@@ -1,0 +1,45 @@
+{
+  "name": "nimi-mods",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "First-party runtime mods for Nimi desktop runtime.",
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "packageManager": "pnpm@10.27.0",
+  "scripts": {
+    "check": "node scripts/check-mods.mjs",
+    "check:dist": "node scripts/check-mods.mjs --require-dist",
+    "typecheck": "pnpm --filter @nimiplatform/mod-kismet run typecheck && pnpm --filter @nimiplatform/mod-local-chat run typecheck && pnpm --filter @nimiplatform/mod-re-life run typecheck && pnpm --filter @nimiplatform/mod-world-studio run typecheck",
+    "build": "node scripts/build-mod.mjs",
+    "watch": "node scripts/build-mod.mjs --watch",
+    "build:kismet": "node scripts/build-mod.mjs --mod kismet",
+    "build:local-chat": "node scripts/build-mod.mjs --mod local-chat",
+    "build:re-life": "node scripts/build-mod.mjs --mod re-life",
+    "build:world-studio": "node scripts/build-mod.mjs --mod world-studio",
+    "watch:kismet": "node scripts/build-mod.mjs --mod kismet --watch",
+    "watch:local-chat": "node scripts/build-mod.mjs --mod local-chat --watch",
+    "watch:re-life": "node scripts/build-mod.mjs --mod re-life --watch",
+    "watch:world-studio": "node scripts/build-mod.mjs --mod world-studio --watch",
+    "clean": "pnpm --filter @nimiplatform/mod-kismet run clean && pnpm --filter @nimiplatform/mod-local-chat run clean && pnpm --filter @nimiplatform/mod-re-life run clean && pnpm --filter @nimiplatform/mod-world-studio run clean",
+    "verify": "pnpm run check && pnpm run typecheck && pnpm run build -- --all && pnpm run check:dist"
+  },
+  "devDependencies": {
+    "@tanstack/react-query": "^5.90.16",
+    "@types/node": "^24.3.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "esbuild": "^0.27.3",
+    "i18next": "^25.8.11",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-i18next": "^16.5.4",
+    "typescript": "^5.9.3",
+    "yaml": "^2.8.2",
+    "zod": "4.3.5",
+    "zustand": "^5.0.11"
+  }
+}

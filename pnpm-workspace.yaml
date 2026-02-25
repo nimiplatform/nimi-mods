@@ -1,0 +1,5 @@
+packages:
+  - 'kismet'
+  - 'local-chat'
+  - 're-life'
+  - 'world-studio'

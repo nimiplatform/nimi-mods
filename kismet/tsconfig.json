@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@nimiplatform/mod-sdk": ["../../sdk/packages/mod-sdk/src/index.ts"],
+      "@nimiplatform/mod-sdk/*": ["../../sdk/packages/mod-sdk/src/*"]
+    }
+  },
+  "include": ["index.ts", "src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["dist/**", "node_modules/**"]
+}

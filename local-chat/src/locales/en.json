@@ -1,0 +1,104 @@
+{
+  "ChatBubble": {
+    "playingVoice": "Playing voice...",
+    "voiceMessage": "Voice message · Tap to play",
+    "roleUser": "User",
+    "roleAgentVoice": "Agent Voice",
+    "roleAgent": "Agent",
+    "generating": "Generating...",
+    "agentPending": "Agent · pending"
+  },
+  "DefaultSettings": {
+    "title": "Default Settings",
+    "enableVoice": "Enable Voice (auto)",
+    "allowMultiReply": "Allow multi-reply from Agent",
+    "allowProactiveContact": "Allow Agent to contact proactively",
+    "autoPlayVoiceReplies": "Auto-play voice replies",
+    "voiceTimbre": "Voice timbre"
+  },
+  "ChatRoute": {
+    "title": "Chat Model Config",
+    "storedNote": "Stored in local-chat mod, not global AI Runtime.",
+    "source": "Source",
+    "connector": "Connector",
+    "model": "Model",
+    "modelPlaceholder": "Search and select model...",
+    "noModels": "No available chat model for current source.",
+    "noMatchingModels": "No model matches current search.",
+    "useRuntimeDefault": "Use Runtime Default"
+  },
+  "VoicePanel": {
+    "title": "Voice Model Config",
+    "enabledNote": "Agent will auto-decide voice or text per content. This config applies to voice segments.",
+    "disabledNote": "Voice is disabled; text-only chat.",
+    "provider": "Provider",
+    "auto": "Auto",
+    "voice": "Voice",
+    "ttsConnector": "TTS Connector",
+    "ttsModel": "TTS Model",
+    "sttConnector": "STT Connector",
+    "sttModel": "STT Model",
+    "modelPlaceholder": "Search and select model...",
+    "noModels": "No available model for current connector.",
+    "noMatchingModels": "No model matches current search.",
+    "noVoices": "No available voices for current provider."
+  },
+  "Diagnostics": {
+    "title": "Turn Diagnostics",
+    "checkHealth": "Check Chat Route Health",
+    "checking": "Checking...",
+    "status": "Status:",
+    "healthy": "Healthy",
+    "unreachable": "Unreachable",
+    "notChecked": "Not checked"
+  },
+  "Header": {
+    "viewAgentIntro": "View Agent intro",
+    "title": "Local Chat",
+    "subtitle": "Agent friends only",
+    "closeIntro": "Close Agent intro",
+    "noBio": "This Agent has no public bio.",
+    "persona": "Persona: ",
+    "goToProfile": "Go to Agent profile",
+    "worldPrefix": "World: ",
+    "hideRuntime": "Hide Runtime",
+    "showRuntime": "Show Runtime"
+  },
+  "RightSidebar": {
+    "collapseTranscript": "Collapse text",
+    "transcribeVoice": "Show transcript"
+  },
+  "MessagePane": {
+    "emptyTitle": "Start a local chat",
+    "emptyDescTarget": "Talking to {{name}} with chat route model {{model}}",
+    "emptyDescNoTarget": "Add an Agent friend in Contacts to start chatting",
+    "resolvingAgent": "Resolving agent context...",
+    "inputPlaceholder": "Type a message...",
+    "noAgentPlaceholder": "No Agent friend available",
+    "startVoiceInput": "Start voice input",
+    "stopVoiceInput": "Stop voice input",
+    "cancelVoiceInput": "Cancel",
+    "voiceRecording": "Recording... click again to stop and transcribe.",
+    "voiceTranscribing": "Transcribing voice...",
+    "voiceFailed": "Voice transcription failed. Check STT route and retry."
+  },
+  "TargetPane": {
+    "title": "Local Chat",
+    "subtitle": "Agent friends only",
+    "refresh": "Refresh",
+    "searchPlaceholder": "Search agents...",
+    "loading": "Loading Agent friends...",
+    "noResults": "No matching Agent friends"
+  },
+  "RuntimeSidebar": {
+    "title": "Chat Runtime",
+    "subtitle": "Mod-owned route selection for this chat only"
+  },
+  "SessionMenu": {
+    "title": "Sessions",
+    "newSession": "New Session",
+    "noSessions": "No sessions for this Agent.",
+    "turns": "{{count}} turns",
+    "delete": "Delete"
+  }
+}

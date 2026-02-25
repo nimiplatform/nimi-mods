@@ -1,0 +1,107 @@
+import { asRecord } from '@nimiplatform/mod-sdk/utils';
+import { parseRuntimeRouteOptions, type RuntimeRouteBinding } from '@nimiplatform/mod-sdk/runtime-route';
+import { createRendererFlowId, logRendererEvent } from '@nimiplatform/mod-sdk/logging';
+import { LOCAL_CHAT_DATA_API_RUNTIME_ROUTE_OPTIONS, LOCAL_CHAT_MOD_ID } from '../../contracts.js';
+import type { ChatRouteSnapshot, UseLocalChatRuntimeRouteInput } from './types.js';
+
+export async function resolveRouteSnapshot(input: {
+  aiClient: UseLocalChatRuntimeRouteInput['aiClient'];
+  routeOverride: RuntimeRouteBinding | null;
+  setRouteSnapshot: (value: ChatRouteSnapshot | null) => void;
+  setStatusBanner: UseLocalChatRuntimeRouteInput['setStatusBanner'];
+}) {
+  try {
+    const resolved = await input.aiClient.resolveRoute({
+      routeHint: 'chat/default',
+      routeOverride: input.routeOverride || undefined,
+    });
+    input.setRouteSnapshot({
+      source: resolved.source,
+      provider: resolved.provider,
+      model: resolved.model,
+      endpoint: resolved.source === 'local-runtime'
+        ? (resolved.localProviderEndpoint || '-')
+        : (resolved.localOpenAiEndpoint || '-'),
+      connectorId: resolved.connectorId,
+    });
+  } catch (error) {
+    input.setRouteSnapshot(null);
+    input.setStatusBanner({
+      kind: 'warn',
+      message: error instanceof Error ? error.message : String(error || ''),
+    });
+  }
+}
+
+export async function loadRouteOptions(input: {
+  hookClient: UseLocalChatRuntimeRouteInput['hookClient'];
+  setChatRouteOptions: (value: ReturnType<typeof parseRuntimeRouteOptions>) => void;
+}) {
+  try {
+    const payload = await input.hookClient.data.query({
+      capability: LOCAL_CHAT_DATA_API_RUNTIME_ROUTE_OPTIONS,
+      query: {
+        capability: 'chat',
+        modId: LOCAL_CHAT_MOD_ID,
+      },
+    });
+    input.setChatRouteOptions(parseRuntimeRouteOptions(payload, { includeResolvedDefault: true }));
+  } catch (error) {
+    input.setChatRouteOptions(null);
+    logRendererEvent({
+      level: 'warn',
+      area: 'local-chat',
+      message: 'local-chat:chat-route-options:failed',
+      details: {
+        error: error instanceof Error ? error.message : String(error || ''),
+      },
+    });
+  }
+}
+
+export async function runRouteHealthCheck(input: {
+  aiClient: UseLocalChatRuntimeRouteInput['aiClient'];
+  routeOverride: RuntimeRouteBinding | null;
+  setCheckingHealth: (value: boolean) => void;
+  setHealthStatus: (value: 'idle' | 'checking' | 'healthy' | 'unreachable') => void;
+  setStatusBanner?: (value: { kind: 'warn' | 'error' | 'success' | 'info'; message: string }) => void;
+}) {
+  input.setCheckingHealth(true);
+  input.setHealthStatus('checking');
+  const flowId = createRendererFlowId('local-chat-health-check');
+  try {
+    const result = await input.aiClient.checkRouteHealth({
+      routeHint: 'chat/default',
+      routeOverride: input.routeOverride || undefined,
+    });
+    const record = asRecord(result);
+    const status = String(record.status || '');
+    const reasonCode = String(record.reasonCode || '').trim();
+    const actionHint = String(record.actionHint || '').trim();
+    input.setHealthStatus(status === 'healthy' ? 'healthy' : 'unreachable');
+    if (status !== 'healthy' && input.setStatusBanner) {
+      input.setStatusBanner({
+        kind: 'warn',
+        message: `Route health degraded (${reasonCode || 'RUNTIME_ROUTE_UNAVAILABLE'})${actionHint ? ` · action: ${actionHint}` : ''}`,
+      });
+    }
+    logRendererEvent({
+      level: 'info',
+      area: 'local-chat',
+      message: 'action:health-check:done',
+      flowId,
+      details: { status, reasonCode, actionHint },
+    });
+  } catch (error) {
+    input.setHealthStatus('unreachable');
+    logRendererEvent({
+      level: 'error',
+      area: 'local-chat',
+      message: 'action:health-check:failed',
+      flowId,
+      details: { error: error instanceof Error ? error.message : String(error || '') },
+    });
+  } finally {
+    input.setCheckingHealth(false);
+  }
+}

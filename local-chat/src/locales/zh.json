@@ -1,0 +1,104 @@
+{
+  "ChatBubble": {
+    "playingVoice": "正在播放语音...",
+    "voiceMessage": "语音消息 · 点击播放",
+    "roleUser": "User",
+    "roleAgentVoice": "Agent Voice",
+    "roleAgent": "Agent",
+    "generating": "生成中...",
+    "agentPending": "Agent · 处理中"
+  },
+  "DefaultSettings": {
+    "title": "默认配置",
+    "enableVoice": "开启语音（自动判定）",
+    "allowMultiReply": "允许 Agent 多次回应",
+    "allowProactiveContact": "允许 Agent 主动联系",
+    "autoPlayVoiceReplies": "自动播放语音回复",
+    "voiceTimbre": "语音音色"
+  },
+  "ChatRoute": {
+    "title": "Chat Model 配置",
+    "storedNote": "存储在 local-chat mod，不影响全局 AI Runtime。",
+    "source": "来源",
+    "connector": "连接器",
+    "model": "模型",
+    "modelPlaceholder": "搜索并选择模型...",
+    "noModels": "当前来源无可用模型。",
+    "noMatchingModels": "无匹配模型。",
+    "useRuntimeDefault": "使用 Runtime 默认值"
+  },
+  "VoicePanel": {
+    "title": "Voice Model 配置",
+    "enabledNote": "Agent 将按内容自动决定语音或文字，本配置用于语音段落。",
+    "disabledNote": "语音开关关闭，当前仅文本聊天。",
+    "provider": "提供商",
+    "auto": "自动",
+    "voice": "音色",
+    "ttsConnector": "TTS Connector",
+    "ttsModel": "TTS Model",
+    "sttConnector": "STT Connector",
+    "sttModel": "STT Model",
+    "modelPlaceholder": "搜索并选择模型...",
+    "noModels": "当前 Connector 无可用模型。",
+    "noMatchingModels": "无匹配模型。",
+    "noVoices": "当前提供商无可用音色。"
+  },
+  "Diagnostics": {
+    "title": "Turn 诊断",
+    "checkHealth": "检查 Chat Route 健康状态",
+    "checking": "检查中...",
+    "status": "状态：",
+    "healthy": "正常",
+    "unreachable": "无法访问",
+    "notChecked": "未检查"
+  },
+  "Header": {
+    "viewAgentIntro": "查看 Agent 介绍",
+    "title": "本地聊天",
+    "subtitle": "仅限 Agent 好友",
+    "closeIntro": "关闭 Agent 介绍",
+    "noBio": "这个 Agent 暂无公开简介。",
+    "persona": "人设：",
+    "goToProfile": "进入 Agent 主页",
+    "worldPrefix": "World: ",
+    "hideRuntime": "隐藏 Runtime",
+    "showRuntime": "显示 Runtime"
+  },
+  "RightSidebar": {
+    "collapseTranscript": "收起文字",
+    "transcribeVoice": "语音转文字"
+  },
+  "MessagePane": {
+    "emptyTitle": "开始本地对话",
+    "emptyDescTarget": "正在与 {{name}} 对话，使用 {{model}} 模型",
+    "emptyDescNoTarget": "在联系人中添加 Agent 好友后开始聊天",
+    "resolvingAgent": "正在解析 Agent 上下文...",
+    "inputPlaceholder": "输入消息...",
+    "noAgentPlaceholder": "暂无可用 Agent 好友",
+    "startVoiceInput": "开始语音输入",
+    "stopVoiceInput": "停止语音输入",
+    "cancelVoiceInput": "取消",
+    "voiceRecording": "录音中...再次点击即可停止并转写。",
+    "voiceTranscribing": "语音转写中...",
+    "voiceFailed": "语音转写失败，请检查 STT 路由后重试。"
+  },
+  "TargetPane": {
+    "title": "本地聊天",
+    "subtitle": "仅限 Agent 好友",
+    "refresh": "刷新",
+    "searchPlaceholder": "搜索 Agent...",
+    "loading": "加载 Agent 好友中...",
+    "noResults": "无匹配 Agent 好友"
+  },
+  "RuntimeSidebar": {
+    "title": "Chat Runtime",
+    "subtitle": "此聊天的独立路由选择（由 Mod 管理）"
+  },
+  "SessionMenu": {
+    "title": "会话",
+    "newSession": "新建会话",
+    "noSessions": "此 Agent 暂无会话。",
+    "turns": "{{count}} 轮",
+    "delete": "删除"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@nimiplatform/mod-kismet",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node ../scripts/build-mod.mjs --mod kismet",
+    "watch": "node ../scripts/build-mod.mjs --mod kismet --watch",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "lightweight-charts": "^5.0.0"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "@nimiplatform/mod-world-studio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node ../scripts/build-mod.mjs --mod world-studio",
+    "watch": "node ../scripts/build-mod.mjs --mod world-studio --watch",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "clean": "rm -rf dist"
+  }
+}
