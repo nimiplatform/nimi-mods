@@ -58,23 +58,23 @@ Use explicit capability keys. Do not use wildcard grants.
 
 ## SDK Imports
 
-Use subpath imports from `@nimiplatform/mod-sdk`:
+Use subpath imports from `@nimiplatform/sdk/mod`:
 
-- `@nimiplatform/mod-sdk/hook`
-- `@nimiplatform/mod-sdk/ai`
-- `@nimiplatform/mod-sdk/types`
-- `@nimiplatform/mod-sdk/ui`
-- `@nimiplatform/mod-sdk/logging`
-- `@nimiplatform/mod-sdk/i18n`
-- `@nimiplatform/mod-sdk/settings`
-- `@nimiplatform/mod-sdk/utils`
+- `@nimiplatform/sdk/mod/hook`
+- `@nimiplatform/sdk/mod/ai`
+- `@nimiplatform/sdk/mod/types`
+- `@nimiplatform/sdk/mod/ui`
+- `@nimiplatform/sdk/mod/logging`
+- `@nimiplatform/sdk/mod/i18n`
+- `@nimiplatform/sdk/mod/settings`
+- `@nimiplatform/sdk/mod/utils`
 
-Avoid root import (`@nimiplatform/mod-sdk`) in mod code.
-`@nimiplatform/mod-sdk/host` is host wiring surface, not mod business API.
+Avoid root import (`@nimiplatform/sdk/mod`) in mod code.
+`@nimiplatform/sdk/mod/host` is host wiring surface, not mod business API.
 
 ## Prohibited Imports / APIs
 
-- `@nimiplatform/sdk`, `@nimiplatform/sdk-runtime`
+- `@nimiplatform/sdk`, `@nimiplatform/sdk/runtime`
 - `@tauri-apps/*`
 - Node builtins (`node:fs`, `node:net`, `node:child_process`, etc.)
 - dynamic execution (`eval`, `new Function`)
