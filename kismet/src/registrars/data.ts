@@ -1,4 +1,4 @@
-import type { HookClient } from '@nimiplatform/mod-sdk/types';
+import type { HookClient } from '@nimiplatform/sdk/mod/types';
 import { createKismetFlowId, emitKismetLog } from '../logging.js';
 
 export async function registerKismetDataCapabilities(input: {

@@ -1,5 +1,5 @@
-import type { ModAiClient } from '@nimiplatform/mod-sdk/ai';
-import type { RuntimeRouteBinding } from '@nimiplatform/mod-sdk/runtime-route';
+import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
+import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 import type { KismetInput, KismetResult, KismetError } from '../types.js';
 import { KISMET_REASON } from '../contracts.js';
 import { buildKismetSystemPrompt } from '../prompt/system-prompt.js';
@@ -8,6 +8,7 @@ import { parseResultFromText } from '../validation/parse-result-json.js';
 import { validateAiOutput } from '../validation/validate-result.js';
 import { interpolateKeyNodes } from './interpolation.js';
 import { emitKismetLog } from '../logging.js';
+import { ReasonCode } from '@nimiplatform/sdk/types';
 
 type GenerateViaAiInput = {
   aiClient: ModAiClient;
@@ -27,7 +28,7 @@ export async function generateViaAi(opts: GenerateViaAiInput): Promise<GenerateV
   // Check route health first
   try {
     const health = await aiClient.checkRouteHealth(routeInput);
-    if (health.reasonCode !== 'RUNTIME_ROUTE_HEALTHY' && health.reasonCode !== 'RUNTIME_ROUTE_DEGRADED') {
+    if (health.reasonCode !== ReasonCode.RUNTIME_ROUTE_HEALTHY && health.reasonCode !== ReasonCode.RUNTIME_ROUTE_DEGRADED) {
       return {
         ok: false,
         error: {

@@ -8,13 +8,13 @@ rules:
   - Kismet 执行主路径固定在 `nimi-mods/kismet`，不得以独立网页壳替代 Nimi runtime mod 形态。
   - Kismet 必须通过 `execution-kernel + hook + llm-adapter` 接入；不得直连 core 数据平面。
   - Kismet 必须提供统一双入口：`Prompt-Import` 与 `Runtime-AI`；两者输出契约必须一致，不允许两套结果模型。
-  - `Runtime-AI` 入口必须通过 `@nimiplatform/mod-sdk/ai` 调用，禁止在 Mod 内直连第三方 `/chat/completions` 自定义 URL。
+  - `Runtime-AI` 入口必须通过 `@nimiplatform/sdk/mod/ai` 调用，禁止在 Mod 内直连第三方 `/chat/completions` 自定义 URL。
   - 路由来源固定为 `local-runtime | token-api`，默认 local-first；fallback 到导入模式必须用户可见并可审计。
   - 用户输入的八字与分析结果属于本地敏感数据，默认仅本地处理与本地导出，不得隐式上传。
   - 导出能力仅允许用户显式触发（JSON/PDF/HTML）；禁止后台自动上报或自动同步到云端。
   - Kismet 的用户可见文案必须纳入 mod i18n；当前 zh/en 双语覆盖为强制要求。
   - Kismet 作为 external/default mod 时，必须保持 `manifest + entry + dist` 统一加载链路，不恢复 builtin 专用路径。
-  - Kismet 对外稳定调用面固定为 `@nimiplatform/mod-sdk/ai|hook|types|ui|logging|utils|runtime-route`；禁止 root import 与 internal/host 直连。
+  - Kismet 对外稳定调用面固定为 `@nimiplatform/sdk/mod/ai|hook|types|ui|logging|utils|runtime-route`；禁止 root import 与 internal/host 直连。
   - Kismet 的 root manifest 与源码 manifest 必须语义一致（版本、能力集合、ai 依赖声明）。
 ---
 
@@ -47,7 +47,7 @@ Kismet 固定双入口，但统一单一结果契约：
    - Mod 完成结构化校验并渲染。
 2. `Runtime-AI`（受控入口）
    - 用户填写同一套八字参数。
-   - Mod 通过 `@nimiplatform/mod-sdk/ai.generateText|streamText` 生成结果。
+   - Mod 通过 `@nimiplatform/sdk/mod/ai.generateText|streamText` 生成结果。
    - 结果经同一校验管线进入渲染。
 
 硬约束：

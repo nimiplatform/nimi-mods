@@ -1,4 +1,4 @@
-import { registerModTranslations } from '@nimiplatform/mod-sdk/i18n';
+import { registerModTranslations } from '@nimiplatform/sdk/mod/i18n';
 import enLocale from './locales/en.js';
 import zhLocale from './locales/zh.js';
 

@@ -7,6 +7,7 @@ import { generateViaAi } from '../services/runtime-ai.js';
 import { getKismetAiClient } from '../runtime-mod.js';
 import { emitKismetLog } from '../logging.js';
 import { KISMET_AUDIT } from '../contracts.js';
+import { ReasonCode } from '@nimiplatform/sdk/types';
 
 export function useKismetController() {
   const store = useKismetStore();
@@ -34,7 +35,7 @@ export function useKismetController() {
         const prompts = generatePrompts(validInput);
         store.setGeneratedPrompts(prompts);
         store.setError({
-          reasonCode: 'KISMET_ROUTE_UNAVAILABLE',
+          reasonCode: ReasonCode.KISMET_ROUTE_UNAVAILABLE,
           message: 'AI 路由不可用，已自动切换到 Prompt 导入模式',
           actionHint: '请复制提示词到外部 AI 执行后粘贴结果',
         });

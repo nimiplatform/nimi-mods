@@ -1,4 +1,4 @@
-import { emitRuntimeLog } from '@nimiplatform/mod-sdk/logging';
+import { emitRuntimeLog } from '@nimiplatform/sdk/mod/logging';
 
 export function createKismetFlowId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;

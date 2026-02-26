@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { parseRuntimeRouteOptions, type RuntimeRouteBinding, type RuntimeRouteSource } from '@nimiplatform/mod-sdk/runtime-route';
+import { parseRuntimeRouteOptions, type RuntimeRouteBinding, type RuntimeRouteSource } from '@nimiplatform/sdk/mod/runtime-route';
 import type { RouteSourceDisplay } from '../types.js';
 import { useKismetStore } from '../state/kismet-store.js';
 import { getKismetAiClient, getKismetHookClient } from '../runtime-mod.js';
 import { KISMET_DATA_API_RUNTIME_ROUTE_OPTIONS, KISMET_MOD_ID } from '../contracts.js';
 import { emitKismetLog } from '../logging.js';
+import { ReasonCode } from '@nimiplatform/sdk/types';
 
 const STORAGE_KEY = 'nimi.kismet.route-override.v1';
 
@@ -82,7 +83,7 @@ export function useKismetRoute() {
       const aiClient = getKismetAiClient();
       const routeInput = { routeHint: 'chat/default' as const, routeOverride: currentOverride || undefined };
       const health = await aiClient.checkRouteHealth(routeInput);
-      if (health.reasonCode !== 'RUNTIME_ROUTE_HEALTHY' && health.reasonCode !== 'RUNTIME_ROUTE_DEGRADED') {
+      if (health.reasonCode !== ReasonCode.RUNTIME_ROUTE_HEALTHY && health.reasonCode !== ReasonCode.RUNTIME_ROUTE_DEGRADED) {
         setRouteSource('unavailable');
         return 'unavailable';
       }

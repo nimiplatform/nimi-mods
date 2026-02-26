@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot } from '@nimiplatform/mod-sdk/runtime-route';
+import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
 import type { KismetInput, KismetResult, KismetError, KismetMode, RouteSourceDisplay } from '../types.js';
 
 type KismetStore = {
