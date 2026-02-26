@@ -31,7 +31,6 @@ export function buildPhase2Prompt(input: {
     '  "world": {',
     '    "name":"...",',
     '    "description":"...",',
-    '    "lore":"...",',
     '    "timeFlowRatio":1,',
     '    "rules": {}',
     '  },',

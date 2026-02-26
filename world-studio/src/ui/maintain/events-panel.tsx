@@ -36,7 +36,9 @@ export function EventsPanel(props: EventsPanelProps) {
       onSyncEvents={() => {
         if (props.syncMode === 'replace' && totalEvents > 0) {
           const confirmed = typeof window !== 'undefined'
-            ? window.confirm('Replace mode will overwrite all remote events. Continue?')
+            ? window.confirm(
+              'Replace mode will archive current active remote events and rewrite them from your graph. Continue?',
+            )
             : true;
           if (!confirmed) return;
         }

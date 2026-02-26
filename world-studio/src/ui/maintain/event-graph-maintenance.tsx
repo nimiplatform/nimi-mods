@@ -57,11 +57,11 @@ export function EventGraphMaintenance(props: EventGraphMaintenanceProps) {
               )}
             >
               <option value="merge">merge (incremental update)</option>
-              <option value="replace">replace (full graph overwrite)</option>
+              <option value="replace">replace (active graph rewrite)</option>
             </select>
           </label>
           <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
-            `replace` clears existing events first then rewrites from current graph; `merge` only does incremental upsert.
+            `replace` archives existing active events first, then writes the current graph as a new active set; `merge` only does incremental upsert.
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">

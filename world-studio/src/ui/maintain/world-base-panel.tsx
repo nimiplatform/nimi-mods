@@ -58,16 +58,6 @@ export function WorldBasePanel(props: WorldBasePanelProps) {
           }))}
         />
       </label>
-      <label className="mt-3 block text-xs text-gray-700">
-        <span className="mb-1 block font-medium">Lore</span>
-        <textarea
-          className="h-24 w-full rounded-md border border-gray-300 p-2 text-xs"
-          value={String(world.lore || '')}
-          onChange={(event) => props.onWorldPatchChange(updateWorld(world, (next) => {
-            next.lore = event.target.value;
-          }))}
-        />
-      </label>
 
       <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-2.5">
         <KeyValueObjectEditor

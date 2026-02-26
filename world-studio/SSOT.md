@@ -83,10 +83,10 @@ Data（均为 `data.query.*`）：
 8. `data.query.data-api.world.maintenance.update`
 9. `data.query.data-api.world.events.list`
 10. `data.query.data-api.world.events.batch-upsert`
-11. `data.query.data-api.world.events.delete`
+11. `data.query.data-api.world.events.delete`（逻辑归档，不做物理硬删）
 12. `data.query.data-api.world.lorebooks.list`
 13. `data.query.data-api.world.lorebooks.batch-upsert`
-14. `data.query.data-api.world.lorebooks.delete`
+14. `data.query.data-api.world.lorebooks.delete`（逻辑归档，不做物理硬删）
 15. `data.query.data-api.world.drafts.list`
 16. `data.query.data-api.world.worlds.mine`
 17. `data.query.data-api.world.mutations.list`
@@ -183,6 +183,7 @@ UI：
 2. 编辑 world/worldview/events/lorebooks。
 3. 使用 `ifSnapshotVersion` 提交，冲突时返回维护冲突语义。
 4. 支持事件同步模式：`merge | replace`。
+5. `replace` 必须先归档当前 active 事件，再写入新 active 事件集合；不得物理删除历史知识资产。
 
 ### 4.3 编辑器主路径
 
@@ -280,9 +281,9 @@ Embedding readiness reasonCode（最小集）：
 
 ### 7.3 迁移语义
 
-1. 运行主链不再消费 `majorEvents`。
-2. 仅允许一次性迁移映射：`majorEvents -> events.primary`。
-3. 迁移后旧字段不得回流主链读写。
+1. 运行主链不再接受 `majorEvents` / `worldFacts`。
+2. 输入面仅接受 `events.primary/events.secondary` 与 `worldLorebooks`。
+3. 旧字段不得回流主链读写，也不保留运行时兼容映射。
 
 ## 8. 错误码与审计事件
 

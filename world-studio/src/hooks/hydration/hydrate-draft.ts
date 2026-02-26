@@ -74,9 +74,7 @@ export function useWorldStudioDraftHydration(input: WorldStudioDraftHydrationInp
         const eventsRoot = asRecord(payload.events);
         const primaryEvents = Array.isArray(eventsRoot.primary)
           ? (eventsRoot.primary as Array<Record<string, unknown>>)
-          : (Array.isArray(payload.majorEvents)
-            ? (payload.majorEvents as Array<Record<string, unknown>>)
-            : []);
+          : [];
         const secondaryEvents = Array.isArray(eventsRoot.secondary)
           ? (eventsRoot.secondary as Array<Record<string, unknown>>)
           : [];
@@ -113,7 +111,7 @@ export function useWorldStudioDraftHydration(input: WorldStudioDraftHydrationInp
             secondary: secondaryEvents as EventNodeDraft[],
           },
           lorebooksDraft: (() => {
-            const raw = payload.worldLorebooks ?? payload.worldFacts;
+            const raw = payload.worldLorebooks;
             return Array.isArray(raw)
               ? (raw as unknown[]).filter((item) => item && typeof item === 'object') as WorldLorebookDraftRow[]
               : [];
