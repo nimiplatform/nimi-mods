@@ -18,7 +18,7 @@ rules:
   - Re:Life 的 root manifest 与源码 manifest 必须语义一致（版本、能力集合、ai 依赖声明）。
   - MBTI 定位为性格参考/偏好洞察，不得作为评判工具或决策建议依据。
   - Perfect Run 必须明确标注"反事实模拟，不构成现实承诺"，并显示推测等级与置信区间。
-  - Re:Life 对外稳定调用面固定为 `@nimiplatform/mod-sdk/ai|hook|types|ui|logging|utils|runtime-route`；禁止 root import 与 internal/host 直连。
+  - Re:Life 对外稳定调用面固定为 `@nimiplatform/sdk/mod/ai|hook|types|ui|logging|utils|runtime-route`；禁止 root import 与 internal/host 直连。
   - Re:Life 作为 external/default mod 时，必须保持 `manifest + entry + dist` 统一加载链路，不恢复 builtin 专用路径。
   - Re:Life 的源码 manifest 禁止回流 builtin 叙事（如 `hash: 'builtin-*'`、`built-in mod` 文案）；统一使用 external/default 术语。
   - Hook SDK 客户端创建入口固定为 `createHookClient(modId)`；禁止恢复 `createModHookClient` 别名入口。

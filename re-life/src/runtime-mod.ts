@@ -1,6 +1,6 @@
 import React, { Suspense } from 'react';
-import { type RuntimeModRegistration } from '@nimiplatform/mod-sdk/types';
-import { createHookClient } from '@nimiplatform/mod-sdk/hook';
+import { type RuntimeModRegistration } from '@nimiplatform/sdk/mod/types';
+import { createHookClient } from '@nimiplatform/sdk/mod/hook';
 import { createReLifeFlowId, emitReLifeLog } from './logging.js';
 import {
   RELIFE_CAPABILITIES,
