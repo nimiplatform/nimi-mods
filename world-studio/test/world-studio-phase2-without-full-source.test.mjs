@@ -132,7 +132,6 @@ test('world-studio phase2 can synthesize without full source text after refresh'
               existences: {},
               resources: {},
               structures: {},
-              knowledge: {},
               visualGuide: {},
               narrativeHooks: {},
             },

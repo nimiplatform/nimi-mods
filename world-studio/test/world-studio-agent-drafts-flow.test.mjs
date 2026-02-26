@@ -129,7 +129,6 @@ test('world-studio agent drafts flow persists phase2 drafts and publishes with d
               existences: {},
               resources: {},
               structures: {},
-              knowledge: {},
               visualGuide: {},
               narrativeHooks: {},
             },
