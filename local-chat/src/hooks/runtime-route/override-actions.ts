@@ -1,4 +1,4 @@
-import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot, RuntimeRouteSource } from '@nimiplatform/mod-sdk/runtime-route';
+import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot, RuntimeRouteSource } from '@nimiplatform/sdk/mod/runtime-route';
 import { pickChatModelForConnector } from '../../services/route/route-override-store.js';
 
 export function buildRouteOverrideForSource(input: {

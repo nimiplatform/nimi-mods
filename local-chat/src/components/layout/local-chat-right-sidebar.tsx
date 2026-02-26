@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useModTranslation } from '@nimiplatform/mod-sdk/i18n';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import { RuntimeStatusSidebar } from '../runtime-status-sidebar.js';
 import type { VoiceContextMenu } from './types.js';
 

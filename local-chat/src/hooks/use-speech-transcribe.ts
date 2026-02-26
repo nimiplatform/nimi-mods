@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import type { ModAiClient } from '@nimiplatform/mod-sdk/ai';
-import { logRendererEvent } from '@nimiplatform/mod-sdk/logging';
+import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
+import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 
 type VoiceInputState = 'idle' | 'recording' | 'transcribing' | 'failed';
 

@@ -1,4 +1,4 @@
-import { loadLocalStorageJson, saveLocalStorageJson } from '@nimiplatform/mod-sdk/utils';
+import { loadLocalStorageJson, saveLocalStorageJson } from '@nimiplatform/sdk/mod/utils';
 
 const LOCAL_CHAT_PROACTIVE_POLICY_STORE_KEY = 'nimi.local-chat.proactive.policy.v1';
 

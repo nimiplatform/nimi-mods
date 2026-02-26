@@ -35,16 +35,18 @@ export function buildAssistantMessagesAndTurns(input: BuildAssistantMessagesInpu
   voiceSegments: number;
   schedulerTotalDelayMs: number;
 } {
+  const fallbackSegment: AssistantPlanSegment = {
+    id: `seg-${Date.now().toString(36)}-0`,
+    content: '抱歉，我现在没有可用回复。请再试一次。',
+    delayMs: 0,
+    channel: 'text',
+    intent: 'answer',
+    reason: 'empty-plan-fallback',
+  };
+
   const normalizedSegments = (input.segments.length > 0
     ? input.segments
-    : [{
-      id: `seg-${Date.now().toString(36)}-0`,
-      content: '抱歉，我现在没有可用回复。请再试一次。',
-      delayMs: 0,
-      channel: 'text',
-      intent: 'answer',
-      reason: 'empty-plan-fallback',
-    }]).slice(0, MAX_SEGMENT_COUNT);
+    : [fallbackSegment]).slice(0, MAX_SEGMENT_COUNT);
 
   let textSegments = 0;
   let voiceSegments = 0;

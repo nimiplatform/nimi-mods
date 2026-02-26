@@ -1,5 +1,5 @@
-import type { ModAiClient } from '@nimiplatform/mod-sdk/ai';
-import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot } from '@nimiplatform/mod-sdk/runtime-route';
+import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
+import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
 import type { Dispatch, SetStateAction } from 'react';
 import type { LocalChatTarget } from '../../data/index.js';
 import type {

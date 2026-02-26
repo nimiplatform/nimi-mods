@@ -1,4 +1,4 @@
-import { createRendererFlowId, logRendererEvent } from '@nimiplatform/mod-sdk/logging';
+import { createRendererFlowId, logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import type { ChatMessage } from '../../types.js';
 import { buildErrorTurnPayload } from './error-handler.js';
 import { createUserMessage, ensureWorkingSession } from './session.js';

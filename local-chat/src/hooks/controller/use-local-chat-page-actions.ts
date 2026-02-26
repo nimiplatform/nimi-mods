@@ -4,6 +4,7 @@ import type { LocalChatBooleanSettingKey } from '../../default-settings-store.js
 import type { ChatMessage } from '../../types.js';
 import type { useLocalChatPageState } from './use-local-chat-page-state.js';
 import type { RuntimeStatusSidebarProps } from '../../components/sidebar/types.js';
+import { ReasonCode } from '@nimiplatform/sdk/types';
 
 type LocalChatPageState = ReturnType<typeof useLocalChatPageState>;
 
@@ -124,7 +125,7 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
       })();
 
       const isLocalSnapshotFailure = autoBoundSource === 'token-api'
-        && dependencySnapshot?.reasonCode === 'LOCAL_AI_DEPENDENCY_SNAPSHOT_FAILED';
+        && dependencySnapshot?.reasonCode === ReasonCode.LOCAL_AI_DEPENDENCY_SNAPSHOT_FAILED;
 
       const capabilityMatchedFromSnapshot = (capability: 'chat' | 'tts' | 'stt'): boolean => {
         const dependencyRows = dependencySnapshot?.dependencies || [];

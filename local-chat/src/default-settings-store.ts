@@ -1,4 +1,4 @@
-import { readRuntimeModSettings, writeRuntimeModSettings } from '@nimiplatform/mod-sdk/settings';
+import { readRuntimeModSettings, writeRuntimeModSettings } from '@nimiplatform/sdk/mod/settings';
 import { LOCAL_CHAT_MOD_ID } from './contracts.js';
 
 export const LOCAL_CHAT_TTS_VOICE_OPTIONS = [

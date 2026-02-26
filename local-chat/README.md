@@ -26,7 +26,7 @@ This mod contains local provider chat capabilities for desktop:
 Design boundary:
 
 - Desktop core does not import local-chat runtime logic directly.
-- Local-chat imports host integration only through `@nimiplatform/mod-sdk/*`.
+- Local-chat imports host integration only through `@nimiplatform/sdk/mod/*`.
 - Model selection is not edited in local-chat page; it is resolved from `nimi.runtime.llm-config.v10` `routing.chat`.
 - Model selection supports mod-owned override in local-chat page and does not overwrite global AI Runtime defaults.
 - Data reads are GET-only. This mod performs no Nimi write operations.

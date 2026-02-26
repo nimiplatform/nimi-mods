@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { logRendererEvent } from '@nimiplatform/mod-sdk/logging';
+import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import type { useLocalChatPageState } from './use-local-chat-page-state.js';
 
 type LocalChatPageState = ReturnType<typeof useLocalChatPageState>;

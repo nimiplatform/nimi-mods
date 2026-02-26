@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { HookClient } from '@nimiplatform/mod-sdk/types';
-import { logRendererEvent } from '@nimiplatform/mod-sdk/logging';
+import type { HookClient } from '@nimiplatform/sdk/mod/types';
+import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import type { ChatMessage } from '../types.js';
 import type { LocalChatTarget } from '../data/index.js';
 import { buildAgentVoiceStylePrompt } from '../services/voice/agent-voice-style.js';

@@ -1,4 +1,4 @@
-import type { ModAiClient } from '@nimiplatform/mod-sdk/ai';
+import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
 import type { LocalChatReadContext, LocalChatTarget } from '../data/index.js';
 import type { LocalChatSession } from '../state/index.js';
 

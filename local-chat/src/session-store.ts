@@ -1,4 +1,4 @@
-import { loadLocalStorageJson, saveLocalStorageJson } from '@nimiplatform/mod-sdk/utils';
+import { loadLocalStorageJson, saveLocalStorageJson } from '@nimiplatform/sdk/mod/utils';
 import type { PromptLayerId } from './prompt/index.js';
 import type { ChatMessageMeta } from './types.js';
 

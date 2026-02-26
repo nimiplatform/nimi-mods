@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { useModTranslation } from '@nimiplatform/mod-sdk/i18n';
-import { useAppStore } from '@nimiplatform/mod-sdk/ui';
-import { filterModelOptions } from '@nimiplatform/mod-sdk/model-options';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
+import { useAppStore } from '@nimiplatform/sdk/mod/ui';
+import { filterModelOptions } from '@nimiplatform/sdk/mod/model-options';
 
 type Props = {
   open: boolean;

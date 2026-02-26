@@ -1,5 +1,5 @@
 import { createLocalChatFlowId, emitLocalChatLog } from '../logging.js';
-import { asRecord } from '@nimiplatform/mod-sdk/utils';
+import { asRecord } from '@nimiplatform/sdk/mod/utils';
 import {
   CORE_DATA_API_FRIENDS_WITH_DETAILS_LIST,
   CORE_DATA_API_USER_BY_ID_GET,

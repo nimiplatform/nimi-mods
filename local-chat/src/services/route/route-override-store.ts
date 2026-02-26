@@ -1,5 +1,5 @@
-import { asRecord, loadLocalStorageJson, removeLocalStorageKey, saveLocalStorageJson } from '@nimiplatform/mod-sdk/utils';
-import { type RuntimeRouteBinding } from '@nimiplatform/mod-sdk/runtime-route';
+import { asRecord, loadLocalStorageJson, removeLocalStorageKey, saveLocalStorageJson } from '@nimiplatform/sdk/mod/utils';
+import { type RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 
 const LOCAL_CHAT_ROUTE_OVERRIDE_STORAGE_KEY = 'nimi.local-chat.route-override.v1';
 

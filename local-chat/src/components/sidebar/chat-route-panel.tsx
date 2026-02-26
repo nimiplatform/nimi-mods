@@ -1,7 +1,7 @@
 import React from 'react';
-import { useModTranslation } from '@nimiplatform/mod-sdk/i18n';
-import { useAppStore } from '@nimiplatform/mod-sdk/ui';
-import { normalizeRuntimeRouteSource, type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot } from '@nimiplatform/mod-sdk/runtime-route';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
+import { useAppStore } from '@nimiplatform/sdk/mod/ui';
+import { normalizeRuntimeRouteSource, type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
 
 type Props = {
   open: boolean;

@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useModTranslation } from '@nimiplatform/mod-sdk/i18n';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import {
   filterModelOptions,
-} from '@nimiplatform/mod-sdk/model-options';
+} from '@nimiplatform/sdk/mod/model-options';
 import {
   type RuntimeRouteBinding,
-} from '@nimiplatform/mod-sdk/runtime-route';
+} from '@nimiplatform/sdk/mod/runtime-route';
 import { dedupeModelIds } from '../services/index.js';
 import { DefaultSettingsPanel } from './sidebar/default-settings-panel.js';
 import { ChatRoutePanel } from './sidebar/chat-route-panel.js';

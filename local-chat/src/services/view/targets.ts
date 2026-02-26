@@ -1,4 +1,4 @@
-import { asRecord } from '@nimiplatform/mod-sdk/utils';
+import { asRecord } from '@nimiplatform/sdk/mod/utils';
 import type { LocalChatTarget } from '../../data/index.js';
 
 export function toTargets(value: unknown): LocalChatTarget[] {

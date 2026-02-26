@@ -5,6 +5,7 @@ import type {
   LocalChatProactivePolicyResult,
   LocalChatWakeStrategy,
 } from './types.js';
+import { ReasonCode } from '@nimiplatform/sdk/types';
 
 export const PROACTIVE_IDLE_MIN_MS = 120 * 60 * 1000;
 export const PROACTIVE_IDLE_MAX_MS = 7 * 24 * 60 * 60 * 1000;
@@ -53,7 +54,7 @@ function buildPolicyResult(
   actionHint: string,
 ): LocalChatProactivePolicyResult {
   return {
-    allowed: reasonCode === 'LOCAL_CHAT_PROACTIVE_ALLOWED',
+    allowed: reasonCode === ReasonCode.LOCAL_CHAT_PROACTIVE_ALLOWED,
     reasonCode,
     actionHint,
   };

@@ -1,6 +1,6 @@
-import { asRecord } from '@nimiplatform/mod-sdk/utils';
-import { parseRuntimeRouteOptions, type RuntimeRouteBinding } from '@nimiplatform/mod-sdk/runtime-route';
-import { createRendererFlowId, logRendererEvent } from '@nimiplatform/mod-sdk/logging';
+import { asRecord } from '@nimiplatform/sdk/mod/utils';
+import { parseRuntimeRouteOptions, type RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
+import { createRendererFlowId, logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import { LOCAL_CHAT_DATA_API_RUNTIME_ROUTE_OPTIONS, LOCAL_CHAT_MOD_ID } from '../../contracts.js';
 import type { ChatRouteSnapshot, UseLocalChatRuntimeRouteInput } from './types.js';
 

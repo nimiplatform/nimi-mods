@@ -1,4 +1,4 @@
-import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot } from '@nimiplatform/mod-sdk/runtime-route';
+import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
 import type { LocalChatCompiledPrompt, PromptLayerId } from '../../prompt/index.js';
 import type { LocalChatTarget } from '../../data/index.js';
 import type { LocalChatPromptTrace, LocalChatTurnAudit } from '../../state/index.js';

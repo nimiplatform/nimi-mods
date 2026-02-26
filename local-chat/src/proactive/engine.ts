@@ -22,6 +22,7 @@ import type {
   LocalChatProactiveAuditEvent,
   LocalChatProactiveHeartbeatInput,
 } from './types.js';
+import { ReasonCode } from '@nimiplatform/sdk/types';
 
 function toErrorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error || '');
@@ -137,7 +138,7 @@ export async function runLocalChatProactiveHeartbeatCycle(
           source: 'runLocalChatProactiveHeartbeatCycle',
           targetId: target.id,
           sessionId: session.id,
-          reasonCode: 'LOCAL_CHAT_PROACTIVE_ALLOWED',
+          reasonCode: ReasonCode.LOCAL_CHAT_PROACTIVE_ALLOWED,
           actionHint: 'model-decision-no-contact',
           level: 'debug',
           details: {
@@ -158,7 +159,7 @@ export async function runLocalChatProactiveHeartbeatCycle(
         source: 'runLocalChatProactiveHeartbeatCycle',
         targetId: target.id,
         sessionId: session.id,
-        reasonCode: 'LOCAL_CHAT_PROACTIVE_ALLOWED',
+        reasonCode: ReasonCode.LOCAL_CHAT_PROACTIVE_ALLOWED,
         actionHint: 'contact-sent',
         level: 'info',
         details: {
@@ -172,7 +173,7 @@ export async function runLocalChatProactiveHeartbeatCycle(
         source: 'runLocalChatProactiveHeartbeatCycle',
         targetId: target.id,
         sessionId: session.id,
-        reasonCode: 'LOCAL_CHAT_PROACTIVE_POLICY_UNAVAILABLE',
+        reasonCode: ReasonCode.LOCAL_CHAT_PROACTIVE_POLICY_UNAVAILABLE,
         actionHint: 'decision-generation-failed',
         level: 'warn',
         details: {

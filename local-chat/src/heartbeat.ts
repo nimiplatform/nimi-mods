@@ -1,4 +1,4 @@
-import type { ModAiClient } from '@nimiplatform/mod-sdk/ai';
+import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
 import { createLocalChatFlowId, emitLocalChatLog } from './logging.js';
 import type { LocalChatReadContext } from './data/index.js';
 import { runLocalChatProactiveHeartbeatCycle } from './proactive/engine.js';

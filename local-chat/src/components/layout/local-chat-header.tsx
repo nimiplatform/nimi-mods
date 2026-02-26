@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from 'react';
-import { useModTranslation } from '@nimiplatform/mod-sdk/i18n';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import { SessionMenu } from '../session-menu.js';
 import type { LocalChatSession } from '../../state/index.js';
 import type { LocalChatTargetItem } from './types.js';

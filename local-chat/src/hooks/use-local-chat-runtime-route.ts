@@ -3,7 +3,7 @@ import {
   type RuntimeRouteBinding,
   type RuntimeRouteOptionsSnapshot,
   type RuntimeRouteSource,
-} from '@nimiplatform/mod-sdk/runtime-route';
+} from '@nimiplatform/sdk/mod/runtime-route';
 import {
   loadLocalChatRouteOverride,
   persistLocalChatRouteOverride,

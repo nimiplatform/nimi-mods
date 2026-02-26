@@ -3,9 +3,9 @@ import {
   createAiClient,
   createAiRuntimeInspector,
   type AiRuntimeDependencySnapshot,
-} from '@nimiplatform/mod-sdk/ai';
-import { createHookClient } from '@nimiplatform/mod-sdk/hook';
-import { useAppStore } from '@nimiplatform/mod-sdk/ui';
+} from '@nimiplatform/sdk/mod/ai';
+import { createHookClient } from '@nimiplatform/sdk/mod/hook';
+import { useAppStore } from '@nimiplatform/sdk/mod/ui';
 import { LOCAL_CHAT_MOD_ID } from '../../contracts.js';
 import type { LocalChatPromptTrace, LocalChatTurnAudit } from '../../session-store.js';
 import type { ChatMessage } from '../../types.js';
@@ -17,6 +17,7 @@ import { useLocalChatTurnSend } from '../use-local-chat-turn-send.js';
 import { useSpeechPlayback } from '../use-speech-playback.js';
 import { useSpeechTranscribe } from '../use-speech-transcribe.js';
 import { buildAgentVoiceStylePrompt } from '../../services/voice/agent-voice-style.js';
+import { ReasonCode } from '@nimiplatform/sdk/types';
 
 type RuntimeFieldsMap = {
   mode?: 'STORY' | 'SCENE_TURN';
@@ -158,13 +159,13 @@ export function useLocalChatPageState() {
         modId: LOCAL_CHAT_MOD_ID,
         status: 'missing',
         routeSource: 'token-api',
-        reasonCode: 'LOCAL_AI_DEPENDENCY_SNAPSHOT_FAILED',
+        reasonCode: ReasonCode.LOCAL_AI_DEPENDENCY_SNAPSHOT_FAILED,
         warnings: [error instanceof Error ? error.message : String(error || 'unknown error')],
         dependencies: [],
         repairActions: [{
           actionId: 'runtime:open-setup',
           label: 'Open Runtime Setup',
-          reasonCode: 'LOCAL_AI_DEPENDENCY_SNAPSHOT_FAILED',
+          reasonCode: ReasonCode.LOCAL_AI_DEPENDENCY_SNAPSHOT_FAILED,
         }],
         updatedAt: new Date().toISOString(),
       });

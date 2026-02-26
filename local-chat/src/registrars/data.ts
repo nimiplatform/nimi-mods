@@ -1,4 +1,4 @@
-import type { HookClient } from '@nimiplatform/mod-sdk/types';
+import type { HookClient } from '@nimiplatform/sdk/mod/types';
 import {
   LOCAL_CHAT_DATA_API_CHAT_TARGET_DETAIL,
   LOCAL_CHAT_DATA_API_CHAT_TARGETS_LIST,

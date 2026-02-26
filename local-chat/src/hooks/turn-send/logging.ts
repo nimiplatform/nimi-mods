@@ -1,4 +1,4 @@
-import { logRendererEvent } from '@nimiplatform/mod-sdk/logging';
+import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import {
   isDegenerateAssistantReply,
   isPromptEchoReply,

@@ -16,11 +16,11 @@ rules:
   - Route profile 口径固定为 `chat/image/video/tts/stt/embedding`，业务侧只消费 `chat/tts/stt/embedding`。
   - local-chat 语音调用必须显式传 `routeSource`，禁止再用 `providerId` 承载 route source 语义。
   - local-chat 的 agent 语音风格提示词采用 `Auto Locked` 策略：自动组装 `language + stylePrompt` 并透传，不对终端用户暴露可编辑入口。
-  - AI 调用入口统一为 `@nimiplatform/mod-sdk/ai`（`generateText|streamText|generateObject|transcribeAudio|generateEmbedding|synthesizeSpeech`），不保留 legacy 场景调用兼容路径。
+  - AI 调用入口统一为 `@nimiplatform/sdk/mod/ai`（`generateText|streamText|generateObject|transcribeAudio|generateEmbedding|synthesizeSpeech`），不保留 legacy 场景调用兼容路径。
   - TTS 必须通过独立 `SpeechAdapter` 抽象接入，不与聊天 LLM provider 强绑定。
   - TTS 接口与字段定义唯一来源是 `@nimiplatform/nimi/ssot/mod/governance.md`；local-chat 只消费，不定义 provider 协议细节。
   - 语音能力调用必须走 manifest 中声明的 speech 系列能力键（`llm.speech.providers.list`、`llm.speech.voices.list`、`llm.speech.synthesize`、`llm.speech.stream.open`、`llm.speech.stream.control`、`llm.speech.stream.close`、`llm.speech.transcribe`）；禁止在 local-chat UI 直连 provider 私有 `/audio/speech` 协议。
-  - local-chat 对运行时能力读取一律通过 manifest 声明的 runtime capability 键（`data.query.data-api.local-chat.chat-targets.list`、`data.query.data-api.local-chat.chat-target.detail`、`data.query.data-api.local-chat.sessions.list`、`data.query.data-api.local-chat.sessions.get`、`data.query.data-api.local-chat.sessions.upsert`、`data.query.data-api.local-chat.sessions.delete`、`data.query.data-api.runtime.route.options`）查询，不允许使用 `@nimiplatform/mod-sdk/host`。
+  - local-chat 对运行时能力读取一律通过 manifest 声明的 runtime capability 键（`data.query.data-api.local-chat.chat-targets.list`、`data.query.data-api.local-chat.chat-target.detail`、`data.query.data-api.local-chat.sessions.list`、`data.query.data-api.local-chat.sessions.get`、`data.query.data-api.local-chat.sessions.upsert`、`data.query.data-api.local-chat.sessions.delete`、`data.query.data-api.runtime.route.options`）查询，不允许使用 `@nimiplatform/sdk/mod/host`。
   - local-chat 代码组织固定为 `components/state/services/hooks` 分层；页面文件只保留容器装配，业务编排下沉到 controller hooks，不承载跨层协议实现细节。
   - local-chat 层禁止新增无语义中间层；任何新增层级必须证明可减少调试跳转和提升可定位性，否则不合入。
   - local-chat 禁止非 `index.ts/tsx` 的 re-export 壳文件；调用方必须直连真实实现模块，减少调试跳转层。
@@ -31,9 +31,9 @@ rules:
   - local-chat 的 Hook 客户端创建入口统一为 `createHookClient(modId)`，不得恢复 `createModHookClient` 历史命名与中间别名。
   - local-chat 的源码 manifest 禁止回流 builtin 叙事（`hash: 'builtin-*'`、`built-in mod` 文案）；统一使用 external/default 术语。
   - local-chat 的 root manifest（`mod.manifest.yaml`）必须与源码单源保持一致：能力集合等于 `LOCAL_CHAT_PERMISSIONS`，版本号等于 `src/manifest.ts`。
-  - local-chat 与 runtime-config 的共享运行时工具必须来自 `@nimiplatform/mod-sdk/utils` 或 `@nimiplatform/mod-sdk/runtime-route` 稳定面，禁止恢复本地重复 helper 门面。
+  - local-chat 与 runtime-config 的共享运行时工具必须来自 `@nimiplatform/sdk/mod/utils` 或 `@nimiplatform/sdk/mod/runtime-route` 稳定面，禁止恢复本地重复 helper 门面。
   - local-chat 路由健康检查统一走 `createAiClient(...).checkRouteHealth`；若直接调用 Hook 健康能力，输入类型必须符合 `RuntimeLlmHealthInput`，不得回退裸 `Record<string, unknown>`。
-  - local-chat 不得导入 `@nimiplatform/mod-sdk/model-options/*` 私有实现路径；模型分组/过滤能力只能经 `@nimiplatform/mod-sdk/model-options` 稳定面使用。
+  - local-chat 不得导入 `@nimiplatform/sdk/mod/model-options/*` 私有实现路径；模型分组/过滤能力只能经 `@nimiplatform/sdk/mod/model-options` 稳定面使用。
   - route 逻辑必须保持 `state/actions/queries` 分层；会话视图映射必须保持 `route/*` 与 `view/*` 服务分域，不允许回流到单体 helper。
   - turn-send 逻辑必须保持 `prompt/assistant-output/session-persist` 分层；`use-local-chat-turn-send.ts` 仅保留编排与错误处理。
   - turn-send 诊断写入必须在 `turn-send/diagnostics` 分层维护；容器与布局组件不得直接拼装诊断负载。
@@ -164,12 +164,12 @@ Manifest `ai.consume` 与 `ai.dependencies`：
 
 SDK 调用面（非 capability 键）：
 
-1. `@nimiplatform/mod-sdk/ai.generateText`
-2. `@nimiplatform/mod-sdk/ai.streamText`
-3. `@nimiplatform/mod-sdk/ai.generateObject`
-4. `@nimiplatform/mod-sdk/ai.synthesizeSpeech`
-5. `@nimiplatform/mod-sdk/ai.transcribeAudio`
-6. `@nimiplatform/mod-sdk/ai.generateEmbedding`
+1. `@nimiplatform/sdk/mod/ai.generateText`
+2. `@nimiplatform/sdk/mod/ai.streamText`
+3. `@nimiplatform/sdk/mod/ai.generateObject`
+4. `@nimiplatform/sdk/mod/ai.synthesizeSpeech`
+5. `@nimiplatform/sdk/mod/ai.transcribeAudio`
+6. `@nimiplatform/sdk/mod/ai.generateEmbedding`
 7. 不暴露历史场景调用入口（`invokeScenario` / `resolveScenarioRuntimeConfig`）作为业务调用入口。
 
 语音返回契约：

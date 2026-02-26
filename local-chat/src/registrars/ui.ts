@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import type { HookClient } from '@nimiplatform/mod-sdk/types';
+import type { HookClient } from '@nimiplatform/sdk/mod/types';
 import {
   LOCAL_CHAT_DATA_API_CHAT_TARGETS_LIST,
   LOCAL_CHAT_MOD_ID,

@@ -1,4 +1,4 @@
-import { asRecord } from '@nimiplatform/mod-sdk/utils';
+import { asRecord } from '@nimiplatform/sdk/mod/utils';
 import { createLocalChatFlowId, emitLocalChatLog } from '../logging.js';
 import { withOpenApiContextLock } from './core-query-bridge.js';
 import type { LocalChatReadContext } from './types.js';

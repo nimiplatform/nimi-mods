@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { logRendererEvent } from '@nimiplatform/mod-sdk/logging';
-import { useRuntimeModSettings } from '@nimiplatform/mod-sdk/settings';
+import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
+import { useRuntimeModSettings } from '@nimiplatform/sdk/mod/settings';
 import {
   type LocalChatBooleanSettingKey,
   type LocalChatDefaultSettings,

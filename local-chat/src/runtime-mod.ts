@@ -1,6 +1,6 @@
-import { type RuntimeModRegistration } from '@nimiplatform/mod-sdk/types';
-import { createHookClient } from '@nimiplatform/mod-sdk/hook';
-import { createAiClient } from '@nimiplatform/mod-sdk/ai';
+import { type RuntimeModRegistration } from '@nimiplatform/sdk/mod/types';
+import { createHookClient } from '@nimiplatform/sdk/mod/hook';
+import { createAiClient } from '@nimiplatform/sdk/mod/ai';
 import { createLocalChatFlowId, emitLocalChatLog } from './logging.js';
 import {
   LOCAL_CHAT_CAPABILITIES,

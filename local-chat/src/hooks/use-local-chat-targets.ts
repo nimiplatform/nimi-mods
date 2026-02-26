@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createRendererFlowId, logRendererEvent } from '@nimiplatform/mod-sdk/logging';
+import { createRendererFlowId, logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import {
   LOCAL_CHAT_DATA_API_CHAT_TARGET_DETAIL,
   LOCAL_CHAT_DATA_API_CHAT_TARGETS_LIST,
