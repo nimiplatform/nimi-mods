@@ -1,6 +1,7 @@
 import { asRecord } from '@nimiplatform/sdk/mod/utils';
 import { emitWorldStudioLog } from '../../../logging.js';
 import type { EventNodeDraft } from '../../../contracts.js';
+import { toWorldEventUpsertPayloadList } from '../../../services/world-event-upsert-payload.js';
 import type { WorldStudioMaintainActionContext, WorldStudioMaintainActionPayload } from './types.js';
 
 export async function syncEvents(
@@ -47,7 +48,10 @@ export async function syncEvents(
     });
 
     const events = context.eventsGraph;
-    const eventUpserts = [...events.primary, ...events.secondary];
+    const eventUpserts = toWorldEventUpsertPayloadList([
+      ...events.primary,
+      ...events.secondary,
+    ]);
     const data = asRecord(await context.mutations.syncEventsMutation.mutateAsync({
       worldId: context.selectedWorldId,
       eventUpserts,

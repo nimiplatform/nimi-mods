@@ -249,11 +249,13 @@ Embedding readiness reasonCode（最小集）：
 2. PRIMARY 结构不完整（标题或叙事核心字段缺失）。
 3. `primaryEvidenceCoverage < 1.0`（存在 PRIMARY 缺证据）。
 4. `chunkSuccessRatio < 0.4`（抽取成功率过低）。
+5. `timeline` 与 PRIMARY `timeRef` 同时为空（`WORLD_STUDIO_TEMPORAL_ANCHOR_MISSING`）。
 
 ### 6.3 WARN 条件（可进入 CHECKPOINTS，需显式提示）
 
 1. `0.4 <= chunkSuccessRatio < 0.7`。
 2. 叙事完整度、故事弧、角色名称纯度、角色档案覆盖、worldSetting 等非阻断缺口。
+3. PRIMARY `timeRef` 覆盖率偏低（`WORLD_STUDIO_PRIMARY_TIME_REF_LOW`）。
 
 ### 6.4 进入 SYNTHESIZE 前的附加硬门槛
 

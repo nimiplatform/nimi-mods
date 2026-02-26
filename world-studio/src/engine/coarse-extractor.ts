@@ -42,6 +42,14 @@ function normalizeEvent(value: unknown, level: 'PRIMARY' | 'SECONDARY', index: n
   const normalizedLevel = String(record.level || level).trim().toUpperCase() === 'SECONDARY'
     ? 'SECONDARY'
     : 'PRIMARY';
+  const temporalBeforeEventIds = toStringArray(record.temporalBeforeEventIds || record.beforeEventIds);
+  const temporalAfterEventIds = toStringArray(record.temporalAfterEventIds || record.afterEventIds);
+  const dependsOnEventIds = Array.from(new Set([
+    ...toStringArray(record.dependsOnEventIds),
+    ...temporalBeforeEventIds,
+  ]));
+  const temporalConfidence = Number(record.temporalConfidence);
+  const normalizedTimeRef = String(record.timeRef || record.time || record.timelineAnchorLabel || '').trim();
   return {
     id: String(record.id || `${normalizedLevel.toLowerCase()}-${index + 1}`),
     level: normalizedLevel,
@@ -51,10 +59,13 @@ function normalizeEvent(value: unknown, level: 'PRIMARY' | 'SECONDARY', index: n
     cause: String(record.cause || '').trim(),
     process: String(record.process || '').trim(),
     result: String(record.result || '').trim(),
-    timeRef: String(record.timeRef || record.time || '').trim(),
+    timeRef: normalizedTimeRef,
     locationRefs: toStringArray(record.locationRefs || (record.locationRef ? [record.locationRef] : [])),
     characterRefs: toStringArray(record.characterRefs),
-    dependsOnEventIds: toStringArray(record.dependsOnEventIds),
+    dependsOnEventIds,
+    ...(temporalBeforeEventIds.length > 0 ? { temporalBeforeEventIds } : {}),
+    ...(temporalAfterEventIds.length > 0 ? { temporalAfterEventIds } : {}),
+    ...(Number.isFinite(temporalConfidence) ? { temporalConfidence: clamp01(temporalConfidence, 0.6) } : {}),
     evidenceRefs,
     confidence: clamp01(record.confidence, 0.6),
     needsEvidence: normalizedLevel === 'PRIMARY' ? evidenceRefs.length === 0 : false,
@@ -142,6 +153,9 @@ function buildCoarsePrompt(input: { chunk: string; index: number; total: number;
     ] : []),
     '## Reference Rules',
     '- characterRefs and locationRefs must use the entity NAME (e.g. "韩立"), never the entity ID (e.g. "char-1").',
+    '- dependsOnEventIds must list prerequisite event IDs that happen earlier in timeline order.',
+    '- beforeEventIds means event IDs that happen BEFORE current event (same direction as dependsOnEventIds).',
+    '- afterEventIds means event IDs that happen AFTER current event.',
     '',
     '## Quality Constraints',
     '- If a field has no relevant content in this chunk, return an empty array. Do NOT fabricate entries.',
@@ -156,8 +170,8 @@ function buildCoarsePrompt(input: { chunk: string; index: number; total: number;
     '  "locations":[{"id":"loc-1","name":"...","description":"...","importance":0.0}],',
     '  "characters":[{"id":"char-1","name":"...","summary":"...","significance":0.0}],',
     '  "events": {',
-    '    "primary":[{"id":"evt-p1","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}],',
-    '    "secondary":[{"id":"evt-s1","parentEventId":"evt-p1","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}]',
+    '    "primary":[{"id":"evt-p1","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"beforeEventIds":[],"afterEventIds":[],"temporalConfidence":0.0,"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}],',
+    '    "secondary":[{"id":"evt-s1","parentEventId":"evt-p1","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"beforeEventIds":[],"afterEventIds":[],"temporalConfidence":0.0,"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}]',
     '  },',
     '  "characterRelations":[{"source":"...","target":"...","relation":"...","reason":"...","strength":0.0}]',
     '}',
@@ -177,7 +191,7 @@ function buildCoarseSchemaLines(): string[] {
     '  "timeline":[{"id":"t1","label":"...","description":"...","time":"...","weight":0.0}],',
     '  "locations":[{"id":"loc-1","name":"...","description":"...","importance":0.0}],',
     '  "characters":[{"id":"char-1","name":"...","summary":"...","significance":0.0}],',
-    '  "events":{"primary":[{"id":"evt-p1","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}],"secondary":[{"id":"evt-s1","parentEventId":"evt-p1","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}]},',
+    '  "events":{"primary":[{"id":"evt-p1","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"beforeEventIds":[],"afterEventIds":[],"temporalConfidence":0.0,"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}],"secondary":[{"id":"evt-s1","parentEventId":"evt-p1","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"beforeEventIds":[],"afterEventIds":[],"temporalConfidence":0.0,"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}]},',
     '  "characterRelations":[{"source":"...","target":"...","relation":"...","reason":"...","strength":0.0}]',
     '}',
   ];

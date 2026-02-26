@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { CreateWorkbench } from '../ui/create/create-workbench.js';
 import { MaintainWorkbench } from '../ui/maintain/maintain-workbench.js';
 import { toUniqueStringArray } from '../services/snapshot-normalize.js';
+import { projectEventsForSelectedStartTime } from '../services/start-time-projection.js';
 import type {
   EventNodeDraft,
   WorldStudioCreateStep,
@@ -64,6 +65,30 @@ type BuildWorldStudioMainPanelInput = {
 
 export function buildWorldStudioMainPanel(input: BuildWorldStudioMainPanelInput): ReactNode {
   if (input.landingTarget === 'CREATE') {
+    const startTimeOptions = input.phase1?.startTimeOptions || input.snapshot.phase1Artifact?.startTimeOptions || [];
+    const buildStartTimeProjectionPatch = (
+      selectedStartTimeId: string,
+      events: { primary: EventNodeDraft[]; secondary: EventNodeDraft[] },
+    ): Pick<WorldStudioWorkspaceSnapshot, 'selectedStartTimeId' | 'eventsDraft' | 'futureEventsText' | 'knowledgeGraph'> => {
+      const projection = projectEventsForSelectedStartTime({
+        selectedStartTimeId,
+        startTimeOptions,
+        timeline: input.snapshot.knowledgeGraph.timeline,
+        events,
+        futureHistoricalEvents: input.snapshot.knowledgeGraph.futureHistoricalEvents,
+      });
+      return {
+        selectedStartTimeId,
+        eventsDraft: projection.events,
+        futureEventsText: JSON.stringify(projection.futureHistoricalEvents || [], null, 2),
+        knowledgeGraph: {
+          ...input.snapshot.knowledgeGraph,
+          events: projection.events,
+          futureHistoricalEvents: projection.futureHistoricalEvents,
+        },
+      };
+    };
+
     return (
       <CreateWorkbench
         step={input.snapshot.createStep}
@@ -107,7 +132,10 @@ export function buildWorldStudioMainPanel(input: BuildWorldStudioMainPanelInput)
         onSourceRefChange={(value) => input.patchSnapshot({ sourceRef: value })}
         onSourceEncodingChange={(value) => input.setSourceEncoding(value)}
         onSelectSourceFile={(file) => { void input.onSelectSourceFile(file); }}
-        onSelectStartTimeId={(value) => input.patchSnapshot({ selectedStartTimeId: value })}
+        onSelectStartTimeId={(value) => input.patchSnapshot({
+          ...buildStartTimeProjectionPatch(value, input.snapshot.eventsDraft),
+          unsavedChangesByPanel: { ...input.snapshot.unsavedChangesByPanel, events: true },
+        })}
         onToggleCharacter={(name, checked) => {
           const current = input.snapshot.selectedCharacters;
           const currentSync = input.snapshot.agentSync.selectedCharacterIds;
@@ -139,11 +167,7 @@ export function buildWorldStudioMainPanel(input: BuildWorldStudioMainPanelInput)
           unsavedChangesByPanel: { ...input.snapshot.unsavedChangesByPanel, worldview: true },
         })}
         onEventsGraphChange={(next) => input.patchSnapshot({
-          eventsDraft: next,
-          knowledgeGraph: {
-            ...input.snapshot.knowledgeGraph,
-            events: next,
-          },
+          ...buildStartTimeProjectionPatch(input.snapshot.selectedStartTimeId, next),
           unsavedChangesByPanel: { ...input.snapshot.unsavedChangesByPanel, events: true },
         })}
         onEventGraphLayoutChange={(next) => input.patchSnapshot({

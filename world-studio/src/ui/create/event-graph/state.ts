@@ -20,6 +20,8 @@ export function toValidation(event: EventNodeDraft) {
 export function normalizeEvent(value: Partial<EventNodeDraft>, fallbackLevel: 'PRIMARY' | 'SECONDARY'): EventNodeDraft {
   const level = value.level === 'SECONDARY' ? 'SECONDARY' : fallbackLevel;
   const evidenceRefs = Array.isArray(value.evidenceRefs) ? value.evidenceRefs : [];
+  const temporalBeforeEventIds = toStringList(value.temporalBeforeEventIds);
+  const temporalAfterEventIds = toStringList(value.temporalAfterEventIds);
   const base: EventNodeDraft = {
     id: String(value.id || makeEventId(level === 'PRIMARY' ? 'primary' : 'secondary')),
     level,
@@ -35,6 +37,11 @@ export function normalizeEvent(value: Partial<EventNodeDraft>, fallbackLevel: 'P
     locationRefs: toStringList(value.locationRefs),
     characterRefs: toStringList(value.characterRefs),
     dependsOnEventIds: toStringList(value.dependsOnEventIds),
+    ...(temporalBeforeEventIds.length > 0 ? { temporalBeforeEventIds } : {}),
+    ...(temporalAfterEventIds.length > 0 ? { temporalAfterEventIds } : {}),
+    ...(Number.isFinite(Number(value.temporalConfidence))
+      ? { temporalConfidence: Math.max(0, Math.min(1, Number(value.temporalConfidence))) }
+      : {}),
     evidenceRefs: evidenceRefs.map((item) => ({
       segmentId: String(item.segmentId || ''),
       offsetStart: Number(item.offsetStart) || 0,

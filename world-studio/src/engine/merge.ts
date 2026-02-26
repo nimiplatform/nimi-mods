@@ -210,21 +210,23 @@ export function mergeExtractions(extractions: ChunkExtraction[]): WorldStudioKno
 }
 
 export function toStartTimeOptions(timeline: Array<Record<string, unknown>>): Phase1Option[] {
-  const options = timeline.slice(0, 10).map((item, index) => ({
-    id: String(item.id || `timeline:${index + 1}`),
-    label: String(item.label || item.time || `Timeline ${index + 1}`),
-    description: String(item.description || ''),
-    weight: clamp01(item.weight, 0.5),
-  }));
-  if (options.length > 0) return options;
-  return [
-    {
-      id: 'timeline:default',
-      label: 'Default Start',
-      description: 'No explicit timeline extracted, use default start point.',
-      weight: 0.5,
-    },
-  ];
+  const seen = new Set<string>();
+  const options: Phase1Option[] = [];
+  timeline.forEach((item, index) => {
+    const label = String(item.label || item.time || '').trim();
+    const id = String(item.id || `timeline:${index + 1}`).trim();
+    if (!label) return;
+    const key = normalizeId(`${label}|${String(item.time || '').trim()}`);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    options.push({
+      id: id || `timeline:${index + 1}`,
+      label,
+      description: String(item.description || ''),
+      weight: clamp01(item.weight, 0.5),
+    });
+  });
+  return options;
 }
 
 export function toCharacterCandidates(characters: Array<Record<string, unknown>>): Phase1Character[] {

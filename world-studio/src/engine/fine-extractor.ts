@@ -34,6 +34,13 @@ function normalizeEvent(value: unknown, level: 'PRIMARY' | 'SECONDARY', index: n
   const normalizedLevel = String(record.level || level).trim().toUpperCase() === 'SECONDARY'
     ? 'SECONDARY'
     : 'PRIMARY';
+  const temporalBeforeEventIds = toStringArray(record.temporalBeforeEventIds || record.beforeEventIds);
+  const temporalAfterEventIds = toStringArray(record.temporalAfterEventIds || record.afterEventIds);
+  const dependsOnEventIds = Array.from(new Set([
+    ...toStringArray(record.dependsOnEventIds),
+    ...temporalBeforeEventIds,
+  ]));
+  const temporalConfidence = Number(record.temporalConfidence);
   return {
     id: String(record.id || `${normalizedLevel.toLowerCase()}-${index + 1}`),
     level: normalizedLevel,
@@ -43,10 +50,13 @@ function normalizeEvent(value: unknown, level: 'PRIMARY' | 'SECONDARY', index: n
     cause: String(record.cause || '').trim(),
     process: String(record.process || '').trim(),
     result: String(record.result || '').trim(),
-    timeRef: String(record.timeRef || record.time || '').trim(),
+    timeRef: String(record.timeRef || record.time || record.timelineAnchorLabel || '').trim(),
     locationRefs: toStringArray(record.locationRefs || (record.locationRef ? [record.locationRef] : [])),
     characterRefs: toStringArray(record.characterRefs),
-    dependsOnEventIds: toStringArray(record.dependsOnEventIds),
+    dependsOnEventIds,
+    ...(temporalBeforeEventIds.length > 0 ? { temporalBeforeEventIds } : {}),
+    ...(temporalAfterEventIds.length > 0 ? { temporalAfterEventIds } : {}),
+    ...(Number.isFinite(temporalConfidence) ? { temporalConfidence: clamp01(temporalConfidence, 0.6) } : {}),
     evidenceRefs,
     confidence: clamp01(record.confidence, 0.6),
     needsEvidence: normalizedLevel === 'PRIMARY' ? evidenceRefs.length === 0 : false,
@@ -254,6 +264,9 @@ function buildFinePrompt(input: {
     '- Do not fabricate facts; if evidence is insufficient keep fields empty/null/[] or omit optional parts.',
     '- Keep all names/content in source language.',
     '- draftPatch can be partial; only include fields supported by this chunk evidence.',
+    '- dependsOnEventIds should encode temporal prerequisites (events that happen earlier).',
+    '- beforeEventIds means event IDs that happen BEFORE current event (same direction as dependsOnEventIds).',
+    '- afterEventIds means event IDs that happen AFTER current event.',
     '',
     'Top-level schema:',
     '{',
@@ -262,7 +275,7 @@ function buildFinePrompt(input: {
     '}',
     '',
     'Extraction event item schema:',
-    '{"id":"...","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":[],"characterRefs":[],"dependsOnEventIds":[],"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}',
+    '{"id":"...","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":[],"characterRefs":[],"dependsOnEventIds":[],"beforeEventIds":[],"afterEventIds":[],"temporalConfidence":0.0,"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}',
     '',
     'Agent draft patch schema (partial allowed):',
     '{"characterName":"...","handle":"","concept":"","backstory":"","coreValues":"","relationshipStyle":"","description":"","scenario":"","greeting":"","exampleDialogue":"","systemPromptBase":"","rules":[],"postHistoryInstructions":"","alternateGreetings":[],"agentLorebooks":[],"dna":{}}',

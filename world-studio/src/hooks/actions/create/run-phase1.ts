@@ -9,6 +9,7 @@ import { emitWorldStudioLog } from '../../../logging.js';
 import { toFailedChunkIndices } from '../../../services/event-graph-map.js';
 import { formatRouteBindingSummary } from '../../../services/mutation-payload.js';
 import { buildPhase1ArtifactFromResult } from '../../../services/phase1-artifact.js';
+import { projectEventsForSelectedStartTime } from '../../../services/start-time-projection.js';
 import { worldStudioMessage } from '../../../i18n/messages.js';
 import type { WorldStudioCreateActionsInput } from './types.js';
 import { resolveAdaptiveChunkPolicy, shrinkAdaptiveChunkPolicy, type AdaptiveChunkPolicy } from './chunk-policy.js';
@@ -264,27 +265,41 @@ function applyPhase1ResultSnapshot(input: WorldStudioCreateActionsInput, params:
     // Ignore diagnostics sink failures in non-runtime environments (tests, headless execution).
   }
 
+  const selectedStartTimeId = params.result.startTimeOptions[0]?.id || '';
+  const projection = projectEventsForSelectedStartTime({
+    selectedStartTimeId,
+    startTimeOptions: params.result.startTimeOptions,
+    timeline: params.result.knowledgeGraph.timeline as Array<Record<string, unknown>>,
+    events: params.result.knowledgeGraph.events as unknown as { primary: EventNodeDraft[]; secondary: EventNodeDraft[] },
+    futureHistoricalEvents: params.result.knowledgeGraph.futureHistoricalEvents || [],
+  });
+  const projectedKnowledgeGraph = {
+    ...params.result.knowledgeGraph,
+    events: projection.events,
+    futureHistoricalEvents: projection.futureHistoricalEvents,
+  };
+
   input.setPhase1(params.result);
   input.patchSnapshot({
-    selectedStartTimeId: params.result.startTimeOptions[0]?.id || '',
+    selectedStartTimeId,
     selectedCharacters,
     phase1Artifact: artifact,
     agentSync: {
       ...input.snapshot.agentSync,
       selectedCharacterIds: selectedCharacters,
     },
-    knowledgeGraph: params.result.knowledgeGraph,
+    knowledgeGraph: projectedKnowledgeGraph,
     finalDraftAccumulator: params.result.finalDraftAccumulator,
-    eventsDraft: params.result.knowledgeGraph.events as unknown as { primary: EventNodeDraft[]; secondary: EventNodeDraft[] },
-    futureEventsText: JSON.stringify(params.result.knowledgeGraph.futureHistoricalEvents || [], null, 2),
+    eventsDraft: projection.events,
+    futureEventsText: JSON.stringify(projection.futureHistoricalEvents || [], null, 2),
     eventGraphLayout: {
       selectedEventId: String(
-        params.result.knowledgeGraph.events.primary[0]?.id
-        || params.result.knowledgeGraph.events.secondary[0]?.id
+        projection.events.primary[0]?.id
+        || projection.events.secondary[0]?.id
         || '',
       ),
-      expandedPrimaryIds: params.result.knowledgeGraph.events.primary[0]?.id
-        ? [String(params.result.knowledgeGraph.events.primary[0].id)]
+      expandedPrimaryIds: projection.events.primary[0]?.id
+        ? [String(projection.events.primary[0].id)]
         : [],
     },
     unsavedChangesByPanel: {

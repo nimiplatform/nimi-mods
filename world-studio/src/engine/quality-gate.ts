@@ -22,6 +22,23 @@ function countEventsWithLocationRefs(events: Array<{ locationRefs?: string[] }>)
   return events.filter((event) => Array.isArray(event.locationRefs) && event.locationRefs.length > 0).length;
 }
 
+function countEventsWithTimeRef(events: Array<{ timeRef?: string }>): number {
+  return events.filter((event) => String(event.timeRef || '').trim().length > 0).length;
+}
+
+function countPrimaryTemporalEdges(events: Array<{
+  dependsOnEventIds?: string[];
+  temporalBeforeEventIds?: string[];
+  temporalAfterEventIds?: string[];
+}>): number {
+  return events.reduce((sum, event) => {
+    const dependencies = Array.isArray(event.dependsOnEventIds) ? event.dependsOnEventIds.length : 0;
+    const before = Array.isArray(event.temporalBeforeEventIds) ? event.temporalBeforeEventIds.length : 0;
+    const after = Array.isArray(event.temporalAfterEventIds) ? event.temporalAfterEventIds.length : 0;
+    return sum + dependencies + before + after;
+  }, 0);
+}
+
 function clamp01(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(1, value));
@@ -119,6 +136,9 @@ export function evaluateQualityGate(input: {
   const primaryEvidenceCoverage = computePrimaryEvidenceCoverage(primaryEvents);
   const eventCharacterCoverage = ratio(countEventsWithCharacterRefs(allEvents), Math.max(1, allEvents.length));
   const eventLocationCoverage = ratio(countEventsWithLocationRefs(allEvents), Math.max(1, allEvents.length));
+  const primaryTimeRefCoverage = ratio(countEventsWithTimeRef(primaryEvents), Math.max(1, primaryEvents.length));
+  const eventTimeRefCoverage = ratio(countEventsWithTimeRef(allEvents), Math.max(1, allEvents.length));
+  const primaryTemporalEdgeCount = countPrimaryTemporalEdges(primaryEvents);
   const primaryNarrativeCompleteness = computePrimaryNarrativeCompleteness(primaryEvents);
   const storyArcCompleteness = computeStoryArcCompleteness(input.graph);
   const characterNamePurity = computeCharacterNamePurity(input.graph, input.refinementMetrics?.characterNamePurity);
@@ -183,6 +203,21 @@ export function evaluateQualityGate(input: {
       'BLOCK',
       '存在主线事件缺少证据引用。',
       `primaryEvidenceCoverage=${Math.round(primaryEvidenceCoverage * 100)}%, threshold=${Math.round(PRIMARY_EVIDENCE_COVERAGE_BLOCK_THRESHOLD * 100)}%`,
+    );
+  }
+
+  if (metrics.primaryCount > 0 && metrics.timelineCount === 0 && primaryTimeRefCoverage === 0 && primaryTemporalEdgeCount === 0) {
+    pushIssue(
+      'WORLD_STUDIO_TEMPORAL_ANCHOR_MISSING',
+      'BLOCK',
+      '时间锚点缺失（timeline、主线 timeRef、主线时序依赖均为空），无法稳定确定 start time。',
+    );
+  } else if (metrics.primaryCount > 0 && primaryTimeRefCoverage < 0.5 && primaryTemporalEdgeCount === 0) {
+    pushIssue(
+      'WORLD_STUDIO_PRIMARY_TIME_REF_LOW',
+      'WARN',
+      '主线事件 timeRef 覆盖率偏低且缺少时序依赖，start time 裁剪可能不稳定。',
+      `primaryTimeRefCoverage=${Math.round(primaryTimeRefCoverage * 100)}%, eventTimeRefCoverage=${Math.round(eventTimeRefCoverage * 100)}%, primaryTemporalEdgeCount=${primaryTemporalEdgeCount}`,
     );
   }
 

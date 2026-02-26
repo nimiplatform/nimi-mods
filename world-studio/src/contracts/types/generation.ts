@@ -50,6 +50,9 @@ export type EventNodeDraft = {
   locationRefs: string[];
   characterRefs: string[];
   dependsOnEventIds: string[];
+  temporalBeforeEventIds?: string[];
+  temporalAfterEventIds?: string[];
+  temporalConfidence?: number;
   evidenceRefs: EvidenceRefDraft[];
   confidence: number;
   needsEvidence: boolean;

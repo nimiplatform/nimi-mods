@@ -54,6 +54,13 @@ function asEventArray(value: unknown): EventNodeDraft[] {
           sourceType: 'text' as const,
         }))
         : [];
+      const temporalBeforeEventIds = Array.isArray(record.temporalBeforeEventIds || record.beforeEventIds)
+        ? (record.temporalBeforeEventIds || record.beforeEventIds) as unknown[]
+        : [];
+      const temporalAfterEventIds = Array.isArray(record.temporalAfterEventIds || record.afterEventIds)
+        ? (record.temporalAfterEventIds || record.afterEventIds) as unknown[]
+        : [];
+      const temporalConfidence = Number(record.temporalConfidence);
       return {
         id: String(record.id || `${level.toLowerCase()}-${index + 1}`),
         level,
@@ -63,7 +70,7 @@ function asEventArray(value: unknown): EventNodeDraft[] {
         cause: String(record.cause || ''),
         process: String(record.process || ''),
         result: String(record.result || ''),
-        timeRef: String(record.timeRef || ''),
+        timeRef: String(record.timeRef || record.timelineAnchorLabel || ''),
         locationRefs: Array.isArray(record.locationRefs)
           ? record.locationRefs.map((entry) => String(entry || '')).filter(Boolean)
           : [],
@@ -73,6 +80,15 @@ function asEventArray(value: unknown): EventNodeDraft[] {
         dependsOnEventIds: Array.isArray(record.dependsOnEventIds)
           ? record.dependsOnEventIds.map((entry) => String(entry || '')).filter(Boolean)
           : [],
+        ...(temporalBeforeEventIds.length > 0
+          ? { temporalBeforeEventIds: temporalBeforeEventIds.map((entry) => String(entry || '')).filter(Boolean) }
+          : {}),
+        ...(temporalAfterEventIds.length > 0
+          ? { temporalAfterEventIds: temporalAfterEventIds.map((entry) => String(entry || '')).filter(Boolean) }
+          : {}),
+        ...(Number.isFinite(temporalConfidence)
+          ? { temporalConfidence: Math.max(0, Math.min(1, temporalConfidence)) }
+          : {}),
         evidenceRefs,
         confidence: Number(record.confidence || 0.5),
         needsEvidence: Boolean(record.needsEvidence),

@@ -91,11 +91,18 @@ export function fallbackCharacterCandidates(
 export function fallbackStartTimeOptions(
   graph: WorldStudioKnowledgeGraphDraft,
 ): Phase1Option[] {
+  const timelineRefs = (graph.timeline || []).flatMap((item) => {
+    const record = item as Record<string, unknown>;
+    return [
+      String(record.label || '').trim(),
+      String(record.time || '').trim(),
+    ];
+  }).filter(Boolean);
   const eventTimeRefs = [
     ...graph.events.primary.map((item) => String(item.timeRef || '').trim()),
     ...graph.events.secondary.map((item) => String(item.timeRef || '').trim()),
   ].filter(Boolean);
-  const uniqueTimeRefs = toUniqueStringArray(eventTimeRefs).slice(0, 12);
+  const uniqueTimeRefs = toUniqueStringArray([...timelineRefs, ...eventTimeRefs]);
   if (uniqueTimeRefs.length === 0) {
     return [{
       id: 'time-anchor-now',

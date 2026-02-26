@@ -126,10 +126,15 @@ export function compressAccumulatedState(state: AccumulatedState, tokenBudget: n
     }
   };
 
-  // Priority order: worldSetting → characters → primary events → locations → secondary events → relations → timeline
+  // Priority order: worldSetting → timeline → characters → primary events → locations → secondary events → relations
   if (state.worldSetting) {
     tryAppend(`WORLD_SETTING: ${truncate(state.worldSetting, 200)}`);
   }
+
+  tryAppendLines(
+    `KNOWN_TIMELINE (${state.timeline.length} total):`,
+    buildTimelineLines(state.timeline),
+  );
 
   tryAppendLines(
     `KNOWN_CHARACTERS (${state.characters.length} total):`,
@@ -157,11 +162,6 @@ export function compressAccumulatedState(state: AccumulatedState, tokenBudget: n
   tryAppendLines(
     `KNOWN_RELATIONS (${state.characterRelations.length} total):`,
     buildRelationLines(state.characterRelations),
-  );
-
-  tryAppendLines(
-    `KNOWN_TIMELINE (${state.timeline.length} total):`,
-    buildTimelineLines(state.timeline),
   );
 
   return sections.join('\n');

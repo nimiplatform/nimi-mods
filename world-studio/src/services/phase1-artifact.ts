@@ -8,8 +8,12 @@ import type {
 } from '../contracts.js';
 import type { Phase1Result } from '../generation/pipeline.js';
 import { worldStudioMessage } from '../i18n/messages.js';
+import { buildStartTimeOptionsFromEvents } from './temporal-order.js';
 
 function toFallbackStartTimeOptions(snapshot: WorldStudioWorkspaceSnapshot): Phase1Option[] {
+  const temporalOptions = buildStartTimeOptionsFromEvents(snapshot.knowledgeGraph.events);
+  if (temporalOptions.length > 0) return temporalOptions;
+
   const timelineOptions = (snapshot.knowledgeGraph.timeline || [])
     .map((item, _index) => {
       const record = asRecord(item);
@@ -24,6 +28,26 @@ function toFallbackStartTimeOptions(snapshot: WorldStudioWorkspaceSnapshot): Pha
     })
     .filter((item): item is Phase1Option => Boolean(item));
   if (timelineOptions.length > 0) return timelineOptions;
+
+  const eventTimeRefs = [
+    ...snapshot.knowledgeGraph.events.primary.map((event) => String(event.timeRef || '').trim()),
+    ...snapshot.knowledgeGraph.events.secondary.map((event) => String(event.timeRef || '').trim()),
+  ].filter(Boolean);
+  const seen = new Set<string>();
+  const eventTimeOptions = eventTimeRefs
+    .filter((timeRef) => {
+      if (seen.has(timeRef)) return false;
+      seen.add(timeRef);
+      return true;
+    })
+    .map((timeRef, index) => ({
+      id: `time-anchor-${index + 1}`,
+      label: timeRef,
+      description: 'Recovered from event time references.',
+      weight: 0.5,
+    } satisfies Phase1Option));
+  if (eventTimeOptions.length > 0) return eventTimeOptions;
+
   if (snapshot.selectedStartTimeId) {
     return [{
       id: snapshot.selectedStartTimeId,

@@ -7,6 +7,7 @@ import {
 import { emitWorldStudioLog } from '../../../logging.js';
 import { runPhase2DraftGeneration } from '../../../generation/pipeline.js';
 import { buildWorldStudioEmbeddingIndex } from '../../../services/embedding-index.js';
+import { START_TIME_PROJECTED_FUTURE_EVENT_KIND } from '../../../services/start-time-projection.js';
 import type { WorldStudioCreateActionsInput } from './types.js';
 
 type RunCreatePhase2Options = {
@@ -314,6 +315,20 @@ export async function runCreatePhase2(
       const draft = draftsByCharacter[name];
       return !(draft && draft.dna && typeof draft.dna === 'object');
     });
+    const preservedProjectedFutureEvents = (input.snapshot.knowledgeGraph.futureHistoricalEvents || [])
+      .filter((item) => {
+        return String(asRecord(item).projectionKind || '') === START_TIME_PROJECTED_FUTURE_EVENT_KIND;
+      })
+      .map((item) => asRecord(item));
+    const synthesizedFutureHistoricalEvents = Array.isArray(result.futureHistoricalEvents)
+      ? result.futureHistoricalEvents
+        .filter((item) => item && typeof item === 'object')
+        .map((item) => asRecord(item))
+      : [];
+    const nextKnowledgeFutureEvents = [
+      ...preservedProjectedFutureEvents,
+      ...synthesizedFutureHistoricalEvents,
+    ];
 
     // >>> DIAG: remove after debugging <<<
     try {
@@ -353,11 +368,11 @@ export async function runCreatePhase2(
       lorebooksDraft: Array.isArray(result.worldLorebooks)
         ? result.worldLorebooks.filter((item) => item && typeof item === 'object') as WorldLorebookDraftRow[]
         : [],
-      futureEventsText: JSON.stringify(result.futureHistoricalEvents, null, 2),
+      futureEventsText: JSON.stringify(synthesizedFutureHistoricalEvents, null, 2),
       knowledgeGraph: {
         ...input.snapshot.knowledgeGraph,
         // events: preserved from Phase 1 — not overwritten by Phase 2
-        futureHistoricalEvents: result.futureHistoricalEvents,
+        futureHistoricalEvents: nextKnowledgeFutureEvents,
       },
       finalDraftAccumulator: result.finalDraftAccumulator || input.snapshot.finalDraftAccumulator,
       unsavedChangesByPanel: {
