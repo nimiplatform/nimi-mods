@@ -1,5 +1,6 @@
 export type {
   ChunkTaskResult,
+  FinalDraftAccumulator,
   DistillRouteOverrideMap,
   EventNodeDraft,
   Phase1Character,

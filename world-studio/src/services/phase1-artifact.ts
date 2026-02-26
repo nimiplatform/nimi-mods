@@ -149,6 +149,7 @@ export function restorePhase1ResultFromArtifact(
       ...snapshot.knowledgeGraph,
       narrativeArc: snapshot.knowledgeGraph.narrativeArc || artifact.narrativeArc || null,
     },
+    finalDraftAccumulator: snapshot.finalDraftAccumulator,
     qualityGate: artifact.qualityGate,
     chunkTasks: artifact.chunkTasks,
     rawText: JSON.stringify({
@@ -159,7 +160,7 @@ export function restorePhase1ResultFromArtifact(
   };
 }
 
-export function buildRecoveredPhase1Artifact(
+export function buildLegacyPhase1Artifact(
   snapshot: WorldStudioWorkspaceSnapshot,
 ): WorldStudioPhase1Artifact | null {
   const hasGraphSignal = (
@@ -182,7 +183,7 @@ export function buildRecoveredPhase1Artifact(
     qualityGate: buildRecoveredQualityGate(snapshot),
     chunkTasks: [],
     narrativeArc: snapshot.knowledgeGraph.narrativeArc || null,
-    sourceDigest: 'snapshot-recovered',
+    sourceDigest: 'legacy-snapshot-recovered',
     updatedAt,
   };
 }

@@ -86,3 +86,22 @@ export async function runCoarsePass(input: CoarsePassInput): Promise<WorldStudio
   });
   return stopReason;
 }
+
+export async function runCoarseChunk(
+  llm: RouteCapabilityLlmInvoker,
+  input: {
+    chunk: string;
+    index: number;
+    total: number;
+    abortSignal?: AbortSignal;
+    accumulatedContext?: string;
+  },
+) {
+  return extractChunkCoarse(llm, {
+    chunk: input.chunk,
+    index: input.index,
+    total: input.total,
+    abortSignal: input.abortSignal,
+    accumulatedContext: input.accumulatedContext,
+  });
+}

@@ -97,6 +97,7 @@ export function useWorldStudioPageContent() {
       startTimeOptions: artifact.startTimeOptions,
       characterCandidates: artifact.characterCandidates,
       knowledgeGraph: storeBindings.snapshot.knowledgeGraph,
+      finalDraftAccumulator: storeBindings.snapshot.finalDraftAccumulator,
       qualityGate: artifact.qualityGate,
       chunkTasks: artifact.chunkTasks,
       rawText: JSON.stringify({

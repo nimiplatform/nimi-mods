@@ -2,23 +2,66 @@ import type { ModAiClient } from '@nimiplatform/mod-sdk/ai';
 import { splitSourceText } from '../engine/chunker.js';
 import { createEmptyAccumulatedState, compressAccumulatedState } from '../engine/accumulated-context.js';
 import { upsertMergeExtraction, toChunkExtraction } from '../engine/accumulated-merge.js';
-import { extractChunkCoarse } from '../engine/coarse-extractor.js';
+import {
+  applyDraftPatch,
+  buildFinalDraftAccumulatorSlice,
+  createEmptyFinalDraftAccumulator,
+} from '../engine/final-draft-accumulator.js';
 import { isContextOverflowError } from '../engine/errors.js';
-import { extractChunkFine } from '../engine/fine-extractor.js';
 import type {
   AccumulatedState,
   ChunkExtraction,
   ChunkTaskResult,
+  DraftPatch,
   DistillRouteOverrideMap,
+  FinalDraftAccumulator,
   Phase1Result,
   WorldStudioProgressState,
   WorldStudioTaskInterruptReason,
 } from '../engine/types.js';
 import { toFailureSummary } from './retry-policy.js';
 import { toNormalizedRouteOverrides, withRouteOverride } from './route-capability-resolver.js';
-import { extractionSignal, shouldRunFinePass, mergeChunkExtraction, countSuccessfulChunks } from './phase1/merge-result.js';
+import { runCoarseChunk } from './phase1/coarse-pass.js';
+import { runFineChunk } from './phase1/fine-pass.js';
+import { extractionSignal, mergeChunkExtraction, countSuccessfulChunks } from './phase1/merge-result.js';
 import { createProgressEmitter } from './phase1/progress.js';
 import { buildPhase1Result } from './phase1/quality.js';
+import { backfillChunkExtractionEventFields } from '../engine/heuristic/event-field-backfill.js';
+
+type FinalDraftAccumulatorPatchUpdate = {
+  chunkIndex: number;
+  logicalChunkIndex: number;
+  changedFields: string[];
+  hasChanges: boolean;
+  before: FinalDraftAccumulator;
+  after: FinalDraftAccumulator;
+  patch: DraftPatch;
+};
+
+function resolveMissingFinalDraftFields(accumulator: FinalDraftAccumulator): string[] {
+  const world = accumulator.world || {};
+  const worldview = accumulator.worldview || {};
+  const worldviewRecord = worldview as Record<string, unknown>;
+  const draftValues = Object.values(accumulator.agentDraftsByCharacter || {});
+  const fields: string[] = [];
+  if (!String(world.name || '').trim()) fields.push('world.name');
+  if (!String(world.description || '').trim()) fields.push('world.description');
+  if (!String(world.genre || '').trim()) fields.push('world.genre');
+  if (!worldviewRecord.timeModel || typeof worldviewRecord.timeModel !== 'object') fields.push('worldview.timeModel');
+  if (!worldviewRecord.spaceTopology || typeof worldviewRecord.spaceTopology !== 'object') fields.push('worldview.spaceTopology');
+  if (!worldviewRecord.causality || typeof worldviewRecord.causality !== 'object') fields.push('worldview.causality');
+  if (!worldviewRecord.coreSystem || typeof worldviewRecord.coreSystem !== 'object') fields.push('worldview.coreSystem');
+  if ((accumulator.worldLorebooks || []).length < 3) fields.push('worldLorebooks');
+  if (draftValues.length === 0) fields.push('agentDrafts');
+  draftValues.slice(0, 6).forEach((draft) => {
+    const name = String(draft.characterName || '').trim();
+    if (!name) return;
+    if (!String(draft.concept || '').trim()) fields.push(`agentDrafts.${name}.concept`);
+    if (!String(draft.description || '').trim()) fields.push(`agentDrafts.${name}.description`);
+    if (!draft.dna || typeof draft.dna !== 'object') fields.push(`agentDrafts.${name}.dna`);
+  });
+  return Array.from(new Set(fields)).slice(0, 24);
+}
 
 export async function runPhase1Extraction(
   aiClient: ModAiClient,
@@ -32,6 +75,8 @@ export async function runPhase1Extraction(
     shouldInterrupt?: () => WorldStudioTaskInterruptReason | null;
     contextTokenBudget?: number;
     initialAccumulatedState?: AccumulatedState;
+    initialFinalDraftAccumulator?: FinalDraftAccumulator;
+    onFinalDraftAccumulatorPatch?: (update: FinalDraftAccumulatorPatchUpdate) => void;
   },
 ): Promise<Phase1Result> {
   const chunks = splitSourceText(sourceText, {
@@ -53,7 +98,10 @@ export async function runPhase1ExtractionFromChunks(
     shouldInterrupt?: () => WorldStudioTaskInterruptReason | null;
     contextTokenBudget?: number;
     initialAccumulatedState?: AccumulatedState;
+    initialFinalDraftAccumulator?: FinalDraftAccumulator;
     onAccumulatedStateUpdate?: (state: AccumulatedState) => void;
+    onFinalDraftAccumulatorUpdate?: (state: FinalDraftAccumulator) => void;
+    onFinalDraftAccumulatorPatch?: (update: FinalDraftAccumulatorPatchUpdate) => void;
   },
 ): Promise<Phase1Result> {
   const normalizedChunks = chunks.map((chunk) => String(chunk || '').trim()).filter(Boolean);
@@ -73,6 +121,7 @@ export async function runPhase1ExtractionFromChunks(
 
   // Initialize accumulated state (supports resume via initialAccumulatedState)
   let accumulatedState = options?.initialAccumulatedState ?? createEmptyAccumulatedState();
+  let finalDraftAccumulator = options?.initialFinalDraftAccumulator ?? createEmptyFinalDraftAccumulator();
   const contextTokenBudget = options?.contextTokenBudget ?? 2000;
   const startIndex = accumulatedState.lastProcessedChunk >= 0
     ? accumulatedState.lastProcessedChunk + 1
@@ -107,7 +156,7 @@ export async function runPhase1ExtractionFromChunks(
 
     // 2. Coarse pass
     try {
-      const coarse = await extractChunkCoarse(coarseLlm, {
+      const coarse = await runCoarseChunk(coarseLlm, {
         chunk,
         index: i,
         total,
@@ -133,35 +182,61 @@ export async function runPhase1ExtractionFromChunks(
         } : {}),
       });
 
-      // 4. Conditional fine pass (same threshold as parallel pipeline: signal < 4)
-      if (shouldRunFinePass(coarse.extraction)) {
-        try {
-          const fine = await extractChunkFine(fineLlm, {
-            chunk,
-            index: i,
-            total,
-            seed: coarse.extraction,
-            abortSignal: options?.abortSignal,
-          });
-          chunkExtractions[i] = mergeChunkExtraction(coarse.extraction, fine.extraction);
-          accumulatedState = upsertMergeExtraction(accumulatedState, fine.extraction, i);
-          chunkTasks.push({
-            chunkIndex: logicalIndex,
-            stage: 'fine',
-            status: 'success',
-            retryCount: fine.retryCount,
-          });
-        } catch (fineError) {
-          const isOverflow = isContextOverflowError(fineError);
-          chunkTasks.push({
-            chunkIndex: logicalIndex,
-            stage: 'fine',
-            status: 'failed',
-            retryCount: 1,
-            errorCode: isOverflow ? 'WORLD_STUDIO_CONTEXT_OVERFLOW' : 'WORLD_STUDIO_FINE_JSON_PARSE_FAILED',
-            errorMessage: fineError instanceof Error ? fineError.message : String(fineError),
+      // 4. Fine pass always runs and contributes accumulator patch (can be no-op patch).
+      try {
+        const fine = await runFineChunk(fineLlm, {
+          chunk,
+          index: i,
+          total,
+          seed: coarse.extraction,
+          accumulatedContext: compressedCtx,
+          accumulatorSlice: buildFinalDraftAccumulatorSlice(finalDraftAccumulator, {
+            maxLorebooks: 8,
+            maxFutureEvents: 8,
+            maxAgentDrafts: 6,
+            maxRevisions: 6,
+          }),
+          missingFields: resolveMissingFinalDraftFields(finalDraftAccumulator),
+          abortSignal: options?.abortSignal,
+        });
+        chunkExtractions[i] = mergeChunkExtraction(coarse.extraction, fine.extraction);
+        accumulatedState = upsertMergeExtraction(accumulatedState, fine.extraction, i);
+        const beforeAccumulator = finalDraftAccumulator;
+        const patchResult = applyDraftPatch(beforeAccumulator, fine.draftPatch);
+        finalDraftAccumulator = patchResult.next;
+        if (options?.onFinalDraftAccumulatorPatch) {
+          options.onFinalDraftAccumulatorPatch({
+            chunkIndex: i,
+            logicalChunkIndex: logicalIndex,
+            changedFields: patchResult.changedFields,
+            hasChanges: patchResult.changedFields.length > 0,
+            before: beforeAccumulator,
+            after: finalDraftAccumulator,
+            patch: fine.draftPatch,
           });
         }
+        chunkTasks.push({
+          chunkIndex: logicalIndex,
+          stage: 'fine',
+          status: 'success',
+          retryCount: fine.retryCount,
+          ...(extractionSignal(fine.extraction) < 1
+            ? {
+              errorCode: 'WORLD_STUDIO_FINE_NOOP_PATCH',
+              errorMessage: 'fine succeeded with minimal extraction delta',
+            }
+            : {}),
+        });
+      } catch (fineError) {
+        const isOverflow = isContextOverflowError(fineError);
+        chunkTasks.push({
+          chunkIndex: logicalIndex,
+          stage: 'fine',
+          status: 'failed',
+          retryCount: 1,
+          errorCode: isOverflow ? 'WORLD_STUDIO_CONTEXT_OVERFLOW' : 'WORLD_STUDIO_FINE_JSON_PARSE_FAILED',
+          errorMessage: fineError instanceof Error ? fineError.message : String(fineError),
+        });
       }
     } catch (coarseError) {
       const isOverflow = isContextOverflowError(coarseError);
@@ -192,13 +267,22 @@ export async function runPhase1ExtractionFromChunks(
     });
 
     // 7. Checkpoint (every 20 chunks or the last chunk)
-    if (options?.onAccumulatedStateUpdate && (i % CHECKPOINT_INTERVAL === 0 || i === normalizedChunks.length - 1)) {
-      options.onAccumulatedStateUpdate(accumulatedState);
+    if (i % CHECKPOINT_INTERVAL === 0 || i === normalizedChunks.length - 1) {
+      if (options?.onAccumulatedStateUpdate) {
+        options.onAccumulatedStateUpdate(accumulatedState);
+      }
+      if (options?.onFinalDraftAccumulatorUpdate) {
+        options.onFinalDraftAccumulatorUpdate(finalDraftAccumulator);
+      }
     }
   }
 
   // 8. Final: use accumulated state instead of concat merge
-  const finalExtraction = toChunkExtraction(accumulatedState);
+  const rawFinalExtraction = toChunkExtraction(accumulatedState);
+  const finalExtraction = backfillChunkExtractionEventFields(
+    rawFinalExtraction,
+    normalizedChunks.join('\n'),
+  );
   const currentRunCompleted = countSuccessfulChunks(chunkExtractions);
   const preResumeCompleted = options?.initialAccumulatedState?.successfulChunks ?? 0;
   const totalCompleted = currentRunCompleted + preResumeCompleted;
@@ -223,6 +307,7 @@ export async function runPhase1ExtractionFromChunks(
     failedChunks: total - totalCompleted,
     chunkTasks,
     normalizedChunks,
+    finalDraftAccumulator,
   });
   if (interruptedReason) {
     result.interrupted = { reason: interruptedReason };

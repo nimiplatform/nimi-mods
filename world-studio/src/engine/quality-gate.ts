@@ -4,6 +4,10 @@ import type {
   WorldStudioQualityIssue,
   WorldStudioKnowledgeGraphDraft,
 } from './types.js';
+import {
+  computePrimaryEvidenceCoverage,
+  PRIMARY_EVIDENCE_COVERAGE_BLOCK_THRESHOLD,
+} from './primary-evidence.js';
 
 function ratio(numerator: number, denominator: number): number {
   if (denominator <= 0) return 0;
@@ -16,10 +20,6 @@ function countEventsWithCharacterRefs(events: Array<{ characterRefs?: string[] }
 
 function countEventsWithLocationRefs(events: Array<{ locationRefs?: string[] }>): number {
   return events.filter((event) => Array.isArray(event.locationRefs) && event.locationRefs.length > 0).length;
-}
-
-function countPrimaryWithEvidence(events: Array<{ evidenceRefs?: unknown[] }>): number {
-  return events.filter((event) => Array.isArray(event.evidenceRefs) && event.evidenceRefs.length > 0).length;
 }
 
 function clamp01(value: number): number {
@@ -116,7 +116,7 @@ export function evaluateQualityGate(input: {
   const secondaryEvents = input.graph.events.secondary || [];
   const allEvents = [...primaryEvents, ...secondaryEvents];
 
-  const primaryEvidenceCoverage = ratio(countPrimaryWithEvidence(primaryEvents), Math.max(1, primaryEvents.length));
+  const primaryEvidenceCoverage = computePrimaryEvidenceCoverage(primaryEvents);
   const eventCharacterCoverage = ratio(countEventsWithCharacterRefs(allEvents), Math.max(1, allEvents.length));
   const eventLocationCoverage = ratio(countEventsWithLocationRefs(allEvents), Math.max(1, allEvents.length));
   const primaryNarrativeCompleteness = computePrimaryNarrativeCompleteness(primaryEvents);
@@ -177,12 +177,12 @@ export function evaluateQualityGate(input: {
     );
   }
 
-  if (primaryEvents.length > 0 && primaryEvidenceCoverage < 1) {
+  if (primaryEvents.length > 0 && primaryEvidenceCoverage < PRIMARY_EVIDENCE_COVERAGE_BLOCK_THRESHOLD) {
     pushIssue(
       'WORLD_STUDIO_PRIMARY_EVIDENCE_MISSING',
       'BLOCK',
       '存在主线事件缺少证据引用。',
-      `primaryEvidenceCoverage=${Math.round(primaryEvidenceCoverage * 100)}%`,
+      `primaryEvidenceCoverage=${Math.round(primaryEvidenceCoverage * 100)}%, threshold=${Math.round(PRIMARY_EVIDENCE_COVERAGE_BLOCK_THRESHOLD * 100)}%`,
     );
   }
 

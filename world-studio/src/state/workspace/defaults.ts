@@ -1,4 +1,5 @@
 import type { WorldStudioWorkspaceSnapshot } from '../../contracts.js';
+import { createEmptyFinalDraftAccumulator } from '../../engine/final-draft-accumulator.js';
 import { syncSnapshot } from './normalize.js';
 
 const DEFAULT_SNAPSHOT: WorldStudioWorkspaceSnapshot = {
@@ -47,6 +48,7 @@ const DEFAULT_SNAPSHOT: WorldStudioWorkspaceSnapshot = {
     characterProfiles: [],
     characterAliasMap: {},
   },
+  finalDraftAccumulator: createEmptyFinalDraftAccumulator(),
   phase1Artifact: null,
   assets: {
     worldCover: { status: 'idle', imageUrl: null },
@@ -113,6 +115,7 @@ export function cloneDefaultSnapshot(): WorldStudioWorkspaceSnapshot {
       characterProfiles: [],
       characterAliasMap: {},
     },
+    finalDraftAccumulator: createEmptyFinalDraftAccumulator(),
     phase1Artifact: null,
     assets: {
       worldCover: { ...DEFAULT_SNAPSHOT.assets.worldCover },

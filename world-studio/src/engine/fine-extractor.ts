@@ -1,5 +1,13 @@
 import { asRecord, clamp01, toStringArray } from '@nimiplatform/mod-sdk/utils';
-import type { ChunkExtraction, EventNodeDraft, EvidenceRefDraft, RouteCapabilityLlmInvoker } from './types.js';
+import type {
+  ChunkExtraction,
+  DraftPatch,
+  EventNodeDraft,
+  EvidenceRefDraft,
+  RouteCapabilityLlmInvoker,
+  WorldStudioAgentDraft,
+  WorldStudioAgentLorebookDraft,
+} from './types.js';
 import { buildRepairPrompt, parseJsonRecord, summarizeModelError } from './json-repair.js';
 
 function normalizeEvidenceRefs(value: unknown): EvidenceRefDraft[] {
@@ -46,28 +54,169 @@ function normalizeEvent(value: unknown, level: 'PRIMARY' | 'SECONDARY', index: n
 }
 
 function normalizeFineExtraction(raw: Record<string, unknown>): ChunkExtraction {
-  const eventsRoot = asRecord(raw.events);
+  const extractionRoot = (() => {
+    const nested = asRecord(raw.extraction);
+    return Object.keys(nested).length > 0 ? nested : raw;
+  })();
+  const eventsRoot = asRecord(extractionRoot.events);
   const primaryRaw = Array.isArray(eventsRoot.primary) ? eventsRoot.primary : [];
   const secondaryRaw = Array.isArray(eventsRoot.secondary) ? eventsRoot.secondary : [];
   return {
-    worldSetting: String(raw.worldSetting || '').trim(),
-    timeline: Array.isArray(raw.timeline)
-      ? raw.timeline.filter((item) => item && typeof item === 'object') as Array<Record<string, unknown>>
+    worldSetting: String(extractionRoot.worldSetting || '').trim(),
+    timeline: Array.isArray(extractionRoot.timeline)
+      ? extractionRoot.timeline.filter((item) => item && typeof item === 'object') as Array<Record<string, unknown>>
       : [],
-    locations: Array.isArray(raw.locations)
-      ? raw.locations.filter((item) => item && typeof item === 'object') as Array<Record<string, unknown>>
+    locations: Array.isArray(extractionRoot.locations)
+      ? extractionRoot.locations.filter((item) => item && typeof item === 'object') as Array<Record<string, unknown>>
       : [],
-    characters: Array.isArray(raw.characters)
-      ? raw.characters.filter((item) => item && typeof item === 'object') as Array<Record<string, unknown>>
+    characters: Array.isArray(extractionRoot.characters)
+      ? extractionRoot.characters.filter((item) => item && typeof item === 'object') as Array<Record<string, unknown>>
       : [],
     events: {
       primary: primaryRaw.map((item, index) => normalizeEvent(item, 'PRIMARY', index)),
       secondary: secondaryRaw.map((item, index) => normalizeEvent(item, 'SECONDARY', index)),
     },
-    characterRelations: Array.isArray(raw.characterRelations)
-      ? raw.characterRelations.filter((item) => item && typeof item === 'object') as Array<Record<string, unknown>>
+    characterRelations: Array.isArray(extractionRoot.characterRelations)
+      ? extractionRoot.characterRelations.filter((item) => item && typeof item === 'object') as Array<Record<string, unknown>>
       : [],
   };
+}
+
+function normalizeNullableString(value: unknown): string | null {
+  if (value == null) return null;
+  const text = String(value || '').trim();
+  return text.length > 0 ? text : null;
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+}
+
+function normalizeAgentDraftPatch(value: unknown): WorldStudioAgentDraft | null {
+  if (!value || typeof value !== 'object') return null;
+  const record = asRecord(value);
+  const characterName = String(record.characterName || '').trim();
+  if (!characterName) return null;
+  const normalizeAgentLorebooks = (input: unknown): WorldStudioAgentLorebookDraft[] => {
+    if (!Array.isArray(input)) return [];
+    return input
+      .filter((item) => item && typeof item === 'object')
+      .map((item) => {
+        const lorebook = asRecord(item);
+        return {
+          name: String(lorebook.name || '').trim(),
+          content: String(lorebook.content || '').trim(),
+          keywords: normalizeStringArray(lorebook.keywords),
+          ...(Number.isFinite(Number(lorebook.priority))
+            ? { priority: Number(lorebook.priority) }
+            : {}),
+          ...(Number.isFinite(Number(lorebook.insertionOrder))
+            ? { insertionOrder: Number(lorebook.insertionOrder) }
+            : {}),
+          ...(typeof lorebook.constant === 'boolean' ? { constant: lorebook.constant } : {}),
+          ...(typeof lorebook.selective === 'boolean' ? { selective: lorebook.selective } : {}),
+          ...(Array.isArray(lorebook.secondaryKeys)
+            ? { secondaryKeys: normalizeStringArray(lorebook.secondaryKeys) }
+            : {}),
+          ...(typeof lorebook.enabled === 'boolean' ? { enabled: lorebook.enabled } : {}),
+          ...(typeof lorebook.source === 'string' ? { source: lorebook.source } : {}),
+        } satisfies WorldStudioAgentLorebookDraft;
+      })
+      .filter((item) => Boolean(item.name || item.content));
+  };
+  return {
+    characterName,
+    handle: String(record.handle || '').trim(),
+    concept: String(record.concept || '').trim(),
+    backstory: String(record.backstory || '').trim(),
+    coreValues: String(record.coreValues || '').trim(),
+    relationshipStyle: String(record.relationshipStyle || '').trim(),
+    ...(Object.prototype.hasOwnProperty.call(record, 'description')
+      ? { description: normalizeNullableString(record.description) }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(record, 'scenario')
+      ? { scenario: normalizeNullableString(record.scenario) }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(record, 'greeting')
+      ? { greeting: normalizeNullableString(record.greeting) }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(record, 'exampleDialogue')
+      ? { exampleDialogue: normalizeNullableString(record.exampleDialogue) }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(record, 'systemPromptBase')
+      ? { systemPromptBase: normalizeNullableString(record.systemPromptBase) }
+      : {}),
+    ...(Array.isArray(record.rules)
+      ? { rules: normalizeStringArray(record.rules) }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(record, 'postHistoryInstructions')
+      ? { postHistoryInstructions: normalizeNullableString(record.postHistoryInstructions) }
+      : {}),
+    ...(Array.isArray(record.alternateGreetings)
+      ? { alternateGreetings: normalizeStringArray(record.alternateGreetings) }
+      : {}),
+    ...(Array.isArray(record.agentLorebooks)
+      ? {
+        agentLorebooks: normalizeAgentLorebooks(record.agentLorebooks),
+      }
+      : {}),
+    ...(record.dna && typeof record.dna === 'object' && !Array.isArray(record.dna)
+      ? { dna: record.dna as WorldStudioAgentDraft['dna'] }
+      : {}),
+  };
+}
+
+function normalizeDraftPatch(raw: Record<string, unknown>, chunkIndex: number): DraftPatch {
+  const patchRoot = (() => {
+    const nested = asRecord(raw.draftPatch);
+    if (Object.keys(nested).length > 0) return nested;
+    return raw;
+  })();
+
+  const patch: DraftPatch = { chunkIndex };
+  const world = asRecord(patchRoot.world);
+  if (Object.keys(world).length > 0) patch.world = world;
+  const worldview = asRecord(patchRoot.worldview);
+  if (Object.keys(worldview).length > 0) patch.worldview = worldview;
+
+  if (Array.isArray(patchRoot.worldLorebooks)) {
+    patch.worldLorebooks = patchRoot.worldLorebooks
+      .filter((item) => item && typeof item === 'object')
+      .map((item) => asRecord(item));
+  }
+  if (Array.isArray(patchRoot.futureHistoricalEvents)) {
+    patch.futureHistoricalEvents = patchRoot.futureHistoricalEvents
+      .filter((item) => item && typeof item === 'object')
+      .map((item) => asRecord(item));
+  }
+  if (Array.isArray(patchRoot.agentDrafts)) {
+    patch.agentDrafts = patchRoot.agentDrafts
+      .map((item) => normalizeAgentDraftPatch(item))
+      .filter((item): item is WorldStudioAgentDraft => Boolean(item));
+  }
+  if (Array.isArray(patchRoot.evidenceRefs)) {
+    patch.evidenceRefs = patchRoot.evidenceRefs
+      .filter((item) => item && typeof item === 'object')
+      .map((item) => {
+        const record = asRecord(item);
+        return {
+          fieldPath: String(record.fieldPath || '').trim(),
+          ...(typeof record.segmentId === 'string' ? { segmentId: record.segmentId } : {}),
+          ...(typeof record.eventId === 'string' ? { eventId: record.eventId } : {}),
+          ...(Number.isFinite(Number(record.confidence)) ? { confidence: Number(record.confidence) } : {}),
+        };
+      })
+      .filter((item) => Boolean(item.fieldPath));
+  }
+  if (Array.isArray(patchRoot.notes)) {
+    patch.notes = patchRoot.notes
+      .map((item) => String(item || '').trim())
+      .filter(Boolean);
+  }
+  return patch;
 }
 
 function buildFinePrompt(input: {
@@ -75,62 +224,66 @@ function buildFinePrompt(input: {
   index: number;
   total: number;
   seed?: ChunkExtraction;
+  accumulatedContext?: string;
+  accumulatorSlice?: Record<string, unknown>;
+  missingFields?: string[];
 }): string {
-  const seed = input.seed;
   const focusTargets: string[] = [];
-  if (!seed || seed.events.primary.length === 0) {
+  if (!input.seed || input.seed.events.primary.length === 0) {
     focusTargets.push('PRIMARY events with explicit cause/process/result and evidenceRefs.');
   }
-  if (!seed || seed.events.secondary.length === 0) {
+  if (!input.seed || input.seed.events.secondary.length === 0) {
     focusTargets.push('SECONDARY events linked to PRIMARY via parentEventId.');
   }
-  if (!seed || seed.characters.length === 0) {
-    focusTargets.push('character entities and their event participation.');
-  }
-  if (!seed || seed.locations.length === 0) {
-    focusTargets.push('location entities tied to events.');
-  }
-  if (!seed || seed.characterRelations.length === 0) {
-    focusTargets.push('characterRelations inferred from co-occurrence and causality.');
+  if (!input.seed || input.seed.characters.length === 0) {
+    focusTargets.push('character entities and participation evidence.');
   }
   const focusLine = focusTargets.length > 0
     ? `Focus targets: ${focusTargets.join(' ')}`
-    : 'Focus targets: enrich sparse fields and improve evidence quality.';
+    : 'Focus targets: refine links and patch missing target fields.';
+  const missingFieldLine = input.missingFields && input.missingFields.length > 0
+    ? `Missing target fields to prioritize: ${input.missingFields.join(', ')}`
+    : 'Missing target fields to prioritize: none';
 
   return [
-    'You are a fine-grained event extraction engine.',
-    'Focus on event evidence and missing links between events/characters/locations.',
+    'You are a fine-grained extraction and draft-patch engine.',
+    'For this chunk, produce BOTH: (1) extraction delta for knowledge graph, (2) draftPatch for final world/agent outputs.',
     '',
-    '## Language Rule',
-    'Output ALL field values in the SAME language as the source text.',
-    'If the source is Chinese, output Chinese. If English, output English. Never translate.',
+    'Rules:',
+    '- Output STRICT JSON only (no markdown).',
+    '- Do not fabricate facts; if evidence is insufficient keep fields empty/null/[] or omit optional parts.',
+    '- Keep all names/content in source language.',
+    '- draftPatch can be partial; only include fields supported by this chunk evidence.',
     '',
-    '## Entity Classification Rules',
-    '- characters: Must be specifically named persons or entities with proper names.',
-    '  Do NOT extract descriptive fragments, pronouns, or partial sentences as character names.',
-    '- locations: Must be specifically named, identifiable places. No vague references.',
-    '- events.primary: Must be significant events with meaningful narrative impact.',
-    '- Prefer precision over recall: it is better to miss an entity than to include a wrong one.',
-    '- If a field has no relevant content, return an empty array. Do NOT fabricate entries.',
-    '',
-    'Return STRICT JSON only. No markdown, no commentary.',
-    'Schema:',
+    'Top-level schema:',
     '{',
-    '  "worldSetting":"string summary",',
-    '  "timeline":[{"id":"...","label":"...","description":"...","time":"...","weight":0.0}],',
-    '  "locations":[{"id":"...","name":"...","description":"...","importance":0.0}],',
-    '  "characters":[{"id":"...","name":"...","summary":"...","significance":0.0}],',
-    '  "events":{',
-    '    "primary":[{"id":"...","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}],',
-    '    "secondary":[{"id":"...","parentEventId":"...","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}]',
-    '  },',
-    '  "characterRelations":[{"source":"...","target":"...","relation":"...","reason":"...","strength":0.0}]',
+    '  "extraction": {"worldSetting":"","timeline":[],"locations":[],"characters":[],"events":{"primary":[],"secondary":[]},"characterRelations":[]},',
+    '  "draftPatch": {"world":{},"worldview":{},"worldLorebooks":[],"futureHistoricalEvents":[],"agentDrafts":[],"evidenceRefs":[],"notes":[]}',
     '}',
+    '',
+    'Extraction event item schema:',
+    '{"id":"...","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":[],"characterRefs":[],"dependsOnEventIds":[],"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}',
+    '',
+    'Agent draft patch schema (partial allowed):',
+    '{"characterName":"...","handle":"","concept":"","backstory":"","coreValues":"","relationshipStyle":"","description":"","scenario":"","greeting":"","exampleDialogue":"","systemPromptBase":"","rules":[],"postHistoryInstructions":"","alternateGreetings":[],"agentLorebooks":[],"dna":{}}',
+    '',
     focusLine,
-    'PRIMARY events must include evidenceRefs when source excerpt is available.',
+    missingFieldLine,
     `CHUNK_INDEX: ${input.index + 1}/${input.total}`,
     'CURRENT_COARSE_RESULT:',
     JSON.stringify(input.seed || {}),
+    ...(input.accumulatedContext
+      ? [
+        'ACCUMULATED_FACT_CONTEXT:',
+        input.accumulatedContext,
+      ]
+      : []),
+    ...(input.accumulatorSlice
+      ? [
+        'CURRENT_ACCUMULATOR_SLICE:',
+        JSON.stringify(input.accumulatorSlice),
+      ]
+      : []),
     '<document_content>',
     input.chunk,
     '</document_content>',
@@ -140,14 +293,17 @@ function buildFinePrompt(input: {
 function buildFineSchemaLines(): string[] {
   return [
     '{',
-    '  "worldSetting":"string summary",',
-    '  "timeline":[{"id":"...","label":"...","description":"...","time":"...","weight":0.0}],',
-    '  "locations":[{"id":"...","name":"...","description":"...","importance":0.0}],',
-    '  "characters":[{"id":"...","name":"...","summary":"...","significance":0.0}],',
-    '  "events":{"primary":[{"id":"...","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}],"secondary":[{"id":"...","parentEventId":"...","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}]},',
-    '  "characterRelations":[{"source":"...","target":"...","relation":"...","reason":"...","strength":0.0}]',
+    '  "extraction":{"worldSetting":"string summary","timeline":[],"locations":[],"characters":[],"events":{"primary":[],"secondary":[]},"characterRelations":[]},',
+    '  "draftPatch":{"world":{},"worldview":{},"worldLorebooks":[],"futureHistoricalEvents":[],"agentDrafts":[],"evidenceRefs":[],"notes":[]}',
     '}',
   ];
+}
+
+function parseFineOutput(raw: Record<string, unknown>, chunkIndex: number): { extraction: ChunkExtraction; draftPatch: DraftPatch } {
+  return {
+    extraction: normalizeFineExtraction(raw),
+    draftPatch: normalizeDraftPatch(raw, chunkIndex),
+  };
 }
 
 export async function extractChunkFine(
@@ -157,9 +313,12 @@ export async function extractChunkFine(
     index: number;
     total: number;
     seed?: ChunkExtraction;
+    accumulatedContext?: string;
+    accumulatorSlice?: Record<string, unknown>;
+    missingFields?: string[];
     abortSignal?: AbortSignal;
   },
-): Promise<{ extraction: ChunkExtraction; retryCount: number }> {
+): Promise<{ extraction: ChunkExtraction; draftPatch: DraftPatch; retryCount: number }> {
   const prompt = buildFinePrompt(input);
   const first = await llm.generateText({
     routeHint: 'chat/fine',
@@ -169,7 +328,7 @@ export async function extractChunkFine(
   });
   try {
     return {
-      extraction: normalizeFineExtraction(parseJsonRecord(first.text)),
+      ...parseFineOutput(parseJsonRecord(first.text), input.index),
       retryCount: 0,
     };
   } catch (firstError) {
@@ -189,7 +348,7 @@ export async function extractChunkFine(
     });
     try {
       return {
-        extraction: normalizeFineExtraction(parseJsonRecord(second.text)),
+        ...parseFineOutput(parseJsonRecord(second.text), input.index),
         retryCount: 1,
       };
     } catch (secondError) {

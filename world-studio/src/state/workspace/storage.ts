@@ -1,6 +1,7 @@
 import { asRecord, loadLocalStorageJson, safeParseObject, saveLocalStorageJson } from '@nimiplatform/mod-sdk/utils';
-import type { WorldStudioWorkspaceSnapshot } from '../../contracts.js';
+import type { EventNodeDraft, WorldStudioWorkspaceSnapshot } from '../../contracts.js';
 import { cloneDefaultSnapshot } from './defaults.js';
+import { toLegacyPrimaryEvents } from './migrate-legacy.js';
 import {
   normalizeEventsDraft,
   normalizeLorebooksDraft,
@@ -13,6 +14,7 @@ import {
 import { emitWorldStudioLog } from '../../logging.js';
 
 const STORAGE_PREFIX_V3 = 'nimi.world-studio.workspace.v3.';
+const STORAGE_PREFIX_V1 = 'nimi.world-studio.workspace.v1.';
 
 function diagLog(message: string, details?: Record<string, unknown>) {
   try {
@@ -31,6 +33,10 @@ function storageKeyForUser(userId: string): string {
   return `${STORAGE_PREFIX_V3}${String(userId || '').trim()}`;
 }
 
+function legacyStorageKeyForUser(userId: string): string {
+  return `${STORAGE_PREFIX_V1}${String(userId || '').trim()}`;
+}
+
 export function readSnapshotFromStorage(userId: string): WorldStudioWorkspaceSnapshot | null {
   const normalizedUserId = String(userId || '').trim();
   if (!normalizedUserId || typeof window === 'undefined') return null;
@@ -39,6 +45,11 @@ export function readSnapshotFromStorage(userId: string): WorldStudioWorkspaceSna
     const parsed = (
       loadLocalStorageJson<Partial<WorldStudioWorkspaceSnapshot> | null>(
         storageKeyForUser(normalizedUserId),
+        null,
+        (value) => (value && typeof value === 'object' ? (value as Partial<WorldStudioWorkspaceSnapshot>) : null),
+      )
+      || loadLocalStorageJson<Partial<WorldStudioWorkspaceSnapshot> | null>(
+        legacyStorageKeyForUser(normalizedUserId),
         null,
         (value) => (value && typeof value === 'object' ? (value as Partial<WorldStudioWorkspaceSnapshot>) : null),
       )
@@ -51,6 +62,7 @@ export function readSnapshotFromStorage(userId: string): WorldStudioWorkspaceSna
       return null;
     }
     const base = cloneDefaultSnapshot();
+    const parsedKnowledgeGraph = asRecord(parsed.knowledgeGraph);
     const parsedWorldPatchRaw = asRecord(parsed.worldPatch);
     const parsedWorldviewPatchRaw = asRecord(parsed.worldviewPatch);
     const parsedWorldPatch = Object.keys(parsedWorldPatchRaw).length > 0
@@ -59,6 +71,7 @@ export function readSnapshotFromStorage(userId: string): WorldStudioWorkspaceSna
     const parsedWorldviewPatch = Object.keys(parsedWorldviewPatchRaw).length > 0
       ? parsedWorldviewPatchRaw
       : safeParseObject(String(parsed.worldviewPatchText || '{}'));
+    const legacyPrimaryEvents = toLegacyPrimaryEvents(parsedKnowledgeGraph);
     const parsedEventsDraftRaw = normalizeEventsDraft(parsed.eventsDraft || {});
     const parsedEventsFromText = parseEventsDraftFromText(String(parsed.eventsText || ''));
     const parsedKnowledgeEvents = normalizeEventsDraft(
@@ -70,7 +83,11 @@ export function readSnapshotFromStorage(userId: string): WorldStudioWorkspaceSna
         : (
           (parsedEventsFromText.primary.length > 0 || parsedEventsFromText.secondary.length > 0)
             ? parsedEventsFromText
-            : parsedKnowledgeEvents
+            : (
+              (parsedKnowledgeEvents.primary.length > 0 || parsedKnowledgeEvents.secondary.length > 0)
+                ? parsedKnowledgeEvents
+                : { primary: legacyPrimaryEvents, secondary: [] as EventNodeDraft[] }
+            )
         );
     const parsedLorebooksDraftRaw = normalizeLorebooksDraft(parsed.lorebooksDraft || (parsed as Record<string, unknown>).factsDraft as unknown[] || []);
     const parsedLorebooksDraft = parsedLorebooksDraftRaw.length > 0
@@ -149,6 +166,21 @@ export function readSnapshotFromStorage(userId: string): WorldStudioWorkspaceSna
       }),
       parsePhase: synced.parseJob.phase,
       createStep: synced.createStep,
+      finalDraftAccumulator: {
+        worldKeys: Object.keys(asRecord(synced.finalDraftAccumulator.world || {})),
+        worldviewKeys: Object.keys(asRecord(synced.finalDraftAccumulator.worldview || {})),
+        lorebookCount: Array.isArray(synced.finalDraftAccumulator.worldLorebooks)
+          ? synced.finalDraftAccumulator.worldLorebooks.length
+          : 0,
+        futureEventCount: Array.isArray(synced.finalDraftAccumulator.futureHistoricalEvents)
+          ? synced.finalDraftAccumulator.futureHistoricalEvents.length
+          : 0,
+        agentDraftKeys: Object.keys(synced.finalDraftAccumulator.agentDraftsByCharacter || {}),
+        revisionCount: Array.isArray(synced.finalDraftAccumulator.revisions)
+          ? synced.finalDraftAccumulator.revisions.length
+          : 0,
+        lastUpdatedChunk: synced.finalDraftAccumulator.lastUpdatedChunk,
+      },
     });
     return {
       ...synced,
@@ -193,5 +225,20 @@ export function persistSnapshotToStorage(userId: string, snapshot: WorldStudioWo
         agentLorebookCount: Array.isArray(record.agentLorebooks) ? record.agentLorebooks.length : 0,
       };
     }),
+    finalDraftAccumulator: {
+      worldKeys: Object.keys(asRecord(synced.finalDraftAccumulator.world || {})),
+      worldviewKeys: Object.keys(asRecord(synced.finalDraftAccumulator.worldview || {})),
+      lorebookCount: Array.isArray(synced.finalDraftAccumulator.worldLorebooks)
+        ? synced.finalDraftAccumulator.worldLorebooks.length
+        : 0,
+      futureEventCount: Array.isArray(synced.finalDraftAccumulator.futureHistoricalEvents)
+        ? synced.finalDraftAccumulator.futureHistoricalEvents.length
+        : 0,
+      agentDraftKeys: Object.keys(synced.finalDraftAccumulator.agentDraftsByCharacter || {}),
+      revisionCount: Array.isArray(synced.finalDraftAccumulator.revisions)
+        ? synced.finalDraftAccumulator.revisions.length
+        : 0,
+      lastUpdatedChunk: synced.finalDraftAccumulator.lastUpdatedChunk,
+    },
   });
 }

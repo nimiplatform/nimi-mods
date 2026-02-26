@@ -1,6 +1,11 @@
 import type { ModAiClient } from '@nimiplatform/mod-sdk/ai';
 import { runSynthesizeDraft } from '../engine/synthesize.js';
-import type { Phase2Result, WorldStudioKnowledgeGraphDraft, WorldStudioRouteOverride } from '../engine/types.js';
+import type {
+  FinalDraftAccumulator,
+  Phase2Result,
+  WorldStudioKnowledgeGraphDraft,
+  WorldStudioRouteOverride,
+} from '../engine/types.js';
 import { withRouteOverride } from './route-capability-resolver.js';
 
 export async function runPhase2DraftGeneration(
@@ -9,6 +14,7 @@ export async function runPhase2DraftGeneration(
     selectedStartTimeId: string;
     selectedCharacters: string[];
     knowledgeGraph?: Record<string, unknown>;
+    finalDraftAccumulator?: FinalDraftAccumulator;
   },
   options?: {
     routeOverride?: WorldStudioRouteOverride | null;
@@ -31,6 +37,7 @@ export async function runPhase2DraftGeneration(
       characterRelations: [],
       futureHistoricalEvents: [],
     }) as WorldStudioKnowledgeGraphDraft,
+    finalDraftAccumulator: input.finalDraftAccumulator,
     abortSignal: options?.abortSignal,
   });
 }

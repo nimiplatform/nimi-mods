@@ -7,6 +7,7 @@ import type {
   WorldLorebookDraftRow,
   WorldStudioAgentSyncPlan,
   WorldStudioAssetDraft,
+  FinalDraftAccumulator,
   WorldStudioKnowledgeGraphDraft,
   WorldStudioNarrativeArc,
   WorldStudioParseJobState,
@@ -134,6 +135,7 @@ export type WorldStudioWorkspaceSnapshot = {
   lorebooksText?: string;
   parseJob: WorldStudioParseJobState;
   knowledgeGraph: WorldStudioKnowledgeGraphDraft;
+  finalDraftAccumulator: FinalDraftAccumulator;
   phase1Artifact: WorldStudioPhase1Artifact | null;
   assets: WorldStudioAssetDraft;
   agentSync: WorldStudioAgentSyncPlan;

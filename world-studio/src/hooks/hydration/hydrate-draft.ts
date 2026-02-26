@@ -61,6 +61,7 @@ export function useWorldStudioDraftHydration(input: WorldStudioDraftHydrationInp
         });
         const payload = asRecord(draft.draftPayload);
         const pipelineState = asRecord(draft.pipelineState);
+        const payloadFinalDraftAccumulator = asRecord(payload.finalDraftAccumulator);
         const payloadAgentSync = asRecord(payload.agentSync);
         const payloadAgentDraftsByCharacter = asRecord(payloadAgentSync.draftsByCharacter);
         const selectedCharacterIds = Array.isArray(payloadAgentSync.selectedCharacterIds)
@@ -74,7 +75,9 @@ export function useWorldStudioDraftHydration(input: WorldStudioDraftHydrationInp
         const eventsRoot = asRecord(payload.events);
         const primaryEvents = Array.isArray(eventsRoot.primary)
           ? (eventsRoot.primary as Array<Record<string, unknown>>)
-          : [];
+          : (Array.isArray(payload.majorEvents)
+            ? (payload.majorEvents as Array<Record<string, unknown>>)
+            : []);
         const secondaryEvents = Array.isArray(eventsRoot.secondary)
           ? (eventsRoot.secondary as Array<Record<string, unknown>>)
           : [];
@@ -86,6 +89,22 @@ export function useWorldStudioDraftHydration(input: WorldStudioDraftHydrationInp
           primaryEvents: primaryEvents.length,
           secondaryEvents: secondaryEvents.length,
           hasAgentSync: Object.keys(payloadAgentSync).length > 0,
+          hasFinalDraftAccumulator: Object.keys(payloadFinalDraftAccumulator).length > 0,
+          finalDraftAccumulatorSummary: {
+            worldKeys: Object.keys(asRecord(payloadFinalDraftAccumulator.world || {})),
+            worldviewKeys: Object.keys(asRecord(payloadFinalDraftAccumulator.worldview || {})),
+            worldLorebookCount: Array.isArray(payloadFinalDraftAccumulator.worldLorebooks)
+              ? payloadFinalDraftAccumulator.worldLorebooks.length
+              : 0,
+            futureHistoricalEventCount: Array.isArray(payloadFinalDraftAccumulator.futureHistoricalEvents)
+              ? payloadFinalDraftAccumulator.futureHistoricalEvents.length
+              : 0,
+            agentDraftKeys: Object.keys(asRecord(payloadFinalDraftAccumulator.agentDraftsByCharacter)),
+            revisionCount: Array.isArray(payloadFinalDraftAccumulator.revisions)
+              ? payloadFinalDraftAccumulator.revisions.length
+              : 0,
+            lastUpdatedChunk: Number(payloadFinalDraftAccumulator.lastUpdatedChunk || -1),
+          },
           agentDraftKeys: Object.keys(payloadAgentDraftsByCharacter),
           agentDraftFieldCoverage: Object.entries(payloadAgentDraftsByCharacter).map(([name, draftValue]) => {
             const draftRecord = asRecord(draftValue);
@@ -111,7 +130,7 @@ export function useWorldStudioDraftHydration(input: WorldStudioDraftHydrationInp
             secondary: secondaryEvents as EventNodeDraft[],
           },
           lorebooksDraft: (() => {
-            const raw = payload.worldLorebooks;
+            const raw = payload.worldLorebooks ?? payload.worldFacts;
             return Array.isArray(raw)
               ? (raw as unknown[]).filter((item) => item && typeof item === 'object') as WorldLorebookDraftRow[]
               : [];
@@ -125,6 +144,7 @@ export function useWorldStudioDraftHydration(input: WorldStudioDraftHydrationInp
             },
             futureHistoricalEvents,
           },
+          finalDraftAccumulator: payloadFinalDraftAccumulator as WorldStudioWorkspaceSnapshot['finalDraftAccumulator'],
           eventGraphLayout: {
             selectedEventId: String(primaryEvents[0]?.id || secondaryEvents[0]?.id || ''),
             expandedPrimaryIds: primaryEvents[0]?.id ? [String(primaryEvents[0].id)] : [],

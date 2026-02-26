@@ -14,6 +14,8 @@ const CHUNK_CHARACTERS_MAX = 14;
 const CHUNK_PRIMARY_EVENTS_MAX = 8;
 const CHUNK_SECONDARY_EVENTS_MAX = 12;
 const CHUNK_RELATIONS_MAX = 14;
+const STRICT_REPAIR_OUTPUT_LIMIT = 1400;
+const STRICT_REPAIR_SOURCE_LIMIT = 2200;
 
 function normalizeEvidenceRefs(value: unknown): EvidenceRefDraft[] {
   if (!Array.isArray(value)) return [];
@@ -181,6 +183,45 @@ function buildCoarseSchemaLines(): string[] {
   ];
 }
 
+function truncateForStrictRepair(value: string, limit: number): string {
+  const text = String(value || '');
+  if (text.length <= limit) return text;
+  return `${text.slice(0, Math.max(0, limit - 3))}...`;
+}
+
+function buildStrictCoarseRepairPrompt(input: {
+  schemaLines: string[];
+  chunk: string;
+  chunkIndex: number;
+  chunkTotal: number;
+  firstOutput: string;
+  secondOutput: string;
+  firstError: string;
+  secondError: string;
+}): string {
+  return [
+    'CRITICAL JSON REPAIR MODE.',
+    'You must return exactly ONE valid JSON object and nothing else.',
+    'If uncertain, keep arrays empty and strings empty, but JSON must be strictly valid.',
+    'Do not use markdown fences, comments, trailing commas, or unquoted keys.',
+    'Schema:',
+    ...input.schemaLines,
+    'Rules:',
+    '- Output must start with { and end with }.',
+    '- Keep required top-level keys: worldSetting, timeline, locations, characters, events, characterRelations.',
+    '- events must include both primary and secondary arrays.',
+    `CHUNK_INDEX: ${input.chunkIndex + 1}/${input.chunkTotal}`,
+    `FIRST_PARSE_ERROR: ${input.firstError}`,
+    `SECOND_PARSE_ERROR: ${input.secondError}`,
+    'FIRST_INVALID_OUTPUT:',
+    truncateForStrictRepair(input.firstOutput, STRICT_REPAIR_OUTPUT_LIMIT),
+    'SECOND_INVALID_OUTPUT:',
+    truncateForStrictRepair(input.secondOutput, STRICT_REPAIR_OUTPUT_LIMIT),
+    'ORIGINAL_CHUNK_SOURCE:',
+    truncateForStrictRepair(input.chunk, STRICT_REPAIR_SOURCE_LIMIT),
+  ].join('\n');
+}
+
 export async function extractChunkCoarse(
   llm: RouteCapabilityLlmInvoker,
   input: { chunk: string; index: number; total: number; abortSignal?: AbortSignal; accumulatedContext?: string },
@@ -218,9 +259,32 @@ export async function extractChunkCoarse(
         retryCount: 1,
       };
     } catch (secondError) {
-      throw new Error(
-        `WORLD_STUDIO_COARSE_JSON_PARSE_FAILED: ${summarizeModelError(firstError)} -> ${summarizeModelError(secondError)}`,
-      );
+      const strictRepairPrompt = buildStrictCoarseRepairPrompt({
+        schemaLines: buildCoarseSchemaLines(),
+        chunk: input.chunk,
+        chunkIndex: input.index,
+        chunkTotal: input.total,
+        firstOutput: String(first.text || ''),
+        secondOutput: String(second.text || ''),
+        firstError: summarizeModelError(firstError),
+        secondError: summarizeModelError(secondError),
+      });
+      const third = await llm.generateText({
+        routeHint: 'chat/retry-low-temp',
+        prompt: strictRepairPrompt,
+        mode: 'STORY',
+        abortSignal: input.abortSignal,
+      });
+      try {
+        return {
+          extraction: normalizeChunkExtraction(parseJsonRecord(third.text)),
+          retryCount: 2,
+        };
+      } catch (thirdError) {
+        throw new Error(
+          `WORLD_STUDIO_COARSE_JSON_PARSE_FAILED: ${summarizeModelError(firstError)} -> ${summarizeModelError(secondError)} -> ${summarizeModelError(thirdError)}`,
+        );
+      }
     }
   }
 }

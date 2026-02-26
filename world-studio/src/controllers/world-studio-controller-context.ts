@@ -78,6 +78,7 @@ export function useWorldStudioControllerContext(input: UseWorldStudioControllerC
       startTimeOptions: input.snapshot.phase1Artifact.startTimeOptions,
       characterCandidates: input.snapshot.phase1Artifact.characterCandidates,
       knowledgeGraph: input.snapshot.knowledgeGraph,
+      finalDraftAccumulator: input.snapshot.finalDraftAccumulator,
       qualityGate: input.snapshot.phase1Artifact.qualityGate,
       chunkTasks: input.snapshot.phase1Artifact.chunkTasks,
       rawText: JSON.stringify({

@@ -84,6 +84,7 @@ export async function saveWorldDraft(
       events: input.snapshot.eventsDraft,
       worldLorebooks: input.snapshot.lorebooksDraft,
       futureHistoricalEvents,
+      finalDraftAccumulator: input.snapshot.finalDraftAccumulator,
       agentSync: {
         selectedCharacterIds: toUniqueStringArray(input.snapshot.agentSync.selectedCharacterIds),
         ownershipType: 'WORLD_OWNED' as const,
@@ -116,6 +117,15 @@ export async function saveWorldDraft(
         };
       }),
       agentSyncOwnershipType: input.snapshot.agentSync.ownershipType,
+      finalDraftAccumulator: {
+        worldKeys: Object.keys(asRecord(input.snapshot.finalDraftAccumulator.world || {})),
+        worldviewKeys: Object.keys(asRecord(input.snapshot.finalDraftAccumulator.worldview || {})),
+        lorebookCount: input.snapshot.finalDraftAccumulator.worldLorebooks.length,
+        futureEventCount: input.snapshot.finalDraftAccumulator.futureHistoricalEvents.length,
+        agentDraftKeys: Object.keys(input.snapshot.finalDraftAccumulator.agentDraftsByCharacter || {}),
+        revisionCount: input.snapshot.finalDraftAccumulator.revisions.length,
+        lastUpdatedChunk: input.snapshot.finalDraftAccumulator.lastUpdatedChunk,
+      },
       pipelineStateSelectedCharacters: pipelineState.selectedCharacters,
     });
 

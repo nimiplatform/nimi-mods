@@ -14,7 +14,8 @@ import type {
   WorldStudioTaskState,
   WorldStudioWorkspaceSnapshot,
 } from '../../contracts.js';
-import { buildRecoveredPhase1Artifact } from '../../services/phase1-artifact.js';
+import { buildLegacyPhase1Artifact } from '../../services/phase1-artifact.js';
+import { createEmptyFinalDraftAccumulator } from '../../engine/final-draft-accumulator.js';
 
 function defaultQualityMetrics(): QualityGateResult['metrics'] {
   return {
@@ -254,6 +255,50 @@ function normalizeAgentDraft(value: unknown): WorldStudioAgentDraft | null {
   };
 }
 
+function normalizeFinalDraftAccumulator(value: unknown): WorldStudioWorkspaceSnapshot['finalDraftAccumulator'] {
+  const base = createEmptyFinalDraftAccumulator();
+  const record = asRecord(value);
+  const agentDraftsByCharacter = Object.entries(asRecord(record.agentDraftsByCharacter)).reduce((acc, [key, draft]) => {
+    const normalized = normalizeAgentDraft(draft);
+    if (!normalized) return acc;
+    acc[String(key)] = normalized;
+    return acc;
+  }, {} as Record<string, WorldStudioAgentDraft>);
+
+  return {
+    ...base,
+    world: asRecord(record.world),
+    worldview: asRecord(record.worldview),
+    worldLorebooks: Array.isArray(record.worldLorebooks)
+      ? record.worldLorebooks.filter((item) => item && typeof item === 'object').map((item) => asRecord(item))
+      : [],
+    futureHistoricalEvents: Array.isArray(record.futureHistoricalEvents)
+      ? record.futureHistoricalEvents.filter((item) => item && typeof item === 'object').map((item) => asRecord(item))
+      : [],
+    agentDraftsByCharacter,
+    revisions: Array.isArray(record.revisions)
+      ? record.revisions
+        .filter((item) => item && typeof item === 'object')
+        .map((item) => {
+          const revision = asRecord(item);
+          return {
+            chunkIndex: Number.isInteger(Number(revision.chunkIndex)) ? Number(revision.chunkIndex) : -1,
+            appliedAt: String(revision.appliedAt || new Date().toISOString()),
+            changedFields: Array.isArray(revision.changedFields)
+              ? revision.changedFields.map((field) => String(field || '').trim()).filter(Boolean)
+              : [],
+            ...(typeof revision.note === 'string' && revision.note.trim().length > 0
+              ? { note: revision.note.trim() }
+              : {}),
+          };
+        })
+      : [],
+    lastUpdatedChunk: Number.isInteger(Number(record.lastUpdatedChunk))
+      ? Number(record.lastUpdatedChunk)
+      : -1,
+  };
+}
+
 function normalizeEmbeddingVector(value: unknown): number[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -482,7 +527,7 @@ export function syncSnapshot(snapshot: WorldStudioWorkspaceSnapshot): WorldStudi
   const lorebooksDraft = normalizeLorebooksDraft(snapshot.lorebooksDraft || []);
   const taskState = normalizeTaskState(snapshot.taskState || {});
   const phase1Artifact = normalizePhase1Artifact(snapshot.phase1Artifact)
-    || buildRecoveredPhase1Artifact(snapshot);
+    || buildLegacyPhase1Artifact(snapshot);
   const parseJob = {
     ...snapshot.parseJob,
     chunkTotal: Math.max(0, Number(snapshot.parseJob?.chunkTotal) || 0),
@@ -502,6 +547,7 @@ export function syncSnapshot(snapshot: WorldStudioWorkspaceSnapshot): WorldStudi
     return acc;
   }, {} as Record<string, WorldStudioAgentDraft>);
   const embeddingIndex = normalizeEmbeddingIndex(snapshot.embeddingIndex || {});
+  const finalDraftAccumulator = normalizeFinalDraftAccumulator(snapshot.finalDraftAccumulator || {});
 
   return {
     ...snapshot,
@@ -517,6 +563,7 @@ export function syncSnapshot(snapshot: WorldStudioWorkspaceSnapshot): WorldStudi
       ...snapshot.knowledgeGraph,
       events: eventsDraft,
     },
+    finalDraftAccumulator,
     agentSync: {
       ...snapshot.agentSync,
       draftsByCharacter,

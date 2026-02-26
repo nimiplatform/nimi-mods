@@ -1,6 +1,8 @@
 import type { RuntimeRouteBinding } from '@nimiplatform/mod-sdk/runtime-route';
 import { splitSourceText } from '../../../engine/chunker.js';
+import { applyDraftPatch, createEmptyFinalDraftAccumulator } from '../../../engine/final-draft-accumulator.js';
 import { mergeExtractions, toCharacterCandidates, toStartTimeOptions } from '../../../engine/merge.js';
+import { backfillKnowledgeGraphEventFields } from '../../../engine/heuristic/event-field-backfill.js';
 import { evaluateQualityGate } from '../../../engine/quality-gate.js';
 import type { WorldStudioParseJobState } from '../../../contracts.js';
 import {
@@ -9,6 +11,7 @@ import {
 } from '../../../services/event-graph-map.js';
 import type {
   DistillRouteOverrideMap,
+  FinalDraftAccumulator,
   Phase1Result,
 } from '../../../generation/pipeline.js';
 import type { WorldStudioCreateActionsInput } from './types.js';
@@ -17,11 +20,11 @@ import type { AdaptiveChunkPolicy } from './chunk-policy.js';
 export function resolvePhase1Chunks(
   input: WorldStudioCreateActionsInput,
   chunkPolicy: AdaptiveChunkPolicy,
-): { allChunks: string[]; usesPreChunkedFileSource: boolean } {
+): { allChunks: string[]; usedLegacyFileChunks: boolean } {
   const hasFileRawText = input.sourceMode === 'FILE' && input.sourceRawTextRef.current.trim().length > 0;
-  const hasPreChunkedFileSource = input.sourceMode === 'FILE' && input.sourceChunksRef.current.length > 0;
+  const hasFileChunks = input.sourceMode === 'FILE' && input.sourceChunksRef.current.length > 0;
   const hasInlineText = input.snapshot.sourceText.trim().length > 0;
-  if (!hasFileRawText && !hasPreChunkedFileSource && !hasInlineText) {
+  if (!hasFileRawText && !hasFileChunks && !hasInlineText) {
     throw new Error('Source text is required.');
   }
   const allChunks = hasFileRawText
@@ -40,7 +43,7 @@ export function resolvePhase1Chunks(
   }
   return {
     allChunks,
-    usesPreChunkedFileSource: !hasFileRawText && hasPreChunkedFileSource,
+    usedLegacyFileChunks: !hasFileRawText && hasFileChunks,
   };
 }
 
@@ -92,18 +95,40 @@ export function mergeRetryPhase1Result(
   result: Phase1Result,
 ): Phase1Result {
   if (mode !== 'failed') return result;
+
+  const mergeFinalDraftAccumulator = (
+    base: FinalDraftAccumulator,
+    incoming: FinalDraftAccumulator,
+  ): FinalDraftAccumulator => {
+    const patched = applyDraftPatch(base, {
+      chunkIndex: Math.max(base.lastUpdatedChunk, incoming.lastUpdatedChunk),
+      world: incoming.world,
+      worldview: incoming.worldview,
+      worldLorebooks: incoming.worldLorebooks,
+      futureHistoricalEvents: incoming.futureHistoricalEvents,
+      agentDrafts: Object.values(incoming.agentDraftsByCharacter || {}),
+      notes: ['mergeRetryPhase1Result'],
+    }).next;
+    return {
+      ...patched,
+      revisions: [...(base.revisions || []), ...(incoming.revisions || []), ...(patched.revisions || [])].slice(-120),
+      lastUpdatedChunk: Math.max(base.lastUpdatedChunk, incoming.lastUpdatedChunk, patched.lastUpdatedChunk),
+    };
+  };
+
   const basePhase1 = input.phase1 || (input.snapshot.phase1Artifact
     ? {
       knowledgeGraph: input.snapshot.knowledgeGraph,
       chunkTasks: input.snapshot.phase1Artifact.chunkTasks,
       characterCandidates: input.snapshot.phase1Artifact.characterCandidates,
+      finalDraftAccumulator: input.snapshot.finalDraftAccumulator,
     }
     : null);
   if (!basePhase1) return result;
-  const mergedGraph = mergeExtractions([
+  const mergedGraph = backfillKnowledgeGraphEventFields(mergeExtractions([
     basePhase1.knowledgeGraph,
     result.knowledgeGraph,
-  ]);
+  ]), allChunks.join('\n'));
   const mergedChunkTasks = [...basePhase1.chunkTasks, ...result.chunkTasks];
   const mergedStatusMap = toTerminalChunkTaskMap(mergedChunkTasks, allChunks.length);
   const successChunks = Array.from(mergedStatusMap.values()).filter((task) => task.status === 'success').length;
@@ -117,11 +142,16 @@ export function mergeRetryPhase1Result(
     const candidates = toCharacterCandidates(mergedGraph.characters as Array<Record<string, unknown>>);
     return candidates.length > 0 ? candidates : basePhase1.characterCandidates || [];
   })();
+  const mergedFinalDraftAccumulator = mergeFinalDraftAccumulator(
+    basePhase1.finalDraftAccumulator || createEmptyFinalDraftAccumulator(),
+    result.finalDraftAccumulator || createEmptyFinalDraftAccumulator(),
+  );
   return {
     ...result,
     startTimeOptions: mergedStartTimeOptions,
     characterCandidates: mergedCharacterCandidates,
     knowledgeGraph: mergedGraph,
+    finalDraftAccumulator: mergedFinalDraftAccumulator,
     qualityGate: mergedQualityGate,
     chunkTasks: mergedChunkTasks,
     rawText: JSON.stringify({
@@ -131,6 +161,7 @@ export function mergeRetryPhase1Result(
       mergedQualityGate,
       mergedChunkTasks,
       mergedGraph,
+      mergedFinalDraftAccumulator,
     }),
   };
 }

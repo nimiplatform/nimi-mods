@@ -3,7 +3,7 @@ import type { RuntimeRouteBinding } from '@nimiplatform/mod-sdk/runtime-route';
 import type { EventNodeDraft, WorldStudioTaskRecord } from '../../../contracts.js';
 import { resolveContextTokenBudget } from '../../../engine/accumulated-context.js';
 import { isContextOverflowText } from '../../../engine/errors.js';
-import type { AccumulatedState, ChunkTaskResult } from '../../../engine/types.js';
+import type { AccumulatedState, ChunkTaskResult, DraftPatch, FinalDraftAccumulator } from '../../../engine/types.js';
 import { runPhase1ExtractionFromChunks } from '../../../generation/pipeline.js';
 import { emitWorldStudioLog } from '../../../logging.js';
 import { toFailedChunkIndices } from '../../../services/event-graph-map.js';
@@ -60,6 +60,115 @@ function summarizeChunkTasks(tasks: ChunkTaskResult[]): {
     .slice(0, 10)
     .map(([code, count]) => ({ code, count }));
   return { total, success, failed, failedByCode };
+}
+
+function summarizeFinalDraftAccumulator(accumulator: FinalDraftAccumulator | undefined): Record<string, unknown> {
+  if (!accumulator) {
+    return {
+      hasAccumulator: false,
+    };
+  }
+  return {
+    hasAccumulator: true,
+    worldKeys: Object.keys(asRecord(accumulator.world || {})),
+    worldviewKeys: Object.keys(asRecord(accumulator.worldview || {})),
+    worldLorebooks: Array.isArray(accumulator.worldLorebooks) ? accumulator.worldLorebooks.length : 0,
+    futureHistoricalEvents: Array.isArray(accumulator.futureHistoricalEvents) ? accumulator.futureHistoricalEvents.length : 0,
+    agentDraftKeys: Object.keys(accumulator.agentDraftsByCharacter || {}),
+    revisionCount: Array.isArray(accumulator.revisions) ? accumulator.revisions.length : 0,
+    lastUpdatedChunk: accumulator.lastUpdatedChunk,
+  };
+}
+
+function isFinalDraftAccumulatorPopulated(accumulator: FinalDraftAccumulator | undefined): boolean {
+  if (!accumulator) return false;
+  return (
+    Object.keys(asRecord(accumulator.world || {})).length > 0
+    || Object.keys(asRecord(accumulator.worldview || {})).length > 0
+    || (Array.isArray(accumulator.worldLorebooks) && accumulator.worldLorebooks.length > 0)
+    || (Array.isArray(accumulator.futureHistoricalEvents) && accumulator.futureHistoricalEvents.length > 0)
+    || Object.keys(accumulator.agentDraftsByCharacter || {}).length > 0
+  );
+}
+
+function summarizeDraftPatch(patch: DraftPatch): Record<string, unknown> {
+  return {
+    chunkIndex: patch.chunkIndex,
+    worldKeys: Object.keys(asRecord(patch.world || {})),
+    worldviewKeys: Object.keys(asRecord(patch.worldview || {})),
+    worldLorebookCount: Array.isArray(patch.worldLorebooks) ? patch.worldLorebooks.length : 0,
+    futureEventCount: Array.isArray(patch.futureHistoricalEvents) ? patch.futureHistoricalEvents.length : 0,
+    agentDraftCharacters: Array.isArray(patch.agentDrafts)
+      ? patch.agentDrafts.map((item) => String(item.characterName || '')).filter(Boolean)
+      : [],
+    evidenceRefCount: Array.isArray(patch.evidenceRefs) ? patch.evidenceRefs.length : 0,
+    noteCount: Array.isArray(patch.notes) ? patch.notes.length : 0,
+  };
+}
+
+function summarizeTerminalChunkFailures(tasks: ChunkTaskResult[]): {
+  terminalTotal: number;
+  terminalSuccess: number;
+  terminalFailed: number;
+  failedByStage: Array<{ stage: string; count: number }>;
+  failedByKind: Array<{ kind: 'json_parse' | 'context_overflow' | 'other'; count: number }>;
+  topFailedErrorCodes: Array<{ code: string; count: number }>;
+} {
+  const terminalMap = new Map<number, ChunkTaskResult>();
+  tasks.forEach((task) => {
+    const existing = terminalMap.get(task.chunkIndex);
+    if (!existing) {
+      terminalMap.set(task.chunkIndex, task);
+      return;
+    }
+    if (task.status === 'success' || existing.status !== 'success') {
+      terminalMap.set(task.chunkIndex, task);
+    }
+  });
+
+  const terminalTasks = Array.from(terminalMap.values());
+  const failedTasks = terminalTasks.filter((task) => task.status !== 'success');
+  const failedByStageMap = new Map<string, number>();
+  const failedByKindMap = new Map<'json_parse' | 'context_overflow' | 'other', number>();
+  const topFailedErrorCodeMap = new Map<string, number>();
+
+  failedTasks.forEach((task) => {
+    const stage = String(task.stage || 'unknown').toLowerCase();
+    failedByStageMap.set(stage, (failedByStageMap.get(stage) || 0) + 1);
+
+    const code = String(task.errorCode || '').toLowerCase();
+    const message = String(task.errorMessage || '').toLowerCase();
+    const kind: 'json_parse' | 'context_overflow' | 'other' = isContextOverflowTask(task)
+      ? 'context_overflow'
+      : (
+        code.includes('json')
+        || code.includes('parse')
+        || message.includes('json')
+        || message.includes('parse')
+      )
+        ? 'json_parse'
+        : 'other';
+    failedByKindMap.set(kind, (failedByKindMap.get(kind) || 0) + 1);
+
+    const errorCode = String(task.errorCode || 'UNKNOWN');
+    topFailedErrorCodeMap.set(errorCode, (topFailedErrorCodeMap.get(errorCode) || 0) + 1);
+  });
+
+  return {
+    terminalTotal: terminalTasks.length,
+    terminalSuccess: terminalTasks.length - failedTasks.length,
+    terminalFailed: failedTasks.length,
+    failedByStage: Array.from(failedByStageMap.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([stage, count]) => ({ stage, count })),
+    failedByKind: Array.from(failedByKindMap.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([kind, count]) => ({ kind, count })),
+    topFailedErrorCodes: Array.from(topFailedErrorCodeMap.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, 10)
+      .map(([code, count]) => ({ code, count })),
+  };
 }
 
 function isContextOverflowTask(task: Pick<ChunkTaskResult, 'errorCode' | 'errorMessage'>): boolean {
@@ -165,6 +274,7 @@ function applyPhase1ResultSnapshot(input: WorldStudioCreateActionsInput, params:
       selectedCharacterIds: selectedCharacters,
     },
     knowledgeGraph: params.result.knowledgeGraph,
+    finalDraftAccumulator: params.result.finalDraftAccumulator,
     eventsDraft: params.result.knowledgeGraph.events as unknown as { primary: EventNodeDraft[]; secondary: EventNodeDraft[] },
     futureEventsText: JSON.stringify(params.result.knowledgeGraph.futureHistoricalEvents || [], null, 2),
     eventGraphLayout: {
@@ -259,14 +369,14 @@ export async function runCreatePhase1(
   });
   const initialChunkPolicy = activeChunkPolicy;
   let allChunks: string[];
-  let usesPreChunkedFileSource = false;
+  let usedLegacyFileChunks = false;
   try {
     const resolved = resolvePhase1Chunks(input, activeChunkPolicy);
     allChunks = resolved.allChunks;
-    usesPreChunkedFileSource = resolved.usesPreChunkedFileSource;
+    usedLegacyFileChunks = resolved.usedLegacyFileChunks;
     diagLog('Phase1 chunks resolved', {
       allChunks: allChunks.length,
-      usesPreChunkedFileSource,
+      usedLegacyFileChunks,
       chunkSize: activeChunkPolicy.chunkSize,
       overlap: activeChunkPolicy.overlap,
       effectiveContextTokens: activeChunkPolicy.effectiveContextTokens,
@@ -281,10 +391,10 @@ export async function runCreatePhase1(
     input.setError(error instanceof Error ? error.message : String(error));
     return;
   }
-  if (usesPreChunkedFileSource) {
+  if (usedLegacyFileChunks) {
     emitWorldStudioLog({
       level: 'warn',
-      message: 'world-studio:chunk-policy:file-raw-missing-prechunked-source',
+      message: 'world-studio:chunk-policy:file-raw-missing-fallback',
       flowId: input.flowId,
       source: 'WorldStudioPage.onRunPhase1',
       details: {
@@ -299,21 +409,25 @@ export async function runCreatePhase1(
   let chunksToRun: string[] = [];
   let chunkIndexMap: number[] | undefined;
   let initialAccumulatedState: AccumulatedState | undefined;
+  let initialFinalDraftAccumulator: FinalDraftAccumulator | undefined;
   if (isResumeRun && resumeTask) {
     const checkpointPayload = asRecord(resumeTask.checkpoint?.payload);
     const savedAccState = checkpointPayload.accumulatedState as AccumulatedState | undefined;
+    const savedFinalDraftAccumulator = checkpointPayload.finalDraftAccumulator as FinalDraftAccumulator | undefined;
     if (savedAccState && savedAccState.lastProcessedChunk >= 0) {
       // R2 resume: pass full chunk array + accumulated state, serial loop skips via startIndex
       chunksToRun = allChunks;
       chunkIndexMap = undefined;
       initialAccumulatedState = savedAccState;
+      initialFinalDraftAccumulator = savedFinalDraftAccumulator || input.snapshot.finalDraftAccumulator;
       diagLog('Phase1 resume with accumulated state', {
         taskId: resumeTask.id,
         lastProcessedChunk: savedAccState.lastProcessedChunk,
+        hasFinalDraftAccumulator: Boolean(savedFinalDraftAccumulator),
         totalChunks: allChunks.length,
       });
     } else {
-      // Resume fallback (no accumulated state in checkpoint): use subset retry logic.
+      // Legacy resume (no accumulated state in checkpoint): fall back to old subset logic
       const checkpointRemaining = sanitizeChunkIndices(checkpointPayload.remainingChunkIndices, allChunks.length);
       const fallbackChunkTasks = input.phase1?.chunkTasks
         || input.snapshot.phase1Artifact?.chunkTasks
@@ -326,11 +440,13 @@ export async function runCreatePhase1(
       chunksToRun = remainingChunkIndices
         .map((index) => allChunks[index])
         .filter((chunk): chunk is string => typeof chunk === 'string' && chunk.trim().length > 0);
-      diagLog('Phase1 resume with recovered remainingChunkIndices', {
+      diagLog('Phase1 resume with legacy remainingChunkIndices', {
         taskId: resumeTask.id,
         remainingChunkIndices,
+        hasFinalDraftAccumulator: Boolean(savedFinalDraftAccumulator),
         resolvedChunksToRun: chunksToRun.length,
       });
+      initialFinalDraftAccumulator = savedFinalDraftAccumulator || input.snapshot.finalDraftAccumulator;
     }
   } else {
     const resolvedRetry = resolveRetryChunks(input, allChunks, effectiveMode, forcedRetryErrorCode);
@@ -427,6 +543,7 @@ export async function runCreatePhase1(
     retryErrorCode: (forcedRetryErrorCode ?? input.retryErrorCode) || null,
     chunkPolicy: activeChunkPolicy,
     remainingChunkIndices: chunkIndexMap || [],
+    finalDraftAccumulator: initialFinalDraftAccumulator || input.snapshot.finalDraftAccumulator,
   });
 
   const extractConcurrency = effectiveMode === 'failed'
@@ -476,11 +593,13 @@ export async function runCreatePhase1(
       chunkIndexMap?: number[];
       chunkPolicy: AdaptiveChunkPolicy;
       initialAccumulatedState?: AccumulatedState;
+      initialFinalDraftAccumulator?: FinalDraftAccumulator;
     }) => {
       const ctxBudget = resolveContextTokenBudget(
         attemptInput.chunkPolicy.effectiveContextTokens,
         attemptInput.chunkPolicy.chunkSize,
       );
+      let firstNonEmptyLogicalChunk: number | null = null;
       diagLog('Phase1 extraction attempt start', {
         taskId,
         chunks: attemptInput.chunks.length,
@@ -489,6 +608,9 @@ export async function runCreatePhase1(
         chunkPolicy: attemptInput.chunkPolicy,
         contextBudget: ctxBudget,
         hasInitialAccumulatedState: Boolean(attemptInput.initialAccumulatedState),
+        hasInitialFinalDraftAccumulator: Boolean(attemptInput.initialFinalDraftAccumulator),
+        initialFinalDraftAccumulator: summarizeFinalDraftAccumulator(attemptInput.initialFinalDraftAccumulator),
+        initialFinalDraftAccumulatorPopulated: isFinalDraftAccumulatorPopulated(attemptInput.initialFinalDraftAccumulator),
       });
       return runPhase1ExtractionFromChunks(input.aiClient, attemptInput.chunks, {
         onProgress: (progress) => {
@@ -544,12 +666,50 @@ export async function runCreatePhase1(
         shouldInterrupt,
         contextTokenBudget: ctxBudget,
         initialAccumulatedState: attemptInput.initialAccumulatedState,
+        initialFinalDraftAccumulator: attemptInput.initialFinalDraftAccumulator,
         onAccumulatedStateUpdate: (accState) => {
           updateTaskCheckpoint({
             step: 'EXTRACT',
             chunkTotal: allChunks.length,
           }, {
             accumulatedState: accState,
+          });
+        },
+        onFinalDraftAccumulatorUpdate: (finalDraftAccumulator) => {
+          updateTaskCheckpoint({
+            step: 'EXTRACT',
+            chunkTotal: allChunks.length,
+          }, {
+            finalDraftAccumulator,
+          });
+        },
+        onFinalDraftAccumulatorPatch: (update) => {
+          const beforePopulated = isFinalDraftAccumulatorPopulated(update.before);
+          const afterPopulated = isFinalDraftAccumulatorPopulated(update.after);
+          const becameNonEmpty = !beforePopulated && afterPopulated;
+          if (becameNonEmpty && firstNonEmptyLogicalChunk == null) {
+            firstNonEmptyLogicalChunk = update.logicalChunkIndex;
+          }
+          if (update.hasChanges) {
+            updateTaskCheckpoint({
+              step: 'EXTRACT',
+              chunkTotal: allChunks.length,
+            }, {
+              finalDraftAccumulator: update.after,
+            });
+          }
+          diagLog('Phase1 finalDraftAccumulator patch', {
+            taskId,
+            chunkIndex: update.chunkIndex,
+            logicalChunkIndex: update.logicalChunkIndex,
+            hasChanges: update.hasChanges,
+            changedFieldCount: update.changedFields.length,
+            changedFields: update.changedFields,
+            becameNonEmpty,
+            firstNonEmptyLogicalChunk,
+            before: summarizeFinalDraftAccumulator(update.before),
+            after: summarizeFinalDraftAccumulator(update.after),
+            patch: summarizeDraftPatch(update.patch),
           });
         },
       });
@@ -560,11 +720,14 @@ export async function runCreatePhase1(
       chunkIndexMap,
       chunkPolicy: activeChunkPolicy,
       initialAccumulatedState,
+      initialFinalDraftAccumulator,
     });
     diagLog('Phase1 extraction attempt done', {
       taskId,
       interruptedReason: result.interrupted?.reason || null,
       summary: summarizeChunkTasks(result.chunkTasks),
+      terminalFailureHistogram: summarizeTerminalChunkFailures(result.chunkTasks),
+      finalDraftAccumulator: summarizeFinalDraftAccumulator(result.finalDraftAccumulator),
       qualityGateStatus: result.qualityGate.status,
       qualityGatePass: result.qualityGate.pass,
     });
@@ -588,6 +751,7 @@ export async function runCreatePhase1(
       }, {
         chunkPolicy: activeChunkPolicy,
         remainingChunkIndices,
+        finalDraftAccumulator: pausedResult.finalDraftAccumulator,
       });
       input.taskController.pauseTask(taskId, 'Extraction paused. Resume to continue.');
       input.taskController.updateTask(taskId, {
@@ -618,7 +782,7 @@ export async function runCreatePhase1(
       return;
     }
 
-    if (effectiveMode === 'all' && !isResumeRun && !usesPreChunkedFileSource && hasTerminalContextOverflowFailures(result.chunkTasks)) {
+    if (effectiveMode === 'all' && !isResumeRun && !usedLegacyFileChunks && hasTerminalContextOverflowFailures(result.chunkTasks)) {
       autoShrinkRetried = true;
       const firstPass = result;
       activeChunkPolicy = shrinkAdaptiveChunkPolicy(activeChunkPolicy, 0.7);
@@ -655,11 +819,13 @@ export async function runCreatePhase1(
       const secondPass = await runExtractionAttempt({
         chunks: chunksToRun,
         chunkPolicy: activeChunkPolicy,
+        initialFinalDraftAccumulator: input.snapshot.finalDraftAccumulator,
       });
       diagLog('Phase1 extraction second pass done', {
         taskId,
         interruptedReason: secondPass.interrupted?.reason || null,
         summary: summarizeChunkTasks(secondPass.chunkTasks),
+        terminalFailureHistogram: summarizeTerminalChunkFailures(secondPass.chunkTasks),
         qualityGateStatus: secondPass.qualityGate.status,
       });
       result = {
@@ -672,6 +838,8 @@ export async function runCreatePhase1(
     diagLog('Phase1 effective result', {
       taskId,
       summary: summarizeChunkTasks(effectiveResult.chunkTasks),
+      terminalFailureHistogram: summarizeTerminalChunkFailures(effectiveResult.chunkTasks),
+      finalDraftAccumulator: summarizeFinalDraftAccumulator(effectiveResult.finalDraftAccumulator),
       qualityGateStatus: effectiveResult.qualityGate.status,
       qualityGatePass: effectiveResult.qualityGate.pass,
       qualityGateReasons: effectiveResult.qualityGate.reasons,
@@ -794,7 +962,7 @@ export async function runCreatePhase1(
     const canAutoShrink = (
       effectiveMode === 'all'
       && !isResumeRun
-      && !usesPreChunkedFileSource
+      && !usedLegacyFileChunks
       && isContextOverflowText(runError instanceof Error ? runError.message : runError)
     );
     if (canAutoShrink) {
@@ -849,6 +1017,7 @@ export async function runCreatePhase1(
           abortSignal,
           shouldInterrupt,
           contextTokenBudget: shrinkCtxBudget,
+          initialFinalDraftAccumulator: input.snapshot.finalDraftAccumulator,
           onAccumulatedStateUpdate: (accState) => {
             updateTaskCheckpoint({
               step: 'EXTRACT',
@@ -857,11 +1026,21 @@ export async function runCreatePhase1(
               accumulatedState: accState,
             });
           },
+          onFinalDraftAccumulatorUpdate: (finalDraftAccumulator) => {
+            updateTaskCheckpoint({
+              step: 'EXTRACT',
+              chunkTotal: allChunks.length,
+            }, {
+              finalDraftAccumulator,
+            });
+          },
         });
         const effectiveRetriedResult = mergeRetryPhase1Result(input, allChunks, chunksToRun, effectiveMode, retriedResult);
         diagLog('Phase1 catch-path retry result', {
           taskId,
           summary: summarizeChunkTasks(effectiveRetriedResult.chunkTasks),
+          terminalFailureHistogram: summarizeTerminalChunkFailures(effectiveRetriedResult.chunkTasks),
+          finalDraftAccumulator: summarizeFinalDraftAccumulator(effectiveRetriedResult.finalDraftAccumulator),
           qualityGateStatus: effectiveRetriedResult.qualityGate.status,
           qualityGateReasons: effectiveRetriedResult.qualityGate.reasons,
         });

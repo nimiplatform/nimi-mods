@@ -234,6 +234,41 @@ export type WorldStudioAgentDraft = {
   dna?: WorldStudioAgentDna;
 };
 
+export type DraftPatchEvidenceRef = {
+  fieldPath: string;
+  segmentId?: string;
+  eventId?: string;
+  confidence?: number;
+};
+
+export type DraftPatch = {
+  chunkIndex: number;
+  world?: Record<string, unknown>;
+  worldview?: Record<string, unknown>;
+  worldLorebooks?: Array<Record<string, unknown>>;
+  futureHistoricalEvents?: Array<Record<string, unknown>>;
+  agentDrafts?: WorldStudioAgentDraft[];
+  evidenceRefs?: DraftPatchEvidenceRef[];
+  notes?: string[];
+};
+
+export type FinalDraftAccumulatorRevision = {
+  chunkIndex: number;
+  appliedAt: string;
+  changedFields: string[];
+  note?: string;
+};
+
+export type FinalDraftAccumulator = {
+  world: Record<string, unknown>;
+  worldview: Record<string, unknown>;
+  worldLorebooks: Array<Record<string, unknown>>;
+  futureHistoricalEvents: Array<Record<string, unknown>>;
+  agentDraftsByCharacter: Record<string, WorldStudioAgentDraft>;
+  revisions: FinalDraftAccumulatorRevision[];
+  lastUpdatedChunk: number;
+};
+
 export type WorldStudioAgentSyncPlan = {
   selectedCharacterIds: string[];
   ownershipType: 'WORLD_OWNED';

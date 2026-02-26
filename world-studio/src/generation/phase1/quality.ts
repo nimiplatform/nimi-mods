@@ -3,6 +3,7 @@ import { toStartTimeOptions } from '../../engine/merge.js';
 import type {
   ChunkExtraction,
   ChunkTaskResult,
+  FinalDraftAccumulator,
   Phase1Result,
 } from '../../engine/types.js';
 import { fallbackCharacterCandidates, fallbackStartTimeOptions } from './heuristic-fallback.js';
@@ -15,6 +16,7 @@ type BuildPhase1ResultInput = {
   failedChunks: number;
   chunkTasks: ChunkTaskResult[];
   normalizedChunks: string[];
+  finalDraftAccumulator: FinalDraftAccumulator;
 };
 
 export function buildPhase1Result(input: BuildPhase1ResultInput): Phase1Result {
@@ -45,6 +47,7 @@ export function buildPhase1Result(input: BuildPhase1ResultInput): Phase1Result {
     startTimeOptions,
     characterCandidates,
     knowledgeGraph,
+    finalDraftAccumulator: input.finalDraftAccumulator,
     qualityGate,
     chunkTasks: input.chunkTasks,
     rawText: JSON.stringify({
@@ -55,6 +58,7 @@ export function buildPhase1Result(input: BuildPhase1ResultInput): Phase1Result {
       qualityGate,
       chunkTasks: input.chunkTasks,
       knowledgeGraph,
+      finalDraftAccumulator: input.finalDraftAccumulator,
     }),
   };
 }

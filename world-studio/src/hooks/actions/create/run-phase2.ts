@@ -1,5 +1,9 @@
 import { asRecord } from '@nimiplatform/mod-sdk/utils';
 import type { WorldLorebookDraftRow } from '../../../contracts.js';
+import {
+  PRIMARY_EVIDENCE_COVERAGE_BLOCK_THRESHOLD,
+  summarizePrimaryEvidenceCoverage,
+} from '../../../engine/primary-evidence.js';
 import { emitWorldStudioLog } from '../../../logging.js';
 import { runPhase2DraftGeneration } from '../../../generation/pipeline.js';
 import { buildWorldStudioEmbeddingIndex } from '../../../services/embedding-index.js';
@@ -111,6 +115,15 @@ export async function runCreatePhase2(
       secondaryEvents: input.snapshot.knowledgeGraph.events.secondary.length,
       relations: input.snapshot.knowledgeGraph.characterRelations.length,
     },
+    finalDraftAccumulator: {
+      worldKeys: Object.keys(asRecord(input.snapshot.finalDraftAccumulator.world || {})),
+      worldviewKeys: Object.keys(asRecord(input.snapshot.finalDraftAccumulator.worldview || {})),
+      worldLorebooks: input.snapshot.finalDraftAccumulator.worldLorebooks.length,
+      futureHistoricalEvents: input.snapshot.finalDraftAccumulator.futureHistoricalEvents.length,
+      agentDrafts: Object.keys(input.snapshot.finalDraftAccumulator.agentDraftsByCharacter || {}),
+      revisions: input.snapshot.finalDraftAccumulator.revisions.length,
+      lastUpdatedChunk: input.snapshot.finalDraftAccumulator.lastUpdatedChunk,
+    },
   });
   const qualityGate = input.phase1?.qualityGate || input.snapshot.phase1Artifact?.qualityGate || null;
   if (!qualityGate || !input.snapshot.selectedStartTimeId) {
@@ -140,15 +153,26 @@ export async function runCreatePhase2(
     input.setError('WORLD_STUDIO_EVENT_GRAPH_INVALID: at least one PRIMARY event is required.');
     return;
   }
-  const missingEvidencePrimary = (input.snapshot.knowledgeGraph.events.primary || []).filter((item) => {
-    return !Array.isArray(item.evidenceRefs) || item.evidenceRefs.length === 0;
-  });
-  if (missingEvidencePrimary.length > 0) {
-    diagLog('Phase2 blocked: primary events missing evidence', {
-      missingEvidenceCount: missingEvidencePrimary.length,
+  const primaryEvents = input.snapshot.knowledgeGraph.events.primary || [];
+  const primaryEvidenceSummary = summarizePrimaryEvidenceCoverage(primaryEvents);
+  if (
+    primaryEvidenceSummary.total > 0
+    && primaryEvidenceSummary.coverage < PRIMARY_EVIDENCE_COVERAGE_BLOCK_THRESHOLD
+  ) {
+    const missingEvidencePrimary = primaryEvents.filter((item) => {
+      return !Array.isArray(item.evidenceRefs) || item.evidenceRefs.length === 0;
+    });
+    diagLog('Phase2 blocked: primary evidence coverage below threshold', {
+      totalPrimary: primaryEvidenceSummary.total,
+      primaryWithEvidence: primaryEvidenceSummary.withEvidence,
+      missingEvidenceCount: primaryEvidenceSummary.missing,
+      coverage: primaryEvidenceSummary.coverage,
+      threshold: PRIMARY_EVIDENCE_COVERAGE_BLOCK_THRESHOLD,
       ids: missingEvidencePrimary.slice(0, 20).map((item) => item.id),
     });
-    input.setError(`WORLD_STUDIO_EVENT_EVIDENCE_REQUIRED: ${missingEvidencePrimary.length} primary events missing evidence.`);
+    input.setError(
+      `WORLD_STUDIO_EVENT_EVIDENCE_REQUIRED: primaryEvidenceCoverage=${primaryEvidenceSummary.coverage.toFixed(3)}, threshold=${PRIMARY_EVIDENCE_COVERAGE_BLOCK_THRESHOLD.toFixed(3)}, missing=${primaryEvidenceSummary.missing}.`,
+    );
     return;
   }
 
@@ -232,6 +256,7 @@ export async function runCreatePhase2(
       selectedStartTimeId: input.snapshot.selectedStartTimeId,
       selectedCharacters: input.snapshot.selectedCharacters,
       knowledgeGraph: input.snapshot.knowledgeGraph,
+      finalDraftAccumulator: input.snapshot.finalDraftAccumulator,
     }, {
       routeOverride: routeOverride || undefined,
       abortSignal,
@@ -244,6 +269,21 @@ export async function runCreatePhase2(
       worldLorebooks: Array.isArray(result.worldLorebooks) ? result.worldLorebooks.length : 0,
       futureHistoricalEvents: Array.isArray(result.futureHistoricalEvents) ? result.futureHistoricalEvents.length : 0,
       agentDrafts: Array.isArray(result.agentDrafts) ? result.agentDrafts.length : 0,
+      finalDraftAccumulator: {
+        hasAccumulator: Boolean(result.finalDraftAccumulator),
+        worldKeys: Object.keys(asRecord(result.finalDraftAccumulator?.world || {})),
+        worldviewKeys: Object.keys(asRecord(result.finalDraftAccumulator?.worldview || {})),
+        worldLorebooks: Array.isArray(result.finalDraftAccumulator?.worldLorebooks)
+          ? result.finalDraftAccumulator?.worldLorebooks.length
+          : 0,
+        futureHistoricalEvents: Array.isArray(result.finalDraftAccumulator?.futureHistoricalEvents)
+          ? result.finalDraftAccumulator?.futureHistoricalEvents.length
+          : 0,
+        agentDrafts: Object.keys(asRecord(result.finalDraftAccumulator?.agentDraftsByCharacter || {})),
+        revisions: Array.isArray(result.finalDraftAccumulator?.revisions)
+          ? result.finalDraftAccumulator?.revisions.length
+          : 0,
+      },
     });
     diagLog('Phase2 dna presence audit', {
       taskId,
@@ -319,6 +359,7 @@ export async function runCreatePhase2(
         // events: preserved from Phase 1 — not overwritten by Phase 2
         futureHistoricalEvents: result.futureHistoricalEvents,
       },
+      finalDraftAccumulator: result.finalDraftAccumulator || input.snapshot.finalDraftAccumulator,
       unsavedChangesByPanel: {
         world: true,
         worldview: true,

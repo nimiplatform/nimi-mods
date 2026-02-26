@@ -84,3 +84,28 @@ export async function runFinePass(input: FinePassInput): Promise<WorldStudioTask
   });
   return stopReason;
 }
+
+export async function runFineChunk(
+  llm: RouteCapabilityLlmInvoker,
+  input: {
+    chunk: string;
+    index: number;
+    total: number;
+    seed?: ChunkExtraction;
+    accumulatedContext?: string;
+    accumulatorSlice?: Record<string, unknown>;
+    missingFields?: string[];
+    abortSignal?: AbortSignal;
+  },
+) {
+  return extractChunkFine(llm, {
+    chunk: input.chunk,
+    index: input.index,
+    total: input.total,
+    seed: input.seed,
+    accumulatedContext: input.accumulatedContext,
+    accumulatorSlice: input.accumulatorSlice,
+    missingFields: input.missingFields,
+    abortSignal: input.abortSignal,
+  });
+}

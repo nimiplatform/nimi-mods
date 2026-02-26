@@ -1,6 +1,7 @@
 import { asRecord } from '@nimiplatform/mod-sdk/utils';
 import type {
   EventNodeDraft,
+  FinalDraftAccumulator,
   Phase2Result,
   RouteCapabilityLlmInvoker,
   WorldStudioAgentDna,
@@ -11,6 +12,15 @@ import type {
 } from './types.js';
 import { parseJsonRecord } from './json-repair.js';
 import { emitWorldStudioLog } from '../logging.js';
+import {
+  applyDraftPatch,
+  buildFinalDraftAccumulatorSlice,
+  createEmptyFinalDraftAccumulator,
+} from './final-draft-accumulator.js';
+import {
+  PRIMARY_EVIDENCE_COVERAGE_BLOCK_THRESHOLD,
+  summarizePrimaryEvidenceCoverage,
+} from './primary-evidence.js';
 
 function diagLog(message: string, details?: Record<string, unknown>) {
   try {
@@ -339,19 +349,27 @@ function buildSynthesizePrompt(input: {
   selectedStartTimeId: string;
   selectedCharacters: string[];
   knowledgeGraph: WorldStudioKnowledgeGraphDraft;
+  finalDraftAccumulator: FinalDraftAccumulator;
 }): string {
   const structuredGraph = buildStructuredGraphForPrompt(input);
+  const accumulatorSlice = buildFinalDraftAccumulatorSlice(input.finalDraftAccumulator, {
+    maxLorebooks: 20,
+    maxFutureEvents: 20,
+    maxAgentDrafts: 24,
+    maxRevisions: 20,
+  });
   return [
-    'You are an event-driven world generation engine.',
+    'You are an event-driven world generation closure engine.',
+    'Use the accumulator as the primary draft source and perform global consistency closure.',
     'Generate publish-ready world/worldview/lorebooks/events/agentDrafts JSON ONLY.',
     '',
     '## Language Rule',
     'Output ALL field values in the SAME language as the structured context below.',
-    'Preserve the original language of names and descriptions. Never translate.',
+    'Preserve the original language of names, descriptions, and lore. Never translate.',
     '',
     'Schema:',
     '{',
-    '  "world": {"name":"...","description":"...","genre":"...","themes":["..."],"era":"...","timeFlowRatio":1,"rules": {}},',
+    '  "world": {"name":"...","description":"...","lore":"...","genre":"...","themes":["..."],"era":"...","timeFlowRatio":1,"rules": {}},',
     '  "worldview": {"timeModel": {"currentNode":"...","timeline":[]},"spaceTopology": {},"causality": {},"coreSystem": {},"existences": {},"resources": {},"structures": {},"visualGuide": {},"narrativeHooks": {}},',
     '  "worldEvents":[{"id":"evt-p1","level":"PRIMARY","parentEventId":null,"title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"text"}],"confidence":0.0,"needsEvidence":false}],',
     '  "worldLorebooks":[{"key":"topic:subtopic:item_name","name":"...","content":"...","keywords":["..."],"value":{"details":{}},"provenance":{"source":"synthesize"}}],',
@@ -398,10 +416,14 @@ function buildSynthesizePrompt(input: {
     '',
     '## General Rules',
     '- worldEvents must align with the event graph and keep PRIMARY/SECONDARY hierarchy.',
+    '- Prefer accumulator values when they are already specific and consistent; only refine when needed.',
     '- futureHistoricalEvents: ONLY include events explicitly described as future or prophesied in the source text. If none exist in the source, return empty array [].',
     '- No markdown, no explanation, JSON only.',
     `CHECKPOINT_START_TIME_ID: ${input.selectedStartTimeId}`,
     `CHECKPOINT_CHARACTERS: ${input.selectedCharacters.join(', ')}`,
+    '<accumulator_context>',
+    JSON.stringify(accumulatorSlice),
+    '</accumulator_context>',
     '<structured_context>',
     JSON.stringify(structuredGraph),
     '</structured_context>',
@@ -413,9 +435,11 @@ function validateEventGraph(knowledgeGraph: WorldStudioKnowledgeGraphDraft): voi
   if (primaryEvents.length === 0) {
     throw new Error('WORLD_STUDIO_SYNTHESIZE_BLOCKED_BY_EVENT_GRAPH: missing primary events');
   }
-  const missingEvidence = primaryEvents.some((event) => !Array.isArray(event.evidenceRefs) || event.evidenceRefs.length === 0);
-  if (missingEvidence) {
-    throw new Error('WORLD_STUDIO_SYNTHESIZE_BLOCKED_BY_EVENT_GRAPH: primary events missing evidence');
+  const summary = summarizePrimaryEvidenceCoverage(primaryEvents);
+  if (summary.coverage < PRIMARY_EVIDENCE_COVERAGE_BLOCK_THRESHOLD) {
+    throw new Error(
+      `WORLD_STUDIO_SYNTHESIZE_BLOCKED_BY_EVENT_GRAPH: primary evidence coverage below threshold (coverage=${summary.coverage.toFixed(3)}, threshold=${PRIMARY_EVIDENCE_COVERAGE_BLOCK_THRESHOLD.toFixed(3)})`,
+    );
   }
 }
 
@@ -719,8 +743,38 @@ function deriveDnaFromExtraction(input: {
 function resolveAgentDrafts(payload: Record<string, unknown>, input: {
   selectedCharacters: string[];
   knowledgeGraph: WorldStudioKnowledgeGraphDraft;
+  finalDraftAccumulator: FinalDraftAccumulator;
 }): WorldStudioAgentDraft[] {
+  const hasMeaningfulValue = (value: unknown): boolean => {
+    if (value == null) return false;
+    if (typeof value === 'string') return value.trim().length > 0;
+    if (typeof value === 'number') return Number.isFinite(value);
+    if (typeof value === 'boolean') return true;
+    if (Array.isArray(value)) return value.length > 0;
+    if (typeof value === 'object') return Object.keys(asRecord(value)).length > 0;
+    return false;
+  };
+  const mergeDraft = (base: WorldStudioAgentDraft | undefined, incoming: WorldStudioAgentDraft): WorldStudioAgentDraft => {
+    if (!base) return incoming;
+    const merged: Record<string, unknown> = { ...asRecord(base) };
+    Object.entries(asRecord(incoming)).forEach(([key, value]) => {
+      if (!hasMeaningfulValue(value)) return;
+      merged[key] = value;
+    });
+    return {
+      ...base,
+      ...(merged as WorldStudioAgentDraft),
+      characterName: incoming.characterName || base.characterName,
+      handle: String(merged.handle || base.handle || ''),
+      concept: String(merged.concept || base.concept || ''),
+      backstory: String(merged.backstory || base.backstory || ''),
+      coreValues: String(merged.coreValues || base.coreValues || ''),
+      relationshipStyle: String(merged.relationshipStyle || base.relationshipStyle || ''),
+    };
+  };
+
   const fallback = buildFallbackAgentDrafts(input);
+  const fromAccumulator = Object.values(input.finalDraftAccumulator.agentDraftsByCharacter || {});
   const rawModelDrafts = Array.isArray(payload.agentDrafts)
     ? payload.agentDrafts
       .filter((item) => item && typeof item === 'object')
@@ -756,25 +810,23 @@ function resolveAgentDrafts(payload: Record<string, unknown>, input: {
   fallback.forEach((draft) => {
     byCharacter.set(draft.characterName, draft);
   });
+  fromAccumulator.forEach((draft, index) => {
+    const key = String(draft.characterName || input.selectedCharacters[index] || '').trim();
+    if (!key) return;
+    byCharacter.set(key, mergeDraft(byCharacter.get(key), {
+      ...draft,
+      characterName: key,
+    }));
+  });
   fromModel.forEach((draft, index) => {
     const key = draft.characterName || input.selectedCharacters[index] || '';
     if (!key) return;
-    byCharacter.set(key, {
-      ...byCharacter.get(key),
+    byCharacter.set(key, mergeDraft(byCharacter.get(key), {
       ...draft,
       characterName: key,
-    });
+    }));
   });
 
-  const profileByName = new Map(
-    (input.knowledgeGraph.characterProfiles || []).map((profile) => [String(profile.name || '').trim(), profile] as const),
-  );
-  const characterSummaryByName = new Map(
-    (input.knowledgeGraph.characters || [])
-      .map((item) => asRecord(item))
-      .map((item) => [String(item.name || '').trim(), String(item.summary || item.description || '').trim()] as const)
-      .filter(([name]) => Boolean(name)),
-  );
   const dnaDerivationAudit: Array<Record<string, unknown>> = [];
 
   const resolvedDrafts = input.selectedCharacters
@@ -786,49 +838,25 @@ function resolveAgentDrafts(payload: Record<string, unknown>, input: {
         dnaDerivationAudit.push({
           characterName,
           action: 'kept_existing_dna',
-          evidenceLength: null,
-        });
-        return draft;
-      }
-
-      const profile = profileByName.get(characterName) || null;
-      const characterSummary = characterSummaryByName.get(characterName) || '';
-      const derived = deriveDnaFromExtraction({
-        characterName,
-        draft,
-        profile,
-        characterSummary,
-        worldSetting: String(input.knowledgeGraph.worldSetting || ''),
-      });
-      if (!derived.dna) {
-        dnaDerivationAudit.push({
-          characterName,
-          action: 'left_empty',
-          reason: 'INSUFFICIENT_EVIDENCE',
-          evidenceLength: derived.evidenceLength,
-          profileSummaryPresent: Boolean(profile?.summary),
-          draftDescriptionPresent: Boolean(draft.description),
-          draftConceptPresent: Boolean(draft.concept),
+          source: fromModel.some((modelDraft) => modelDraft.characterName === characterName && Boolean(modelDraft.dna))
+            ? 'model'
+            : 'accumulator',
         });
         return draft;
       }
       dnaDerivationAudit.push({
         characterName,
-        action: 'derived_from_extraction',
-        evidenceLength: derived.evidenceLength,
-        derivedIdentityRole: derived.dna.identity.role,
-        derivedMbti: derived.dna.personality.mbti,
+        action: 'left_empty',
+        reason: 'DNA_NOT_PROVIDED',
+        sourcePriority: ['accumulator', 'model', 'fallback'],
       });
-      return {
-        ...draft,
-        dna: derived.dna,
-      };
+      return draft;
     })
     .filter((draft) => Boolean(String(draft.characterName || '').trim()));
 
   diagLog('Phase2 dna derivation audit', {
     selectedCharacters: input.selectedCharacters,
-    derivedCount: dnaDerivationAudit.filter((item) => String(item.action || '') === 'derived_from_extraction').length,
+    derivedCount: 0,
     keptCount: dnaDerivationAudit.filter((item) => String(item.action || '') === 'kept_existing_dna').length,
     emptyCount: dnaDerivationAudit.filter((item) => String(item.action || '') === 'left_empty').length,
     dnaDerivationAudit,
@@ -843,11 +871,16 @@ export async function runSynthesizeDraft(
     selectedStartTimeId: string;
     selectedCharacters: string[];
     knowledgeGraph: WorldStudioKnowledgeGraphDraft;
+    finalDraftAccumulator?: FinalDraftAccumulator;
     abortSignal?: AbortSignal;
   },
 ): Promise<Phase2Result> {
   validateEventGraph(input.knowledgeGraph);
-  const prompt = buildSynthesizePrompt(input);
+  const finalDraftAccumulator = input.finalDraftAccumulator || createEmptyFinalDraftAccumulator();
+  const prompt = buildSynthesizePrompt({
+    ...input,
+    finalDraftAccumulator,
+  });
   const response = await llm.generateText({
     routeHint: 'chat/fine',
     prompt,
@@ -855,9 +888,15 @@ export async function runSynthesizeDraft(
     abortSignal: input.abortSignal,
   });
   const payload = parseJsonRecord(response.text);
-  const world = { ...asRecord(payload.world) };
-  const worldview = { ...asRecord(payload.worldview) };
-  // Align variant model output: visual style belongs to worldview.visualGuide.
+  const world = {
+    ...asRecord(finalDraftAccumulator.world || {}),
+    ...asRecord(payload.world),
+  };
+  const worldview = {
+    ...asRecord(finalDraftAccumulator.worldview || {}),
+    ...asRecord(payload.worldview),
+  };
+  // Align legacy model output: visual style belongs to worldview.visualGuide.
   if (
     (!worldview.visualGuide || typeof worldview.visualGuide !== 'object' || Array.isArray(worldview.visualGuide))
     && world.visualStyle
@@ -877,18 +916,33 @@ export async function runSynthesizeDraft(
   const lorebookPayload = Array.isArray(payload.worldLorebooks)
     ? (payload.worldLorebooks as Array<Record<string, unknown>>)
     : [];
-  const worldLorebooks = lorebookPayload.length >= 3
+  const worldLorebooks = lorebookPayload.length > 0
     ? lorebookPayload
-    : [...lorebookPayload, ...buildEventLorebooks(worldEvents)];
+    : (
+      (finalDraftAccumulator.worldLorebooks || []).length > 0
+        ? finalDraftAccumulator.worldLorebooks
+        : buildEventLorebooks(worldEvents)
+    );
 
   const futureHistoricalEvents = Array.isArray(payload.futureHistoricalEvents)
     ? (payload.futureHistoricalEvents as Array<Record<string, unknown>>)
-    : [];
+    : (finalDraftAccumulator.futureHistoricalEvents || []);
 
   const agentDrafts = resolveAgentDrafts(payload, {
     selectedCharacters: input.selectedCharacters,
     knowledgeGraph: input.knowledgeGraph,
+    finalDraftAccumulator,
   });
+
+  const closureAccumulator = applyDraftPatch(finalDraftAccumulator, {
+    chunkIndex: Math.max(finalDraftAccumulator.lastUpdatedChunk, input.knowledgeGraph.timeline.length),
+    world,
+    worldview,
+    worldLorebooks,
+    futureHistoricalEvents,
+    agentDrafts,
+    notes: ['phase2_synthesize_closure'],
+  }).next;
 
   if (!world.name || !world.description) {
     throw new Error('WORLD_STUDIO_PHASE2_INVALID_WORLD');
@@ -904,6 +958,7 @@ export async function runSynthesizeDraft(
     worldEvents,
     futureHistoricalEvents,
     agentDrafts,
+    finalDraftAccumulator: closureAccumulator,
     rawText: response.text,
   };
 }

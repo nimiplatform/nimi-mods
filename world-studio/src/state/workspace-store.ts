@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { asRecord } from '@nimiplatform/mod-sdk/utils';
 import type {
+  FinalDraftAccumulator,
   EventNodeDraft,
   WorldStudioCreateStep,
   WorldStudioSnapshotPatch,
@@ -137,6 +138,37 @@ export const useWorldStudioWorkspaceStore = create<WorldStudioWorkspaceStore>((s
           return asRecord(record.entries) as WorldStudioWorkspaceSnapshot['embeddingIndex']['entries'];
         })(),
       },
+      finalDraftAccumulator: (() => {
+        if (!patch.finalDraftAccumulator || typeof patch.finalDraftAccumulator !== 'object') {
+          return state.snapshot.finalDraftAccumulator;
+        }
+        const incoming = patch.finalDraftAccumulator as Partial<FinalDraftAccumulator>;
+        return {
+          ...state.snapshot.finalDraftAccumulator,
+          ...incoming,
+          world: incoming.world && typeof incoming.world === 'object'
+            ? asRecord(incoming.world)
+            : state.snapshot.finalDraftAccumulator.world,
+          worldview: incoming.worldview && typeof incoming.worldview === 'object'
+            ? asRecord(incoming.worldview)
+            : state.snapshot.finalDraftAccumulator.worldview,
+          worldLorebooks: Array.isArray(incoming.worldLorebooks)
+            ? incoming.worldLorebooks as FinalDraftAccumulator['worldLorebooks']
+            : state.snapshot.finalDraftAccumulator.worldLorebooks,
+          futureHistoricalEvents: Array.isArray(incoming.futureHistoricalEvents)
+            ? incoming.futureHistoricalEvents as FinalDraftAccumulator['futureHistoricalEvents']
+            : state.snapshot.finalDraftAccumulator.futureHistoricalEvents,
+          agentDraftsByCharacter: incoming.agentDraftsByCharacter && typeof incoming.agentDraftsByCharacter === 'object'
+            ? asRecord(incoming.agentDraftsByCharacter) as FinalDraftAccumulator['agentDraftsByCharacter']
+            : state.snapshot.finalDraftAccumulator.agentDraftsByCharacter,
+          revisions: Array.isArray(incoming.revisions)
+            ? incoming.revisions as FinalDraftAccumulator['revisions']
+            : state.snapshot.finalDraftAccumulator.revisions,
+          lastUpdatedChunk: Number.isInteger(Number(incoming.lastUpdatedChunk))
+            ? Number(incoming.lastUpdatedChunk)
+            : state.snapshot.finalDraftAccumulator.lastUpdatedChunk,
+        };
+      })(),
       taskState: {
         ...state.snapshot.taskState,
         ...(patch.taskState || {}),
