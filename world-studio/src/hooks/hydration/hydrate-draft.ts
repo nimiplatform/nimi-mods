@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import { asRecord } from '@nimiplatform/mod-sdk/utils';
-import type { HookClient } from '@nimiplatform/mod-sdk/types';
+import { asRecord } from '@nimiplatform/sdk/mod/utils';
+import type { HookClient } from '@nimiplatform/sdk/mod/types';
 import type {
   EventNodeDraft,
   WorldLorebookDraftRow,

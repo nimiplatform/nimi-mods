@@ -1,4 +1,4 @@
-import type { RuntimeRouteBinding } from '@nimiplatform/mod-sdk/runtime-route';
+import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 import { splitSourceText } from '../../../engine/chunker.js';
 import { applyDraftPatch, createEmptyFinalDraftAccumulator } from '../../../engine/final-draft-accumulator.js';
 import { mergeExtractions, toCharacterCandidates, toStartTimeOptions } from '../../../engine/merge.js';

@@ -1,6 +1,6 @@
 import React from 'react';
-import { useModTranslation } from '@nimiplatform/mod-sdk/i18n';
-import type { RuntimeRouteBinding, RuntimeRouteConnectorOption, RuntimeRouteSource } from '@nimiplatform/mod-sdk/runtime-route';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
+import type { RuntimeRouteBinding, RuntimeRouteConnectorOption, RuntimeRouteSource } from '@nimiplatform/sdk/mod/runtime-route';
 import { RouteCapabilityControls } from './route-capability-controls.js';
 
 export function WorldStudioRouteConfigCard(props: {

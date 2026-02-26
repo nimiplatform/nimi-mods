@@ -1,4 +1,4 @@
-import type { ModAiClient } from '@nimiplatform/mod-sdk/ai';
+import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
 import type {
   DistillRouteOverrideMap,
   RouteCapabilityLlmInvoker,

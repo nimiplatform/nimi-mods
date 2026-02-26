@@ -1,6 +1,7 @@
-import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot } from '@nimiplatform/mod-sdk/runtime-route';
+import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
 import type { DistillRouteOverrideMap } from '../../generation/pipeline.js';
 import type { WorldStudioWorkspaceSnapshot } from '../../contracts.js';
+import { ReasonCode } from '@nimiplatform/sdk/types';
 
 function hasText(value: unknown): boolean {
   return String(value || '').trim().length > 0;
@@ -27,7 +28,7 @@ export function evaluateRouteBindingReadiness(
   if (!binding) {
     return {
       ready: false,
-      reasonCode: 'WORLD_STUDIO_ROUTE_BINDING_MISSING',
+      reasonCode: ReasonCode.WORLD_STUDIO_ROUTE_BINDING_MISSING,
       actionHint: 'select-model',
       message: 'Route binding is missing.',
     };
@@ -37,7 +38,7 @@ export function evaluateRouteBindingReadiness(
     if (!hasText(binding.model)) {
       return {
         ready: false,
-        reasonCode: 'WORLD_STUDIO_LOCAL_MODEL_MISSING',
+        reasonCode: ReasonCode.WORLD_STUDIO_LOCAL_MODEL_MISSING,
         actionHint: 'install-local-model',
         message: 'No local runtime model selected.',
       };
@@ -47,7 +48,7 @@ export function evaluateRouteBindingReadiness(
     if (!matchedModel) {
       return {
         ready: false,
-        reasonCode: 'WORLD_STUDIO_LOCAL_MODEL_UNAVAILABLE',
+        reasonCode: ReasonCode.WORLD_STUDIO_LOCAL_MODEL_UNAVAILABLE,
         actionHint: 'install-local-model',
         message: 'Selected local model is unavailable.',
       };
@@ -55,14 +56,14 @@ export function evaluateRouteBindingReadiness(
     if (String(matchedModel.status || '').trim() === 'unhealthy') {
       return {
         ready: false,
-        reasonCode: 'WORLD_STUDIO_LOCAL_MODEL_UNHEALTHY',
+        reasonCode: ReasonCode.WORLD_STUDIO_LOCAL_MODEL_UNHEALTHY,
         actionHint: 'install-local-model',
         message: 'Selected local model is unhealthy.',
       };
     }
     return {
       ready: true,
-      reasonCode: 'WORLD_STUDIO_ROUTE_READY',
+      reasonCode: ReasonCode.WORLD_STUDIO_ROUTE_READY,
       actionHint: 'none',
       message: 'Local route is ready.',
     };
@@ -71,7 +72,7 @@ export function evaluateRouteBindingReadiness(
   if (!hasText(binding.connectorId) || !hasText(binding.model)) {
     return {
       ready: false,
-      reasonCode: 'WORLD_STUDIO_TOKEN_ROUTE_INCOMPLETE',
+      reasonCode: ReasonCode.WORLD_STUDIO_TOKEN_ROUTE_INCOMPLETE,
       actionHint: 'select-connector',
       message: 'Token API route requires connector and model.',
     };
@@ -79,7 +80,7 @@ export function evaluateRouteBindingReadiness(
   if (!routeOptions) {
     return {
       ready: true,
-      reasonCode: 'WORLD_STUDIO_ROUTE_READY',
+      reasonCode: ReasonCode.WORLD_STUDIO_ROUTE_READY,
       actionHint: 'none',
       message: 'Token API route is ready.',
     };
@@ -89,7 +90,7 @@ export function evaluateRouteBindingReadiness(
   if (!connector) {
     return {
       ready: false,
-      reasonCode: 'WORLD_STUDIO_CONNECTOR_MISSING',
+      reasonCode: ReasonCode.WORLD_STUDIO_CONNECTOR_MISSING,
       actionHint: 'select-connector',
       message: 'Selected Token API connector is missing.',
     };
@@ -97,14 +98,14 @@ export function evaluateRouteBindingReadiness(
   if (connector.models.length === 0 || connector.models.includes(binding.model)) {
     return {
       ready: true,
-      reasonCode: 'WORLD_STUDIO_ROUTE_READY',
+      reasonCode: ReasonCode.WORLD_STUDIO_ROUTE_READY,
       actionHint: 'none',
       message: 'Token API route is ready.',
     };
   }
   return {
     ready: false,
-    reasonCode: 'WORLD_STUDIO_TOKEN_MODEL_UNAVAILABLE',
+    reasonCode: ReasonCode.WORLD_STUDIO_TOKEN_MODEL_UNAVAILABLE,
     actionHint: 'select-model',
     message: 'Selected Token API model is unavailable on connector.',
   };
@@ -137,7 +138,7 @@ export function evaluateEmbeddingReadiness(input: {
   if (lorebooksCount === 0) {
     return {
       healthy: true,
-      reasonCode: 'WORLD_STUDIO_EMBEDDING_NOT_REQUIRED',
+      reasonCode: ReasonCode.WORLD_STUDIO_EMBEDDING_NOT_REQUIRED,
       actionHint: 'none',
       message: 'No lorebooks available for embedding index.',
     };
@@ -150,7 +151,7 @@ export function evaluateEmbeddingReadiness(input: {
   if (!routeReadiness.ready) {
     return {
       healthy: false,
-      reasonCode: 'WORLD_STUDIO_EMBEDDING_ROUTE_UNREADY',
+      reasonCode: ReasonCode.WORLD_STUDIO_EMBEDDING_ROUTE_UNREADY,
       actionHint: mapActionHintForEmbedding(routeReadiness.actionHint),
       message: routeReadiness.message,
     };
@@ -161,7 +162,7 @@ export function evaluateEmbeddingReadiness(input: {
   if (embeddingIndex.status === 'building') {
     return {
       healthy: true,
-      reasonCode: 'WORLD_STUDIO_EMBEDDING_BUILDING',
+      reasonCode: ReasonCode.WORLD_STUDIO_EMBEDDING_BUILDING,
       actionHint: 'none',
       message: 'Embedding index is building.',
     };
@@ -169,7 +170,7 @@ export function evaluateEmbeddingReadiness(input: {
   if (embeddingIndex.status === 'ready' && entryCount > 0) {
     return {
       healthy: true,
-      reasonCode: 'WORLD_STUDIO_EMBEDDING_READY',
+      reasonCode: ReasonCode.WORLD_STUDIO_EMBEDDING_READY,
       actionHint: 'none',
       message: 'Embedding index is ready.',
     };
@@ -177,14 +178,14 @@ export function evaluateEmbeddingReadiness(input: {
   if (embeddingIndex.status === 'failed') {
     return {
       healthy: false,
-      reasonCode: 'WORLD_STUDIO_EMBEDDING_BUILD_FAILED',
+      reasonCode: ReasonCode.WORLD_STUDIO_EMBEDDING_BUILD_FAILED,
       actionHint: embeddingIndex.routeSource === 'local-runtime' ? 'install-local-model' : 'retry',
       message: embeddingIndex.errorMessage || 'Embedding index build failed.',
     };
   }
   return {
     healthy: false,
-    reasonCode: 'WORLD_STUDIO_EMBEDDING_NOT_BUILT',
+    reasonCode: ReasonCode.WORLD_STUDIO_EMBEDDING_NOT_BUILT,
     actionHint: 'retry',
     message: 'Embedding index is not built yet.',
   };

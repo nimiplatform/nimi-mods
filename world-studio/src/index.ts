@@ -1,7 +1,7 @@
 import React, { Suspense } from 'react';
-import { registerModTranslations } from '@nimiplatform/mod-sdk/i18n';
-import { type RuntimeModRegistration } from '@nimiplatform/mod-sdk/types';
-import { createHookClient } from '@nimiplatform/mod-sdk/hook';
+import { registerModTranslations } from '@nimiplatform/sdk/mod/i18n';
+import { type RuntimeModRegistration } from '@nimiplatform/sdk/mod/types';
+import { createHookClient } from '@nimiplatform/sdk/mod/hook';
 import enLocale from './locales/en.js';
 import zhLocale from './locales/zh.js';
 import {

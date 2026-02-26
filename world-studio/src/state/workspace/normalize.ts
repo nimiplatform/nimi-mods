@@ -1,4 +1,4 @@
-import { asRecord, safeParseArray, safeParseObject } from '@nimiplatform/mod-sdk/utils';
+import { asRecord, safeParseArray, safeParseObject } from '@nimiplatform/sdk/mod/utils';
 import type {
   ChunkTaskResult,
   EventNodeDraft,

@@ -1,4 +1,4 @@
-import { asRecord } from '@nimiplatform/mod-sdk/utils';
+import { asRecord } from '@nimiplatform/sdk/mod/utils';
 import { emitWorldStudioLog } from '../../../logging.js';
 import { validateWorldviewPatchInput } from '../../../services/snapshot-normalize.js';
 import type { WorldStudioMaintainActionContext, WorldStudioMaintainActionPayload } from './types.js';

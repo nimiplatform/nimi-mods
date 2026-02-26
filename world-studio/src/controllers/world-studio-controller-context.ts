@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
-import { createHookClient } from '@nimiplatform/mod-sdk/hook';
-import { asRecord } from '@nimiplatform/mod-sdk/utils';
-import type { RuntimeRouteOptionsSnapshot } from '@nimiplatform/mod-sdk/runtime-route';
+import { createHookClient } from '@nimiplatform/sdk/mod/hook';
+import { asRecord } from '@nimiplatform/sdk/mod/utils';
+import type { RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
 import type { LandingState, WorldDraftSummary, WorldSummary } from '../ui/types.js';
 import type { Phase1Result } from '../generation/pipeline.js';
 import type { WorldStudioWorkspaceSnapshot } from '../contracts.js';

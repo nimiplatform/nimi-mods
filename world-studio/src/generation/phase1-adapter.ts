@@ -1,4 +1,4 @@
-import type { ModAiClient } from '@nimiplatform/mod-sdk/ai';
+import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
 import { splitSourceText } from '../engine/chunker.js';
 import { createEmptyAccumulatedState, compressAccumulatedState } from '../engine/accumulated-context.js';
 import { upsertMergeExtraction, toChunkExtraction } from '../engine/accumulated-merge.js';

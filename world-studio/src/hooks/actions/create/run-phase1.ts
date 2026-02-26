@@ -1,5 +1,5 @@
-import { asRecord } from '@nimiplatform/mod-sdk/utils';
-import type { RuntimeRouteBinding } from '@nimiplatform/mod-sdk/runtime-route';
+import { asRecord } from '@nimiplatform/sdk/mod/utils';
+import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 import type { EventNodeDraft, WorldStudioTaskRecord } from '../../../contracts.js';
 import { resolveContextTokenBudget } from '../../../engine/accumulated-context.js';
 import { isContextOverflowText } from '../../../engine/errors.js';

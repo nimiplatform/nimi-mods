@@ -1,4 +1,4 @@
-import { asRecord } from '@nimiplatform/mod-sdk/utils';
+import { asRecord } from '@nimiplatform/sdk/mod/utils';
 import { formatConflictReloadSummary } from '../../../ui/status-summary.js';
 import type {
   EventNodeDraft,

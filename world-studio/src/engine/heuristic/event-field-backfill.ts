@@ -1,4 +1,4 @@
-import { asRecord } from '@nimiplatform/mod-sdk/utils';
+import { asRecord } from '@nimiplatform/sdk/mod/utils';
 import { isSyntheticEntityName } from '../errors.js';
 import type {
   ChunkExtraction,

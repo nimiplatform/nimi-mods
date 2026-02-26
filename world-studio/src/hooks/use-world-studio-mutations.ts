@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import type { HookClient } from '@nimiplatform/mod-sdk/types';
+import type { HookClient } from '@nimiplatform/sdk/mod/types';
 import {
   batchCreateCreatorAgents,
   batchUpsertWorldEvents,

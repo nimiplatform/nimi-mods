@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import type { HookClient } from '@nimiplatform/mod-sdk/types';
+import type { HookClient } from '@nimiplatform/sdk/mod/types';
 import type {
   WorldStudioPanelState,
   WorldStudioSnapshotPatch,

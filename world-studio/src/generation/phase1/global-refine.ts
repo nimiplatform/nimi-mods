@@ -1,4 +1,4 @@
-import { asRecord, clamp01 } from '@nimiplatform/mod-sdk/utils';
+import { asRecord, clamp01 } from '@nimiplatform/sdk/mod/utils';
 import {
   canonicalizeCharacterNames,
   normalizeZhCharacterName,

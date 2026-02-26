@@ -1,8 +1,8 @@
 import { useCallback, useEffect } from 'react';
-import type { createHookClient } from '@nimiplatform/mod-sdk/hook';
+import type { createHookClient } from '@nimiplatform/sdk/mod/hook';
 import {
-  asRecord } from '@nimiplatform/mod-sdk/utils';
-import { parseRuntimeRouteOptions, type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot } from '@nimiplatform/mod-sdk/runtime-route';
+  asRecord } from '@nimiplatform/sdk/mod/utils';
+import { parseRuntimeRouteOptions, type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
 import { WORLD_STUDIO_DATA_API_RUNTIME_ROUTE_OPTIONS, WORLD_STUDIO_MOD_ID } from '../contracts.js';
 import { getMyWorldAccess, resolveWorldLanding } from '../data.js';
 import {

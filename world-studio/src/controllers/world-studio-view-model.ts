@@ -3,7 +3,7 @@ import type {
   RuntimeRouteConnectorOption,
   RuntimeRouteOptionsSnapshot,
   RuntimeRouteSource,
-} from '@nimiplatform/mod-sdk/runtime-route';
+} from '@nimiplatform/sdk/mod/runtime-route';
 import type { SupportedEncoding } from '../engine/encoding.js';
 import type {
   EventNodeDraft,

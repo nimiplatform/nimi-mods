@@ -1,4 +1,4 @@
-import { clamp01 } from '@nimiplatform/mod-sdk/utils';
+import { clamp01 } from '@nimiplatform/sdk/mod/utils';
 import { toCharacterCandidates } from '../../engine/merge.js';
 import { canonicalizeCharacterNames } from '../../engine/character/normalize-zh.js';
 import type { Phase1Character, Phase1Option, WorldStudioKnowledgeGraphDraft } from '../../engine/types.js';

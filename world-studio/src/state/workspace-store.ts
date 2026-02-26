@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { asRecord } from '@nimiplatform/mod-sdk/utils';
+import { asRecord } from '@nimiplatform/sdk/mod/utils';
 import type {
   FinalDraftAccumulator,
   EventNodeDraft,

@@ -2,7 +2,7 @@ import type {
   RuntimeRouteBinding,
   RuntimeRouteModelProfile,
   RuntimeRouteOptionsSnapshot,
-} from '@nimiplatform/mod-sdk/runtime-route';
+} from '@nimiplatform/sdk/mod/runtime-route';
 import type { WorldStudioParseJobState } from '../../../contracts.js';
 
 type ChunkPolicyContextSource = NonNullable<WorldStudioParseJobState['chunkPolicy']>['contextSource'];

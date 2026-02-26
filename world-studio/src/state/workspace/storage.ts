@@ -1,4 +1,4 @@
-import { asRecord, loadLocalStorageJson, safeParseObject, saveLocalStorageJson } from '@nimiplatform/mod-sdk/utils';
+import { asRecord, loadLocalStorageJson, safeParseObject, saveLocalStorageJson } from '@nimiplatform/sdk/mod/utils';
 import type { EventNodeDraft, WorldStudioWorkspaceSnapshot } from '../../contracts.js';
 import { cloneDefaultSnapshot } from './defaults.js';
 import { toLegacyPrimaryEvents } from './migrate-legacy.js';

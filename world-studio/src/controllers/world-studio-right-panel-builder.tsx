@@ -3,7 +3,7 @@ import type {
   RuntimeRouteBinding,
   RuntimeRouteConnectorOption,
   RuntimeRouteSource,
-} from '@nimiplatform/mod-sdk/runtime-route';
+} from '@nimiplatform/sdk/mod/runtime-route';
 import type { WorldStudioTaskRecord, WorldStudioWorkspaceSnapshot } from '../contracts.js';
 import type { Phase1Result, Phase2Result } from '../generation/pipeline.js';
 import { parseLooseArray } from '../services/snapshot-normalize.js';

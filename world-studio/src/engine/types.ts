@@ -1,5 +1,5 @@
-import type { RuntimeRouteBinding } from '@nimiplatform/mod-sdk/runtime-route';
-import type { RuntimeRouteOverride } from '@nimiplatform/mod-sdk/types';
+import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
+import type { RuntimeRouteOverride } from '@nimiplatform/sdk/mod/types';
 
 export type DistillStage =
   | 'INGEST'

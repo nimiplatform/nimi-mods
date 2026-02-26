@@ -1,4 +1,4 @@
-import { asRecord } from '@nimiplatform/mod-sdk/utils';
+import { asRecord } from '@nimiplatform/sdk/mod/utils';
 import type { WorldLorebookDraftRow } from '../../../contracts.js';
 import {
   PRIMARY_EVIDENCE_COVERAGE_BLOCK_THRESHOLD,

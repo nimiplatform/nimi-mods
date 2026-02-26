@@ -1,4 +1,4 @@
-import type { HookClient } from '@nimiplatform/mod-sdk/types';
+import type { HookClient } from '@nimiplatform/sdk/mod/types';
 import {
   WORLD_STUDIO_DATA_API_EVENTS_BATCH_UPSERT,
   WORLD_STUDIO_DATA_API_EVENTS_DELETE,

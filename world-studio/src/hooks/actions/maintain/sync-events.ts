@@ -1,4 +1,4 @@
-import { asRecord } from '@nimiplatform/mod-sdk/utils';
+import { asRecord } from '@nimiplatform/sdk/mod/utils';
 import { emitWorldStudioLog } from '../../../logging.js';
 import type { EventNodeDraft } from '../../../contracts.js';
 import type { WorldStudioMaintainActionContext, WorldStudioMaintainActionPayload } from './types.js';

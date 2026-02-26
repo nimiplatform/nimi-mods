@@ -1,4 +1,4 @@
-import type { HookClient } from '@nimiplatform/mod-sdk/types';
+import type { HookClient } from '@nimiplatform/sdk/mod/types';
 import {
   WORLD_STUDIO_DATA_API_MAINTENANCE_GET,
   WORLD_STUDIO_DATA_API_MAINTENANCE_UPDATE,

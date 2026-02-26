@@ -1,4 +1,4 @@
-import { asRecord, clamp01, toStringArray } from '@nimiplatform/mod-sdk/utils';
+import { asRecord, clamp01, toStringArray } from '@nimiplatform/sdk/mod/utils';
 import type {
   ChunkExtraction,
   DraftPatch,

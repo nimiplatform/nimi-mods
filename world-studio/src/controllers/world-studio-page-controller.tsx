@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { createHookClient } from '@nimiplatform/mod-sdk/hook';
-import { createAiClient } from '@nimiplatform/mod-sdk/ai';
-import { useModTranslation } from '@nimiplatform/mod-sdk/i18n';
-import { useAppStore } from '@nimiplatform/mod-sdk/ui';
+import { createHookClient } from '@nimiplatform/sdk/mod/hook';
+import { createAiClient } from '@nimiplatform/sdk/mod/ai';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
+import { useAppStore } from '@nimiplatform/sdk/mod/ui';
 import { WORLD_STUDIO_MOD_ID } from '../contracts.js';
 import { createWorldStudioFlowId, emitWorldStudioLog } from '../logging.js';
 import { useWorldStudioBootstrap } from '../hooks/use-world-studio-bootstrap.js';

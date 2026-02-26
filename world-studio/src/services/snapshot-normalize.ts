@@ -1,4 +1,4 @@
-import { asRecord } from '@nimiplatform/mod-sdk/utils';
+import { asRecord } from '@nimiplatform/sdk/mod/utils';
 import type { WorldStudioLandingMode } from '../contracts.js';
 import type { LandingState } from '../ui/types.js';
 

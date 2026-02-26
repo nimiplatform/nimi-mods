@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { useModTranslation } from '@nimiplatform/mod-sdk/i18n';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type {
   RuntimeRouteBinding,
   RuntimeRouteConnectorOption,
   RuntimeRouteSource,
-} from '@nimiplatform/mod-sdk/runtime-route';
+} from '@nimiplatform/sdk/mod/runtime-route';
 import type { WorldStudioTaskRecord } from '../contracts.js';
 import { MaintenanceActionsCard } from './maintenance-actions-card.js';
 import { StudioStatusCard } from './studio-status-card.js';

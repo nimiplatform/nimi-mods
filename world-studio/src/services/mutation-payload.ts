@@ -1,5 +1,5 @@
-import { asRecord, loadLocalStorageJson, saveLocalStorageJson } from '@nimiplatform/mod-sdk/utils';
-import { parseRuntimeRouteBinding, type RuntimeRouteBinding } from '@nimiplatform/mod-sdk/runtime-route';
+import { asRecord, loadLocalStorageJson, saveLocalStorageJson } from '@nimiplatform/sdk/mod/utils';
+import { parseRuntimeRouteBinding, type RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 import type { DistillRouteOverrideMap } from '../generation/pipeline.js';
 
 const WORLD_STUDIO_ROUTE_OVERRIDE_STORAGE_KEY_PREFIX = 'nimi.world-studio.route-override.v2';

@@ -1,5 +1,5 @@
-import type { ModAiClient } from '@nimiplatform/mod-sdk/ai';
-import type { RuntimeRouteOverride } from '@nimiplatform/mod-sdk/types';
+import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
+import type { RuntimeRouteOverride } from '@nimiplatform/sdk/mod/types';
 import type {
   WorldLorebookDraftRow,
   WorldStudioEmbeddingIndex,

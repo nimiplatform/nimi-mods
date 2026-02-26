@@ -1,8 +1,8 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import {
   normalizeRuntimeRouteSource,
-} from '@nimiplatform/mod-sdk/runtime-route';
-import { type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot, type RuntimeRouteSource } from '@nimiplatform/mod-sdk/runtime-route';
+} from '@nimiplatform/sdk/mod/runtime-route';
+import { type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot, type RuntimeRouteSource } from '@nimiplatform/sdk/mod/runtime-route';
 import type { DistillRouteOverrideMap } from '../../generation/pipeline.js';
 
 export type RouteStage = 'coarse' | 'fine';

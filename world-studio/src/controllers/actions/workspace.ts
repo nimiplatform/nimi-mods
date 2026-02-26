@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { asRecord } from '@nimiplatform/mod-sdk/utils';
+import { asRecord } from '@nimiplatform/sdk/mod/utils';
 import { toUniqueStringArray } from '../../services/snapshot-normalize.js';
 import type { WorldStudioSnapshotPatch, WorldStudioWorkspaceSnapshot } from '../../contracts.js';
 import type { Phase1Result, Phase2Result } from '../../generation/pipeline.js';

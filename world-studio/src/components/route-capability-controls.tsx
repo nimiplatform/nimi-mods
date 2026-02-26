@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useModTranslation } from '@nimiplatform/mod-sdk/i18n';
-import { filterModelOptions } from '@nimiplatform/mod-sdk/model-options';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
+import { filterModelOptions } from '@nimiplatform/sdk/mod/model-options';
 import type { RouteStage } from '../hooks/use-world-studio-route-overrides.js';
 import {
   normalizeRuntimeRouteSource,
   type RuntimeRouteBinding,
   type RuntimeRouteConnectorOption,
   type RuntimeRouteSource,
-} from '@nimiplatform/mod-sdk/runtime-route';
+} from '@nimiplatform/sdk/mod/runtime-route';
+import { ReasonCode } from '@nimiplatform/sdk/types';
 
 type RouteCapabilityControlsProps = {
   profile: RouteStage;
@@ -35,7 +36,7 @@ export function RouteCapabilityControls(props: RouteCapabilityControlsProps) {
   };
   const readiness = props.readiness || {
     ready: true,
-    reasonCode: 'WORLD_STUDIO_ROUTE_READY',
+    reasonCode: ReasonCode.WORLD_STUDIO_ROUTE_READY,
     actionHint: 'none',
     message: 'Route is ready.',
   };

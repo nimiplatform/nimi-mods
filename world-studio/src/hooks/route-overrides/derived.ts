@@ -2,11 +2,12 @@ import { useMemo } from 'react';
 import type {
   RuntimeRouteBinding,
   RuntimeRouteOptionsSnapshot,
-} from '@nimiplatform/mod-sdk/runtime-route';
+} from '@nimiplatform/sdk/mod/runtime-route';
 import type { DistillRouteOverrideMap } from '../../generation/pipeline.js';
 import type { WorldStudioWorkspaceSnapshot } from '../../contracts.js';
 import { formatRouteBindingSummary } from '../../services/mutation-payload.js';
 import { evaluateEmbeddingReadiness, evaluateRouteBindingReadiness } from './readiness.js';
+import { ReasonCode } from '@nimiplatform/sdk/types';
 
 export function useWorldStudioRouteOverrideDerived(input: {
   routeOverrideMap: DistillRouteOverrideMap;
@@ -68,7 +69,7 @@ export function useWorldStudioRouteOverrideDerived(input: {
     ? coarseRouteReadiness.reasonCode
     : !fineRouteReadiness.ready
       ? fineRouteReadiness.reasonCode
-      : 'WORLD_STUDIO_ROUTE_READY';
+      : ReasonCode.WORLD_STUDIO_ROUTE_READY;
   const routeConfigActionHint = !coarseRouteReadiness.ready
     ? coarseRouteReadiness.actionHint
     : !fineRouteReadiness.ready

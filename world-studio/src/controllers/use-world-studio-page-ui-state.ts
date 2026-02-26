@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { RuntimeRouteOptionsSnapshot } from '@nimiplatform/mod-sdk/runtime-route';
+import type { RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
 import type { SupportedEncoding } from '../engine/encoding.js';
 import type { Phase1Result, Phase2Result } from '../generation/pipeline.js';
 import type { RetryScope } from '../services/event-graph-map.js';

@@ -1,4 +1,4 @@
-import type { HookClient } from '@nimiplatform/mod-sdk/types';
+import type { HookClient } from '@nimiplatform/sdk/mod/types';
 import {
   WORLD_STUDIO_DATA_API_CREATOR_AGENTS_BATCH_CREATE,
   WORLD_STUDIO_DATA_API_CREATOR_AGENTS_CREATE,

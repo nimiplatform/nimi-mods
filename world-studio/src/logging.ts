@@ -1,4 +1,4 @@
-import { createRendererFlowId, logRendererEvent } from '@nimiplatform/mod-sdk/logging';
+import { createRendererFlowId, logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 
 export function createWorldStudioFlowId(prefix: string): string {
   return createRendererFlowId(prefix.startsWith('world-studio') ? prefix : `world-studio-${prefix}`);
