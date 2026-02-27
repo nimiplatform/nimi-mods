@@ -257,7 +257,6 @@ function applyPhase1ResultSnapshot(input: WorldStudioCreateActionsInput, params:
   const projection = projectEventsForSelectedStartTime({
     selectedStartTimeId,
     startTimeOptions: params.result.startTimeOptions,
-    timeline: params.result.knowledgeGraph.timeline as Array<Record<string, unknown>>,
     events: params.result.knowledgeGraph.events as unknown as { primary: EventNodeDraft[]; secondary: EventNodeDraft[] },
     futureHistoricalEvents: params.result.knowledgeGraph.futureHistoricalEvents || [],
   });

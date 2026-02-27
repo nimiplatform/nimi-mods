@@ -1,11 +1,9 @@
 import { useCallback } from 'react';
 import { asRecord } from '@nimiplatform/sdk/mod/utils';
 import { evaluateQualityGate } from '../../engine/quality-gate.js';
-import { toStartTimeOptions } from '../../engine/merge.js';
-import { fallbackCharacterCandidates, fallbackStartTimeOptions } from '../../generation/phase1/heuristic-fallback.js';
+import { deriveCharacterCandidates, deriveStartTimeOptions } from '../../generation/phase1/derived-options.js';
 import { toUniqueStringArray } from '../../services/snapshot-normalize.js';
 import { projectEventsForSelectedStartTime } from '../../services/start-time-projection.js';
-import { buildStartTimeOptionsFromEvents } from '../../services/temporal-order.js';
 import { buildPhase1ArtifactFromResult } from '../../services/phase1-artifact.js';
 import type { WorldStudioSnapshotPatch, WorldStudioWorkspaceSnapshot } from '../../contracts.js';
 import type { Phase1Result, Phase2Result } from '../../generation/pipeline.js';
@@ -34,18 +32,14 @@ export function useWorldStudioWorkspaceControllerActions(
       ...input.snapshot.knowledgeGraph,
       events: input.snapshot.eventsDraft,
     };
-    const temporalOptions = buildStartTimeOptionsFromEvents(graph.events);
-    const timelineOptions = toStartTimeOptions(graph.timeline as Array<Record<string, unknown>>);
-    const startTimeOptions = temporalOptions.length > 0
-      ? temporalOptions
-      : (timelineOptions.length > 0 ? timelineOptions : fallbackStartTimeOptions(graph));
-    const characterCandidates = fallbackCharacterCandidates(graph, input.snapshot.sourceText);
+    const startTimeOptions = deriveStartTimeOptions(graph);
+    const characterCandidates = deriveCharacterCandidates(graph);
     const candidateNameSet = new Set(characterCandidates.map((item) => item.name));
     const currentSelectedCharacters = input.snapshot.selectedCharacters
       .map((item) => String(item || '').trim())
       .filter((item) => item.length > 0);
     const selectedCharacters = (() => {
-      if (candidateNameSet.size === 0) return toUniqueStringArray(currentSelectedCharacters);
+      if (candidateNameSet.size === 0) return [];
       const filtered = currentSelectedCharacters.filter((item) => candidateNameSet.has(item));
       if (filtered.length > 0) return toUniqueStringArray(filtered);
       return characterCandidates.slice(0, 6).map((item) => item.name);
@@ -54,7 +48,7 @@ export function useWorldStudioWorkspaceControllerActions(
       .map((item) => String(item || '').trim())
       .filter((item) => item.length > 0);
     const selectedAgentSyncCharacters = (() => {
-      if (candidateNameSet.size === 0) return toUniqueStringArray(currentAgentSyncSelected);
+      if (candidateNameSet.size === 0) return [];
       const filtered = currentAgentSyncSelected.filter((item) => candidateNameSet.has(item));
       if (filtered.length > 0) return toUniqueStringArray(filtered);
       return toUniqueStringArray(selectedCharacters);
@@ -65,10 +59,15 @@ export function useWorldStudioWorkspaceControllerActions(
     const projection = projectEventsForSelectedStartTime({
       selectedStartTimeId,
       startTimeOptions,
-      timeline: graph.timeline as Array<Record<string, unknown>>,
       events: input.snapshot.eventsDraft,
       futureHistoricalEvents: graph.futureHistoricalEvents || [],
     });
+    if (!projection.applied) {
+      const reasonCode = projection.reasonCode || 'WORLD_STUDIO_START_TIME_PROJECTION_FAILED';
+      input.setError(`WORLD_STUDIO_START_TIME_PROJECTION_FAILED: ${reasonCode}`);
+      input.setNotice('Quality gate refresh aborted: start-time projection failed.');
+      return;
+    }
     const projectedKnowledgeGraph = {
       ...graph,
       events: projection.events,

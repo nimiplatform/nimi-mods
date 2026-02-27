@@ -1,11 +1,9 @@
 import type { ReactNode } from 'react';
 import { CreateWorkbench } from '../ui/create/create-workbench.js';
 import { MaintainWorkbench } from '../ui/maintain/maintain-workbench.js';
-import { toStartTimeOptions } from '../engine/merge.js';
-import { fallbackCharacterCandidates, fallbackStartTimeOptions } from '../generation/phase1/heuristic-fallback.js';
+import { deriveCharacterCandidates, deriveStartTimeOptions } from '../generation/phase1/derived-options.js';
 import { toUniqueStringArray } from '../services/snapshot-normalize.js';
 import { projectEventsForSelectedStartTime } from '../services/start-time-projection.js';
-import { buildStartTimeOptionsFromEvents } from '../services/temporal-order.js';
 import type {
   EventNodeDraft,
   WorldStudioCreateStep,
@@ -39,6 +37,7 @@ type BuildWorldStudioMainPanelInput = {
   eventSyncMode: 'merge' | 'replace';
   mutations: WorldMutationSummary[];
   setCreateStep: (step: WorldStudioCreateStep) => void;
+  setError: (value: string | null) => void;
   patchSnapshot: (patch: WorldStudioSnapshotPatch) => void;
   patchPanel: (patch: Partial<WorldStudioWorkspaceSnapshot['panel']>) => void;
   setSourceMode: (mode: 'TEXT' | 'FILE') => void;
@@ -73,16 +72,8 @@ export function buildWorldStudioMainPanel(input: BuildWorldStudioMainPanelInput)
       ...input.snapshot.knowledgeGraph,
       events: input.snapshot.eventsDraft,
     };
-    const derivedStartTimeOptions = (() => {
-      const temporalOptions = buildStartTimeOptionsFromEvents(graphForCheckpoints.events);
-      if (temporalOptions.length > 0) return temporalOptions;
-      const timelineOptions = toStartTimeOptions(graphForCheckpoints.timeline as Array<Record<string, unknown>>);
-      return timelineOptions.length > 0 ? timelineOptions : fallbackStartTimeOptions(graphForCheckpoints);
-    })();
-    const derivedCharacterCandidates = fallbackCharacterCandidates(
-      graphForCheckpoints,
-      input.snapshot.sourceText,
-    );
+    const derivedStartTimeOptions = deriveStartTimeOptions(graphForCheckpoints);
+    const derivedCharacterCandidates = deriveCharacterCandidates(graphForCheckpoints);
     const phase1ForWorkbench = input.phase1
       ? {
         ...input.phase1,
@@ -115,10 +106,12 @@ export function buildWorldStudioMainPanel(input: BuildWorldStudioMainPanelInput)
       const projection = projectEventsForSelectedStartTime({
         selectedStartTimeId,
         startTimeOptions,
-        timeline: input.snapshot.knowledgeGraph.timeline,
         events,
         futureHistoricalEvents: input.snapshot.knowledgeGraph.futureHistoricalEvents,
       });
+      if (!projection.applied) {
+        input.setError(`WORLD_STUDIO_START_TIME_PROJECTION_FAILED: ${projection.reasonCode || 'WORLD_STUDIO_START_TIME_PROJECTION_FAILED'}`);
+      }
       return {
         selectedStartTimeId,
         eventsDraft: projection.events,

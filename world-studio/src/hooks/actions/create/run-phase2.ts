@@ -4,16 +4,25 @@ import {
   PRIMARY_EVIDENCE_COVERAGE_BLOCK_THRESHOLD,
   summarizePrimaryEvidenceCoverage,
 } from '../../../engine/primary-evidence.js';
+import { deriveCharacterCandidates, deriveStartTimeOptions } from '../../../generation/phase1/derived-options.js';
 import { emitWorldStudioLog } from '../../../logging.js';
 import { runPhase2DraftGeneration } from '../../../generation/pipeline.js';
 import { buildWorldStudioEmbeddingIndex } from '../../../services/embedding-index.js';
-import { START_TIME_PROJECTED_FUTURE_EVENT_KIND } from '../../../services/start-time-projection.js';
+import { toUniqueStringArray } from '../../../services/snapshot-normalize.js';
+import {
+  projectEventsForSelectedStartTime,
+  START_TIME_PROJECTED_FUTURE_EVENT_KIND,
+} from '../../../services/start-time-projection.js';
 import type { WorldStudioCreateActionsInput } from './types.js';
 
 type RunCreatePhase2Options = {
   taskId?: string;
   resume?: boolean;
 };
+
+function normalizeStringArray(value: string[]): string[] {
+  return toUniqueStringArray(value.map((item) => String(item || '').trim()).filter((item) => item.length > 0));
+}
 
 function diagLog(message: string, details?: Record<string, unknown>) {
   try {
@@ -103,8 +112,20 @@ export async function runCreatePhase2(
   input: WorldStudioCreateActionsInput,
   options?: RunCreatePhase2Options,
 ): Promise<void> {
+  const graphForPhase2 = {
+    ...input.snapshot.knowledgeGraph,
+    events: input.snapshot.eventsDraft,
+  };
+  const startTimeOptions = deriveStartTimeOptions(graphForPhase2);
+  const selectedStartTimeId = startTimeOptions.some((item) => item.id === input.snapshot.selectedStartTimeId)
+    ? input.snapshot.selectedStartTimeId
+    : (startTimeOptions[0]?.id || '');
+  const qualityGate = input.phase1?.qualityGate || input.snapshot.phase1Artifact?.qualityGate || null;
+
   diagLog('Phase2 ENTER', {
     selectedStartTimeId: input.snapshot.selectedStartTimeId,
+    effectiveSelectedStartTimeId: selectedStartTimeId,
+    startTimeOptionCount: startTimeOptions.length,
     selectedCharacters: input.snapshot.selectedCharacters,
     selectedCharactersCount: input.snapshot.selectedCharacters.length,
     phase1QualityStatus: input.phase1?.qualityGate?.status || input.snapshot.phase1Artifact?.qualityGate?.status || null,
@@ -126,11 +147,10 @@ export async function runCreatePhase2(
       lastUpdatedChunk: input.snapshot.finalDraftAccumulator.lastUpdatedChunk,
     },
   });
-  const qualityGate = input.phase1?.qualityGate || input.snapshot.phase1Artifact?.qualityGate || null;
-  if (!qualityGate || !input.snapshot.selectedStartTimeId) {
+  if (!qualityGate || !selectedStartTimeId) {
     diagLog('Phase2 blocked: missing qualityGate or selectedStartTimeId', {
       hasQualityGate: Boolean(qualityGate),
-      selectedStartTimeId: input.snapshot.selectedStartTimeId,
+      selectedStartTimeId,
     });
     input.setError('Please complete extract step and select start time first.');
     return;
@@ -144,17 +164,85 @@ export async function runCreatePhase2(
     input.setError(`WORLD_STUDIO_PHASE1_QUALITY_GATE_BLOCKED: ${qualityGate.reasons.join(' | ')}`);
     return;
   }
-  if (input.snapshot.selectedCharacters.length === 0) {
-    diagLog('Phase2 blocked: no selected characters');
-    input.setError('Please select at least one character before synthesize.');
+
+  const projection = projectEventsForSelectedStartTime({
+    selectedStartTimeId,
+    startTimeOptions,
+    events: input.snapshot.eventsDraft,
+    futureHistoricalEvents: graphForPhase2.futureHistoricalEvents || [],
+  });
+  if (!projection.applied) {
+    const reasonCode = projection.reasonCode || 'WORLD_STUDIO_START_TIME_PROJECTION_FAILED';
+    diagLog('Phase2 blocked: start-time projection failed', {
+      selectedStartTimeId,
+      reasonCode,
+    });
+    input.setError(`WORLD_STUDIO_START_TIME_PROJECTION_FAILED: ${reasonCode}`);
     return;
   }
-  if ((input.snapshot.knowledgeGraph.events.primary || []).length === 0) {
+  const projectedKnowledgeGraph = {
+    ...graphForPhase2,
+    events: projection.events,
+    futureHistoricalEvents: projection.futureHistoricalEvents,
+  };
+  const characterCandidates = deriveCharacterCandidates(projectedKnowledgeGraph);
+  const candidateNameSet = new Set(characterCandidates.map((item) => item.name));
+  const selectedCharacters = normalizeStringArray(input.snapshot.selectedCharacters)
+    .filter((item) => candidateNameSet.has(item));
+  if (candidateNameSet.size === 0) {
+    diagLog('Phase2 blocked: no character candidates', {
+      selectedStartTimeId,
+      candidateCount: characterCandidates.length,
+    });
+    input.patchSnapshot({
+      selectedCharacters: [],
+      agentSync: {
+        ...input.snapshot.agentSync,
+        selectedCharacterIds: [],
+      },
+    });
+    input.setError('WORLD_STUDIO_CHARACTER_SELECTION_INVALID: no valid character candidates.');
+    return;
+  }
+  if (selectedCharacters.length === 0) {
+    diagLog('Phase2 blocked: selected characters not in candidate set', {
+      selectedCharacters: input.snapshot.selectedCharacters,
+      candidateNames: Array.from(candidateNameSet).slice(0, 24),
+    });
+    input.patchSnapshot({
+      selectedCharacters: [],
+      agentSync: {
+        ...input.snapshot.agentSync,
+        selectedCharacterIds: [],
+      },
+    });
+    input.setError('WORLD_STUDIO_CHARACTER_SELECTION_INVALID: please select at least one valid character.');
+    return;
+  }
+  const selectedAgentSyncCharacters = (() => {
+    const filtered = normalizeStringArray(input.snapshot.agentSync.selectedCharacterIds)
+      .filter((item) => candidateNameSet.has(item));
+    if (filtered.length > 0) return filtered;
+    return [...selectedCharacters];
+  })();
+  input.patchSnapshot({
+    selectedStartTimeId,
+    selectedCharacters,
+    agentSync: {
+      ...input.snapshot.agentSync,
+      selectedCharacterIds: selectedAgentSyncCharacters,
+    },
+    eventsDraft: projection.events,
+    futureEventsText: JSON.stringify(projection.futureHistoricalEvents || [], null, 2),
+    knowledgeGraph: projectedKnowledgeGraph,
+  });
+
+  if ((projectedKnowledgeGraph.events.primary || []).length === 0) {
     diagLog('Phase2 blocked: no primary events');
     input.setError('WORLD_STUDIO_EVENT_GRAPH_INVALID: at least one PRIMARY event is required.');
     return;
   }
-  const primaryEvents = input.snapshot.knowledgeGraph.events.primary || [];
+  const primaryEvents = projectedKnowledgeGraph.events.primary || [];
   const primaryEvidenceSummary = summarizePrimaryEvidenceCoverage(primaryEvents);
   if (
     primaryEvidenceSummary.total > 0
@@ -239,8 +327,8 @@ export async function runCreatePhase2(
     chunkCompleted: input.snapshot.parseJob.chunkCompleted || 0,
     chunkFailed: input.snapshot.parseJob.chunkFailed || 0,
     payload: {
-      selectedStartTimeId: input.snapshot.selectedStartTimeId,
-      selectedCharacters: input.snapshot.selectedCharacters,
+      selectedStartTimeId,
+      selectedCharacters,
     },
   });
 
@@ -254,9 +342,9 @@ export async function runCreatePhase2(
       routeConnectorId: routeOverride?.connectorId || null,
     });
     const result = await runPhase2DraftGeneration(input.aiClient, {
-      selectedStartTimeId: input.snapshot.selectedStartTimeId,
-      selectedCharacters: input.snapshot.selectedCharacters,
-      knowledgeGraph: input.snapshot.knowledgeGraph,
+      selectedStartTimeId,
+      selectedCharacters,
+      knowledgeGraph: projectedKnowledgeGraph,
       finalDraftAccumulator: input.snapshot.finalDraftAccumulator,
     }, {
       routeOverride: routeOverride || undefined,
@@ -288,7 +376,7 @@ export async function runCreatePhase2(
     });
     diagLog('Phase2 dna presence audit', {
       taskId,
-      selectedCharacters: input.snapshot.selectedCharacters,
+      selectedCharacters,
       agentDraftHasDna: (result.agentDrafts || []).map((draft) => ({
         name: draft.characterName,
         hasDna: Boolean(draft.dna && typeof draft.dna === 'object'),
@@ -311,11 +399,11 @@ export async function runCreatePhase2(
       };
       return acc;
     }, {} as Record<string, typeof result.agentDrafts[number]>);
-    const missingDnaCharacters = input.snapshot.selectedCharacters.filter((name) => {
+    const missingDnaCharacters = selectedCharacters.filter((name) => {
       const draft = draftsByCharacter[name];
       return !(draft && draft.dna && typeof draft.dna === 'object');
     });
-    const preservedProjectedFutureEvents = (input.snapshot.knowledgeGraph.futureHistoricalEvents || [])
+    const preservedProjectedFutureEvents = (projectedKnowledgeGraph.futureHistoricalEvents || [])
       .filter((item) => {
         return String(asRecord(item).projectionKind || '') === START_TIME_PROJECTED_FUTURE_EVENT_KIND;
       })
@@ -374,7 +462,7 @@ export async function runCreatePhase2(
         : [],
       futureEventsText: JSON.stringify(synthesizedFutureHistoricalEvents, null, 2),
       knowledgeGraph: {
-        ...input.snapshot.knowledgeGraph,
+        ...projectedKnowledgeGraph,
         // events: preserved from Phase 1 — not overwritten by Phase 2
         futureHistoricalEvents: nextKnowledgeFutureEvents,
       },
@@ -404,7 +492,7 @@ export async function runCreatePhase2(
     diagLog('Phase2 snapshot patched', {
       taskId,
       worldName: String(asRecord(result.world).name || ''),
-      selectedCharacters: input.snapshot.selectedCharacters,
+      selectedCharacters,
       draftsByCharacterKeys: Object.keys(draftsByCharacter),
       missingDnaCharacters,
       lorebooksDraftCount: Array.isArray(result.worldLorebooks)

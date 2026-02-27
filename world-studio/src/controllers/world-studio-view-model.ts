@@ -64,6 +64,7 @@ export type WorldStudioShellRuntimeInput = {
   retryErrorCode: string | null;
   eventSyncMode: 'merge' | 'replace';
   mutations: WorldMutationSummary[];
+  setError: (value: string | null) => void;
   setCreateStep: (step: WorldStudioCreateStep) => void;
   patchSnapshot: (patch: WorldStudioSnapshotPatch) => void;
   patchPanel: (patch: Partial<WorldStudioWorkspaceSnapshot['panel']>) => void;

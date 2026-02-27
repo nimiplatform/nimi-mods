@@ -71,6 +71,8 @@ test('start-time projection splits current vs future event buckets', () => {
     futureHistoricalEvents: [],
   });
 
+  assert.equal(projected.applied, true);
+  assert.equal(projected.reasonCode, null);
   assert.deepEqual(projected.events.primary.map((item) => item.id), ['p1', 'p2']);
   assert.deepEqual(projected.events.secondary.map((item) => item.id), ['s1']);
 
@@ -104,6 +106,8 @@ test('start-time projection is non-destructive and can restore future events', (
     events: base,
     futureHistoricalEvents: [],
   });
+  assert.equal(first.applied, true);
+  assert.equal(first.reasonCode, null);
   assert.deepEqual(first.events.primary.map((item) => item.id), ['p1']);
   assert.equal(first.futureHistoricalEvents.length, 2);
 
@@ -115,6 +119,8 @@ test('start-time projection is non-destructive and can restore future events', (
     futureHistoricalEvents: first.futureHistoricalEvents,
   });
 
+  assert.equal(second.applied, true);
+  assert.equal(second.reasonCode, null);
   assert.deepEqual(second.events.primary.map((item) => item.id), ['p1', 'p2', 'p3']);
   assert.equal(second.futureHistoricalEvents.length, 0);
 });
@@ -142,9 +148,29 @@ test('start-time projection supports temporal dependency ordering without explic
     futureHistoricalEvents: [],
   });
 
+  assert.equal(projected.applied, true);
+  assert.equal(projected.reasonCode, null);
   assert.deepEqual(projected.events.primary.map((item) => item.id), ['p1', 'p2']);
   assert.deepEqual(
     projected.futureHistoricalEvents.map((item) => String(item.id || '')).filter(Boolean),
     ['p3'],
   );
+});
+
+test('start-time projection reports explicit failure when selected option cannot map to events', () => {
+  const projected = projectEventsForSelectedStartTime({
+    selectedStartTimeId: 'event:missing',
+    startTimeOptions: [{ id: 'event:missing', label: 'Missing', description: '', weight: 0.5 }],
+    timeline: [],
+    events: {
+      primary: [primary('p1', 'Chapter 1')],
+      secondary: [],
+    },
+    futureHistoricalEvents: [],
+  });
+
+  assert.equal(projected.applied, false);
+  assert.equal(projected.reasonCode, 'WORLD_STUDIO_START_TIME_EVENT_NOT_FOUND');
+  assert.deepEqual(projected.events.primary.map((item) => item.id), ['p1']);
+  assert.equal(projected.futureHistoricalEvents.length, 0);
 });

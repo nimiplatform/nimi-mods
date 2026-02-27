@@ -45,6 +45,7 @@ export function buildWorldStudioPanels(viewModel: WorldStudioViewModel): {
     retryErrorCode: viewModel.runtime.retryErrorCode,
     eventSyncMode: viewModel.runtime.eventSyncMode,
     mutations: viewModel.runtime.mutations,
+    setError: viewModel.runtime.setError,
     setCreateStep: viewModel.runtime.setCreateStep,
     patchSnapshot: viewModel.runtime.patchSnapshot,
     patchPanel: viewModel.runtime.patchPanel,

@@ -12,20 +12,21 @@ type EventBuckets = {
 type StartTimeProjectionInput = {
   selectedStartTimeId: string;
   startTimeOptions: Phase1Option[];
-  timeline: Array<Record<string, unknown>>;
   events: EventBuckets;
   futureHistoricalEvents: Array<Record<string, unknown>>;
 };
+
+export type StartTimeProjectionReasonCode =
+  | 'START_TIME_NOT_SELECTED'
+  | 'WORLD_STUDIO_START_TIME_NO_PRIMARY_EVENTS'
+  | 'WORLD_STUDIO_START_TIME_EVENT_NOT_FOUND'
+  | 'WORLD_STUDIO_START_TIME_ORDER_NOT_FOUND';
 
 type StartTimeProjectionResult = {
+  applied: boolean;
+  reasonCode: StartTimeProjectionReasonCode | null;
   events: EventBuckets;
   futureHistoricalEvents: Array<Record<string, unknown>>;
-};
-
-type TimelineNode = {
-  id: string;
-  label: string;
-  time: string;
 };
 
 type FutureEventExtraction = {
@@ -58,66 +59,6 @@ function eventKey(event: EventNodeDraft): string {
   const id = normalizeKey(event.id);
   if (id) return id;
   return normalizeKey(`${event.level}:${event.title}:${event.timeRef}:${event.parentEventId || ''}`);
-}
-
-function buildTimelineNodes(
-  startTimeOptions: Phase1Option[],
-  timeline: Array<Record<string, unknown>>,
-): TimelineNode[] {
-  if (Array.isArray(startTimeOptions) && startTimeOptions.length > 0) {
-    return startTimeOptions.map((item) => ({
-      id: safeString(item.id),
-      label: safeString(item.label),
-      time: '',
-    }));
-  }
-  return (timeline || []).map((item, index) => {
-    const record = asRecord(item);
-    return {
-      id: safeString(record.id) || `timeline:${index + 1}`,
-      label: safeString(record.label),
-      time: safeString(record.time),
-    };
-  });
-}
-
-function buildTimelineIndexMap(nodes: TimelineNode[]): Map<string, number> {
-  const indexMap = new Map<string, number>();
-  nodes.forEach((node, index) => {
-    const keys = [normalizeKey(node.id), normalizeKey(node.label), normalizeKey(node.time)];
-    keys.forEach((key) => {
-      if (key && !indexMap.has(key)) {
-        indexMap.set(key, index);
-      }
-    });
-  });
-  return indexMap;
-}
-
-function resolveEventTimelineIndex(
-  event: EventNodeDraft,
-  indexMap: Map<string, number>,
-  nodes: TimelineNode[],
-): number | null {
-  const timeRef = safeString(event.timeRef);
-  if (!timeRef) return null;
-  const normalized = normalizeKey(timeRef);
-  if (!normalized) return null;
-
-  const direct = indexMap.get(normalized);
-  if (typeof direct === 'number') return direct;
-
-  for (let i = 0; i < nodes.length; i += 1) {
-    const node = nodes[i]!;
-    const candidates = [normalizeKey(node.label), normalizeKey(node.time)];
-    for (const candidate of candidates) {
-      if (!candidate || candidate.length < 2) continue;
-      if (normalized.includes(candidate) || candidate.includes(normalized)) {
-        return i;
-      }
-    }
-  }
-  return null;
 }
 
 function normalizeEventNode(value: unknown, fallbackLevel: 'PRIMARY' | 'SECONDARY'): EventNodeDraft | null {
@@ -270,12 +211,16 @@ function projectWithTemporalOrder(input: {
   startTimeOptions: Phase1Option[];
   fullPrimary: EventNodeDraft[];
   fullSecondary: EventNodeDraft[];
-}): { success: boolean; events: EventBuckets } {
+}): (
+  | { success: true; events: EventBuckets }
+  | { success: false; reasonCode: Exclude<StartTimeProjectionReasonCode, 'START_TIME_NOT_SELECTED'>; events: EventBuckets }
+) {
   const fullPrimary = input.fullPrimary;
   const fullSecondary = input.fullSecondary;
   if (fullPrimary.length === 0) {
     return {
       success: false,
+      reasonCode: 'WORLD_STUDIO_START_TIME_NO_PRIMARY_EVENTS',
       events: { primary: fullPrimary, secondary: fullSecondary },
     };
   }
@@ -288,6 +233,7 @@ function projectWithTemporalOrder(input: {
   if (!selectedPrimaryId) {
     return {
       success: false,
+      reasonCode: 'WORLD_STUDIO_START_TIME_EVENT_NOT_FOUND',
       events: { primary: fullPrimary, secondary: fullSecondary },
     };
   }
@@ -300,6 +246,7 @@ function projectWithTemporalOrder(input: {
   if (typeof selectedOrderIndex !== 'number') {
     return {
       success: false,
+      reasonCode: 'WORLD_STUDIO_START_TIME_ORDER_NOT_FOUND',
       events: { primary: fullPrimary, secondary: fullSecondary },
     };
   }
@@ -344,63 +291,6 @@ function projectWithTemporalOrder(input: {
   };
 }
 
-function projectWithLegacyTimeline(input: {
-  selectedStartTimeId: string;
-  startTimeOptions: Phase1Option[];
-  timeline: Array<Record<string, unknown>>;
-  fullPrimary: EventNodeDraft[];
-  fullSecondary: EventNodeDraft[];
-}): { success: boolean; events: EventBuckets; futurePrimary: EventNodeDraft[]; futureSecondary: EventNodeDraft[] } {
-  const timelineNodes = buildTimelineNodes(input.startTimeOptions, input.timeline);
-  const timelineIndexMap = buildTimelineIndexMap(timelineNodes);
-  const selectedIndex = input.selectedStartTimeId
-    ? timelineNodes.findIndex((node) => node.id === input.selectedStartTimeId)
-    : -1;
-  if (selectedIndex < 0) {
-    return {
-      success: false,
-      events: { primary: input.fullPrimary, secondary: input.fullSecondary },
-      futurePrimary: [],
-      futureSecondary: [],
-    };
-  }
-
-  const sourceOrderMap = new Map<string, number>();
-  [...input.fullPrimary, ...input.fullSecondary].forEach((event, index) => {
-    sourceOrderMap.set(eventKey(event), index);
-  });
-
-  const rankOf = (event: EventNodeDraft): number => {
-    const rank = resolveEventTimelineIndex(event, timelineIndexMap, timelineNodes);
-    return typeof rank === 'number' ? rank : Number.MAX_SAFE_INTEGER;
-  };
-
-  const futurePrimary = input.fullPrimary.filter((event) => {
-    const rank = resolveEventTimelineIndex(event, timelineIndexMap, timelineNodes);
-    return typeof rank === 'number' && rank > selectedIndex;
-  });
-  const currentPrimary = input.fullPrimary.filter((event) => !futurePrimary.includes(event));
-
-  const futurePrimaryIdSet = new Set(futurePrimary.map((event) => event.id));
-  const futureSecondary = input.fullSecondary.filter((event) => {
-    const rank = resolveEventTimelineIndex(event, timelineIndexMap, timelineNodes);
-    const parentInFuture = Boolean(event.parentEventId && futurePrimaryIdSet.has(event.parentEventId));
-    const dependencyInFuture = (event.dependsOnEventIds || []).some((depId) => futurePrimaryIdSet.has(depId));
-    return parentInFuture || dependencyInFuture || (typeof rank === 'number' && rank > selectedIndex);
-  });
-  const currentSecondary = input.fullSecondary.filter((event) => !futureSecondary.includes(event));
-
-  return {
-    success: true,
-    events: {
-      primary: sortEventsByRank(currentPrimary, rankOf, sourceOrderMap),
-      secondary: sortEventsByRank(currentSecondary, rankOf, sourceOrderMap),
-    },
-    futurePrimary: sortEventsByRank(futurePrimary, rankOf, sourceOrderMap),
-    futureSecondary: sortEventsByRank(futureSecondary, rankOf, sourceOrderMap),
-  };
-}
-
 export function projectEventsForSelectedStartTime(
   input: StartTimeProjectionInput,
 ): StartTimeProjectionResult {
@@ -418,6 +308,8 @@ export function projectEventsForSelectedStartTime(
 
   if (!selectedStartTimeId) {
     return {
+      applied: false,
+      reasonCode: 'START_TIME_NOT_SELECTED',
       events: {
         primary: fullPrimary,
         secondary: fullSecondary,
@@ -445,33 +337,23 @@ export function projectEventsForSelectedStartTime(
       ...fullSecondary,
     ].filter((event) => !projectedCurrentIdSet.has(event.id));
   } else {
-    const legacyProjection = projectWithLegacyTimeline({
-      selectedStartTimeId,
-      startTimeOptions: input.startTimeOptions,
-      timeline: input.timeline,
-      fullPrimary,
-      fullSecondary,
-    });
-    if (!legacyProjection.success) {
-      return {
-        events: {
-          primary: fullPrimary,
-          secondary: fullSecondary,
-        },
-        futureHistoricalEvents: futureExtraction.preservedNarrativeEntries,
-      };
-    }
-    projectedEvents = legacyProjection.events;
-    futureEventsForProjection = [
-      ...legacyProjection.futurePrimary,
-      ...legacyProjection.futureSecondary,
-    ];
+    return {
+      applied: false,
+      reasonCode: temporalProjection.reasonCode,
+      events: {
+        primary: fullPrimary,
+        secondary: fullSecondary,
+      },
+      futureHistoricalEvents: futureExtraction.preservedNarrativeEntries,
+    };
   }
 
   const projectedFutureEvents = futureEventsForProjection
     .map((event) => asProjectedFutureEventRecord(event, selectedStartTimeId));
 
   return {
+    applied: true,
+    reasonCode: null,
     events: projectedEvents,
     futureHistoricalEvents: [
       ...futureExtraction.preservedNarrativeEntries,

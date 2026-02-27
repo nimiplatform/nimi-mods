@@ -1,14 +1,12 @@
 import { evaluateQualityGate } from '../../engine/quality-gate.js';
-import { toStartTimeOptions } from '../../engine/merge.js';
 import type {
   ChunkExtraction,
   ChunkTaskResult,
   FinalDraftAccumulator,
   Phase1Result,
 } from '../../engine/types.js';
-import { fallbackCharacterCandidates, fallbackStartTimeOptions } from './heuristic-fallback.js';
+import { deriveCharacterCandidates, deriveStartTimeOptions } from './derived-options.js';
 import { runPhase1GlobalRefine } from './global-refine.js';
-import { buildStartTimeOptionsFromEvents } from '../../services/temporal-order.js';
 
 type BuildPhase1ResultInput = {
   merged: ChunkExtraction;
@@ -37,14 +35,8 @@ export function buildPhase1Result(input: BuildPhase1ResultInput): Phase1Result {
     },
   });
 
-  const startTimeOptions = (() => {
-    const temporalOptions = buildStartTimeOptionsFromEvents(knowledgeGraph.events);
-    if (temporalOptions.length > 0) return temporalOptions;
-    const options = toStartTimeOptions(knowledgeGraph.timeline);
-    return options.length > 0 ? options : fallbackStartTimeOptions(knowledgeGraph);
-  })();
-  const sourceText = input.normalizedChunks.join('\n');
-  const characterCandidates = fallbackCharacterCandidates(knowledgeGraph, sourceText);
+  const startTimeOptions = deriveStartTimeOptions(knowledgeGraph);
+  const characterCandidates = deriveCharacterCandidates(knowledgeGraph);
 
   return {
     startTimeOptions,

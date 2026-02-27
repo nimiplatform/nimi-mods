@@ -154,6 +154,7 @@ export function buildWorldStudioViewModel(args: BuildWorldStudioViewModelArgs): 
       retryErrorCode: args.ui.retryErrorCode,
       eventSyncMode: args.ui.eventSyncMode,
       mutations: (args.context.queries.mutationsQuery.data || []) as WorldMutationSummary[],
+      setError: args.ui.setError,
       setCreateStep: args.setCreateStep,
       patchSnapshot: args.patchSnapshot,
       patchPanel: args.patchPanel,
