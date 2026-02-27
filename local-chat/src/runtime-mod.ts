@@ -17,9 +17,9 @@ export function createLocalChatRuntimeMod(): RuntimeModRegistration {
     modId: LOCAL_CHAT_MOD_ID,
     capabilities: [...LOCAL_CHAT_CAPABILITIES],
     isDefaultPrivateExecution: false,
-    setup: async ({ getHttpContext }) => {
-      const hookClient = createHookClient(LOCAL_CHAT_MOD_ID);
-      const aiClient = createAiClient(LOCAL_CHAT_MOD_ID);
+    setup: async ({ getHttpContext, sdkRuntimeContext }) => {
+      const hookClient = createHookClient(LOCAL_CHAT_MOD_ID, sdkRuntimeContext);
+      const aiClient = createAiClient(LOCAL_CHAT_MOD_ID, sdkRuntimeContext);
       const flowId = createLocalChatFlowId('local-chat-setup');
       const startedAt = performance.now();
 

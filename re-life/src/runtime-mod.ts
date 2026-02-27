@@ -21,8 +21,8 @@ export function createReLifeRuntimeMod(): RuntimeModRegistration {
     modId: RELIFE_MOD_ID,
     capabilities: [...RELIFE_CAPABILITIES],
     isDefaultPrivateExecution: false,
-    setup: async () => {
-      const hookClient = createHookClient(RELIFE_MOD_ID);
+    setup: async ({ sdkRuntimeContext }) => {
+      const hookClient = createHookClient(RELIFE_MOD_ID, sdkRuntimeContext);
       const flowId = createReLifeFlowId('re-life-setup');
       const startedAt = performance.now();
 

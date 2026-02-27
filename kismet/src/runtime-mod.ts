@@ -32,9 +32,9 @@ export function createKismetRuntimeMod(): RuntimeModRegistration {
     modId: KISMET_MOD_ID,
     capabilities: [...KISMET_CAPABILITIES],
     isDefaultPrivateExecution: false,
-    setup: async () => {
-      const hookClient = createHookClient(KISMET_MOD_ID);
-      const aiClient = createAiClient(KISMET_MOD_ID);
+    setup: async ({ sdkRuntimeContext }) => {
+      const hookClient = createHookClient(KISMET_MOD_ID, sdkRuntimeContext);
+      const aiClient = createAiClient(KISMET_MOD_ID, sdkRuntimeContext);
       _aiClient = aiClient;
       _hookClient = hookClient;
       const flowId = createKismetFlowId('kismet-setup');

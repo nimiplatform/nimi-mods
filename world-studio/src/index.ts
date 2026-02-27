@@ -38,8 +38,8 @@ export function createWorldStudioRuntimeMod(): RuntimeModRegistration {
     modId: WORLD_STUDIO_MOD_ID,
     capabilities: [...WORLD_STUDIO_CAPABILITIES],
     isDefaultPrivateExecution: false,
-    setup: async () => {
-      const hookClient = createHookClient(WORLD_STUDIO_MOD_ID);
+    setup: async ({ sdkRuntimeContext }) => {
+      const hookClient = createHookClient(WORLD_STUDIO_MOD_ID, sdkRuntimeContext);
       const flowId = createWorldStudioFlowId('world-studio-setup');
       const startedAt = performance.now();
 
