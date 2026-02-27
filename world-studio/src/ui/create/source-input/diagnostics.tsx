@@ -25,6 +25,14 @@ function recommendAction(errorCodeOrMessage: string): string {
   if (normalized.includes('fine')) {
     return 'Switch Fine route to a stronger structured-output model.';
   }
+  if (
+    normalized.includes('provider_internal')
+    || normalized.includes('ai_output_invalid')
+    || normalized.includes('runtime_bridge_unary')
+    || normalized.includes('missing required key payload')
+  ) {
+    return 'Provider internal error detected. Retry failed chunks after checking runtime bridge and provider health.';
+  }
   if (normalized.includes('timeout') || normalized.includes('network')) {
     return 'Retry failed chunks; if repeated failures occur, lower concurrency and retry.';
   }

@@ -56,6 +56,8 @@ const SPEECH_SUFFIXES = [
 const EDGE_PUNCTUATION_RE = /^[\s"'“”‘’《》〈〉「」【】（）()[\]{}<>]+|[\s"'“”‘’《》〈〉「」【】（）()[\]{}<>，。！？、；：,.!?]+$/g;
 const HAS_CJK_RE = /[\u4e00-\u9fff]/;
 const LATIN_NAME_RE = /^[A-Za-z][A-Za-z0-9'\-. ]{1,40}$/;
+const PLACEHOLDER_ENTITY_RE = /^(?:char(?:acter)?|loc(?:ation)?|evt|event|timeline|segment|item|node)(?:[-_: ]+[a-z0-9]+|\d+)$/i;
+const PLACEHOLDER_CJK_RE = /^(?:角色|人物|地点|事件|时间线)[-_:\s]*\d+$/;
 
 function normalizeWhitespace(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
@@ -86,6 +88,7 @@ function normalizeRawName(raw: string): string {
 
 function isLikelyValidName(name: string): boolean {
   if (!name) return false;
+  if (PLACEHOLDER_ENTITY_RE.test(name) || PLACEHOLDER_CJK_RE.test(name)) return false;
   if (CHARACTER_STOPWORDS.has(name)) return false;
   if (HAS_CJK_RE.test(name)) {
     if (/\d/.test(name)) return false;

@@ -81,6 +81,7 @@ type CreateWorkbenchProps = {
   onRetryConcurrencyChange: (value: number) => void;
   retryErrorCode: string | null;
   onClearRetryErrorCode: () => void;
+  onRefreshQualityGate: () => void;
   onRunPhase2: () => void;
 };
 
@@ -186,6 +187,7 @@ export function CreateWorkbench(props: CreateWorkbenchProps) {
               onToggleCharacter={props.onToggleCharacter}
               onEventsChange={props.onEventsGraphChange}
               onEventGraphLayoutChange={props.onEventGraphLayoutChange}
+              onRefreshQualityGate={props.onRefreshQualityGate}
               onRunPhase2={props.onRunPhase2}
               working={props.working}
             />

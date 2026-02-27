@@ -7,7 +7,7 @@ import {
   buildFinalDraftAccumulatorSlice,
   createEmptyFinalDraftAccumulator,
 } from '../engine/final-draft-accumulator.js';
-import { isContextOverflowError } from '../engine/errors.js';
+import { isContextOverflowError, resolveChunkFailureCode } from '../engine/errors.js';
 import type {
   AccumulatedState,
   ChunkExtraction,
@@ -228,24 +228,22 @@ export async function runPhase1ExtractionFromChunks(
             : {}),
         });
       } catch (fineError) {
-        const isOverflow = isContextOverflowError(fineError);
         chunkTasks.push({
           chunkIndex: logicalIndex,
           stage: 'fine',
           status: 'failed',
           retryCount: 1,
-          errorCode: isOverflow ? 'WORLD_STUDIO_CONTEXT_OVERFLOW' : 'WORLD_STUDIO_FINE_JSON_PARSE_FAILED',
+          errorCode: resolveChunkFailureCode('fine', fineError),
           errorMessage: fineError instanceof Error ? fineError.message : String(fineError),
         });
       }
     } catch (coarseError) {
-      const isOverflow = isContextOverflowError(coarseError);
       chunkTasks.push({
         chunkIndex: logicalIndex,
         stage: 'coarse',
         status: 'failed',
         retryCount: 1,
-        errorCode: isOverflow ? 'WORLD_STUDIO_CONTEXT_OVERFLOW' : 'WORLD_STUDIO_COARSE_JSON_PARSE_FAILED',
+        errorCode: resolveChunkFailureCode('coarse', coarseError),
         errorMessage: coarseError instanceof Error ? coarseError.message : String(coarseError),
       });
     }

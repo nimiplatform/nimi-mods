@@ -206,6 +206,12 @@ export type WorldStudioAgentLorebookDraft = {
   source?: string | null;
 };
 
+export type WorldStudioAgentRules = {
+  format: 'rule-lines-v1';
+  lines: string[];
+  text: string;
+};
+
 export type WorldStudioAgentDraft = {
   characterName: string;
   handle: string;
@@ -218,10 +224,12 @@ export type WorldStudioAgentDraft = {
   greeting?: string | null;
   exampleDialogue?: string | null;
   systemPromptBase?: string | null;
-  rules?: string[];
+  rules?: WorldStudioAgentRules;
   postHistoryInstructions?: string | null;
   alternateGreetings?: string[];
   agentLorebooks?: WorldStudioAgentLorebookDraft[];
+  referenceImageUrl?: string | null;
+  wakeStrategy?: 'PASSIVE' | 'PROACTIVE';
   dnaPrimary?: string;
   dnaSecondary?: string[];
   dna?: WorldStudioAgentDna;

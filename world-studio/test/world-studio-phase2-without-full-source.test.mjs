@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cloneDefaultSnapshot } from '../mods/world-studio/src/state/workspace/defaults.ts';
-import { runCreatePhase2 } from '../mods/world-studio/src/hooks/actions/create/run-phase2.ts';
+import { cloneDefaultSnapshot } from '../src/state/workspace/defaults.ts';
+import { runCreatePhase2 } from '../src/hooks/actions/create/run-phase2.ts';
 import { createMockTaskController } from './helpers/world-studio-task-controller-mock.mjs';
 
 function makeQualityGatePass() {
@@ -122,7 +122,6 @@ test('world-studio phase2 can synthesize without full source text after refresh'
               lore: '',
               timeFlowRatio: 1,
               rules: {},
-              visualStyle: {},
             },
             worldview: {
               timeModel: { currentNode: 't-1', timeline: [] },
@@ -136,7 +135,6 @@ test('world-studio phase2 can synthesize without full source text after refresh'
               narrativeHooks: {},
             },
             worldEvents: snapshotRef.current.knowledgeGraph.events.primary,
-            worldFacts: [],
             futureHistoricalEvents: [],
             agentDrafts: [{
               characterName: '汪淼',

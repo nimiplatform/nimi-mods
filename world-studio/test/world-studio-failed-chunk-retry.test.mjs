@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { runPhase1ExtractionFromChunks } from '../mods/world-studio/src/generation/pipeline.ts';
+import { runPhase1ExtractionFromChunks } from '../src/generation/pipeline.ts';
 
 function makeStrictJsonChunkResult(index) {
   return JSON.stringify({

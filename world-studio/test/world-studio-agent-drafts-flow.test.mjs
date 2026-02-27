@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cloneDefaultSnapshot } from '../mods/world-studio/src/state/workspace/defaults.ts';
-import { runCreatePhase2 } from '../mods/world-studio/src/hooks/actions/create/run-phase2.ts';
-import { publishWorldDraft } from '../mods/world-studio/src/hooks/actions/create/draft-publish.ts';
+import { cloneDefaultSnapshot } from '../src/state/workspace/defaults.ts';
+import { runCreatePhase2 } from '../src/hooks/actions/create/run-phase2.ts';
+import { publishWorldDraft } from '../src/hooks/actions/create/draft-publish.ts';
 import { createMockTaskController } from './helpers/world-studio-task-controller-mock.mjs';
 
 function makePassQualityGate() {
@@ -119,7 +119,6 @@ test('world-studio agent drafts flow persists phase2 drafts and publishes with d
               lore: '',
               timeFlowRatio: 1,
               rules: {},
-              visualStyle: {},
             },
             worldview: {
               timeModel: { currentNode: 't-1', timeline: [] },
@@ -133,7 +132,6 @@ test('world-studio agent drafts flow persists phase2 drafts and publishes with d
               narrativeHooks: {},
             },
             worldEvents: snapshotRef.current.knowledgeGraph.events.primary,
-            worldFacts: [],
             futureHistoricalEvents: [],
             agentDrafts: [{
               characterName: '汪淼',
@@ -147,7 +145,15 @@ test('world-studio agent drafts flow persists phase2 drafts and publishes with d
               greeting: '你好，我是汪淼。',
               exampleDialogue: '汪淼：先确认事实，再下结论。',
               systemPromptBase: '以科学事实与理性推理优先。',
-              rules: ['先验证再判断', '避免夸张结论'],
+              rules: {
+                format: 'rule-lines-v1',
+                lines: ['先验证再判断', '避免夸张结论'],
+                text: '先验证再判断\n避免夸张结论',
+              },
+              referenceImageUrl: 'https://example.com/wangmiao.png',
+              wakeStrategy: 'PROACTIVE',
+              dnaPrimary: 'RATIONAL',
+              dnaSecondary: ['CAUTIOUS', 'ANALYTICAL'],
               postHistoryInstructions: '回复应与既有事件线一致。',
               alternateGreetings: ['又见面了，实验还顺利吗？'],
               agentLorebooks: [
@@ -252,8 +258,12 @@ test('world-studio agent drafts flow persists phase2 drafts and publishes with d
   assert.equal(Boolean(wDraft.dna), true);
   assert.equal(wDraft.dna.identity.name, '汪淼');
   assert.equal(wDraft.description, '汪淼是纳米科学家。');
-  assert.equal(wDraft.rules.length, 2);
+  assert.equal(wDraft.rules.lines.length, 2);
   assert.equal(wDraft.agentLorebooks.length, 1);
+  assert.equal(wDraft.referenceImageUrl, 'https://example.com/wangmiao.png');
+  assert.equal(wDraft.wakeStrategy, 'PROACTIVE');
+  assert.equal(wDraft.dnaPrimary, 'RATIONAL');
+  assert.deepEqual(wDraft.dnaSecondary, ['CAUTIOUS', 'ANALYTICAL']);
 
   const publishInput = {
     ...baseInput,
@@ -273,9 +283,17 @@ test('world-studio agent drafts flow persists phase2 drafts and publishes with d
   assert.equal(batchPayloadRef.current.items[0].worldId, 'world-1');
   assert.equal(Boolean(batchPayloadRef.current.items[0].dna), true);
   assert.equal(batchPayloadRef.current.items[0].dna.identity.name, '汪淼');
-  assert.equal(Object.prototype.hasOwnProperty.call(batchPayloadRef.current.items[0], 'description'), false);
-  assert.equal(Object.prototype.hasOwnProperty.call(batchPayloadRef.current.items[0], 'scenario'), false);
-  assert.equal(Object.prototype.hasOwnProperty.call(batchPayloadRef.current.items[0], 'agentLorebooks'), false);
+  assert.equal(batchPayloadRef.current.items[0].description, '汪淼是纳米科学家。');
+  assert.equal(batchPayloadRef.current.items[0].scenario, '你在倒计时危机后与我讨论实验进展。');
+  assert.equal(batchPayloadRef.current.items[0].rules.format, 'rule-lines-v1');
+  assert.deepEqual(batchPayloadRef.current.items[0].rules.lines, ['先验证再判断', '避免夸张结论']);
+  assert.equal(batchPayloadRef.current.items[0].rules.text, '先验证再判断\n避免夸张结论');
+  assert.equal(Array.isArray(batchPayloadRef.current.items[0].agentLorebooks), true);
+  assert.equal(batchPayloadRef.current.items[0].agentLorebooks.length, 1);
+  assert.equal(batchPayloadRef.current.items[0].referenceImageUrl, 'https://example.com/wangmiao.png');
+  assert.equal(batchPayloadRef.current.items[0].wakeStrategy, 'PROACTIVE');
+  assert.equal(batchPayloadRef.current.items[0].dnaPrimary, 'RATIONAL');
+  assert.deepEqual(batchPayloadRef.current.items[0].dnaSecondary, ['CAUTIOUS', 'ANALYTICAL']);
 });
 
 test('world-studio publish normalizes invalid handle to ASCII fallback', async () => {

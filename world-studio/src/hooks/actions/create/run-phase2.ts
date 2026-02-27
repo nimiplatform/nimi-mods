@@ -19,7 +19,7 @@ function diagLog(message: string, details?: Record<string, unknown>) {
   try {
     emitWorldStudioLog({
       level: 'error',
-      message: `[AGENT_SYNC_DIAG] ${message}`,
+      message: `[MODS-TEST-DIAG] ${message}`,
       source: 'DIAG',
       details,
     });
@@ -334,19 +334,23 @@ export async function runCreatePhase2(
     try {
       emitWorldStudioLog({
         level: 'error',
-        message: '[AGENT_SYNC_DIAG] Phase2 complete: writing agentSync.draftsByCharacter',
+        message: '[MODS-TEST-DIAG] Phase2 complete: writing agentSync.draftsByCharacter',
         source: 'DIAG',
         details: {
           agentDraftCount: (result.agentDrafts || []).length,
           agentDraftNames: (result.agentDrafts || []).map((d) => d.characterName),
           agentDraftHasDna: (result.agentDrafts || []).map((d) => ({ name: d.characterName, hasDna: Boolean(d.dna), dnaKeys: d.dna && typeof d.dna === 'object' ? Object.keys(d.dna) : [] })),
           agentDraftFieldCoverage: (result.agentDrafts || []).map((d) => ({
+            // Keep diagnostics stable across canonical rules object shape.
+            ruleCount: (() => {
+              const ruleLines = asRecord(d.rules).lines;
+              return Array.isArray(ruleLines) ? ruleLines.length : 0;
+            })(),
             name: d.characterName,
             fields: Object.keys(asRecord(d)).sort(),
             hasDescription: typeof d.description === 'string' && d.description.trim().length > 0,
             hasScenario: typeof d.scenario === 'string' && d.scenario.trim().length > 0,
             hasGreeting: typeof d.greeting === 'string' && d.greeting.trim().length > 0,
-            ruleCount: Array.isArray(d.rules) ? d.rules.length : 0,
             alternateGreetingCount: Array.isArray(d.alternateGreetings) ? d.alternateGreetings.length : 0,
             agentLorebookCount: Array.isArray(d.agentLorebooks) ? d.agentLorebooks.length : 0,
           })),

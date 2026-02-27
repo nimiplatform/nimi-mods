@@ -16,7 +16,7 @@ function diagLog(message: string, details?: Record<string, unknown>) {
   try {
     emitWorldStudioLog({
       level: 'error',
-      message: `[AGENT_SYNC_DIAG] ${message}`,
+      message: `[MODS-TEST-DIAG] ${message}`,
       source: 'DIAG',
       details,
     });
@@ -36,6 +36,26 @@ function normalizeStringArray(value: unknown): string[] {
   return value
     .map((item) => String(item || '').trim())
     .filter(Boolean);
+}
+
+function normalizeAgentRules(value: unknown): { format: 'rule-lines-v1'; lines: string[]; text: string } | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const record = asRecord(value);
+  if (String(record.format || '').trim() !== 'rule-lines-v1') return undefined;
+  const lines = normalizeStringArray(record.lines);
+  return {
+    format: 'rule-lines-v1',
+    lines,
+    text: lines.join('\n'),
+  };
+}
+
+function normalizeWakeStrategy(value: unknown): 'PASSIVE' | 'PROACTIVE' | undefined {
+  const text = String(value || '').trim().toUpperCase();
+  if (text === 'PASSIVE' || text === 'PROACTIVE') {
+    return text;
+  }
+  return undefined;
 }
 
 function hasMeaningfulValue(value: unknown): boolean {
@@ -108,11 +128,12 @@ export async function saveWorldDraft(
       agentSyncDraftsByCharacterKeys: Object.keys(input.snapshot.agentSync.draftsByCharacter || {}),
       agentSyncDraftFieldCoverage: Object.entries(input.snapshot.agentSync.draftsByCharacter || {}).map(([name, draft]) => {
         const record = asRecord(draft);
+        const ruleLines = asRecord(record.rules).lines;
         return {
           name,
           fields: Object.keys(record).sort(),
           hasDna: Boolean(record.dna && typeof record.dna === 'object'),
-          ruleCount: Array.isArray(record.rules) ? record.rules.length : 0,
+          ruleCount: Array.isArray(ruleLines) ? ruleLines.length : 0,
           agentLorebookCount: Array.isArray(record.agentLorebooks) ? record.agentLorebooks.length : 0,
         };
       }),
@@ -275,14 +296,14 @@ export async function publishWorldDraft(
         worldId,
       });
       const usedHandleBases = new Set<string>();
-      const payloadMode = 'CREATOR_BATCH_CREATE_V1_MINIMAL';
+      const payloadMode = 'CREATOR_BATCH_CREATE_V2_FULL_PROFILE';
       const compatibilityReports: Array<{
         characterName: string;
         producedFields: string[];
         sentFields: string[];
-        droppedFields: string[];
         agentLorebooksPrepared: number;
         agentLorebooksSkippedEmptyContent: number;
+        rulesLineCount: number;
         hasDna: boolean;
       }> = [];
 
@@ -313,10 +334,14 @@ export async function publishWorldDraft(
           greeting: toNullableTrimmedString(draft.greeting),
           exampleDialogue: toNullableTrimmedString(draft.exampleDialogue),
           systemPromptBase: toNullableTrimmedString(draft.systemPromptBase),
-          rules: normalizeStringArray(draft.rules),
+          rules: normalizeAgentRules(draft.rules),
           postHistoryInstructions: toNullableTrimmedString(draft.postHistoryInstructions),
           alternateGreetings: normalizeStringArray(draft.alternateGreetings),
         };
+        const normalizedDnaPrimary = toNullableTrimmedString(draft.dnaPrimary);
+        const normalizedDnaSecondary = normalizeStringArray(draft.dnaSecondary).slice(0, 3);
+        const normalizedWakeStrategy = normalizeWakeStrategy(draft.wakeStrategy);
+        const normalizedReferenceImageUrl = toNullableTrimmedString(draft.referenceImageUrl);
         const normalizedAgentLorebooks = Array.isArray(draft.agentLorebooks)
           ? draft.agentLorebooks
             .filter((item) => item && typeof item === 'object')
@@ -342,6 +367,20 @@ export async function publishWorldDraft(
         const agentLorebooksPrepared = normalizedAgentLorebooks
           .filter((entry) => Boolean(entry.content))
           .length;
+        const agentLorebooksForPayload = normalizedAgentLorebooks
+          .filter((entry) => Boolean(entry.content))
+          .map((entry) => ({
+            ...(entry.name ? { name: entry.name } : {}),
+            content: entry.content,
+            ...(entry.keywords.length > 0 ? { keywords: entry.keywords } : {}),
+            ...(typeof entry.priority === 'number' ? { priority: entry.priority } : {}),
+            ...(typeof entry.insertionOrder === 'number' ? { insertionOrder: entry.insertionOrder } : {}),
+            ...(typeof entry.constant === 'boolean' ? { constant: entry.constant } : {}),
+            ...(typeof entry.selective === 'boolean' ? { selective: entry.selective } : {}),
+            ...(entry.secondaryKeys.length > 0 ? { secondaryKeys: entry.secondaryKeys } : {}),
+            ...(typeof entry.enabled === 'boolean' ? { enabled: entry.enabled } : {}),
+            ...(entry.source ? { source: entry.source } : {}),
+          }));
         const producedFields = listProducedAgentDraftFields(draft);
 
         // >>> DIAG: per-character item detail <<<
@@ -366,17 +405,31 @@ export async function publishWorldDraft(
           concept: richConcept,
           ownershipType: 'WORLD_OWNED',
           worldId,
+          ...(normalizedIdentityCard.description ? { description: normalizedIdentityCard.description } : {}),
+          ...(normalizedIdentityCard.scenario ? { scenario: normalizedIdentityCard.scenario } : {}),
+          ...(normalizedIdentityCard.greeting ? { greeting: normalizedIdentityCard.greeting } : {}),
+          ...(normalizedIdentityCard.exampleDialogue ? { exampleDialogue: normalizedIdentityCard.exampleDialogue } : {}),
+          ...(normalizedIdentityCard.systemPromptBase ? { systemPromptBase: normalizedIdentityCard.systemPromptBase } : {}),
+          ...(normalizedIdentityCard.rules ? { rules: normalizedIdentityCard.rules } : {}),
+          ...(normalizedIdentityCard.postHistoryInstructions
+            ? { postHistoryInstructions: normalizedIdentityCard.postHistoryInstructions }
+            : {}),
+          alternateGreetings: normalizedIdentityCard.alternateGreetings,
+          ...(normalizedReferenceImageUrl ? { referenceImageUrl: normalizedReferenceImageUrl } : {}),
+          ...(normalizedWakeStrategy ? { wakeStrategy: normalizedWakeStrategy } : {}),
+          ...(normalizedDnaPrimary ? { dnaPrimary: normalizedDnaPrimary } : {}),
+          ...(normalizedDnaSecondary.length > 0 ? { dnaSecondary: normalizedDnaSecondary } : {}),
+          agentLorebooks: agentLorebooksForPayload,
           ...(dna ? { dna } : {}),
         };
         const sentFields = Object.keys(payload).sort();
-        const droppedFields = producedFields.filter((field) => !sentFields.includes(field));
         compatibilityReports.push({
           characterName,
           producedFields,
           sentFields,
-          droppedFields,
           agentLorebooksPrepared,
           agentLorebooksSkippedEmptyContent,
+          rulesLineCount: normalizedIdentityCard.rules?.lines.length || 0,
           hasDna: Boolean(dna),
         });
         return payload;
@@ -384,7 +437,7 @@ export async function publishWorldDraft(
 
       diagLog('batchCreate calling...', {
         payloadMode,
-        payloadPolicy: 'Send only fields supported by current CreateAgentDto path; others remain in draft snapshot for traceability.',
+        payloadPolicy: 'Send full canonical agent profile payload aligned with backend CreateAgentDto and SSOT.',
         itemCount: items.length,
         itemHandles: items.map((i) => i.handle),
         itemDisplayNames: items.map((i) => i.displayName),
@@ -393,9 +446,9 @@ export async function publishWorldDraft(
           characterName: item.characterName,
           sentFields: item.sentFields,
         })),
-        agentPayloadDroppedFields: compatibilityReports.map((item) => ({
+        agentPayloadRules: compatibilityReports.map((item) => ({
           characterName: item.characterName,
-          droppedFields: item.droppedFields,
+          rulesLineCount: item.rulesLineCount,
         })),
         agentLorebookStats: compatibilityReports.map((item) => ({
           characterName: item.characterName,

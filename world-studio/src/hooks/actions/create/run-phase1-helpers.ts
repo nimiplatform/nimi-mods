@@ -1,10 +1,10 @@
 import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 import { splitSourceText } from '../../../engine/chunker.js';
 import { applyDraftPatch, createEmptyFinalDraftAccumulator } from '../../../engine/final-draft-accumulator.js';
-import { mergeExtractions, toCharacterCandidates, toStartTimeOptions } from '../../../engine/merge.js';
+import { mergeExtractions, toStartTimeOptions } from '../../../engine/merge.js';
 import { backfillKnowledgeGraphEventFields } from '../../../engine/heuristic/event-field-backfill.js';
 import { evaluateQualityGate } from '../../../engine/quality-gate.js';
-import { fallbackStartTimeOptions } from '../../../generation/phase1/heuristic-fallback.js';
+import { fallbackCharacterCandidates, fallbackStartTimeOptions } from '../../../generation/phase1/heuristic-fallback.js';
 import { buildStartTimeOptionsFromEvents } from '../../../services/temporal-order.js';
 import type { WorldStudioParseJobState } from '../../../contracts.js';
 import {
@@ -146,7 +146,7 @@ export function mergeRetryPhase1Result(
     return options.length > 0 ? options : fallbackStartTimeOptions(mergedGraph);
   })();
   const mergedCharacterCandidates = (() => {
-    const candidates = toCharacterCandidates(mergedGraph.characters as Array<Record<string, unknown>>);
+    const candidates = fallbackCharacterCandidates(mergedGraph, allChunks.join('\n'));
     return candidates.length > 0 ? candidates : basePhase1.characterCandidates || [];
   })();
   const mergedFinalDraftAccumulator = mergeFinalDraftAccumulator(

@@ -14,7 +14,6 @@ import type {
   WorldStudioTaskState,
   WorldStudioWorkspaceSnapshot,
 } from '../../contracts.js';
-import { buildLegacyPhase1Artifact } from '../../services/phase1-artifact.js';
 import { createEmptyFinalDraftAccumulator } from '../../engine/final-draft-accumulator.js';
 
 function defaultQualityMetrics(): QualityGateResult['metrics'] {
@@ -176,6 +175,24 @@ function normalizeAgentDraft(value: unknown): WorldStudioAgentDraft | null {
     const text = String(input || '').trim();
     return text.length > 0 ? text : null;
   };
+  const normalizeAgentRules = (input: unknown): WorldStudioAgentDraft['rules'] | undefined => {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return undefined;
+    const ruleRecord = asRecord(input);
+    if (String(ruleRecord.format || '').trim() !== 'rule-lines-v1') return undefined;
+    const lines = normalizeStringArray(ruleRecord.lines);
+    return {
+      format: 'rule-lines-v1',
+      lines,
+      text: lines.join('\n'),
+    };
+  };
+  const normalizeWakeStrategy = (input: unknown): WorldStudioAgentDraft['wakeStrategy'] | undefined => {
+    const text = String(input || '').trim().toUpperCase();
+    if (text === 'PASSIVE' || text === 'PROACTIVE') {
+      return text;
+    }
+    return undefined;
+  };
   const normalizeStringArray = (input: unknown): string[] => {
     if (!Array.isArray(input)) return [];
     return input.map((item) => String(item || '').trim()).filter(Boolean);
@@ -213,6 +230,9 @@ function normalizeAgentDraft(value: unknown): WorldStudioAgentDraft | null {
     ? (record.dna as WorldStudioAgentDraft['dna'])
     : undefined;
   const hasDnaField = Object.prototype.hasOwnProperty.call(record, 'dna');
+  const hasRulesField = Object.prototype.hasOwnProperty.call(record, 'rules');
+  const normalizedRules = normalizeAgentRules(record.rules);
+  const normalizedWakeStrategy = normalizeWakeStrategy(record.wakeStrategy);
   return {
     characterName,
     handle: String(record.handle || '').trim(),
@@ -235,11 +255,17 @@ function normalizeAgentDraft(value: unknown): WorldStudioAgentDraft | null {
     ...(Object.prototype.hasOwnProperty.call(record, 'systemPromptBase')
       ? { systemPromptBase: normalizeNullableString(record.systemPromptBase) }
       : {}),
-    ...(Array.isArray(record.rules)
-      ? { rules: normalizeStringArray(record.rules) }
+    ...(hasRulesField && normalizedRules
+      ? { rules: normalizedRules }
       : {}),
     ...(Object.prototype.hasOwnProperty.call(record, 'postHistoryInstructions')
       ? { postHistoryInstructions: normalizeNullableString(record.postHistoryInstructions) }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(record, 'referenceImageUrl')
+      ? { referenceImageUrl: normalizeNullableString(record.referenceImageUrl) }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(record, 'wakeStrategy') && normalizedWakeStrategy
+      ? { wakeStrategy: normalizedWakeStrategy }
       : {}),
     ...(Array.isArray(record.alternateGreetings)
       ? { alternateGreetings: normalizeStringArray(record.alternateGreetings) }
@@ -526,8 +552,7 @@ export function syncSnapshot(snapshot: WorldStudioWorkspaceSnapshot): WorldStudi
   );
   const lorebooksDraft = normalizeLorebooksDraft(snapshot.lorebooksDraft || []);
   const taskState = normalizeTaskState(snapshot.taskState || {});
-  const phase1Artifact = normalizePhase1Artifact(snapshot.phase1Artifact)
-    || buildLegacyPhase1Artifact(snapshot);
+  const phase1Artifact = normalizePhase1Artifact(snapshot.phase1Artifact);
   const parseJob = {
     ...snapshot.parseJob,
     chunkTotal: Math.max(0, Number(snapshot.parseJob?.chunkTotal) || 0),

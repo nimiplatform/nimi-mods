@@ -1,7 +1,6 @@
 import { asRecord, loadLocalStorageJson, safeParseObject, saveLocalStorageJson } from '@nimiplatform/sdk/mod/utils';
-import type { EventNodeDraft, WorldStudioWorkspaceSnapshot } from '../../contracts.js';
+import type { WorldStudioWorkspaceSnapshot } from '../../contracts.js';
 import { cloneDefaultSnapshot } from './defaults.js';
-import { toLegacyPrimaryEvents } from './migrate-legacy.js';
 import {
   normalizeEventsDraft,
   normalizeLorebooksDraft,
@@ -14,13 +13,12 @@ import {
 import { emitWorldStudioLog } from '../../logging.js';
 
 const STORAGE_PREFIX_V3 = 'nimi.world-studio.workspace.v3.';
-const STORAGE_PREFIX_V1 = 'nimi.world-studio.workspace.v1.';
 
 function diagLog(message: string, details?: Record<string, unknown>) {
   try {
     emitWorldStudioLog({
       level: 'error',
-      message: `[AGENT_SYNC_DIAG] ${message}`,
+      message: `[MODS-TEST-DIAG] ${message}`,
       source: 'DIAG',
       details,
     });
@@ -33,26 +31,15 @@ function storageKeyForUser(userId: string): string {
   return `${STORAGE_PREFIX_V3}${String(userId || '').trim()}`;
 }
 
-function legacyStorageKeyForUser(userId: string): string {
-  return `${STORAGE_PREFIX_V1}${String(userId || '').trim()}`;
-}
-
 export function readSnapshotFromStorage(userId: string): WorldStudioWorkspaceSnapshot | null {
   const normalizedUserId = String(userId || '').trim();
   if (!normalizedUserId || typeof window === 'undefined') return null;
 
   try {
-    const parsed = (
-      loadLocalStorageJson<Partial<WorldStudioWorkspaceSnapshot> | null>(
-        storageKeyForUser(normalizedUserId),
-        null,
-        (value) => (value && typeof value === 'object' ? (value as Partial<WorldStudioWorkspaceSnapshot>) : null),
-      )
-      || loadLocalStorageJson<Partial<WorldStudioWorkspaceSnapshot> | null>(
-        legacyStorageKeyForUser(normalizedUserId),
-        null,
-        (value) => (value && typeof value === 'object' ? (value as Partial<WorldStudioWorkspaceSnapshot>) : null),
-      )
+    const parsed = loadLocalStorageJson<Partial<WorldStudioWorkspaceSnapshot> | null>(
+      storageKeyForUser(normalizedUserId),
+      null,
+      (value) => (value && typeof value === 'object' ? (value as Partial<WorldStudioWorkspaceSnapshot>) : null),
     );
 
     if (!parsed) {
@@ -62,7 +49,6 @@ export function readSnapshotFromStorage(userId: string): WorldStudioWorkspaceSna
       return null;
     }
     const base = cloneDefaultSnapshot();
-    const parsedKnowledgeGraph = asRecord(parsed.knowledgeGraph);
     const parsedWorldPatchRaw = asRecord(parsed.worldPatch);
     const parsedWorldviewPatchRaw = asRecord(parsed.worldviewPatch);
     const parsedWorldPatch = Object.keys(parsedWorldPatchRaw).length > 0
@@ -71,7 +57,6 @@ export function readSnapshotFromStorage(userId: string): WorldStudioWorkspaceSna
     const parsedWorldviewPatch = Object.keys(parsedWorldviewPatchRaw).length > 0
       ? parsedWorldviewPatchRaw
       : safeParseObject(String(parsed.worldviewPatchText || '{}'));
-    const legacyPrimaryEvents = toLegacyPrimaryEvents(parsedKnowledgeGraph);
     const parsedEventsDraftRaw = normalizeEventsDraft(parsed.eventsDraft || {});
     const parsedEventsFromText = parseEventsDraftFromText(String(parsed.eventsText || ''));
     const parsedKnowledgeEvents = normalizeEventsDraft(
@@ -83,16 +68,12 @@ export function readSnapshotFromStorage(userId: string): WorldStudioWorkspaceSna
         : (
           (parsedEventsFromText.primary.length > 0 || parsedEventsFromText.secondary.length > 0)
             ? parsedEventsFromText
-            : (
-              (parsedKnowledgeEvents.primary.length > 0 || parsedKnowledgeEvents.secondary.length > 0)
-                ? parsedKnowledgeEvents
-                : { primary: legacyPrimaryEvents, secondary: [] as EventNodeDraft[] }
-            )
+            : parsedKnowledgeEvents
         );
-    const parsedLorebooksDraftRaw = normalizeLorebooksDraft(parsed.lorebooksDraft || (parsed as Record<string, unknown>).factsDraft as unknown[] || []);
+    const parsedLorebooksDraftRaw = normalizeLorebooksDraft(parsed.lorebooksDraft || []);
     const parsedLorebooksDraft = parsedLorebooksDraftRaw.length > 0
       ? parsedLorebooksDraftRaw
-      : parseLorebooksDraftFromText(String(parsed.lorebooksText || (parsed as Record<string, unknown>).factsText || ''));
+      : parseLorebooksDraftFromText(String(parsed.lorebooksText || ''));
 
     const snapshot: WorldStudioWorkspaceSnapshot = {
       ...base,
@@ -156,11 +137,12 @@ export function readSnapshotFromStorage(userId: string): WorldStudioWorkspaceSna
       agentSyncDraftKeys: Object.keys(synced.agentSync.draftsByCharacter || {}),
       agentSyncDraftCoverage: Object.entries(synced.agentSync.draftsByCharacter || {}).map(([name, draft]) => {
         const record = asRecord(draft);
+        const ruleLines = asRecord(record.rules).lines;
         return {
           name,
           fields: Object.keys(record).sort(),
           hasDna: Boolean(record.dna && typeof record.dna === 'object'),
-          ruleCount: Array.isArray(record.rules) ? record.rules.length : 0,
+          ruleCount: Array.isArray(ruleLines) ? ruleLines.length : 0,
           agentLorebookCount: Array.isArray(record.agentLorebooks) ? record.agentLorebooks.length : 0,
         };
       }),
@@ -217,11 +199,12 @@ export function persistSnapshotToStorage(userId: string, snapshot: WorldStudioWo
     agentSyncDraftKeys: Object.keys(synced.agentSync.draftsByCharacter || {}),
     agentSyncDraftCoverage: Object.entries(synced.agentSync.draftsByCharacter || {}).map(([name, draft]) => {
       const record = asRecord(draft);
+      const ruleLines = asRecord(record.rules).lines;
       return {
         name,
         fields: Object.keys(record).sort(),
         hasDna: Boolean(record.dna && typeof record.dna === 'object'),
-        ruleCount: Array.isArray(record.rules) ? record.rules.length : 0,
+        ruleCount: Array.isArray(ruleLines) ? ruleLines.length : 0,
         agentLorebookCount: Array.isArray(record.agentLorebooks) ? record.agentLorebooks.length : 0,
       };
     }),

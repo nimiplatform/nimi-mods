@@ -15,6 +15,14 @@ function normalizeId(value: unknown): string {
   return String(value || '').trim().toLowerCase();
 }
 
+const PLACEHOLDER_ENTITY_NAME_RE = /^(?:char(?:acter)?|role|persona?|loc(?:ation)?|evt|event|timeline|segment|item|node|人物|角色|地点|事件|时间线)(?:[-_: ]+[a-z0-9]+|\d+)$/i;
+
+function isPlaceholderEntityName(value: string): boolean {
+  const name = String(value || '').trim();
+  if (!name) return true;
+  return PLACEHOLDER_ENTITY_NAME_RE.test(name);
+}
+
 function uniqueBy<T>(items: T[], keyOf: (item: T, index: number) => string): T[] {
   const seen = new Set<string>();
   const output: T[] = [];
@@ -43,10 +51,14 @@ function normalizeEvent(item: EventNodeDraft, fallbackLevel: 'PRIMARY' | 'SECOND
     result: String(item.result || '').trim(),
     timeRef: String(item.timeRef || '').trim(),
     locationRefs: Array.isArray(item.locationRefs)
-      ? item.locationRefs.map((entry) => String(entry || '').trim()).filter(Boolean)
+      ? item.locationRefs
+        .map((entry) => String(entry || '').trim())
+        .filter((entry) => entry.length > 0 && !isPlaceholderEntityName(entry))
       : [],
     characterRefs: Array.isArray(item.characterRefs)
-      ? item.characterRefs.map((entry) => String(entry || '').trim()).filter(Boolean)
+      ? item.characterRefs
+        .map((entry) => String(entry || '').trim())
+        .filter((entry) => entry.length > 0 && !isPlaceholderEntityName(entry))
       : [],
     dependsOnEventIds: Array.isArray(item.dependsOnEventIds)
       ? item.dependsOnEventIds.map((entry) => String(entry || '').trim()).filter(Boolean)
@@ -232,12 +244,12 @@ export function toStartTimeOptions(timeline: Array<Record<string, unknown>>): Ph
 export function toCharacterCandidates(characters: Array<Record<string, unknown>>): Phase1Character[] {
   return uniqueBy(
     characters
-      .map((item, index) => ({
-        name: String(item.name || `Character-${index + 1}`).trim(),
+      .map((item) => ({
+        name: String(item.name || '').trim(),
         summary: String(item.summary || item.description || ''),
         significance: clamp01(item.significance, 0.5),
       }))
-      .filter((item) => Boolean(item.name)),
+      .filter((item) => item.name.length > 0 && !isPlaceholderEntityName(item.name)),
     (item) => normalizeId(item.name),
   ).slice(0, 24);
 }

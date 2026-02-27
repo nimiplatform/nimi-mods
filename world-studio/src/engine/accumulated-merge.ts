@@ -1,4 +1,5 @@
 import { asRecord } from '@nimiplatform/sdk/mod/utils';
+import { isSyntheticEntityName } from './errors.js';
 import type {
   AccumulatedCharacter,
   AccumulatedEvent,
@@ -13,15 +14,6 @@ import type {
 
 function normalizeId(value: unknown): string {
   return String(value || '').trim().toLowerCase();
-}
-
-/** Reject synthetic IDs leaked from LLM output schema examples.
- *  Matches: char-1, char-han-li, loc-3, evt-p1, segment-5, etc.
- *  Safe for CJK names: Chinese/Japanese/Korean characters are NOT in [\w-]. */
-const SYNTHETIC_ID_PATTERN = /^(char|loc|evt|t|segment|future|primary|secondary)-[\w-]+$/i;
-
-function isSyntheticId(name: string): boolean {
-  return SYNTHETIC_ID_PATTERN.test(name.trim());
 }
 
 function makeFreshness(chunkIndex: number): EntityFreshness {
@@ -53,7 +45,7 @@ function upsertCharacters(
   incoming.forEach((item) => {
     const name = String(item.name || '').trim();
     const key = normalizeId(name);
-    if (!key || isSyntheticId(name)) return;
+    if (!key || isSyntheticEntityName(name)) return;
     const prev = byKey.get(key);
     if (prev) {
       byKey.set(key, {
@@ -82,7 +74,7 @@ function upsertLocations(
   incoming.forEach((item) => {
     const name = String(item.name || '').trim();
     const key = normalizeId(name);
-    if (!key || isSyntheticId(name)) return;
+    if (!key || isSyntheticEntityName(name)) return;
     const prev = byKey.get(key);
     if (prev) {
       byKey.set(key, {

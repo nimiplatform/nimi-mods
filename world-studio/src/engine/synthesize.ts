@@ -26,7 +26,7 @@ function diagLog(message: string, details?: Record<string, unknown>) {
   try {
     emitWorldStudioLog({
       level: 'error',
-      message: `[AGENT_SYNC_DIAG] ${message}`,
+      message: `[MODS-TEST-DIAG] ${message}`,
       source: 'DIAG',
       details,
     });
@@ -124,6 +124,26 @@ function normalizeStringArray(value: unknown): string[] {
   return value
     .map((item) => String(item || '').trim())
     .filter(Boolean);
+}
+
+function normalizeAgentRules(value: unknown): WorldStudioAgentDraft['rules'] | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const record = asRecord(value);
+  if (String(record.format || '').trim() !== 'rule-lines-v1') return undefined;
+  const lines = normalizeStringArray(record.lines);
+  return {
+    format: 'rule-lines-v1',
+    lines,
+    text: lines.join('\n'),
+  };
+}
+
+function normalizeWakeStrategy(value: unknown): WorldStudioAgentDraft['wakeStrategy'] | undefined {
+  const text = String(value || '').trim().toUpperCase();
+  if (text === 'PASSIVE' || text === 'PROACTIVE') {
+    return text;
+  }
+  return undefined;
 }
 
 function firstClause(text: unknown, max = 48): string {
@@ -390,7 +410,7 @@ function buildSynthesizePrompt(input: {
     '  "worldEvents":[{"id":"evt-p1","level":"PRIMARY","parentEventId":null,"title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"text"}],"confidence":0.0,"needsEvidence":false}],',
     '  "worldLorebooks":[{"key":"topic:subtopic:item_name","name":"...","content":"...","keywords":["..."],"value":{"details":{}},"provenance":{"source":"synthesize"}}],',
     '  "futureHistoricalEvents":[{"id":"future-1","title":"...","description":"...","timeNode":"...","impact":"..."}],',
-    '  "agentDrafts":[{"characterName":"...","handle":"...","concept":"...","backstory":"...","coreValues":"...","relationshipStyle":"...","description":"...","scenario":"...","greeting":"...","exampleDialogue":"...","systemPromptBase":"...","rules":["..."],"postHistoryInstructions":"...","alternateGreetings":["..."],"agentLorebooks":[{"name":"...","content":"...","keywords":["..."],"priority":10,"insertionOrder":100,"constant":false,"selective":false,"secondaryKeys":[],"enabled":true,"source":"world-studio.synthesize"}],"dna":{"identity":{"name":"...","role":"...","worldview":"...","species":"...","summary":"..."},"biological":{"gender":"...","visualAge":"...","ethnicity":"...","heightCm":0,"weightKg":0},"appearance":{"artStyle":"...","hair":"...","eyes":"...","skin":"...","fashionStyle":"...","signatureItems":[]},"personality":{"summary":"...","mbti":"...","interests":[],"goals":[],"relationshipMode":"..."},"communication":{"summary":"...","responseLength":"medium","formality":"casual","sentiment":"neutral"},"voice":{"voiceId":"...","emotionEnabled":true,"speed":0,"pitch":0},"nsfwLevel":"SAFE"}}]',
+    '  "agentDrafts":[{"characterName":"...","handle":"...","concept":"...","backstory":"...","coreValues":"...","relationshipStyle":"...","description":"...","scenario":"...","greeting":"...","exampleDialogue":"...","systemPromptBase":"...","rules":{"format":"rule-lines-v1","lines":["..."],"text":"..."},"postHistoryInstructions":"...","alternateGreetings":["..."],"agentLorebooks":[{"name":"...","content":"...","keywords":["..."],"priority":10,"insertionOrder":100,"constant":false,"selective":false,"secondaryKeys":[],"enabled":true,"source":"world-studio.synthesize"}],"dna":{"identity":{"name":"...","role":"...","worldview":"...","species":"...","summary":"..."},"biological":{"gender":"...","visualAge":"...","ethnicity":"...","heightCm":0,"weightKg":0},"appearance":{"artStyle":"...","hair":"...","eyes":"...","skin":"...","fashionStyle":"...","signatureItems":[]},"personality":{"summary":"...","mbti":"...","interests":[],"goals":[],"relationshipMode":"..."},"communication":{"summary":"...","responseLength":"medium","formality":"casual","sentiment":"neutral"},"voice":{"voiceId":"...","emotionEnabled":true,"speed":0,"pitch":0},"nsfwLevel":"SAFE"}}]',
     '}',
     '',
     '## World Fields',
@@ -417,7 +437,8 @@ function buildSynthesizePrompt(input: {
     '- backstory: Key background events that shaped this character.',
     '- coreValues: The character\'s fundamental beliefs and motivations.',
     '- description/scenario/greeting/exampleDialogue/systemPromptBase/postHistoryInstructions: populate when evidence exists, otherwise use empty string.',
-    '- rules/alternateGreetings/agentLorebooks: return arrays (can be empty when evidence is insufficient).',
+    '- rules: must use canonical object {"format":"rule-lines-v1","lines":[],"text":""}.',
+    '- alternateGreetings/agentLorebooks: return arrays (can be empty when evidence is insufficient).',
     '- dna: Include when evidence is sufficient. If insufficient, omit dna field (do not fabricate).',
     '- dna.identity.name MUST match characterName exactly when dna exists.',
     '- dna.biological: Infer from source text (gender, visualAge, ethnicity, height, weight). Use realistic values consistent with the world setting.',
@@ -586,6 +607,8 @@ function validateAgentDna(value: unknown): AgentDnaValidation {
 function normalizeAgentDraft(value: unknown, fallbackName: string, index: number): WorldStudioAgentDraft {
   const record = asRecord(value);
   const characterName = String(record.characterName || fallbackName || '').trim() || fallbackName;
+  const normalizedRules = normalizeAgentRules(record.rules);
+  const normalizedWakeStrategy = normalizeWakeStrategy(record.wakeStrategy);
   const dnaValidation = validateAgentDna(record.dna);
   const dna = dnaValidation.dna;
   // Enforce: dna.identity.name must match characterName
@@ -614,11 +637,17 @@ function normalizeAgentDraft(value: unknown, fallbackName: string, index: number
     ...(Object.prototype.hasOwnProperty.call(record, 'systemPromptBase')
       ? { systemPromptBase: normalizeNullableString(record.systemPromptBase) }
       : {}),
-    ...(Array.isArray(record.rules)
-      ? { rules: normalizeStringArray(record.rules) }
+    ...(Object.prototype.hasOwnProperty.call(record, 'rules') && normalizedRules
+      ? { rules: normalizedRules }
       : {}),
     ...(Object.prototype.hasOwnProperty.call(record, 'postHistoryInstructions')
       ? { postHistoryInstructions: normalizeNullableString(record.postHistoryInstructions) }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(record, 'referenceImageUrl')
+      ? { referenceImageUrl: normalizeNullableString(record.referenceImageUrl) }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(record, 'wakeStrategy') && normalizedWakeStrategy
+      ? { wakeStrategy: normalizedWakeStrategy }
       : {}),
     ...(Array.isArray(record.alternateGreetings)
       ? { alternateGreetings: normalizeStringArray(record.alternateGreetings) }
@@ -660,7 +689,11 @@ function buildFallbackAgentDrafts(input: {
       greeting: null,
       exampleDialogue: null,
       systemPromptBase: null,
-      rules: [],
+      rules: {
+        format: 'rule-lines-v1',
+        lines: [],
+        text: '',
+      },
       postHistoryInstructions: null,
       alternateGreetings: [],
       agentLorebooks: [],
@@ -912,18 +945,6 @@ export async function runSynthesizeDraft(
     ...asRecord(finalDraftAccumulator.worldview || {}),
     ...asRecord(payload.worldview),
   };
-  // Align legacy model output: visual style belongs to worldview.visualGuide.
-  if (
-    (!worldview.visualGuide || typeof worldview.visualGuide !== 'object' || Array.isArray(worldview.visualGuide))
-    && world.visualStyle
-    && typeof world.visualStyle === 'object'
-    && !Array.isArray(world.visualStyle)
-  ) {
-    worldview.visualGuide = world.visualStyle;
-  }
-  if ('visualStyle' in world) {
-    delete world.visualStyle;
-  }
   const modelEvents = asEventArray(payload.worldEvents);
   const worldEvents = modelEvents.length > 0
     ? modelEvents

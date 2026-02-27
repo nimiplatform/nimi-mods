@@ -2,7 +2,7 @@ import { asRecord } from '@nimiplatform/sdk/mod/utils';
 import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 import type { EventNodeDraft, WorldStudioTaskRecord } from '../../../contracts.js';
 import { resolveContextTokenBudget } from '../../../engine/accumulated-context.js';
-import { isContextOverflowText } from '../../../engine/errors.js';
+import { classifyChunkFailureKind, isContextOverflowText } from '../../../engine/errors.js';
 import type { AccumulatedState, ChunkTaskResult, DraftPatch, FinalDraftAccumulator } from '../../../engine/types.js';
 import { runPhase1ExtractionFromChunks } from '../../../generation/pipeline.js';
 import { emitWorldStudioLog } from '../../../logging.js';
@@ -31,7 +31,7 @@ function diagLog(message: string, details?: Record<string, unknown>) {
   try {
     emitWorldStudioLog({
       level: 'error',
-      message: `[AGENT_SYNC_DIAG] ${message}`,
+      message: `[MODS-TEST-DIAG] ${message}`,
       source: 'DIAG',
       details,
     });
@@ -112,7 +112,10 @@ function summarizeTerminalChunkFailures(tasks: ChunkTaskResult[]): {
   terminalSuccess: number;
   terminalFailed: number;
   failedByStage: Array<{ stage: string; count: number }>;
-  failedByKind: Array<{ kind: 'json_parse' | 'context_overflow' | 'other'; count: number }>;
+  failedByKind: Array<{
+    kind: 'json_parse' | 'context_overflow' | 'provider_timeout' | 'provider_internal' | 'other';
+    count: number;
+  }>;
   topFailedErrorCodes: Array<{ code: string; count: number }>;
 } {
   const terminalMap = new Map<number, ChunkTaskResult>();
@@ -130,25 +133,17 @@ function summarizeTerminalChunkFailures(tasks: ChunkTaskResult[]): {
   const terminalTasks = Array.from(terminalMap.values());
   const failedTasks = terminalTasks.filter((task) => task.status !== 'success');
   const failedByStageMap = new Map<string, number>();
-  const failedByKindMap = new Map<'json_parse' | 'context_overflow' | 'other', number>();
+  const failedByKindMap = new Map<
+    'json_parse' | 'context_overflow' | 'provider_timeout' | 'provider_internal' | 'other',
+    number
+  >();
   const topFailedErrorCodeMap = new Map<string, number>();
 
   failedTasks.forEach((task) => {
     const stage = String(task.stage || 'unknown').toLowerCase();
     failedByStageMap.set(stage, (failedByStageMap.get(stage) || 0) + 1);
 
-    const code = String(task.errorCode || '').toLowerCase();
-    const message = String(task.errorMessage || '').toLowerCase();
-    const kind: 'json_parse' | 'context_overflow' | 'other' = isContextOverflowTask(task)
-      ? 'context_overflow'
-      : (
-        code.includes('json')
-        || code.includes('parse')
-        || message.includes('json')
-        || message.includes('parse')
-      )
-        ? 'json_parse'
-        : 'other';
+    const kind = classifyChunkFailureKind(`${String(task.errorCode || '')}\n${String(task.errorMessage || '')}`);
     failedByKindMap.set(kind, (failedByKindMap.get(kind) || 0) + 1);
 
     const errorCode = String(task.errorCode || 'UNKNOWN');
@@ -211,13 +206,6 @@ function buildSourceDigest(chunks: string[]): string {
   return `len:${joined.length}:fnv1a:${normalized}`;
 }
 
-function sanitizeChunkIndices(value: unknown, total: number): number[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => Number(item))
-    .filter((item) => Number.isInteger(item) && item >= 0 && item < total);
-}
-
 function resolvePhase1ResumeTask(
   input: WorldStudioCreateActionsInput,
   options?: RunCreatePhase1Options,
@@ -251,7 +239,7 @@ function applyPhase1ResultSnapshot(input: WorldStudioCreateActionsInput, params:
   try {
     emitWorldStudioLog({
       level: 'error',
-      message: '[AGENT_SYNC_DIAG] Phase1 applyResult: writing selectedCharacters + agentSync.selectedCharacterIds',
+      message: '[MODS-TEST-DIAG] Phase1 applyResult: writing selectedCharacters + agentSync.selectedCharacterIds',
       source: 'DIAG',
       details: {
         selectedCharacters,
@@ -429,40 +417,34 @@ export async function runCreatePhase1(
     const checkpointPayload = asRecord(resumeTask.checkpoint?.payload);
     const savedAccState = checkpointPayload.accumulatedState as AccumulatedState | undefined;
     const savedFinalDraftAccumulator = checkpointPayload.finalDraftAccumulator as FinalDraftAccumulator | undefined;
-    if (savedAccState && savedAccState.lastProcessedChunk >= 0) {
-      // R2 resume: pass full chunk array + accumulated state, serial loop skips via startIndex
-      chunksToRun = allChunks;
-      chunkIndexMap = undefined;
-      initialAccumulatedState = savedAccState;
-      initialFinalDraftAccumulator = savedFinalDraftAccumulator || input.snapshot.finalDraftAccumulator;
-      diagLog('Phase1 resume with accumulated state', {
+    if (
+      !savedAccState
+      || !Number.isFinite(Number(savedAccState.lastProcessedChunk))
+      || !Number.isFinite(Number(savedAccState.successfulChunks))
+    ) {
+      const resumeError = 'WORLD_STUDIO_PHASE1_RESUME_STATE_MISSING: checkpoint has no valid accumulatedState.';
+      diagLog('Phase1 resume rejected: missing accumulated state', {
         taskId: resumeTask.id,
-        lastProcessedChunk: savedAccState.lastProcessedChunk,
+        checkpointPayloadKeys: Object.keys(checkpointPayload),
         hasFinalDraftAccumulator: Boolean(savedFinalDraftAccumulator),
-        totalChunks: allChunks.length,
       });
-    } else {
-      // Legacy resume (no accumulated state in checkpoint): fall back to old subset logic
-      const checkpointRemaining = sanitizeChunkIndices(checkpointPayload.remainingChunkIndices, allChunks.length);
-      const fallbackChunkTasks = input.phase1?.chunkTasks
-        || input.snapshot.phase1Artifact?.chunkTasks
-        || [];
-      const fallbackRemaining = toFailedChunkIndices(fallbackChunkTasks, allChunks.length, 'all');
-      const remainingChunkIndices = checkpointRemaining.length > 0
-        ? checkpointRemaining
-        : (fallbackRemaining.length > 0 ? fallbackRemaining : allChunks.map((_, index) => index));
-      chunkIndexMap = remainingChunkIndices;
-      chunksToRun = remainingChunkIndices
-        .map((index) => allChunks[index])
-        .filter((chunk): chunk is string => typeof chunk === 'string' && chunk.trim().length > 0);
-      diagLog('Phase1 resume with legacy remainingChunkIndices', {
-        taskId: resumeTask.id,
-        remainingChunkIndices,
-        hasFinalDraftAccumulator: Boolean(savedFinalDraftAccumulator),
-        resolvedChunksToRun: chunksToRun.length,
-      });
-      initialFinalDraftAccumulator = savedFinalDraftAccumulator || input.snapshot.finalDraftAccumulator;
+      input.taskController.failTask(resumeTask.id, resumeError);
+      input.setError(resumeError);
+      input.setNotice('Resume state missing. Please rerun extraction.');
+      return;
     }
+    // Resume requires accumulated state and always reuses the full chunk list.
+    chunksToRun = allChunks;
+    chunkIndexMap = undefined;
+    initialAccumulatedState = savedAccState;
+    initialFinalDraftAccumulator = savedFinalDraftAccumulator || input.snapshot.finalDraftAccumulator;
+    diagLog('Phase1 resume with accumulated state', {
+      taskId: resumeTask.id,
+      lastProcessedChunk: savedAccState.lastProcessedChunk,
+      successfulChunks: savedAccState.successfulChunks,
+      hasFinalDraftAccumulator: Boolean(savedFinalDraftAccumulator),
+      totalChunks: allChunks.length,
+    });
   } else {
     const resolvedRetry = resolveRetryChunks(input, allChunks, effectiveMode, forcedRetryErrorCode);
     chunksToRun = resolvedRetry.chunksToRun;
@@ -557,7 +539,6 @@ export async function runCreatePhase1(
     retryScope: input.retryScope,
     retryErrorCode: (forcedRetryErrorCode ?? input.retryErrorCode) || null,
     chunkPolicy: activeChunkPolicy,
-    remainingChunkIndices: chunkIndexMap || [],
     finalDraftAccumulator: initialFinalDraftAccumulator || input.snapshot.finalDraftAccumulator,
   });
 
@@ -765,7 +746,6 @@ export async function runCreatePhase1(
         chunkFailed: pausedResult.qualityGate.metrics.failedChunks,
       }, {
         chunkPolicy: activeChunkPolicy,
-        remainingChunkIndices,
         finalDraftAccumulator: pausedResult.finalDraftAccumulator,
       });
       input.taskController.pauseTask(taskId, 'Extraction paused. Resume to continue.');
@@ -816,7 +796,6 @@ export async function runCreatePhase1(
         chunkFailed: 0,
       }, {
         chunkPolicy: activeChunkPolicy,
-        remainingChunkIndices: allChunks.map((_, index) => index),
       });
       emitWorldStudioLog({
         level: 'warn',
@@ -877,7 +856,6 @@ export async function runCreatePhase1(
       chunkFailed: effectiveResult.qualityGate.metrics.failedChunks,
     }, {
       chunkPolicy: activeChunkPolicy,
-      remainingChunkIndices: [],
     });
 
     if (effectiveResult.qualityGate.status === 'PASS') {

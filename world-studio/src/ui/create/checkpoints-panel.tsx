@@ -20,6 +20,7 @@ type CheckpointsPanelProps = {
   onToggleCharacter: (name: string, checked: boolean) => void;
   onEventsChange: (next: { primary: EventNodeDraft[]; secondary: EventNodeDraft[] }) => void;
   onEventGraphLayoutChange?: (next: { selectedEventId: string; expandedPrimaryIds: string[] }) => void;
+  onRefreshQualityGate: () => void;
   onRunPhase2: () => void;
   working: boolean;
 };
@@ -44,7 +45,17 @@ export function CheckpointsPanel(props: CheckpointsPanelProps) {
   return (
     <div className="space-y-4">
       <section className="rounded-xl border border-gray-200 bg-white p-4">
-        <h3 className="text-sm font-semibold text-gray-900">Checkpoints</h3>
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-sm font-semibold text-gray-900">Checkpoints</h3>
+          <button
+            type="button"
+            className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 disabled:opacity-60"
+            onClick={props.onRefreshQualityGate}
+            disabled={props.working}
+          >
+            Refresh Quality Gate
+          </button>
+        </div>
         <div className="mt-3">
           <label className="text-xs font-medium text-gray-700">Checkpoint 1: Start Time</label>
           <select
@@ -100,8 +111,8 @@ export function CheckpointsPanel(props: CheckpointsPanelProps) {
           <button
             type="button"
             className="rounded-md bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
-          onClick={props.onRunPhase2}
-          disabled={!canRunSynthesize}
+            onClick={props.onRunPhase2}
+            disabled={!canRunSynthesize}
           >
             Run Synthesis
           </button>

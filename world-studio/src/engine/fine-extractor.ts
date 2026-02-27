@@ -9,6 +9,15 @@ import type {
   WorldStudioAgentLorebookDraft,
 } from './types.js';
 import { buildRepairPrompt, parseJsonRecord, summarizeModelError } from './json-repair.js';
+import { isSyntheticEntityName } from './errors.js';
+
+function normalizeEntityRefs(value: unknown): string[] {
+  return Array.from(new Set(
+    toStringArray(value)
+      .map((item) => String(item || '').trim())
+      .filter((item) => item.length > 0 && !isSyntheticEntityName(item)),
+  ));
+}
 
 function normalizeEvidenceRefs(value: unknown): EvidenceRefDraft[] {
   if (!Array.isArray(value)) return [];
@@ -51,8 +60,8 @@ function normalizeEvent(value: unknown, level: 'PRIMARY' | 'SECONDARY', index: n
     process: String(record.process || '').trim(),
     result: String(record.result || '').trim(),
     timeRef: String(record.timeRef || record.time || record.timelineAnchorLabel || '').trim(),
-    locationRefs: toStringArray(record.locationRefs || (record.locationRef ? [record.locationRef] : [])),
-    characterRefs: toStringArray(record.characterRefs),
+    locationRefs: normalizeEntityRefs(record.locationRefs || (record.locationRef ? [record.locationRef] : [])),
+    characterRefs: normalizeEntityRefs(record.characterRefs),
     dependsOnEventIds,
     ...(temporalBeforeEventIds.length > 0 ? { temporalBeforeEventIds } : {}),
     ...(temporalAfterEventIds.length > 0 ? { temporalAfterEventIds } : {}),
@@ -80,7 +89,12 @@ function normalizeFineExtraction(raw: Record<string, unknown>): ChunkExtraction 
       ? extractionRoot.locations.filter((item) => item && typeof item === 'object') as Array<Record<string, unknown>>
       : [],
     characters: Array.isArray(extractionRoot.characters)
-      ? extractionRoot.characters.filter((item) => item && typeof item === 'object') as Array<Record<string, unknown>>
+      ? extractionRoot.characters
+        .filter((item) => item && typeof item === 'object')
+        .filter((item) => {
+          const name = String(asRecord(item).name || '').trim();
+          return name.length > 0 && !isSyntheticEntityName(name);
+        }) as Array<Record<string, unknown>>
       : [],
     events: {
       primary: primaryRaw.map((item, index) => normalizeEvent(item, 'PRIMARY', index)),
@@ -105,11 +119,24 @@ function normalizeStringArray(value: unknown): string[] {
     .filter(Boolean);
 }
 
+function normalizeAgentRules(value: unknown): WorldStudioAgentDraft['rules'] | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const record = asRecord(value);
+  if (String(record.format || '').trim() !== 'rule-lines-v1') return undefined;
+  const lines = normalizeStringArray(record.lines);
+  return {
+    format: 'rule-lines-v1',
+    lines,
+    text: lines.join('\n'),
+  };
+}
+
 function normalizeAgentDraftPatch(value: unknown): WorldStudioAgentDraft | null {
   if (!value || typeof value !== 'object') return null;
   const record = asRecord(value);
   const characterName = String(record.characterName || '').trim();
   if (!characterName) return null;
+  const normalizedRules = normalizeAgentRules(record.rules);
   const normalizeAgentLorebooks = (input: unknown): WorldStudioAgentLorebookDraft[] => {
     if (!Array.isArray(input)) return [];
     return input
@@ -159,8 +186,8 @@ function normalizeAgentDraftPatch(value: unknown): WorldStudioAgentDraft | null 
     ...(Object.prototype.hasOwnProperty.call(record, 'systemPromptBase')
       ? { systemPromptBase: normalizeNullableString(record.systemPromptBase) }
       : {}),
-    ...(Array.isArray(record.rules)
-      ? { rules: normalizeStringArray(record.rules) }
+    ...(Object.prototype.hasOwnProperty.call(record, 'rules') && normalizedRules
+      ? { rules: normalizedRules }
       : {}),
     ...(Object.prototype.hasOwnProperty.call(record, 'postHistoryInstructions')
       ? { postHistoryInstructions: normalizeNullableString(record.postHistoryInstructions) }
@@ -278,7 +305,7 @@ function buildFinePrompt(input: {
     '{"id":"...","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":[],"characterRefs":[],"dependsOnEventIds":[],"beforeEventIds":[],"afterEventIds":[],"temporalConfidence":0.0,"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}',
     '',
     'Agent draft patch schema (partial allowed):',
-    '{"characterName":"...","handle":"","concept":"","backstory":"","coreValues":"","relationshipStyle":"","description":"","scenario":"","greeting":"","exampleDialogue":"","systemPromptBase":"","rules":[],"postHistoryInstructions":"","alternateGreetings":[],"agentLorebooks":[],"dna":{}}',
+    '{"characterName":"...","handle":"","concept":"","backstory":"","coreValues":"","relationshipStyle":"","description":"","scenario":"","greeting":"","exampleDialogue":"","systemPromptBase":"","rules":{"format":"rule-lines-v1","lines":[],"text":""},"postHistoryInstructions":"","alternateGreetings":[],"agentLorebooks":[],"dna":{}}',
     '',
     focusLine,
     missingFieldLine,

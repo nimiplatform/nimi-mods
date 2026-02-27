@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { extractChunkCoarse } from '../mods/world-studio/src/engine/coarse-extractor.ts';
+import { extractChunkCoarse } from '../src/engine/coarse-extractor.ts';
 
 function makeValidCoarsePayload() {
   return JSON.stringify({

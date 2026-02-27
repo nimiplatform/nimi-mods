@@ -1,5 +1,5 @@
 import { extractChunkCoarse } from '../../engine/coarse-extractor.js';
-import { isContextOverflowError } from '../../engine/errors.js';
+import { resolveChunkFailureCode } from '../../engine/errors.js';
 import type {
   ChunkExtraction,
   ChunkTaskResult,
@@ -59,13 +59,12 @@ export async function runCoarsePass(input: CoarsePassInput): Promise<WorldStudio
         } : {}),
       });
     } catch (error) {
-      const isOverflow = isContextOverflowError(error);
       input.chunkTasks.push({
         chunkIndex: logicalChunkIndex,
         stage: 'coarse',
         status: 'failed',
         retryCount: 1,
-        errorCode: isOverflow ? 'WORLD_STUDIO_CONTEXT_OVERFLOW' : 'WORLD_STUDIO_COARSE_JSON_PARSE_FAILED',
+        errorCode: resolveChunkFailureCode('coarse', error),
         errorMessage: error instanceof Error ? error.message : String(error),
       });
     }

@@ -1,8 +1,11 @@
 import type { ReactNode } from 'react';
 import { CreateWorkbench } from '../ui/create/create-workbench.js';
 import { MaintainWorkbench } from '../ui/maintain/maintain-workbench.js';
+import { toStartTimeOptions } from '../engine/merge.js';
+import { fallbackCharacterCandidates, fallbackStartTimeOptions } from '../generation/phase1/heuristic-fallback.js';
 import { toUniqueStringArray } from '../services/snapshot-normalize.js';
 import { projectEventsForSelectedStartTime } from '../services/start-time-projection.js';
+import { buildStartTimeOptionsFromEvents } from '../services/temporal-order.js';
 import type {
   EventNodeDraft,
   WorldStudioCreateStep,
@@ -50,6 +53,7 @@ type BuildWorldStudioMainPanelInput = {
   onSelectSourceFile: (file: File | null) => Promise<void>;
   onRunPhase1: (mode?: 'all' | 'failed', forcedRetryErrorCode?: string | null) => Promise<void>;
   onRunPhase2: () => Promise<void>;
+  onRefreshPhase1QualityGate: () => void;
   onGenerateWorldCover: () => Promise<void>;
   onGenerateCharacterPortrait: (name: string) => Promise<void>;
   onToggleAgentSyncCharacter: (name: string, checked: boolean) => void;
@@ -65,7 +69,45 @@ type BuildWorldStudioMainPanelInput = {
 
 export function buildWorldStudioMainPanel(input: BuildWorldStudioMainPanelInput): ReactNode {
   if (input.landingTarget === 'CREATE') {
-    const startTimeOptions = input.phase1?.startTimeOptions || input.snapshot.phase1Artifact?.startTimeOptions || [];
+    const graphForCheckpoints = {
+      ...input.snapshot.knowledgeGraph,
+      events: input.snapshot.eventsDraft,
+    };
+    const derivedStartTimeOptions = (() => {
+      const temporalOptions = buildStartTimeOptionsFromEvents(graphForCheckpoints.events);
+      if (temporalOptions.length > 0) return temporalOptions;
+      const timelineOptions = toStartTimeOptions(graphForCheckpoints.timeline as Array<Record<string, unknown>>);
+      return timelineOptions.length > 0 ? timelineOptions : fallbackStartTimeOptions(graphForCheckpoints);
+    })();
+    const derivedCharacterCandidates = fallbackCharacterCandidates(
+      graphForCheckpoints,
+      input.snapshot.sourceText,
+    );
+    const phase1ForWorkbench = input.phase1
+      ? {
+        ...input.phase1,
+        startTimeOptions: derivedStartTimeOptions,
+        characterCandidates: derivedCharacterCandidates,
+        knowledgeGraph: graphForCheckpoints,
+      }
+      : (input.snapshot.phase1Artifact
+        ? {
+          startTimeOptions: derivedStartTimeOptions,
+          characterCandidates: derivedCharacterCandidates,
+          knowledgeGraph: graphForCheckpoints,
+          finalDraftAccumulator: input.snapshot.finalDraftAccumulator,
+          qualityGate: input.snapshot.phase1Artifact.qualityGate,
+          chunkTasks: input.snapshot.phase1Artifact.chunkTasks,
+          rawText: JSON.stringify({
+            restoredFromArtifact: true,
+            updatedAt: input.snapshot.phase1Artifact.updatedAt,
+          }),
+        }
+        : null);
+    const startTimeOptions = phase1ForWorkbench?.startTimeOptions || [];
+    const effectiveSelectedStartTimeId = startTimeOptions.some((item) => item.id === input.snapshot.selectedStartTimeId)
+      ? input.snapshot.selectedStartTimeId
+      : (startTimeOptions[0]?.id || '');
     const buildStartTimeProjectionPatch = (
       selectedStartTimeId: string,
       events: { primary: EventNodeDraft[]; secondary: EventNodeDraft[] },
@@ -99,13 +141,13 @@ export function buildWorldStudioMainPanel(input: BuildWorldStudioMainPanelInput)
         sourceEncoding={input.sourceEncoding}
         filePreviewText={input.filePreviewText}
         parseJob={input.snapshot.parseJob}
-        chunkTasks={input.phase1?.chunkTasks || input.snapshot.phase1Artifact?.chunkTasks || []}
-        phase1={input.phase1}
-        qualityGate={input.phase1?.qualityGate || input.snapshot.phase1Artifact?.qualityGate || null}
+        chunkTasks={phase1ForWorkbench?.chunkTasks || input.snapshot.phase1Artifact?.chunkTasks || []}
+        phase1={phase1ForWorkbench}
+        qualityGate={phase1ForWorkbench?.qualityGate || input.snapshot.phase1Artifact?.qualityGate || null}
         phase2={input.phase2}
         knowledgeGraph={input.snapshot.knowledgeGraph}
         assets={input.snapshot.assets}
-        selectedStartTimeId={input.snapshot.selectedStartTimeId}
+        selectedStartTimeId={effectiveSelectedStartTimeId}
         selectedCharacters={input.snapshot.selectedCharacters}
         selectedAgentSyncCharacters={input.selectedAgentSyncCharacters}
         agentDraftsByCharacter={input.agentDraftsByCharacter}
@@ -167,7 +209,7 @@ export function buildWorldStudioMainPanel(input: BuildWorldStudioMainPanelInput)
           unsavedChangesByPanel: { ...input.snapshot.unsavedChangesByPanel, worldview: true },
         })}
         onEventsGraphChange={(next) => input.patchSnapshot({
-          ...buildStartTimeProjectionPatch(input.snapshot.selectedStartTimeId, next),
+          ...buildStartTimeProjectionPatch(effectiveSelectedStartTimeId, next),
           unsavedChangesByPanel: { ...input.snapshot.unsavedChangesByPanel, events: true },
         })}
         onEventGraphLayoutChange={(next) => input.patchSnapshot({
@@ -195,6 +237,7 @@ export function buildWorldStudioMainPanel(input: BuildWorldStudioMainPanelInput)
         }}
         onRetryConcurrencyChange={input.setRetryConcurrency}
         onClearRetryErrorCode={() => input.setRetryErrorCode(null)}
+        onRefreshQualityGate={input.onRefreshPhase1QualityGate}
         onRunPhase2={() => { void input.onRunPhase2(); }}
       />
     );

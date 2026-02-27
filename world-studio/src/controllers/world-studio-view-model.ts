@@ -81,6 +81,7 @@ export type WorldStudioShellActionInput = {
   onSelectSourceFile: (file: File | null) => Promise<void>;
   onRunPhase1: (mode?: 'all' | 'failed', forcedRetryErrorCode?: string | null) => Promise<void>;
   onRunPhase2: () => Promise<void>;
+  onRefreshPhase1QualityGate: () => void;
   onRebuildEmbeddingIndex: () => Promise<void>;
   onGenerateWorldCover: () => Promise<void>;
   onGenerateCharacterPortrait: (name: string) => Promise<void>;

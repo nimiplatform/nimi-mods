@@ -60,6 +60,7 @@ export function buildWorldStudioPanels(viewModel: WorldStudioViewModel): {
     onSelectSourceFile: viewModel.actions.onSelectSourceFile,
     onRunPhase1: viewModel.actions.onRunPhase1,
     onRunPhase2: viewModel.actions.onRunPhase2,
+    onRefreshPhase1QualityGate: viewModel.actions.onRefreshPhase1QualityGate,
     onGenerateWorldCover: viewModel.actions.onGenerateWorldCover,
     onGenerateCharacterPortrait: viewModel.actions.onGenerateCharacterPortrait,
     onToggleAgentSyncCharacter: viewModel.actions.onToggleAgentSyncCharacter,

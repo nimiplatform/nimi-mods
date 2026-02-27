@@ -9,6 +9,8 @@ const ERROR_SUMMARY_MAP: Record<string, string> = {
   WORLD_STUDIO_TASK_CANCELED: 'error.taskCanceled',
   WORLD_STUDIO_ROUTE_CONFIG_REQUIRED: 'error.routeConfigRequired',
   WORLD_STUDIO_MAINTENANCE_CONFLICT: 'error.maintenanceConflict',
+  WORLD_STUDIO_PROVIDER_TIMEOUT: 'error.providerTimeout',
+  WORLD_STUDIO_PROVIDER_INTERNAL: 'error.genericWithCode',
   WORLD_MAINTENANCE_VERSION_CONFLICT: 'error.maintenanceConflict',
   PLAY_PROVIDER_TIMEOUT: 'error.providerTimeout',
   PLAY_PROVIDER_ABORTED: 'error.taskCanceled',

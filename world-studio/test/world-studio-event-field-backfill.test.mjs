@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { backfillChunkExtractionEventFields } from '../mods/world-studio/src/engine/heuristic/event-field-backfill.ts';
+import { backfillChunkExtractionEventFields } from '../src/engine/heuristic/event-field-backfill.ts';
 
 function makeEvidence(excerpt) {
   return [{

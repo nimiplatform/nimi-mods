@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { setModSdkHost, clearModSdkHost } from '../../libs/mod-sdk/src/host.ts';
-import { cloneDefaultSnapshot } from '../mods/world-studio/src/state/workspace/defaults.ts';
-import { runCreatePhase1 } from '../mods/world-studio/src/hooks/actions/create/run-phase1.ts';
+import { cloneDefaultSnapshot } from '../src/state/workspace/defaults.ts';
+import { runCreatePhase1 } from '../src/hooks/actions/create/run-phase1.ts';
 import { createMockTaskController } from './helpers/world-studio-task-controller-mock.mjs';
 
 function makeValidPayload(index = 1) {
@@ -161,7 +161,7 @@ test('runCreatePhase1 emits terminal failure histogram in diagnostics', async ()
     await runCreatePhase1(input);
 
     const effectiveResultLog = rendererLogs.find(
-      (entry) => String(entry.message || '').includes('[AGENT_SYNC_DIAG] Phase1 effective result'),
+      (entry) => String(entry.message || '').includes('[MODS-TEST-DIAG] Phase1 effective result'),
     );
     assert.equal(Boolean(effectiveResultLog), true);
     const histogram = effectiveResultLog?.details?.terminalFailureHistogram;

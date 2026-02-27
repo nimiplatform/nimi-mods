@@ -1,4 +1,4 @@
-import { isContextOverflowError } from '../../engine/errors.js';
+import { resolveChunkFailureCode } from '../../engine/errors.js';
 import { extractChunkFine } from '../../engine/fine-extractor.js';
 import type {
   ChunkExtraction,
@@ -56,13 +56,12 @@ export async function runFinePass(input: FinePassInput): Promise<WorldStudioTask
         retryCount: fine.retryCount,
       });
     } catch (error) {
-      const isOverflow = isContextOverflowError(error);
       input.chunkTasks.push({
         chunkIndex: logicalChunkIndex,
         stage: 'fine',
         status: 'failed',
         retryCount: 1,
-        errorCode: isOverflow ? 'WORLD_STUDIO_CONTEXT_OVERFLOW' : 'WORLD_STUDIO_FINE_JSON_PARSE_FAILED',
+        errorCode: resolveChunkFailureCode('fine', error),
         errorMessage: error instanceof Error ? error.message : String(error),
       });
       // Keep whatever coarse extraction we already have — do NOT fall back to heuristic regex.

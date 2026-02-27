@@ -17,6 +17,14 @@ const CHUNK_RELATIONS_MAX = 14;
 const STRICT_REPAIR_OUTPUT_LIMIT = 1400;
 const STRICT_REPAIR_SOURCE_LIMIT = 2200;
 
+function normalizeEntityRefs(value: unknown): string[] {
+  return Array.from(new Set(
+    toStringArray(value)
+      .map((item) => String(item || '').trim())
+      .filter((item) => item.length > 0 && !isSyntheticEntityName(item)),
+  ));
+}
+
 function normalizeEvidenceRefs(value: unknown): EvidenceRefDraft[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -60,8 +68,8 @@ function normalizeEvent(value: unknown, level: 'PRIMARY' | 'SECONDARY', index: n
     process: String(record.process || '').trim(),
     result: String(record.result || '').trim(),
     timeRef: normalizedTimeRef,
-    locationRefs: toStringArray(record.locationRefs || (record.locationRef ? [record.locationRef] : [])),
-    characterRefs: toStringArray(record.characterRefs),
+    locationRefs: normalizeEntityRefs(record.locationRefs || (record.locationRef ? [record.locationRef] : [])),
+    characterRefs: normalizeEntityRefs(record.characterRefs),
     dependsOnEventIds,
     ...(temporalBeforeEventIds.length > 0 ? { temporalBeforeEventIds } : {}),
     ...(temporalAfterEventIds.length > 0 ? { temporalAfterEventIds } : {}),
@@ -152,7 +160,8 @@ function buildCoarsePrompt(input: { chunk: string; index: number; total: number;
       '',
     ] : []),
     '## Reference Rules',
-    '- characterRefs and locationRefs must use the entity NAME (e.g. "韩立"), never the entity ID (e.g. "char-1").',
+    '- characterRefs and locationRefs must use the entity NAME (e.g. "韩立"), never schema IDs.',
+    '- characters[].name must be a proper name from source text; reject placeholder IDs or labels.',
     '- dependsOnEventIds must list prerequisite event IDs that happen earlier in timeline order.',
     '- beforeEventIds means event IDs that happen BEFORE current event (same direction as dependsOnEventIds).',
     '- afterEventIds means event IDs that happen AFTER current event.',
@@ -166,9 +175,9 @@ function buildCoarsePrompt(input: { chunk: string; index: number; total: number;
     'Schema:',
     '{',
     '  "worldSetting": "string summary",',
-    '  "timeline":[{"id":"t1","label":"...","description":"...","time":"...","weight":0.0}],',
-    '  "locations":[{"id":"loc-1","name":"...","description":"...","importance":0.0}],',
-    '  "characters":[{"id":"char-1","name":"...","summary":"...","significance":0.0}],',
+    '  "timeline":[{"id":"timeline-anchor-1","label":"...","description":"...","time":"...","weight":0.0}],',
+    '  "locations":[{"id":"place-anchor-1","name":"...","description":"...","importance":0.0}],',
+    '  "characters":[{"id":"person-anchor-1","name":"...","summary":"...","significance":0.0}],',
     '  "events": {',
     '    "primary":[{"id":"evt-p1","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"beforeEventIds":[],"afterEventIds":[],"temporalConfidence":0.0,"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}],',
     '    "secondary":[{"id":"evt-s1","parentEventId":"evt-p1","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"beforeEventIds":[],"afterEventIds":[],"temporalConfidence":0.0,"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}]',
@@ -188,9 +197,9 @@ function buildCoarseSchemaLines(): string[] {
   return [
     '{',
     '  "worldSetting":"string summary",',
-    '  "timeline":[{"id":"t1","label":"...","description":"...","time":"...","weight":0.0}],',
-    '  "locations":[{"id":"loc-1","name":"...","description":"...","importance":0.0}],',
-    '  "characters":[{"id":"char-1","name":"...","summary":"...","significance":0.0}],',
+    '  "timeline":[{"id":"timeline-anchor-1","label":"...","description":"...","time":"...","weight":0.0}],',
+    '  "locations":[{"id":"place-anchor-1","name":"...","description":"...","importance":0.0}],',
+    '  "characters":[{"id":"person-anchor-1","name":"...","summary":"...","significance":0.0}],',
     '  "events":{"primary":[{"id":"evt-p1","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"beforeEventIds":[],"afterEventIds":[],"temporalConfidence":0.0,"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}],"secondary":[{"id":"evt-s1","parentEventId":"evt-p1","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"beforeEventIds":[],"afterEventIds":[],"temporalConfidence":0.0,"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}]},',
     '  "characterRelations":[{"source":"...","target":"...","relation":"...","reason":"...","strength":0.0}]',
     '}',

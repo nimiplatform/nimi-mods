@@ -14,6 +14,17 @@ function recommendAction(errorCodeOrMessage: string): string {
   if (normalized.includes('fine')) {
     return 'Switch Fine-route model and retry';
   }
+  if (
+    normalized.includes('provider_internal')
+    || normalized.includes('ai_output_invalid')
+    || normalized.includes('runtime_bridge_unary')
+    || normalized.includes('missing required key payload')
+  ) {
+    return 'Provider internal error; check bridge/provider health and retry failed chunks';
+  }
+  if (normalized.includes('timeout') || normalized.includes('network')) {
+    return 'Provider timeout/network issue; lower concurrency and retry failed chunks';
+  }
   return 'Retry failed chunks from diagnostics filtering';
 }
 
