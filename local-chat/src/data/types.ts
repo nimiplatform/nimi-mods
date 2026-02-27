@@ -6,7 +6,7 @@ export type LocalChatCoreQueryBridge = {
   query: (capability: string, query?: Record<string, unknown>) => Promise<unknown>;
   withOpenApiContextLock?: <T>(
     context: {
-      apiBaseUrl: string;
+      realmBaseUrl: string;
       accessToken?: string;
       fetchImpl?: FetchImpl | null;
     },
@@ -15,7 +15,7 @@ export type LocalChatCoreQueryBridge = {
 };
 
 export type LocalChatReadContext = {
-  apiBaseUrl: string;
+  realmBaseUrl: string;
   accessToken?: string;
   fetchImpl?: FetchImpl | null;
 };

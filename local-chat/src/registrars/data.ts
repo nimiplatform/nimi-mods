@@ -15,12 +15,12 @@ import { registerLocalChatSessionCapabilities } from './sessions.js';
 type FetchImpl = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
 function toReadContext(input: {
-  apiBaseUrl: string;
+  realmBaseUrl: string;
   accessToken?: string;
   fetchImpl?: FetchImpl;
 }): LocalChatReadContext {
   return {
-    apiBaseUrl: String(input.apiBaseUrl || ''),
+    realmBaseUrl: String(input.realmBaseUrl || ''),
     accessToken: input.accessToken || undefined,
     fetchImpl: input.fetchImpl || undefined,
   };
@@ -34,7 +34,7 @@ function readTargetInput(query: unknown): Record<string, unknown> {
 
 export function createLocalChatReadContextResolver(input: {
   getHttpContext: () => {
-    apiBaseUrl: string;
+    realmBaseUrl: string;
     accessToken?: string;
     fetchImpl?: FetchImpl;
   };
@@ -45,7 +45,7 @@ export function createLocalChatReadContextResolver(input: {
 export async function registerLocalChatDataCapabilities(input: {
   hookClient: HookClient;
   getHttpContext: () => {
-    apiBaseUrl: string;
+    realmBaseUrl: string;
     accessToken?: string;
     fetchImpl?: FetchImpl;
   };

@@ -19,7 +19,7 @@ export function asNullableString(value: unknown): string | null {
   return value;
 }
 
-export function normalizeApiBaseUrl(value: unknown): string {
+export function normalizeRealmBaseUrl(value: unknown): string {
   const text = String(value || '').trim();
   return text ? text.replace(/\/+$/, '') : '';
 }
@@ -46,18 +46,18 @@ export async function withReadContext<T>(
   const flowId = options?.flowId || createLocalChatFlowId('local-chat-read');
   const source = options?.source || 'withReadContext';
   const startedAt = performance.now();
-  const apiBaseUrl = normalizeApiBaseUrl(context.apiBaseUrl);
-  if (!apiBaseUrl) {
+  const realmBaseUrl = normalizeRealmBaseUrl(context.realmBaseUrl);
+  if (!realmBaseUrl) {
     emitLocalChatLog({
       level: 'error',
       message: 'phase:with-read-context:failed',
       flowId,
       source,
       details: {
-        reason: 'missing-api-base-url',
+        reason: 'missing-realm-base-url',
       },
     });
-    throw new Error('LOCAL_CHAT_API_BASE_URL_REQUIRED: apiBaseUrl is required');
+    throw new Error('LOCAL_CHAT_REALM_BASE_URL_REQUIRED: realmBaseUrl is required');
   }
 
   emitLocalChatLog({
@@ -66,7 +66,7 @@ export async function withReadContext<T>(
     flowId,
     source,
     details: {
-      apiBaseUrl,
+      realmBaseUrl,
       hasAccessToken: Boolean(String(context.accessToken || '').trim()),
       hasFetchImpl: typeof context.fetchImpl === 'function',
     },
@@ -75,7 +75,7 @@ export async function withReadContext<T>(
   try {
     const result = await withOpenApiContextLock(
       {
-        apiBaseUrl,
+        realmBaseUrl,
         accessToken: context.accessToken || undefined,
         fetchImpl: context.fetchImpl || undefined,
       },

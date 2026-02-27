@@ -33,7 +33,7 @@ export function createLocalChatRuntimeMod(): RuntimeModRegistration {
       await registerLocalChatDataCapabilities({
         hookClient,
         getHttpContext: getHttpContext as () => {
-          apiBaseUrl: string;
+          realmBaseUrl: string;
           accessToken?: string;
           fetchImpl?: FetchImpl;
         },
@@ -43,7 +43,7 @@ export function createLocalChatRuntimeMod(): RuntimeModRegistration {
 
       const getReadContext = createLocalChatReadContextResolver({
         getHttpContext: getHttpContext as () => {
-          apiBaseUrl: string;
+          realmBaseUrl: string;
           accessToken?: string;
           fetchImpl?: FetchImpl;
         },
