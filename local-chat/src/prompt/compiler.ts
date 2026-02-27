@@ -93,7 +93,6 @@ function toLayerContent(input: LocalChatPromptCompileInput): Record<PromptLayerI
   const target = input.target;
   const profile = asRecord(target.agentProfile);
   const metadata = asRecord(target.agentMetadata);
-  const world = asRecord(target.world);
   const worldview = asRecord(target.worldview);
   const payload = asRecord(target.payload);
 
@@ -101,7 +100,8 @@ function toLayerContent(input: LocalChatPromptCompileInput): Record<PromptLayerI
   const systemPromptBase = asString(profile.systemPromptBase || metadata.systemPromptBase || payload.systemPromptBase);
   const postHistoryInstructions = asString(profile.postHistoryInstructions || payload.postHistoryInstructions);
 
-  const worldviewHardRules = worldview.rules ?? worldview.coreSystem ?? world.rules ?? payload.worldHardRules;
+  const worldviewCoreSystem = asRecord(worldview.coreSystem);
+  const worldviewHardRules = worldview.rules ?? worldviewCoreSystem.rules ?? payload.worldHardRules;
   const worldKeywordLore = worldview.keyword ?? worldview.keywordLorebook ?? payload.worldLoreKeyword;
   const agentLorebook = profile.lorebook ?? profile.agentLorebook ?? metadata.lorebook ?? payload.agentLorebook;
   const coreMemory = payload.coreMemory ?? payload.memoryCore ?? [];
