@@ -284,7 +284,7 @@ Embedding readiness reasonCode（最小集）：
 ### 7.3 迁移语义
 
 1. 运行主链不再接受 `majorEvents` / `worldFacts`。
-2. 输入面仅接受 `events.primary/events.secondary` 与 `worldLorebooks`。
+2. 输入面仅接受 `events.primary/events.secondary/futureHistoricalEvents` 与 `worldLorebooks`。
 3. 旧字段不得回流主链读写，也不保留运行时兼容映射。
 
 ## 8. 错误码与审计事件
