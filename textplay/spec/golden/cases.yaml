@@ -1,0 +1,33 @@
+version: 2026-03-01-v1
+modId: world.nimi.textplay
+cases:
+  - id: TXT-001-USERTURN-RENDER
+    description: UserTurn 正常渲染，输出非空文本且包含 meta。
+    expected:
+      ok: true
+      minCharCount: 50
+      hasMeta: true
+
+  - id: TXT-002-INTERNAL-FILTER-NPC
+    description: NPC internal 事件在 prompt 前被过滤。
+    expected:
+      filteredEventsCount: 1
+
+  - id: TXT-003-INTERNAL-KEEP-PLAYER
+    description: 玩家自身 internal 事件保留进入 prompt。
+    expected:
+      filteredEventsCount: 1
+
+  - id: TXT-004-PERSISTENCE-WARN-NONBLOCKING
+    description: 持久化失败只告警，不阻断渲染输出。
+    expected:
+      ok: true
+      reasonCode: TEXTPLAY_PERSISTENCE_FAILED_WARN
+      outputReturned: true
+
+  - id: TXT-005-PRESENCE-IDLE-AWAY
+    description: Presence 状态按 idle -> away 迁移并可上报。
+    expected:
+      reportSequence:
+        - idle
+        - away

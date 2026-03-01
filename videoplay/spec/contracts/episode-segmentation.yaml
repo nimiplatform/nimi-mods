@@ -1,0 +1,45 @@
+version: 2026-03-01-v1
+input:
+  required_fields:
+    - projectId
+    - storyId
+    - ingestCursorStart
+    - turns
+    - policy
+  turn_constraints:
+    turn_id_strictly_increasing: true
+    spine_events_required: true
+policy:
+  target_episode_duration_sec:
+    min: 15
+    max: 180
+  min_episode_duration_sec:
+    min: 15
+    max: 180
+  max_episode_duration_sec:
+    min: 15
+    max: 180
+  max_turns_per_episode:
+    min: 1
+    max: 30
+  suspense_cut_required_default: true
+  hard_break_on_system_event_default: false
+output:
+  required_fields:
+    - episodes
+    - backlogTurnIds
+    - nextIngestCursor
+    - segmentationTrace
+  episode_spec_required_fields:
+    - episodeId
+    - sourceTurnRange
+    - sourceTurnIds
+    - sourceEventIds
+    - segmentationReason
+    - policyHash
+invariants:
+  - segmentation_is_pure_function
+  - consumed_turn_windows_must_be_contiguous
+  - consumed_turn_windows_must_not_overlap
+  - source_event_ids_must_come_from_source_turns_only
+  - identical_input_and_policy_must_produce_identical_output

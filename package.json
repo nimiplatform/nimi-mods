@@ -12,6 +12,10 @@
   "packageManager": "pnpm@10.27.0",
   "scripts": {
     "check": "node scripts/check-mods.mjs",
+    "check:spec": "pnpm run check:spec:narrative && pnpm run check:spec:textplay && pnpm run check:spec:videoplay",
+    "check:spec:narrative": "node scripts/check-narrative-spec.mjs",
+    "check:spec:textplay": "node scripts/check-textplay-spec.mjs",
+    "check:spec:videoplay": "node scripts/check-videoplay-spec.mjs",
     "check:dist": "node scripts/check-mods.mjs --require-dist",
     "typecheck": "pnpm --filter @nimiplatform/mod-kismet run typecheck && pnpm --filter @nimiplatform/mod-local-chat run typecheck && pnpm --filter @nimiplatform/mod-re-life run typecheck && pnpm --filter @nimiplatform/mod-world-studio run typecheck",
     "build": "node scripts/build-mod.mjs",
@@ -25,7 +29,7 @@
     "watch:re-life": "node scripts/build-mod.mjs --mod re-life --watch",
     "watch:world-studio": "node scripts/build-mod.mjs --mod world-studio --watch",
     "clean": "pnpm --filter @nimiplatform/mod-kismet run clean && pnpm --filter @nimiplatform/mod-local-chat run clean && pnpm --filter @nimiplatform/mod-re-life run clean && pnpm --filter @nimiplatform/mod-world-studio run clean",
-    "verify": "pnpm run check && pnpm run typecheck && pnpm run build -- --all && pnpm run check:dist"
+    "verify": "pnpm run check && pnpm run check:spec && pnpm run typecheck && pnpm run build -- --all && pnpm run check:dist"
   },
   "devDependencies": {
     "@tanstack/react-query": "^5.90.16",

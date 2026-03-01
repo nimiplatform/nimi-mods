@@ -1,0 +1,53 @@
+version: 2026-03-01-v1
+enums:
+  TriggerSource:
+    - UserTurn
+    - AgentInitiative
+    - SystemEvent
+  NarrativeMode:
+    - normal
+    - retrospective_collapse
+    - timeskip
+  ModelRoute:
+    - lite
+    - pro
+  CheckStatus:
+    - APPROVED
+    - ADJUSTED
+    - REJECTED
+turn_input:
+  required:
+    - storyId
+    - triggerSource
+  conditional_required:
+    userMessage_when_triggerSource_UserTurn: true
+  field_constraints:
+    storyId_non_empty: true
+    systemPayload_is_json_object: true
+core_output:
+  required:
+    - spineEvents
+    - stateChanges
+    - metrics
+  spine_event_required_fields:
+    - type
+    - payload
+  metrics_range:
+    tension:
+      min: 0
+      max: 1
+    significance:
+      min: 0
+      max: 1
+check_result:
+  required:
+    - status
+    - checkerTrace
+    - requestId
+    - policyVersion
+  conditional_required:
+    adjustedOutput_when_status_ADJUSTED: true
+    reasonCode_and_actionHint_when_status_ADJUSTED_or_REJECTED: true
+turn_result:
+  success_shape: { ok: true, output: CoreOutput, check: CheckResult }
+  failure_shape: { ok: false, check: CheckResult }

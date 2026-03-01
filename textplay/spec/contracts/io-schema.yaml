@@ -1,0 +1,43 @@
+version: 2026-03-01-v1
+enums:
+  TriggerSource:
+    - UserTurn
+    - AgentInitiative
+    - SystemEvent
+  Visibility:
+    - public
+    - internal
+    - sensory
+  PresenceState:
+    - composing
+    - paused
+    - active
+    - idle
+    - away
+render_input:
+  required_fields:
+    - events
+    - triggerSource
+    - userMessage
+    - player
+  player_required_fields:
+    - name
+    - identity
+  constraints:
+    visibility_invalid_fail_close: true
+render_output:
+  required_fields:
+    - text
+    - meta
+  meta_required_fields:
+    - charCount
+    - model
+    - latencyMs
+  constraints:
+    text_non_empty: true
+    char_count_min: 1
+presence_report:
+  required_fields:
+    - storyId
+    - state
+    - timestamp

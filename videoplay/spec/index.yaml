@@ -1,0 +1,32 @@
+version: 2026-03-01-v1
+modId: world.nimi.videoplay
+ssotVersion: 2026-03-01-v4
+imports:
+  - id: fact-projection
+    path: ./contracts/fact-projection.yaml
+    kind: contract
+  - id: pipeline
+    path: ./contracts/pipeline.yaml
+    kind: contract
+  - id: episode-segmentation
+    path: ./contracts/episode-segmentation.yaml
+    kind: contract
+  - id: edit-compose
+    path: ./contracts/edit-compose.yaml
+    kind: contract
+  - id: model-routing
+    path: ./contracts/model-routing.yaml
+    kind: contract
+  - id: quality-gates
+    path: ./contracts/quality-gates.yaml
+    kind: contract
+  - id: error-codes
+    path: ./contracts/error-codes.yaml
+    kind: contract
+  - id: golden-cases
+    path: ./golden/cases.yaml
+    kind: golden
+checks:
+  - id: videoplay-spec-integrity
+    command: node ./scripts/check-videoplay-spec.mjs
+    scope: imports + cross-reference + thresholds

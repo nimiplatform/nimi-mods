@@ -1,0 +1,66 @@
+version: 2026-03-01-v1
+codes:
+  - code: VIDEOPLAY_INPUT_INVALID
+    stage: orchestrator
+    blocking: true
+    actionHint: 修正输入字段与取值范围后重试。
+  - code: VIDEOPLAY_FACT_PROJECTION_INVALID
+    stage: narrative-bridge
+    blocking: true
+    actionHint: 修复 Narrative 投影后重试。
+  - code: VIDEOPLAY_EPISODE_SEGMENTATION_FAILED
+    stage: segment
+    blocking: true
+    actionHint: 调整切分策略或输入窗口后重试。
+  - code: VIDEOPLAY_EPISODE_SEGMENTATION_NON_DETERMINISTIC
+    stage: segment
+    blocking: true
+    actionHint: 修复切分逻辑非确定性。
+  - code: VIDEOPLAY_SCREENPLAY_SCHEMA_INVALID
+    stage: screenplay
+    blocking: true
+    actionHint: 修复 screenplay schema 后重试。
+  - code: VIDEOPLAY_STORYBOARD_SCHEMA_INVALID
+    stage: storyboard
+    blocking: true
+    actionHint: 修复 storyboard schema 后重试。
+  - code: VIDEOPLAY_ROUTE_UNAVAILABLE
+    stage: route
+    blocking: true
+    actionHint: 恢复可用 route source 后重试。
+  - code: VIDEOPLAY_SHOT_RENDER_FAILED
+    stage: render
+    blocking: false
+    actionHint: 重试失败 shot 或切换模型。
+  - code: VIDEOPLAY_CLIP_RENDER_COVERAGE_LOW
+    stage: render
+    blocking: true
+    actionHint: 补齐未完成镜头再进入 QC。
+  - code: VIDEOPLAY_TIMELINE_SCHEMA_INVALID
+    stage: edit
+    blocking: true
+    actionHint: 修复时间线结构后重试。
+  - code: VIDEOPLAY_AUDIO_VIDEO_SYNC_DRIFT
+    stage: edit
+    blocking: true
+    actionHint: 重新对齐音画锚点。
+  - code: VIDEOPLAY_EDIT_COMPOSE_FAILED
+    stage: edit
+    blocking: true
+    actionHint: 修复资产和导出参数后重试。
+  - code: VIDEOPLAY_VISUAL_ATTRACTION_LOW
+    stage: qc
+    blocking: true
+    actionHint: 返工分镜与关键镜头渲染。
+  - code: VIDEOPLAY_QC_FAILED
+    stage: qc
+    blocking: true
+    actionHint: 修复未通过门禁项后重试。
+  - code: VIDEOPLAY_RELEASE_PACKAGE_INVALID
+    stage: package
+    blocking: true
+    actionHint: 补齐发布包最小集后重试。
+  - code: VIDEOPLAY_PERSISTENCE_FAILED_WARN
+    stage: persistence
+    blocking: false
+    actionHint: 排查存储链路，不阻断已完成输出。

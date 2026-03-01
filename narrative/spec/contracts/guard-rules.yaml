@@ -1,0 +1,16 @@
+version: 2026-03-01-v1
+guard:
+  top_level_whitelist_enforced: true
+  visibility_invalid_fail_close: true
+  event_count_policy:
+    underflow_behavior: reject
+    overflow_behavior: adjust-truncate
+  metrics_range_enforced: true
+  unsupported_spine_type_behavior: reject
+  empty_payload_behavior: reject
+adjustment:
+  adjusted_output_must_replace_raw_output: true
+  adjustment_reason_required: true
+audit:
+  check_result_must_be_auditable: true
+  request_id_required: true

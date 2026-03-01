@@ -1,0 +1,15 @@
+version: 2026-03-01-v1
+trigger_neutrality:
+  supported_sources:
+    - UserTurn
+    - AgentInitiative
+    - SystemEvent
+initiative_tick:
+  noop_when_presence_in:
+    - composing
+    - active
+  cooldown_hit_behavior: no-fire
+  cooldown_hit_reason_code: NARRATIVE_INITIATIVE_COOLDOWN_ACTIVE
+  fired_path_must_call_process_turn: true
+observability:
+  initiative_decision_must_emit_audit_event: true

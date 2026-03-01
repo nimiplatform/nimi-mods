@@ -1,0 +1,38 @@
+version: 2026-03-01-v1
+input:
+  required_fields:
+    - episodeId
+    - clipAssets
+    - shotAssets
+    - sourceEventMap
+  clip_asset_required_fields:
+    - clipId
+    - uri
+    - durationMs
+    - fps
+    - resolution
+output:
+  required_fields:
+    - episodeTimeline
+    - episodeMasterVideo
+    - episodePoster
+    - episodeCaptionTrack
+    - composeTrace
+  episode_master_duration_ms:
+    min: 15000
+    max: 180000
+timeline:
+  fps_default: 30
+  video_track_must_be_sorted_by_start_ms: true
+  video_track_overlap_forbidden: true
+  master_duration_equals_last_clip_end: true
+av_thresholds:
+  max_av_drift_ms: 80
+  max_black_gap_ms: 250
+export_spec:
+  video_codec: H.264
+  audio_codec: AAC
+  container: mp4
+idempotency:
+  compose_replay_same_key_must_not_change_uri: true
+  same_asset_set_must_produce_same_timeline_hash: true

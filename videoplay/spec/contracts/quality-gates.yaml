@@ -1,0 +1,35 @@
+version: 2026-03-01-v1
+gates:
+  grounded_ratio:
+    min: 0.98
+    fail_code: VIDEOPLAY_QC_FAILED
+  asset_coverage_ratio:
+    min: 0.90
+    fail_code: VIDEOPLAY_CLIP_RENDER_COVERAGE_LOW
+  episode_master_duration_sec:
+    min: 15
+    max: 180
+    fail_code: VIDEOPLAY_QC_FAILED
+  max_av_drift_ms:
+    max: 80
+    fail_code: VIDEOPLAY_AUDIO_VIDEO_SYNC_DRIFT
+  visual_attraction_score:
+    min: 0.72
+    fail_code: VIDEOPLAY_VISUAL_ATTRACTION_LOW
+visual_attraction_formula:
+  score_range:
+    min: 0
+    max: 1
+  weighted_components:
+    - name: characterConsistency
+      weight: 0.30
+      min_component_score: 0.55
+    - name: motionContinuity
+      weight: 0.30
+      min_component_score: 0.55
+    - name: compositionReadability
+      weight: 0.20
+      min_component_score: 0.55
+    - name: lightColorCoherence
+      weight: 0.20
+      min_component_score: 0.55

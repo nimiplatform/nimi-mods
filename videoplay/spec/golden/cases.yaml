@@ -1,0 +1,87 @@
+version: 2026-03-01-v3
+modId: world.nimi.videoplay
+cases:
+  - id: VID-001-CONTINUOUS-TURNS-TO-EPISODE
+    description: 连续 Narrative turn 可切分为分集并进入生产主链。
+    expected:
+      episodeCreated: true
+      episodeCount: 1
+      statusFlow: [INGEST, SEGMENT, SCREENPLAY]
+
+  - id: VID-002-EPISODE-RELEASE-PACKAGE
+    description: 单集产线完成后输出发布级 ReleasePackage。
+    expected:
+      package:
+        hasEpisodeMasterVideo: true
+        hasPoster: true
+        hasCaptionTrack: true
+        hasMetadata: true
+        hasTraceBundle: true
+      qcStatus: APPROVED
+
+  - id: VID-003-SEGMENTED-RENDER-NOT-ONE-SHOT
+    description: 渲染必须按 clip/shot 分段执行，不能一条长视频一次生成。
+    expected:
+      renderCalls:
+        mode: segmented
+        singleLongVideoCall: false
+
+  - id: VID-004-SOURCE-EVENT-GROUNDING-FAIL
+    description: shot 未能映射 sourceEventIds 时必须 fail-close。
+    expected:
+      ok: false
+      stage: QC
+      reasonCode: VIDEOPLAY_QC_FAILED
+
+  - id: VID-005-CLIP-COVERAGE-LOW-REJECT
+    description: clip 渲染覆盖率低于阈值时拒绝发布包。
+    expected:
+      ok: false
+      reasonCode: VIDEOPLAY_CLIP_RENDER_COVERAGE_LOW
+      releasePackageCreated: false
+
+  - id: VID-006-IDEMPOTENT-REPLAY
+    description: 相同 idempotencyKey 重放不得重复写入资产副作用。
+    expected:
+      replayDetected: true
+      assetWriteCount: 1
+
+  - id: VID-007-ROUTE-FALLBACK-AUDITED
+    description: route 从 local-runtime 回退到 token-api 时必须可见并审计。
+    expected:
+      fallbackVisible: true
+      auditEventContains: [fallback_to_token_api]
+
+  - id: VID-008-PERSIST-WARN-NONBLOCKING
+    description: 持久化失败只告警，不阻断已完成分集输出。
+    expected:
+      ok: true
+      reasonCode: VIDEOPLAY_PERSISTENCE_FAILED_WARN
+
+  - id: VID-009-SEGMENTATION-DETERMINISTIC
+    description: 同输入 turn 流与 policy 必须产出一致 EpisodeSpec。
+    expected:
+      deterministic: true
+      reasonCodeOnMismatch: VIDEOPLAY_EPISODE_SEGMENTATION_NON_DETERMINISTIC
+
+  - id: VID-010-TIMELINE-OVERLAP-REJECT
+    description: edit-compose 时间线片段重叠时必须拒绝。
+    expected:
+      ok: false
+      stage: EDIT
+      reasonCode: VIDEOPLAY_TIMELINE_SCHEMA_INVALID
+
+  - id: VID-011-AV-SYNC-DRIFT-REJECT
+    description: 音画漂移超过 80ms 必须 reject。
+    expected:
+      ok: false
+      stage: EDIT
+      reasonCode: VIDEOPLAY_AUDIO_VIDEO_SYNC_DRIFT
+
+  - id: VID-012-VISUAL-ATTRACTION-LOW-REJECT
+    description: visualAttractionScore 低于阈值时不得放行发布包。
+    expected:
+      ok: false
+      stage: QC
+      reasonCode: VIDEOPLAY_VISUAL_ATTRACTION_LOW
+      releasePackageCreated: false

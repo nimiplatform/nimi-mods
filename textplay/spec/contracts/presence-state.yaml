@@ -1,0 +1,33 @@
+version: 2026-03-01-v1
+states:
+  - composing
+  - paused
+  - active
+  - idle
+  - away
+transitions:
+  - event: onUserComposing
+    from: "*"
+    to: composing
+  - event: onUserPaused
+    from: "*"
+    to: paused
+  - event: onUserActive
+    from: "*"
+    to: active
+  - event: idleTimeout
+    from:
+      - composing
+      - paused
+      - active
+    to: idle
+  - event: awayTimeout
+    from:
+      - idle
+    to: away
+  - event: onInitiativeReceived
+    from: "*"
+    to: keep
+constraints:
+  initiative_received_must_reset_idle_and_away_timers: true
+  every_state_change_must_emit_presence_report: true

@@ -1,0 +1,69 @@
+version: 2026-03-01-v1
+execution_chain:
+  - narrative-ingest
+  - episode-segmentation
+  - screenplay
+  - storyboard
+  - asset-render
+  - edit-compose
+  - qc-gate
+  - release-package
+state_machine:
+  RECEIVED:
+    preconditions:
+      - input_schema_valid
+    next: INGEST
+  INGEST:
+    preconditions:
+      - narrative_turn_readable
+    next: SEGMENT
+  SEGMENT:
+    preconditions:
+      - turn_buffer_valid
+    next: SCREENPLAY
+  SCREENPLAY:
+    preconditions:
+      - episode_spec_valid
+    next: STORYBOARD
+  STORYBOARD:
+    preconditions:
+      - screenplay_valid
+    next: RENDER
+  RENDER:
+    preconditions:
+      - shot_plan_valid
+    next: EDIT
+  EDIT:
+    preconditions:
+      - rendered_assets_ready
+    next: QC
+  QC:
+    preconditions:
+      - episode_master_ready
+    outcomes:
+      - APPROVED
+      - ADJUSTED
+      - REJECTED
+  PACKAGE:
+    preconditions:
+      - qc_status_in_APPROVED_or_ADJUSTED
+    next: COMPLETED
+  REJECT_TERMINAL:
+    preconditions:
+      - qc_status_REJECTED
+    next: TERMINATED
+orchestration:
+  job_units:
+    root: EpisodeJob
+    children:
+      - ClipJob
+      - ShotJob
+  retry_policy:
+    shot_retry_max: 3
+    render_concurrency_min: 1
+    render_concurrency_max: 4
+  cancellation:
+    episode_job_cancel_cascades_to_unfinished_clip_jobs: true
+  idempotency:
+    require_idempotency_key_for_all_writes: true
+    replay_must_not_duplicate_side_effects: true
