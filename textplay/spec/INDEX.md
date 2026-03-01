@@ -18,6 +18,12 @@
 2. `spec/kernel/tables/pipeline-states.yaml`
 3. `spec/textplay.md`
 
+### Change run orchestration / resume recovery
+
+1. `spec/kernel/run-orchestration-contract.md`
+2. `spec/kernel/tables/run-states.yaml`
+3. `spec/textplay.md`
+
 ### Change visibility/POV policy
 
 1. `spec/kernel/visibility-pov-contract.md`

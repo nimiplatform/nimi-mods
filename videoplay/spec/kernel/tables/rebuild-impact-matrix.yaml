@@ -1,0 +1,29 @@
+version: 1
+rules:
+  - operation_group: shot_content_change
+    examples:
+      - update-shot
+      - regenerate-shot
+      - create-shot-variant
+    minimum_rebuild_scope: shot
+    source_rule: V-OPS-004
+  - operation_group: shot_link_change
+    examples:
+      - link-shot-transition
+      - generate-first-last-frame
+    minimum_rebuild_scope: adjacent-shots-plus-compose
+    source_rule: V-OPS-004
+  - operation_group: clip_structure_change
+    examples:
+      - split-shot
+      - merge-shots
+      - reorder-shot
+    minimum_rebuild_scope: clip-plus-compose
+    source_rule: V-OPS-004
+  - operation_group: episode_rhythm_change
+    examples:
+      - segmentation-policy-change
+      - branch-switch
+      - merge-branch
+    minimum_rebuild_scope: post-segmentation-full-chain
+    source_rule: V-OPS-004

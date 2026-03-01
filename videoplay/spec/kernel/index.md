@@ -11,7 +11,7 @@ Domain docs must reference kernel rule IDs and must not duplicate kernel prose.
 ## 2. Rule ID Format
 
 - Format: `V-<DOMAIN>-NNN`
-- Domain enum: `FACT`, `PIPE`, `SEG`, `EDIT`, `ROUTE`, `QC`, `ERR`, `ACC`
+- Domain enum: `FACT`, `PIPE`, `SEG`, `EDIT`, `ROUTE`, `QC`, `OPS`, `LINEAGE`, `PROMPT`, `ERR`, `ACC`
 
 ## 3. Ownership
 
@@ -21,6 +21,9 @@ Domain docs must reference kernel rule IDs and must not duplicate kernel prose.
 - `edit-compose-contract.md` -> `V-EDIT-*`
 - `routing-contract.md` -> `V-ROUTE-*`
 - `quality-gate-contract.md` -> `V-QC-*`
+- `creator-workflow-contract.md` -> `V-OPS-*`
+- `version-lineage-contract.md` -> `V-LINEAGE-*`
+- `prompt-governance-contract.md` -> `V-PROMPT-*`
 - `error-model.md` -> `V-ERR-*`
 - `acceptance-contract.md` -> `V-ACC-*`
 
@@ -32,6 +35,12 @@ Domain docs must reference kernel rule IDs and must not duplicate kernel prose.
 - `edit-compose-policy.yaml`
 - `routing-stages.yaml`
 - `quality-gates.yaml`
+- `creator-operations.yaml`
+- `rebuild-impact-matrix.yaml`
+- `continuity-constraints.yaml`
+- `version-lineage-policy.yaml`
+- `forbidden-patterns.yaml`
+- `prompt-canary-cases.yaml`
 - `reason-codes.yaml`
 - `acceptance-cases.yaml`
 

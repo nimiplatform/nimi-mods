@@ -21,3 +21,11 @@ Fallback events must emit auditable trace fields.
 ## V-ROUTE-005 Vendor Access Ban
 
 Mod direct vendor API calls are forbidden.
+
+## V-ROUTE-006 Capability Inference Ban
+
+Inferring runtime capability from model naming convention is forbidden.
+
+## V-ROUTE-007 Capability Hardcoding Ban
+
+Business logic must not hardcode capability-to-stage branches outside runtime route contracts.

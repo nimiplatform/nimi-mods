@@ -1,0 +1,64 @@
+version: 1
+minimum_closed_loop_operations:
+  - operation: insert-shot
+    required: true
+    source_rule: V-OPS-002
+  - operation: update-shot
+    required: true
+    source_rule: V-OPS-002
+  - operation: delete-shot
+    required: true
+    source_rule: V-OPS-002
+  - operation: regenerate-shot
+    required: true
+    source_rule: V-OPS-002
+  - operation: create-shot-variant
+    required: true
+    source_rule: V-OPS-002
+  - operation: undo-last-regeneration
+    required: true
+    source_rule: V-OPS-002
+  - operation: link-shot-transition
+    required: true
+    source_rule: V-OPS-002
+  - operation: generate-first-last-frame
+    required: true
+    source_rule: V-OPS-002
+  - operation: generate-voice-line
+    required: true
+    source_rule: V-OPS-002
+  - operation: apply-lip-sync
+    required: true
+    source_rule: V-OPS-002
+  - operation: create-branch
+    required: true
+    source_rule: V-OPS-002
+  - operation: switch-branch
+    required: true
+    source_rule: V-OPS-002
+extended_operations:
+  - operation: split-shot
+    required: false
+    source_rule: V-OPS-001
+  - operation: merge-shots
+    required: false
+    source_rule: V-OPS-001
+  - operation: reorder-shot
+    required: false
+    source_rule: V-OPS-001
+  - operation: redo
+    required: false
+    source_rule: V-OPS-001
+  - operation: merge-branch
+    required: false
+    source_rule: V-OPS-001
+operation_audit_required_fields:
+  fields:
+    - versionId
+    - parentVersionId
+    - branchId
+    - operationType
+    - deltaSummary
+    - operator
+    - timestamp
+  source_rule: V-OPS-005

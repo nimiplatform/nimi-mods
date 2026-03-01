@@ -230,6 +230,49 @@ function checkVideoplay(tables, reasonCodeSet, config) {
   }
 }
 
+function checkWorldStudio(tables, reasonCodeSet, config) {
+  const chain = tables['pipeline-states.yaml']?.distill_stage_chain || [];
+  const chainSteps = chain.map((row) => String(row?.stage || '').trim());
+  if (JSON.stringify(chainSteps) !== JSON.stringify(config.requiredPipelineChain)) {
+    fail('[world-studio] distill_stage_chain mismatch');
+  }
+
+  const singleFlight = Number(tables['task-states.yaml']?.single_flight?.max_active_task_count || 0);
+  if (singleFlight !== 1) {
+    fail(`[world-studio] single-flight max_active_task_count must be 1, got ${singleFlight}`);
+  }
+
+  const taskLifecycleRows = tables['task-states.yaml']?.lifecycle_states || [];
+  const lifecycleStates = taskLifecycleRows.map((row) => String(row?.state || '').trim());
+  const requiredStates = ['RUNNING', 'PAUSE_REQUESTED', 'PAUSED', 'CANCEL_REQUESTED', 'CANCELED', 'FAILED', 'COMPLETED'];
+  for (const state of requiredStates) {
+    if (!lifecycleStates.includes(state)) {
+      fail(`[world-studio] missing task lifecycle state: ${state}`);
+    }
+  }
+
+  const routeRows = tables['route-readiness-codes.yaml']?.route_readiness || [];
+  for (const row of routeRows) {
+    const code = String(row?.reason_code || '').trim();
+    if (!reasonCodeSet.has(code)) {
+      fail(`[world-studio] route readiness reason code missing from reason-codes table: ${code}`);
+    }
+  }
+
+  const embeddingRows = tables['route-readiness-codes.yaml']?.embedding_readiness || [];
+  for (const row of embeddingRows) {
+    const code = String(row?.reason_code || '').trim();
+    if (!reasonCodeSet.has(code)) {
+      fail(`[world-studio] embedding readiness reason code missing from reason-codes table: ${code}`);
+    }
+  }
+
+  const primaryEvidenceThreshold = Number(tables['quality-gate-policies.yaml']?.thresholds?.primary_evidence_coverage_block_lt);
+  if (Math.abs(primaryEvidenceThreshold - 0.9) > 1e-6) {
+    fail(`[world-studio] primary_evidence_coverage_block_lt must be 0.9, got ${primaryEvidenceThreshold}`);
+  }
+}
+
 function main() {
   const { mod } = parseArgs(process.argv.slice(2));
   const config = getConfig(mod);
@@ -306,6 +349,8 @@ function main() {
     checkTextplay(tables, config);
   } else if (mod === 'videoplay') {
     checkVideoplay(tables, reasonCodeSet, config);
+  } else if (mod === 'world-studio') {
+    checkWorldStudio(tables, reasonCodeSet, config);
   }
 
   process.stdout.write(`[${mod}] kernel consistency checks passed\n`);

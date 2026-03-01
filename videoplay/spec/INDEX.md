@@ -42,6 +42,27 @@
 2. `spec/kernel/tables/quality-gates.yaml`
 3. `spec/videoplay.md`
 
+### Change creator workflow operations
+
+1. `spec/kernel/creator-workflow-contract.md`
+2. `spec/kernel/tables/creator-operations.yaml`
+3. `spec/kernel/tables/rebuild-impact-matrix.yaml`
+4. `spec/kernel/tables/continuity-constraints.yaml`
+5. `spec/videoplay.md`
+
+### Change version branch and lineage
+
+1. `spec/kernel/version-lineage-contract.md`
+2. `spec/kernel/tables/version-lineage-policy.yaml`
+3. `spec/videoplay.md`
+
+### Change guardrails and prompt governance
+
+1. `spec/kernel/prompt-governance-contract.md`
+2. `spec/kernel/tables/forbidden-patterns.yaml`
+3. `spec/kernel/tables/prompt-canary-cases.yaml`
+4. `spec/videoplay.md`
+
 ### Change reason codes / acceptance
 
 1. `spec/kernel/error-model.md`

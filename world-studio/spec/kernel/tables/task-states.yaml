@@ -1,0 +1,131 @@
+version: 1
+single_flight:
+  max_active_task_count: 1
+  reject_reason_code_when_conflict: WORLD_STUDIO_TASK_CONFLICT
+  source_rule: WS-TASK-001
+lifecycle_states:
+  - state: RUNNING
+    allowed_next:
+      - PAUSE_REQUESTED
+      - CANCEL_REQUESTED
+      - FAILED
+      - COMPLETED
+    source_rule: WS-TASK-002
+  - state: PAUSE_REQUESTED
+    allowed_next:
+      - PAUSED
+      - CANCEL_REQUESTED
+      - FAILED
+      - COMPLETED
+    source_rule: WS-TASK-002
+  - state: PAUSED
+    allowed_next:
+      - RUNNING
+      - CANCEL_REQUESTED
+      - FAILED
+    source_rule: WS-TASK-002
+  - state: CANCEL_REQUESTED
+    allowed_next:
+      - CANCELED
+      - FAILED
+    source_rule: WS-TASK-002
+  - state: CANCELED
+    terminal: true
+    source_rule: WS-TASK-002
+  - state: FAILED
+    terminal: true
+    source_rule: WS-TASK-002
+  - state: COMPLETED
+    terminal: true
+    source_rule: WS-TASK-002
+task_kinds:
+  - kind: CREATE_PHASE1
+    atomic: false
+    resumable: true
+    can_pause: true
+    can_cancel: true
+    default_step: INGEST
+    source_rule: WS-TASK-003
+  - kind: CREATE_PHASE2
+    atomic: false
+    resumable: false
+    can_pause: false
+    can_cancel: true
+    default_step: SYNTHESIZE
+    source_rule: WS-TASK-003
+  - kind: CREATE_WORLD_COVER
+    atomic: false
+    resumable: false
+    can_pause: false
+    can_cancel: true
+    default_step: DRAFT
+    source_rule: WS-TASK-003
+  - kind: CREATE_CHARACTER_PORTRAIT
+    atomic: false
+    resumable: false
+    can_pause: false
+    can_cancel: true
+    default_step: DRAFT
+    source_rule: WS-TASK-003
+  - kind: CREATE_SAVE_DRAFT
+    atomic: true
+    resumable: false
+    can_pause: false
+    can_cancel: false
+    default_step: DRAFT
+    source_rule: WS-TASK-003
+  - kind: CREATE_PUBLISH_DRAFT
+    atomic: true
+    resumable: false
+    can_pause: false
+    can_cancel: false
+    default_step: PUBLISH
+    source_rule: WS-TASK-003
+  - kind: MAINTAIN_SAVE
+    atomic: true
+    resumable: false
+    can_pause: false
+    can_cancel: false
+    default_step: MAINTAIN
+    source_rule: WS-TASK-003
+  - kind: MAINTAIN_SYNC_EVENTS
+    atomic: false
+    resumable: false
+    can_pause: false
+    can_cancel: true
+    default_step: MAINTAIN
+    source_rule: WS-TASK-003
+  - kind: MAINTAIN_SYNC_LOREBOOKS
+    atomic: false
+    resumable: false
+    can_pause: false
+    can_cancel: true
+    default_step: MAINTAIN
+    source_rule: WS-TASK-003
+checkpoint_policy:
+  checkpoint_fields:
+    - checkpointVersion
+    - step
+    - chunkTotal
+    - chunkCompleted
+    - chunkFailed
+    - payload
+  require_for_non_atomic_tasks: true
+  require_monotonic_checkpoint_version: true
+  source_rule: WS-TASK-004
+interrupt_bridge:
+  pause_request_sets_status: PAUSE_REQUESTED
+  cancel_request_sets_status: CANCEL_REQUESTED
+  cancel_request_aborts_signal: true
+  wait_while_paused_requires_resume_or_cancel_signal: true
+  source_rule: WS-TASK-005
+reload_recovery:
+  live_statuses_before_reload:
+    - RUNNING
+    - PAUSE_REQUESTED
+    - PAUSED
+    - CANCEL_REQUESTED
+  resumable_task_target_status: PAUSED
+  non_resumable_task_target_status: FAILED
+  non_resumable_error_code: WORLD_STUDIO_TASK_RECOVERY_INTERRUPTED
+  source_rule: WS-TASK-006

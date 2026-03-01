@@ -11,12 +11,13 @@ Domain docs reference kernel rule IDs and cannot duplicate kernel prose.
 ## 2. Rule ID Format
 
 - Format: `T-<DOMAIN>-NNN`
-- Domain enum: `FACT`, `PIPE`, `VIS`, `PRES`, `ERR`, `ACC`
+- Domain enum: `FACT`, `PIPE`, `RUN`, `VIS`, `PRES`, `ERR`, `ACC`
 
 ## 3. Ownership
 
 - `fact-projection-contract.md` -> `T-FACT-*`
 - `pipeline-contract.md` -> `T-PIPE-*`
+- `run-orchestration-contract.md` -> `T-RUN-*`
 - `visibility-pov-contract.md` -> `T-VIS-*`
 - `presence-contract.md` -> `T-PRES-*`
 - `error-model.md` -> `T-ERR-*`
@@ -26,6 +27,7 @@ Domain docs reference kernel rule IDs and cannot duplicate kernel prose.
 
 - `projection-mapping.yaml`
 - `pipeline-states.yaml`
+- `run-states.yaml`
 - `visibility-policies.yaml`
 - `presence-transitions.yaml`
 - `reason-codes.yaml`

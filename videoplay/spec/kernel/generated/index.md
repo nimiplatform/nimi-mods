@@ -10,5 +10,11 @@
 | `edit-compose-policy.md` | `tables/edit-compose-policy.yaml` |
 | `routing-stages.md` | `tables/routing-stages.yaml` |
 | `quality-gates.md` | `tables/quality-gates.yaml` |
+| `creator-operations.md` | `tables/creator-operations.yaml` |
+| `rebuild-impact-matrix.md` | `tables/rebuild-impact-matrix.yaml` |
+| `continuity-constraints.md` | `tables/continuity-constraints.yaml` |
+| `version-lineage-policy.md` | `tables/version-lineage-policy.yaml` |
+| `forbidden-patterns.md` | `tables/forbidden-patterns.yaml` |
+| `prompt-canary-cases.md` | `tables/prompt-canary-cases.yaml` |
 | `reason-codes.md` | `tables/reason-codes.yaml` |
 | `acceptance-cases.md` | `tables/acceptance-cases.yaml` |

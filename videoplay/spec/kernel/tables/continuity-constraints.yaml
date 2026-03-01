@@ -1,0 +1,25 @@
+version: 1
+topology_constraints:
+  shot_graph_must_be_acyclic: true
+  shot_graph_must_be_ordered: true
+  source_rule: V-OPS-003
+visual_constraints:
+  enforce_first_last_frame_continuity: true
+  enforce_character_orientation_consistency: true
+  enforce_character_position_continuity: true
+  enforce_composition_anchor_continuity: true
+  source_rule: V-OPS-003
+audio_visual_constraints:
+  enforce_dialogue_action_anchor_alignment: true
+  max_av_drift_ms: 80
+  source_rule: V-OPS-003
+compose_constraints:
+  transition_must_be_legal: true
+  max_black_gap_ms: 250
+  dependency_invalidation_must_be_traceable: true
+  source_rule: V-OPS-003
+ui_binding_policy:
+  timeline_editor_is_optional_carrier: true
+  panel_linking_is_valid_carrier: true
+  first_last_frame_flow_is_valid_carrier: true
+  source_rule: V-OPS-003

@@ -1,0 +1,65 @@
+version: 1
+manifest_identity:
+  mod_id: world.nimi.world-studio
+  tab_id: mod:world-studio
+  entry: ./dist/mods/world-studio/index.js
+  version: 1.0.0
+  kind: capability-mod
+  nav_slot: ui-extension.app.sidebar.mods
+  route_slot: ui-extension.app.content.routes
+  source_rule: WS-CAP-001
+ai_profile:
+  consume:
+    - chat
+    - image
+  required_dependencies:
+    - dependency_id: world-studio/chat-qwen2.5-7b
+      kind: model
+      capability: chat
+      model_id: qwen2.5-7b-instruct
+      engine: openai-compatible
+  optional_dependencies:
+    - dependency_id: world-studio/image-token-node
+      kind: node
+      capability: image
+      node_id: image.generate.token-api
+  preferred_binding:
+    chat: world-studio/chat-qwen2.5-7b
+  source_rule: WS-CAP-003
+capabilities:
+  llm:
+    - llm.text.generate
+    - llm.text.stream
+    - llm.image.generate
+  data_query:
+    - data.query.data-api.world.access.me
+    - data.query.data-api.world.landing.resolve
+    - data.query.data-api.world.draft.create
+    - data.query.data-api.world.draft.get
+    - data.query.data-api.world.draft.update
+    - data.query.data-api.world.draft.publish
+    - data.query.data-api.world.maintenance.get
+    - data.query.data-api.world.maintenance.update
+    - data.query.data-api.world.events.list
+    - data.query.data-api.world.events.batch-upsert
+    - data.query.data-api.world.events.delete
+    - data.query.data-api.world.lorebooks.list
+    - data.query.data-api.world.lorebooks.batch-upsert
+    - data.query.data-api.world.lorebooks.delete
+    - data.query.data-api.world.drafts.list
+    - data.query.data-api.world.worlds.mine
+    - data.query.data-api.world.mutations.list
+    - data.query.data-api.creator.agents.list
+    - data.query.data-api.creator.agents.create
+    - data.query.data-api.creator.agents.batch-create
+    - data.query.data-api.runtime.route.options
+  ui_register:
+    - ui.register.ui-extension.app.sidebar.mods
+    - ui.register.ui-extension.app.content.routes
+  source_rule: WS-CAP-002
+manifest_validation:
+  required_fields:
+    - id
+    - entry
+    - capabilities
+  source_rule: WS-CAP-005

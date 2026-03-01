@@ -6,6 +6,7 @@
 |---|---|
 | `projection-mapping.md` | `tables/projection-mapping.yaml` |
 | `pipeline-states.md` | `tables/pipeline-states.yaml` |
+| `run-states.md` | `tables/run-states.yaml` |
 | `visibility-policies.md` | `tables/visibility-policies.yaml` |
 | `presence-transitions.md` | `tables/presence-transitions.yaml` |
 | `reason-codes.md` | `tables/reason-codes.yaml` |

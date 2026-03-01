@@ -1,0 +1,46 @@
+version: 1
+cases:
+  - id: VPROMPT-001-STORYBOARD-PLAN-SHAPE
+    description: Storyboard planning prompt returns required structured fields.
+    prompt_scope: storyboard-plan
+    required_output_fields:
+      - episodeId
+      - clipPlans
+      - shotPlans
+      - sourceEventIds
+    source_rule: V-PROMPT-003
+  - id: VPROMPT-002-SHOT-REWRITE-SHAPE
+    description: Shot rewrite prompt keeps schema and required continuity anchors.
+    prompt_scope: shot-rewrite
+    required_output_fields:
+      - shotId
+      - visualPrompt
+      - motionCue
+      - continuityAnchors
+    source_rule: V-PROMPT-003
+  - id: VPROMPT-003-VARIANT-GENERATE-SHAPE
+    description: Variant generation returns branch-safe shot variant payload.
+    prompt_scope: shot-variant
+    required_output_fields:
+      - baseShotId
+      - variantShotId
+      - variantDelta
+      - sourceEventIds
+    source_rule: V-PROMPT-003
+  - id: VPROMPT-004-PLACEHOLDER-PARITY-ZH-EN
+    description: zh/en templates keep placeholder parity.
+    prompt_scope: locale-parity
+    required_placeholder_parity: true
+    source_rule: V-PROMPT-004
+  - id: VPROMPT-005-VARIABLE-SCHEMA-VALIDATION
+    description: Prompt variables pass declared schema before rendering.
+    prompt_scope: variable-schema
+    schema_validation_required: true
+    source_rule: V-PROMPT-002
+verification_commands:
+  - command: pnpm -C nimi-mods run generate:spec:videoplay-kernel-docs
+    source_rule: V-PROMPT-005
+  - command: pnpm -C nimi-mods run check:spec:videoplay-kernel-docs-drift
+    source_rule: V-PROMPT-005
+  - command: pnpm -C nimi-mods run check:spec:videoplay-kernel-consistency
+    source_rule: V-PROMPT-005

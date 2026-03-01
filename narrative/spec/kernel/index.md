@@ -11,13 +11,14 @@ Domain docs must reference kernel rule IDs and must not duplicate kernel prose.
 ## 2. Rule ID Format
 
 - Format: `N-<DOMAIN>-NNN`
-- Domain enum: `FACT`, `PIPE`, `CTX`, `GUARD`, `INIT`, `ERR`, `ACC`
+- Domain enum: `FACT`, `PIPE`, `RUN`, `CTX`, `GUARD`, `INIT`, `ERR`, `ACC`
 - Example: `N-PIPE-001`
 
 ## 3. Ownership
 
 - `fact-layer-contract.md` -> `N-FACT-*`
 - `pipeline-contract.md` -> `N-PIPE-*`
+- `run-orchestration-contract.md` -> `N-RUN-*`
 - `context-assembly-contract.md` -> `N-CTX-*`
 - `guard-contract.md` -> `N-GUARD-*`
 - `initiative-contract.md` -> `N-INIT-*`
@@ -30,6 +31,7 @@ Authoritative tables live in `tables/` and must be the first edit point:
 
 - `fact-layers.yaml`
 - `pipeline-states.yaml`
+- `run-states.yaml`
 - `context-snapshot-fields.yaml`
 - `guard-policies.yaml`
 - `initiative-policies.yaml`

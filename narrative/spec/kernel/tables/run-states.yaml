@@ -1,0 +1,83 @@
+version: 1
+lifecycle_states:
+  - state: RUNNING
+    allowed_next:
+      - PAUSE_REQUESTED
+      - CANCEL_REQUESTED
+      - FAILED
+      - COMPLETED
+    source_rule: N-RUN-001
+  - state: PAUSE_REQUESTED
+    allowed_next:
+      - PAUSED
+      - RUNNING
+      - FAILED
+    source_rule: N-RUN-001
+  - state: PAUSED
+    allowed_next:
+      - RUNNING
+      - CANCEL_REQUESTED
+      - FAILED
+    source_rule: N-RUN-001
+  - state: CANCEL_REQUESTED
+    allowed_next:
+      - CANCELED
+      - FAILED
+    source_rule: N-RUN-001
+  - state: CANCELED
+    terminal: true
+    source_rule: N-RUN-001
+  - state: FAILED
+    terminal: true
+    source_rule: N-RUN-001
+  - state: COMPLETED
+    terminal: true
+    source_rule: N-RUN-001
+event_envelope:
+  required_fields:
+    - runId
+    - stage
+    - step
+    - seq
+    - attempt
+    - eventType
+    - timestamp
+  source_rule: N-RUN-002
+recoverable_steps:
+  - step: step1-assembly
+    checkpoint_required: true
+    resume_required_fields:
+      - checkpointToken
+      - stepInputHash
+      - lastCompletedUnit
+    source_rule: N-RUN-003
+  - step: step2-generate
+    checkpoint_required: true
+    resume_required_fields:
+      - checkpointToken
+      - stepInputHash
+      - lastCompletedUnit
+    source_rule: N-RUN-003
+  - step: step3-guard
+    checkpoint_required: false
+    source_rule: N-RUN-003
+resume_validation:
+  step_input_hash_must_match: true
+  replay_side_effects_must_be_idempotent: true
+  source_rule: N-RUN-004
+retry_classes:
+  - class: retryable
+    examples:
+      - route_unavailable
+      - provider_timeout
+      - transient_parse_error
+    source_rule: N-RUN-005
+  - class: non-retryable
+    examples:
+      - contract_violation
+      - canonical_fact_mismatch
+    source_rule: N-RUN-005
+cancel_bridge:
+  ui_cancel_request_must_emit_cancel_requested: true
+  task_execution_must_emit_canceled_or_failed: true
+  source_rule: N-RUN-006

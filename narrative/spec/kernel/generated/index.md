@@ -6,6 +6,7 @@
 |---|---|
 | `fact-layers.md` | `tables/fact-layers.yaml` |
 | `pipeline-states.md` | `tables/pipeline-states.yaml` |
+| `run-states.md` | `tables/run-states.yaml` |
 | `context-snapshot-fields.md` | `tables/context-snapshot-fields.yaml` |
 | `guard-policies.md` | `tables/guard-policies.yaml` |
 | `initiative-policies.md` | `tables/initiative-policies.yaml` |

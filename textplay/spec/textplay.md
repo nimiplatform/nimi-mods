@@ -8,6 +8,7 @@
 
 - Fact projection: `kernel/fact-projection-contract.md` (`T-FACT-*`)
 - Render pipeline: `kernel/pipeline-contract.md` (`T-PIPE-*`)
+- Run orchestration and recovery: `kernel/run-orchestration-contract.md` (`T-RUN-*`)
 - Visibility and POV: `kernel/visibility-pov-contract.md` (`T-VIS-*`)
 - Presence state machine: `kernel/presence-contract.md` (`T-PRES-*`)
 - Error semantics: `kernel/error-model.md` (`T-ERR-*`)
@@ -20,6 +21,7 @@
 - `TXT-003`: Visibility and POV constraints are both mandatory.
 - `TXT-004`: Persistence failure is non-blocking for returned render output.
 - `TXT-005`: Presence transitions must emit auditable report events.
+- `TXT-006`: Run recovery must preserve idempotent side effects and terminal-state monotonicity.
 
 ## 2. Domain Increments
 
@@ -28,6 +30,7 @@
 - `TXT-012`: Route-unavailable is fail-close and returns blocking reason code.
 - `TXT-013`: Render output must always include `text` and `meta`.
 - `TXT-014`: Initiative events reset idle/away timers in presence state machine.
+- `TXT-015`: Resume with checkpoint hash mismatch is fail-close.
 
 ## 3. No Over-Design Guard
 
