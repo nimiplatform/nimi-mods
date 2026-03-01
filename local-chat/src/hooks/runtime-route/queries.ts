@@ -1,8 +1,75 @@
 import { asRecord } from '@nimiplatform/sdk/mod/utils';
-import { parseRuntimeRouteOptions, type RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
+import { parseRuntimeRouteOptions, type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
 import { createRendererFlowId, logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import { LOCAL_CHAT_DATA_API_RUNTIME_ROUTE_OPTIONS, LOCAL_CHAT_MOD_ID } from '../../contracts.js';
+import { emitLocalChatLog } from '../../logging.js';
 import type { ChatRouteSnapshot, UseLocalChatRuntimeRouteInput } from './types.js';
+
+const ROUTE_OPTIONS_QUERY_TIMEOUT_MS = 6000;
+
+function safeLogRendererEvent(payload: Parameters<typeof logRendererEvent>[0]): void {
+  emitLocalChatLog({
+    level: payload.level,
+    message: payload.message,
+    flowId: payload.flowId,
+    source: 'runtime-route.queries',
+    costMs: payload.costMs,
+    details: payload.details as Record<string, unknown> | undefined,
+  });
+  try {
+    logRendererEvent(payload);
+  } catch {
+    // Logging must never break runtime-route option loading.
+  }
+}
+
+function normalizeTokenApiBinding(
+  binding: RuntimeRouteBinding,
+  connectors: RuntimeRouteOptionsSnapshot['connectors'],
+): RuntimeRouteBinding {
+  if (binding.source !== 'token-api' || connectors.length === 0) {
+    return binding;
+  }
+  const matched = connectors.find((item) => item.id === binding.connectorId) || connectors[0];
+  if (!matched) {
+    return binding;
+  }
+  const connectorId = matched.id;
+  const model = matched.models.includes(binding.model)
+    ? binding.model
+    : (matched.models[0] || binding.model || '');
+  if (connectorId === binding.connectorId && model === binding.model) {
+    return binding;
+  }
+  return {
+    ...binding,
+    connectorId,
+    model,
+  };
+}
+
+function normalizeRouteOptionsSnapshot(
+  snapshot: RuntimeRouteOptionsSnapshot | null,
+): RuntimeRouteOptionsSnapshot | null {
+  if (!snapshot || snapshot.connectors.length === 0) {
+    return snapshot;
+  }
+  const selected = normalizeTokenApiBinding(snapshot.selected, snapshot.connectors);
+  const resolvedDefault = snapshot.resolvedDefault
+    ? normalizeTokenApiBinding(snapshot.resolvedDefault, snapshot.connectors)
+    : undefined;
+  if (
+    selected === snapshot.selected
+    && resolvedDefault === snapshot.resolvedDefault
+  ) {
+    return snapshot;
+  }
+  return {
+    ...snapshot,
+    selected,
+    ...(resolvedDefault ? { resolvedDefault } : {}),
+  };
+}
 
 export async function resolveRouteSnapshot(input: {
   aiClient: UseLocalChatRuntimeRouteInput['aiClient'];
@@ -36,19 +103,70 @@ export async function resolveRouteSnapshot(input: {
 export async function loadRouteOptions(input: {
   hookClient: UseLocalChatRuntimeRouteInput['hookClient'];
   setChatRouteOptions: (value: ReturnType<typeof parseRuntimeRouteOptions>) => void;
-}) {
+}): Promise<ReturnType<typeof parseRuntimeRouteOptions>> {
   try {
-    const payload = await input.hookClient.data.query({
-      capability: LOCAL_CHAT_DATA_API_RUNTIME_ROUTE_OPTIONS,
-      query: {
-        capability: 'chat',
-        modId: LOCAL_CHAT_MOD_ID,
+    safeLogRendererEvent({
+      level: 'debug',
+      area: 'local-chat',
+      message: 'local-chat:chat-route-options:query:start',
+      details: {
+        timeoutMs: ROUTE_OPTIONS_QUERY_TIMEOUT_MS,
       },
     });
-    input.setChatRouteOptions(parseRuntimeRouteOptions(payload, { includeResolvedDefault: true }));
+    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+    const payload = await Promise.race<unknown>([
+      input.hookClient.data.query({
+        capability: LOCAL_CHAT_DATA_API_RUNTIME_ROUTE_OPTIONS,
+        query: {
+          capability: 'chat',
+          modId: LOCAL_CHAT_MOD_ID,
+        },
+      }),
+      new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(() => {
+          reject(new Error(`local-chat route options query timeout (${ROUTE_OPTIONS_QUERY_TIMEOUT_MS}ms)`));
+        }, ROUTE_OPTIONS_QUERY_TIMEOUT_MS);
+      }),
+    ]).finally(() => {
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
+    });
+    const parsed = parseRuntimeRouteOptions(payload, { includeResolvedDefault: true });
+    if (!parsed) {
+      const record = asRecord(payload);
+      safeLogRendererEvent({
+        level: 'warn',
+        area: 'local-chat',
+        message: 'local-chat:chat-route-options:parsed-null',
+        details: {
+          payloadKeys: Object.keys(record),
+          hasSelected: typeof record.selected === 'object' && record.selected !== null,
+          hasConnectors: Array.isArray(record.connectors),
+          connectorsCount: Array.isArray(record.connectors) ? record.connectors.length : -1,
+        },
+      });
+      input.setChatRouteOptions(null);
+      return null;
+    }
+    const resolved = normalizeRouteOptionsSnapshot(parsed);
+    safeLogRendererEvent({
+      level: 'debug',
+      area: 'local-chat',
+      message: 'local-chat:chat-route-options:loaded',
+      details: {
+        selectedSource: resolved?.selected.source || null,
+        selectedConnectorId: resolved?.selected.connectorId || null,
+        selectedModel: resolved?.selected.model || null,
+        connectorsCount: resolved?.connectors.length ?? 0,
+        connectorIds: resolved?.connectors.map((item) => item.id) || [],
+      },
+    });
+    input.setChatRouteOptions(resolved);
+    return resolved;
   } catch (error) {
     input.setChatRouteOptions(null);
-    logRendererEvent({
+    safeLogRendererEvent({
       level: 'warn',
       area: 'local-chat',
       message: 'local-chat:chat-route-options:failed',
@@ -56,6 +174,7 @@ export async function loadRouteOptions(input: {
         error: error instanceof Error ? error.message : String(error || ''),
       },
     });
+    return null;
   }
 }
 

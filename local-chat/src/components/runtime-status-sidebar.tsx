@@ -64,9 +64,26 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     onDefaultVoiceNameChange,
   } = props;
 
-  const effectiveChatBinding: RuntimeRouteBinding | null = routeOverride || chatRouteOptions?.selected || null;
+  const hasValidTokenApiOverride = (
+    routeOverride?.source === 'token-api'
+      ? (
+        (chatRouteOptions?.connectors.length || 0) === 0
+          || chatRouteOptions?.connectors.some((connector) => connector.id === routeOverride.connectorId)
+      )
+      : true
+  );
+  const effectiveChatBinding: RuntimeRouteBinding | null = (
+    routeOverride && hasValidTokenApiOverride
+      ? routeOverride
+      : chatRouteOptions?.selected || routeOverride || null
+  );
   const activeChatSource = effectiveChatBinding?.source || 'local-runtime';
-  const activeChatConnectorId = effectiveChatBinding?.connectorId || '';
+  const fallbackConnectorId = chatRouteOptions?.connectors[0]?.id || '';
+  const activeChatConnectorId = (
+    activeChatSource === 'token-api'
+      ? (effectiveChatBinding?.connectorId || fallbackConnectorId || '')
+      : ''
+  );
   const activeChatConnector = chatRouteOptions?.connectors.find((connector) => connector.id === activeChatConnectorId)
     || chatRouteOptions?.connectors[0]
     || null;
