@@ -2,4 +2,5 @@ packages:
   - 'kismet'
   - 'local-chat'
   - 're-life'
+  - 'test-chat-tts'
   - 'world-studio'
