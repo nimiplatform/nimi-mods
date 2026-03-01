@@ -333,11 +333,13 @@ Embedding readiness reasonCode（最小集）：
 
 1. World 治理与控制面：`@nimiplatform/nimi/ssot/boundaries/world.md`
 2. Mod 通用治理与能力边界：`@nimiplatform/nimi/ssot/mod/governance.md`
-3. Local Runtime 路由与依赖编排：`@nimiplatform/nimi/ssot/runtime/local-runtime.md`
-4. AI 最后一公里跨域语义：`@nimiplatform/nimi/ssot/platform/ai-last-mile.md`
+3. World Studio -> Narrative -> Rendering 跨 mod 编排：`@nimiplatform/nimi/ssot/mod/worldstudio-narrative-rendering.md`
+4. Local Runtime 路由与依赖编排：`@nimiplatform/nimi/ssot/runtime/local-runtime.md`
+5. AI 最后一公里跨域语义：`@nimiplatform/nimi/ssot/platform/ai-last-mile.md`
 
 冲突裁决：
 
 1. world 控制面语义冲突 -> 以 `boundaries/world.md` 为准。
 2. mod 治理语义冲突 -> 以 `ssot/mod/governance.md` 为准。
-3. world-studio 业务执行细节冲突 -> 以本文件为准。
+3. world-studio / narrative / renderer 跨链路语义冲突 -> 以 `ssot/mod/worldstudio-narrative-rendering.md` 为准。
+4. world-studio 业务执行细节冲突 -> 以本文件为准。

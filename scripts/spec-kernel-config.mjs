@@ -1,0 +1,131 @@
+export const MOD_SPEC_CONFIG = {
+  narrative: {
+    modId: 'world.nimi.narrative',
+    specRoot: 'narrative/spec',
+    domainDoc: 'narrative.md',
+    rulePrefix: 'N',
+    requiredKernelDocs: [
+      'index.md',
+      'fact-layer-contract.md',
+      'pipeline-contract.md',
+      'context-assembly-contract.md',
+      'guard-contract.md',
+      'initiative-contract.md',
+      'error-model.md',
+      'acceptance-contract.md',
+    ],
+    tableSpecs: [
+      { input: 'fact-layers.yaml', output: 'fact-layers.md', title: 'Generated Fact Layers' },
+      { input: 'pipeline-states.yaml', output: 'pipeline-states.md', title: 'Generated Pipeline States' },
+      { input: 'context-snapshot-fields.yaml', output: 'context-snapshot-fields.md', title: 'Generated Context Snapshot Fields' },
+      { input: 'guard-policies.yaml', output: 'guard-policies.md', title: 'Generated Guard Policies' },
+      { input: 'initiative-policies.yaml', output: 'initiative-policies.md', title: 'Generated Initiative Policies' },
+      { input: 'reason-codes.yaml', output: 'reason-codes.md', title: 'Generated Reason Codes' },
+      { input: 'acceptance-cases.yaml', output: 'acceptance-cases.md', title: 'Generated Acceptance Cases' },
+    ],
+    requiredPipelineChain: ['step0-intent', 'step1-assembly', 'step2-generate', 'step3-guard', 'write-spine'],
+    requiredAcceptanceCaseIds: [
+      'NAR-001-USERTURN-APPROVED',
+      'NAR-002-OVERFLOW-ADJUSTED',
+      'NAR-003-INVALID-VISIBILITY-REJECTED',
+      'NAR-004-CONTEXT-MISSING-REJECTED',
+      'NAR-005-INITIATIVE-COOLDOWN-NOOP',
+    ],
+    requiredVerificationCommands: [
+      'pnpm -C nimi-mods run generate:spec:narrative-kernel-docs',
+      'pnpm -C nimi-mods run check:spec:narrative-kernel-docs-drift',
+      'pnpm -C nimi-mods run check:spec:narrative-kernel-consistency',
+    ],
+  },
+  textplay: {
+    modId: 'world.nimi.textplay',
+    specRoot: 'textplay/spec',
+    domainDoc: 'textplay.md',
+    rulePrefix: 'T',
+    requiredKernelDocs: [
+      'index.md',
+      'fact-projection-contract.md',
+      'pipeline-contract.md',
+      'visibility-pov-contract.md',
+      'presence-contract.md',
+      'error-model.md',
+      'acceptance-contract.md',
+    ],
+    tableSpecs: [
+      { input: 'projection-mapping.yaml', output: 'projection-mapping.md', title: 'Generated Projection Mapping' },
+      { input: 'pipeline-states.yaml', output: 'pipeline-states.md', title: 'Generated Pipeline States' },
+      { input: 'visibility-policies.yaml', output: 'visibility-policies.md', title: 'Generated Visibility Policies' },
+      { input: 'presence-transitions.yaml', output: 'presence-transitions.md', title: 'Generated Presence Transitions' },
+      { input: 'reason-codes.yaml', output: 'reason-codes.md', title: 'Generated Reason Codes' },
+      { input: 'acceptance-cases.yaml', output: 'acceptance-cases.md', title: 'Generated Acceptance Cases' },
+    ],
+    requiredPipelineChain: ['received', 'normalize', 'filter-visibility', 'build-prompt', 'generate', 'wrap-output', 'persist-best-effort'],
+    requiredAcceptanceCaseIds: [
+      'TXT-001-USERTURN-RENDER',
+      'TXT-002-INTERNAL-FILTER-NPC',
+      'TXT-003-INTERNAL-KEEP-PLAYER',
+      'TXT-004-PERSISTENCE-WARN-NONBLOCKING',
+      'TXT-005-PRESENCE-IDLE-AWAY',
+    ],
+    requiredVerificationCommands: [
+      'pnpm -C nimi-mods run generate:spec:textplay-kernel-docs',
+      'pnpm -C nimi-mods run check:spec:textplay-kernel-docs-drift',
+      'pnpm -C nimi-mods run check:spec:textplay-kernel-consistency',
+    ],
+  },
+  videoplay: {
+    modId: 'world.nimi.videoplay',
+    specRoot: 'videoplay/spec',
+    domainDoc: 'videoplay.md',
+    rulePrefix: 'V',
+    requiredKernelDocs: [
+      'index.md',
+      'fact-projection-contract.md',
+      'pipeline-contract.md',
+      'segmentation-contract.md',
+      'edit-compose-contract.md',
+      'routing-contract.md',
+      'quality-gate-contract.md',
+      'error-model.md',
+      'acceptance-contract.md',
+    ],
+    tableSpecs: [
+      { input: 'fact-traceability.yaml', output: 'fact-traceability.md', title: 'Generated Fact Traceability' },
+      { input: 'pipeline-states.yaml', output: 'pipeline-states.md', title: 'Generated Pipeline States' },
+      { input: 'segmentation-policy.yaml', output: 'segmentation-policy.md', title: 'Generated Segmentation Policy' },
+      { input: 'edit-compose-policy.yaml', output: 'edit-compose-policy.md', title: 'Generated Edit Compose Policy' },
+      { input: 'routing-stages.yaml', output: 'routing-stages.md', title: 'Generated Routing Stages' },
+      { input: 'quality-gates.yaml', output: 'quality-gates.md', title: 'Generated Quality Gates' },
+      { input: 'reason-codes.yaml', output: 'reason-codes.md', title: 'Generated Reason Codes' },
+      { input: 'acceptance-cases.yaml', output: 'acceptance-cases.md', title: 'Generated Acceptance Cases' },
+    ],
+    requiredPipelineChain: ['narrative-ingest', 'episode-segmentation', 'screenplay', 'storyboard', 'asset-render', 'edit-compose', 'qc-gate', 'release-package'],
+    requiredAcceptanceCaseIds: [
+      'VID-001-CONTINUOUS-TURNS-TO-EPISODE',
+      'VID-002-EPISODE-RELEASE-PACKAGE',
+      'VID-003-SEGMENTED-RENDER-NOT-ONE-SHOT',
+      'VID-004-SOURCE-EVENT-GROUNDING-FAIL',
+      'VID-005-CLIP-COVERAGE-LOW-REJECT',
+      'VID-006-IDEMPOTENT-REPLAY',
+      'VID-007-ROUTE-FALLBACK-AUDITED',
+      'VID-008-PERSIST-WARN-NONBLOCKING',
+      'VID-009-SEGMENTATION-DETERMINISTIC',
+      'VID-010-TIMELINE-OVERLAP-REJECT',
+      'VID-011-AV-SYNC-DRIFT-REJECT',
+      'VID-012-VISUAL-ATTRACTION-LOW-REJECT',
+    ],
+    requiredVerificationCommands: [
+      'pnpm -C nimi-mods run generate:spec:videoplay-kernel-docs',
+      'pnpm -C nimi-mods run check:spec:videoplay-kernel-docs-drift',
+      'pnpm -C nimi-mods run check:spec:videoplay-kernel-consistency',
+    ],
+  },
+};
+
+export function getConfig(mod) {
+  const config = MOD_SPEC_CONFIG[mod];
+  if (!config) {
+    throw new Error(`unsupported mod: ${mod}`);
+  }
+  return config;
+}

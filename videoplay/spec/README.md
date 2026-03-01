@@ -1,14 +1,17 @@
 # VideoPlay Spec
 
-This directory is the executable contract layer for VideoPlay.
+VideoPlay spec uses a kernel + domain two-layer model.
 
 Load order:
 
-1. `index.yaml` (import map)
-2. `contracts/*.yaml` (normative contracts)
-3. `golden/cases.yaml` (acceptance behavior)
+1. `INDEX.md`
+2. `kernel/*.md` (rule contracts)
+3. `kernel/tables/*.yaml` (authoritative facts)
+4. `kernel/generated/*.md` (generated views)
+5. `videoplay.md` (domain increments)
 
-Validation:
+Verification:
 
-1. `node /Users/zhangkuan/Git/nimi-realm/nimi/nimi-mods/scripts/check-videoplay-spec.mjs`
-2. `pnpm -C /Users/zhangkuan/Git/nimi-realm/nimi/nimi-mods run check:spec:videoplay`
+1. `pnpm -C nimi-mods run generate:spec:videoplay-kernel-docs`
+2. `pnpm -C nimi-mods run check:spec:videoplay-kernel-docs-drift`
+3. `pnpm -C nimi-mods run check:spec:videoplay-kernel-consistency`

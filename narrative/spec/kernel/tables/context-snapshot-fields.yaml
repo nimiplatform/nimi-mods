@@ -1,0 +1,57 @@
+version: 1
+assembly_chain:
+  - stage: provider-2a
+    order: 1
+    source_rule: N-CTX-001
+  - stage: extract-keywords
+    order: 2
+    source_rule: N-CTX-001
+  - stage: consumer-2b
+    order: 3
+    source_rule: N-CTX-001
+inputs:
+  world:
+    fields:
+      - worldview
+      - worldEvents
+      - worldLorebooks
+    source_rule: N-CTX-002
+  agent:
+    fields:
+      - profiles
+      - memories
+      - rules
+      - lorebooks
+    source_rule: N-CTX-002
+  narrative_context:
+    fields:
+      - CANON
+      - STORY
+      - SUBJECT
+      - RELATION
+    source_rule: N-CTX-005
+snapshot_required_fields:
+  - field: place
+    source_rule: N-CTX-004
+  - field: worldviewRules
+    source_rule: N-CTX-004
+  - field: sceneMaterial
+    source_rule: N-CTX-004
+  - field: availableActors
+    source_rule: N-CTX-004
+  - field: narrativeStyle
+    source_rule: N-CTX-004
+  - field: characterRelations
+    source_rule: N-CTX-004
+  - field: narrativeContextScopes
+    source_rule: N-CTX-004
+constraints:
+  - name: unbounded_full_context_injection_forbidden
+    value: true
+    source_rule: N-CTX-003
+  - name: read_realm_via_stable_boundary_only
+    value: true
+    source_rule: N-CTX-002
+  - name: context_cannot_store_world_or_agent_raw_payload
+    value: true
+    source_rule: N-CTX-005

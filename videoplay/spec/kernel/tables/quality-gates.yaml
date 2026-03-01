@@ -1,0 +1,51 @@
+version: 1
+gates:
+  - gate: grounded_ratio
+    min: 0.98
+    max: null
+    fail_code: VIDEOPLAY_QC_FAILED
+    source_rule: V-QC-001
+  - gate: asset_coverage_ratio
+    min: 0.90
+    max: null
+    fail_code: VIDEOPLAY_CLIP_RENDER_COVERAGE_LOW
+    source_rule: V-QC-001
+  - gate: episode_master_duration_sec
+    min: 15
+    max: 180
+    fail_code: VIDEOPLAY_QC_FAILED
+    source_rule: V-QC-001
+  - gate: max_av_drift_ms
+    min: null
+    max: 80
+    fail_code: VIDEOPLAY_AUDIO_VIDEO_SYNC_DRIFT
+    source_rule: V-QC-001
+  - gate: visual_attraction_score
+    min: 0.72
+    max: 1
+    fail_code: VIDEOPLAY_VISUAL_ATTRACTION_LOW
+    source_rule: V-QC-001
+visual_attraction_formula:
+  score_range:
+    min: 0
+    max: 1
+  weighted_components:
+    - name: characterConsistency
+      weight: 0.30
+      min_component_score: 0.55
+      source_rule: V-QC-003
+    - name: motionContinuity
+      weight: 0.30
+      min_component_score: 0.55
+      source_rule: V-QC-003
+    - name: compositionReadability
+      weight: 0.20
+      min_component_score: 0.55
+      source_rule: V-QC-003
+    - name: lightColorCoherence
+      weight: 0.20
+      min_component_score: 0.55
+      source_rule: V-QC-003
+fail_behavior:
+  block_release_package: true
+  source_rule: V-QC-002

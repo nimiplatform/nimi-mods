@@ -1,0 +1,47 @@
+version: 1
+layers:
+  - layer: base
+    owner: realm
+    source: world+agent
+    write_access_to_narrative_spine: forbidden
+    source_rule: N-FACT-001
+  - layer: narrative
+    owner: narrative
+    source: CoreOutput
+    write_access_to_narrative_spine: allowed
+    source_rule: N-FACT-002
+  - layer: renderer
+    owner: textplay|videoplay
+    source: narrative_projection
+    write_access_to_narrative_spine: forbidden
+    source_rule: N-FACT-003
+core_output_whitelist:
+  - field: spineEvents
+    required: true
+    source_rule: N-FACT-004
+  - field: stateChanges
+    required: true
+    source_rule: N-FACT-004
+  - field: metrics
+    required: true
+    source_rule: N-FACT-004
+visibility_values:
+  - value: public
+    source_rule: N-FACT-005
+  - value: internal
+    source_rule: N-FACT-005
+  - value: sensory
+    source_rule: N-FACT-005
+context_scopes:
+  - scope: CANON
+    source_rule: N-FACT-006
+  - scope: STORY
+    source_rule: N-FACT-006
+  - scope: SUBJECT
+    source_rule: N-FACT-006
+  - scope: RELATION
+    source_rule: N-FACT-006
+constraints:
+  - name: stores_world_or_agent_raw_facts
+    value: false
+    source_rule: N-FACT-006

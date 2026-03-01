@@ -1,0 +1,320 @@
+#!/usr/bin/env node
+
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parse as parseYaml } from 'yaml';
+import { getConfig } from './spec-kernel-config.mjs';
+
+const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+const modsRoot = path.resolve(scriptDir, '..');
+
+function parseArgs(argv) {
+  let mod = '';
+  for (let i = 0; i < argv.length; i += 1) {
+    if (argv[i] === '--mod') {
+      mod = String(argv[i + 1] || '').trim();
+      i += 1;
+    }
+  }
+  if (!mod) {
+    throw new Error('missing --mod');
+  }
+  return { mod };
+}
+
+function fail(message) {
+  throw new Error(message);
+}
+
+function readText(filePath) {
+  if (!existsSync(filePath)) {
+    fail(`missing file: ${filePath}`);
+  }
+  return readFileSync(filePath, 'utf8');
+}
+
+function readYaml(filePath) {
+  const parsed = parseYaml(readText(filePath));
+  if (!parsed || typeof parsed !== 'object') {
+    fail(`YAML root must be object: ${filePath}`);
+  }
+  return parsed;
+}
+
+function collectSourceRules(value, out) {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectSourceRules(item, out);
+    }
+    return;
+  }
+  if (!value || typeof value !== 'object') {
+    return;
+  }
+  for (const [key, nested] of Object.entries(value)) {
+    if (key === 'source_rule' && typeof nested === 'string') {
+      out.add(nested.trim());
+    }
+    collectSourceRules(nested, out);
+  }
+}
+
+function collectReasonCodes(value, out) {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectReasonCodes(item, out);
+    }
+    return;
+  }
+  if (!value || typeof value !== 'object') {
+    return;
+  }
+  for (const [key, nested] of Object.entries(value)) {
+    if ((key === 'reason_code' || key === 'mismatch_reason_code') && typeof nested === 'string' && nested.trim().length > 0) {
+      out.add(nested.trim());
+    }
+    collectReasonCodes(nested, out);
+  }
+}
+
+function normalizeCommandList(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((row) => {
+      if (row && typeof row === 'object') {
+        return String(row.command || '').trim();
+      }
+      return String(row || '').trim();
+    })
+    .filter(Boolean);
+}
+
+function checkAcceptanceCoverage(mod, acceptanceTable, config) {
+  const cases = Array.isArray(acceptanceTable?.cases) ? acceptanceTable.cases : [];
+  if (cases.length === 0) {
+    fail(`[${mod}] acceptance cases table is empty`);
+  }
+
+  const caseIdSet = new Set();
+  for (const row of cases) {
+    const id = String(row?.id || '').trim();
+    if (!id) {
+      fail(`[${mod}] acceptance case id is empty`);
+    }
+    if (caseIdSet.has(id)) {
+      fail(`[${mod}] duplicated acceptance case id: ${id}`);
+    }
+    caseIdSet.add(id);
+  }
+
+  const requiredCaseIds = Array.isArray(config.requiredAcceptanceCaseIds) ? config.requiredAcceptanceCaseIds : [];
+  for (const caseId of requiredCaseIds) {
+    if (!caseIdSet.has(caseId)) {
+      fail(`[${mod}] missing required acceptance case: ${caseId}`);
+    }
+  }
+
+  const commands = normalizeCommandList(acceptanceTable?.verification_commands);
+  const commandSet = new Set(commands);
+  const requiredCommands = Array.isArray(config.requiredVerificationCommands) ? config.requiredVerificationCommands : [];
+  for (const command of requiredCommands) {
+    if (!commandSet.has(command)) {
+      fail(`[${mod}] missing required verification command: ${command}`);
+    }
+  }
+}
+
+function collectKernelRuleDefinitions(kernelDir, rulePrefix) {
+  const files = readdirSync(kernelDir)
+    .filter((file) => file.endsWith('.md'))
+    .filter((file) => file !== 'index.md');
+  const ruleRegex = new RegExp(`\\b${rulePrefix}-[A-Z]+-\\d{3}\\b`, 'g');
+  const ruleSet = new Set();
+
+  for (const file of files) {
+    const text = readText(path.join(kernelDir, file));
+    const matches = text.match(ruleRegex) || [];
+    for (const id of matches) {
+      ruleSet.add(id);
+    }
+  }
+
+  return ruleSet;
+}
+
+function ensureDomainImportsReferenceKernelDocs(domainText, requiredKernelDocs) {
+  for (const doc of requiredKernelDocs) {
+    if (doc === 'index.md') {
+      continue;
+    }
+    const name = `kernel/${doc}`;
+    if (!domainText.includes(name)) {
+      fail(`domain doc missing kernel import reference: ${name}`);
+    }
+  }
+}
+
+function ensureNoKernelRuleDefinitionInDomain(domainText, rulePrefix) {
+  const headingRegex = new RegExp(`^##\\s+${rulePrefix}-[A-Z]+-\\d{3}`, 'mu');
+  if (headingRegex.test(domainText)) {
+    fail('domain doc defines kernel rule heading directly');
+  }
+}
+
+function checkNarrative(tables, reasonCodeSet, config) {
+  const chain = tables['pipeline-states.yaml']?.execution_chain || [];
+  const chainSteps = chain.map((row) => String(row?.step || '').trim());
+  if (JSON.stringify(chainSteps) !== JSON.stringify(config.requiredPipelineChain)) {
+    fail(`[narrative] pipeline execution_chain mismatch`);
+  }
+
+  const whitelist = tables['fact-layers.yaml']?.core_output_whitelist || [];
+  const fields = whitelist.map((row) => String(row?.field || '').trim());
+  const expected = ['spineEvents', 'stateChanges', 'metrics'];
+  if (JSON.stringify(fields) !== JSON.stringify(expected)) {
+    fail('[narrative] core_output_whitelist must be spineEvents/stateChanges/metrics');
+  }
+
+  const initiativeReasonCode = String(tables['initiative-policies.yaml']?.cooldown?.reason_code || '').trim();
+  if (!reasonCodeSet.has(initiativeReasonCode)) {
+    fail(`[narrative] initiative cooldown reason code missing from reason-codes table: ${initiativeReasonCode}`);
+  }
+}
+
+function checkTextplay(tables, config) {
+  const chain = tables['pipeline-states.yaml']?.execution_chain || [];
+  const chainSteps = chain.map((row) => String(row?.step || '').trim());
+  if (JSON.stringify(chainSteps) !== JSON.stringify(config.requiredPipelineChain)) {
+    fail('[textplay] pipeline execution_chain mismatch');
+  }
+
+  const visibilityValues = tables['visibility-policies.yaml']?.visibility_enum || [];
+  const values = visibilityValues.map((row) => String(row?.value || '').trim());
+  const expectedVisibility = ['public', 'internal', 'sensory'];
+  if (JSON.stringify(values) !== JSON.stringify(expectedVisibility)) {
+    fail('[textplay] visibility enum mismatch');
+  }
+
+  const presenceRows = tables['presence-transitions.yaml']?.states || [];
+  const states = presenceRows.map((row) => String(row?.state || '').trim());
+  const requiredStates = ['composing', 'paused', 'active', 'idle', 'away'];
+  for (const state of requiredStates) {
+    if (!states.includes(state)) {
+      fail(`[textplay] missing presence state: ${state}`);
+    }
+  }
+}
+
+function checkVideoplay(tables, reasonCodeSet, config) {
+  const chain = tables['pipeline-states.yaml']?.execution_chain || [];
+  const chainSteps = chain.map((row) => String(row?.step || '').trim());
+  if (JSON.stringify(chainSteps) !== JSON.stringify(config.requiredPipelineChain)) {
+    fail('[videoplay] pipeline execution_chain mismatch');
+  }
+
+  const weighted = tables['quality-gates.yaml']?.visual_attraction_formula?.weighted_components || [];
+  const sum = weighted.reduce((acc, row) => acc + Number(row?.weight || 0), 0);
+  if (Math.abs(sum - 1) > 1e-6) {
+    fail(`[videoplay] quality weighted components must sum to 1, got ${sum}`);
+  }
+
+  const routingStages = tables['routing-stages.yaml']?.stages || [];
+  for (const stage of routingStages) {
+    const code = String(stage?.fail_code_when_both_unavailable || '').trim();
+    if (!reasonCodeSet.has(code)) {
+      fail(`[videoplay] routing fail code missing from reason-codes table: ${code}`);
+    }
+  }
+}
+
+function main() {
+  const { mod } = parseArgs(process.argv.slice(2));
+  const config = getConfig(mod);
+
+  const specDir = path.join(modsRoot, config.specRoot);
+  const kernelDir = path.join(specDir, 'kernel');
+  const tablesDir = path.join(kernelDir, 'tables');
+
+  for (const doc of config.requiredKernelDocs) {
+    const absolute = path.join(kernelDir, doc);
+    if (!existsSync(absolute)) {
+      fail(`[${mod}] missing kernel doc: ${doc}`);
+    }
+  }
+
+  const domainText = readText(path.join(specDir, config.domainDoc));
+  ensureDomainImportsReferenceKernelDocs(domainText, config.requiredKernelDocs);
+  ensureNoKernelRuleDefinitionInDomain(domainText, config.rulePrefix);
+
+  const kernelRules = collectKernelRuleDefinitions(kernelDir, config.rulePrefix);
+  if (kernelRules.size === 0) {
+    fail(`[${mod}] no kernel rule IDs found`);
+  }
+
+  const tables = {};
+  for (const spec of config.tableSpecs) {
+    const absolute = path.join(tablesDir, spec.input);
+    tables[spec.input] = readYaml(absolute);
+  }
+
+  const sourceRuleSet = new Set();
+  for (const table of Object.values(tables)) {
+    collectSourceRules(table, sourceRuleSet);
+  }
+  if (sourceRuleSet.size === 0) {
+    fail(`[${mod}] no source_rule found in tables`);
+  }
+  for (const sourceRule of sourceRuleSet) {
+    if (!kernelRules.has(sourceRule)) {
+      fail(`[${mod}] unresolved source_rule: ${sourceRule}`);
+    }
+  }
+
+  const reasonCodeRows = tables['reason-codes.yaml']?.codes;
+  if (!Array.isArray(reasonCodeRows) || reasonCodeRows.length === 0) {
+    fail(`[${mod}] reason-codes table is missing or empty`);
+  }
+  const reasonCodeSet = new Set();
+  for (const row of reasonCodeRows) {
+    const code = String(row?.code || '').trim();
+    if (!code) {
+      fail(`[${mod}] empty reason code entry`);
+    }
+    if (reasonCodeSet.has(code)) {
+      fail(`[${mod}] duplicated reason code: ${code}`);
+    }
+    reasonCodeSet.add(code);
+  }
+
+  const acceptance = tables['acceptance-cases.yaml'];
+  checkAcceptanceCoverage(mod, acceptance, config);
+
+  const referenced = new Set();
+  collectReasonCodes(acceptance, referenced);
+  for (const code of referenced) {
+    if (!reasonCodeSet.has(code)) {
+      fail(`[${mod}] acceptance references unknown reason code: ${code}`);
+    }
+  }
+
+  if (mod === 'narrative') {
+    checkNarrative(tables, reasonCodeSet, config);
+  } else if (mod === 'textplay') {
+    checkTextplay(tables, config);
+  } else if (mod === 'videoplay') {
+    checkVideoplay(tables, reasonCodeSet, config);
+  }
+
+  process.stdout.write(`[${mod}] kernel consistency checks passed\n`);
+}
+
+try {
+  main();
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  process.stderr.write(`check-mod-spec-kernel-consistency failed: ${message}\n`);
+  process.exit(1);
+}

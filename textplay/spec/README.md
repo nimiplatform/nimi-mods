@@ -1,14 +1,17 @@
 # TextPlay Spec
 
-Executable contract layer for TextPlay.
+TextPlay spec uses a kernel + domain two-layer model.
 
 Load order:
 
-1. `index.yaml` (import map)
-2. `contracts/*.yaml` (normative contracts)
-3. `golden/cases.yaml` (acceptance behavior)
+1. `INDEX.md`
+2. `kernel/*.md` (rule contracts)
+3. `kernel/tables/*.yaml` (authoritative facts)
+4. `kernel/generated/*.md` (generated views)
+5. `textplay.md` (domain increments)
 
-Validation:
+Verification:
 
-1. `node /Users/zhangkuan/Git/nimi-realm/nimi/nimi-mods/scripts/check-textplay-spec.mjs`
-2. `pnpm -C /Users/zhangkuan/Git/nimi-realm/nimi/nimi-mods run check:spec:textplay`
+1. `pnpm -C nimi-mods run generate:spec:textplay-kernel-docs`
+2. `pnpm -C nimi-mods run check:spec:textplay-kernel-docs-drift`
+3. `pnpm -C nimi-mods run check:spec:textplay-kernel-consistency`
