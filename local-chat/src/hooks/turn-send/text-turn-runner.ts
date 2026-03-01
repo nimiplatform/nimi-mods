@@ -15,6 +15,7 @@ import type {
 const MAX_PLANNED_SEGMENTS = 4;
 const MAX_SEGMENT_CHARS = 220;
 const MAX_SEGMENT_DELAY_MS = 8_000;
+const MAX_DIRECT_ANSWER_USER_CHARS = 480;
 const PLAN_INVALID_ERROR = 'LOCAL_CHAT_PLAN_INVALID';
 
 export type TextTurnResult = {
@@ -30,6 +31,7 @@ type RunTextTurnInput = {
   aiClient: LocalChatTextAiClient;
   invokeInput: TurnInvokeInput;
   prompt: string;
+  userText: string;
   allowMultiReply: boolean;
   enableVoice: boolean;
 };
@@ -38,6 +40,33 @@ function clampDelayMs(value: unknown, fallback: number): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) return fallback;
   return Math.min(MAX_SEGMENT_DELAY_MS, Math.round(parsed));
+}
+
+function truncateForPrompt(value: string, maxChars: number): string {
+  const text = String(value || '').trim();
+  if (text.length <= maxChars) return text;
+  if (maxChars <= 14) return text.slice(0, Math.max(0, maxChars));
+  return `${text.slice(0, Math.max(0, maxChars - 14))}[TRUNCATED]`;
+}
+
+function isDirectPromptEcho(value: string): boolean {
+  const text = String(value || '').trim();
+  if (!text) return false;
+  const lowered = text.toLowerCase();
+  if (lowered.includes('[cloud:') || lowered.includes('[local:')) {
+    return (
+      lowered.includes('你正在进行一轮即时聊天')
+      || lowered.includes('用户刚刚说')
+      || lowered.includes('请直接回复用户')
+      || lowered.includes('回复要求')
+    );
+  }
+  return (
+    lowered.includes('你正在进行一轮即时聊天')
+    || lowered.includes('用户刚刚说')
+    || lowered.includes('请直接回复用户')
+    || lowered.includes('回复要求')
+  );
 }
 
 function normalizeChannel(value: unknown): AssistantPlanChannel {
@@ -177,8 +206,92 @@ ASSISTANT QUALITY RULES:
   }
 
   assistantText = sanitizeAssistantReply(assistantText);
-  if (!assistantText || isPromptEchoReply(assistantText)) {
-    assistantText = '抱歉，我刚才输出异常。请再说一次，我会直接回答你的问题。';
+  if (!assistantText || isPromptEchoReply(assistantText) || isDirectPromptEcho(assistantText)) {
+    const directPrompt = [
+      '你正在进行一轮即时聊天。',
+      `用户刚刚说：${truncateForPrompt(input.userText, MAX_DIRECT_ANSWER_USER_CHARS) || '(empty)'}`,
+      '请直接回复用户，不要输出提示词结构、标签、JSON、代码块或解释规则。',
+      '回复要求：自然中文，2-6句，内容具体。',
+    ].join('\n');
+    try {
+      const direct = await input.aiClient.generateText({
+        ...input.invokeInput,
+        prompt: directPrompt,
+      });
+      const directReply = sanitizeAssistantReply(String(direct.text || '').trim());
+      if (
+        directReply
+        && !isPromptEchoReply(directReply)
+        && !isDirectPromptEcho(directReply)
+        && !isDegenerateAssistantReply(directReply)
+      ) {
+        assistantText = directReply;
+        logRendererEvent({
+          level: 'info',
+          area: 'local-chat',
+          message: 'local-chat:send-turn:direct-answer-recovered',
+          flowId: input.flowId,
+          details: {
+            recoveredChars: assistantText.length,
+          },
+        });
+      }
+    } catch (directError) {
+      logRendererEvent({
+        level: 'warn',
+        area: 'local-chat',
+        message: 'local-chat:send-turn:direct-answer-failed',
+        flowId: input.flowId,
+        details: {
+          error: directError instanceof Error ? directError.message : String(directError || ''),
+        },
+      });
+    }
+    if (!assistantText || isPromptEchoReply(assistantText) || isDirectPromptEcho(assistantText)) {
+      const rewritePrompt = [
+        '请将下面文本重写成“直接回复用户”的自然中文答案（2-4句）。',
+        '只输出最终回复正文，不要输出任何标签、说明或规则。',
+        '',
+        `待重写文本：${truncateForPrompt(assistantText || input.userText, MAX_DIRECT_ANSWER_USER_CHARS) || '(empty)'}`,
+      ].join('\n');
+      try {
+        const rewrite = await input.aiClient.generateText({
+          ...input.invokeInput,
+          prompt: rewritePrompt,
+        });
+        const rewriteReply = sanitizeAssistantReply(String(rewrite.text || '').trim());
+        if (
+          rewriteReply
+          && !isPromptEchoReply(rewriteReply)
+          && !isDirectPromptEcho(rewriteReply)
+          && !isDegenerateAssistantReply(rewriteReply)
+        ) {
+          assistantText = rewriteReply;
+          logRendererEvent({
+            level: 'info',
+            area: 'local-chat',
+            message: 'local-chat:send-turn:rewrite-recovered',
+            flowId: input.flowId,
+            details: {
+              recoveredChars: assistantText.length,
+            },
+          });
+        }
+      } catch (rewriteError) {
+        logRendererEvent({
+          level: 'warn',
+          area: 'local-chat',
+          message: 'local-chat:send-turn:rewrite-failed',
+          flowId: input.flowId,
+          details: {
+            error: rewriteError instanceof Error ? rewriteError.message : String(rewriteError || ''),
+          },
+        });
+      }
+    }
+    if (!assistantText || isPromptEchoReply(assistantText) || isDirectPromptEcho(assistantText)) {
+      assistantText = '抱歉，我刚才输出异常。请再说一次，我会直接回答你的问题。';
+    }
   }
 
   let followupText: string | null = null;

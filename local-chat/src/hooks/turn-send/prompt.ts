@@ -38,6 +38,7 @@ export async function prepareLocalChatTurn(input: {
     aiClient: input.aiClient,
     invokeInput,
     prompt,
+    userText: input.text,
     allowMultiReply: input.allowMultiReply,
     enableVoice: input.enableVoice,
   });
