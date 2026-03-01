@@ -3,6 +3,12 @@ import type { EventNodeDraft, Phase1Option } from '../contracts.js';
 import { computeTemporalOrder, parseStartTimeEventOptionId } from './temporal-order.js';
 
 export const START_TIME_PROJECTED_FUTURE_EVENT_KIND = 'world-studio.start-time.future-event';
+const START_TIME_PROJECTION_REASON_CODE = {
+  START_TIME_NOT_SELECTED: 'START_TIME_NOT_SELECTED',
+  WORLD_STUDIO_START_TIME_NO_PRIMARY_EVENTS: 'WORLD_STUDIO_START_TIME_NO_PRIMARY_EVENTS',
+  WORLD_STUDIO_START_TIME_EVENT_NOT_FOUND: 'WORLD_STUDIO_START_TIME_EVENT_NOT_FOUND',
+  WORLD_STUDIO_START_TIME_ORDER_NOT_FOUND: 'WORLD_STUDIO_START_TIME_ORDER_NOT_FOUND',
+} as const;
 
 type EventBuckets = {
   primary: EventNodeDraft[];
@@ -17,10 +23,7 @@ type StartTimeProjectionInput = {
 };
 
 export type StartTimeProjectionReasonCode =
-  | 'START_TIME_NOT_SELECTED'
-  | 'WORLD_STUDIO_START_TIME_NO_PRIMARY_EVENTS'
-  | 'WORLD_STUDIO_START_TIME_EVENT_NOT_FOUND'
-  | 'WORLD_STUDIO_START_TIME_ORDER_NOT_FOUND';
+  (typeof START_TIME_PROJECTION_REASON_CODE)[keyof typeof START_TIME_PROJECTION_REASON_CODE];
 
 type StartTimeProjectionResult = {
   applied: boolean;
@@ -220,7 +223,7 @@ function projectWithTemporalOrder(input: {
   if (fullPrimary.length === 0) {
     return {
       success: false,
-      reasonCode: 'WORLD_STUDIO_START_TIME_NO_PRIMARY_EVENTS',
+      reasonCode: START_TIME_PROJECTION_REASON_CODE.WORLD_STUDIO_START_TIME_NO_PRIMARY_EVENTS,
       events: { primary: fullPrimary, secondary: fullSecondary },
     };
   }
@@ -233,7 +236,7 @@ function projectWithTemporalOrder(input: {
   if (!selectedPrimaryId) {
     return {
       success: false,
-      reasonCode: 'WORLD_STUDIO_START_TIME_EVENT_NOT_FOUND',
+      reasonCode: START_TIME_PROJECTION_REASON_CODE.WORLD_STUDIO_START_TIME_EVENT_NOT_FOUND,
       events: { primary: fullPrimary, secondary: fullSecondary },
     };
   }
@@ -246,7 +249,7 @@ function projectWithTemporalOrder(input: {
   if (typeof selectedOrderIndex !== 'number') {
     return {
       success: false,
-      reasonCode: 'WORLD_STUDIO_START_TIME_ORDER_NOT_FOUND',
+      reasonCode: START_TIME_PROJECTION_REASON_CODE.WORLD_STUDIO_START_TIME_ORDER_NOT_FOUND,
       events: { primary: fullPrimary, secondary: fullSecondary },
     };
   }
@@ -309,7 +312,7 @@ export function projectEventsForSelectedStartTime(
   if (!selectedStartTimeId) {
     return {
       applied: false,
-      reasonCode: 'START_TIME_NOT_SELECTED',
+      reasonCode: START_TIME_PROJECTION_REASON_CODE.START_TIME_NOT_SELECTED,
       events: {
         primary: fullPrimary,
         secondary: fullSecondary,
