@@ -37,6 +37,17 @@ cases:
     prompt_scope: variable-schema
     schema_validation_required: true
     source_rule: V-PROMPT-002
+  - id: VPROMPT-006-CATALOG-TEMPLATE-DRIFT
+    description: Prompt registry IDs, template scopes, and placeholder sets stay synchronized.
+    prompt_scope: catalog-template-drift
+    registry_scope_alignment_required: true
+    placeholder_set_alignment_required: true
+    source_rule: V-PROMPT-006
+drift_guard:
+  registry_and_template_alignment_required: true
+  placeholder_set_parity_required: true
+  fail_on_unregistered_scope: true
+  source_rule: V-PROMPT-006
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:videoplay-kernel-docs
     source_rule: V-PROMPT-005

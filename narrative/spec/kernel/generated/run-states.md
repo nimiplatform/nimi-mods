@@ -41,6 +41,7 @@ lifecycle_states:
     source_rule: N-RUN-001
 event_envelope:
   required_fields:
+    - traceId
     - runId
     - stage
     - step
@@ -49,6 +50,13 @@ event_envelope:
     - eventType
     - timestamp
   source_rule: N-RUN-002
+run_task_identity:
+  run_id_and_task_id_must_be_distinct: true
+  binding_fields:
+    - runId
+    - taskId
+    - workflowType
+  source_rule: N-RUN-007
 recoverable_steps:
   - step: step1-assembly
     checkpoint_required: true
@@ -87,4 +95,16 @@ cancel_bridge:
   ui_cancel_request_must_emit_cancel_requested: true
   task_execution_must_emit_canceled_or_failed: true
   source_rule: N-RUN-006
+cancel_terminal_semantics:
+  terminal_status: CANCELED
+  terminal_event_type: run.canceled
+  cancel_must_not_emit_run_error: true
+  source_rule: N-RUN-008
+recovery_feed:
+  incremental_pull_required: true
+  incremental_query_fields:
+    - afterSeq
+    - limit
+  gap_refill_required_before_apply: true
+  source_rule: N-RUN-009
 ```

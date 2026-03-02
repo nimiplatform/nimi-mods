@@ -35,6 +35,7 @@ lifecycle_states:
     source_rule: T-RUN-001
 event_envelope:
   required_fields:
+    - traceId
     - runId
     - stage
     - step
@@ -43,6 +44,13 @@ event_envelope:
     - eventType
     - timestamp
   source_rule: T-RUN-002
+run_task_identity:
+  run_id_and_task_id_must_be_distinct: true
+  binding_fields:
+    - runId
+    - taskId
+    - workflowType
+  source_rule: T-RUN-006
 persist_semantics:
   persist_best_effort_non_blocking: true
   warn_reason_code_required: true
@@ -63,3 +71,15 @@ retry_classes:
       - projection_contract_violation
       - pov_visibility_violation
     source_rule: T-RUN-005
+cancel_terminal_semantics:
+  terminal_status: CANCELED
+  terminal_event_type: run.canceled
+  cancel_must_not_emit_run_error: true
+  source_rule: T-RUN-007
+recovery_feed:
+  incremental_pull_required: true
+  incremental_query_fields:
+    - afterSeq
+    - limit
+  gap_refill_required_before_apply: true
+  source_rule: T-RUN-008

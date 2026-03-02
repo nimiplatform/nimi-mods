@@ -33,3 +33,7 @@ Maintain operations are explicit (`save-maintenance`, `sync-events`, `sync-loreb
 ## WS-PIPE-007 Publish Projection Path
 
 Publish requires saved draft id and transitions landing target to `MAINTAIN`; agent sync ownership is `WORLD_OWNED`.
+
+## WS-PIPE-008 Narrative Handoff Projection
+
+Published world projection must include a narrative-consumable handoff bundle (event identity, temporal anchor, trace binding). Missing handoff bundle is fail-close.

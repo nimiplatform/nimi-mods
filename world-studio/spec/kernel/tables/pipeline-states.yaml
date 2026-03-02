@@ -114,3 +114,15 @@ publish_flow:
   post_publish_landing_target: MAINTAIN
   agent_sync_ownership_type: WORLD_OWNED
   source_rule: WS-PIPE-007
+narrative_handoff_projection:
+  required: true
+  required_fields:
+    - worldId
+    - worldVersion
+    - eventId
+    - eventType
+    - temporalAnchor
+    - sourceEventIds
+    - traceId
+  fail_reason_code: WORLD_STUDIO_NARRATIVE_HANDOFF_INVALID
+  source_rule: WS-PIPE-008

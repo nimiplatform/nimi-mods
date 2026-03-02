@@ -41,4 +41,9 @@ codes:
     blocking: false
     action_hint: Investigate persistence path. Output already returned.
     source_rule: T-ERR-003
+  - code: TEXTPLAY_RUN_CANCELED
+    stage: run
+    blocking: false
+    action_hint: Run is canceled. Resume from checkpoint or start a new run.
+    source_rule: T-RUN-007
 ```

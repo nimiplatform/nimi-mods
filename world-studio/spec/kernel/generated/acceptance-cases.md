@@ -66,6 +66,19 @@ cases:
     expected_ok: false
     reason_code: WORLD_STUDIO_PHASE1_QUALITY_GATE_BLOCKED
     source_rule: WS-ACC-002
+  - id: WS-013-NARRATIVE-HANDOFF-PROJECTION
+    description: Publish output contains complete narrative handoff projection bundle for downstream narrative ingestion.
+    expected_ok: true
+    handoff_fields_required:
+      - worldId
+      - worldVersion
+      - eventId
+      - eventType
+      - temporalAnchor
+      - sourceEventIds
+      - traceId
+    reason_code: null
+    source_rule: WS-PIPE-008
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:world-studio-kernel-docs
     source_rule: WS-ACC-003

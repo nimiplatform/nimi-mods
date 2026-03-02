@@ -31,6 +31,18 @@ cases:
     expected_reason_code: NARRATIVE_INITIATIVE_COOLDOWN_ACTIVE
     write_spine: false
     source_rule: N-ACC-002
+  - id: NAR-006-RUN-CANCEL-TERMINAL
+    description: Cancel path emits run.canceled and reaches CANCELED terminal state without run.error normalization.
+    expected_status: CANCELED
+    expected_reason_code: NARRATIVE_RUN_CANCELED
+    write_spine: false
+    source_rule: N-RUN-008
+  - id: NAR-007-RECOVERY-GAP-REFILL
+    description: Recovery with seq gap performs gap refill before applying new streaming events.
+    expected_status: APPROVED
+    expected_reason_code: null
+    gap_refill_applied: true
+    source_rule: N-RUN-009
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:narrative-kernel-docs
     source_rule: N-ACC-003

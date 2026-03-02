@@ -32,6 +32,18 @@ cases:
       - away
     reason_code: null
     source_rule: T-ACC-002
+  - id: TXT-006-RUN-CANCEL-TERMINAL
+    description: Cancel path emits run.canceled and reaches CANCELED terminal state without run.error normalization.
+    expected_ok: true
+    reason_code: TEXTPLAY_RUN_CANCELED
+    terminal_status: CANCELED
+    source_rule: T-RUN-007
+  - id: TXT-007-RECOVERY-GAP-REFILL
+    description: Recovery with seq gap performs gap refill before applying new streaming events.
+    expected_ok: true
+    gap_refill_applied: true
+    reason_code: null
+    source_rule: T-RUN-008
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:textplay-kernel-docs
     source_rule: T-ACC-003

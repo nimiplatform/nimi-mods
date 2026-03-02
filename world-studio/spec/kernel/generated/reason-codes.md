@@ -201,6 +201,9 @@ codes:
   - code: WORLD_STUDIO_PUBLISH_ROLLBACK
     category: publish
     source_rule: WS-ERR-001
+  - code: WORLD_STUDIO_NARRATIVE_HANDOFF_INVALID
+    category: publish
+    source_rule: WS-PIPE-008
   - code: WORLD_STUDIO_STRUCTURED_OUTPUT_INVALID
     category: validation
     source_rule: WS-ERR-001

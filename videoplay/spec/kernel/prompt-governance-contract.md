@@ -21,3 +21,7 @@ Different locale templates must keep placeholder parity.
 ## V-PROMPT-005 Canary Baseline
 
 Prompt canary coverage is authoritative in `tables/prompt-canary-cases.yaml` and must run in regression gate.
+
+## V-PROMPT-006 Catalog/Template Drift Guard
+
+Prompt registry IDs, template scopes, and placeholder sets must stay in sync under automated drift checks.
