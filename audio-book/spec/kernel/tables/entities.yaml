@@ -1,0 +1,261 @@
+version: 1
+description: Audio Book core entity definitions
+source_contract: entity-contract.md
+
+entities:
+  - name: VoiceProject
+    rule_id: VS-ENT-001
+    fields:
+      - name: id
+        type: string
+        format: ULID
+        required: true
+        description: Unique project identifier
+      - name: name
+        type: string
+        required: true
+        description: User-defined project name
+      - name: status
+        type: enum
+        ref: project-states.yaml
+        required: true
+        description: Current pipeline stage
+      - name: sourceChapters
+        type: SourceChapter[]
+        required: true
+        description: Imported text organized by chapters
+      - name: createdAt
+        type: timestamp
+        required: true
+      - name: updatedAt
+        type: timestamp
+        required: true
+
+  - name: SourceChapter
+    rule_id: VS-ENT-002
+    fields:
+      - name: index
+        type: integer
+        required: true
+        description: Zero-based chapter order
+      - name: title
+        type: string
+        required: false
+        description: Chapter title (auto-detected or user-defined)
+      - name: rawText
+        type: string
+        required: true
+        description: Plain text content of the chapter
+
+  - name: Script
+    rule_id: VS-ENT-003
+    fields:
+      - name: projectId
+        type: string
+        format: ULID
+        required: true
+      - name: segments
+        type: ScriptSegment[]
+        required: true
+        description: Ordered list of all speech segments across chapters
+
+  - name: ScriptSegment
+    rule_id: VS-ENT-004
+    fields:
+      - name: id
+        type: string
+        format: ULID
+        required: true
+      - name: chapterIndex
+        type: integer
+        required: true
+        description: References SourceChapter.index
+      - name: index
+        type: integer
+        required: true
+        description: Global segment order (cross-chapter sequential)
+      - name: type
+        type: enum
+        ref: segment-types.yaml
+        required: true
+      - name: speaker
+        type: string
+        required: true
+        description: "CharacterProfile.name; 'narrator' for narration segments"
+      - name: text
+        type: string
+        required: true
+        description: Text content to synthesize
+      - name: startOffset
+        type: integer
+        required: true
+        description: Start char offset in SourceChapter.rawText (inclusive, 0-based)
+      - name: endOffset
+        type: integer
+        required: true
+        description: End char offset in SourceChapter.rawText (exclusive, 0-based)
+      - name: emotion
+        type: string
+        required: false
+        description: "Emotion hint for TTS (happy/sad/angry/calm/fearful/surprised)"
+
+  - name: CharacterProfile
+    rule_id: VS-ENT-005
+    fields:
+      - name: name
+        type: string
+        required: true
+        description: Unique character identifier within project
+      - name: gender
+        type: enum
+        values: [male, female, neutral]
+        required: true
+      - name: ageGroup
+        type: enum
+        values: [child, young, adult, elder]
+        required: true
+      - name: traits
+        type: string[]
+        required: true
+        description: Personality trait descriptors
+      - name: segmentCount
+        type: integer
+        derived: true
+        description: Count of segments where speaker = this character (not persisted, computed at runtime)
+      - name: tier
+        type: enum
+        ref: character-tiers.yaml
+        derived: true
+        description: Computed character tier based on segmentCount thresholds
+      - name: voiceCasting
+        type: VoiceCasting
+        required: false
+        description: Assigned voice (null until Step 3)
+
+  - name: VoiceCasting
+    rule_id: VS-ENT-006
+    fields:
+      - name: voiceSource
+        type: enum
+        values: [preset, designed]
+        required: true
+        description: "'preset' for v1; 'designed' reserved for Voice Design"
+      - name: providerId
+        type: string
+        required: false
+        required_when: "voiceSource = 'preset'"
+        description: TTS provider identifier
+      - name: voiceId
+        type: string
+        required: false
+        required_when: "voiceSource = 'preset'"
+        description: Voice identifier within the provider
+      - name: voiceName
+        type: string
+        required: false
+        required_when: "voiceSource = 'preset'"
+        description: Human-readable voice name
+      - name: designPrompt
+        type: string
+        required: false
+        description: "Voice design text prompt (reserved, voiceSource='designed' only)"
+      - name: designedVoiceId
+        type: string
+        required: false
+        description: "Provider-returned designed voice ID (reserved)"
+      - name: speakingRate
+        type: float
+        default: 1.0
+        description: Default speaking rate for this character
+      - name: pitch
+        type: float
+        default: 0
+        description: Default pitch adjustment for this character
+      - name: emotion
+        type: string
+        required: false
+        description: Default emotion for this character
+      - name: previewAudioUri
+        type: string
+        required: false
+        description: Base64 data URI of preview audio
+
+  - name: SynthesisJob
+    rule_id: VS-ENT-007
+    fields:
+      - name: projectId
+        type: string
+        format: ULID
+        required: true
+      - name: status
+        type: enum
+        ref: job-states.yaml
+        required: true
+      - name: segmentJobs
+        type: SegmentJob[]
+        required: true
+      - name: concurrency
+        type: integer
+        default: 3
+        description: Max parallel synthesis requests
+      - name: startedAt
+        type: timestamp
+        required: false
+      - name: completedAt
+        type: timestamp
+        required: false
+
+  - name: SegmentJob
+    rule_id: VS-ENT-008
+    fields:
+      - name: segmentId
+        type: string
+        format: ULID
+        required: true
+      - name: status
+        type: enum
+        values: [pending, running, done, failed]
+        required: true
+      - name: audioStorageKey
+        type: string
+        required: false
+        description: "IndexedDB key for audio Blob (format: ab:audio:{projectId}:{segmentId})"
+      - name: durationMs
+        type: integer
+        required: false
+      - name: retryCount
+        type: integer
+        default: 0
+      - name: error
+        type: string
+        required: false
+      - name: errorClassification
+        type: enum
+        values: [transient, permanent]
+        required: false
+        description: "transient = retry with backoff; permanent = no retry (e.g. invalid voice, text too long)"
+      - name: startedAt
+        type: timestamp
+        required: false
+      - name: completedAt
+        type: timestamp
+        required: false
+
+  - name: AudioOutput
+    rule_id: VS-ENT-009
+    fields:
+      - name: projectId
+        type: string
+        format: ULID
+        required: true
+      - name: chapterIndex
+        type: integer
+        required: true
+      - name: totalDurationMs
+        type: integer
+        required: true
+        description: Sum of all segment durations in this chapter
+      - name: segmentIds
+        type: string[]
+        required: true
+        description: Ordered segment IDs for playback queue
