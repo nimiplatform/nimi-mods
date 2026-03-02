@@ -1,0 +1,172 @@
+version: 1
+description: VoiceProject state machine
+source_rule: VS-PIPE-002
+
+states:
+  - id: draft
+    label: Draft
+    label_zh: 草稿
+    description: Project created, no text imported yet
+
+  - id: imported
+    label: Text Imported
+    label_zh: 已导入
+    description: Source text uploaded and split into chapters
+
+  - id: analyzing
+    label: Analyzing
+    label_zh: 分析中
+    description: LLM is analyzing chapters (transient state)
+
+  - id: analyzed
+    label: Analyzed
+    label_zh: 已分析
+    description: Script and character profiles generated
+
+  - id: casting
+    label: Voice Casting
+    label_zh: 分配声线中
+    description: User is assigning voices to characters
+
+  - id: cast_complete
+    label: Cast Complete
+    label_zh: 声线已分配
+    description: All required characters have assigned voices
+
+  - id: synthesizing
+    label: Synthesizing
+    label_zh: 合成中
+    description: Batch TTS synthesis in progress (transient state)
+
+  - id: done
+    label: Complete
+    label_zh: 已完成
+    description: All segments synthesized successfully
+
+  - id: done_with_errors
+    label: Complete with Errors
+    label_zh: 完成（部分失败）
+    description: Synthesis finished but some segments failed
+
+transitions:
+  - from: draft
+    to: imported
+    trigger: text_imported
+    description: User uploads or pastes text
+
+  - from: imported
+    to: analyzing
+    trigger: start_analysis
+    description: User clicks "Analyze Text"
+
+  - from: analyzing
+    to: analyzed
+    trigger: analysis_complete
+    description: All chapters analyzed by LLM
+
+  - from: analyzing
+    to: imported
+    trigger: analysis_cancelled
+    description: User cancels analysis
+
+  - from: analyzed
+    to: casting
+    trigger: enter_casting
+    description: User enters Step 3
+
+  - from: casting
+    to: cast_complete
+    trigger: all_voices_assigned
+    description: All non-minor characters have voices assigned
+
+  - from: cast_complete
+    to: synthesizing
+    trigger: start_synthesis
+    description: User clicks "Start Synthesis"
+
+  - from: synthesizing
+    to: done
+    trigger: synthesis_complete
+    description: All segments synthesized successfully
+
+  - from: synthesizing
+    to: done_with_errors
+    trigger: synthesis_complete_with_failures
+    description: Synthesis finished with some failed segments
+
+  - from: synthesizing
+    to: cast_complete
+    trigger: synthesis_cancelled
+    description: User cancels synthesis
+
+  # Backward transitions
+  - from: analyzed
+    to: imported
+    trigger: re_import
+    description: User re-imports text (clears script + profiles)
+    side_effects:
+      - clear_script
+      - clear_character_profiles
+      - clear_voice_castings
+      - clear_synthesis_jobs
+
+  - from: casting
+    to: analyzed
+    trigger: re_analyze
+    description: User triggers re-analysis from casting step
+    side_effects:
+      - clear_script
+      - clear_character_profiles
+      - clear_voice_castings
+      - clear_synthesis_jobs
+
+  - from: cast_complete
+    to: analyzed
+    trigger: re_analyze
+    description: User triggers re-analysis
+    side_effects:
+      - clear_script
+      - clear_character_profiles
+      - clear_voice_castings
+      - clear_synthesis_jobs
+
+  - from: done
+    to: casting
+    trigger: modify_voices
+    description: User modifies voice assignments after completion
+    side_effects:
+      - invalidate_affected_segment_jobs
+
+  - from: done
+    to: imported
+    trigger: re_import
+    description: User re-imports entirely different text
+    side_effects:
+      - clear_script
+      - clear_character_profiles
+      - clear_voice_castings
+      - clear_synthesis_jobs
+      - clear_audio_data
+
+  - from: done_with_errors
+    to: synthesizing
+    trigger: retry_failed
+    description: User retries failed segments only
+
+  - from: done_with_errors
+    to: casting
+    trigger: modify_voices
+    description: User modifies voice assignments
+    side_effects:
+      - invalidate_affected_segment_jobs
+
+  - from: done_with_errors
+    to: imported
+    trigger: re_import
+    description: User re-imports entirely different text
+    side_effects:
+      - clear_script
+      - clear_character_profiles
+      - clear_voice_castings
+      - clear_synthesis_jobs
+      - clear_audio_data

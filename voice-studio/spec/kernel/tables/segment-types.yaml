@@ -1,0 +1,36 @@
+version: 1
+description: ScriptSegment type enumeration
+source_rule: VS-ENT-004
+
+segment_types:
+  - id: dialogue
+    label: Dialogue
+    label_zh: 对话
+    description: Character speech in quotes or dialogue markers
+    has_speaker: true
+    example: '"有人要杀你。"'
+
+  - id: narration
+    label: Narration
+    label_zh: 旁白
+    description: Narrative text, scene descriptions, action descriptions
+    has_speaker: false
+    fixed_speaker: narrator
+    example: 汪淼骑着自行车来到射击场，远远看见一群人站在靶场边上。
+
+  - id: inner_thought
+    label: Inner Thought
+    label_zh: 内心独白
+    description: Character internal monologue, not spoken aloud
+    has_speaker: true
+    example: 汪淼心想，这个人看起来不像个警察。
+
+  - id: sound_effect
+    label: Sound Effect
+    label_zh: 音效描述
+    description: >
+      Non-verbal sound descriptions. V1 synthesized as narration;
+      future versions may map to actual sound effect assets.
+    has_speaker: false
+    fixed_speaker: narrator
+    example: 一声巨响从远处传来。

@@ -1,0 +1,169 @@
+version: 1
+description: Voice Studio error codes
+source_rule: VS-SYNTH-003
+
+error_codes:
+  # Import errors
+  - code: VS_IMPORT_EMPTY_TEXT
+    category: import
+    severity: error
+    message: Imported text is empty
+    user_message_zh: 导入的文本为空
+
+  - code: VS_IMPORT_TOO_LARGE
+    category: import
+    severity: error
+    message: Imported text exceeds maximum size
+    user_message_zh: 文本超过最大允许大小
+    details: "Default limit: 2MB raw text"
+
+  - code: VS_IMPORT_NO_CHAPTERS
+    category: import
+    severity: warning
+    message: No chapter markers detected; treating entire text as single chapter
+    user_message_zh: 未检测到章节标记，全文作为单章节处理
+
+  # Analysis errors
+  - code: VS_ANALYSIS_CHAPTER_FAILED
+    category: analysis
+    severity: warning
+    message: LLM analysis failed for a chapter
+    user_message_zh: 章节分析失败
+    recoverable: true
+    recovery: Retry individual chapter analysis
+
+  - code: VS_ANALYSIS_INVALID_OUTPUT
+    category: analysis
+    severity: warning
+    message: LLM returned invalid structured output for a chapter
+    user_message_zh: AI 返回了无效的分析结果
+    recoverable: true
+    recovery: Retry with adjusted prompt
+
+  - code: VS_ANALYSIS_CANCELLED
+    category: analysis
+    severity: info
+    message: Analysis cancelled by user
+    user_message_zh: 用户取消了分析
+
+  - code: VS_ANALYSIS_ALL_CHAPTERS_FAILED
+    category: analysis
+    severity: error
+    message: All chapters failed analysis; no segments generated
+    user_message_zh: 全部章节分析失败，未生成任何段落
+    recoverable: true
+    recovery: Check LLM availability and retry
+
+  - code: VS_ANALYSIS_NO_DIALOGUE
+    category: analysis
+    severity: warning
+    message: No dialogue segments detected in chapter
+    user_message_zh: 该章节未检测到对话内容
+    description: >
+      System proceeds with narration-only segments.
+      The project is still valid — a narration-only audiobook
+      uses only the narrator voice.
+
+  - code: VS_ANALYSIS_CHAPTER_TOO_LONG
+    category: analysis
+    severity: warning
+    message: Chapter exceeds LLM context limit; will be analyzed in chunks
+    user_message_zh: 章节文本过长，将分段分析
+    recoverable: true
+
+  - code: VS_TEXT_FIDELITY_MISMATCH
+    category: analysis
+    severity: warning
+    message: Segment text cannot be safely aligned to source chapter text
+    user_message_zh: 分段文本与原文章节无法安全对齐
+    recoverable: true
+    recovery: Retry chapter analysis with stricter JSON/text constraints
+
+  # Voice casting errors
+  - code: VS_CAST_VOICE_UNAVAILABLE
+    category: casting
+    severity: error
+    message: Selected voice is no longer available from provider
+    user_message_zh: 所选声线当前不可用
+    recoverable: true
+    recovery: Select a different voice
+
+  - code: VS_CAST_PREVIEW_FAILED
+    category: casting
+    severity: warning
+    message: Voice preview synthesis failed
+    user_message_zh: 试听生成失败
+    recoverable: true
+
+  - code: VS_CAST_MISSING
+    category: casting
+    severity: error
+    message: Segment references a speaker with no VoiceCasting record
+    user_message_zh: 段落引用了未分配声线的角色
+    recoverable: true
+    recovery: Assign a voice to the character before synthesis
+
+  # Synthesis errors
+  - code: VS_SYNTH_SEGMENT_FAILED
+    category: synthesis
+    severity: warning
+    message: Segment synthesis failed after max retries
+    user_message_zh: 段落合成失败
+    recoverable: true
+    recovery: Manual retry via "Retry Failed" button
+
+  - code: VS_SYNTH_PROVIDER_UNAVAILABLE
+    category: synthesis
+    severity: error
+    message: TTS provider is unavailable
+    user_message_zh: 语音合成服务不可用
+    recoverable: true
+    recovery: Wait and retry, or switch provider
+
+  - code: VS_SYNTH_PROVIDER_RATE_LIMITED
+    category: synthesis
+    severity: warning
+    message: TTS provider rate limit reached
+    user_message_zh: 语音合成服务请求过于频繁
+    recoverable: true
+    recovery: Auto-retry with backoff
+
+  - code: VS_SYNTH_TEXT_TOO_LONG
+    category: synthesis
+    severity: warning
+    message: Segment text exceeds provider max input length
+    user_message_zh: 段落文本超过合成服务的最大长度限制
+    recoverable: true
+    recovery: Split segment and retry
+
+  # Storage errors
+  - code: VS_STORAGE_QUOTA_EXCEEDED
+    category: storage
+    severity: error
+    message: IndexedDB storage quota exceeded
+    user_message_zh: 存储空间不足
+    recoverable: false
+    recovery: Delete old projects to free space
+
+  - code: VS_STORAGE_WRITE_FAILED
+    category: storage
+    severity: error
+    message: Failed to write audio data to IndexedDB
+    user_message_zh: 音频数据写入失败
+
+  # Playback errors
+  - code: VS_PLAY_AUDIO_LOAD_FAILED
+    category: playback
+    severity: warning
+    message: Failed to load audio segment from IndexedDB
+    user_message_zh: 音频加载失败
+    recoverable: true
+    recovery: Re-synthesize the segment
+
+  - code: VS_PLAY_AUDIO_DECODE_FAILED
+    category: playback
+    severity: warning
+    message: Failed to decode audio segment for playback
+    user_message_zh: 音频解码失败
+    recoverable: true
+    recovery: Re-synthesize the segment
