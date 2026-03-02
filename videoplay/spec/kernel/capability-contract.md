@@ -16,7 +16,7 @@ VideoPlay must consume model routes from runtime route options and must not dire
 
 ## V-CAP-004 Fact Read/Write Boundary
 
-VideoPlay reads narrative projection through declared `data.query.*` capabilities and writes videoplay-owned production assets only through declared `data.register.*` + `data.query.*` pairs under `data-api.videoplay.*`.
+VideoPlay reads narrative projection through shared Narrative-Engine module API and writes videoplay-owned production assets only through declared `data.register.*` + `data.query.*` pairs under `data-api.videoplay.*`.
 
 ## V-CAP-005 Capability Drift Gate
 

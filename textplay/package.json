@@ -1,0 +1,12 @@
+{
+  "name": "@nimiplatform/mod-textplay",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node ../scripts/build-mod.mjs --mod textplay",
+    "watch": "node ../scripts/build-mod.mjs --mod textplay --watch",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "clean": "rm -rf dist"
+  }
+}

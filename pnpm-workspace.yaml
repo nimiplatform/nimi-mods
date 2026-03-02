@@ -1,6 +1,9 @@
 packages:
   - 'kismet'
   - 'local-chat'
+  - 'narrative-engine'
+  - 'textplay'
   - 're-life'
   - 'test-chat-tts'
+  - 'videoplay'
   - 'world-studio'

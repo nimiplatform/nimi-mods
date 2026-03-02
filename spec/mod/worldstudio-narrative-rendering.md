@@ -9,7 +9,7 @@
 本文件约束三层协作：
 
 1. `world-studio`：生产世界知识资产（World/Worldview/Events/Lorebooks）。
-2. `narrative-engine`：把世界资产 + agent 关系连续性编译成回合事实。
+2. `narrative-engine`：共享能力模块，把世界资产 + agent 关系连续性编译成回合事实。
 3. `renderer`：把事实投影渲染为用户可消费内容（文本或视频）。
 
 本文件不定义：
@@ -28,8 +28,8 @@
 #### 1.1.1 架构主链（系统内部契约）
 
 1. `world-studio -> narrative-engine -> renderer(textplay|videoplay)`。
-2. `narrative-engine` 负责事实编译与守卫，不直接作为玩家 UI 入口。
-3. `renderer` 只消费 `CoreOutput` 投影，不回写叙事事实层。
+2. `narrative-engine` 负责事实编译与守卫，不直接作为玩家 UI 入口，也不作为独立 sideload mod 单独加载。
+3. `renderer` 以共享模块方式调用 narrative-engine，只消费 `CoreOutput` 投影，不回写叙事事实层。
 
 #### 1.1.2 玩家体验链（产品交互主路径）
 
@@ -61,7 +61,7 @@
 输入：
 
 1. `TurnInput`（storyId + triggerSource + message/systemPayload）
-2. 回合触发源来自 textplay 玩家互动、agent initiative 或 system event（统一进入 narrative-engine 编译链）。
+2. 回合触发源来自 textplay 玩家互动、agent initiative 或 system event（统一进入 narrative-engine 编译链）；renderer 编排层必须补齐 `worldId + agentId + playerId` 绑定后再触发 narrative compile。
 3. Stage A 产出的 world 资产（读）
 4. agent 语义资产（profile + memory + NarrativeContext(setting/state)）
 
@@ -89,6 +89,7 @@ NarrativeContext 正式 scope 字段：
 
 1. renderer 只能读取 `CoreOutput` 投影。
 2. renderer 不能写入 narrative-engine spine。
+3. narrative-engine 共享模块不得被定义为终端交互入口。
 
 ## 3. 统一事实接口（跨 text/video）
 
@@ -169,7 +170,7 @@ NarrativeContext 正式 scope 字段：
 ## 7. 验收门禁（链路级）
 
 1. world-studio 发布资产可被 narrative-engine step1 直接消费（无 legacy 适配层）。
-2. narrative-engine 输出对 textplay 与 videoplay 输入均可稳定投影。
+2. narrative-engine 共享模块输出对 textplay 与 videoplay 输入均可稳定投影。
 3. text/video 双 renderer 对同一 turn 不产生事实分叉。
 4. 任一阶段失败均返回结构化 `reasonCode + actionHint + stage`。
 5. traceId 可贯通 stage A/B/C，支持端到端审计。

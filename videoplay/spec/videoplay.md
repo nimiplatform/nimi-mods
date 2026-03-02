@@ -1,7 +1,7 @@
 # VideoPlay Domain Spec
 
 > Status: Draft
-> Date: 2026-03-01
+> Date: 2026-03-02
 > Scope: Episode-scale video renderer increments only.
 
 ## 0. Normative Imports
@@ -21,7 +21,7 @@
 ## 1. Domain Invariants
 
 - `VID-001`: VideoPlay is episode production, not one-shot long video generation.
-- `VID-002`: VideoPlay consumes narrative projection and cannot rewrite narrative facts.
+- `VID-002`: VideoPlay loads Narrative-Engine as a shared module for turn-window/projection reads and cannot rewrite narrative facts.
 - `VID-003`: Every rendered unit must carry `sourceEventIds` for grounding.
 - `VID-004`: Route capability is provided by runtime only; mod direct vendor API is forbidden.
 - `VID-005`: Quality gate failures fail-close and block release package.

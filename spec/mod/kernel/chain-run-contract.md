@@ -2,14 +2,14 @@
 
 > Status: Draft
 > Date: 2026-03-02
-> Scope: `world-studio -> narrative-engine -> textplay|videoplay` 跨 mod 统一运行协议。
+> Scope: `world-studio -> narrative-engine -> textplay|videoplay` 统一运行协议（narrative-engine 为共享能力模块阶段）。
 
 ## 1. 目标与范围
 
 本文件约束四段链路在运行时的统一行为：
 
 1. `world-studio` 资产生成/维护任务。
-2. `narrative-engine` 回合编译任务。
+2. `narrative-engine` 回合编译任务（逻辑 stage，由 renderer 加载共享模块执行）。
 3. `textplay` 文本渲染任务。
 4. `videoplay` 分集生产任务。
 

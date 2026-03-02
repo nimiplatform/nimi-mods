@@ -13,10 +13,6 @@ required_capabilities:
     source_rule: V-CAP-002
   - key: data.query.data-api.runtime.route.options
     source_rule: V-CAP-003
-  - key: data.query.data-api.narrative.turn.window
-    source_rule: V-CAP-004
-  - key: data.query.data-api.narrative.projection.render-input
-    source_rule: V-CAP-004
   - key: data.register.data-api.videoplay.episode.upsert
     source_rule: V-CAP-004
   - key: data.query.data-api.videoplay.episode.upsert
@@ -41,6 +37,9 @@ forbidden_patterns:
   - pattern: direct-vendor-video-api-call
     reason: bypasses runtime route contract
     source_rule: V-CAP-003
+  - pattern: cross-mod-narrative-data-api-query
+    reason: VideoPlay must use shared narrative-engine module instead of cross-mod data-api query
+    source_rule: V-CAP-004
   - pattern: narrative-spine-write
     reason: breaks videoplay renderer write boundary
     source_rule: V-CAP-004

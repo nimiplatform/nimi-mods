@@ -50,6 +50,30 @@ cases:
     gap_refill_applied: true
     reason_code: null
     source_rule: T-RUN-008
+  - id: TXT-008-REPLICA-PRIMARY-ONLY
+    description: Playable replica list keeps PRIMARY world events only.
+    expected_ok: true
+    primary_only: true
+    reason_code: null
+    source_rule: T-ACC-002
+  - id: TXT-009-STARTUP-PACKAGE-FRESH
+    description: Startup package resolves even when narrative latest turn is missing and returns fresh-mode recommendedEntryTurn null.
+    expected_ok: true
+    fresh_mode_supported: true
+    reason_code: null
+    source_rule: T-ACC-002
+  - id: TXT-010-SEND-BLOCKED-WITHOUT-REPLICA
+    description: Send is blocked when no selected replica or startup package is unavailable.
+    expected_ok: true
+    send_blocked_without_replica: true
+    reason_code: null
+    source_rule: T-ACC-002
+  - id: TXT-011-REPLICA-SWITCH-RELOADS-RUNS
+    description: Switching replica clears run surface and reloads persisted runs by story id.
+    expected_ok: true
+    reloads_story_records: true
+    reason_code: null
+    source_rule: T-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:textplay-kernel-docs
     source_rule: T-ACC-003

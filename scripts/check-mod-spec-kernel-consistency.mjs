@@ -43,6 +43,19 @@ function readYaml(filePath) {
   return parsed;
 }
 
+function readPackageJson(modDir) {
+  const packageJsonPath = path.join(modDir, 'package.json');
+  if (!existsSync(packageJsonPath)) {
+    return null;
+  }
+  const raw = readText(packageJsonPath);
+  const parsed = JSON.parse(raw);
+  if (!parsed || typeof parsed !== 'object') {
+    return null;
+  }
+  return parsed;
+}
+
 function collectSourceRules(value, out) {
   if (Array.isArray(value)) {
     for (const item of value) {
@@ -169,9 +182,14 @@ function findManifestPath(modDir) {
 }
 
 function readManifestCapabilities(modDir) {
+  const packageJson = readPackageJson(modDir);
+  const packageKind = String(packageJson?.nimiPackageKind || '').trim();
   const manifestPath = findManifestPath(modDir);
   if (!manifestPath) {
-    if (existsSync(path.join(modDir, 'package.json'))) {
+    if (packageKind === 'capability-module') {
+      return null;
+    }
+    if (packageJson) {
       fail(`missing manifest in ${modDir}`);
     }
     return null;
@@ -251,6 +269,12 @@ function ensureNoKernelRuleDefinitionInDomain(domainText, rulePrefix) {
 }
 
 function checkNarrative(tables, reasonCodeSet, config) {
+  const moduleIdentity = tables['capabilities.yaml']?.module_identity;
+  const exportFactory = String(moduleIdentity?.export_factory || '').trim();
+  if (exportFactory !== 'createNarrativeEngineModule') {
+    fail('[narrative-engine] module_identity.export_factory must be createNarrativeEngineModule');
+  }
+
   const chain = tables['pipeline-states.yaml']?.execution_chain || [];
   const chainSteps = chain.map((row) => String(row?.step || '').trim());
   if (JSON.stringify(chainSteps) !== JSON.stringify(config.requiredPipelineChain)) {

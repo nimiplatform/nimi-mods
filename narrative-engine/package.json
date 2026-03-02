@@ -1,0 +1,13 @@
+{
+  "name": "@nimiplatform/mod-narrative-engine",
+  "version": "1.0.0",
+  "private": true,
+  "nimiPackageKind": "capability-module",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json --noEmit",
+    "watch": "tsc -p tsconfig.build.json --noEmit --watch",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "clean": "rm -rf dist"
+  }
+}

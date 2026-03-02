@@ -55,50 +55,79 @@ function parseManifest(manifestPath) {
   return parseYaml(raw);
 }
 
+function parsePackageJson(modDir) {
+  const packageJsonPath = path.join(modDir, 'package.json');
+  if (!existsSync(packageJsonPath)) {
+    return null;
+  }
+  const raw = readFileSync(packageJsonPath, 'utf8');
+  const parsed = JSON.parse(raw);
+  if (!parsed || typeof parsed !== 'object') {
+    return null;
+  }
+  return parsed;
+}
+
 function validateMod(modName) {
   const modDir = path.join(modsRoot, modName);
   const errors = [];
+  const packageJson = parsePackageJson(modDir);
+  const packageKind = String(packageJson?.nimiPackageKind || '').trim();
 
   const manifestPath = findManifestPath(modDir);
-  if (!manifestPath) {
+  const isCapabilityModule = packageKind === 'capability-module';
+  if (!manifestPath && !isCapabilityModule) {
     errors.push('missing manifest (mod.manifest.yaml|yml|json)');
     return errors;
   }
-
-  let manifest = null;
-  try {
-    manifest = parseManifest(manifestPath);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    errors.push(`manifest parse failed: ${message}`);
-    return errors;
-  }
-  if (!manifest || typeof manifest !== 'object') {
-    errors.push('manifest is not an object');
+  if (!packageJson) {
+    errors.push('missing package.json');
     return errors;
   }
 
-  const expectedEntry = `./dist/mods/${modName}/index.js`;
-  const manifestEntry = String(manifest.entry || '').trim();
-  if (!manifestEntry) {
-    errors.push('manifest.entry is required');
-  } else if (manifestEntry !== expectedEntry) {
-    errors.push(`manifest.entry must be "${expectedEntry}" (received "${manifestEntry}")`);
-  }
+  if (manifestPath) {
+    let manifest = null;
+    try {
+      manifest = parseManifest(manifestPath);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`manifest parse failed: ${message}`);
+      return errors;
+    }
+    if (!manifest || typeof manifest !== 'object') {
+      errors.push('manifest is not an object');
+      return errors;
+    }
 
-  const manifestId = String(manifest.id || '').trim();
-  if (!manifestId) {
-    errors.push('manifest.id is required');
+    const expectedEntry = `./dist/mods/${modName}/index.js`;
+    const manifestEntry = String(manifest.entry || '').trim();
+    if (!manifestEntry) {
+      errors.push('manifest.entry is required');
+    } else if (manifestEntry !== expectedEntry) {
+      errors.push(`manifest.entry must be "${expectedEntry}" (received "${manifestEntry}")`);
+    }
+
+    const manifestId = String(manifest.id || '').trim();
+    if (!manifestId) {
+      errors.push('manifest.id is required');
+    }
+
+    if (requireDist) {
+      const entryPath = path.join(modDir, expectedEntry.slice(2));
+      if (!existsSync(entryPath)) {
+        errors.push(`missing dist entry file: ${expectedEntry}`);
+      }
+    }
+  } else if (isCapabilityModule) {
+    const moduleEntryPath = path.join(modDir, 'src', 'index.ts');
+    if (!existsSync(moduleEntryPath)) {
+      errors.push('capability module requires src/index.ts');
+    }
   }
 
   const indexTsPath = path.join(modDir, 'index.ts');
   if (!existsSync(indexTsPath)) {
     errors.push('missing index.ts');
-  }
-
-  const packageJsonPath = path.join(modDir, 'package.json');
-  if (!existsSync(packageJsonPath)) {
-    errors.push('missing package.json');
   }
 
   const disallowedSourceJsFiles = listDisallowedSourceJsFiles(modDir);
@@ -108,13 +137,6 @@ function validateMod(modName) {
       ? ` (+${disallowedSourceJsFiles.length - 5} more)`
       : '';
     errors.push(`src must be TypeScript-only; remove .js files in src/: ${preview}${remainder}`);
-  }
-
-  if (requireDist) {
-    const entryPath = path.join(modDir, expectedEntry.slice(2));
-    if (!existsSync(entryPath)) {
-      errors.push(`missing dist entry file: ${expectedEntry}`);
-    }
   }
 
   return errors;

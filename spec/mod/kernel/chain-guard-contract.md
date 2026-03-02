@@ -2,7 +2,7 @@
 
 > Status: Draft
 > Date: 2026-03-02
-> Scope: `world-studio -> narrative-engine -> textplay|videoplay` 跨阶段守卫与回归门禁。
+> Scope: `world-studio -> narrative-engine -> textplay|videoplay` 跨阶段守卫与回归门禁（narrative-engine 为共享能力模块阶段）。
 
 ## 1. 目标与范围
 
@@ -20,12 +20,13 @@
 
 1. mod 直连 vendor API。
 2. 通过模型名猜能力或硬编码 capability。
-3. renderer 回写 narrative-engine spine。
-4. 绕过 canonical `CoreOutput` 输入事实。
-5. 跳过强制 quality gate 直接生成 release package。
-6. 通过 `stage/message` 文本启发式推断 run 终态。
-7. `runId` 与 `taskId` 别名复用。
-8. 将 `run.canceled` 归一成 `run.error`。
+3. 将 narrative-engine 作为独立 runtime sideload mod 直接加载。
+4. renderer 回写 narrative-engine spine。
+5. 绕过 canonical `CoreOutput` 输入事实。
+6. 跳过强制 quality gate 直接生成 release package。
+7. 通过 `stage/message` 文本启发式推断 run 终态。
+8. `runId` 与 `taskId` 别名复用。
+9. 将 `run.canceled` 归一成 `run.error`。
 
 ## 3. 行为一致性守卫（MUST）
 

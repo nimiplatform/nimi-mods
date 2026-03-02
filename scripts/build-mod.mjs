@@ -116,16 +116,31 @@ function listAvailableMods() {
   return [...new Set(modNames)].sort((a, b) => a.localeCompare(b));
 }
 
+function listRuntimeMods(modNames) {
+  return modNames.filter((modName) => {
+    const modDir = path.join(modsRoot, modName);
+    return Boolean(findManifestFile(modDir));
+  });
+}
+
 function resolveTargetMods(args) {
   const available = listAvailableMods();
+  const runtimeMods = listRuntimeMods(available);
   if (args.all) {
-    return available;
+    return runtimeMods;
   }
   if (args.mods.length > 0) {
     const deduped = [...new Set(args.mods)];
     const unknown = deduped.filter((name) => !available.includes(name));
     if (unknown.length > 0) {
       throw new Error(`Unknown mod(s): ${unknown.join(', ')}. Available: ${available.join(', ')}`);
+    }
+    const nonRuntime = deduped.filter((name) => !runtimeMods.includes(name));
+    if (nonRuntime.length > 0) {
+      throw new Error(
+        `Unsupported runtime build target(s): ${nonRuntime.join(', ')}. ` +
+        `These packages are not runtime-loadable mods.`,
+      );
     }
     return deduped;
   }

@@ -1,7 +1,7 @@
 # TextPlay Domain Spec
 
 > Status: Draft
-> Date: 2026-03-01
+> Date: 2026-03-02
 > Scope: Text renderer increments only.
 
 ## 0. Normative Imports
@@ -18,7 +18,7 @@
 ## 1. Domain Invariants
 
 - `TXT-001`: TextPlay is a renderer. It cannot create or rewrite narrative facts.
-- `TXT-002`: TextPlay consumes only narrative projection inputs.
+- `TXT-002`: TextPlay loads Narrative-Engine as a shared module and performs compile + projection read in-process.
 - `TXT-003`: Visibility and POV constraints are both mandatory.
 - `TXT-004`: Persistence failure is non-blocking for returned render output.
 - `TXT-005`: Presence transitions must emit auditable report events.
@@ -27,11 +27,17 @@
 ## 2. Domain Increments
 
 - `TXT-010`: Input normalization runs before any visibility filter.
-- `TXT-011`: Prompt building operates only on filtered event set.
-- `TXT-012`: Route-unavailable is fail-close and returns blocking reason code.
-- `TXT-013`: Render output must always include `text` and `meta`.
-- `TXT-014`: Initiative events reset idle/away timers in presence state machine.
-- `TXT-015`: Resume with checkpoint hash mismatch is fail-close.
+- `TXT-011`: Narrative compile context assembly uses TextPlay-declared world/agent read capabilities only.
+- `TXT-012`: Prompt building operates only on filtered event set.
+- `TXT-013`: Route-unavailable is fail-close and returns blocking reason code.
+- `TXT-014`: Render output must always include `text` and `meta`.
+- `TXT-015`: Initiative events reset idle/away timers in presence state machine.
+- `TXT-016`: Resume with checkpoint hash mismatch is fail-close.
+- `TXT-017`: Playable replica catalog is derived from `data-api.world.events.list` and keeps `PRIMARY` events only.
+- `TXT-018`: Replica startup package is assembled from world events, lorebooks, agent memory recall, and optional narrative latest turn lookup.
+- `TXT-019`: Send action is blocked when no selected replica or startup package is not ready.
+- `TXT-023`: Replica switch resets run surface state and reloads persisted records by selected replica story id.
+- `TXT-024`: Runtime binding uses single primary agent id for turn execution and keeps other participants as context-only metadata.
 
 ## 3. No Over-Design Guard
 

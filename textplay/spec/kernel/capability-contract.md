@@ -12,7 +12,7 @@ TextPlay must declare explicit minimum capability keys only. Wildcards and undec
 
 ## T-CAP-003 Read/Render Boundary
 
-TextPlay reads narrative projection and route options only through declared `data.query.*` capabilities and never bypasses narrative output contracts.
+TextPlay invokes Narrative-Engine through shared module API, not through cross-mod `data-api.narrative.*` calls. Narrative compile and projection read must still honor narrative output contracts.
 
 ## T-CAP-004 Persistence Boundary
 
