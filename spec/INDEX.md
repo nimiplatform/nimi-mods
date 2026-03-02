@@ -11,7 +11,7 @@
   - `local-chat/spec/**`
   - `re-life/spec/**`
   - `test-chat-tts/spec/**`
-  - `narrative/spec/**`
+  - `narrative-engine/spec/**`
   - `textplay/spec/**`
   - `videoplay/spec/**`
   - `world-studio/spec/**`
@@ -21,11 +21,11 @@
 1. Kernel tables are authoritative fact sources.
 2. Domain docs only define domain increments and rule references.
 3. Generated docs are derived artifacts and must not be edited manually.
-4. Shared world-studio -> narrative -> renderer chain contracts are defined once in `spec/mod/**`.
+4. Shared world-studio -> narrative-engine -> renderer chain contracts are defined once in `spec/mod/**`.
 
 ## Task-Oriented Read Path
 
-### Change world-studio -> narrative -> renderer chain contract
+### Change world-studio -> narrative-engine -> renderer chain contract
 
 1. `spec/mod/worldstudio-narrative-rendering.md`
 2. `spec/mod/kernel/chain-run-contract.md`

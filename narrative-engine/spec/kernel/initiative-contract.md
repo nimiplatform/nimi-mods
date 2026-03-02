@@ -21,3 +21,7 @@ Fired initiative path must call `processTurn`.
 ## N-INIT-005 Initiative Audit
 
 Every initiative decision emits auditable event.
+
+## N-INIT-006 Cooldown Window Baseline
+
+Default cooldown window is table-governed and uses a 180-second baseline unless explicitly overridden by product policy.

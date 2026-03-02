@@ -36,8 +36,11 @@ cases:
   - id: VPROMPT-004-PLACEHOLDER-PARITY-ZH-EN
     description: zh/en templates keep placeholder parity.
     prompt_scope: locale-parity
+    required_locales:
+      - zh
+      - en
     required_placeholder_parity: true
-    source_rule: V-PROMPT-004
+    source_rule: V-PROMPT-007
   - id: VPROMPT-005-VARIABLE-SCHEMA-VALIDATION
     description: Prompt variables pass declared schema before rendering.
     prompt_scope: variable-schema
@@ -54,6 +57,12 @@ drift_guard:
   placeholder_set_parity_required: true
   fail_on_unregistered_scope: true
   source_rule: V-PROMPT-006
+locale_baseline:
+  locales:
+    - zh
+    - en
+  fallback_locale: zh
+  source_rule: V-PROMPT-007
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:videoplay-kernel-docs
     source_rule: V-PROMPT-005

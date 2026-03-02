@@ -1,21 +1,22 @@
-# Narrative Kernel Contracts
+# Narrative-Engine Kernel Contracts
 
 > Status: Normative
 > Date: 2026-03-01
 
 ## 1. Goals
 
-Kernel is the only home for Narrative cross-domain rules.
+Kernel is the only home for Narrative-Engine cross-domain rules.
 Domain docs must reference kernel rule IDs and must not duplicate kernel prose.
 
 ## 2. Rule ID Format
 
 - Format: `N-<DOMAIN>-NNN`
-- Domain enum: `FACT`, `PIPE`, `RUN`, `CTX`, `GUARD`, `INIT`, `ERR`, `ACC`
+- Domain enum: `CAP`, `FACT`, `PIPE`, `RUN`, `CTX`, `GUARD`, `INIT`, `ERR`, `ACC`
 - Example: `N-PIPE-001`
 
 ## 3. Ownership
 
+- `capability-contract.md` -> `N-CAP-*`
 - `fact-layer-contract.md` -> `N-FACT-*`
 - `pipeline-contract.md` -> `N-PIPE-*`
 - `run-orchestration-contract.md` -> `N-RUN-*`
@@ -29,6 +30,7 @@ Domain docs must reference kernel rule IDs and must not duplicate kernel prose.
 
 Authoritative tables live in `tables/` and must be the first edit point:
 
+- `capabilities.yaml`
 - `fact-layers.yaml`
 - `pipeline-states.yaml`
 - `run-states.yaml`

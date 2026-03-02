@@ -2,14 +2,14 @@
 
 > Status: Draft
 > Date: 2026-03-02
-> Scope: `world-studio -> narrative -> textplay|videoplay` 跨 mod 统一运行协议。
+> Scope: `world-studio -> narrative-engine -> textplay|videoplay` 跨 mod 统一运行协议。
 
 ## 1. 目标与范围
 
 本文件约束四段链路在运行时的统一行为：
 
 1. `world-studio` 资产生成/维护任务。
-2. `narrative` 回合编译任务。
+2. `narrative-engine` 回合编译任务。
 3. `textplay` 文本渲染任务。
 4. `videoplay` 分集生产任务。
 
@@ -25,7 +25,7 @@
 1. `traceId`
 2. `runId`
 3. `parentRunId`（可空）
-4. `stage`（`world-studio|narrative|textplay|videoplay`）
+4. `stage`（`world-studio|narrative-engine|textplay|videoplay`）
 5. `step`
 6. `eventType`（`run.start|step.start|step.chunk|step.complete|step.error|run.complete|run.error|run.canceled`）
 7. `seq`（单调递增，不允许回退）
@@ -106,7 +106,7 @@
 
 ## 7. 与模块合同关系
 
-1. narrative 运行细节：`nimi-mods/narrative/spec/kernel/run-orchestration-contract.md`
+1. narrative-engine 运行细节：`nimi-mods/narrative-engine/spec/kernel/run-orchestration-contract.md`
 2. textplay 运行细节：`nimi-mods/textplay/spec/kernel/run-orchestration-contract.md`
 3. videoplay 创作与重跑影响：`nimi-mods/videoplay/spec/kernel/creator-workflow-contract.md`
 4. 跨阶段守卫治理：`spec/mod/kernel/chain-guard-contract.md`

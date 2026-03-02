@@ -28,6 +28,8 @@ export function DiagnosticsPanel(props: Props) {
     checkingHealth,
     onHealthCheck,
   } = props;
+  const hasRecentMessagesLayer = latestPromptTrace?.appliedLayers?.includes('recentMessages') || false;
+  const hasPostHistoryLayer = latestPromptTrace?.appliedLayers?.includes('postHistoryInstructions') || false;
 
   return (
     <div className="rounded-[10px] border border-gray-200 bg-gray-50 p-3 text-xs">
@@ -54,6 +56,14 @@ export function DiagnosticsPanel(props: Props) {
             {Array.isArray(latestPromptTrace?.layerOrder)
               ? ` / ${latestPromptTrace.layerOrder.length}`
               : ''}
+          </p>
+          <p className="mt-1 text-gray-700">
+            Dropped layers: {latestPromptTrace?.droppedLayers?.length
+              ? latestPromptTrace.droppedLayers.join(', ')
+              : '-'}
+          </p>
+          <p className="mt-1 text-gray-700">
+            Critical layers: recentMessages={hasRecentMessagesLayer ? 'yes' : 'no'} · postHistoryInstructions={hasPostHistoryLayer ? 'yes' : 'no'}
           </p>
           <p className="mt-1 text-gray-700">
             Memory slices: {latestPromptTrace

@@ -6,6 +6,7 @@
 
 ## 0. Normative Imports
 
+- Capability boundary: `kernel/capability-contract.md` (`T-CAP-*`)
 - Fact projection: `kernel/fact-projection-contract.md` (`T-FACT-*`)
 - Render pipeline: `kernel/pipeline-contract.md` (`T-PIPE-*`)
 - Run orchestration and recovery: `kernel/run-orchestration-contract.md` (`T-RUN-*`)

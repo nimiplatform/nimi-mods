@@ -13,10 +13,16 @@ import type {
 } from './types.js';
 
 const MAX_PLANNED_SEGMENTS = 4;
-const MAX_SEGMENT_CHARS = 220;
+const MAX_SEGMENT_CHARS = 420;
 const MAX_SEGMENT_DELAY_MS = 8_000;
 const MAX_DIRECT_ANSWER_USER_CHARS = 480;
 const PLAN_INVALID_ERROR = 'LOCAL_CHAT_PLAN_INVALID';
+const TERMINAL_PUNCTUATION_RE = /[。！？!?…]$/;
+const TRAILING_DELIMITER_RE = /[，、；：,:-]\s*$/;
+const TRAILING_FRAGMENT_AFTER_TERMINAL_RE = /[。！？!?…][^。！？!?…]{2,}$/;
+const MID_CLAUSE_PUNCTUATION_RE = /[，、；：,:]/;
+const TRAILING_SEMANTIC_FRAGMENT_RE = /(而结|而起|而止|而终|而定|而成|而归|而来|而去)[。！？!?…]?$/;
+const SOFT_DANGLING_TAIL_RE = /(不过|但是|因为|所以|如果|并且|而且|然后|只是|些许|一些|一点|等等|以及|或者)$/;
 
 export type TextTurnResult = {
   planner: 'object' | 'fallback';
@@ -69,6 +75,50 @@ function isDirectPromptEcho(value: string): boolean {
   );
 }
 
+function trimDanglingFragmentAfterTerminal(value: string): string {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  if (!TRAILING_FRAGMENT_AFTER_TERMINAL_RE.test(text)) return text;
+  for (let index = text.length - 1; index >= 0; index -= 1) {
+    const char = text[index];
+    if (char === '。' || char === '！' || char === '？' || char === '!' || char === '?' || char === '…') {
+      return text.slice(0, index + 1).trim();
+    }
+  }
+  return text;
+}
+
+function isLikelyIncompleteAssistantReply(value: string): boolean {
+  const text = String(value || '').trim();
+  if (!text) return true;
+  if (TRAILING_DELIMITER_RE.test(text)) return true;
+  if (TRAILING_FRAGMENT_AFTER_TERMINAL_RE.test(text)) return true;
+  if (TRAILING_SEMANTIC_FRAGMENT_RE.test(text)) return true;
+  if (!TERMINAL_PUNCTUATION_RE.test(text)) {
+    if (MID_CLAUSE_PUNCTUATION_RE.test(text)) return true;
+    if (text.length >= 14) return true;
+  }
+  if (!TERMINAL_PUNCTUATION_RE.test(text) && text.length >= 6 && SOFT_DANGLING_TAIL_RE.test(text)) {
+    return true;
+  }
+  return false;
+}
+
+function normalizeAssistantReplyTail(value: string): string {
+  const trimmed = trimDanglingFragmentAfterTerminal(value);
+  if (!trimmed) return '';
+  return trimmed.replace(/[，、；：,:-\s]+$/g, '').trim();
+}
+
+function ensureTerminalPunctuation(value: string): string {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  if (TERMINAL_PUNCTUATION_RE.test(text)) return text;
+  const body = text.replace(/[，、；：,:-\s]+$/g, '').trim();
+  if (!body) return '';
+  return `${body}。`;
+}
+
 function normalizeChannel(value: unknown): AssistantPlanChannel {
   const normalized = String(value || '').trim().toLowerCase();
   if (normalized === 'voice') return 'voice';
@@ -96,9 +146,14 @@ function toAssistantPlanSegment(input: {
     || input.raw.message
     || '',
   ).trim();
-  const content = sanitizeAssistantReply(textRaw).slice(0, MAX_SEGMENT_CHARS);
+  const content = normalizeAssistantReplyTail(
+    sanitizeAssistantReply(textRaw).slice(0, MAX_SEGMENT_CHARS),
+  );
   if (!content) return null;
   if (isPromptEchoReply(content) || isDegenerateAssistantReply(content)) {
+    return null;
+  }
+  if (isLikelyIncompleteAssistantReply(content)) {
     return null;
   }
   return {
@@ -168,13 +223,28 @@ async function buildSegmentsFromFallbackText(input: RunTextTurnInput): Promise<{
 }> {
   const result = await input.aiClient.generateText(input.invokeInput);
   const firstReply = String(result.text || '').trim();
-  let assistantText = sanitizeAssistantReply(firstReply);
+  let assistantText = normalizeAssistantReplyTail(sanitizeAssistantReply(firstReply));
   let retryAttempted = false;
   let retryImproved = false;
-  const firstReplyBad = isDegenerateAssistantReply(assistantText) || isPromptEchoReply(assistantText);
+  const firstReplyDegenerate = isDegenerateAssistantReply(assistantText);
+  const firstReplyPromptEcho = isPromptEchoReply(assistantText);
+  const firstReplyIncomplete = isLikelyIncompleteAssistantReply(assistantText);
+  const firstReplyBad = firstReplyDegenerate || firstReplyPromptEcho || firstReplyIncomplete;
 
   if (firstReplyBad) {
     retryAttempted = true;
+    logRendererEvent({
+      level: 'info',
+      area: 'local-chat',
+      message: 'local-chat:send-turn:first-reply-rejected',
+      flowId: input.flowId,
+      details: {
+        firstReplyChars: assistantText.length,
+        degenerate: firstReplyDegenerate,
+        promptEcho: firstReplyPromptEcho,
+        incomplete: firstReplyIncomplete,
+      },
+    });
     const retryPrompt = `${input.prompt}
 
 ASSISTANT QUALITY RULES:
@@ -187,7 +257,9 @@ ASSISTANT QUALITY RULES:
         ...input.invokeInput,
         prompt: retryPrompt,
       });
-      const retryReply = sanitizeAssistantReply(String(retry.text || '').trim());
+      const retryReply = normalizeAssistantReplyTail(
+        sanitizeAssistantReply(String(retry.text || '').trim()),
+      );
       if (retryReply && !isPromptEchoReply(retryReply)) {
         retryImproved = !isDegenerateAssistantReply(retryReply);
         assistantText = retryReply;
@@ -205,8 +277,13 @@ ASSISTANT QUALITY RULES:
     }
   }
 
-  assistantText = sanitizeAssistantReply(assistantText);
-  if (!assistantText || isPromptEchoReply(assistantText) || isDirectPromptEcho(assistantText)) {
+  assistantText = normalizeAssistantReplyTail(sanitizeAssistantReply(assistantText));
+  if (
+    !assistantText
+    || isPromptEchoReply(assistantText)
+    || isDirectPromptEcho(assistantText)
+    || isLikelyIncompleteAssistantReply(assistantText)
+  ) {
     const directPrompt = [
       '你正在进行一轮即时聊天。',
       `用户刚刚说：${truncateForPrompt(input.userText, MAX_DIRECT_ANSWER_USER_CHARS) || '(empty)'}`,
@@ -218,12 +295,15 @@ ASSISTANT QUALITY RULES:
         ...input.invokeInput,
         prompt: directPrompt,
       });
-      const directReply = sanitizeAssistantReply(String(direct.text || '').trim());
+      const directReply = normalizeAssistantReplyTail(
+        sanitizeAssistantReply(String(direct.text || '').trim()),
+      );
       if (
         directReply
         && !isPromptEchoReply(directReply)
         && !isDirectPromptEcho(directReply)
         && !isDegenerateAssistantReply(directReply)
+        && !isLikelyIncompleteAssistantReply(directReply)
       ) {
         assistantText = directReply;
         logRendererEvent({
@@ -259,12 +339,15 @@ ASSISTANT QUALITY RULES:
           ...input.invokeInput,
           prompt: rewritePrompt,
         });
-        const rewriteReply = sanitizeAssistantReply(String(rewrite.text || '').trim());
+        const rewriteReply = normalizeAssistantReplyTail(
+          sanitizeAssistantReply(String(rewrite.text || '').trim()),
+        );
         if (
           rewriteReply
           && !isPromptEchoReply(rewriteReply)
           && !isDirectPromptEcho(rewriteReply)
           && !isDegenerateAssistantReply(rewriteReply)
+          && !isLikelyIncompleteAssistantReply(rewriteReply)
         ) {
           assistantText = rewriteReply;
           logRendererEvent({
@@ -289,10 +372,66 @@ ASSISTANT QUALITY RULES:
         });
       }
     }
-    if (!assistantText || isPromptEchoReply(assistantText) || isDirectPromptEcho(assistantText)) {
+    if (
+      assistantText
+      && !isPromptEchoReply(assistantText)
+      && !isDirectPromptEcho(assistantText)
+      && isLikelyIncompleteAssistantReply(assistantText)
+    ) {
+      const completionPrompt = [
+        '请把下面回复补全为完整自然中文（2-4句）。',
+        '保留原意，直接回答用户，不要输出标签、JSON、规则说明。',
+        `用户消息：${truncateForPrompt(input.userText, MAX_DIRECT_ANSWER_USER_CHARS) || '(empty)'}`,
+        `当前回复：${truncateForPrompt(assistantText, MAX_DIRECT_ANSWER_USER_CHARS) || '(empty)'}`,
+      ].join('\n');
+      try {
+        const completion = await input.aiClient.generateText({
+          ...input.invokeInput,
+          prompt: completionPrompt,
+        });
+        const completionReply = normalizeAssistantReplyTail(
+          sanitizeAssistantReply(String(completion.text || '').trim()),
+        );
+        if (
+          completionReply
+          && !isPromptEchoReply(completionReply)
+          && !isDirectPromptEcho(completionReply)
+          && !isDegenerateAssistantReply(completionReply)
+          && !isLikelyIncompleteAssistantReply(completionReply)
+        ) {
+          assistantText = completionReply;
+          logRendererEvent({
+            level: 'info',
+            area: 'local-chat',
+            message: 'local-chat:send-turn:completion-recovered',
+            flowId: input.flowId,
+            details: {
+              recoveredChars: assistantText.length,
+            },
+          });
+        }
+      } catch (completionError) {
+        logRendererEvent({
+          level: 'warn',
+          area: 'local-chat',
+          message: 'local-chat:send-turn:completion-failed',
+          flowId: input.flowId,
+          details: {
+            error: completionError instanceof Error ? completionError.message : String(completionError || ''),
+          },
+        });
+      }
+    }
+    if (
+      !assistantText
+      || isPromptEchoReply(assistantText)
+      || isDirectPromptEcho(assistantText)
+      || isLikelyIncompleteAssistantReply(assistantText)
+    ) {
       assistantText = '抱歉，我刚才输出异常。请再说一次，我会直接回答你的问题。';
     }
   }
+  assistantText = ensureTerminalPunctuation(normalizeAssistantReplyTail(assistantText));
 
   let followupText: string | null = null;
   if (input.allowMultiReply) {

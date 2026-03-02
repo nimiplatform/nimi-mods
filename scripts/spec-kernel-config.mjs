@@ -130,13 +130,14 @@ export const MOD_SPEC_CONFIG = {
       'pnpm -C nimi-mods run check',
     ],
   },
-  narrative: {
-    modId: 'world.nimi.narrative',
-    specRoot: 'narrative/spec',
-    domainDoc: 'narrative.md',
+  'narrative-engine': {
+    modId: 'world.nimi.narrative-engine',
+    specRoot: 'narrative-engine/spec',
+    domainDoc: 'narrative-engine.md',
     rulePrefix: 'N',
     requiredKernelDocs: [
       'index.md',
+      'capability-contract.md',
       'fact-layer-contract.md',
       'pipeline-contract.md',
       'run-orchestration-contract.md',
@@ -147,6 +148,7 @@ export const MOD_SPEC_CONFIG = {
       'acceptance-contract.md',
     ],
     tableSpecs: [
+      { input: 'capabilities.yaml', output: 'capabilities.md', title: 'Generated Capabilities' },
       { input: 'fact-layers.yaml', output: 'fact-layers.md', title: 'Generated Fact Layers' },
       { input: 'pipeline-states.yaml', output: 'pipeline-states.md', title: 'Generated Pipeline States' },
       { input: 'run-states.yaml', output: 'run-states.md', title: 'Generated Run States' },
@@ -165,9 +167,9 @@ export const MOD_SPEC_CONFIG = {
       'NAR-005-INITIATIVE-COOLDOWN-NOOP',
     ],
     requiredVerificationCommands: [
-      'pnpm -C nimi-mods run generate:spec:narrative-kernel-docs',
-      'pnpm -C nimi-mods run check:spec:narrative-kernel-docs-drift',
-      'pnpm -C nimi-mods run check:spec:narrative-kernel-consistency',
+      'pnpm -C nimi-mods run generate:spec:narrative-engine-kernel-docs',
+      'pnpm -C nimi-mods run check:spec:narrative-engine-kernel-docs-drift',
+      'pnpm -C nimi-mods run check:spec:narrative-engine-kernel-consistency',
       'pnpm -C nimi-mods run check',
     ],
   },
@@ -178,6 +180,7 @@ export const MOD_SPEC_CONFIG = {
     rulePrefix: 'T',
     requiredKernelDocs: [
       'index.md',
+      'capability-contract.md',
       'fact-projection-contract.md',
       'pipeline-contract.md',
       'run-orchestration-contract.md',
@@ -187,6 +190,7 @@ export const MOD_SPEC_CONFIG = {
       'acceptance-contract.md',
     ],
     tableSpecs: [
+      { input: 'capabilities.yaml', output: 'capabilities.md', title: 'Generated Capabilities' },
       { input: 'projection-mapping.yaml', output: 'projection-mapping.md', title: 'Generated Projection Mapping' },
       { input: 'pipeline-states.yaml', output: 'pipeline-states.md', title: 'Generated Pipeline States' },
       { input: 'run-states.yaml', output: 'run-states.md', title: 'Generated Run States' },
@@ -217,6 +221,7 @@ export const MOD_SPEC_CONFIG = {
     rulePrefix: 'V',
     requiredKernelDocs: [
       'index.md',
+      'capability-contract.md',
       'fact-projection-contract.md',
       'pipeline-contract.md',
       'segmentation-contract.md',
@@ -230,6 +235,7 @@ export const MOD_SPEC_CONFIG = {
       'acceptance-contract.md',
     ],
     tableSpecs: [
+      { input: 'capabilities.yaml', output: 'capabilities.md', title: 'Generated Capabilities' },
       { input: 'fact-traceability.yaml', output: 'fact-traceability.md', title: 'Generated Fact Traceability' },
       { input: 'pipeline-states.yaml', output: 'pipeline-states.md', title: 'Generated Pipeline States' },
       { input: 'segmentation-policy.yaml', output: 'segmentation-policy.md', title: 'Generated Segmentation Policy' },

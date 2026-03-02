@@ -1,4 +1,4 @@
-# Narrative Domain Spec
+# Narrative-Engine Domain Spec
 
 > Status: Draft
 > Date: 2026-03-01
@@ -6,6 +6,7 @@
 
 ## 0. Normative Imports
 
+- Capability boundary: `kernel/capability-contract.md` (`N-CAP-*`)
 - Fact boundary: `kernel/fact-layer-contract.md` (`N-FACT-*`)
 - Pipeline: `kernel/pipeline-contract.md` (`N-PIPE-*`)
 - Run orchestration and recovery: `kernel/run-orchestration-contract.md` (`N-RUN-*`)

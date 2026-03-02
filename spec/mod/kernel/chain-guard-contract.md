@@ -2,7 +2,7 @@
 
 > Status: Draft
 > Date: 2026-03-02
-> Scope: `world-studio -> narrative -> textplay|videoplay` 跨阶段守卫与回归门禁。
+> Scope: `world-studio -> narrative-engine -> textplay|videoplay` 跨阶段守卫与回归门禁。
 
 ## 1. 目标与范围
 
@@ -10,8 +10,8 @@
 
 范围：
 
-1. world-studio 发布到 narrative 的输入契约。
-2. narrative 到 textplay/videoplay 的事实投影契约。
+1. world-studio 发布到 narrative-engine 的输入契约。
+2. narrative-engine 到 textplay/videoplay 的事实投影契约。
 3. renderer 的创作操作、重跑影响与质量门禁契约。
 
 ## 2. 禁止模式（MUST）
@@ -20,7 +20,7 @@
 
 1. mod 直连 vendor API。
 2. 通过模型名猜能力或硬编码 capability。
-3. renderer 回写 narrative spine。
+3. renderer 回写 narrative-engine spine。
 4. 绕过 canonical `CoreOutput` 输入事实。
 5. 跳过强制 quality gate 直接生成 release package。
 6. 通过 `stage/message` 文本启发式推断 run 终态。
@@ -35,7 +35,7 @@
 2. 幂等副作用：同 `idempotencyKey` 不得重复写。
 3. 索引连续性：shot/panel index 不得断裂或重复。
 4. 引用完整性：clip/shot/voice/episode 关系可解析。
-5. 字段联动一致性：`CoreOutput` 变更必须触发 narrative/textplay/videoplay 联动校验。
+5. 字段联动一致性：`CoreOutput` 变更必须触发 narrative-engine/textplay/videoplay 联动校验。
 
 ## 4. 回归矩阵（MUST）
 
@@ -77,4 +77,4 @@
 
 1. 外部项目中的路由拆分方式、数据库字段形态、日志习惯不构成可迁移合同。
 2. 仅以下三类内容可迁移：协议机制、恢复机制、测试治理机制。
-3. 任一提案若同时破坏“worldstudio 提供事实 / narrative 编译叙事 / renderer 消费渲染”主意图，必须驳回。
+3. 任一提案若同时破坏“worldstudio 提供事实 / narrative-engine 编译叙事 / renderer 消费渲染”主意图，必须驳回。

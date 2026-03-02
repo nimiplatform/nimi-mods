@@ -254,19 +254,19 @@ function checkNarrative(tables, reasonCodeSet, config) {
   const chain = tables['pipeline-states.yaml']?.execution_chain || [];
   const chainSteps = chain.map((row) => String(row?.step || '').trim());
   if (JSON.stringify(chainSteps) !== JSON.stringify(config.requiredPipelineChain)) {
-    fail(`[narrative] pipeline execution_chain mismatch`);
+    fail('[narrative-engine] pipeline execution_chain mismatch');
   }
 
   const whitelist = tables['fact-layers.yaml']?.core_output_whitelist || [];
   const fields = whitelist.map((row) => String(row?.field || '').trim());
   const expected = ['spineEvents', 'stateChanges', 'metrics'];
   if (JSON.stringify(fields) !== JSON.stringify(expected)) {
-    fail('[narrative] core_output_whitelist must be spineEvents/stateChanges/metrics');
+    fail('[narrative-engine] core_output_whitelist must be spineEvents/stateChanges/metrics');
   }
 
   const initiativeReasonCode = String(tables['initiative-policies.yaml']?.cooldown?.reason_code || '').trim();
   if (!reasonCodeSet.has(initiativeReasonCode)) {
-    fail(`[narrative] initiative cooldown reason code missing from reason-codes table: ${initiativeReasonCode}`);
+    fail(`[narrative-engine] initiative cooldown reason code missing from reason-codes table: ${initiativeReasonCode}`);
   }
 }
 
@@ -432,7 +432,7 @@ function main() {
     }
   }
 
-  if (mod === 'narrative') {
+  if (mod === 'narrative-engine') {
     checkNarrative(tables, reasonCodeSet, config);
   } else if (mod === 'textplay') {
     checkTextplay(tables, config);

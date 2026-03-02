@@ -44,11 +44,11 @@ cases:
     gap_refill_applied: true
     source_rule: N-RUN-009
 verification_commands:
-  - command: pnpm -C nimi-mods run generate:spec:narrative-kernel-docs
+  - command: pnpm -C nimi-mods run generate:spec:narrative-engine-kernel-docs
     source_rule: N-ACC-003
-  - command: pnpm -C nimi-mods run check:spec:narrative-kernel-docs-drift
+  - command: pnpm -C nimi-mods run check:spec:narrative-engine-kernel-docs-drift
     source_rule: N-ACC-003
-  - command: pnpm -C nimi-mods run check:spec:narrative-kernel-consistency
+  - command: pnpm -C nimi-mods run check:spec:narrative-engine-kernel-consistency
     source_rule: N-ACC-003
   - command: pnpm -C nimi-mods run check
     source_rule: N-ACC-003

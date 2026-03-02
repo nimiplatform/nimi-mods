@@ -18,6 +18,12 @@
 2. `spec/kernel/tables/pipeline-states.yaml`
 3. `spec/textplay.md`
 
+### Change capability boundary
+
+1. `spec/kernel/capability-contract.md`
+2. `spec/kernel/tables/capabilities.yaml`
+3. `spec/textplay.md`
+
 ### Change run orchestration / resume recovery
 
 1. `spec/kernel/run-orchestration-contract.md`

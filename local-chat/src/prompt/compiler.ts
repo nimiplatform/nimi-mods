@@ -7,6 +7,8 @@ const DEFAULT_MAX_JSON_CHARS = 2_000;
 
 const LAYER_ORDER: PromptLayerId[] = [
   'platformSafety',
+  'recentMessages',
+  'postHistoryInstructions',
   'worldHardRules',
   'identityRules',
   'identityBase',
@@ -15,8 +17,6 @@ const LAYER_ORDER: PromptLayerId[] = [
   'agentLorebook',
   'coreMemory',
   'e2eMemory',
-  'recentMessages',
-  'postHistoryInstructions',
 ];
 
 const LAYER_TITLES: Record<PromptLayerId, string> = {

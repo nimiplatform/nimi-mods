@@ -6,6 +6,7 @@
 
 ## 0. Normative Imports
 
+- Capability boundary: `kernel/capability-contract.md` (`V-CAP-*`)
 - Fact and traceability boundary: `kernel/fact-projection-contract.md` (`V-FACT-*`)
 - Production pipeline: `kernel/pipeline-contract.md` (`V-PIPE-*`)
 - Segmentation: `kernel/segmentation-contract.md` (`V-SEG-*`)

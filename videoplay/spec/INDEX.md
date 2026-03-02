@@ -18,6 +18,12 @@
 2. `spec/kernel/tables/pipeline-states.yaml`
 3. `spec/videoplay.md`
 
+### Change capability boundary
+
+1. `spec/kernel/capability-contract.md`
+2. `spec/kernel/tables/capabilities.yaml`
+3. `spec/videoplay.md`
+
 ### Change segmentation policy
 
 1. `spec/kernel/segmentation-contract.md`

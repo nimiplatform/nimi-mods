@@ -4,6 +4,7 @@
 
 | File | Source |
 |---|---|
+| `capabilities.md` | `tables/capabilities.yaml` |
 | `fact-traceability.md` | `tables/fact-traceability.yaml` |
 | `pipeline-states.md` | `tables/pipeline-states.yaml` |
 | `segmentation-policy.md` | `tables/segmentation-policy.yaml` |

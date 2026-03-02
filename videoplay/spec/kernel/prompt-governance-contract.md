@@ -25,3 +25,7 @@ Prompt canary coverage is authoritative in `tables/prompt-canary-cases.yaml` and
 ## V-PROMPT-006 Catalog/Template Drift Guard
 
 Prompt registry IDs, template scopes, and placeholder sets must stay in sync under automated drift checks.
+
+## V-PROMPT-007 Prompt Locale Baseline
+
+Prompt language baseline is `zh + en` from day one and cannot degrade to single-locale templates without explicit contract change.

@@ -39,6 +39,10 @@ transitions:
     from: "*"
     to: keep
     source_rule: T-PRES-003
+timeouts:
+  idle_timeout_seconds: 60
+  away_timeout_seconds: 300
+  source_rule: T-PRES-005
 constraints:
   - name: initiative_received_must_reset_idle_and_away_timers
     value: true

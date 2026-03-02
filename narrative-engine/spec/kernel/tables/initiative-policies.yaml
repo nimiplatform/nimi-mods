@@ -15,6 +15,9 @@ cooldown:
   hit_behavior: no-fire
   reason_code: NARRATIVE_INITIATIVE_COOLDOWN_ACTIVE
   source_rule: N-INIT-003
+cooldown_window:
+  cooldown_window_seconds: 180
+  source_rule: N-INIT-006
 fired_path:
   must_call: process_turn
   source_rule: N-INIT-004

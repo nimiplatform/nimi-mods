@@ -5,7 +5,7 @@
 
 ## Scope
 
-Cross-mod contracts for `world-studio -> narrative -> textplay|videoplay` chain.
+Cross-mod contracts for `world-studio -> narrative-engine -> textplay|videoplay` chain.
 
 ## Structure
 

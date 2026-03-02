@@ -4,6 +4,7 @@
 
 | File | Source |
 |---|---|
+| `capabilities.md` | `tables/capabilities.yaml` |
 | `projection-mapping.md` | `tables/projection-mapping.yaml` |
 | `pipeline-states.md` | `tables/pipeline-states.yaml` |
 | `run-states.md` | `tables/run-states.yaml` |

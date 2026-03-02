@@ -11,10 +11,11 @@ Domain docs must reference kernel rule IDs and must not duplicate kernel prose.
 ## 2. Rule ID Format
 
 - Format: `V-<DOMAIN>-NNN`
-- Domain enum: `FACT`, `PIPE`, `SEG`, `EDIT`, `ROUTE`, `QC`, `OPS`, `LINEAGE`, `PROMPT`, `ERR`, `ACC`
+- Domain enum: `CAP`, `FACT`, `PIPE`, `SEG`, `EDIT`, `ROUTE`, `QC`, `OPS`, `LINEAGE`, `PROMPT`, `ERR`, `ACC`
 
 ## 3. Ownership
 
+- `capability-contract.md` -> `V-CAP-*`
 - `fact-projection-contract.md` -> `V-FACT-*`
 - `pipeline-contract.md` -> `V-PIPE-*`
 - `segmentation-contract.md` -> `V-SEG-*`
@@ -29,6 +30,7 @@ Domain docs must reference kernel rule IDs and must not duplicate kernel prose.
 
 ## 4. Fact Sources
 
+- `capabilities.yaml`
 - `fact-traceability.yaml`
 - `pipeline-states.yaml`
 - `segmentation-policy.yaml`
