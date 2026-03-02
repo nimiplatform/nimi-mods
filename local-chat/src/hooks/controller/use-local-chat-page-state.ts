@@ -129,6 +129,50 @@ export function useLocalChatPageState() {
     setStatusBanner,
   });
 
+  const effectiveTtsConnectorId = useMemo(
+    () => (
+      speechSettingsState.defaultSettings.ttsConnectorId
+      || runtimeRouteState.routeOverride?.connectorId
+      || runtimeRouteState.chatRouteOptions?.selected?.connectorId
+      || ''
+    ),
+    [
+      speechSettingsState.defaultSettings.ttsConnectorId,
+      runtimeRouteState.routeOverride?.connectorId,
+      runtimeRouteState.chatRouteOptions?.selected?.connectorId,
+    ],
+  );
+
+  useEffect(() => {
+    if (speechSettingsState.defaultSettings.ttsRouteSource !== 'token-api') {
+      return;
+    }
+    const connectorId = String(effectiveTtsConnectorId || '').trim();
+    if (!connectorId) {
+      return;
+    }
+    const connectors = runtimeRouteState.chatRouteOptions?.connectors || [];
+    const connector = connectors.find((item) => item.id === connectorId);
+    if (!connector || connector.models.length === 0) {
+      return;
+    }
+    const currentModel = String(speechSettingsState.defaultSettings.ttsModel || '').trim();
+    if (currentModel && connector.models.includes(currentModel)) {
+      return;
+    }
+    const fallbackModel = connector.models[0] || '';
+    if (!fallbackModel || fallbackModel === currentModel) {
+      return;
+    }
+    speechSettingsState.handleTtsModelChange(fallbackModel);
+  }, [
+    effectiveTtsConnectorId,
+    runtimeRouteState.chatRouteOptions?.connectors,
+    speechSettingsState.defaultSettings.ttsRouteSource,
+    speechSettingsState.defaultSettings.ttsModel,
+    speechSettingsState.handleTtsModelChange,
+  ]);
+
   const effectiveRouteSource = (
     runtimeRouteState.routeOverride?.source
     || runtimeRouteState.routeSnapshot?.source
@@ -201,10 +245,7 @@ export function useLocalChatPageState() {
     defaultVoiceId: DEFAULT_TTS_VOICE,
     defaultAudioFormat: DEFAULT_TTS_FORMAT,
     ttsRouteSource: speechSettingsState.defaultSettings.ttsRouteSource,
-    ttsConnectorId: speechSettingsState.defaultSettings.ttsConnectorId
-      || runtimeRouteState.routeOverride?.connectorId
-      || runtimeRouteState.chatRouteOptions?.selected?.connectorId
-      || '',
+    ttsConnectorId: effectiveTtsConnectorId,
     ttsModel: speechSettingsState.defaultSettings.ttsModel,
     selectedSpeechProviderId: speechSettingsState.selectedSpeechProviderId,
     selectedTargetId: targetsState.selectedTargetId,
@@ -239,10 +280,7 @@ export function useLocalChatPageState() {
       text,
       providerId: speechSettingsState.selectedSpeechProviderId || undefined,
       routeSource: speechSettingsState.defaultSettings.ttsRouteSource,
-      connectorId: speechSettingsState.defaultSettings.ttsConnectorId
-        || runtimeRouteState.routeOverride?.connectorId
-        || runtimeRouteState.chatRouteOptions?.selected?.connectorId
-        || undefined,
+      connectorId: effectiveTtsConnectorId || undefined,
       model: speechSettingsState.defaultSettings.ttsModel || undefined,
       voiceId: speechSettingsState.defaultSettings.voiceName,
       format: DEFAULT_TTS_FORMAT,
@@ -259,9 +297,7 @@ export function useLocalChatPageState() {
     sessionsState.selectedSessionId,
     speechSettingsState.selectedSpeechProviderId,
     speechSettingsState.defaultSettings.ttsRouteSource,
-    speechSettingsState.defaultSettings.ttsConnectorId,
-    runtimeRouteState.routeOverride?.connectorId,
-    runtimeRouteState.chatRouteOptions?.selected?.connectorId,
+    effectiveTtsConnectorId,
     speechSettingsState.defaultSettings.ttsModel,
     speechSettingsState.defaultSettings.voiceName,
   ]);

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import { useAppStore } from '@nimiplatform/sdk/mod/ui';
-import { filterModelOptions } from '@nimiplatform/sdk/mod/model-options';
+import { filterModelOptions, filterModelsForSpeechSynthesis } from '@nimiplatform/sdk/mod/model-options';
 
 type Props = {
   open: boolean;
@@ -68,7 +68,9 @@ export function VoicePanel(props: Props) {
 
   const ttsConnectorModels = useMemo(() => {
     if (!ttsConnectorId) return [];
-    return connectors.find((c) => c.id === ttsConnectorId)?.models || [];
+    const allModels = connectors.find((c) => c.id === ttsConnectorId)?.models || [];
+    const ttsModels = filterModelsForSpeechSynthesis(allModels);
+    return ttsModels.length > 0 ? ttsModels : allModels;
   }, [connectors, ttsConnectorId]);
 
   const sttConnectorModels = useMemo(() => {
