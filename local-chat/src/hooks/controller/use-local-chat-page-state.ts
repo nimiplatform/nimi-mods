@@ -201,7 +201,10 @@ export function useLocalChatPageState() {
     defaultVoiceId: DEFAULT_TTS_VOICE,
     defaultAudioFormat: DEFAULT_TTS_FORMAT,
     ttsRouteSource: speechSettingsState.defaultSettings.ttsRouteSource,
-    ttsConnectorId: speechSettingsState.defaultSettings.ttsConnectorId,
+    ttsConnectorId: speechSettingsState.defaultSettings.ttsConnectorId
+      || runtimeRouteState.routeOverride?.connectorId
+      || runtimeRouteState.chatRouteOptions?.selected?.connectorId
+      || '',
     ttsModel: speechSettingsState.defaultSettings.ttsModel,
     selectedSpeechProviderId: speechSettingsState.selectedSpeechProviderId,
     selectedTargetId: targetsState.selectedTargetId,
@@ -236,7 +239,10 @@ export function useLocalChatPageState() {
       text,
       providerId: speechSettingsState.selectedSpeechProviderId || undefined,
       routeSource: speechSettingsState.defaultSettings.ttsRouteSource,
-      connectorId: speechSettingsState.defaultSettings.ttsConnectorId || undefined,
+      connectorId: speechSettingsState.defaultSettings.ttsConnectorId
+        || runtimeRouteState.routeOverride?.connectorId
+        || runtimeRouteState.chatRouteOptions?.selected?.connectorId
+        || undefined,
       model: speechSettingsState.defaultSettings.ttsModel || undefined,
       voiceId: speechSettingsState.defaultSettings.voiceName,
       format: DEFAULT_TTS_FORMAT,
@@ -254,6 +260,8 @@ export function useLocalChatPageState() {
     speechSettingsState.selectedSpeechProviderId,
     speechSettingsState.defaultSettings.ttsRouteSource,
     speechSettingsState.defaultSettings.ttsConnectorId,
+    runtimeRouteState.routeOverride?.connectorId,
+    runtimeRouteState.chatRouteOptions?.selected?.connectorId,
     speechSettingsState.defaultSettings.ttsModel,
     speechSettingsState.defaultSettings.voiceName,
   ]);
