@@ -43,33 +43,9 @@ function hasContextPayload(scopes: NarrativeContextResolveResponse['scopes']): b
     || Object.keys(scopes.RELATION).length > 0;
 }
 
-function buildDefaultContextScopes(input: {
-  storyId: string;
-  worldId: string;
-  agentId: string;
-  playerId: string;
-  systemPayload?: Record<string, unknown>;
-}): NarrativeContextResolveRequest['scopes'] {
-  return {
-    CANON: {
-      pacingPolicy: 'steady',
-      initiativePolicy: 'player-led',
-    },
-    STORY: {
-      storyId: input.storyId,
-      worldId: input.worldId,
-      phase: 'opening',
-    },
-    SUBJECT: {
-      agentId: input.agentId,
-      playerId: input.playerId,
-      activeObjective: String(input.systemPayload?.activeObjective || 'respond to player action'),
-    },
-    RELATION: {
-      pairKey: `${input.agentId}:${input.playerId}`,
-      trust: 0.5,
-    },
-  };
+function hasCriticalNarrativeContext(scopes: NarrativeContextResolveResponse['scopes']): boolean {
+  return Object.keys(scopes.CANON).length > 0
+    && Object.keys(scopes.STORY).length > 0;
 }
 
 export async function queryNarrativeContextResolve(input: {
@@ -120,23 +96,24 @@ export async function ensureNarrativeContext(input: {
       action: 'resolve',
     },
   });
-  if (hasContextPayload(current.scopes)) {
+  if (hasCriticalNarrativeContext(current.scopes)) {
     return current;
   }
-
-  return queryNarrativeContextResolve({
-    narrativeEngine: input.narrativeEngine,
-    request: {
-      storyId: input.storyId,
-      action: 'upsert',
-      scopes: buildDefaultContextScopes({
-        storyId: input.storyId,
-        worldId: input.worldId,
-        agentId: input.agentId,
-        playerId: input.playerId,
-        systemPayload: input.systemPayload,
-      }),
-    },
+  if (hasContextPayload(current.scopes)) {
+    throw new TextplayPipelineError({
+      reasonCode: TEXTPLAY_REASON.CONTEXT_MISSING_CRITICAL,
+      actionHint: 'Complete CANON/STORY narrative contexts and retry.',
+      message: 'TEXTPLAY_NARRATIVE_CONTEXT_CRITICAL_SCOPE_MISSING',
+      stage: 'context',
+      retryClass: 'non-retryable',
+    });
+  }
+  throw new TextplayPipelineError({
+    reasonCode: TEXTPLAY_REASON.CONTEXT_MISSING_CRITICAL,
+    actionHint: 'Complete CANON/STORY narrative contexts and retry.',
+    message: 'TEXTPLAY_NARRATIVE_CONTEXT_EMPTY',
+    stage: 'context',
+    retryClass: 'non-retryable',
   });
 }
 

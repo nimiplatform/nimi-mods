@@ -5,6 +5,8 @@ import {
   TEXTPLAY_DATA_API_WORLD_ACCESS_ME,
   TEXTPLAY_DATA_API_WORLD_EVENTS_LIST,
   TEXTPLAY_DATA_API_WORLD_LOREBOOKS_LIST,
+  TEXTPLAY_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST,
+  TEXTPLAY_DATA_API_WORLD_SCENES_LIST,
   TEXTPLAY_MOD_ID,
   TEXTPLAY_NAV_SLOT,
   TEXTPLAY_PERMISSIONS,
@@ -44,6 +46,14 @@ export const TEXTPLAY_MANIFEST = {
       {
         name: TEXTPLAY_DATA_API_WORLD_LOREBOOKS_LIST,
         description: 'Read world lorebook facts required by narrative compile context assembly',
+      },
+      {
+        name: TEXTPLAY_DATA_API_WORLD_SCENES_LIST,
+        description: 'Read world scene context required by story startup package assembly',
+      },
+      {
+        name: TEXTPLAY_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST,
+        description: 'Read narrative contexts required by story startup package and prompt policy assembly',
       },
       {
         name: TEXTPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY,

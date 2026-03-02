@@ -39,6 +39,8 @@ states:
   - state: INGEST
     preconditions:
       - narrative_turn_readable
+      - story_package_ready
+      - story_source_mode_supported
     next: SEGMENT
     source_rule: V-PIPE-002
   - state: SEGMENT
@@ -87,4 +89,12 @@ idempotency:
   require_idempotency_key_for_all_writes: true
   replay_must_not_duplicate_side_effects: true
   source_rule: V-PIPE-006
+story_source_modes:
+  supported:
+    - canonical-story
+    - textplay-enriched-story
+  enriched_requirements:
+    - has_user_or_agent_initiative_turn
+    - latest_window_selected
+  source_rule: V-PIPE-007
 ```

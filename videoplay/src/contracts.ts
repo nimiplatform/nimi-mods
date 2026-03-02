@@ -5,6 +5,11 @@ export const VIDEOPLAY_NAV_SLOT = 'ui-extension.app.sidebar.mods';
 export const VIDEOPLAY_ROUTE_SLOT = 'ui-extension.app.content.routes';
 
 export const VIDEOPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS = 'data-api.runtime.route.options';
+export const VIDEOPLAY_DATA_API_WORLD_EVENTS_LIST = 'data-api.world.events.list';
+export const VIDEOPLAY_DATA_API_WORLD_LOREBOOKS_LIST = 'data-api.world.lorebooks.list';
+export const VIDEOPLAY_DATA_API_WORLD_SCENES_LIST = 'data-api.world.scenes.list';
+export const VIDEOPLAY_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST = 'data-api.world.narrative-contexts.list';
+export const VIDEOPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY = 'data-api.core.agent.memory.recall.for-entity';
 
 export const VIDEOPLAY_DATA_API_EPISODE_UPSERT = 'data-api.videoplay.episode.upsert';
 export const VIDEOPLAY_DATA_API_ASSET_BATCH_UPSERT = 'data-api.videoplay.asset.batch-upsert';
@@ -15,6 +20,11 @@ export const VIDEOPLAY_CAPABILITIES = [
   'llm.image.generate',
   'llm.video.generate',
   `data.query.${VIDEOPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS}`,
+  `data.query.${VIDEOPLAY_DATA_API_WORLD_EVENTS_LIST}`,
+  `data.query.${VIDEOPLAY_DATA_API_WORLD_LOREBOOKS_LIST}`,
+  `data.query.${VIDEOPLAY_DATA_API_WORLD_SCENES_LIST}`,
+  `data.query.${VIDEOPLAY_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST}`,
+  `data.query.${VIDEOPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY}`,
   `data.register.${VIDEOPLAY_DATA_API_EPISODE_UPSERT}`,
   `data.query.${VIDEOPLAY_DATA_API_EPISODE_UPSERT}`,
   `data.register.${VIDEOPLAY_DATA_API_ASSET_BATCH_UPSERT}`,
@@ -28,6 +38,8 @@ export const VIDEOPLAY_CAPABILITIES = [
 export const VIDEOPLAY_REASON = {
   INPUT_INVALID: 'VIDEOPLAY_INPUT_INVALID',
   FACT_PROJECTION_INVALID: 'VIDEOPLAY_FACT_PROJECTION_INVALID',
+  STORY_PACKAGE_INVALID: 'VIDEOPLAY_STORY_PACKAGE_INVALID',
+  STORY_SOURCE_UNAVAILABLE: 'VIDEOPLAY_STORY_SOURCE_UNAVAILABLE',
   SEGMENTATION_FAILED: 'VIDEOPLAY_EPISODE_SEGMENTATION_FAILED',
   SEGMENTATION_NON_DETERMINISTIC: 'VIDEOPLAY_EPISODE_SEGMENTATION_NON_DETERMINISTIC',
   SCREENPLAY_SCHEMA_INVALID: 'VIDEOPLAY_SCREENPLAY_SCHEMA_INVALID',
@@ -91,6 +103,14 @@ export const VIDEOPLAY_STAGE_CAPABILITY = {
 
 export type VideoPlayRouteStage =
   typeof VIDEOPLAY_ROUTE_STAGES[number];
+
+export const VIDEOPLAY_STORY_SOURCE_MODE = {
+  CANONICAL: 'canonical-story',
+  ENRICHED: 'textplay-enriched-story',
+} as const;
+
+export type VideoStorySourceMode =
+  typeof VIDEOPLAY_STORY_SOURCE_MODE[keyof typeof VIDEOPLAY_STORY_SOURCE_MODE];
 
 export const VIDEOPLAY_PROMPT_ID = {
   STORYBOARD_PLAN: 'VPROMPT-STORYBOARD-PLAN-V1',

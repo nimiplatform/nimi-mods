@@ -8,6 +8,7 @@ import type {
   VideoPlayReasonCode,
   VideoPlayRetryClass,
   VideoPlayRouteStage,
+  VideoStorySourceMode,
 } from './contracts.js';
 
 export type NarrativeSpineEvent = {
@@ -47,6 +48,114 @@ export type NarrativeProjectionRenderInput = {
   sceneAnchor: Record<string, unknown>;
   metrics: Record<string, unknown>;
   sourceEventIds: string[];
+};
+
+export type VideoStorySummary = {
+  storyId: string;
+  worldId: string;
+  entryEventId: string;
+  title: string;
+  summary: string;
+  primaryAgentId: string;
+  participants: string[];
+  eventHorizon: 'PAST' | 'ONGOING' | 'FUTURE';
+  updatedAt: string;
+  playable: boolean;
+  agentBindingMissing: boolean;
+};
+
+export type VideoStoryDetail = VideoStorySummary & {
+  cause: string;
+  process: string;
+  result: string;
+  timeRef: string;
+  locationRefs: string[];
+  characterRefs: string[];
+  recommendedSceneId: string | null;
+};
+
+export type VideoStoryContextCoverage = {
+  canon: boolean;
+  story: boolean;
+  subject: boolean;
+  relation: boolean;
+  scene: boolean;
+};
+
+export type VideoStorySnapshot = {
+  storyId: string;
+  entryEventId: string;
+  primaryAgentId: string;
+  version: string;
+  source: string;
+  loadedAt: string;
+  contextCoverage: VideoStoryContextCoverage;
+  gapWarnings: string[];
+};
+
+export type VideoStoryPackage = {
+  storyId: string;
+  worldId: string;
+  entryEventId: string;
+  sourceMode: VideoStorySourceMode;
+  entry: {
+    title: string;
+    summary: string;
+    cause: string;
+    process: string;
+    result: string;
+    timeRef: string;
+    locationRefs: string[];
+    characterRefs: string[];
+    recommendedSceneId: string | null;
+  };
+  cast: {
+    primaryAgentId: string;
+    participants: string[];
+  };
+  materials: {
+    lorebooks: Array<{
+      id: string;
+      key: string;
+      content: string;
+      score: number;
+    }>;
+    memories: string[];
+    scenes: Array<{
+      id: string;
+      name: string;
+      description: string;
+      score: number;
+    }>;
+    contexts: Array<{
+      id: string;
+      scope: 'CANON' | 'STORY' | 'SUBJECT' | 'RELATION';
+      scopeKey: string;
+      storyId: string | null;
+      narrativeSetting: Record<string, unknown>;
+      narrativeState: Record<string, unknown>;
+    }>;
+    recallSource: string;
+  };
+  narrativeScopes: {
+    CANON: Record<string, unknown>;
+    STORY: Record<string, unknown>;
+    SUBJECT: Record<string, unknown>;
+    RELATION: Record<string, unknown>;
+  };
+  turnWindow: NarrativeTurnWindow;
+  projection: NarrativeProjectionRenderInput;
+  recommendedEntryTurn: {
+    turnId: string;
+    createdAt?: string;
+    triggerSource?: string;
+  } | null;
+  windowPolicy: {
+    maxTurns: number;
+    readLimit: number;
+    enrichedRequiredTriggerSources: Array<'UserTurn' | 'AgentInitiative'>;
+  };
+  snapshot: VideoStorySnapshot;
 };
 
 export type SegmentationPolicy = {
@@ -376,6 +485,9 @@ export type VideoPlayPipelineInput = {
   projectId: string;
   storyId: string;
   ingestCursorStart: string;
+  sourceMode: VideoStorySourceMode;
+  storyPackage: VideoStoryPackage;
+  windowPolicy?: Partial<VideoStoryPackage['windowPolicy']>;
   policy?: Partial<SegmentationPolicy>;
   taskId?: string;
   operator?: string;

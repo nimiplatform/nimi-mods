@@ -77,6 +77,12 @@ export function buildNarrativeRenderInput(input: {
       summary: worldStyleSummary,
       ...input.snapshot.narrativeStyle,
       worldviewRules: input.snapshot.worldviewRules,
+      phase: input.snapshot.phase,
+      objective: input.snapshot.objective,
+      tensionTarget: input.snapshot.tensionTarget,
+      openThreads: input.snapshot.openThreads,
+      startupPolicy: input.snapshot.startupPolicy,
+      contextCoverage: input.snapshot.contextCoverage,
     },
     player: {
       id: input.turn.playerId,
@@ -95,6 +101,7 @@ export function buildNarrativeRenderInput(input: {
     sceneAnchor: {
       place: input.snapshot.place,
       material: input.snapshot.sceneMaterial,
+      futurePressure: input.snapshot.futurePressure,
     },
     agentAnchor: {
       id: input.turn.agentId,

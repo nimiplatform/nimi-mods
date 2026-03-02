@@ -13,11 +13,18 @@ import {
   VIDEOPLAY_OPERATION_TYPE,
   VIDEOPLAY_PIPELINE_CHAIN,
   VIDEOPLAY_REASON,
+  VIDEOPLAY_STORY_SOURCE_MODE,
   type VideoPlayOperationType,
   type VideoPlayPipelineStep,
+  type VideoPlayReasonCode,
+  type VideoStorySourceMode,
 } from '../contracts.js';
 import { toVideoPlayError } from '../errors.js';
 import { createHash, createUlid } from '../id.js';
+import {
+  listPlayableVideoStories,
+  loadVideoStoryPackage,
+} from '../data/story-package.js';
 import { runVideoPlayEpisodeProduction } from '../pipeline/orchestrator.js';
 import { applyCreatorOperation } from '../storage/operations.js';
 import type {
@@ -26,11 +33,19 @@ import type {
   ReleasePackage,
   RenderedAsset,
   VideoPlayRunEvent,
+  VideoStoryPackage,
+  VideoStorySummary,
 } from '../types.js';
 import type { VideoPlayWorkbenchProps } from '../ui/video-play-workbench.js';
 
 type AppStoreState = {
   setStatusBanner?: (value: { kind: 'warn' | 'error' | 'success' | 'info'; message: string }) => void;
+};
+
+type ControllerError = {
+  reasonCode: string;
+  actionHint: string;
+  message: string;
 };
 
 function operationLabel(value: VideoPlayOperationType): string {
@@ -142,6 +157,18 @@ function buildSyntheticVoiceAssets(input: {
   return assets;
 }
 
+function toControllerError(
+  error: unknown,
+  fallback: { reasonCode: VideoPlayReasonCode; actionHint: string; stage: string },
+): ControllerError {
+  const normalized = toVideoPlayError(error, fallback);
+  return {
+    reasonCode: normalized.reasonCode,
+    actionHint: normalized.actionHint,
+    message: normalized.message,
+  };
+}
+
 export function useVideoPlayController(): VideoPlayWorkbenchProps {
   const hookClient = useMemo(() => createHookClient(VIDEOPLAY_MOD_ID), []);
   const aiClient = useMemo(() => createAiClient(VIDEOPLAY_MOD_ID), []);
@@ -159,9 +186,16 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
   }), [aiClient, hookClient]);
   const setStatusBanner = useAppStore((state) => (state as AppStoreState).setStatusBanner);
 
+  const [worldId, setWorldId] = useState('world-main');
   const [projectId, setProjectId] = useState('project-main');
-  const [storyId, setStoryId] = useState('story-main');
   const [ingestCursorStart, setIngestCursorStart] = useState('turn-0000');
+  const [stories, setStories] = useState<VideoStorySummary[]>([]);
+  const [selectedStoryId, setSelectedStoryId] = useState('');
+  const [sourceMode, setSourceMode] = useState<VideoStorySourceMode>(VIDEOPLAY_STORY_SOURCE_MODE.CANONICAL);
+  const [storyPackage, setStoryPackage] = useState<VideoStoryPackage | null>(null);
+  const [storyPackageLoading, setStoryPackageLoading] = useState(false);
+  const [storyPackageError, setStoryPackageError] = useState<ControllerError | null>(null);
+
   const [runStatus, setRunStatus] = useState('IDLE');
   const [loading, setLoading] = useState(false);
   const [rerunStep, setRerunStep] = useState<VideoPlayPipelineStep>('screenplay');
@@ -182,7 +216,7 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
   const [fallbackAudits, setFallbackAudits] = useState<FallbackAuditRecord[]>([]);
   const [selectedEpisodeId, setSelectedEpisodeId] = useState('');
   const [lastRebuildScope, setLastRebuildScope] = useState<string | null>(null);
-  const [error, setError] = useState<{ reasonCode: string; actionHint: string; message: string } | null>(null);
+  const [error, setError] = useState<ControllerError | null>(null);
   const [routeStatuses, setRouteStatuses] = useState<Array<{
     capability: 'chat' | 'image' | 'video';
     source: string;
@@ -196,10 +230,21 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
   ]);
 
   const cancelRequestedRef = useRef(false);
+  const storyPackageLoadSeqRef = useRef(0);
+
+  const selectedStory = useMemo(
+    () => stories.find((item) => item.storyId === selectedStoryId) || null,
+    [stories, selectedStoryId],
+  );
 
   const selectedEpisode = useMemo(
     () => episodes.find((item) => item.episodeId === selectedEpisodeId) || null,
     [episodes, selectedEpisodeId],
+  );
+
+  const routeReady = useMemo(
+    () => routeStatuses.every((item) => item.ready),
+    [routeStatuses],
   );
 
   const selectedReleaseCandidate = selectedEpisode?.candidateRelease || null;
@@ -248,20 +293,62 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
     setRouteStatuses(next);
   }, [hookClient]);
 
+  const refreshStoryCatalog = useCallback(async () => {
+    try {
+      const catalog = await listPlayableVideoStories({
+        hookClient,
+        worldId,
+      });
+      setStories(catalog);
+      setSelectedStoryId((current) => {
+        if (current && catalog.some((item) => item.storyId === current)) {
+          return current;
+        }
+        return catalog[0]?.storyId || '';
+      });
+      if (catalog.length === 0) {
+        setStoryPackage(null);
+        setStoryPackageError({
+          reasonCode: VIDEOPLAY_REASON.STORY_SOURCE_UNAVAILABLE,
+          actionHint: 'Create PRIMARY world event projection first.',
+          message: 'No playable PRIMARY stories found.',
+        });
+      } else {
+        setStoryPackageError(null);
+      }
+    } catch (catalogError) {
+      const normalized = toControllerError(catalogError, {
+        reasonCode: VIDEOPLAY_REASON.STORY_SOURCE_UNAVAILABLE,
+        actionHint: 'Enable story source capabilities and retry catalog load.',
+        stage: 'story-catalog',
+      });
+      setStories([]);
+      setSelectedStoryId('');
+      setStoryPackage(null);
+      setStoryPackageError(normalized);
+      setStatusBanner?.({
+        kind: 'error',
+        message: `${normalized.reasonCode}: ${normalized.actionHint}`,
+      });
+    }
+  }, [hookClient, setStatusBanner, worldId]);
+
   const refreshStorageView = useCallback(async () => {
     try {
       const episodeResponse = await hookClient.data.query({
         capability: VIDEOPLAY_DATA_API_EPISODE_UPSERT,
         query: {
           operation: 'list',
-          storyId,
+          ...(selectedStoryId ? { storyId: selectedStoryId } : {}),
         },
       });
       const list = episodeResponse && typeof episodeResponse === 'object'
         ? (episodeResponse as { episodes?: EpisodeRecord[] }).episodes || []
         : [];
       setEpisodes(list);
-      if (!selectedEpisodeId && list.length > 0) {
+      if (list.length === 0) {
+        setSelectedEpisodeId('');
+      } else if (!list.some((item) => item.episodeId === selectedEpisodeId)) {
         setSelectedEpisodeId(list[0]!.episodeId);
       }
 
@@ -282,14 +369,140 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
         message: `VideoPlay state refresh failed: ${message}`,
       });
     }
-  }, [hookClient, selectedEpisodeId, setStatusBanner, storyId]);
+  }, [hookClient, selectedEpisodeId, selectedStoryId, setStatusBanner]);
+
+  const resetRunSurface = useCallback(() => {
+    setRunStatus('IDLE');
+    setRuns([]);
+    setRunEvents([]);
+    setFallbackAudits([]);
+    setEpisodes([]);
+    setSelectedEpisodeId('');
+    setLastRebuildScope(null);
+    setError(null);
+  }, []);
+
+  const loadSelectedStoryPackage = useCallback(async () => {
+    if (!selectedStory) {
+      setStoryPackage(null);
+      setStoryPackageError(null);
+      return;
+    }
+
+    setStoryPackageLoading(true);
+    setStoryPackageError(null);
+    const seq = storyPackageLoadSeqRef.current + 1;
+    storyPackageLoadSeqRef.current = seq;
+
+    try {
+      const nextPackage = await loadVideoStoryPackage({
+        hookClient,
+        narrativeEngine,
+        worldId,
+        storyId: selectedStory.storyId,
+        projectId,
+        ingestCursorStart,
+        sourceMode,
+        runtimeAgentId: selectedStory.primaryAgentId || undefined,
+      });
+      if (storyPackageLoadSeqRef.current !== seq) {
+        return;
+      }
+      setStoryPackage(nextPackage);
+      setStoryPackageError(null);
+    } catch (packageError) {
+      if (storyPackageLoadSeqRef.current !== seq) {
+        return;
+      }
+      const normalized = toControllerError(packageError, {
+        reasonCode: VIDEOPLAY_REASON.STORY_PACKAGE_INVALID,
+        actionHint: 'Repair story package source data and reload.',
+        stage: 'story-package',
+      });
+      setStoryPackage(null);
+      setStoryPackageError(normalized);
+      setStatusBanner?.({
+        kind: 'error',
+        message: `${normalized.reasonCode}: ${normalized.actionHint}`,
+      });
+    } finally {
+      if (storyPackageLoadSeqRef.current === seq) {
+        setStoryPackageLoading(false);
+      }
+    }
+  }, [
+    hookClient,
+    ingestCursorStart,
+    narrativeEngine,
+    projectId,
+    selectedStory,
+    setStatusBanner,
+    sourceMode,
+    worldId,
+  ]);
 
   useEffect(() => {
     void refreshRouteStatuses();
+  }, [refreshRouteStatuses]);
+
+  useEffect(() => {
+    void refreshStoryCatalog();
+  }, [refreshStoryCatalog]);
+
+  useEffect(() => {
     void refreshStorageView();
-  }, [refreshRouteStatuses, refreshStorageView]);
+  }, [refreshStorageView]);
+
+  useEffect(() => {
+    resetRunSurface();
+    if (!selectedStoryId) {
+      setStoryPackage(null);
+      setStoryPackageError(null);
+      return;
+    }
+    void loadSelectedStoryPackage();
+  }, [
+    ingestCursorStart,
+    loadSelectedStoryPackage,
+    projectId,
+    resetRunSurface,
+    selectedStoryId,
+    sourceMode,
+    worldId,
+  ]);
 
   const executePipeline = useCallback(async (mode: 'run' | 'rerun-step' | 'continue') => {
+    if (!selectedStory) {
+      const blockingError: ControllerError = {
+        reasonCode: VIDEOPLAY_REASON.STORY_SOURCE_UNAVAILABLE,
+        actionHint: 'Select a playable story first.',
+        message: 'No story selected.',
+      };
+      setError(blockingError);
+      setStatusBanner?.({ kind: 'warn', message: `${blockingError.reasonCode}: ${blockingError.actionHint}` });
+      return;
+    }
+    if (!routeReady) {
+      const blockingError: ControllerError = {
+        reasonCode: VIDEOPLAY_REASON.ROUTE_UNAVAILABLE,
+        actionHint: 'Ensure chat/image/video routes are ready.',
+        message: 'Route not ready for at least one capability.',
+      };
+      setError(blockingError);
+      setStatusBanner?.({ kind: 'warn', message: `${blockingError.reasonCode}: ${blockingError.actionHint}` });
+      return;
+    }
+    if (storyPackageLoading || !storyPackage) {
+      const baseError = storyPackageError || {
+        reasonCode: VIDEOPLAY_REASON.STORY_PACKAGE_INVALID,
+        actionHint: 'Wait for story package ready and retry.',
+        message: 'Story package is not ready.',
+      };
+      setError(baseError);
+      setStatusBanner?.({ kind: 'warn', message: `${baseError.reasonCode}: ${baseError.actionHint}` });
+      return;
+    }
+
     cancelRequestedRef.current = false;
     setRunStatus('RUNNING');
     setError(null);
@@ -304,8 +517,11 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
         },
         {
           projectId,
-          storyId,
-          ingestCursorStart,
+          storyId: selectedStory.storyId,
+          ingestCursorStart: storyPackage.turnWindow.ingestCursorStart,
+          sourceMode,
+          storyPackage,
+          windowPolicy: storyPackage.windowPolicy,
           operator: 'creator',
         },
       );
@@ -340,17 +556,13 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
           : `VideoPlay ${mode} completed (${result.episodes.length} episode)`,
       });
     } catch (pipelineError) {
-      const normalized = toVideoPlayError(pipelineError, {
+      const normalized = toControllerError(pipelineError, {
         reasonCode: VIDEOPLAY_REASON.INPUT_INVALID,
         actionHint: 'Fix pipeline input and retry.',
         stage: 'orchestrator',
       });
       setRunStatus('FAILED');
-      setError({
-        reasonCode: normalized.reasonCode,
-        actionHint: normalized.actionHint,
-        message: normalized.message,
-      });
+      setError(normalized);
       setRuns((current) => [{
         runId: createUlid(),
         traceId: createUlid(),
@@ -370,13 +582,17 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
   }, [
     aiClient,
     hookClient,
-    ingestCursorStart,
     narrativeEngine,
     projectId,
     refreshRouteStatuses,
     refreshStorageView,
+    routeReady,
+    selectedStory,
     setStatusBanner,
-    storyId,
+    sourceMode,
+    storyPackage,
+    storyPackageError,
+    storyPackageLoading,
   ]);
 
   const handleApplyOperation = useCallback(async () => {
@@ -428,16 +644,12 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
         message: `Operation applied: ${operationType} · scope=${applied.rebuildScope}`,
       });
     } catch (operationError) {
-      const normalized = toVideoPlayError(operationError, {
+      const normalized = toControllerError(operationError, {
         reasonCode: VIDEOPLAY_REASON.INPUT_INVALID,
         actionHint: 'Fix operation payload and retry.',
         stage: 'operation',
       });
-      setError({
-        reasonCode: normalized.reasonCode,
-        actionHint: normalized.actionHint,
-        message: normalized.message,
-      });
+      setError(normalized);
     }
   }, [
     hookClient,
@@ -484,15 +696,23 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
   return {
     title: 'VideoPlay Workbench',
     subtitle: 'Canonical narrative -> episode production package',
+    worldId,
     projectId,
-    storyId,
     ingestCursorStart,
+    stories,
+    selectedStoryId,
+    selectedStory,
+    sourceMode,
+    storyPackage,
+    storyPackageLoading,
+    storyPackageError,
     runStatus,
     rerunStep,
     operationType,
     operationPayload,
     selectedEpisodeId,
     routeStatuses,
+    routeReady,
     episodes,
     runs,
     runEvents,
@@ -505,9 +725,11 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
     loading,
     error,
     operationOptions,
+    onWorldIdChange: setWorldId,
     onProjectIdChange: setProjectId,
-    onStoryIdChange: setStoryId,
     onIngestCursorStartChange: setIngestCursorStart,
+    onSelectStory: setSelectedStoryId,
+    onSourceModeChange: setSourceMode,
     onRerunStepChange: setRerunStep,
     onOperationTypeChange: setOperationType,
     onOperationPayloadChange: setOperationPayload,
@@ -533,9 +755,14 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
     onPublish: () => {
       void handlePublish();
     },
+    onReloadStoryPackage: () => {
+      void loadSelectedStoryPackage();
+    },
     onRefresh: () => {
       void refreshRouteStatuses();
+      void refreshStoryCatalog();
       void refreshStorageView();
+      void loadSelectedStoryPackage();
     },
   };
 }

@@ -19,6 +19,16 @@ required_capabilities:
     source_rule: V-CAP-002
   - key: data.query.data-api.runtime.route.options
     source_rule: V-CAP-003
+  - key: data.query.data-api.world.events.list
+    source_rule: V-CAP-006
+  - key: data.query.data-api.world.lorebooks.list
+    source_rule: V-CAP-006
+  - key: data.query.data-api.world.scenes.list
+    source_rule: V-CAP-006
+  - key: data.query.data-api.world.narrative-contexts.list
+    source_rule: V-CAP-006
+  - key: data.query.data-api.core.agent.memory.recall.for-entity
+    source_rule: V-CAP-006
   - key: data.register.data-api.videoplay.episode.upsert
     source_rule: V-CAP-004
   - key: data.query.data-api.videoplay.episode.upsert

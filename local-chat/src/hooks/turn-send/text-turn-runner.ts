@@ -96,7 +96,7 @@ function isLikelyIncompleteAssistantReply(value: string): boolean {
   if (TRAILING_SEMANTIC_FRAGMENT_RE.test(text)) return true;
   if (!TERMINAL_PUNCTUATION_RE.test(text)) {
     if (MID_CLAUSE_PUNCTUATION_RE.test(text)) return true;
-    if (text.length >= 14) return true;
+    if (text.length >= 10) return true;
   }
   if (!TERMINAL_PUNCTUATION_RE.test(text) && text.length >= 6 && SOFT_DANGLING_TAIL_RE.test(text)) {
     return true;

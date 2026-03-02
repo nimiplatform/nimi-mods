@@ -30,6 +30,7 @@
 - `WS-DOM-012`: Reload conflict action replaces local unsaved snapshot with remote authoritative snapshot.
 - `WS-DOM-013`: Reload recovery converts live task to `PAUSED` or `FAILED` by resumable capability.
 - `WS-DOM-014`: Publish path keeps agent sync world-owned and normalizes invalid handles.
+- `WS-DOM-015`: Maintenance diagnostics expose story projection summary (`count/missingContext/latestProjectedAt`) for narrative handoff audit.
 
 ## 3. No Over-Design Guard
 

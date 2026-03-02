@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadReplicaStartupPackage } from '../src/data/replica-catalog.ts';
+import { loadStoryStartupPackage } from '../src/data/story-catalog.ts';
 
 function createHookClient() {
   return {
@@ -27,6 +27,78 @@ function createHookClient() {
           };
         }
 
+        if (capability === 'data-api.world.scenes.list') {
+          return {
+            worldId: 'world-1',
+            items: [
+              {
+                id: 'scene-docks',
+                worldId: 'world-1',
+                name: 'Iron Docks',
+                description: 'Rain hammers the mooring towers.',
+                setting: { weather: 'rain' },
+                activeEntities: ['agent-1', 'player-1'],
+                updatedAt: '2026-03-02T09:00:00.000Z',
+              },
+            ],
+          };
+        }
+
+        if (capability === 'data-api.world.narrative-contexts.list') {
+          return {
+            worldId: 'world-1',
+            items: [
+              {
+                id: 'ctx-canon',
+                scope: 'CANON',
+                scopeKey: 'canon:world-1',
+                storyId: null,
+                narrativeSetting: { pacingPolicy: { curve: 'steady' } },
+                narrativeState: {},
+              },
+              {
+                id: 'ctx-story',
+                scope: 'STORY',
+                scopeKey: 'story:world-1:evt-primary',
+                storyId: 'story.world-1.evt-primary',
+                narrativeSetting: {
+                  recommendedSceneId: 'scene-docks',
+                  initiativePolicy: { enabled: true, tickSeconds: 10, cooldownSeconds: 180, maxConsecutive: 3 },
+                  pacingPolicy: { targetTension: 0.6, tensionBand: [0.45, 0.75], beatDensity: 0.5, curve: 'steady-rise' },
+                },
+                narrativeState: {
+                  phase: 'in-progress',
+                  objective: 'Stabilize the negotiation',
+                  tension: 0.62,
+                  openThreads: ['missing cargo stamp'],
+                },
+              },
+              {
+                id: 'ctx-subject',
+                scope: 'SUBJECT',
+                scopeKey: 'subject:world-1:agent-1',
+                storyId: 'story.world-1.evt-primary',
+                subjectType: 'AGENT',
+                subjectId: 'agent-1',
+                narrativeSetting: { dramaticRole: 'mediator' },
+                narrativeState: { activeObjective: 'protect player' },
+              },
+              {
+                id: 'ctx-relation',
+                scope: 'RELATION',
+                scopeKey: 'relation:world-1:agent-1:player-1',
+                storyId: 'story.world-1.evt-primary',
+                subjectType: 'AGENT',
+                subjectId: 'agent-1',
+                targetSubjectType: 'PLAYER',
+                targetSubjectId: 'player-1',
+                narrativeSetting: { relationContract: 'uneasy-allies' },
+                narrativeState: { trust: 0.4 },
+              },
+            ],
+          };
+        }
+
         if (capability === 'data-api.core.agent.memory.recall.for-entity') {
           return {
             recallSource: 'remote-only',
@@ -47,25 +119,28 @@ function createHookClient() {
 }
 
 const detail = {
-  replicaId: 'evt-primary',
-  storyId: 'tp.story.world-1.evt-primary',
+  storyId: 'story.world-1.evt-primary',
   worldId: 'world-1',
-  sourceEventId: 'evt-primary',
+  entryEventId: 'evt-primary',
   title: 'Storm Harbor Incident',
   summary: 'A tense negotiation breaks under heavy rain.',
   primaryAgentId: 'agent-1',
   participants: ['agent-1', 'player-1'],
-  createdAt: '2026-03-02T08:00:00.000Z',
   updatedAt: '2026-03-02T09:00:00.000Z',
+  eventHorizon: 'PAST',
+  playable: true,
   agentBindingMissing: false,
   cause: 'Contraband dispute',
   process: 'Negotiation escalates near docks',
   result: 'Local order fractures',
   timeRef: 'night-watch',
+  locationRefs: ['scene-docks'],
+  characterRefs: ['agent-1', 'player-1'],
+  recommendedSceneId: 'scene-docks',
 };
 
 test('startup package composes summary/material/objective/snapshot and supports fresh mode', async () => {
-  const startup = await loadReplicaStartupPackage({
+  const startup = await loadStoryStartupPackage({
     hookClient: createHookClient(),
     narrativeEngine: {
       turnLatest: async () => {
@@ -77,12 +152,17 @@ test('startup package composes summary/material/objective/snapshot and supports 
   });
 
   assert.equal(startup.storyId, detail.storyId);
-  assert.equal(startup.backgroundSummary.includes('Cause: Contraband dispute'), true);
-  assert.equal(startup.phase, 'post-outcome');
-  assert.equal(startup.objective, 'Local order fractures');
-  assert.equal(startup.availableMaterials.lorebooks.length > 0, true);
-  assert.equal(startup.availableMaterials.memories.length > 0, true);
+  assert.equal(startup.background.summary.includes('Cause: Contraband dispute'), true);
+  assert.equal(startup.narrativeScopes.STORY.phase, 'in-progress');
+  assert.equal(startup.narrativeScopes.STORY.objective, 'Stabilize the negotiation');
+  assert.equal(startup.materials.lorebooks.length > 0, true);
+  assert.equal(startup.materials.memories.length > 0, true);
+  assert.equal(startup.materials.scenes.length > 0, true);
+  assert.equal(startup.materials.contexts.length >= 4, true);
   assert.equal(startup.recommendedEntryTurn, null);
-  assert.equal(startup.snapshot.replicaId, detail.replicaId);
+  assert.equal(startup.snapshot.entryEventId, detail.entryEventId);
+  assert.equal(startup.snapshot.contextCoverage.canon, true);
+  assert.equal(startup.snapshot.contextCoverage.story, true);
+  assert.equal(startup.startupPolicy.initiative.cooldownSeconds, 180);
   assert.equal(startup.snapshot.version.startsWith('h'), true);
 });

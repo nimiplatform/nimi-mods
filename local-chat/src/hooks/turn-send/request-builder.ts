@@ -7,7 +7,7 @@ import {
 import type { LocalChatCompiledPrompt } from '../../prompt/index.js';
 import type { ChatMessage } from '../../types.js';
 
-const MAX_SEGMENT_TOKENS = 320;
+const MAX_SEGMENT_TOKENS = 1024;
 
 type BuildTurnRequestInput = {
   text: string;

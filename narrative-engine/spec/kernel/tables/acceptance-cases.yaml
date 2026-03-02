@@ -43,6 +43,19 @@ cases:
     expected_reason_code: null
     gap_refill_applied: true
     source_rule: N-RUN-009
+  - id: NAR-008-TENSION-JUMP-ADJUSTED
+    description: Guard adjusts output when tension delta exceeds policy maxTensionDelta.
+    expected_status: ADJUSTED
+    expected_reason_code: NARRATIVE_TENSION_JUMP_ADJUSTED
+    write_spine: true
+    source_rule: N-ACC-002
+  - id: NAR-009-SUBJECT-RELATION-SCENE-DEGRADED-WARN
+    description: Missing SUBJECT/RELATION/scene does not block run when CANON/STORY are present.
+    expected_status: APPROVED
+    expected_reason_code: null
+    context_degraded_warning_only: true
+    write_spine: true
+    source_rule: N-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:narrative-engine-kernel-docs
     source_rule: N-ACC-003

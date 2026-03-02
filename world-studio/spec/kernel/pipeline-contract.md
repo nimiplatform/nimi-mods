@@ -37,3 +37,7 @@ Publish requires saved draft id and transitions landing target to `MAINTAIN`; ag
 ## WS-PIPE-008 Narrative Handoff Projection
 
 Published world projection must include a narrative-consumable handoff bundle (event identity, temporal anchor, trace binding). Missing handoff bundle is fail-close.
+
+## WS-PIPE-009 Story Projection Summary
+
+Publish must upsert story projection contexts derived from `PRIMARY` events and expose summary metrics in maintenance diagnostics.

@@ -155,6 +155,7 @@ export const TextplayWorldEventRowSchema = z.strictObject({
   id: z.string().min(1),
   worldId: z.string().optional(),
   level: z.string().optional(),
+  eventHorizon: z.enum(['PAST', 'ONGOING', 'FUTURE']).optional(),
   title: z.string().optional(),
   summary: z.string().optional(),
   cause: z.string().optional(),
@@ -202,6 +203,47 @@ export const TextplayWorldLorebookListResponseSchema = z.union([
   z.strictObject({
     worldId: z.string().optional(),
     items: z.array(TextplayWorldLorebookRowSchema),
+  }).passthrough(),
+]);
+
+export const TextplayWorldSceneRowSchema = z.strictObject({
+  id: z.string().min(1),
+  worldId: z.string().optional(),
+  name: z.string().optional(),
+  description: z.string().optional(),
+  setting: z.record(z.string(), z.unknown()).optional(),
+  activeEntities: z.array(z.string()).optional(),
+  updatedAt: z.string().optional(),
+}).passthrough();
+
+export const TextplayWorldSceneListResponseSchema = z.union([
+  z.array(TextplayWorldSceneRowSchema),
+  z.strictObject({
+    worldId: z.string().optional(),
+    items: z.array(TextplayWorldSceneRowSchema),
+  }).passthrough(),
+]);
+
+export const TextplayWorldNarrativeContextRowSchema = z.strictObject({
+  id: z.string().min(1),
+  worldId: z.string().optional(),
+  scope: z.enum(['CANON', 'STORY', 'SUBJECT', 'RELATION']),
+  scopeKey: z.string().min(1),
+  storyId: z.string().nullable().optional(),
+  subjectType: z.enum(['AGENT', 'PLAYER', 'WORLD']).nullable().optional(),
+  subjectId: z.string().nullable().optional(),
+  targetSubjectType: z.enum(['AGENT', 'PLAYER', 'WORLD']).nullable().optional(),
+  targetSubjectId: z.string().nullable().optional(),
+  narrativeSetting: z.record(z.string(), z.unknown()).default({}),
+  narrativeState: z.record(z.string(), z.unknown()).default({}),
+  updatedAt: z.string().optional(),
+}).passthrough();
+
+export const TextplayWorldNarrativeContextListResponseSchema = z.union([
+  z.array(TextplayWorldNarrativeContextRowSchema),
+  z.strictObject({
+    worldId: z.string().optional(),
+    items: z.array(TextplayWorldNarrativeContextRowSchema),
   }).passthrough(),
 ]);
 
@@ -379,6 +421,10 @@ export type TextplayWorldEventRow = z.infer<typeof TextplayWorldEventRowSchema>;
 export type TextplayWorldEventListResponse = z.infer<typeof TextplayWorldEventListResponseSchema>;
 export type TextplayWorldLorebookRow = z.infer<typeof TextplayWorldLorebookRowSchema>;
 export type TextplayWorldLorebookListResponse = z.infer<typeof TextplayWorldLorebookListResponseSchema>;
+export type TextplayWorldSceneRow = z.infer<typeof TextplayWorldSceneRowSchema>;
+export type TextplayWorldSceneListResponse = z.infer<typeof TextplayWorldSceneListResponseSchema>;
+export type TextplayWorldNarrativeContextRow = z.infer<typeof TextplayWorldNarrativeContextRowSchema>;
+export type TextplayWorldNarrativeContextListResponse = z.infer<typeof TextplayWorldNarrativeContextListResponseSchema>;
 export type TextplayMemoryRecallResponse = z.infer<typeof TextplayMemoryRecallResponseSchema>;
 export type TextplayPersistQuery = z.infer<typeof TextplayPersistQuerySchema>;
 export type TextplayRenderRequest = z.infer<typeof TextplayRenderRequestSchema>;

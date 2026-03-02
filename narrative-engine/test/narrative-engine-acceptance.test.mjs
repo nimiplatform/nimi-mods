@@ -88,6 +88,88 @@ function createNarrativeEngine() {
       if (capability === 'data-api.world.lorebooks.list') {
         return worldLorebooks;
       }
+      if (capability === 'data-api.world.scenes.list') {
+        return {
+          worldId: String(query.worldId || ''),
+          items: [
+            {
+              id: 'scene-1',
+              worldId: String(query.worldId || ''),
+              name: 'Sky Harbor',
+              description: 'Floating harbor with tense factions.',
+              setting: { weather: 'storm' },
+              activeEntities: ['agent-1', 'player-1'],
+              updatedAt: '2026-03-02T00:00:00.000Z',
+            },
+          ],
+        };
+      }
+      if (capability === 'data-api.world.narrative-contexts.list') {
+        const storyId = String(query.storyId || '');
+        if (storyId === 'story-context-missing') {
+          return { worldId: String(query.worldId || ''), items: [] };
+        }
+        return {
+          worldId: String(query.worldId || ''),
+          items: [
+            {
+              id: 'ctx-canon',
+              worldId: String(query.worldId || ''),
+              scope: 'CANON',
+              scopeKey: `canon:${query.worldId}`,
+              storyId: null,
+              narrativeSetting: { pacingPolicy: { curve: 'steady' } },
+              narrativeState: {},
+              updatedAt: '2026-03-02T00:00:00.000Z',
+            },
+            {
+              id: 'ctx-story',
+              worldId: String(query.worldId || ''),
+              scope: 'STORY',
+              scopeKey: `story:${storyId}`,
+              storyId,
+              narrativeSetting: {
+                initiativePolicy: { enabled: true },
+                pacingPolicy: { targetTension: 0.6 },
+                materialHints: { conflicts: ['storm-front'] },
+              },
+              narrativeState: {
+                phase: 'opening',
+                objective: 'stabilize harbor',
+                tension: 0.6,
+                openThreads: ['missing convoy'],
+              },
+              updatedAt: '2026-03-02T00:00:01.000Z',
+            },
+            {
+              id: 'ctx-subject',
+              worldId: String(query.worldId || ''),
+              scope: 'SUBJECT',
+              scopeKey: `subject:${storyId}:agent-1`,
+              storyId,
+              subjectType: 'AGENT',
+              subjectId: 'agent-1',
+              narrativeSetting: { dramaticRole: 'guardian' },
+              narrativeState: { activeObjective: 'assist player' },
+              updatedAt: '2026-03-02T00:00:02.000Z',
+            },
+            {
+              id: 'ctx-relation',
+              worldId: String(query.worldId || ''),
+              scope: 'RELATION',
+              scopeKey: `relation:${storyId}:agent-1:player-1`,
+              storyId,
+              subjectType: 'AGENT',
+              subjectId: 'agent-1',
+              targetSubjectType: 'PLAYER',
+              targetSubjectId: 'player-1',
+              narrativeSetting: { relationContract: 'allies' },
+              narrativeState: { trust: 0.4 },
+              updatedAt: '2026-03-02T00:00:03.000Z',
+            },
+          ],
+        };
+      }
       if (capability === 'data-api.core.agent.memory.recall.for-entity') {
         return {
           recallSource: 'remote-only',

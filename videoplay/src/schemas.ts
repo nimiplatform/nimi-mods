@@ -4,11 +4,14 @@ import {
   VIDEOPLAY_PIPELINE_CHAIN,
   VIDEOPLAY_REASON,
   VIDEOPLAY_ROUTE_STAGES,
+  VIDEOPLAY_STORY_SOURCE_MODE,
 } from './contracts.js';
 
 const VideoPlayReasonCodeSchema = z.enum([
   VIDEOPLAY_REASON.INPUT_INVALID,
   VIDEOPLAY_REASON.FACT_PROJECTION_INVALID,
+  VIDEOPLAY_REASON.STORY_PACKAGE_INVALID,
+  VIDEOPLAY_REASON.STORY_SOURCE_UNAVAILABLE,
   VIDEOPLAY_REASON.SEGMENTATION_FAILED,
   VIDEOPLAY_REASON.SEGMENTATION_NON_DETERMINISTIC,
   VIDEOPLAY_REASON.SCREENPLAY_SCHEMA_INVALID,
@@ -94,6 +97,121 @@ export const NarrativeProjectionRenderInputSchema = z.object({
   metrics: z.record(z.string(), z.unknown()),
   sourceEventIds: SourceEventIdsSchema,
 }).passthrough();
+
+export const VideoStorySourceModeSchema = z.enum([
+  VIDEOPLAY_STORY_SOURCE_MODE.CANONICAL,
+  VIDEOPLAY_STORY_SOURCE_MODE.ENRICHED,
+]);
+
+export const VideoStorySummarySchema = z.object({
+  storyId: z.string().min(1),
+  worldId: z.string().min(1),
+  entryEventId: z.string().min(1),
+  title: z.string().min(1),
+  summary: z.string().min(1),
+  primaryAgentId: z.string(),
+  participants: z.array(z.string().min(1)),
+  eventHorizon: z.enum(['PAST', 'ONGOING', 'FUTURE']),
+  updatedAt: z.string().min(1),
+  playable: z.boolean(),
+  agentBindingMissing: z.boolean(),
+});
+
+export const VideoStoryDetailSchema = VideoStorySummarySchema.extend({
+  cause: z.string(),
+  process: z.string(),
+  result: z.string(),
+  timeRef: z.string(),
+  locationRefs: z.array(z.string()),
+  characterRefs: z.array(z.string()),
+  recommendedSceneId: z.string().nullable(),
+});
+
+export const VideoStoryContextCoverageSchema = z.object({
+  canon: z.boolean(),
+  story: z.boolean(),
+  subject: z.boolean(),
+  relation: z.boolean(),
+  scene: z.boolean(),
+});
+
+export const VideoStorySnapshotSchema = z.object({
+  storyId: z.string().min(1),
+  entryEventId: z.string().min(1),
+  primaryAgentId: z.string(),
+  version: z.string().min(1),
+  source: z.string().min(1),
+  loadedAt: z.string().min(1),
+  contextCoverage: VideoStoryContextCoverageSchema,
+  gapWarnings: z.array(z.string()),
+});
+
+const VideoStoryMaterialContextSchema = z.object({
+  id: z.string().min(1),
+  scope: z.enum(['CANON', 'STORY', 'SUBJECT', 'RELATION']),
+  scopeKey: z.string().min(1),
+  storyId: z.string().nullable(),
+  narrativeSetting: z.record(z.string(), z.unknown()),
+  narrativeState: z.record(z.string(), z.unknown()),
+});
+
+export const VideoStoryPackageSchema = z.object({
+  storyId: z.string().min(1),
+  worldId: z.string().min(1),
+  entryEventId: z.string().min(1),
+  sourceMode: VideoStorySourceModeSchema,
+  entry: z.object({
+    title: z.string().min(1),
+    summary: z.string().min(1),
+    cause: z.string(),
+    process: z.string(),
+    result: z.string(),
+    timeRef: z.string(),
+    locationRefs: z.array(z.string()),
+    characterRefs: z.array(z.string()),
+    recommendedSceneId: z.string().nullable(),
+  }),
+  cast: z.object({
+    primaryAgentId: z.string(),
+    participants: z.array(z.string().min(1)),
+  }),
+  materials: z.object({
+    lorebooks: z.array(z.object({
+      id: z.string().min(1),
+      key: z.string(),
+      content: z.string(),
+      score: z.number(),
+    })),
+    memories: z.array(z.string()),
+    scenes: z.array(z.object({
+      id: z.string().min(1),
+      name: z.string(),
+      description: z.string(),
+      score: z.number(),
+    })),
+    contexts: z.array(VideoStoryMaterialContextSchema),
+    recallSource: z.string(),
+  }),
+  narrativeScopes: z.object({
+    CANON: z.record(z.string(), z.unknown()),
+    STORY: z.record(z.string(), z.unknown()),
+    SUBJECT: z.record(z.string(), z.unknown()),
+    RELATION: z.record(z.string(), z.unknown()),
+  }),
+  turnWindow: NarrativeTurnWindowSchema,
+  projection: NarrativeProjectionRenderInputSchema,
+  recommendedEntryTurn: z.object({
+    turnId: z.string().min(1),
+    createdAt: z.string().optional(),
+    triggerSource: z.string().optional(),
+  }).nullable(),
+  windowPolicy: z.object({
+    maxTurns: z.number().int().positive(),
+    readLimit: z.number().int().positive(),
+    enrichedRequiredTriggerSources: z.array(z.enum(['UserTurn', 'AgentInitiative'])).min(1),
+  }),
+  snapshot: VideoStorySnapshotSchema,
+});
 
 export const EpisodePlanSchema = z.object({
   episodeId: z.string().min(1),

@@ -4,6 +4,8 @@ export const NARRATIVE_ENGINE_DATA_API_RUNTIME_ROUTE_OPTIONS = 'data-api.runtime
 export const NARRATIVE_ENGINE_DATA_API_WORLD_ACCESS_ME = 'data-api.world.access.me';
 export const NARRATIVE_ENGINE_DATA_API_WORLD_EVENTS_LIST = 'data-api.world.events.list';
 export const NARRATIVE_ENGINE_DATA_API_WORLD_LOREBOOKS_LIST = 'data-api.world.lorebooks.list';
+export const NARRATIVE_ENGINE_DATA_API_WORLD_SCENES_LIST = 'data-api.world.scenes.list';
+export const NARRATIVE_ENGINE_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST = 'data-api.world.narrative-contexts.list';
 export const NARRATIVE_ENGINE_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY = 'data-api.core.agent.memory.recall.for-entity';
 
 export const NARRATIVE_ENGINE_DATA_API_CONTEXT_RESOLVE = 'data-api.narrative.context.resolve';
@@ -28,6 +30,7 @@ export const NARRATIVE_REASON_CODES = {
   NARRATIVE_VISIBILITY_INVALID: 'NARRATIVE_VISIBILITY_INVALID',
   NARRATIVE_EVENT_COUNT_UNDERFLOW: 'NARRATIVE_EVENT_COUNT_UNDERFLOW',
   NARRATIVE_EVENT_COUNT_OVERFLOW_ADJUSTED: 'NARRATIVE_EVENT_COUNT_OVERFLOW_ADJUSTED',
+  NARRATIVE_TENSION_JUMP_ADJUSTED: 'NARRATIVE_TENSION_JUMP_ADJUSTED',
   NARRATIVE_SPINE_WRITE_CONFLICT: 'NARRATIVE_SPINE_WRITE_CONFLICT',
   NARRATIVE_INITIATIVE_COOLDOWN_ACTIVE: 'NARRATIVE_INITIATIVE_COOLDOWN_ACTIVE',
   NARRATIVE_RUN_CANCELED: 'NARRATIVE_RUN_CANCELED',
@@ -42,6 +45,7 @@ export const NARRATIVE_ACTION_HINT_BY_REASON_CODE: Record<NarrativeReasonCode, s
   NARRATIVE_VISIBILITY_INVALID: 'Enforce visibility enum and retry.',
   NARRATIVE_EVENT_COUNT_UNDERFLOW: 'Raise minimum event output and retry.',
   NARRATIVE_EVENT_COUNT_OVERFLOW_ADJUSTED: 'Output is truncated and adjusted before commit.',
+  NARRATIVE_TENSION_JUMP_ADJUSTED: 'Tension delta is too large and has been adjusted.',
   NARRATIVE_SPINE_WRITE_CONFLICT: 'Resolve append conflict and retry.',
   NARRATIVE_INITIATIVE_COOLDOWN_ACTIVE: 'Wait for cooldown window before next initiative tick.',
   NARRATIVE_RUN_CANCELED: 'Run is canceled. Resume from checkpoint or start a new run.',
@@ -52,6 +56,7 @@ export const NARRATIVE_GUARD_DEFAULTS = {
   maxEvents: 8,
   minMetric: 0,
   maxMetric: 1,
+  maxTensionDelta: 0.45,
 } as const;
 
 export const NARRATIVE_INITIATIVE_DEFAULTS = {

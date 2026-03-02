@@ -4,8 +4,14 @@ import type {
   FallbackAuditRecord,
   ReleasePackage,
   VideoPlayRunEvent,
+  VideoStoryPackage,
+  VideoStorySummary,
 } from '../types.js';
-import type { VideoPlayOperationType, VideoPlayPipelineStep } from '../contracts.js';
+import type {
+  VideoPlayOperationType,
+  VideoPlayPipelineStep,
+  VideoStorySourceMode,
+} from '../contracts.js';
 
 type RouteStatusView = {
   capability: 'chat' | 'image' | 'video';
@@ -33,15 +39,23 @@ type VideoPlayErrorView = {
 export type VideoPlayWorkbenchProps = {
   title: string;
   subtitle: string;
+  worldId: string;
   projectId: string;
-  storyId: string;
   ingestCursorStart: string;
+  stories: VideoStorySummary[];
+  selectedStoryId: string;
+  selectedStory: VideoStorySummary | null;
+  sourceMode: VideoStorySourceMode;
+  storyPackage: VideoStoryPackage | null;
+  storyPackageLoading: boolean;
+  storyPackageError: VideoPlayErrorView | null;
   runStatus: string;
   rerunStep: VideoPlayPipelineStep;
   operationType: VideoPlayOperationType;
   operationPayload: string;
   selectedEpisodeId: string;
   routeStatuses: RouteStatusView[];
+  routeReady: boolean;
   episodes: EpisodeRecord[];
   runs: RunSummaryView[];
   runEvents: VideoPlayRunEvent[];
@@ -54,9 +68,11 @@ export type VideoPlayWorkbenchProps = {
   loading: boolean;
   error: VideoPlayErrorView | null;
   operationOptions: Array<{ value: VideoPlayOperationType; label: string }>;
+  onWorldIdChange: (value: string) => void;
   onProjectIdChange: (value: string) => void;
-  onStoryIdChange: (value: string) => void;
   onIngestCursorStartChange: (value: string) => void;
+  onSelectStory: (storyId: string) => void;
+  onSourceModeChange: (value: VideoStorySourceMode) => void;
   onRerunStepChange: (value: VideoPlayPipelineStep) => void;
   onOperationTypeChange: (value: VideoPlayOperationType) => void;
   onOperationPayloadChange: (value: string) => void;
@@ -67,6 +83,7 @@ export type VideoPlayWorkbenchProps = {
   onCancelRun: () => void;
   onApplyOperation: () => void;
   onPublish: () => void;
+  onReloadStoryPackage: () => void;
   onRefresh: () => void;
 };
 
@@ -77,10 +94,26 @@ function statusTone(status: string): string {
   return 'text-slate-500';
 }
 
+function sourceModeLabel(mode: VideoStorySourceMode): string {
+  return mode === 'textplay-enriched-story' ? 'TextPlay Enriched Story' : 'Canonical Story';
+}
+
+function packageCoverageText(pkg: VideoStoryPackage): string {
+  const c = pkg.snapshot.contextCoverage;
+  return `CANON=${c.canon ? 'Y' : 'N'} STORY=${c.story ? 'Y' : 'N'} SUBJECT=${c.subject ? 'Y' : 'N'} RELATION=${c.relation ? 'Y' : 'N'} SCENE=${c.scene ? 'Y' : 'N'}`;
+}
+
 export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
   const canPublish = Boolean(
     props.selectedReleaseCandidate
     && (props.selectedReleaseCandidate.qcStatus === 'APPROVED' || props.selectedReleaseCandidate.qcStatus === 'ADJUSTED'),
+  );
+  const canRun = Boolean(
+    !props.loading
+    && props.routeReady
+    && props.selectedStory
+    && props.storyPackage
+    && !props.storyPackageLoading,
   );
 
   return (
@@ -94,7 +127,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
           <button
             type="button"
             onClick={props.onRunPipeline}
-            disabled={props.loading}
+            disabled={!canRun}
             className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Run Pipeline
@@ -124,10 +157,18 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
           </button>
         </div>
       </header>
-      <div className="grid min-h-0 flex-1 grid-cols-[320px_minmax(0,1fr)_360px]">
+      <div className="grid min-h-0 flex-1 grid-cols-[340px_minmax(0,1fr)_380px]">
         <aside className="min-h-0 overflow-y-auto border-r border-gray-200 bg-white p-3">
           <section className="space-y-2 rounded-lg border border-gray-200 p-3">
-            <h3 className="text-sm font-semibold text-gray-900">Narrative Window</h3>
+            <h3 className="text-sm font-semibold text-gray-900">Story Source</h3>
+            <label className="block text-xs text-gray-600">
+              World ID
+              <input
+                value={props.worldId}
+                onChange={(event) => props.onWorldIdChange(event.target.value)}
+                className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-xs"
+              />
+            </label>
             <label className="block text-xs text-gray-600">
               Project ID
               <input
@@ -137,28 +178,85 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
               />
             </label>
             <label className="block text-xs text-gray-600">
-              Story ID
-              <input
-                value={props.storyId}
-                onChange={(event) => props.onStoryIdChange(event.target.value)}
+              Story
+              <select
+                value={props.selectedStoryId}
+                onChange={(event) => props.onSelectStory(event.target.value)}
                 className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-xs"
-              />
+              >
+                {props.stories.map((story) => (
+                  <option key={story.storyId} value={story.storyId}>
+                    {story.title} ({story.storyId})
+                  </option>
+                ))}
+                {props.stories.length === 0 ? <option value="">No playable PRIMARY stories</option> : null}
+              </select>
             </label>
             <label className="block text-xs text-gray-600">
-              Ingest Cursor Start
+              Source Mode
+              <select
+                value={props.sourceMode}
+                onChange={(event) => props.onSourceModeChange(event.target.value as VideoStorySourceMode)}
+                className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-xs"
+              >
+                <option value="canonical-story">Canonical Story</option>
+                <option value="textplay-enriched-story">TextPlay Enriched Story</option>
+              </select>
+            </label>
+            <label className="block text-xs text-gray-600">
+              Ingest Cursor Start (Debug)
               <input
                 value={props.ingestCursorStart}
                 onChange={(event) => props.onIngestCursorStartChange(event.target.value)}
                 className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-xs"
               />
             </label>
-            <button
-              type="button"
-              onClick={props.onRefresh}
-              className="w-full rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
-            >
-              Refresh
-            </button>
+            <p className="text-[11px] text-gray-500">
+              Story ID: <span className="font-medium text-gray-700">{props.selectedStory?.storyId || '-'}</span>
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={props.onReloadStoryPackage}
+                className="rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
+              >
+                Reload Package
+              </button>
+              <button
+                type="button"
+                onClick={props.onRefresh}
+                className="rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
+              >
+                Refresh
+              </button>
+            </div>
+          </section>
+
+          <section className="mt-3 space-y-2 rounded-lg border border-gray-200 p-3">
+            <h3 className="text-sm font-semibold text-gray-900">Story Package</h3>
+            <p className={`text-xs font-medium ${props.storyPackageLoading ? 'text-amber-600' : 'text-slate-600'}`}>
+              {props.storyPackageLoading ? 'loading' : props.storyPackage ? 'ready' : 'not-ready'}
+            </p>
+            {props.storyPackage ? (
+              <>
+                <p className="text-xs text-gray-600">sourceMode: {sourceModeLabel(props.storyPackage.sourceMode)}</p>
+                <p className="text-xs text-gray-600">version: {props.storyPackage.snapshot.version}</p>
+                <p className="text-xs text-gray-600">coverage: {packageCoverageText(props.storyPackage)}</p>
+                <p className="text-xs text-gray-600">
+                  gapWarnings: {props.storyPackage.snapshot.gapWarnings.length > 0 ? props.storyPackage.snapshot.gapWarnings.join(', ') : 'none'}
+                </p>
+                <p className="text-xs text-gray-600">
+                  turns: {props.storyPackage.turnWindow.turns.length} (max={props.storyPackage.windowPolicy.maxTurns})
+                </p>
+              </>
+            ) : null}
+            {props.storyPackageError ? (
+              <div className="rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-700">
+                <p className="font-semibold">{props.storyPackageError.reasonCode}</p>
+                <p>{props.storyPackageError.message}</p>
+                <p>{props.storyPackageError.actionHint}</p>
+              </div>
+            ) : null}
           </section>
 
           <section className="mt-3 space-y-2 rounded-lg border border-gray-200 p-3">
@@ -274,6 +372,9 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
         <aside className="min-h-0 overflow-y-auto border-l border-gray-200 bg-white p-3">
           <section className="space-y-2 rounded-lg border border-gray-200 p-3">
             <h3 className="text-sm font-semibold text-gray-900">Route Status</h3>
+            <p className={`text-xs font-medium ${props.routeReady ? 'text-emerald-600' : 'text-rose-600'}`}>
+              {props.routeReady ? 'all-ready' : 'missing-route'}
+            </p>
             {props.routeStatuses.map((route) => (
               <div key={route.capability} className="rounded-md border border-gray-200 px-2 py-1 text-xs">
                 <p className="font-medium text-gray-900">{route.capability}</p>
@@ -281,6 +382,26 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
                 <p className="text-gray-500">{route.source} / {route.connectorId || '-'} / {route.model || '-'}</p>
               </div>
             ))}
+          </section>
+
+          <section className="mt-3 space-y-2 rounded-lg border border-gray-200 p-3">
+            <h3 className="text-sm font-semibold text-gray-900">Story Package Diagnostics</h3>
+            {props.storyPackage ? (
+              <>
+                <p className="text-xs text-gray-600">story: {props.storyPackage.storyId}</p>
+                <p className="text-xs text-gray-600">sourceMode: {sourceModeLabel(props.storyPackage.sourceMode)}</p>
+                <p className="text-xs text-gray-600">loadedAt: {props.storyPackage.snapshot.loadedAt}</p>
+                <p className="text-xs text-gray-600">contextCoverage: {packageCoverageText(props.storyPackage)}</p>
+                <p className="text-xs text-gray-600">gapWarnings: {props.storyPackage.snapshot.gapWarnings.join(', ') || 'none'}</p>
+                {props.storyPackage.sourceMode === 'textplay-enriched-story' ? (
+                  <p className="text-xs text-amber-700">
+                    enriched gate: window must contain UserTurn or AgentInitiative.
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <p className="text-xs text-gray-500">Story package unavailable.</p>
+            )}
           </section>
 
           <section className="mt-3 space-y-2 rounded-lg border border-gray-200 p-3">

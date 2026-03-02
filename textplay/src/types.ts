@@ -115,46 +115,86 @@ export type TextplayRenderFailure = {
 
 export type TextplayRenderResult = TextplayRenderSuccess | TextplayRenderFailure;
 
-export type TextplayReplicaSummary = {
-  replicaId: string;
+export type TextplayStorySummary = {
   storyId: string;
   worldId: string;
-  sourceEventId: string;
+  entryEventId: string;
   title: string;
   summary: string;
   primaryAgentId: string;
   participants: string[];
-  createdAt: string;
+  eventHorizon: 'PAST' | 'ONGOING' | 'FUTURE';
   updatedAt: string;
+  playable: boolean;
   agentBindingMissing: boolean;
 };
 
-export type TextplayReplicaDetail = TextplayReplicaSummary & {
+export type TextplayStoryDetail = TextplayStorySummary & {
   cause: string;
   process: string;
   result: string;
   timeRef: string;
+  locationRefs: string[];
+  characterRefs: string[];
+  recommendedSceneId: string | null;
 };
 
-export type TextplayReplicaSnapshot = {
-  replicaId: string;
+export type TextplayStorySnapshot = {
   storyId: string;
+  entryEventId: string;
   primaryAgentId: string;
   version: string;
   source: string;
   loadedAt: string;
+  contextCoverage: {
+    canon: boolean;
+    story: boolean;
+    subject: boolean;
+    relation: boolean;
+    scene: boolean;
+  };
+  gapWarnings: string[];
+};
+
+export type TextplayStartupPolicy = {
+  initiative: {
+    enabled: boolean;
+    tickSeconds: number;
+    cooldownSeconds: number;
+    maxConsecutive: number;
+    blockedPresenceStates: TextplayPresenceState[];
+  };
+  pacing: {
+    targetTension: number;
+    tensionBand: [number, number];
+    beatDensity: number;
+    curve: string;
+  };
 };
 
 export type TextplayStartupPackage = {
-  replicaId: string;
   storyId: string;
   worldId: string;
-  primaryAgentId: string;
-  participants: string[];
-  backgroundSummary: string;
-  phase: string;
-  objective: string;
-  availableMaterials: {
+  entryEventId: string;
+  entry: {
+    title: string;
+    summary: string;
+    cause: string;
+    process: string;
+    result: string;
+    timeRef: string;
+    locationRefs: string[];
+    characterRefs: string[];
+    recommendedSceneId: string | null;
+  };
+  cast: {
+    primaryAgentId: string;
+    participants: string[];
+  };
+  background: {
+    summary: string;
+  };
+  materials: {
     lorebooks: Array<{
       id: string;
       key: string;
@@ -162,13 +202,34 @@ export type TextplayStartupPackage = {
       score: number;
     }>;
     memories: string[];
+    scenes: Array<{
+      id: string;
+      name: string;
+      description: string;
+      score: number;
+    }>;
+    contexts: Array<{
+      id: string;
+      scope: 'CANON' | 'STORY' | 'SUBJECT' | 'RELATION';
+      scopeKey: string;
+      storyId: string | null;
+      narrativeSetting: Record<string, unknown>;
+      narrativeState: Record<string, unknown>;
+    }>;
     recallSource: string;
+  };
+  narrativeScopes: {
+    CANON: Record<string, unknown>;
+    STORY: Record<string, unknown>;
+    SUBJECT: Record<string, unknown>;
+    RELATION: Record<string, unknown>;
   };
   recommendedEntryTurn: {
     turnId: string;
     createdAt?: string;
   } | null;
-  snapshot: TextplayReplicaSnapshot;
+  startupPolicy: TextplayStartupPolicy;
+  snapshot: TextplayStorySnapshot;
 };
 
 export type TextplayPersistRecord = {

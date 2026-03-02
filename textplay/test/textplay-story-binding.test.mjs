@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { listPlayableReplicas } from '../src/data/replica-catalog.ts';
+import { listPlayableStories } from '../src/data/story-catalog.ts';
 
 function createHookClient(eventRow) {
   return {
@@ -19,7 +19,7 @@ function createHookClient(eventRow) {
 }
 
 test('primary agent falls back to first characterRef when runtime agent is missing', async () => {
-  const rows = await listPlayableReplicas({
+  const rows = await listPlayableStories({
     hookClient: createHookClient({
       id: 'evt-a',
       level: 'PRIMARY',
@@ -39,7 +39,7 @@ test('primary agent falls back to first characterRef when runtime agent is missi
 });
 
 test('agent binding missing is reported when no runtime agent and no character refs', async () => {
-  const rows = await listPlayableReplicas({
+  const rows = await listPlayableStories({
     hookClient: createHookClient({
       id: 'evt-b',
       level: 'PRIMARY',

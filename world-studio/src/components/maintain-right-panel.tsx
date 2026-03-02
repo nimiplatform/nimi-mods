@@ -82,6 +82,9 @@ export function MaintainRightPanel(props: {
   missingPrimaryEvidenceCount: number;
   eventCharacterCoverage: number;
   eventLocationCoverage: number;
+  storyProjectionCount: number;
+  storyProjectionMissingContextCount: number;
+  storyProjectionLatestAt: string;
   terminalChunkSuccess: number;
   terminalChunkTotal: number;
   terminalChunkFailed: number;
@@ -126,6 +129,14 @@ export function MaintainRightPanel(props: {
                 embedded
                 showTitle={false}
               />
+              <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Story Projection</p>
+                <p className="mt-1 text-xs text-gray-700">count: {props.storyProjectionCount}</p>
+                <p className="mt-1 text-xs text-gray-700">missingContext: {props.storyProjectionMissingContextCount}</p>
+                <p className="mt-1 text-xs text-gray-700 break-all">
+                  latestProjectedAt: {props.storyProjectionLatestAt || '-'}
+                </p>
+              </div>
             </div>
           ) : null}
         </section>

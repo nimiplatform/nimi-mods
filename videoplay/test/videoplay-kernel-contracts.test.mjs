@@ -49,6 +49,114 @@ function makeSegmentationInput() {
   };
 }
 
+function makeStoryPackage(overrides = {}) {
+  const turns = [
+    makeTurn('turn-1', 1, 'ev-1'),
+    makeTurn('turn-2', 2, 'ev-2'),
+    makeTurn('turn-3', 3, 'ev-3'),
+    makeTurn('turn-4', 4, 'ev-4'),
+    makeTurn('turn-5', 5, 'ev-5'),
+  ];
+  turns[2].triggerSource = 'UserTurn';
+
+  return {
+    storyId: 'story-main',
+    worldId: 'world-main',
+    entryEventId: 'ev-1',
+    sourceMode: 'canonical-story',
+    entry: {
+      title: 'Entry',
+      summary: 'Entry summary',
+      cause: 'cause',
+      process: 'process',
+      result: 'result',
+      timeRef: 'time',
+      locationRefs: ['scene-1'],
+      characterRefs: ['agent-1', 'player-1'],
+      recommendedSceneId: 'scene-1',
+    },
+    cast: {
+      primaryAgentId: 'agent-1',
+      participants: ['agent-1', 'player-1'],
+    },
+    materials: {
+      lorebooks: [{ id: 'lore-1', key: 'lore-1', content: 'lore', score: 3 }],
+      memories: ['memory-1'],
+      scenes: [{ id: 'scene-1', name: 'Scene 1', description: 'desc', score: 5 }],
+      contexts: [
+        {
+          id: 'ctx-canon',
+          scope: 'CANON',
+          scopeKey: 'world-main',
+          storyId: null,
+          narrativeSetting: { revealPolicy: 'strict' },
+          narrativeState: {},
+        },
+        {
+          id: 'ctx-story',
+          scope: 'STORY',
+          scopeKey: 'story-main',
+          storyId: 'story-main',
+          narrativeSetting: { phase: 'act1' },
+          narrativeState: { tension: 0.4 },
+        },
+      ],
+      recallSource: 'memory-recall',
+    },
+    narrativeScopes: {
+      CANON: { revealPolicy: 'strict' },
+      STORY: { phase: 'act1', tension: 0.4 },
+      SUBJECT: {},
+      RELATION: {},
+    },
+    turnWindow: {
+      projectId: 'project-main',
+      storyId: 'story-main',
+      ingestCursorStart: 'turn-0',
+      turns,
+    },
+    projection: {
+      events: [{ id: 'ev-1' }, { id: 'ev-2' }, { id: 'ev-3' }, { id: 'ev-4' }, { id: 'ev-5' }],
+      triggerSource: 'UserTurn',
+      userMessage: 'hello',
+      systemContext: { locale: 'zh' },
+      worldStyle: { genre: 'drama' },
+      agentAnchor: {},
+      playerAnchor: {},
+      sceneAnchor: {},
+      metrics: {},
+      sourceEventIds: ['ev-1', 'ev-2', 'ev-3', 'ev-4', 'ev-5'],
+    },
+    recommendedEntryTurn: {
+      turnId: 'turn-5',
+      triggerSource: 'UserTurn',
+      createdAt: new Date().toISOString(),
+    },
+    windowPolicy: {
+      maxTurns: 40,
+      readLimit: 100,
+      enrichedRequiredTriggerSources: ['UserTurn', 'AgentInitiative'],
+    },
+    snapshot: {
+      storyId: 'story-main',
+      entryEventId: 'ev-1',
+      primaryAgentId: 'agent-1',
+      version: 'vstory-fixed',
+      source: 'test-fixture',
+      loadedAt: new Date().toISOString(),
+      contextCoverage: {
+        canon: true,
+        story: true,
+        subject: true,
+        relation: true,
+        scene: true,
+      },
+      gapWarnings: [],
+    },
+    ...overrides,
+  };
+}
+
 function makeQualityFixture(overrides = {}) {
   const episode = {
     episodeId: 'episode-1',
@@ -584,6 +692,8 @@ test('release package contains mandatory minimum fields', async () => {
     projectId: 'project-main',
     storyId: 'story-main',
     ingestCursorStart: 'turn-0',
+    sourceMode: 'canonical-story',
+    storyPackage: makeStoryPackage(),
   });
 
   assert.equal(result.releaseCandidates.length > 0, true);
@@ -594,6 +704,19 @@ test('release package contains mandatory minimum fields', async () => {
   assert.ok(pkg.episodeMetadata);
   assert.ok(pkg.episodeTraceBundle);
   assert.equal(pkg.published, false);
+});
+
+test('run blocks when story package is missing', async () => {
+  const { deps } = createPipelineDeps();
+  await assert.rejects(
+    runVideoPlayEpisodeProduction(deps, {
+      projectId: 'project-main',
+      storyId: 'story-main',
+      ingestCursorStart: 'turn-0',
+      sourceMode: 'canonical-story',
+    }),
+    /VIDEOPLAY_STORY_PACKAGE_SCHEMA_INVALID/,
+  );
 });
 
 test('prompt canary covers shape/locale-parity/registry-drift cases', () => {

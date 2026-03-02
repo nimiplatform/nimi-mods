@@ -26,6 +26,7 @@
 - `VID-004`: Route capability is provided by runtime only; mod direct vendor API is forbidden.
 - `VID-005`: Quality gate failures fail-close and block release package.
 - `VID-006`: Creator operation loop must remain editable and auditable, not one-shot generation only.
+- `VID-007`: VideoPlay owns `VideoStoryPackage` lifecycle and does not reuse TextPlay startup package contract.
 
 ## 2. Domain Increments
 
@@ -36,9 +37,13 @@
 - `VID-014`: Release package minimum set is mandatory for publish readiness.
 - `VID-015`: Continuity rules are capability contracts and cannot be hard-bound to one UI component.
 - `VID-016`: Prompt template changes must pass canary baseline before merge.
+- `VID-017`: Story source mode is explicit (`canonical-story|textplay-enriched-story`) and resolved in `narrative-ingest`.
+- `VID-018`: `textplay-enriched-story` requires canonical turns containing at least one `UserTurn|AgentInitiative`.
+- `VID-019`: Story package assembly is fail-close; missing critical context or schema mismatch blocks pipeline.
 
 ## 3. No Over-Design Guard
 
 - `VID-020`: No renderer-owned world fact persistence model is introduced.
 - `VID-021`: No vendor-specific model binding is encoded in domain rules.
 - `VID-022`: No compatibility fallback path is introduced.
+- `VID-023`: VideoPlay must not read TextPlay private persisted run records as factual pipeline input.

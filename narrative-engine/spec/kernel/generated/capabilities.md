@@ -23,6 +23,10 @@ host_capability_contract:
       source_rule: N-CAP-003
     - key: data.query.data-api.world.lorebooks.list
       source_rule: N-CAP-003
+    - key: data.query.data-api.world.scenes.list
+      source_rule: N-CAP-003
+    - key: data.query.data-api.world.narrative-contexts.list
+      source_rule: N-CAP-003
     - key: data.query.data-api.core.agent.memory.recall.for-entity
       source_rule: N-CAP-003
   exported_contract_names:

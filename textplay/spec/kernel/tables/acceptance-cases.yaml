@@ -44,8 +44,8 @@ cases:
     gap_refill_applied: true
     reason_code: null
     source_rule: T-RUN-008
-  - id: TXT-008-REPLICA-PRIMARY-ONLY
-    description: Playable replica list keeps PRIMARY world events only.
+  - id: TXT-008-STORY-PRIMARY-ONLY
+    description: Playable story list keeps PRIMARY world events only.
     expected_ok: true
     primary_only: true
     reason_code: null
@@ -56,17 +56,34 @@ cases:
     fresh_mode_supported: true
     reason_code: null
     source_rule: T-ACC-002
-  - id: TXT-010-SEND-BLOCKED-WITHOUT-REPLICA
-    description: Send is blocked when no selected replica or startup package is unavailable.
+  - id: TXT-010-SEND-BLOCKED-WITHOUT-STORY
+    description: Send is blocked when no selected story or startup package is unavailable.
     expected_ok: true
-    send_blocked_without_replica: true
+    send_blocked_without_story: true
     reason_code: null
     source_rule: T-ACC-002
-  - id: TXT-011-REPLICA-SWITCH-RELOADS-RUNS
-    description: Switching replica clears run surface and reloads persisted runs by story id.
+  - id: TXT-011-STORY-SWITCH-RELOADS-RUNS
+    description: Switching story clears run surface and reloads persisted runs by story id.
     expected_ok: true
     reloads_story_records: true
     reason_code: null
+    source_rule: T-ACC-002
+  - id: TXT-012-STORY-STARTUP-CONTEXT-COVERAGE
+    description: Startup package snapshot must include CANON/STORY/SUBJECT/RELATION/scene coverage and gap warnings.
+    expected_ok: true
+    startup_snapshot_has_context_coverage: true
+    reason_code: null
+    source_rule: T-ACC-002
+  - id: TXT-013-AUTO-INITIATIVE-IDLE-TICK
+    description: Auto tick triggers AgentInitiative when idle threshold/cooldown/maxConsecutive allow it.
+    expected_ok: true
+    trigger_source: AgentInitiative
+    reason_code: null
+    source_rule: T-ACC-002
+  - id: TXT-014-CONTEXT-CRITICAL-FAIL-CLOSE
+    description: Missing CANON or STORY context blocks startup/send with fail-close semantics.
+    expected_ok: false
+    reason_code: TEXTPLAY_CONTEXT_MISSING_CRITICAL
     source_rule: T-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:textplay-kernel-docs

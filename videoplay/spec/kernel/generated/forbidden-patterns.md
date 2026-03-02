@@ -36,4 +36,9 @@ patterns:
     description: Release package without quality gate pass is forbidden.
     enforcement: hard-block
     source_rule: V-QC-002
+  - id: V-FORBID-007
+    pattern: use-story-package-supplementary-input-as-grounding
+    description: World/context/memory supplementary fields cannot replace canonical sourceEventIds grounding.
+    enforcement: hard-block
+    source_rule: V-FACT-006
 ```

@@ -55,6 +55,7 @@ function cloneCoreOutput(coreOutput: NarrativeCoreOutput): NarrativeCoreOutput {
 
 export function runNarrativeStep3Guard(input: {
   coreOutput: NarrativeCoreOutput;
+  tensionTarget?: number;
 }): NarrativeGuardResult {
   const coreOutput = cloneCoreOutput(input.coreOutput);
 
@@ -131,6 +132,27 @@ export function runNarrativeStep3Guard(input: {
       output: adjusted,
       adjustmentReason: `spineEvents truncated to ${NARRATIVE_GUARD_DEFAULTS.maxEvents}`,
     };
+  }
+
+  const target = typeof input.tensionTarget === 'number'
+    ? Math.max(0, Math.min(1, input.tensionTarget))
+    : null;
+  const observed = coreOutput.metrics.tension;
+  if (target != null && typeof observed === 'number' && Number.isFinite(observed)) {
+    const delta = Math.abs(observed - target);
+    if (delta > NARRATIVE_GUARD_DEFAULTS.maxTensionDelta) {
+      const adjusted = cloneCoreOutput(coreOutput);
+      const direction = observed > target ? 1 : -1;
+      const corrected = target + direction * NARRATIVE_GUARD_DEFAULTS.maxTensionDelta;
+      adjusted.metrics.tension = Math.max(0, Math.min(1, corrected));
+      return {
+        status: 'ADJUSTED',
+        reasonCode: NARRATIVE_REASON_CODES.NARRATIVE_TENSION_JUMP_ADJUSTED,
+        actionHint: 'Tension delta exceeded threshold and was adjusted.',
+        output: adjusted,
+        adjustmentReason: `tension adjusted from ${observed.toFixed(3)} to ${adjusted.metrics.tension.toFixed(3)} against target ${target.toFixed(3)}`,
+      };
+    }
   }
 
   return {

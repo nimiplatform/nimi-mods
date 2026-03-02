@@ -126,3 +126,16 @@ narrative_handoff_projection:
     - traceId
   fail_reason_code: WORLD_STUDIO_NARRATIVE_HANDOFF_INVALID
   source_rule: WS-PIPE-008
+story_projection_summary:
+  required: true
+  source_from:
+    - publish_result.storyProjectionStats
+    - maintenance_payload.storyProjectionSummary
+  required_fields:
+    - storyCount
+    - missingContextCount
+    - latestProjectedAt
+  projection_rules:
+    - PRIMARY-event-only
+    - stable-story-id-by-world-event
+  source_rule: WS-PIPE-009

@@ -38,6 +38,20 @@ export type NarrativeContextSnapshot = {
   availableActors: string[];
   narrativeStyle: Record<string, unknown>;
   characterRelations: Array<Record<string, unknown>>;
+  phase: string;
+  objective: string;
+  tensionTarget: number;
+  openThreads: string[];
+  startupPolicy: Record<string, unknown>;
+  futurePressure: string[];
+  contextCoverage: {
+    canon: boolean;
+    story: boolean;
+    subject: boolean;
+    relation: boolean;
+    scene: boolean;
+    warnings: string[];
+  };
   narrativeContextScopes: NarrativeContextScopes;
 };
 

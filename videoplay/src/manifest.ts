@@ -1,8 +1,13 @@
 import {
   VIDEOPLAY_CAPABILITIES,
+  VIDEOPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY,
   VIDEOPLAY_DATA_API_ASSET_BATCH_UPSERT,
   VIDEOPLAY_DATA_API_EPISODE_UPSERT,
   VIDEOPLAY_DATA_API_RELEASE_PUBLISH,
+  VIDEOPLAY_DATA_API_WORLD_EVENTS_LIST,
+  VIDEOPLAY_DATA_API_WORLD_LOREBOOKS_LIST,
+  VIDEOPLAY_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST,
+  VIDEOPLAY_DATA_API_WORLD_SCENES_LIST,
   VIDEOPLAY_MOD_ID,
   VIDEOPLAY_NAV_SLOT,
   VIDEOPLAY_ROUTE_SLOT,
@@ -25,6 +30,26 @@ export const VIDEOPLAY_MANIFEST = {
   dependencies: [],
   hooks: {
     dataApis: [
+      {
+        name: VIDEOPLAY_DATA_API_WORLD_EVENTS_LIST,
+        description: 'Read world events for VideoStoryPackage catalog and entry mapping',
+      },
+      {
+        name: VIDEOPLAY_DATA_API_WORLD_LOREBOOKS_LIST,
+        description: 'Read world lorebooks for VideoStoryPackage materials',
+      },
+      {
+        name: VIDEOPLAY_DATA_API_WORLD_SCENES_LIST,
+        description: 'Read world scenes for VideoStoryPackage diagnostics and scene hints',
+      },
+      {
+        name: VIDEOPLAY_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST,
+        description: 'Read world narrative contexts for VideoStoryPackage scope coverage',
+      },
+      {
+        name: VIDEOPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY,
+        description: 'Read memory recall for VideoStoryPackage materials',
+      },
       {
         name: VIDEOPLAY_DATA_API_EPISODE_UPSERT,
         description: 'VideoPlay episode upsert/list/get operations',

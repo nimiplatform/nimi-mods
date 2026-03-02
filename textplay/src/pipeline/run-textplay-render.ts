@@ -1,6 +1,5 @@
 import { TEXTPLAY_CHAIN_REASON, TEXTPLAY_REASON } from '../contracts.js';
 import {
-  ensureNarrativeContext,
   queryNarrativeProjectionRenderInput,
   queryNarrativeTurnById,
   queryNarrativeTurnResultUpsert,
@@ -244,15 +243,6 @@ export async function runTextplayRender(input: TextplayRenderExecutionInput): Pr
     assertNotAborted(input.deps.abortSignal);
 
     appendStepStart('normalize');
-    await ensureNarrativeContext({
-      narrativeEngine: input.deps.narrativeEngine,
-      storyId: input.request.storyId,
-      worldId: input.request.worldId,
-      agentId: input.request.agentId,
-      playerId: input.request.playerId,
-      systemPayload: input.request.systemPayload,
-    });
-
     const upsertedTurn = await queryNarrativeTurnResultUpsert({
       narrativeEngine: input.deps.narrativeEngine,
       request: {

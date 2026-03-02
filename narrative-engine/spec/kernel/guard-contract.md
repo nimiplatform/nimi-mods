@@ -25,3 +25,4 @@ Unsupported spine event type or empty payload rejects.
 ## N-GUARD-006 Adjustment Traceability
 
 Adjusted output must include adjustment reason and replace raw output in commit path.
+Tension-delta overflow is adjusted with non-blocking reason code semantics.

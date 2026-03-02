@@ -6,6 +6,8 @@ import {
   NARRATIVE_ENGINE_DATA_API_WORLD_ACCESS_ME,
   NARRATIVE_ENGINE_DATA_API_WORLD_EVENTS_LIST,
   NARRATIVE_ENGINE_DATA_API_WORLD_LOREBOOKS_LIST,
+  NARRATIVE_ENGINE_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST,
+  NARRATIVE_ENGINE_DATA_API_WORLD_SCENES_LIST,
   NARRATIVE_REASON_CODES,
   type NarrativeReasonCode,
 } from '../contracts.js';
@@ -16,7 +18,6 @@ import {
   appendNarrativeSpine,
   findIdempotentTurn,
   getNarrativeSpineByStoryId,
-  resolveNarrativeContext,
   saveIdempotentTurn,
   upsertNarrativeTurn,
 } from '../store/repository.js';
@@ -416,6 +417,18 @@ export async function processNarrativeTurn(input: {
       NARRATIVE_ENGINE_DATA_API_WORLD_LOREBOOKS_LIST,
       { worldId: normalized.worldId },
     ),
+    queryWorldScenes: () => deps.queryData(
+      NARRATIVE_ENGINE_DATA_API_WORLD_SCENES_LIST,
+      { worldId: normalized.worldId, take: 200 },
+    ),
+    queryNarrativeContexts: () => deps.queryData(
+      NARRATIVE_ENGINE_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST,
+      {
+        worldId: normalized.worldId,
+        storyId: normalized.storyId,
+        take: 200,
+      },
+    ),
     queryAgentMemoryRecall: () => deps.queryData(
       NARRATIVE_ENGINE_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY,
       {
@@ -425,7 +438,6 @@ export async function processNarrativeTurn(input: {
         queryText: normalized.userMessage,
       },
     ),
-    resolveNarrativeContext: () => resolveNarrativeContext(normalized.storyId),
   });
   if (!step1.ok || !step1.value) {
     const reasonCode = step1.reasonCode || NARRATIVE_REASON_CODES.NARRATIVE_CONTEXT_INSUFFICIENT;
@@ -495,6 +507,7 @@ export async function processNarrativeTurn(input: {
   eventLog.startStep('step3-guard');
   const guard = runNarrativeStep3Guard({
     coreOutput: step2.value,
+    tensionTarget: step1.value.snapshot.tensionTarget,
   });
   if (guard.status === 'REJECTED' || !guard.output) {
     const reasonCode = guard.reasonCode || NARRATIVE_REASON_CODES.NARRATIVE_GENERATION_SCHEMA_INVALID;
@@ -563,7 +576,7 @@ export async function processNarrativeTurn(input: {
     coreOutput: finalOutput,
   });
   const reasonCode = guard.status === 'ADJUSTED'
-    ? NARRATIVE_REASON_CODES.NARRATIVE_EVENT_COUNT_OVERFLOW_ADJUSTED
+    ? (guard.reasonCode || NARRATIVE_REASON_CODES.NARRATIVE_EVENT_COUNT_OVERFLOW_ADJUSTED)
     : null;
   const actionHint = resolveActionHint(reasonCode, guard.actionHint);
 

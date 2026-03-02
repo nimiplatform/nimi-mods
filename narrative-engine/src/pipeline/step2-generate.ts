@@ -31,9 +31,20 @@ function buildGeneratePrompt(input: {
       agentId: input.turn.agentId,
       playerId: input.turn.playerId,
       snapshot: input.assembly.snapshot,
+      storyState: {
+        phase: input.assembly.snapshot.phase,
+        objective: input.assembly.snapshot.objective,
+        tensionTarget: input.assembly.snapshot.tensionTarget,
+        openThreads: input.assembly.snapshot.openThreads,
+      },
+      startupPolicy: input.assembly.snapshot.startupPolicy,
+      futurePressure: input.assembly.snapshot.futurePressure,
+      contextCoverage: input.assembly.snapshot.contextCoverage,
       memoryRecall: input.assembly.assets.memoryRecall,
       worldEvents: input.assembly.assets.worldEvents.slice(0, 20),
       worldLorebooks: input.assembly.assets.worldLorebooks.slice(0, 20),
+      worldScenes: input.assembly.assets.worldScenes.slice(0, 20),
+      narrativeContexts: input.assembly.assets.narrativeContexts.slice(0, 20),
     },
     outputJsonShape: {
       spineEvents: [

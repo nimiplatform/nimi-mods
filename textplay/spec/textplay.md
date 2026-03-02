@@ -33,11 +33,14 @@
 - `TXT-014`: Render output must always include `text` and `meta`.
 - `TXT-015`: Initiative events reset idle/away timers in presence state machine.
 - `TXT-016`: Resume with checkpoint hash mismatch is fail-close.
-- `TXT-017`: Playable replica catalog is derived from `data-api.world.events.list` and keeps `PRIMARY` events only.
-- `TXT-018`: Replica startup package is assembled from world events, lorebooks, agent memory recall, and optional narrative latest turn lookup.
-- `TXT-019`: Send action is blocked when no selected replica or startup package is not ready.
-- `TXT-023`: Replica switch resets run surface state and reloads persisted records by selected replica story id.
+- `TXT-017`: Playable story catalog is derived from `data-api.world.events.list` and keeps `PRIMARY` events only.
+- `TXT-018`: Story startup package is assembled from world events, scenes, narrative-contexts, lorebooks, agent memory recall, and optional narrative latest turn lookup.
+- `TXT-019`: Send action is blocked when no selected story or startup package is not ready.
+- `TXT-023`: Story switch resets run surface state and reloads persisted records by selected story id.
 - `TXT-024`: Runtime binding uses single primary agent id for turn execution and keeps other participants as context-only metadata.
+- `TXT-025`: Story startup package must include `startupPolicy` and snapshot `contextCoverage/gapWarnings` diagnostics.
+- `TXT-026`: Frontend auto tick may trigger `AgentInitiative` only when presence/cooldown/maxConsecutive policies are satisfied.
+- `TXT-027`: Missing `CANON/STORY` context is fail-close; missing `SUBJECT/RELATION/scene` is degraded with warnings.
 
 ## 3. No Over-Design Guard
 

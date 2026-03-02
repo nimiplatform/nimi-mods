@@ -25,6 +25,7 @@ import {
   RunEventSchema,
   ScreenplaySchema,
   StoryboardSchema,
+  VideoStoryPackageSchema,
 } from '../schemas.js';
 import {
   DEFAULT_SEGMENTATION_POLICY,
@@ -117,6 +118,10 @@ function actionHintByReasonCode(reasonCode: string): string {
       return 'Fix input schema and value bounds, then retry.';
     case VIDEOPLAY_REASON.FACT_PROJECTION_INVALID:
       return 'Repair narrative projection mapping and retry.';
+    case VIDEOPLAY_REASON.STORY_PACKAGE_INVALID:
+      return 'Repair story package schema/coverage and retry.';
+    case VIDEOPLAY_REASON.STORY_SOURCE_UNAVAILABLE:
+      return 'Select an available story source mode and retry.';
     case VIDEOPLAY_REASON.SEGMENTATION_FAILED:
       return 'Adjust segmentation policy or input window and retry.';
     case VIDEOPLAY_REASON.SEGMENTATION_NON_DETERMINISTIC:
@@ -952,26 +957,84 @@ export async function runVideoPlayEpisodeProduction(
   let projection: NarrativeProjectionRenderInput;
   let routeCatalog: Record<'chat' | 'image' | 'video', RuntimeRouteCatalogSnapshot>;
   const policy = normalizeSegmentationPolicy(input.policy);
+  const sourceMode = input.sourceMode;
 
   try {
     runEventFactory.pushEvent({
       step: 'narrative-ingest',
       eventType: 'step.start',
-      details: { storyId: input.storyId },
+      details: {
+        storyId: input.storyId,
+        sourceMode,
+      },
     });
 
-    const turnWindowRaw = await deps.narrativeEngine.turnWindow({
-      projectId: input.projectId,
-      storyId: input.storyId,
-      ingestCursorStart: input.ingestCursorStart,
+    const storyPackageParsed = VideoStoryPackageSchema.safeParse(input.storyPackage);
+    if (!storyPackageParsed.success) {
+      throw new VideoPlayError({
+        reasonCode: VIDEOPLAY_REASON.STORY_PACKAGE_INVALID,
+        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.STORY_PACKAGE_INVALID),
+        stage: 'story-package',
+        message: 'VIDEOPLAY_STORY_PACKAGE_SCHEMA_INVALID',
+        details: {
+          issues: storyPackageParsed.error.issues.map((item) => `${item.path.join('.')}:${item.message}`),
+        },
+      });
+    }
+    const storyPackage = storyPackageParsed.data;
+    if (storyPackage.storyId !== input.storyId) {
+      throw new VideoPlayError({
+        reasonCode: VIDEOPLAY_REASON.STORY_PACKAGE_INVALID,
+        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.STORY_PACKAGE_INVALID),
+        stage: 'story-package',
+        message: 'VIDEOPLAY_STORY_PACKAGE_STORY_ID_MISMATCH',
+        details: {
+          packageStoryId: storyPackage.storyId,
+          inputStoryId: input.storyId,
+        },
+      });
+    }
+    if (storyPackage.sourceMode !== sourceMode) {
+      throw new VideoPlayError({
+        reasonCode: VIDEOPLAY_REASON.STORY_PACKAGE_INVALID,
+        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.STORY_PACKAGE_INVALID),
+        stage: 'story-package',
+        message: 'VIDEOPLAY_STORY_PACKAGE_SOURCE_MODE_MISMATCH',
+        details: {
+          packageSourceMode: storyPackage.sourceMode,
+          inputSourceMode: sourceMode,
+        },
+      });
+    }
+
+    const maxTurns = Number.isFinite(Number(input.windowPolicy?.maxTurns))
+      ? Math.max(1, Math.floor(Number(input.windowPolicy?.maxTurns)))
+      : storyPackage.windowPolicy.maxTurns;
+    const requiredTriggerSources = Array.isArray(input.windowPolicy?.enrichedRequiredTriggerSources)
+      ? [...new Set(input.windowPolicy.enrichedRequiredTriggerSources
+        .map((item) => String(item || '').trim())
+        .filter((item): item is 'UserTurn' | 'AgentInitiative' => item === 'UserTurn' || item === 'AgentInitiative'))]
+      : storyPackage.windowPolicy.enrichedRequiredTriggerSources;
+    const trimmedTurns = storyPackage.turnWindow.turns.slice(-maxTurns);
+    if (trimmedTurns.length === 0) {
+      throw new VideoPlayError({
+        reasonCode: VIDEOPLAY_REASON.STORY_SOURCE_UNAVAILABLE,
+        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.STORY_SOURCE_UNAVAILABLE),
+        stage: 'narrative-ingest',
+        message: 'VIDEOPLAY_STORY_WINDOW_EMPTY',
+      });
+    }
+    const turnWindowParsed = NarrativeTurnWindowSchema.safeParse({
+      ...storyPackage.turnWindow,
+      ingestCursorStart: trimmedTurns[0]!.turnId,
+      turns: trimmedTurns,
     });
-    const turnWindowParsed = NarrativeTurnWindowSchema.safeParse(turnWindowRaw);
     if (!turnWindowParsed.success) {
       throw new VideoPlayError({
-        reasonCode: VIDEOPLAY_REASON.FACT_PROJECTION_INVALID,
-        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.FACT_PROJECTION_INVALID),
-        stage: 'narrative-bridge',
-        message: 'VIDEOPLAY_TURN_WINDOW_SCHEMA_INVALID',
+        reasonCode: VIDEOPLAY_REASON.STORY_PACKAGE_INVALID,
+        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.STORY_PACKAGE_INVALID),
+        stage: 'story-package',
+        message: 'VIDEOPLAY_STORY_TURN_WINDOW_SCHEMA_INVALID',
         details: {
           issues: turnWindowParsed.error.issues.map((item) => `${item.path.join('.')}:${item.message}`),
         },
@@ -979,17 +1042,29 @@ export async function runVideoPlayEpisodeProduction(
     }
     turnWindow = turnWindowParsed.data;
 
-    const projectionRaw = await deps.narrativeEngine.projectionRenderInput({
-      storyId: input.storyId,
-      ingestCursorStart: input.ingestCursorStart,
-    });
-    const projectionParsed = NarrativeProjectionRenderInputSchema.safeParse(projectionRaw);
+    if (sourceMode === 'textplay-enriched-story') {
+      const required = new Set(requiredTriggerSources);
+      const hasEnrichedTurn = turnWindow.turns.some((turn) => required.has(String(turn.triggerSource || '').trim() as 'UserTurn' | 'AgentInitiative'));
+      if (!hasEnrichedTurn) {
+        throw new VideoPlayError({
+          reasonCode: VIDEOPLAY_REASON.STORY_SOURCE_UNAVAILABLE,
+          actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.STORY_SOURCE_UNAVAILABLE),
+          stage: 'narrative-ingest',
+          message: 'VIDEOPLAY_ENRICHED_SOURCE_TRIGGER_MISSING',
+          details: {
+            requiredTriggerSources,
+          },
+        });
+      }
+    }
+
+    const projectionParsed = NarrativeProjectionRenderInputSchema.safeParse(storyPackage.projection);
     if (!projectionParsed.success) {
       throw new VideoPlayError({
-        reasonCode: VIDEOPLAY_REASON.FACT_PROJECTION_INVALID,
-        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.FACT_PROJECTION_INVALID),
-        stage: 'narrative-bridge',
-        message: 'VIDEOPLAY_PROJECTION_SCHEMA_INVALID',
+        reasonCode: VIDEOPLAY_REASON.STORY_PACKAGE_INVALID,
+        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.STORY_PACKAGE_INVALID),
+        stage: 'story-package',
+        message: 'VIDEOPLAY_STORY_PROJECTION_SCHEMA_INVALID',
         details: {
           issues: projectionParsed.error.issues.map((item) => `${item.path.join('.')}:${item.message}`),
         },
@@ -1005,6 +1080,8 @@ export async function runVideoPlayEpisodeProduction(
       step: 'narrative-ingest',
       eventType: 'step.complete',
       details: {
+        sourceMode,
+        storyPackageVersion: storyPackage.snapshot.version,
         turnCount: turnWindow.turns.length,
         projectionEvents: projection.events.length,
         routeSelected: {

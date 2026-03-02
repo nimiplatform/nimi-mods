@@ -49,6 +49,9 @@ type BuildWorldStudioRightPanelInput = {
   missingPrimaryEvidenceCount: number;
   eventCharacterCoverage: number;
   eventLocationCoverage: number;
+  storyProjectionCount: number;
+  storyProjectionMissingContextCount: number;
+  storyProjectionLatestAt: string;
   terminalChunkSuccess: number;
   terminalChunkTotal: number;
   terminalChunkFailed: number;
@@ -202,6 +205,9 @@ export function buildWorldStudioRightPanel(input: BuildWorldStudioRightPanelInpu
       missingPrimaryEvidenceCount={input.missingPrimaryEvidenceCount}
       eventCharacterCoverage={input.eventCharacterCoverage}
       eventLocationCoverage={input.eventLocationCoverage}
+      storyProjectionCount={input.storyProjectionCount}
+      storyProjectionMissingContextCount={input.storyProjectionMissingContextCount}
+      storyProjectionLatestAt={input.storyProjectionLatestAt}
       terminalChunkSuccess={input.terminalChunkSuccess}
       terminalChunkTotal={input.terminalChunkTotal}
       terminalChunkFailed={input.terminalChunkFailed}

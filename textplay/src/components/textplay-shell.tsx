@@ -4,9 +4,9 @@ import type {
   TextplayPresenceReport,
   TextplayPresenceState,
   TextplayRenderFailure,
-  TextplayReplicaDetail,
-  TextplayReplicaSnapshot,
-  TextplayReplicaSummary,
+  TextplayStoryDetail,
+  TextplayStorySnapshot,
+  TextplayStorySummary,
   TextplayRunEvent,
   TextplayRunSnapshot,
   TextplayStartupPackage,
@@ -19,20 +19,20 @@ export type TextplayShellProps = {
   agentId: string;
   playerId: string;
   routeLabel: string;
-  replicas: TextplayReplicaSummary[];
-  selectedReplicaId: string | null;
-  selectedReplica: TextplayReplicaDetail | null;
+  stories: TextplayStorySummary[];
+  selectedStoryId: string | null;
+  selectedStory: TextplayStoryDetail | null;
   startupPackage: TextplayStartupPackage | null;
   startupLoading: boolean;
   startupError: string | null;
-  replicaSnapshot: TextplayReplicaSnapshot | null;
+  storySnapshot: TextplayStorySnapshot | null;
   presenceState: TextplayPresenceState;
   presenceReports: TextplayPresenceReport[];
   inputText: string;
   inputPlaceholder: string;
   isRunning: boolean;
   canSend: boolean;
-  canSelectReplica: boolean;
+  canSelectStory: boolean;
   runId: string | null;
   records: TextplayPersistRecord[];
   selectedRecordRunId: string | null;
@@ -50,7 +50,7 @@ export type TextplayShellProps = {
   onCancel: () => void;
   onRefresh: () => void;
   onInitiativeReceived: () => void;
-  onSelectReplica: (replicaId: string) => void;
+  onSelectStory: (storyId: string) => void;
   onSelectRecord: (runId: string) => void;
   onLoadRecoveryDelta: () => void;
 };
@@ -78,18 +78,19 @@ function formatRecordTitle(record: TextplayPersistRecord): string {
   return `${message.slice(0, 40)}...`;
 }
 
-function renderReplicaSummary(replica: TextplayReplicaDetail | null) {
-  if (!replica) {
+function renderStorySummary(story: TextplayStoryDetail | null) {
+  if (!story) {
     return <div className="text-xs text-gray-500">Select a playable story to load context.</div>;
   }
 
   return (
     <div className="space-y-1 text-xs text-gray-600">
-      <div className="font-medium text-gray-800">{replica.title}</div>
-      <div className="text-[11px] text-gray-500">storyId: {replica.storyId}</div>
-      <div>{replica.summary}</div>
-      <div className="text-[11px] text-gray-500">primaryAgent: {replica.primaryAgentId || '(missing)'}</div>
-      <div className="text-[11px] text-gray-500">participants: {replica.participants.length}</div>
+      <div className="font-medium text-gray-800">{story.title}</div>
+      <div className="text-[11px] text-gray-500">storyId: {story.storyId}</div>
+      <div>{story.summary}</div>
+      <div className="text-[11px] text-gray-500">eventHorizon: {story.eventHorizon}</div>
+      <div className="text-[11px] text-gray-500">primaryAgent: {story.primaryAgentId || '(missing)'}</div>
+      <div className="text-[11px] text-gray-500">participants: {story.participants.length}</div>
     </div>
   );
 }
@@ -101,41 +102,41 @@ export function TextplayShell(props: TextplayShellProps) {
         <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Context</div>
 
         <label className="mt-3 block text-xs text-gray-600">
-          Playable Replica
+          Playable Story
           <select
             className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm"
-            value={props.selectedReplicaId || ''}
-            onChange={(event) => props.onSelectReplica(event.target.value)}
-            disabled={!props.canSelectReplica || props.replicas.length === 0}
+            value={props.selectedStoryId || ''}
+            onChange={(event) => props.onSelectStory(event.target.value)}
+            disabled={!props.canSelectStory || props.stories.length === 0}
           >
             <option value="" disabled>
-              {props.replicas.length > 0 ? 'Select a playable story' : 'No playable story'}
+              {props.stories.length > 0 ? 'Select a playable story' : 'No playable story'}
             </option>
-            {props.replicas.map((replica) => (
-              <option key={replica.replicaId} value={replica.replicaId}>
-                {replica.title}
+            {props.stories.map((story) => (
+              <option key={story.storyId} value={story.storyId}>
+                {story.title}
               </option>
             ))}
           </select>
         </label>
 
         <div className="mt-2 max-h-40 overflow-auto rounded-lg border border-gray-200 bg-white p-2 text-xs">
-          {props.replicas.length === 0 ? (
+          {props.stories.length === 0 ? (
             <div className="text-gray-500">No PRIMARY world events available for play.</div>
           ) : (
             <div className="space-y-1">
-              {props.replicas.map((replica) => {
-                const active = replica.replicaId === props.selectedReplicaId;
+              {props.stories.map((story) => {
+                const active = story.storyId === props.selectedStoryId;
                 return (
                   <button
-                    key={replica.replicaId}
+                    key={story.storyId}
                     type="button"
-                    disabled={!props.canSelectReplica}
+                    disabled={!props.canSelectStory}
                     className={`w-full rounded border px-2 py-1 text-left text-[11px] ${active ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-white hover:bg-gray-50'} disabled:cursor-not-allowed disabled:opacity-50`}
-                    onClick={() => props.onSelectReplica(replica.replicaId)}
+                    onClick={() => props.onSelectStory(story.storyId)}
                   >
-                    <div className="font-medium text-gray-800">{replica.title}</div>
-                    <div className="text-gray-500">{replica.storyId}</div>
+                    <div className="font-medium text-gray-800">{story.title}</div>
+                    <div className="text-gray-500">{story.storyId}</div>
                   </button>
                 );
               })}
@@ -144,7 +145,7 @@ export function TextplayShell(props: TextplayShellProps) {
         </div>
 
         <div className="mt-2 rounded-lg border border-gray-200 bg-white p-2">
-          {renderReplicaSummary(props.selectedReplica)}
+          {renderStorySummary(props.selectedStory)}
         </div>
 
         <div className="mt-2 rounded-lg border border-gray-200 bg-white p-2 text-xs text-gray-600">
@@ -153,10 +154,12 @@ export function TextplayShell(props: TextplayShellProps) {
           {!props.startupLoading && props.startupError ? <div className="mt-1 text-rose-600">{props.startupError}</div> : null}
           {!props.startupLoading && !props.startupError && props.startupPackage ? (
             <div className="mt-1 space-y-1">
-              <div>phase: {props.startupPackage.phase}</div>
-              <div>objective: {props.startupPackage.objective}</div>
-              <div>lorebooks: {props.startupPackage.availableMaterials.lorebooks.length}</div>
-              <div>memories: {props.startupPackage.availableMaterials.memories.length}</div>
+              <div>phase: {String(props.startupPackage.narrativeScopes.STORY.phase || 'opening')}</div>
+              <div>objective: {String(props.startupPackage.narrativeScopes.STORY.objective || 'advance-story')}</div>
+              <div>lorebooks: {props.startupPackage.materials.lorebooks.length}</div>
+              <div>memories: {props.startupPackage.materials.memories.length}</div>
+              <div>scenes: {props.startupPackage.materials.scenes.length}</div>
+              <div>contexts: {props.startupPackage.materials.contexts.length}</div>
             </div>
           ) : null}
         </div>
@@ -278,10 +281,10 @@ export function TextplayShell(props: TextplayShellProps) {
             </div>
           </div>
 
-          {!props.selectedReplicaId ? (
+          {!props.selectedStoryId ? (
             <div className="mt-2 text-xs text-amber-700">Select a playable story before sending.</div>
           ) : null}
-          {props.selectedReplicaId && !props.startupPackage && !props.startupLoading ? (
+          {props.selectedStoryId && !props.startupPackage && !props.startupLoading ? (
             <div className="mt-2 text-xs text-amber-700">Startup package is required before sending.</div>
           ) : null}
 
@@ -300,16 +303,31 @@ export function TextplayShell(props: TextplayShellProps) {
       </main>
 
       <aside className="w-full bg-slate-50 p-3 lg:w-80">
-        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Replica Snapshot</div>
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Story Snapshot</div>
         <div className="rounded-lg border border-gray-200 bg-white p-2 text-xs text-gray-600">
-          {props.replicaSnapshot ? (
+          {props.storySnapshot ? (
             <div className="space-y-1">
-              <div>replicaId: {props.replicaSnapshot.replicaId}</div>
-              <div>storyId: {props.replicaSnapshot.storyId}</div>
-              <div>primaryAgentId: {props.replicaSnapshot.primaryAgentId || '(missing)'}</div>
-              <div>version: {props.replicaSnapshot.version}</div>
-              <div>source: {props.replicaSnapshot.source}</div>
-              <div>loadedAt: {props.replicaSnapshot.loadedAt}</div>
+              <div>storyId: {props.storySnapshot.storyId}</div>
+              <div>entryEventId: {props.storySnapshot.entryEventId}</div>
+              <div>primaryAgentId: {props.storySnapshot.primaryAgentId || '(missing)'}</div>
+              <div>version: {props.storySnapshot.version}</div>
+              <div>source: {props.storySnapshot.source}</div>
+              <div>loadedAt: {props.storySnapshot.loadedAt}</div>
+              {props.startupPackage ? (
+                <div>
+                  initiative: tick={props.startupPackage.startupPolicy.initiative.tickSeconds}s
+                  {' '}cooldown={props.startupPackage.startupPolicy.initiative.cooldownSeconds}s
+                  {' '}max={props.startupPackage.startupPolicy.initiative.maxConsecutive}
+                </div>
+              ) : null}
+              <div>
+                coverage: canon={String(props.storySnapshot.contextCoverage.canon)}
+                {' '}story={String(props.storySnapshot.contextCoverage.story)}
+                {' '}subject={String(props.storySnapshot.contextCoverage.subject)}
+                {' '}relation={String(props.storySnapshot.contextCoverage.relation)}
+                {' '}scene={String(props.storySnapshot.contextCoverage.scene)}
+              </div>
+              <div>gapWarnings: {props.storySnapshot.gapWarnings.length}</div>
             </div>
           ) : (
             <div>none</div>

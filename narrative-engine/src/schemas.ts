@@ -60,6 +60,20 @@ export const NarrativeContextSnapshotSchema = z.object({
   availableActors: z.array(z.string()),
   narrativeStyle: z.record(z.string(), z.unknown()),
   characterRelations: z.array(z.record(z.string(), z.unknown())),
+  phase: z.string().min(1),
+  objective: z.string().min(1),
+  tensionTarget: z.number().finite(),
+  openThreads: z.array(z.string()),
+  startupPolicy: z.record(z.string(), z.unknown()),
+  futurePressure: z.array(z.string()),
+  contextCoverage: z.object({
+    canon: z.boolean(),
+    story: z.boolean(),
+    subject: z.boolean(),
+    relation: z.boolean(),
+    scene: z.boolean(),
+    warnings: z.array(z.string()),
+  }),
   narrativeContextScopes: NarrativeContextScopesSchema,
 }).strict();
 

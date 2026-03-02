@@ -22,6 +22,7 @@ registerModTranslations('videoplay', 'zh', zhLocale as Record<string, unknown>);
 export * from './contracts.js';
 export * from './types.js';
 export * from './schemas.js';
+export * from './data/story-package.js';
 export * from './storage/state.js';
 export * from './storage/operations.js';
 export {

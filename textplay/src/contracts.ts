@@ -8,6 +8,8 @@ export const TEXTPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS = 'data-api.runtime.route.o
 export const TEXTPLAY_DATA_API_WORLD_ACCESS_ME = 'data-api.world.access.me';
 export const TEXTPLAY_DATA_API_WORLD_EVENTS_LIST = 'data-api.world.events.list';
 export const TEXTPLAY_DATA_API_WORLD_LOREBOOKS_LIST = 'data-api.world.lorebooks.list';
+export const TEXTPLAY_DATA_API_WORLD_SCENES_LIST = 'data-api.world.scenes.list';
+export const TEXTPLAY_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST = 'data-api.world.narrative-contexts.list';
 export const TEXTPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY = 'data-api.core.agent.memory.recall.for-entity';
 export const TEXTPLAY_DATA_API_RENDER_PERSIST = 'data-api.textplay.render.persist';
 
@@ -17,6 +19,8 @@ export const TEXTPLAY_CAPABILITIES = [
   `data.query.${TEXTPLAY_DATA_API_WORLD_ACCESS_ME}`,
   `data.query.${TEXTPLAY_DATA_API_WORLD_EVENTS_LIST}`,
   `data.query.${TEXTPLAY_DATA_API_WORLD_LOREBOOKS_LIST}`,
+  `data.query.${TEXTPLAY_DATA_API_WORLD_SCENES_LIST}`,
+  `data.query.${TEXTPLAY_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST}`,
   `data.query.${TEXTPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY}`,
   `data.register.${TEXTPLAY_DATA_API_RENDER_PERSIST}`,
   `data.query.${TEXTPLAY_DATA_API_RENDER_PERSIST}`,

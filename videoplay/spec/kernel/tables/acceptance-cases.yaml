@@ -76,6 +76,28 @@ cases:
     expected_ok: false
     reason_code: VIDEOPLAY_VISUAL_ATTRACTION_LOW
     source_rule: V-ACC-002
+  - id: VID-013-STORY-CATALOG-PRIMARY-ONLY
+    description: Playable VideoPlay story catalog keeps PRIMARY world events only.
+    expected_ok: true
+    primary_only: true
+    reason_code: null
+    source_rule: V-ACC-002
+  - id: VID-014-VIDEOSTORY-PACKAGE-READY
+    description: VideoStoryPackage assembles required fields from world/context/memory and narrative projection inputs.
+    expected_ok: true
+    package_ready: true
+    reason_code: null
+    source_rule: V-ACC-002
+  - id: VID-015-ENRICHED-SOURCE-REQUIRES-USER-OR-INITIATIVE-TURN
+    description: Enriched mode fails close when no UserTurn or AgentInitiative turn exists in selected window.
+    expected_ok: false
+    reason_code: VIDEOPLAY_STORY_SOURCE_UNAVAILABLE
+    source_rule: V-ACC-002
+  - id: VID-016-RUN-BLOCKED-WHEN-STORY-PACKAGE-NOT-READY
+    description: Pipeline run is blocked when story package is missing critical context or schema invalid.
+    expected_ok: false
+    reason_code: VIDEOPLAY_STORY_PACKAGE_INVALID
+    source_rule: V-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:videoplay-kernel-docs
     source_rule: V-ACC-003

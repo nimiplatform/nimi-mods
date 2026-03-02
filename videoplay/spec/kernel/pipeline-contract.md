@@ -27,3 +27,7 @@ Release package is allowed only for `APPROVED` or `ADJUSTED`.
 ## V-PIPE-006 Idempotent Writes
 
 All write operations require idempotency key and replay-safe side effects.
+
+## V-PIPE-007 Story Source Resolve in Narrative-Ingest
+
+`narrative-ingest` must resolve `canonical-story|textplay-enriched-story` and validate story package readiness before segmentation. Unresolved source mode is fail-close.

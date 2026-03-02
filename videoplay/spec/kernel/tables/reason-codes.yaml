@@ -10,6 +10,16 @@ codes:
     blocking: true
     action_hint: Repair narrative projection mapping and retry.
     source_rule: V-ERR-001
+  - code: VIDEOPLAY_STORY_PACKAGE_INVALID
+    stage: narrative-ingest
+    blocking: true
+    action_hint: Repair story package schema/coverage and retry.
+    source_rule: V-ERR-004
+  - code: VIDEOPLAY_STORY_SOURCE_UNAVAILABLE
+    stage: narrative-ingest
+    blocking: true
+    action_hint: Select an available story source mode and retry.
+    source_rule: V-ERR-004
   - code: VIDEOPLAY_EPISODE_SEGMENTATION_FAILED
     stage: segment
     blocking: true

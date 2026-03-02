@@ -10,18 +10,18 @@ import {
 } from '../contracts.js';
 import { assertTextplayChatRouteAvailable } from '../data/route-options.js';
 import {
-  getPlayableReplicaDetail,
-  listPlayableReplicas,
-  loadReplicaStartupPackage,
-} from '../data/replica-catalog.js';
+  getPlayableStoryDetail,
+  listPlayableStories,
+  loadStoryStartupPackage,
+} from '../data/story-catalog.js';
 import { runTextplayRender } from '../pipeline/run-textplay-render.js';
 import { createTextplayPresenceMachine } from '../presence/state-machine.js';
 import type { TextplayShellProps } from '../components/textplay-shell.js';
 import type {
   TextplayPersistRecord,
   TextplayPresenceReport,
-  TextplayReplicaDetail,
-  TextplayReplicaSummary,
+  TextplayStoryDetail,
+  TextplayStorySummary,
   TextplayRunEvent,
   TextplayRunSnapshot,
   TextplayWarning,
@@ -298,11 +298,11 @@ function upsertPersistRecord(records: TextplayPersistRecord[], next: TextplayPer
   return copied.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 }
 
-function deriveReplicaPlaceholder(replica: TextplayReplicaDetail | null): string {
-  if (!replica) {
+function deriveStoryPlaceholder(story: TextplayStoryDetail | null): string {
+  if (!story) {
     return 'Select a playable story first...';
   }
-  return `在《${replica.title}》中输入下一步行动...`;
+  return `在《${story.title}》中输入下一步行动...`;
 }
 
 export function useTextplayController(): TextplayShellProps {
@@ -340,13 +340,13 @@ export function useTextplayController(): TextplayShellProps {
   const [playerId, setPlayerIdState] = useState<string>(() => playerIdSeed);
   const [routeLabel, setRouteLabel] = useState<string>('unresolved');
 
-  const [replicas, setReplicas] = useState<TextplayReplicaSummary[]>([]);
-  const [selectedReplicaId, setSelectedReplicaId] = useState<string | null>(null);
-  const [selectedReplica, setSelectedReplica] = useState<TextplayReplicaDetail | null>(null);
+  const [stories, setStories] = useState<TextplayStorySummary[]>([]);
+  const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
+  const [selectedStory, setSelectedStory] = useState<TextplayStoryDetail | null>(null);
   const [startupPackage, setStartupPackage] = useState<TextplayShellProps['startupPackage']>(null);
   const [startupLoading, setStartupLoading] = useState(false);
   const [startupError, setStartupError] = useState<string | null>(null);
-  const [replicaSnapshot, setReplicaSnapshot] = useState<TextplayShellProps['replicaSnapshot']>(null);
+  const [storySnapshot, setStorySnapshot] = useState<TextplayShellProps['storySnapshot']>(null);
 
   const [presenceState, setPresenceState] = useState(presenceMachine.getState());
   const [presenceReports, setPresenceReports] = useState<TextplayPresenceReport[]>([]);
@@ -363,11 +363,14 @@ export function useTextplayController(): TextplayShellProps {
   const [failure, setFailure] = useState<TextplayShellProps['failure']>(null);
 
   const abortRef = useRef<AbortController | null>(null);
-  const replicaHydrationSeqRef = useRef(0);
+  const storyHydrationSeqRef = useRef(0);
+  const lastUserActivityMsRef = useRef<number>(Date.now());
+  const lastInitiativeAtMsRef = useRef<number>(0);
+  const consecutiveInitiativeRef = useRef<number>(0);
 
-  const storyId = selectedReplica?.storyId || '';
-  const worldId = selectedReplica?.worldId || worldIdRuntime;
-  const agentId = agentIdRuntime || selectedReplica?.primaryAgentId || '';
+  const storyId = selectedStory?.storyId || '';
+  const worldId = selectedStory?.worldId || worldIdRuntime;
+  const agentId = agentIdRuntime || selectedStory?.primaryAgentId || '';
 
   const syncPresenceView = useCallback(() => {
     setPresenceState(presenceMachine.getState());
@@ -411,7 +414,9 @@ export function useTextplayController(): TextplayShellProps {
 
   const setInputText = useCallback((value: string) => {
     setInputTextState(value);
+    lastUserActivityMsRef.current = Date.now();
     if (value.trim()) {
+      consecutiveInitiativeRef.current = 0;
       presenceMachine.dispatch('onUserComposing');
     } else {
       presenceMachine.dispatch('onUserPaused');
@@ -500,23 +505,23 @@ export function useTextplayController(): TextplayShellProps {
     }
   }, [hookClient]);
 
-  const hydrateReplicaSelection = useCallback(async (replicaId: string, options?: {
+  const hydrateStorySelection = useCallback(async (storyId: string, options?: {
     clearRunSurface?: boolean;
   }) => {
-    const normalizedReplicaId = replicaId.trim();
-    if (!normalizedReplicaId || !worldIdRuntime) {
-      setSelectedReplica(null);
+    const normalizedStoryId = storyId.trim();
+    if (!normalizedStoryId || !worldIdRuntime) {
+      setSelectedStory(null);
       setStartupPackage(null);
-      setReplicaSnapshot(null);
-      setStartupError(worldIdRuntime ? 'Replica id is missing.' : 'worldId is missing from runtime context.');
+      setStorySnapshot(null);
+      setStartupError(worldIdRuntime ? 'Story id is missing.' : 'worldId is missing from runtime context.');
       if (options?.clearRunSurface !== false) {
         resetRunSurface();
       }
       return;
     }
 
-    const seq = replicaHydrationSeqRef.current + 1;
-    replicaHydrationSeqRef.current = seq;
+    const seq = storyHydrationSeqRef.current + 1;
+    storyHydrationSeqRef.current = seq;
 
     if (options?.clearRunSurface !== false) {
       resetRunSurface();
@@ -526,27 +531,27 @@ export function useTextplayController(): TextplayShellProps {
     setStartupError(null);
 
     try {
-      const detail = await getPlayableReplicaDetail({
+      const detail = await getPlayableStoryDetail({
         hookClient,
         worldId: worldIdRuntime,
-        replicaId: normalizedReplicaId,
+        storyId: normalizedStoryId,
         runtimeAgentId: agentIdRuntime,
       });
 
-      if (replicaHydrationSeqRef.current !== seq) {
+      if (storyHydrationSeqRef.current !== seq) {
         return;
       }
 
       if (!detail) {
-        setSelectedReplica(null);
+        setSelectedStory(null);
         setStartupPackage(null);
-        setReplicaSnapshot(null);
-        setStartupError('Replica detail not found. Refresh and try again.');
+        setStorySnapshot(null);
+        setStartupError('Story detail not found. Refresh and try again.');
         return;
       }
 
-      setSelectedReplica(detail);
-      setReplicaSnapshot(null);
+      setSelectedStory(detail);
+      setStorySnapshot(null);
 
       if (typeof setRuntimeField === 'function') {
         setRuntimeField('storyId', detail.storyId);
@@ -555,23 +560,23 @@ export function useTextplayController(): TextplayShellProps {
         }
       }
 
-      const startup = await loadReplicaStartupPackage({
+      const startup = await loadStoryStartupPackage({
         hookClient,
         narrativeEngine,
         detail,
         playerId: playerId.trim(),
       });
 
-      if (replicaHydrationSeqRef.current !== seq) {
+      if (storyHydrationSeqRef.current !== seq) {
         return;
       }
 
       setStartupPackage(startup);
-      setReplicaSnapshot(startup.snapshot);
+      setStorySnapshot(startup.snapshot);
       setStartupError(null);
 
       const rows = await queryStoryRecords(detail.storyId);
-      if (replicaHydrationSeqRef.current !== seq) {
+      if (storyHydrationSeqRef.current !== seq) {
         return;
       }
 
@@ -592,12 +597,12 @@ export function useTextplayController(): TextplayShellProps {
         applyRecordSurface(null);
       }
     } catch (error) {
-      if (replicaHydrationSeqRef.current !== seq) {
+      if (storyHydrationSeqRef.current !== seq) {
         return;
       }
       const message = error instanceof Error ? error.message : String(error || '');
       setStartupPackage(null);
-      setReplicaSnapshot(null);
+      setStorySnapshot(null);
       setStartupError(message || 'Failed to load startup package.');
       if (typeof setStatusBanner === 'function') {
         setStatusBanner({
@@ -606,7 +611,7 @@ export function useTextplayController(): TextplayShellProps {
         });
       }
     } finally {
-      if (replicaHydrationSeqRef.current === seq) {
+      if (storyHydrationSeqRef.current === seq) {
         setStartupLoading(false);
       }
     }
@@ -624,43 +629,43 @@ export function useTextplayController(): TextplayShellProps {
     worldIdRuntime,
   ]);
 
-  const loadReplicaList = useCallback(async () => {
+  const loadStoryList = useCallback(async () => {
     const worldId = worldIdRuntime.trim();
     if (!worldId) {
-      setReplicas([]);
-      setSelectedReplicaId(null);
-      setSelectedReplica(null);
+      setStories([]);
+      setSelectedStoryId(null);
+      setSelectedStory(null);
       setStartupPackage(null);
       setStartupError('worldId is required to load playable stories.');
       return;
     }
 
     try {
-      const rows = await listPlayableReplicas({
+      const rows = await listPlayableStories({
         hookClient,
         worldId,
         runtimeAgentId: agentIdRuntime,
       });
-      setReplicas(rows);
-      setSelectedReplicaId((previous) => {
-        if (previous && rows.some((row) => row.replicaId === previous)) {
+      setStories(rows);
+      setSelectedStoryId((previous) => {
+        if (previous && rows.some((row) => row.storyId === previous)) {
           return previous;
         }
-        return rows[0]?.replicaId || null;
+        return rows[0]?.storyId || null;
       });
       if (rows.length === 0) {
-        setSelectedReplica(null);
+        setSelectedStory(null);
         setStartupPackage(null);
-        setReplicaSnapshot(null);
+        setStorySnapshot(null);
         setStartupError('No playable PRIMARY world events yet.');
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error || '');
-      setReplicas([]);
-      setSelectedReplicaId(null);
-      setSelectedReplica(null);
+      setStories([]);
+      setSelectedStoryId(null);
+      setSelectedStory(null);
       setStartupPackage(null);
-      setReplicaSnapshot(null);
+      setStorySnapshot(null);
       setStartupError(message || 'Failed to load playable stories.');
       if (typeof setStatusBanner === 'function') {
         setStatusBanner({
@@ -706,11 +711,14 @@ export function useTextplayController(): TextplayShellProps {
   }, [loadRunRecovery, runEvents, selectedRecordRunId, setStatusBanner]);
 
   const onInputFocus = useCallback(() => {
+    lastUserActivityMsRef.current = Date.now();
+    consecutiveInitiativeRef.current = 0;
     presenceMachine.dispatch('onUserActive');
     syncPresenceView();
   }, [presenceMachine, syncPresenceView]);
 
   const onInputBlur = useCallback(() => {
+    lastUserActivityMsRef.current = Date.now();
     presenceMachine.dispatch('onUserPaused');
     syncPresenceView();
   }, [presenceMachine, syncPresenceView]);
@@ -728,15 +736,15 @@ export function useTextplayController(): TextplayShellProps {
     controller.abort();
   }, []);
 
-  const onSelectReplica = useCallback((replicaId: string) => {
+  const onSelectStory = useCallback((storyId: string) => {
     if (isRunning) {
       return;
     }
-    const normalized = replicaId.trim();
+    const normalized = storyId.trim();
     if (!normalized) {
       return;
     }
-    setSelectedReplicaId(normalized);
+    setSelectedStoryId(normalized);
   }, [isRunning]);
 
   const onSend = useCallback(() => {
@@ -745,13 +753,13 @@ export function useTextplayController(): TextplayShellProps {
         return;
       }
 
-      const activeReplica = selectedReplica;
+      const activeStory = selectedStory;
       const normalizedPlayerId = playerId.trim();
       const normalizedMessage = inputText.trim();
-      const normalizedWorldId = (activeReplica?.worldId || worldIdRuntime).trim();
-      const normalizedAgentId = (agentIdRuntime || activeReplica?.primaryAgentId || '').trim();
+      const normalizedWorldId = (activeStory?.worldId || worldIdRuntime).trim();
+      const normalizedAgentId = (agentIdRuntime || activeStory?.primaryAgentId || '').trim();
 
-      if (!activeReplica) {
+      if (!activeStory) {
         if (typeof setStatusBanner === 'function') {
           setStatusBanner({
             kind: 'warn',
@@ -805,6 +813,8 @@ export function useTextplayController(): TextplayShellProps {
         return;
       }
 
+      lastUserActivityMsRef.current = Date.now();
+      consecutiveInitiativeRef.current = 0;
       const nextRunId = createUlid();
       const traceId = createUlid();
       const controller = new AbortController();
@@ -823,7 +833,7 @@ export function useTextplayController(): TextplayShellProps {
       try {
         const result = await runTextplayRender({
           request: {
-            storyId: activeReplica.storyId,
+            storyId: activeStory.storyId,
             worldId: normalizedWorldId,
             agentId: normalizedAgentId,
             playerId: normalizedPlayerId,
@@ -937,7 +947,168 @@ export function useTextplayController(): TextplayShellProps {
     playerId,
     presenceMachine,
     queryStoryRecords,
-    selectedReplica,
+    selectedStory,
+    setStatusBanner,
+    startupPackage,
+    syncPresenceView,
+    worldIdRuntime,
+  ]);
+
+  const triggerInitiativeRender = useCallback((inactiveMs: number) => {
+    void (async () => {
+      if (isRunning) {
+        return;
+      }
+
+      const activeStory = selectedStory;
+      const normalizedPlayerId = playerId.trim();
+      const normalizedWorldId = (activeStory?.worldId || worldIdRuntime).trim();
+      const normalizedAgentId = (agentIdRuntime || activeStory?.primaryAgentId || '').trim();
+
+      if (!activeStory || !startupPackage || !normalizedPlayerId || !normalizedWorldId || !normalizedAgentId) {
+        return;
+      }
+
+      const nextRunId = createUlid();
+      const traceId = createUlid();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      const initiativePayload = {
+        initiative: {
+          source: 'textplay.auto-tick',
+          inactiveMs,
+        },
+      };
+
+      setIsRunning(true);
+      setRunId(nextRunId);
+      setFailure(null);
+      setGapRefillApplied(false);
+
+      const nowMs = Date.now();
+      lastInitiativeAtMsRef.current = nowMs;
+      consecutiveInitiativeRef.current += 1;
+
+      const presenceMark = presenceMachine.mark();
+      presenceMachine.dispatch('onInitiativeReceived');
+      syncPresenceView();
+
+      try {
+        const result = await runTextplayRender({
+          request: {
+            storyId: activeStory.storyId,
+            worldId: normalizedWorldId,
+            agentId: normalizedAgentId,
+            playerId: normalizedPlayerId,
+            triggerSource: 'AgentInitiative',
+            systemPayload: initiativePayload,
+            runId: nextRunId,
+            traceId,
+          },
+          deps: {
+            hookClient,
+            aiClient,
+            narrativeEngine,
+            abortSignal: controller.signal,
+          },
+          presenceReports: presenceMachine.collectSince(presenceMark),
+        });
+
+        if (result.ok) {
+          const fallbackRecord: TextplayPersistRecord = {
+            id: createUlid(),
+            storyId: result.meta.storyId,
+            turnId: result.meta.turnId,
+            runId: result.meta.runId,
+            traceId: result.meta.traceId,
+            triggerSource: 'AgentInitiative',
+            playerId: normalizedPlayerId,
+            userMessage: '',
+            systemPayload: initiativePayload,
+            text: result.text,
+            meta: result.meta,
+            runEvents: result.runEvents,
+            runSnapshot: result.meta.runSnapshot,
+            warnings: result.meta.warnings,
+            presenceReports: result.meta.presenceReports,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+
+          setLastRenderedText(result.text);
+          setRunEvents(result.runEvents);
+          setWarnings(result.meta.warnings);
+          setRunSnapshot(result.meta.runSnapshot);
+          setGapRefillApplied(Boolean(result.meta.runSnapshot.gapRefillApplied));
+          setRecords((previous) => upsertPersistRecord(previous, fallbackRecord));
+          setSelectedRecordRunId(result.meta.runId);
+
+          const rows = await queryStoryRecords(result.meta.storyId);
+          setRecords(rows);
+          const selected = rows.find((row) => row.runId === result.meta.runId) || fallbackRecord;
+          applyRecordSurface(selected);
+
+          await loadRunRecovery({
+            runId: result.meta.runId,
+            afterSeq: 0,
+            append: false,
+          });
+
+          if (typeof setStatusBanner === 'function') {
+            setStatusBanner({
+              kind: result.meta.warnings.some((warning) => warning.code === TEXTPLAY_REASON.PERSISTENCE_FAILED_WARN)
+                ? 'warn'
+                : 'info',
+              message: result.meta.warnings.length > 0
+                ? 'TextPlay initiative rendered with persistence warning.'
+                : 'TextPlay initiative rendered.',
+            });
+          }
+
+          return;
+        }
+
+        setFailure(result);
+        setWarnings(result.warnings);
+        setRunSnapshot(result.runSnapshot);
+        setRunEvents(result.runEvents);
+        setGapRefillApplied(Boolean(result.runSnapshot.gapRefillApplied));
+        setLastRenderedText('');
+
+        if (typeof setStatusBanner === 'function') {
+          setStatusBanner({
+            kind: result.reasonCode === TEXTPLAY_REASON.RUN_CANCELED ? 'warn' : 'error',
+            message: `${result.reasonCode}: ${result.actionHint}`,
+          });
+        }
+      } catch (error) {
+        if (typeof setStatusBanner === 'function') {
+          setStatusBanner({
+            kind: 'error',
+            message: `TextPlay initiative failed: ${error instanceof Error ? error.message : String(error || '')}`,
+          });
+        }
+      } finally {
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+        }
+        setIsRunning(false);
+        syncPresenceView();
+      }
+    })();
+  }, [
+    agentIdRuntime,
+    aiClient,
+    applyRecordSurface,
+    hookClient,
+    isRunning,
+    loadRunRecovery,
+    narrativeEngine,
+    playerId,
+    presenceMachine,
+    queryStoryRecords,
+    selectedStory,
     setStatusBanner,
     startupPackage,
     syncPresenceView,
@@ -948,9 +1119,9 @@ export function useTextplayController(): TextplayShellProps {
     void refreshRouteAvailability();
 
     void (async () => {
-      await loadReplicaList();
-      if (selectedReplicaId) {
-        await hydrateReplicaSelection(selectedReplicaId, {
+      await loadStoryList();
+      if (selectedStoryId) {
+        await hydrateStorySelection(selectedStoryId, {
           clearRunSurface: false,
         });
       }
@@ -970,12 +1141,12 @@ export function useTextplayController(): TextplayShellProps {
       }
     });
   }, [
-    hydrateReplicaSelection,
-    loadReplicaList,
+    hydrateStorySelection,
+    loadStoryList,
     loadRunRecovery,
     refreshRouteAvailability,
     selectedRecordRunId,
-    selectedReplicaId,
+    selectedStoryId,
     setStatusBanner,
   ]);
 
@@ -999,21 +1170,73 @@ export function useTextplayController(): TextplayShellProps {
   }, [refreshRouteAvailability]);
 
   useEffect(() => {
-    void loadReplicaList();
-  }, [loadReplicaList]);
+    void loadStoryList();
+  }, [loadStoryList]);
 
   useEffect(() => {
-    if (!selectedReplicaId) {
-      setSelectedReplica(null);
+    if (!selectedStoryId) {
+      setSelectedStory(null);
       setStartupPackage(null);
-      setReplicaSnapshot(null);
-      setStartupError(replicas.length > 0 ? 'Select a playable story.' : startupError);
+      setStorySnapshot(null);
+      setStartupError(stories.length > 0 ? 'Select a playable story.' : startupError);
       return;
     }
-    void hydrateReplicaSelection(selectedReplicaId, {
+    void hydrateStorySelection(selectedStoryId, {
       clearRunSurface: true,
     });
-  }, [hydrateReplicaSelection, replicas.length, selectedReplicaId]);
+  }, [hydrateStorySelection, stories.length, selectedStoryId]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return;
+      }
+      const startup = startupPackage;
+      if (!startup || isRunning || !selectedStory) {
+        return;
+      }
+      const policy = startup.startupPolicy.initiative;
+      if (!policy.enabled) {
+        return;
+      }
+      if (policy.blockedPresenceStates.includes(presenceState)) {
+        if (presenceState === 'active' || presenceState === 'composing') {
+          consecutiveInitiativeRef.current = 0;
+          lastUserActivityMsRef.current = Date.now();
+        }
+        return;
+      }
+
+      const nowMs = Date.now();
+      const idleThresholdMs = presenceState === 'away'
+        ? 300_000
+        : presenceState === 'idle'
+          ? 120_000
+          : Number.POSITIVE_INFINITY;
+      const inactiveMs = nowMs - lastUserActivityMsRef.current;
+      if (!Number.isFinite(idleThresholdMs) || inactiveMs < idleThresholdMs) {
+        return;
+      }
+      if (nowMs - lastInitiativeAtMsRef.current < policy.cooldownSeconds * 1000) {
+        return;
+      }
+      if (consecutiveInitiativeRef.current >= policy.maxConsecutive) {
+        return;
+      }
+
+      triggerInitiativeRender(inactiveMs);
+    }, 10_000);
+
+    return () => {
+      clearInterval(timer);
+    };
+  }, [
+    isRunning,
+    presenceState,
+    selectedStory,
+    startupPackage,
+    triggerInitiativeRender,
+  ]);
 
   useEffect(() => () => {
     presenceMachine.destroy();
@@ -1021,10 +1244,13 @@ export function useTextplayController(): TextplayShellProps {
   }, [presenceMachine]);
 
   const canSend = !isRunning
-    && !!selectedReplica
+    && !!selectedStory
     && !!startupPackage
     && !startupLoading
-    && !selectedReplica?.agentBindingMissing
+    && !selectedStory?.agentBindingMissing
+    && routeLabel !== 'unavailable'
+    && startupPackage.snapshot.contextCoverage.canon
+    && startupPackage.snapshot.contextCoverage.story
     && storyId.trim().length > 0
     && playerId.trim().length > 0
     && worldId.trim().length > 0
@@ -1037,20 +1263,20 @@ export function useTextplayController(): TextplayShellProps {
     agentId,
     playerId,
     routeLabel,
-    replicas,
-    selectedReplicaId,
-    selectedReplica,
+    stories,
+    selectedStoryId,
+    selectedStory,
     startupPackage,
     startupLoading,
     startupError,
-    replicaSnapshot,
+    storySnapshot,
     presenceState,
     presenceReports,
     inputText,
-    inputPlaceholder: deriveReplicaPlaceholder(selectedReplica),
+    inputPlaceholder: deriveStoryPlaceholder(selectedStory),
     isRunning,
     canSend,
-    canSelectReplica: !isRunning,
+    canSelectStory: !isRunning,
     runId,
     records,
     selectedRecordRunId,
@@ -1068,7 +1294,7 @@ export function useTextplayController(): TextplayShellProps {
     onCancel,
     onRefresh,
     onInitiativeReceived,
-    onSelectReplica,
+    onSelectStory,
     onSelectRecord,
     onLoadRecoveryDelta,
   };

@@ -21,3 +21,7 @@ VideoPlay reads narrative projection through shared Narrative-Engine module API 
 ## V-CAP-005 Capability Drift Gate
 
 Any capability change must update table source and pass kernel consistency checks in the same change.
+
+## V-CAP-006 Story Package Read Scope
+
+VideoPlay may read `world.events/scenes/narrative-contexts/lorebooks` and `core.agent.memory.recall` for `VideoStoryPackage` assembly, but these reads cannot extend write scope or narrative fact write permissions.

@@ -148,6 +148,9 @@ export type WorldStudioShellMetricsInput = {
   missingPrimaryEvidenceCount: number;
   eventCharacterCoverage: number;
   eventLocationCoverage: number;
+  storyProjectionCount: number;
+  storyProjectionMissingContextCount: number;
+  storyProjectionLatestAt: string;
   terminalChunkSuccess: number;
   terminalChunkTotal: number;
   terminalChunkFailed: number;

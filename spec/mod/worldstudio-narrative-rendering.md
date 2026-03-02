@@ -111,6 +111,12 @@ NarrativeContext 正式 scope 字段：
 6. `metrics`
 7. `sourceEventIds`（渲染计划中每个 beat/shot 的事实追溯键）
 
+补充约束：
+
+1. renderer 允许读取 world/scenes/narrative-contexts/lorebooks/memory 作为 story package 组装辅料。
+2. 上述辅料仅用于启动、风格、编排与诊断，不得直接作为 beat/shot 事实 grounding。
+3. beat/shot 的 grounding 事实来源仍唯一绑定 canonical `CoreOutput` 派生的 `sourceEventIds`。
+
 ## 4. TextPlay 与 VideoPlay 分工
 
 ### 4.1 TextPlay（正式）
@@ -128,6 +134,8 @@ NarrativeContext 正式 scope 字段：
 5. 每个 beat/shot 必须携带 `sourceEventIds`，并可回溯到输入 `spineEvents`。
 6. `groundedRatio` 与 `assetCoverageRatio` 未达门槛时必须 fail-close。
 7. 产线交付单位固定为 episode，不是单回合片段；发布包必须包含 video+poster+caption+metadata+trace 最小集。
+8. VideoPlay 的 story source 支持 `canonical-story` 与 `textplay-enriched-story` 双模式。
+9. `textplay-enriched-story` 仍必须来自 canonical turn/spine 累积事实，禁止读取 textplay 私有草稿或本地临时状态。
 
 ### 4.3 Text/Video 一致性
 
@@ -180,6 +188,7 @@ NarrativeContext 正式 scope 字段：
 9. videoplay 任一分集中的 beat/shot 都必须可回溯到被聚合 turn 的 `sourceEventIds`。
 10. 玩家交互入口必须位于 renderer 层（textplay/videoplay），不得把 narrative-engine 作为终端玩家直达入口。
 11. videoplay 的 episode 输入窗口必须来自 narrative-engine 已生成的 canonical 事实流（可由 textplay 互动回合累积形成）。
+12. renderer 的 story package 组装输入允许扩展到 world/context/memory，但 episode/clip/beat/shot 的可追溯 grounding 必须保持 canonical 单源。
 
 ## 8. 引用关系
 

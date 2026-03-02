@@ -73,6 +73,15 @@ cases:
       - traceId
     reason_code: null
     source_rule: WS-PIPE-008
+  - id: WS-014-STORY-PROJECTION-SUMMARY-DIAGNOSTIC
+    description: Maintenance diagnostics expose story projection summary derived from PRIMARY events.
+    expected_ok: true
+    story_projection_fields_required:
+      - storyCount
+      - missingContextCount
+      - latestProjectedAt
+    reason_code: null
+    source_rule: WS-PIPE-009
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:world-studio-kernel-docs
     source_rule: WS-ACC-003

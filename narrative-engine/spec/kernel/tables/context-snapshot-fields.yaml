@@ -1,27 +1,24 @@
 version: 1
 assembly_chain:
-  - stage: provider-2a
+  - stage: fetch-realm-assets
     order: 1
     source_rule: N-CTX-001
-  - stage: extract-keywords
+  - stage: resolve-scope-coverage
     order: 2
     source_rule: N-CTX-001
-  - stage: consumer-2b
+  - stage: resolve-scene-and-material
     order: 3
+    source_rule: N-CTX-001
+  - stage: compose-snapshot
+    order: 4
     source_rule: N-CTX-001
 inputs:
   world:
     fields:
-      - worldview
       - worldEvents
       - worldLorebooks
-    source_rule: N-CTX-002
-  agent:
-    fields:
-      - profiles
-      - memories
-      - rules
-      - lorebooks
+      - worldScenes
+      - routeOptions
     source_rule: N-CTX-002
   narrative_context:
     fields:
@@ -30,6 +27,10 @@ inputs:
       - SUBJECT
       - RELATION
     source_rule: N-CTX-005
+  memory:
+    fields:
+      - recall
+    source_rule: N-CTX-002
 snapshot_required_fields:
   - field: place
     source_rule: N-CTX-004
@@ -43,6 +44,20 @@ snapshot_required_fields:
     source_rule: N-CTX-004
   - field: characterRelations
     source_rule: N-CTX-004
+  - field: phase
+    source_rule: N-CTX-004
+  - field: objective
+    source_rule: N-CTX-004
+  - field: tensionTarget
+    source_rule: N-CTX-004
+  - field: openThreads
+    source_rule: N-CTX-004
+  - field: startupPolicy
+    source_rule: N-CTX-004
+  - field: futurePressure
+    source_rule: N-CTX-004
+  - field: contextCoverage
+    source_rule: N-CTX-004
   - field: narrativeContextScopes
     source_rule: N-CTX-004
 constraints:
@@ -55,3 +70,9 @@ constraints:
   - name: context_cannot_store_world_or_agent_raw_payload
     value: true
     source_rule: N-CTX-005
+  - name: missing_canon_or_story_is_fail_close
+    value: true
+    source_rule: N-CTX-004
+  - name: missing_subject_relation_or_scene_warn_only
+    value: true
+    source_rule: N-CTX-004

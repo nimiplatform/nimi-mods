@@ -13,6 +13,8 @@ type NarrativeAssemblyAssets = {
   routeOptions: NarrativeRouteOptionsSnapshot;
   worldEvents: Array<Record<string, unknown>>;
   worldLorebooks: Array<Record<string, unknown>>;
+  worldScenes: Array<Record<string, unknown>>;
+  narrativeContexts: Array<Record<string, unknown>>;
   memoryRecall: Record<string, unknown>;
 };
 
@@ -23,6 +25,14 @@ export type NarrativeStep1AssemblyResult = {
 
 function toString(value: unknown): string {
   return String(value || '').trim();
+}
+
+function toNumber(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return parsed;
 }
 
 function toStringArray(value: unknown): string[] {
@@ -85,12 +95,28 @@ function extractWorldviewRules(lorebooks: Array<Record<string, unknown>>): strin
       rules.push(valueText);
     }
   }
-  return uniqueStrings(rules).slice(0, 40);
+  return uniqueStrings(rules).slice(0, 60);
 }
 
-function extractSceneMaterial(worldEvents: Array<Record<string, unknown>>): string[] {
+function extractFuturePressure(worldEvents: Array<Record<string, unknown>>): string[] {
+  const rows = worldEvents
+    .filter((event) => toString(event.eventHorizon).toUpperCase() === 'FUTURE')
+    .flatMap((event) => [
+      toString(event.title || event.name),
+      toString(event.summary || event.description || event.process),
+      toString(event.result),
+    ])
+    .filter(Boolean);
+  return uniqueStrings(rows).slice(0, 12);
+}
+
+function extractSceneMaterial(input: {
+  worldEvents: Array<Record<string, unknown>>;
+  storyScope: Record<string, unknown>;
+  scene: Record<string, unknown> | null;
+}): string[] {
   const materials: string[] = [];
-  for (const event of worldEvents) {
+  for (const event of input.worldEvents) {
     const title = toString(event.title || event.name);
     const summary = toString(event.summary || event.description || event.process);
     const cause = toString(event.cause);
@@ -100,33 +126,43 @@ function extractSceneMaterial(worldEvents: Array<Record<string, unknown>>): stri
     if (cause) materials.push(cause);
     if (result) materials.push(result);
   }
-  return uniqueStrings(materials).slice(0, 60);
+
+  const materialHints = asRecord(input.storyScope.materialHints);
+  if (Object.keys(materialHints).length > 0) {
+    materials.push(JSON.stringify(materialHints));
+  }
+
+  if (input.scene) {
+    const sceneName = toString(input.scene.name);
+    const sceneDescription = toString(input.scene.description);
+    if (sceneName) {
+      materials.push(sceneName);
+    }
+    if (sceneDescription) {
+      materials.push(sceneDescription);
+    }
+  }
+
+  return uniqueStrings(materials).slice(0, 80);
 }
 
-function extractActors(worldEvents: Array<Record<string, unknown>>, input: NarrativeTurnInputNormalized): string[] {
-  const actors: string[] = [input.agentId, input.playerId];
-  for (const event of worldEvents) {
+function extractActors(input: {
+  worldEvents: Array<Record<string, unknown>>;
+  scene: Record<string, unknown> | null;
+  turn: NarrativeTurnInputNormalized;
+}): string[] {
+  const actors: string[] = [input.turn.agentId, input.turn.playerId];
+  for (const event of input.worldEvents) {
     const fields = [
       ...toStringArray(event.characterRefs),
       ...toStringArray(event.actors),
     ];
     fields.forEach((field) => actors.push(field));
   }
-  return uniqueStrings(actors).slice(0, 20);
-}
-
-function extractPlace(worldLorebooks: Array<Record<string, unknown>>, input: NarrativeTurnInputNormalized): string {
-  for (const lorebook of worldLorebooks) {
-    const key = toString(lorebook.key || lorebook.id || lorebook.title).toLowerCase();
-    if (!key.includes('place') && !key.includes('location') && !key.includes('scene')) {
-      continue;
-    }
-    const content = toString(lorebook.content || lorebook.summary || lorebook.description || lorebook.value);
-    if (content) {
-      return content;
-    }
+  if (input.scene) {
+    toStringArray(input.scene.activeEntities).forEach((entity) => actors.push(entity));
   }
-  return `world:${input.worldId}`;
+  return uniqueStrings(actors).slice(0, 24);
 }
 
 function extractCharacterRelations(scopes: NarrativeContextScopes): Array<Record<string, unknown>> {
@@ -138,22 +174,157 @@ function extractCharacterRelations(scopes: NarrativeContextScopes): Array<Record
       .filter((item) => Object.keys(item).length > 0)
       .slice(0, 20);
   }
+  if (Object.keys(relation).length > 0) {
+    return [relation];
+  }
   return [];
 }
 
+function pickLatestScopeRow(input: {
+  rows: Array<Record<string, unknown>>;
+  scope: 'CANON' | 'STORY' | 'SUBJECT' | 'RELATION';
+  score?: (row: Record<string, unknown>) => number;
+}): Record<string, unknown> | null {
+  const rows = input.rows.filter((row) => toString(row.scope).toUpperCase() === input.scope);
+  if (rows.length === 0) {
+    return null;
+  }
+
+  const ordered = rows
+    .map((row) => ({
+      row,
+      updatedAt: Date.parse(toString(row.updatedAt) || '1970-01-01T00:00:00.000Z') || 0,
+      score: input.score ? input.score(row) : 0,
+    }))
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+      if (right.updatedAt !== left.updatedAt) {
+        return right.updatedAt - left.updatedAt;
+      }
+      return toString(right.row.id).localeCompare(toString(left.row.id));
+    });
+  return ordered[0]?.row || null;
+}
+
+function resolveNarrativeScopes(input: {
+  rows: Array<Record<string, unknown>>;
+  turn: NarrativeTurnInputNormalized;
+}): {
+  scopes: NarrativeContextScopes;
+  coverage: NarrativeContextSnapshot['contextCoverage'];
+} {
+  const canon = pickLatestScopeRow({
+    rows: input.rows,
+    scope: 'CANON',
+  });
+  const story = pickLatestScopeRow({
+    rows: input.rows,
+    scope: 'STORY',
+    score: (row) => (toString(row.storyId) === input.turn.storyId ? 1 : 0),
+  });
+  const subject = pickLatestScopeRow({
+    rows: input.rows,
+    scope: 'SUBJECT',
+    score: (row) => (toString(row.subjectId) === input.turn.agentId ? 1 : 0),
+  });
+  const relation = pickLatestScopeRow({
+    rows: input.rows,
+    scope: 'RELATION',
+    score: (row) => {
+      const subjectId = toString(row.subjectId);
+      const targetSubjectId = toString(row.targetSubjectId);
+      const direct = subjectId === input.turn.agentId && targetSubjectId === input.turn.playerId;
+      const reverse = subjectId === input.turn.playerId && targetSubjectId === input.turn.agentId;
+      return direct || reverse ? 1 : 0;
+    },
+  });
+
+  const canonScope = {
+    ...asRecord(canon?.narrativeSetting),
+    ...asRecord(canon?.narrativeState),
+  };
+  const storyScope = {
+    ...asRecord(story?.narrativeSetting),
+    ...asRecord(story?.narrativeState),
+  };
+  const subjectScope = {
+    ...asRecord(subject?.narrativeSetting),
+    ...asRecord(subject?.narrativeState),
+  };
+  const relationScope = {
+    ...asRecord(relation?.narrativeSetting),
+    ...asRecord(relation?.narrativeState),
+  };
+
+  const warnings: string[] = [];
+  if (!subject) {
+    warnings.push('NARRATIVE_CONTEXT_SUBJECT_MISSING_WARN');
+  }
+  if (!relation) {
+    warnings.push('NARRATIVE_CONTEXT_RELATION_MISSING_WARN');
+  }
+
+  return {
+    scopes: {
+      CANON: canonScope,
+      STORY: storyScope,
+      SUBJECT: subjectScope,
+      RELATION: relationScope,
+    },
+    coverage: {
+      canon: Boolean(canon),
+      story: Boolean(story),
+      subject: Boolean(subject),
+      relation: Boolean(relation),
+      scene: false,
+      warnings,
+    },
+  };
+}
+
+function resolveScene(input: {
+  worldScenes: Array<Record<string, unknown>>;
+  worldEvents: Array<Record<string, unknown>>;
+  storyScope: Record<string, unknown>;
+}): Record<string, unknown> | null {
+  const sceneById = new Map<string, Record<string, unknown>>();
+  for (const scene of input.worldScenes) {
+    const id = toString(scene.id);
+    if (id) {
+      sceneById.set(id, scene);
+    }
+  }
+
+  const preferredSceneId = toString(input.storyScope.recommendedSceneId);
+  if (preferredSceneId && sceneById.has(preferredSceneId)) {
+    return sceneById.get(preferredSceneId) || null;
+  }
+
+  for (const event of input.worldEvents) {
+    const refs = toStringArray(event.locationRefs);
+    for (const ref of refs) {
+      if (sceneById.has(ref)) {
+        return sceneById.get(ref) || null;
+      }
+    }
+  }
+
+  return input.worldScenes[0] || null;
+}
+
 function hasSufficientContext(snapshot: NarrativeContextSnapshot): boolean {
+  if (!snapshot.contextCoverage.canon || !snapshot.contextCoverage.story) {
+    return false;
+  }
   if (!snapshot.place) {
     return false;
   }
   if (snapshot.worldviewRules.length === 0 && snapshot.sceneMaterial.length === 0) {
     return false;
   }
-  const scopes = snapshot.narrativeContextScopes;
-  const hasScopedPayload = Object.keys(scopes.CANON).length > 0
-    || Object.keys(scopes.STORY).length > 0
-    || Object.keys(scopes.SUBJECT).length > 0
-    || Object.keys(scopes.RELATION).length > 0;
-  return hasScopedPayload;
+  return true;
 }
 
 export async function runNarrativeStep1Assembly(input: {
@@ -161,36 +332,108 @@ export async function runNarrativeStep1Assembly(input: {
   queryRuntimeRouteOptions: () => Promise<unknown>;
   queryWorldEvents: () => Promise<unknown>;
   queryWorldLorebooks: () => Promise<unknown>;
+  queryWorldScenes: () => Promise<unknown>;
+  queryNarrativeContexts: () => Promise<unknown>;
   queryAgentMemoryRecall: () => Promise<unknown>;
-  resolveNarrativeContext: () => NarrativeContextScopes;
 }): Promise<NarrativeStepResult<NarrativeStep1AssemblyResult>> {
   try {
-    const [routePayload, worldEventsPayload, worldLorebooksPayload, memoryRecallPayload] = await Promise.all([
+    const [
+      routePayload,
+      worldEventsPayload,
+      worldLorebooksPayload,
+      worldScenesPayload,
+      narrativeContextsPayload,
+      memoryRecallPayload,
+    ] = await Promise.all([
       input.queryRuntimeRouteOptions(),
       input.queryWorldEvents(),
       input.queryWorldLorebooks(),
+      input.queryWorldScenes(),
+      input.queryNarrativeContexts(),
       input.queryAgentMemoryRecall(),
     ]);
 
     const worldEvents = toRecordArray(worldEventsPayload);
     const worldLorebooks = toRecordArray(worldLorebooksPayload);
+    const worldScenes = toRecordArray(worldScenesPayload);
+    const narrativeContexts = toRecordArray(narrativeContextsPayload);
     const memoryRecall = asRecord(memoryRecallPayload);
-    const narrativeContextScopes = input.resolveNarrativeContext();
+
+    const resolved = resolveNarrativeScopes({
+      rows: narrativeContexts,
+      turn: input.turn,
+    });
+
+    const scene = resolveScene({
+      worldScenes,
+      worldEvents,
+      storyScope: resolved.scopes.STORY,
+    });
+    if (!scene) {
+      resolved.coverage.warnings.push('NARRATIVE_CONTEXT_SCENE_MISSING_WARN');
+    }
+    resolved.coverage.scene = Boolean(scene);
+
     const routePayloadRecord = asRecord(routePayload);
     const routePayloadSelected = asRecord(routePayloadRecord.selected);
+    const phase = toString(resolved.scopes.STORY.phase || asRecord(resolved.scopes.STORY.narrativeState).phase)
+      || 'opening';
+    const objective = toString(
+      resolved.scopes.STORY.objective
+      || asRecord(resolved.scopes.STORY.narrativeState).objective,
+    ) || 'advance-story';
+    const tensionTarget = toNumber(
+      resolved.scopes.STORY.tension
+      || asRecord(resolved.scopes.STORY.narrativeState).tension,
+      0.5,
+    );
+    const openThreads = toStringArray(
+      resolved.scopes.STORY.openThreads
+      || asRecord(resolved.scopes.STORY.narrativeState).openThreads,
+    );
+    const startupPolicy = {
+      initiative: asRecord(
+        resolved.scopes.STORY.initiativePolicy
+        || asRecord(resolved.scopes.STORY.narrativeSetting).initiativePolicy,
+      ),
+      pacing: asRecord(
+        resolved.scopes.STORY.pacingPolicy
+        || asRecord(resolved.scopes.STORY.narrativeSetting).pacingPolicy,
+      ),
+    };
+
+    const place = toString(scene?.name)
+      || toString(asRecord(resolved.scopes.STORY.narrativeSetting).location)
+      || `world:${input.turn.worldId}`;
+    const sceneMaterial = extractSceneMaterial({
+      worldEvents,
+      storyScope: resolved.scopes.STORY,
+      scene,
+    });
 
     const snapshot: NarrativeContextSnapshot = {
-      place: extractPlace(worldLorebooks, input.turn),
+      place,
       worldviewRules: extractWorldviewRules(worldLorebooks),
-      sceneMaterial: extractSceneMaterial(worldEvents),
-      availableActors: extractActors(worldEvents, input.turn),
+      sceneMaterial,
+      availableActors: extractActors({
+        worldEvents,
+        scene,
+        turn: input.turn,
+      }),
       narrativeStyle: {
-        ...asRecord(narrativeContextScopes.CANON),
+        ...asRecord(resolved.scopes.CANON),
         routeSource: toString(routePayloadSelected.source || routePayloadRecord.source),
         routeModel: toString(routePayloadSelected.model || routePayloadRecord.model),
       },
-      characterRelations: extractCharacterRelations(narrativeContextScopes),
-      narrativeContextScopes,
+      characterRelations: extractCharacterRelations(resolved.scopes),
+      phase,
+      objective,
+      tensionTarget: Math.max(0, Math.min(1, tensionTarget)),
+      openThreads: uniqueStrings(openThreads).slice(0, 20),
+      startupPolicy,
+      futurePressure: extractFuturePressure(worldEvents),
+      contextCoverage: resolved.coverage,
+      narrativeContextScopes: resolved.scopes,
     };
 
     const snapshotCheck = NarrativeContextSnapshotSchema.safeParse(snapshot);
@@ -198,7 +441,7 @@ export async function runNarrativeStep1Assembly(input: {
       return {
         ok: false,
         reasonCode: NARRATIVE_REASON_CODES.NARRATIVE_CONTEXT_INSUFFICIENT,
-        actionHint: 'Complete required context scopes and retry.',
+        actionHint: 'Complete CANON/STORY contexts and retry.',
         value: null,
       };
     }
@@ -207,6 +450,8 @@ export async function runNarrativeStep1Assembly(input: {
       routeOptions: toNarrativeRouteOptions(routePayload),
       worldEvents,
       worldLorebooks,
+      worldScenes,
+      narrativeContexts,
       memoryRecall,
     };
 
@@ -223,7 +468,7 @@ export async function runNarrativeStep1Assembly(input: {
     return {
       ok: false,
       reasonCode: NARRATIVE_REASON_CODES.NARRATIVE_CONTEXT_INSUFFICIENT,
-      actionHint: 'Complete required context scopes and retry.',
+      actionHint: 'Complete CANON/STORY contexts and retry.',
       value: null,
     };
   }

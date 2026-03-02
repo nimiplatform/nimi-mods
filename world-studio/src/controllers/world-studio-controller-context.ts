@@ -106,11 +106,18 @@ export function useWorldStudioControllerContext(input: UseWorldStudioControllerC
     eventsGraph,
     phase1: effectivePhase1,
   });
+  const maintenancePayload = asRecord(queries.maintenanceQuery.data);
   const maintenanceEditorSnapshotVersion = String(
-    asRecord(queries.maintenanceQuery.data).editorSnapshotVersion
+    maintenancePayload.editorSnapshotVersion
     || input.snapshot.editorSnapshotVersion
     || '',
   );
+  const storyProjectionSummaryRaw = asRecord(maintenancePayload.storyProjectionSummary);
+  const storyProjectionSummary = {
+    storyCount: Number(storyProjectionSummaryRaw.storyCount || 0),
+    latestProjectedAt: String(storyProjectionSummaryRaw.latestProjectedAt || ''),
+    missingContextCount: Number(storyProjectionSummaryRaw.missingContextCount || 0),
+  };
 
   return {
     selectedWorldId,
@@ -130,6 +137,7 @@ export function useWorldStudioControllerContext(input: UseWorldStudioControllerC
     currentTimeNode,
     selectedAgentSyncCharacters,
     maintenanceEditorSnapshotVersion,
+    storyProjectionSummary,
     runtimeDefaultRouteBinding,
     ...routeOverrides,
     ...statusMetrics,

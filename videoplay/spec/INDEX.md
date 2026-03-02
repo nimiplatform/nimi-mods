@@ -48,6 +48,18 @@
 2. `spec/kernel/tables/quality-gates.yaml`
 3. `spec/videoplay.md`
 
+### Change story source package
+
+1. `spec/kernel/capability-contract.md`
+2. `spec/kernel/fact-projection-contract.md`
+3. `spec/kernel/pipeline-contract.md`
+4. `spec/kernel/tables/capabilities.yaml`
+5. `spec/kernel/tables/fact-traceability.yaml`
+6. `spec/kernel/tables/pipeline-states.yaml`
+7. `spec/kernel/tables/reason-codes.yaml`
+8. `spec/kernel/tables/acceptance-cases.yaml`
+9. `spec/videoplay.md`
+
 ### Change creator workflow operations
 
 1. `spec/kernel/creator-workflow-contract.md`

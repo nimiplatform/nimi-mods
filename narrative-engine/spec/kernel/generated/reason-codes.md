@@ -36,6 +36,11 @@ codes:
     blocking: false
     action_hint: Output is truncated and adjusted before commit.
     source_rule: N-ERR-003
+  - code: NARRATIVE_TENSION_JUMP_ADJUSTED
+    stage: step3-guard
+    blocking: false
+    action_hint: Tension delta is too large and has been adjusted.
+    source_rule: N-ERR-003
   - code: NARRATIVE_SPINE_WRITE_CONFLICT
     stage: write-spine
     blocking: true
