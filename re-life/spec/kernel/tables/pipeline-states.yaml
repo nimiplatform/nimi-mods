@@ -1,0 +1,45 @@
+version: 1
+simulation_chain:
+  - step: collect-decision-context
+    order: 1
+    source_rule: RL-PIPE-001
+  - step: generate-fact-graph
+    order: 2
+    source_rule: RL-PIPE-001
+  - step: generate-decision-tree
+    order: 3
+    source_rule: RL-PIPE-001
+  - step: render-screenplay
+    order: 4
+    source_rule: RL-PIPE-001
+  - step: persist-scenario
+    order: 5
+    source_rule: RL-PIPE-004
+information_modes:
+  - mode: sealed
+    default: true
+    source_rule: RL-PIPE-002
+  - mode: omniscient
+    default: false
+    requires_explicit_opt_in: true
+    source_rule: RL-PIPE-002
+share_pipeline:
+  - step: pii-detect
+    order: 1
+    source_rule: RL-PIPE-003
+  - step: semantic-rewrite
+    order: 2
+    source_rule: RL-PIPE-003
+  - step: preview-confirm
+    order: 3
+    source_rule: RL-PIPE-003
+  - step: signed-publish
+    order: 4
+    source_rule: RL-PIPE-003
+traceability_fields:
+  - scenario_id
+  - model_version
+  - prompt_version
+  - uncertainty_level
+  - information_mode
+source_rule: RL-PIPE-004

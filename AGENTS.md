@@ -14,18 +14,26 @@ Mods run in desktop-governed hook runtime and must not call runtime SDK directly
 ```
 nimi-mods/<mod-name>/
 ├── index.ts
+├── spec/
+│   ├── AGENTS.md
+│   ├── INDEX.md
+│   ├── <mod-name>.md
+│   └── kernel/
+│       ├── *.md
+│       ├── tables/*.yaml
+│       └── generated/*.md
 ├── src/
 │   └── ...
 ├── dist/
 │   └── mods/<mod-name>/index.js
 ├── mod.manifest.yaml
-├── SSOT.md
 ├── package.json
 ├── tsconfig.json
 └── tsconfig.build.json
 ```
 
-Each mod owns its own business SSOT in `nimi-mods/<mod-name>/SSOT.md`.
+Each mod owns its own business spec in `nimi-mods/<mod-name>/spec/**`.
+Cross-mod contracts live in `nimi-mods/spec/mod/**`.
 
 ## Registration Contract
 
@@ -99,6 +107,7 @@ Use `nimi-mods` scripts as source of truth:
 
 ```bash
 pnpm run check
+pnpm run check:spec
 pnpm run build -- --mod local-chat
 pnpm run watch:local-chat
 pnpm run verify

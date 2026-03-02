@@ -1,0 +1,34 @@
+version: 1
+cases:
+  - id: LC-001-SESSION-FIRST-CREATE
+    description: First enter on target auto-creates default session.
+    expected_ok: true
+    reason_code: null
+    source_rule: LC-ACC-002
+  - id: LC-002-ASSISTANT-TURN-AUDIT
+    description: Assistant turn persists diagnostics and audit context.
+    expected_ok: true
+    reason_code: null
+    source_rule: LC-ACC-002
+  - id: LC-003-ROUTE-OVERRIDE-LOCAL-SCOPE
+    description: Route override affects local-chat only and does not mutate global defaults.
+    expected_ok: true
+    reason_code: null
+    source_rule: LC-ACC-002
+  - id: LC-004-TTS-FAIL-NONBLOCKING
+    description: TTS failure is recorded as diagnostics without blocking text turn commit.
+    expected_ok: true
+    reason_code: LOCAL_CHAT_TTS_FAILED
+    source_rule: LC-ACC-002
+  - id: LC-005-SESSION-DELETE-RECOVER
+    description: Deleting active session recovers to latest remaining session or auto-creates one.
+    expected_ok: true
+    reason_code: null
+    source_rule: LC-ACC-002
+verification_commands:
+  - command: pnpm -C nimi-mods run generate:spec:local-chat-kernel-docs
+    source_rule: LC-ACC-001
+  - command: pnpm -C nimi-mods run check:spec:local-chat-kernel-docs-drift
+    source_rule: LC-ACC-001
+  - command: pnpm -C nimi-mods run check:spec:local-chat-kernel-consistency
+    source_rule: LC-ACC-001

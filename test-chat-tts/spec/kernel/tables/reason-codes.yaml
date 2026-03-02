@@ -1,0 +1,22 @@
+version: 1
+codes:
+  - code: TEST_CHAT_TTS_ROUTE_OPTIONS_UNAVAILABLE
+    stage: route-options-query
+    blocking: true
+    action_hint: Verify runtime route options endpoint and retry.
+    source_rule: TCT-ERR-001
+  - code: TEST_CHAT_TTS_TEXT_GENERATE_FAILED
+    stage: text-generate
+    blocking: true
+    action_hint: Retry text generation.
+    source_rule: TCT-ERR-001
+  - code: TEST_CHAT_TTS_SPEECH_PROVIDERS_LIST_FAILED
+    stage: providers-list
+    blocking: true
+    action_hint: Verify speech provider capability and retry.
+    source_rule: TCT-ERR-001
+  - code: TEST_CHAT_TTS_SPEECH_SYNTHESIZE_FAILED
+    stage: speech-synthesize
+    blocking: true
+    action_hint: Retry TTS synthesis with available voice.
+    source_rule: TCT-ERR-002

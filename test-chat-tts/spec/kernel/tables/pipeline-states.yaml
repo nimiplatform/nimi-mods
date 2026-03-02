@@ -1,0 +1,24 @@
+version: 1
+chat_diagnostics_chain:
+  - step: route-options-query
+    order: 1
+    source_rule: TCT-PIPE-001
+  - step: text-generate
+    order: 2
+    source_rule: TCT-PIPE-001
+  - step: render-result
+    order: 3
+    source_rule: TCT-PIPE-001
+tts_diagnostics_chain:
+  - step: providers-list
+    order: 1
+    source_rule: TCT-PIPE-002
+  - step: voices-list
+    order: 2
+    source_rule: TCT-PIPE-002
+  - step: speech-synthesize
+    order: 3
+    source_rule: TCT-PIPE-002
+  - step: render-audio-uri
+    order: 4
+    source_rule: TCT-PIPE-002
