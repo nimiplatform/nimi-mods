@@ -36,4 +36,39 @@ codes:
     blocking: false
     action_hint: Retry speech or switch to text-only response.
     source_rule: LC-ERR-002
+  - code: LOCAL_CHAT_PROACTIVE_ALLOWED
+    stage: proactive-policy
+    blocking: false
+    action_hint: policy-gate-passed
+    source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_PROACTIVE_DISABLED_BY_USER_SETTING
+    stage: proactive-policy
+    blocking: false
+    action_hint: toggle-allow-proactive-contact
+    source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_PROACTIVE_DISABLED_BY_WAKE_STRATEGY
+    stage: proactive-policy
+    blocking: false
+    action_hint: agent-wake-strategy-not-proactive
+    source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_PROACTIVE_SOCIAL_PRECONDITION_FAILED
+    stage: proactive-policy
+    blocking: false
+    action_hint: idle-window-not-satisfied
+    source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_PROACTIVE_COOLDOWN_ACTIVE
+    stage: proactive-policy
+    blocking: false
+    action_hint: wait-cooldown-window
+    source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_PROACTIVE_DAILY_CAP_REACHED
+    stage: proactive-policy
+    blocking: false
+    action_hint: wait-next-day-window
+    source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_PROACTIVE_POLICY_UNAVAILABLE
+    stage: proactive-policy
+    blocking: false
+    action_hint: policy-state-unavailable
+    source_rule: LC-ERR-001
 ```

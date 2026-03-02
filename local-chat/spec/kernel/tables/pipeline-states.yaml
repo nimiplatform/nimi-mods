@@ -40,6 +40,25 @@ speech_turn_chain:
   - step: diagnostics-persist
     order: 4
     source_rule: LC-PIPE-004
+proactive_turn_chain:
+  - step: heartbeat-tick
+    order: 1
+    source_rule: LC-PIPE-005
+  - step: target-and-session-scan
+    order: 2
+    source_rule: LC-PIPE-005
+  - step: policy-evaluate
+    order: 3
+    source_rule: LC-PIPE-005
+  - step: decision-generate
+    order: 4
+    source_rule: LC-PIPE-005
+  - step: proactive-turn-persist
+    order: 5
+    source_rule: LC-PIPE-005
+  - step: proactive-audit-persist
+    order: 6
+    source_rule: LC-PIPE-005
 route_scope_policy:
   override_scope: local-chat-only
   must_not_mutate_global_defaults: true

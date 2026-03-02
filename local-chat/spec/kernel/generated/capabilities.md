@@ -55,6 +55,24 @@ required_capabilities:
     source_rule: LC-CAP-001
   - key: data.query.data-api.runtime.route.options
     source_rule: LC-CAP-004
+  - key: data.query.data-api.core.social.friends-with-details.list
+    source_rule: LC-CAP-005
+  - key: data.query.data-api.core.user.by-id.get
+    source_rule: LC-CAP-005
+  - key: data.query.data-api.core.user.by-handle.get
+    source_rule: LC-CAP-005
+  - key: data.query.data-api.core.world.by-id.get
+    source_rule: LC-CAP-005
+  - key: data.query.data-api.core.worldview.by-id.get
+    source_rule: LC-CAP-005
+  - key: data.query.data-api.core.agent.memory.recall.for-entity
+    source_rule: LC-CAP-005
+  - key: data.query.data-api.core.agent.memory.core.list
+    source_rule: LC-CAP-005
+  - key: data.query.data-api.core.agent.memory.e2e.list
+    source_rule: LC-CAP-005
+  - key: data.query.data-api.core.agent.memory.stats.get
+    source_rule: LC-CAP-005
   - key: ui.register.ui-extension.app.sidebar.mods
     source_rule: LC-CAP-001
   - key: ui.register.ui-extension.app.content.routes

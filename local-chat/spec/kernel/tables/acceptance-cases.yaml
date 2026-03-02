@@ -25,6 +25,18 @@ cases:
     expected_ok: true
     reason_code: null
     source_rule: LC-ACC-002
+  - id: LC-006-PROACTIVE-POLICY-DISABLED-BY-USER
+    description: Proactive policy blocks contact when allowProactiveContact is disabled.
+    expected_ok: true
+    reason_code: LOCAL_CHAT_PROACTIVE_DISABLED_BY_USER_SETTING
+    test_reference: local-chat-proactive-policy.test.mjs
+    source_rule: LC-ACC-002
+  - id: LC-007-PROACTIVE-POLICY-ALLOWED
+    description: Proactive policy allows contact when wake strategy and idle window both satisfy policy gate.
+    expected_ok: true
+    reason_code: LOCAL_CHAT_PROACTIVE_ALLOWED
+    test_reference: local-chat-proactive-policy.test.mjs
+    source_rule: LC-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:local-chat-kernel-docs
     source_rule: LC-ACC-001

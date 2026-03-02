@@ -11,6 +11,15 @@ export const LOCAL_CHAT_DATA_API_SESSIONS_GET = 'data-api.local-chat.sessions.ge
 export const LOCAL_CHAT_DATA_API_SESSIONS_UPSERT = 'data-api.local-chat.sessions.upsert';
 export const LOCAL_CHAT_DATA_API_SESSIONS_DELETE = 'data-api.local-chat.sessions.delete';
 export const LOCAL_CHAT_DATA_API_RUNTIME_ROUTE_OPTIONS = 'data-api.runtime.route.options';
+export const LOCAL_CHAT_CORE_DATA_API_FRIENDS_WITH_DETAILS_LIST = 'data-api.core.social.friends-with-details.list';
+export const LOCAL_CHAT_CORE_DATA_API_USER_BY_ID_GET = 'data-api.core.user.by-id.get';
+export const LOCAL_CHAT_CORE_DATA_API_USER_BY_HANDLE_GET = 'data-api.core.user.by-handle.get';
+export const LOCAL_CHAT_CORE_DATA_API_WORLD_BY_ID_GET = 'data-api.core.world.by-id.get';
+export const LOCAL_CHAT_CORE_DATA_API_WORLDVIEW_BY_ID_GET = 'data-api.core.worldview.by-id.get';
+export const LOCAL_CHAT_CORE_DATA_API_AGENT_MEMORY_RECALL_FOR_ENTITY = 'data-api.core.agent.memory.recall.for-entity';
+export const LOCAL_CHAT_CORE_DATA_API_AGENT_MEMORY_CORE_LIST = 'data-api.core.agent.memory.core.list';
+export const LOCAL_CHAT_CORE_DATA_API_AGENT_MEMORY_E2E_LIST = 'data-api.core.agent.memory.e2e.list';
+export const LOCAL_CHAT_CORE_DATA_API_AGENT_MEMORY_STATS_GET = 'data-api.core.agent.memory.stats.get';
 
 export const LOCAL_CHAT_CAPABILITIES = [
   'llm.text.generate',
@@ -35,6 +44,15 @@ export const LOCAL_CHAT_CAPABILITIES = [
   `data.register.${LOCAL_CHAT_DATA_API_SESSIONS_DELETE}`,
   `data.query.${LOCAL_CHAT_DATA_API_SESSIONS_DELETE}`,
   `data.query.${LOCAL_CHAT_DATA_API_RUNTIME_ROUTE_OPTIONS}`,
+  `data.query.${LOCAL_CHAT_CORE_DATA_API_FRIENDS_WITH_DETAILS_LIST}`,
+  `data.query.${LOCAL_CHAT_CORE_DATA_API_USER_BY_ID_GET}`,
+  `data.query.${LOCAL_CHAT_CORE_DATA_API_USER_BY_HANDLE_GET}`,
+  `data.query.${LOCAL_CHAT_CORE_DATA_API_WORLD_BY_ID_GET}`,
+  `data.query.${LOCAL_CHAT_CORE_DATA_API_WORLDVIEW_BY_ID_GET}`,
+  `data.query.${LOCAL_CHAT_CORE_DATA_API_AGENT_MEMORY_RECALL_FOR_ENTITY}`,
+  `data.query.${LOCAL_CHAT_CORE_DATA_API_AGENT_MEMORY_CORE_LIST}`,
+  `data.query.${LOCAL_CHAT_CORE_DATA_API_AGENT_MEMORY_E2E_LIST}`,
+  `data.query.${LOCAL_CHAT_CORE_DATA_API_AGENT_MEMORY_STATS_GET}`,
   `ui.register.${LOCAL_CHAT_NAV_SLOT}`,
   `ui.register.${LOCAL_CHAT_ROUTE_SLOT}`,
   `ui.register.${LOCAL_CHAT_UI_SLOT}`,

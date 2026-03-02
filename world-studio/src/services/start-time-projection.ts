@@ -265,6 +265,7 @@ function projectWithTemporalOrder(input: {
 
   const futurePrimary = fullPrimary.filter((event) => rankOf(event) > selectedOrderIndex);
   const currentPrimary = fullPrimary.filter((event) => rankOf(event) <= selectedOrderIndex);
+  const currentPrimaryIdSet = new Set<string>(currentPrimary.map((event) => event.id));
 
   const futureEventIdSet = new Set<string>(futurePrimary.map((event) => event.id));
   let changed = true;
@@ -275,7 +276,11 @@ function projectWithTemporalOrder(input: {
       const rankBeyondStart = rankOf(event) > selectedOrderIndex;
       const parentInFuture = Boolean(event.parentEventId && futureEventIdSet.has(event.parentEventId));
       const dependencyInFuture = (event.dependsOnEventIds || []).some((depId) => futureEventIdSet.has(depId));
-      if (rankBeyondStart || parentInFuture || dependencyInFuture) {
+      const parentInCurrent = Boolean(event.parentEventId && currentPrimaryIdSet.has(event.parentEventId));
+      const dependencyInCurrent = (event.dependsOnEventIds || []).some((depId) => currentPrimaryIdSet.has(depId));
+      const hasRelationalAnchor = Boolean(event.parentEventId) || (event.dependsOnEventIds || []).length > 0;
+      const shouldFallbackToRank = !hasRelationalAnchor && !parentInCurrent && !dependencyInCurrent;
+      if (parentInFuture || dependencyInFuture || (shouldFallbackToRank && rankBeyondStart)) {
         futureEventIdSet.add(event.id);
         changed = true;
       }
@@ -301,12 +306,12 @@ export function projectEventsForSelectedStartTime(
 
   const futureExtraction = extractFutureEventNodes(input.futureHistoricalEvents);
   const fullPrimary = dedupeEvents([
-    ...futureExtraction.projectedFutureEventNodes.primary,
     ...input.events.primary,
+    ...futureExtraction.projectedFutureEventNodes.primary,
   ]);
   const fullSecondary = dedupeEvents([
-    ...futureExtraction.projectedFutureEventNodes.secondary,
     ...input.events.secondary,
+    ...futureExtraction.projectedFutureEventNodes.secondary,
   ]);
 
   if (!selectedStartTimeId) {

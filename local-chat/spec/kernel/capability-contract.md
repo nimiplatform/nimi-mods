@@ -17,3 +17,7 @@ Speech calls must use declared speech capabilities and structured request fields
 ## LC-CAP-004 Route Query Boundary
 
 Runtime route options are read-only query capabilities from mod side.
+
+## LC-CAP-005 Core Data Query Boundary
+
+Core social/world/memory reads must use explicit `data.query.data-api.core.*` capability declarations.

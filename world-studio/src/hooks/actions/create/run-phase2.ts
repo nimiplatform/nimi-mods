@@ -112,9 +112,17 @@ export async function runCreatePhase2(
   input: WorldStudioCreateActionsInput,
   options?: RunCreatePhase2Options,
 ): Promise<void> {
+  const hasDraftEvents = (
+    Array.isArray(input.snapshot.eventsDraft.primary) && input.snapshot.eventsDraft.primary.length > 0
+  ) || (
+    Array.isArray(input.snapshot.eventsDraft.secondary) && input.snapshot.eventsDraft.secondary.length > 0
+  );
+  const eventsForPhase2 = hasDraftEvents
+    ? input.snapshot.eventsDraft
+    : input.snapshot.knowledgeGraph.events;
   const graphForPhase2 = {
     ...input.snapshot.knowledgeGraph,
-    events: input.snapshot.eventsDraft,
+    events: eventsForPhase2,
   };
   const startTimeOptions = deriveStartTimeOptions(graphForPhase2);
   const selectedStartTimeId = startTimeOptions.some((item) => item.id === input.snapshot.selectedStartTimeId)
@@ -168,7 +176,7 @@ export async function runCreatePhase2(
   const projection = projectEventsForSelectedStartTime({
     selectedStartTimeId,
     startTimeOptions,
-    events: input.snapshot.eventsDraft,
+    events: eventsForPhase2,
     futureHistoricalEvents: graphForPhase2.futureHistoricalEvents || [],
   });
   if (!projection.applied) {
@@ -522,7 +530,7 @@ export async function runCreatePhase2(
           embeddingIndex: {
             ...input.snapshot.embeddingIndex,
             status: 'failed',
-            errorMessage: error instanceof Error ? error.message : String(error || 'WORLD_STUDIO_EMBEDDING_FAILED'),
+            errorMessage: error instanceof Error ? error.message : String(error || 'WORLD_STUDIO_EMBEDDING_BUILD_FAILED'),
           },
         });
       });

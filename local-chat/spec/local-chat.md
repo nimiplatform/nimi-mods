@@ -26,6 +26,8 @@
 - `LC-DOM-012`: TTS route source is explicit (`local-runtime|token-api|auto`).
 - `LC-DOM-013`: Agent voice style prompt is auto-locked and not user-editable.
 - `LC-DOM-014`: `allowProactiveContact` is opt-in and driven by heartbeat scheduling.
+- `LC-DOM-015`: Proactive heartbeat policy emits deterministic reason codes for gate/audit outcomes.
+- `LC-DOM-016`: Core social/world/memory read dependencies are explicit capability declarations.
 
 ## 3. No Over-Design Guard
 

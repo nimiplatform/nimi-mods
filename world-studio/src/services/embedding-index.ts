@@ -169,7 +169,7 @@ export async function buildWorldStudioEmbeddingIndex(
         routeSource,
         routeModel,
         entries: {},
-        errorMessage: error instanceof Error ? error.message : String(error || 'WORLD_STUDIO_EMBEDDING_FAILED'),
+        errorMessage: error instanceof Error ? error.message : String(error || 'WORLD_STUDIO_EMBEDDING_BUILD_FAILED'),
       },
     };
   }

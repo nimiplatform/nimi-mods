@@ -122,10 +122,9 @@ export function areDistillRoutesReady(
 }
 
 function mapActionHintForEmbedding(
-  actionHint: RouteReadinessResult['actionHint'],
+  _actionHint: RouteReadinessResult['actionHint'],
 ): EmbeddingReadinessResult['actionHint'] {
-  if (actionHint === 'install-local-model') return 'install-local-model';
-  if (actionHint === 'switch-token-api') return 'switch-token-api';
+  // Embedding route readiness keeps a single retry action per spec contract.
   return 'retry';
 }
 
@@ -179,7 +178,7 @@ export function evaluateEmbeddingReadiness(input: {
     return {
       healthy: false,
       reasonCode: ReasonCode.WORLD_STUDIO_EMBEDDING_BUILD_FAILED,
-      actionHint: embeddingIndex.routeSource === 'local-runtime' ? 'install-local-model' : 'retry',
+      actionHint: 'retry',
       message: embeddingIndex.errorMessage || 'Embedding index build failed.',
     };
   }

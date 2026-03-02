@@ -17,3 +17,7 @@ Speech synthesize/transcribe paths are capability-driven and route-source explic
 ## LC-PIPE-004 Diagnostics Contract
 
 Assistant execution must emit structured turn diagnostics and audit context.
+
+## LC-PIPE-005 Proactive Heartbeat Pipeline
+
+Proactive contact uses deterministic heartbeat -> policy -> decision -> persist pipeline with auditable outcomes.
