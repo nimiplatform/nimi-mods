@@ -6,4 +6,5 @@ packages:
   - 're-life'
   - 'test-chat-tts'
   - 'videoplay'
+  - 'voice-studio'
   - 'world-studio'
