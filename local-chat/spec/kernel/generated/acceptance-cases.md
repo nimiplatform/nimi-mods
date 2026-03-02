@@ -38,4 +38,6 @@ verification_commands:
     source_rule: LC-ACC-001
   - command: pnpm -C nimi-mods run check:spec:local-chat-kernel-consistency
     source_rule: LC-ACC-001
+  - command: pnpm -C nimi-mods run check
+    source_rule: LC-ACC-001
 ```

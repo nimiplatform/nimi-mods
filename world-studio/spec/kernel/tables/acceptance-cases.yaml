@@ -80,3 +80,5 @@ verification_commands:
     source_rule: WS-ACC-003
   - command: pnpm -C nimi-mods run check:spec:world-studio-kernel-consistency
     source_rule: WS-ACC-003
+  - command: pnpm -C nimi-mods run check
+    source_rule: WS-ACC-003

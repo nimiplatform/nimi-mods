@@ -29,15 +29,27 @@ required_capabilities:
     source_rule: LC-CAP-003
   - key: llm.speech.transcribe
     source_rule: LC-CAP-003
+  - key: data.register.data-api.local-chat.chat-targets.list
+    source_rule: LC-CAP-001
   - key: data.query.data-api.local-chat.chat-targets.list
+    source_rule: LC-CAP-001
+  - key: data.register.data-api.local-chat.chat-target.detail
     source_rule: LC-CAP-001
   - key: data.query.data-api.local-chat.chat-target.detail
     source_rule: LC-CAP-001
+  - key: data.register.data-api.local-chat.sessions.list
+    source_rule: LC-CAP-001
   - key: data.query.data-api.local-chat.sessions.list
+    source_rule: LC-CAP-001
+  - key: data.register.data-api.local-chat.sessions.get
     source_rule: LC-CAP-001
   - key: data.query.data-api.local-chat.sessions.get
     source_rule: LC-CAP-001
+  - key: data.register.data-api.local-chat.sessions.upsert
+    source_rule: LC-CAP-001
   - key: data.query.data-api.local-chat.sessions.upsert
+    source_rule: LC-CAP-001
+  - key: data.register.data-api.local-chat.sessions.delete
     source_rule: LC-CAP-001
   - key: data.query.data-api.local-chat.sessions.delete
     source_rule: LC-CAP-001

@@ -29,6 +29,7 @@ export const MOD_SPEC_CONFIG = {
       'pnpm -C nimi-mods run generate:spec:kismet-kernel-docs',
       'pnpm -C nimi-mods run check:spec:kismet-kernel-docs-drift',
       'pnpm -C nimi-mods run check:spec:kismet-kernel-consistency',
+      'pnpm -C nimi-mods run check',
     ],
   },
   'local-chat': {
@@ -61,6 +62,7 @@ export const MOD_SPEC_CONFIG = {
       'pnpm -C nimi-mods run generate:spec:local-chat-kernel-docs',
       'pnpm -C nimi-mods run check:spec:local-chat-kernel-docs-drift',
       'pnpm -C nimi-mods run check:spec:local-chat-kernel-consistency',
+      'pnpm -C nimi-mods run check',
     ],
   },
   're-life': {
@@ -93,6 +95,7 @@ export const MOD_SPEC_CONFIG = {
       'pnpm -C nimi-mods run generate:spec:re-life-kernel-docs',
       'pnpm -C nimi-mods run check:spec:re-life-kernel-docs-drift',
       'pnpm -C nimi-mods run check:spec:re-life-kernel-consistency',
+      'pnpm -C nimi-mods run check',
     ],
   },
   'test-chat-tts': {
@@ -124,6 +127,7 @@ export const MOD_SPEC_CONFIG = {
       'pnpm -C nimi-mods run generate:spec:test-chat-tts-kernel-docs',
       'pnpm -C nimi-mods run check:spec:test-chat-tts-kernel-docs-drift',
       'pnpm -C nimi-mods run check:spec:test-chat-tts-kernel-consistency',
+      'pnpm -C nimi-mods run check',
     ],
   },
   narrative: {
@@ -164,6 +168,7 @@ export const MOD_SPEC_CONFIG = {
       'pnpm -C nimi-mods run generate:spec:narrative-kernel-docs',
       'pnpm -C nimi-mods run check:spec:narrative-kernel-docs-drift',
       'pnpm -C nimi-mods run check:spec:narrative-kernel-consistency',
+      'pnpm -C nimi-mods run check',
     ],
   },
   textplay: {
@@ -202,6 +207,7 @@ export const MOD_SPEC_CONFIG = {
       'pnpm -C nimi-mods run generate:spec:textplay-kernel-docs',
       'pnpm -C nimi-mods run check:spec:textplay-kernel-docs-drift',
       'pnpm -C nimi-mods run check:spec:textplay-kernel-consistency',
+      'pnpm -C nimi-mods run check',
     ],
   },
   videoplay: {
@@ -258,6 +264,7 @@ export const MOD_SPEC_CONFIG = {
       'pnpm -C nimi-mods run generate:spec:videoplay-kernel-docs',
       'pnpm -C nimi-mods run check:spec:videoplay-kernel-docs-drift',
       'pnpm -C nimi-mods run check:spec:videoplay-kernel-consistency',
+      'pnpm -C nimi-mods run check',
     ],
   },
   'world-studio': {
@@ -305,6 +312,7 @@ export const MOD_SPEC_CONFIG = {
       'pnpm -C nimi-mods run generate:spec:world-studio-kernel-docs',
       'pnpm -C nimi-mods run check:spec:world-studio-kernel-docs-drift',
       'pnpm -C nimi-mods run check:spec:world-studio-kernel-consistency',
+      'pnpm -C nimi-mods run check',
     ],
   },
 };

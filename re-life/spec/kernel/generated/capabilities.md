@@ -17,21 +17,39 @@ required_capabilities:
     source_rule: RL-CAP-001
   - key: llm.object.generate
     source_rule: RL-CAP-002
+  - key: data.register.data-api.relife.decisions.upsert
+    source_rule: RL-CAP-003
   - key: data.query.data-api.relife.decisions.upsert
+    source_rule: RL-CAP-003
+  - key: data.register.data-api.relife.decisions.list
     source_rule: RL-CAP-003
   - key: data.query.data-api.relife.decisions.list
     source_rule: RL-CAP-003
+  - key: data.register.data-api.relife.decisions.get
+    source_rule: RL-CAP-003
   - key: data.query.data-api.relife.decisions.get
+    source_rule: RL-CAP-003
+  - key: data.register.data-api.relife.scenarios.upsert
     source_rule: RL-CAP-003
   - key: data.query.data-api.relife.scenarios.upsert
     source_rule: RL-CAP-003
+  - key: data.register.data-api.relife.scenarios.list
+    source_rule: RL-CAP-003
   - key: data.query.data-api.relife.scenarios.list
+    source_rule: RL-CAP-003
+  - key: data.register.data-api.relife.shared.publish
     source_rule: RL-CAP-003
   - key: data.query.data-api.relife.shared.publish
     source_rule: RL-CAP-003
+  - key: data.register.data-api.relife.shared.revoke
+    source_rule: RL-CAP-003
   - key: data.query.data-api.relife.shared.revoke
     source_rule: RL-CAP-003
+  - key: data.register.data-api.relife.shared.list
+    source_rule: RL-CAP-003
   - key: data.query.data-api.relife.shared.list
+    source_rule: RL-CAP-003
+  - key: data.register.data-api.relife.metrics.aggregate
     source_rule: RL-CAP-003
   - key: data.query.data-api.relife.metrics.aggregate
     source_rule: RL-CAP-003

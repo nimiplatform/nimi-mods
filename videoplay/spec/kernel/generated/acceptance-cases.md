@@ -89,4 +89,6 @@ verification_commands:
     source_rule: V-ACC-003
   - command: pnpm -C nimi-mods run check:spec:videoplay-kernel-consistency
     source_rule: V-ACC-003
+  - command: pnpm -C nimi-mods run check
+    source_rule: V-ACC-003
 ```

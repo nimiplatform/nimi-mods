@@ -33,4 +33,6 @@ verification_commands:
     source_rule: TCT-ACC-001
   - command: pnpm -C nimi-mods run check:spec:test-chat-tts-kernel-consistency
     source_rule: TCT-ACC-001
+  - command: pnpm -C nimi-mods run check
+    source_rule: TCT-ACC-001
 ```

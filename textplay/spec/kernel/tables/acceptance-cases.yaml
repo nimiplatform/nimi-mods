@@ -51,3 +51,5 @@ verification_commands:
     source_rule: T-ACC-003
   - command: pnpm -C nimi-mods run check:spec:textplay-kernel-consistency
     source_rule: T-ACC-003
+  - command: pnpm -C nimi-mods run check
+    source_rule: T-ACC-003

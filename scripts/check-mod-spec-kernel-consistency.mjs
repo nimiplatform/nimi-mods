@@ -8,6 +8,7 @@ import { getConfig } from './spec-kernel-config.mjs';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const modsRoot = path.resolve(scriptDir, '..');
+const CAPABILITY_KEY_RE = /^(llm|data|ui|turn|inter-mod|hook|audit|meta)\./;
 
 function parseArgs(argv) {
   let mod = '';
@@ -78,6 +79,27 @@ function collectReasonCodes(value, out) {
   }
 }
 
+function collectCapabilityKeys(value, out) {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectCapabilityKeys(item, out);
+    }
+    return;
+  }
+  if (!value || typeof value !== 'object') {
+    if (typeof value === 'string') {
+      const text = value.trim();
+      if (CAPABILITY_KEY_RE.test(text)) {
+        out.add(text);
+      }
+    }
+    return;
+  }
+  for (const nested of Object.values(value)) {
+    collectCapabilityKeys(nested, out);
+  }
+}
+
 function normalizeCommandList(value) {
   if (!Array.isArray(value)) {
     return [];
@@ -92,7 +114,7 @@ function normalizeCommandList(value) {
     .filter(Boolean);
 }
 
-function checkAcceptanceCoverage(mod, acceptanceTable, config) {
+function checkAcceptanceCoverage(mod, acceptanceTable, config, modDir) {
   const cases = Array.isArray(acceptanceTable?.cases) ? acceptanceTable.cases : [];
   if (cases.length === 0) {
     fail(`[${mod}] acceptance cases table is empty`);
@@ -108,6 +130,15 @@ function checkAcceptanceCoverage(mod, acceptanceTable, config) {
       fail(`[${mod}] duplicated acceptance case id: ${id}`);
     }
     caseIdSet.add(id);
+
+    const testReference = String(row?.test_reference || '').trim();
+    if (testReference) {
+      const inTestDir = path.join(modDir, 'test', testReference);
+      const inModDir = path.join(modDir, testReference);
+      if (!existsSync(inTestDir) && !existsSync(inModDir)) {
+        fail(`[${mod}] acceptance test_reference not found: ${testReference}`);
+      }
+    }
   }
 
   const requiredCaseIds = Array.isArray(config.requiredAcceptanceCaseIds) ? config.requiredAcceptanceCaseIds : [];
@@ -123,6 +154,61 @@ function checkAcceptanceCoverage(mod, acceptanceTable, config) {
   for (const command of requiredCommands) {
     if (!commandSet.has(command)) {
       fail(`[${mod}] missing required verification command: ${command}`);
+    }
+  }
+}
+
+function findManifestPath(modDir) {
+  for (const filename of ['mod.manifest.yaml', 'mod.manifest.yml', 'mod.manifest.json']) {
+    const candidate = path.join(modDir, filename);
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return '';
+}
+
+function readManifestCapabilities(modDir) {
+  const manifestPath = findManifestPath(modDir);
+  if (!manifestPath) {
+    if (existsSync(path.join(modDir, 'package.json'))) {
+      fail(`missing manifest in ${modDir}`);
+    }
+    return null;
+  }
+  if (manifestPath.endsWith('.json')) {
+    const manifest = JSON.parse(readText(manifestPath));
+    const capabilities = Array.isArray(manifest?.capabilities) ? manifest.capabilities : [];
+    return new Set(capabilities.map((item) => String(item || '').trim()).filter(Boolean));
+  }
+  const manifest = readYaml(manifestPath);
+  const capabilities = Array.isArray(manifest?.capabilities) ? manifest.capabilities : [];
+  return new Set(capabilities.map((item) => String(item || '').trim()).filter(Boolean));
+}
+
+function checkManifestCapabilitiesParity(mod, modDir, capabilitiesTable) {
+  const manifestCapabilities = readManifestCapabilities(modDir);
+  if (manifestCapabilities == null) {
+    return;
+  }
+  const specCapabilities = new Set();
+  collectCapabilityKeys(capabilitiesTable, specCapabilities);
+
+  if (manifestCapabilities.size === 0) {
+    fail(`[${mod}] manifest capabilities must not be empty`);
+  }
+  if (specCapabilities.size === 0) {
+    fail(`[${mod}] capabilities table has no capability keys`);
+  }
+
+  for (const capability of manifestCapabilities) {
+    if (!specCapabilities.has(capability)) {
+      fail(`[${mod}] manifest capability not declared in spec table: ${capability}`);
+    }
+  }
+  for (const capability of specCapabilities) {
+    if (!manifestCapabilities.has(capability)) {
+      fail(`[${mod}] spec capability missing in manifest: ${capability}`);
     }
   }
 }
@@ -276,6 +362,7 @@ function checkWorldStudio(tables, reasonCodeSet, config) {
 function main() {
   const { mod } = parseArgs(process.argv.slice(2));
   const config = getConfig(mod);
+  const modDir = path.join(modsRoot, mod);
 
   const specDir = path.join(modsRoot, config.specRoot);
   const kernelDir = path.join(specDir, 'kernel');
@@ -302,6 +389,8 @@ function main() {
     const absolute = path.join(tablesDir, spec.input);
     tables[spec.input] = readYaml(absolute);
   }
+
+  checkManifestCapabilitiesParity(mod, modDir, tables['capabilities.yaml']);
 
   const sourceRuleSet = new Set();
   for (const table of Object.values(tables)) {
@@ -333,7 +422,7 @@ function main() {
   }
 
   const acceptance = tables['acceptance-cases.yaml'];
-  checkAcceptanceCoverage(mod, acceptance, config);
+  checkAcceptanceCoverage(mod, acceptance, config, modDir);
 
   const referenced = new Set();
   collectReasonCodes(acceptance, referenced);

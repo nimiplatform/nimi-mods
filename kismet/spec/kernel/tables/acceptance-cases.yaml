@@ -32,3 +32,5 @@ verification_commands:
     source_rule: KIS-ACC-001
   - command: pnpm -C nimi-mods run check:spec:kismet-kernel-consistency
     source_rule: KIS-ACC-001
+  - command: pnpm -C nimi-mods run check
+    source_rule: KIS-ACC-001
