@@ -1,13 +1,21 @@
 import type { HookClient } from '@nimiplatform/sdk/mod/types';
-import { TEXTPLAY_DATA_API_RENDER_PERSIST } from '../contracts.js';
+import {
+  TEXTPLAY_DATA_API_RENDER_PERSIST,
+  TEXTPLAY_DATA_API_SESSIONS_MINE,
+} from '../contracts.js';
 import { createTextplayFlowId, emitTextplayLog } from '../logging.js';
 import {
   getTextplayPersistRecordsByTurn,
   getTextplayPersistRunEvents,
+  listTextplayHistorySessionsMine,
+  listTextplayPersistRecordsByScope,
   listTextplayPersistRecordsByStory,
   upsertTextplayPersistRecord,
 } from '../persist/store.js';
-import { TextplayPersistQuerySchema } from '../data/schemas.js';
+import {
+  TextplayHistorySessionMineQuerySchema,
+  TextplayPersistQuerySchema,
+} from '../data/schemas.js';
 
 export async function registerTextplayDataCapabilities(input: {
   hookClient: HookClient;
@@ -97,10 +105,52 @@ export async function registerTextplayDataCapabilities(input: {
             records,
           };
         }
+        case 'listByScope': {
+          const records = await listTextplayPersistRecordsByScope({
+            queryData,
+            worldId: payload.worldId,
+            agentId: payload.agentId,
+            playerId: payload.playerId,
+            limit: payload.limit,
+          });
+          return {
+            ok: true,
+            records,
+          };
+        }
         default: {
           throw new Error('TEXTPLAY_PERSIST_QUERY_UNSUPPORTED');
         }
       }
+    },
+  });
+
+  await input.hookClient.data.register({
+    capability: TEXTPLAY_DATA_API_SESSIONS_MINE,
+    handler: async (query) => {
+      const parsed = TextplayHistorySessionMineQuerySchema.safeParse(query);
+      if (!parsed.success) {
+        throw new Error(`TEXTPLAY_HISTORY_QUERY_INVALID:${parsed.error.issues[0]?.message || 'unknown'}`);
+      }
+      const payload = parsed.data;
+      const queryData = (request: {
+        capability: string;
+        query: Record<string, unknown>;
+      }) => input.hookClient.data.query(request);
+      const sessions = await listTextplayHistorySessionsMine({
+        queryData,
+        playerId: payload.playerId,
+        worldId: payload.worldId,
+        limit: payload.limit,
+        cursor: payload.cursor,
+        refresh: payload.refresh,
+      });
+      return {
+        ok: true,
+        items: sessions.items,
+        nextCursor: sessions.nextCursor,
+        total: sessions.total,
+      };
     },
   });
 

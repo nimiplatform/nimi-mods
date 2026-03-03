@@ -44,6 +44,9 @@
 - `TXT-028`: Story selection is world-scoped and requires selecting account world first.
 - `TXT-029`: Fresh story requires explicit Start action that triggers one opening `SystemEvent` render before player input is accepted.
 - `TXT-030`: Left context panel must be independently scrollable to preserve access to session controls on small viewports.
+- `TXT-031`: Tension pacing constraints are injected into render prompt based on `pacingContext.tensionBand` (HIGH/MODERATE/LOW).
+- `TXT-032`: Event type rendering guidance is appended per-event as `Rendering hint` when the event carries a recognized `type` field.
+- `TXT-033`: Unknown or missing event `type` degrades gracefully — no rendering hint appended, event renders with visibility tag only.
 
 ## 3. No Over-Design Guard
 

@@ -125,4 +125,20 @@ test('step2 prompt includes governance priorities and mandatory self-review rule
   assert.match(prompt, /Anti-people-pleasing rule/i);
   assert.match(prompt, /Self-Review \(Mandatory Before Output\)/);
   assert.match(prompt, /extraordinary player claims, generate proportionate skepticism/i);
+
+  // NPC Reaction Gradient assertions
+  assert.match(prompt, /NPC Reaction Gradient/);
+  assert.match(prompt, /Plausible claim/);
+  assert.match(prompt, /Impossible claim/);
+
+  // Dramatic Tension Guidelines assertions
+  assert.match(prompt, /Power Hierarchy/);
+  assert.match(prompt, /Villain Autonomy/);
+  assert.match(prompt, /Tension Flow/);
+  assert.match(prompt, /0\.7/);
+
+  // Spine Event Type Guide assertions
+  assert.match(prompt, /Spine Event Type Guide/);
+  assert.match(prompt, /thought:/i);
+  assert.match(prompt, /branch-point:/i);
 });

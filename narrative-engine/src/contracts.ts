@@ -21,7 +21,11 @@ export const NARRATIVE_CONTEXT_SCOPES = ['CANON', 'STORY', 'SUBJECT', 'RELATION'
 
 export const NARRATIVE_VISIBILITY_VALUES = ['public', 'internal', 'sensory'] as const;
 
-export const NARRATIVE_SPINE_EVENT_TYPES = ['scene-beat', 'dialogue', 'action', 'state-change'] as const;
+export const NARRATIVE_SPINE_EVENT_TYPES = [
+  'scene-beat', 'dialogue', 'action', 'state-change',
+  'thought', 'decision', 'discovery', 'relation-shift', 'emotion', 'observation',
+  'memory', 'gravity', 'timeskip', 'branch-point', 'system',
+] as const;
 
 export const NARRATIVE_REASON_CODES = {
   NARRATIVE_INPUT_INVALID: 'NARRATIVE_INPUT_INVALID',

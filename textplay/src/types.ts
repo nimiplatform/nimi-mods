@@ -265,8 +265,10 @@ export type TextplayPersistRecord = {
 
 export type TextplayProjectionEvent = {
   eventId: string;
+  type: string;
   visibility: TextplayVisibility;
   content: string;
+  payload: Record<string, unknown>;
   thinker: string;
   decider: string;
   experiencer: string;
@@ -292,10 +294,25 @@ export type TextplayNormalizedRenderInput = {
   worldStyleSummary: string;
   events: TextplayProjectionEvent[];
   metrics: Record<string, unknown>;
+  pacingContext: {
+    currentTension: number;
+    tensionBand: 'HIGH' | 'MODERATE' | 'LOW';
+  };
 };
 
 export type TextplayStoryBrief = {
   mode: 'opening' | 'recap';
   text: string;
   generatedAt: string;
+};
+
+export type TextplayHistorySession = {
+  runId: string;
+  storyId: string;
+  worldId: string;
+  agentId: string;
+  storyTitle: string;
+  updatedAt: string;
+  triggerSource: TextplayTriggerSource;
+  preview: string;
 };

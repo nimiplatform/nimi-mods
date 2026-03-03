@@ -129,6 +129,45 @@ function allowRetcon(event: NarrativeSpineEvent): boolean {
   return payload.allowRetcon === true || payload.retconApproved === true;
 }
 
+const CONTRADICTORY_KEYWORD_PAIRS: ReadonlyArray<[string, string]> = [
+  ['alive', 'dead'], ['活', '死'],
+  ['won', 'lost'], ['胜', '败'],
+  ['trust', 'distrust'], ['信任', '不信任'],
+  ['ally', 'enemy'], ['盟友', '敌人'],
+  ['safe', 'danger'], ['安全', '危险'],
+  ['free', 'imprisoned'], ['自由', '囚禁'],
+  ['intact', 'destroyed'], ['完好', '毁'],
+  ['loyal', 'betrayed'], ['忠', '叛'],
+  ['visible', 'hidden'], ['可见', '隐'],
+  ['peaceful', 'hostile'], ['和平', '敌对'],
+];
+
+const CAUSAL_RETCON_PATTERNS: ReadonlyArray<RegExp> = [
+  /(?:其实|原来|事实上|实际上).*(?:并非|不是|从来没有|根本没)/,
+  /(?:actually|in fact|truth is).*(?:never|not|wasn't|weren't)/i,
+  /(?:一直以来|始终).*(?:都是假的|都是错的|被骗|被蒙蔽)/,
+  /(?:所有人都以为|大家都认为).*(?:但其实|然而实际)/,
+  /(?:the whole time|all along).*(?:was actually|had been|was never)/i,
+];
+
+function detectKeywordContradiction(newText: string, oldText: string): boolean {
+  if (!hasTokenOverlap(newText, oldText)) {
+    return false;
+  }
+  const newLower = newText.toLowerCase();
+  const oldLower = oldText.toLowerCase();
+  for (const [a, b] of CONTRADICTORY_KEYWORD_PAIRS) {
+    if ((newLower.includes(a) && oldLower.includes(b)) || (newLower.includes(b) && oldLower.includes(a))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function detectCausalRetcon(text: string): boolean {
+  return CAUSAL_RETCON_PATTERNS.some((pattern) => pattern.test(text));
+}
+
 function detectSemanticContradiction(input: {
   generated: NarrativeSpineEvent[];
   recent: NarrativeSpineEvent[];
@@ -161,6 +200,18 @@ function detectSemanticContradiction(input: {
       if (newHasNegation !== oldHasNegation) {
         return 'semantic polarity reversal against recent spine facts';
       }
+    }
+
+    // Layer A: keyword contradiction pairs
+    for (const oldText of recentTexts) {
+      if (detectKeywordContradiction(text, oldText)) {
+        return 'contradictory keyword pair detected against recent spine facts';
+      }
+    }
+
+    // Layer B: causal retcon patterns
+    if (detectCausalRetcon(text)) {
+      return 'causal retcon pattern detected in generated event';
     }
   }
 

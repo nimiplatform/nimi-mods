@@ -38,16 +38,35 @@ function normalizeEvent(event: NarrativeProjectionRenderInputResponse['events'][
     ? event.sourceEventIds
     : [event.eventId];
 
+  const rawPayload = (event as Record<string, unknown>).payload;
+  const payload = rawPayload && typeof rawPayload === 'object' && !Array.isArray(rawPayload)
+    ? (rawPayload as Record<string, unknown>)
+    : {};
+
+  const rawType = String((event as Record<string, unknown>).type || '').trim();
+
   return {
     eventId: event.eventId,
+    type: rawType || 'scene-beat',
     visibility: event.visibility,
     content: String(event.content || '').trim(),
+    payload,
     thinker: normalizeActorField(event.thinker),
     decider: normalizeActorField(event.decider),
     experiencer: normalizeActorField(event.experiencer),
     owner: normalizeActorField(event.owner),
     sourceEventIds,
   };
+}
+
+function extractPacingContext(metrics: Record<string, unknown>): {
+  currentTension: number;
+  tensionBand: 'HIGH' | 'MODERATE' | 'LOW';
+} {
+  const raw = Number(metrics?.tension);
+  const currentTension = Number.isFinite(raw) ? Math.max(0, Math.min(1, raw)) : 0.5;
+  const tensionBand = currentTension >= 0.7 ? 'HIGH' : currentTension >= 0.4 ? 'MODERATE' : 'LOW';
+  return { currentTension, tensionBand };
 }
 
 function resolveTurnConsistency(input: {
@@ -255,6 +274,9 @@ export function normalizeTextplayRenderInput(input: {
   });
   const systemPayload = input.request.systemPayload || input.projection.systemPayload || null;
 
+  const projectionMetrics = input.projection.metrics as Record<string, unknown>;
+  const pacingContext = extractPacingContext(projectionMetrics);
+
   const normalized: TextplayNormalizedRenderInput = {
     storyId: consistency.storyId,
     worldId: normalizeId(input.request.worldId),
@@ -273,6 +295,7 @@ export function normalizeTextplayRenderInput(input: {
     worldStyleSummary: contextSummary.worldStyleSummary,
     events: input.projection.events.map(normalizeEvent),
     metrics: input.projection.metrics,
+    pacingContext,
   };
 
   const sourceEventIds = Array.from(new Set(

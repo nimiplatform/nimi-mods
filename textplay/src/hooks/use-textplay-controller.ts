@@ -9,6 +9,7 @@ import type {
 import { useAppStore } from '@nimiplatform/sdk/mod/ui';
 import { createNarrativeEngineModule } from '../../../narrative-engine/src/index.js';
 import {
+  TEXTPLAY_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST,
   TEXTPLAY_DATA_API_RENDER_PERSIST,
   TEXTPLAY_MOD_ID,
   TEXTPLAY_REASON,
@@ -19,12 +20,18 @@ import {
   listPlayableStories,
   loadStoryStartupPackage,
 } from '../data/story-catalog.js';
+import { listMyHistorySessions } from '../data/history-sessions.js';
 import { listMyWorlds } from '../data/world-catalog.js';
 import { runTextplayRender } from '../pipeline/run-textplay-render.js';
 import { createTextplayPresenceMachine } from '../presence/state-machine.js';
 import type { TextplayShellProps } from '../components/textplay-shell.js';
-import type { NarrativeTurnWindowResponse } from '../data/schemas.js';
+import {
+  TextplayWorldNarrativeContextListResponseSchema,
+  type NarrativeTurnWindowResponse,
+  type TextplayWorldNarrativeContextRow,
+} from '../data/schemas.js';
 import type {
+  TextplayHistorySession,
   TextplayPersistRecord,
   TextplayPresenceReport,
   TextplayStoryBrief,
@@ -37,6 +44,7 @@ import type {
   TextplayWarning,
 } from '../types.js';
 import { createUlid } from '../utils/ulid.js';
+import { createTextplayFlowId, emitTextplayLog } from '../logging.js';
 import { queryNarrativeTurnWindow } from '../data/narrative.js';
 import {
   buildInitiativeDirectorMessage,
@@ -70,6 +78,8 @@ type PlayerProfileDraft = {
 };
 
 const GLOBAL_PLAYER_PROFILE_SCOPE = '__global__';
+const SEND_RUNTIME_ERROR_REASON = 'TEXTPLAY_RENDER_RUNTIME_ERROR';
+const MAX_AGENT_FALLBACK_CANDIDATES = 2;
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object') {
@@ -361,6 +371,133 @@ function upsertPersistRecord(records: TextplayPersistRecord[], next: TextplayPer
   return copied.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 }
 
+function abbreviateText(value: string, maxLength = 72): string {
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return '';
+  }
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  return `${normalized.slice(0, maxLength)}...`;
+}
+
+function buildHistoryPreview(record: TextplayPersistRecord): string {
+  const renderText = abbreviateText(String(record.text || ''));
+  if (renderText) {
+    return renderText;
+  }
+  const userMessage = abbreviateText(String(record.userMessage || ''));
+  if (userMessage) {
+    return userMessage;
+  }
+  return '(no preview)';
+}
+
+function toHistorySession(input: {
+  record: TextplayPersistRecord;
+  storyTitle: string;
+}): TextplayHistorySession {
+  return {
+    runId: input.record.runId,
+    storyId: input.record.storyId,
+    worldId: input.record.worldId || parseWorldIdFromStoryId(input.record.storyId),
+    agentId: input.record.agentId,
+    storyTitle: input.storyTitle.trim() || input.record.storyId,
+    updatedAt: input.record.updatedAt,
+    triggerSource: input.record.triggerSource,
+    preview: buildHistoryPreview(input.record),
+  };
+}
+
+function sortHistorySessions(sessions: TextplayHistorySession[]): TextplayHistorySession[] {
+  return [...sessions].sort((left, right) => (
+    right.updatedAt.localeCompare(left.updatedAt)
+    || left.storyId.localeCompare(right.storyId)
+    || left.runId.localeCompare(right.runId)
+  ));
+}
+
+function upsertHistorySessionByStory(
+  sessions: TextplayHistorySession[],
+  next: TextplayHistorySession,
+): TextplayHistorySession[] {
+  const index = sessions.findIndex((item) => item.storyId === next.storyId);
+  if (index === -1) {
+    return sortHistorySessions([...sessions, next]);
+  }
+  const previous = sessions[index];
+  if (!previous) {
+    return sortHistorySessions([...sessions, next]);
+  }
+  if (previous.updatedAt.localeCompare(next.updatedAt) >= 0) {
+    return sessions;
+  }
+  const copied = [...sessions];
+  copied[index] = next;
+  return sortHistorySessions(copied);
+}
+
+const WORLD_AGENT_CANDIDATE_KEY = '__world__';
+
+function withAgentCandidate(
+  index: Record<string, string[]>,
+  key: string,
+  candidate: unknown,
+): void {
+  const normalizedKey = key.trim();
+  const normalized = toTrimmedString(candidate);
+  if (!normalizedKey || !isEntityId(normalized)) {
+    return;
+  }
+  const existing = index[normalizedKey] || [];
+  if (!existing.includes(normalized)) {
+    index[normalizedKey] = [...existing, normalized];
+  }
+}
+
+function collectWorldAgentCandidatesByStory(rows: TextplayWorldNarrativeContextRow[]): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const row of rows) {
+    const storyId = toTrimmedString(row.storyId);
+    const storyKey = storyId || WORLD_AGENT_CANDIDATE_KEY;
+    const subjectType = toTrimmedString(row.subjectType).toUpperCase();
+    const targetType = toTrimmedString(row.targetSubjectType).toUpperCase();
+    if (subjectType === 'AGENT') {
+      withAgentCandidate(out, storyKey, row.subjectId);
+    }
+    if (targetType === 'AGENT') {
+      withAgentCandidate(out, storyKey, row.targetSubjectId);
+    }
+    if (storyId) {
+      if (subjectType === 'AGENT') {
+        withAgentCandidate(out, WORLD_AGENT_CANDIDATE_KEY, row.subjectId);
+      }
+      if (targetType === 'AGENT') {
+        withAgentCandidate(out, WORLD_AGENT_CANDIDATE_KEY, row.targetSubjectId);
+      }
+    }
+  }
+  return out;
+}
+
+function mergeAgentCandidateIds(values: string[]): string[] {
+  return uniqueStrings(values).filter((candidate) => isEntityId(candidate));
+}
+
+function pickAgentFallbackCandidates(input: {
+  preferredAgentId?: string;
+  candidateAgentIds?: string[];
+  max?: number;
+}): string[] {
+  const max = Number.isFinite(input.max) ? Math.max(1, Math.floor(Number(input.max))) : MAX_AGENT_FALLBACK_CANDIDATES;
+  const merged = mergeAgentCandidateIds([
+    String(input.preferredAgentId || ''),
+    ...(Array.isArray(input.candidateAgentIds) ? input.candidateAgentIds : []),
+  ]);
+  return merged.slice(0, max);
+}
+
 function deriveStoryPlaceholder(input: {
   story: TextplayStoryDetail | null;
   startupReady: boolean;
@@ -531,6 +668,10 @@ export function useTextplayController(): TextplayShellProps {
   const [worldsLoading, setWorldsLoading] = useState(false);
   const [worldsError, setWorldsError] = useState<string | null>(null);
   const [selectedWorldId, setSelectedWorldId] = useState<string | null>(null);
+  const [historySessions, setHistorySessions] = useState<TextplayHistorySession[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [selectedHistoryRunId, setSelectedHistoryRunId] = useState<string | null>(null);
 
   const [chatRouteOptions, setChatRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
   const [routeOverride, setRouteOverride] = useState<RuntimeRouteBinding | null>(null);
@@ -561,10 +702,15 @@ export function useTextplayController(): TextplayShellProps {
     message: string;
   } | null>(null);
   const [failure, setFailure] = useState<TextplayShellProps['failure']>(null);
+  const [pendingUserTurn, setPendingUserTurn] = useState<TextplayShellProps['pendingUserTurn']>(null);
   const [storyBrief, setStoryBrief] = useState<TextplayStoryBrief | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
   const storyHydrationSeqRef = useRef(0);
+  const historyHydrationSeqRef = useRef(0);
+  const historyRefreshInFlightRef = useRef(false);
+  const selectedRecordRunIdRef = useRef<string | null>(null);
+  const startupPackageRef = useRef<TextplayShellProps['startupPackage']>(null);
   const lastUserActivityMsRef = useRef<number>(Date.now());
   const lastInitiativeAtMsRef = useRef<number>(0);
   const consecutiveInitiativeRef = useRef<number>(0);
@@ -588,11 +734,20 @@ export function useTextplayController(): TextplayShellProps {
     setPresenceReports(presenceMachine.getAllReports().slice(-20));
   }, [presenceMachine]);
 
+  useEffect(() => {
+    selectedRecordRunIdRef.current = selectedRecordRunId;
+  }, [selectedRecordRunId]);
+
+  useEffect(() => {
+    startupPackageRef.current = startupPackage;
+  }, [startupPackage]);
+
   const resetRunSurface = useCallback(() => {
     setRecords([]);
     setSelectedRecordRunId(null);
     setLastRenderedText('');
     setStoryBrief(null);
+    setPendingUserTurn(null);
     setRunEvents([]);
     setWarnings([]);
     setRunSnapshot(null);
@@ -662,36 +817,119 @@ export function useTextplayController(): TextplayShellProps {
   const queryStoryRecords = useCallback(async (input: {
     storyId: string;
     worldId: string;
-    agentId: string;
+    agentId?: string;
+    playerId?: string;
   }): Promise<TextplayPersistRecord[]> => {
     const normalizedStoryId = input.storyId.trim();
     const normalizedWorldId = input.worldId.trim();
-    const normalizedAgentId = input.agentId.trim();
-    const normalizedPlayerId = playerId.trim();
+    const normalizedAgentId = String(input.agentId || '').trim();
+    const normalizedPlayerId = input.playerId == null
+      ? playerId.trim()
+      : String(input.playerId || '').trim();
     if (!normalizedStoryId) {
       return [];
     }
-    if (!normalizedPlayerId) {
+    if (!normalizedWorldId) {
       return [];
     }
-    if (!normalizedWorldId || !normalizedAgentId) {
-      return [];
+
+    const query: Record<string, unknown> = {
+      op: 'listByStory',
+      storyId: normalizedStoryId,
+      worldId: normalizedWorldId,
+      limit: 30,
+    };
+    if (normalizedPlayerId) {
+      query.playerId = normalizedPlayerId;
+    }
+    if (normalizedAgentId) {
+      query.agentId = normalizedAgentId;
     }
 
     const payload = await hookClient.data.query({
       capability: TEXTPLAY_DATA_API_RENDER_PERSIST,
-      query: {
-        op: 'listByStory',
-        storyId: normalizedStoryId,
-        worldId: normalizedWorldId,
-        agentId: normalizedAgentId,
-        playerId: normalizedPlayerId,
-        limit: 30,
-      },
+      query,
     });
 
     return parsePersistRecordList(payload);
   }, [hookClient, playerId]);
+
+  const queryWorldAgentCandidatesByStory = useCallback(async (worldId: string): Promise<Record<string, string[]>> => {
+    const normalizedWorldId = worldId.trim();
+    if (!normalizedWorldId) {
+      return {};
+    }
+    try {
+      const payload = await hookClient.data.query({
+        capability: TEXTPLAY_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST,
+        query: { worldId: normalizedWorldId },
+      });
+      const parsed = TextplayWorldNarrativeContextListResponseSchema.safeParse(payload);
+      if (!parsed.success) {
+        return {};
+      }
+      const rows = Array.isArray(parsed.data) ? parsed.data : parsed.data.items;
+      return collectWorldAgentCandidatesByStory(rows);
+    } catch {
+      return {};
+    }
+  }, [hookClient]);
+
+  const queryStoryRecordsWithAgentFallback = useCallback(async (input: {
+    storyId: string;
+    worldId: string;
+    preferredAgentId?: string;
+    candidateAgentIds?: string[];
+    maxAgentCandidates?: number;
+  }): Promise<TextplayPersistRecord[]> => {
+    const candidates = pickAgentFallbackCandidates({
+      preferredAgentId: input.preferredAgentId,
+      candidateAgentIds: input.candidateAgentIds,
+      max: input.maxAgentCandidates ?? MAX_AGENT_FALLBACK_CANDIDATES,
+    });
+
+    for (const agentId of candidates) {
+      const rows = await queryStoryRecords({
+        storyId: input.storyId,
+        worldId: input.worldId,
+        agentId,
+      });
+      if (rows.length > 0) {
+        return rows;
+      }
+    }
+
+    const scopedRows = await queryStoryRecords({
+      storyId: input.storyId,
+      worldId: input.worldId,
+    });
+    if (scopedRows.length > 0) {
+      return scopedRows;
+    }
+
+    if (!playerId.trim()) {
+      return [];
+    }
+
+    const fallbackAgentId = candidates[0];
+    if (fallbackAgentId) {
+      const rows = await queryStoryRecords({
+        storyId: input.storyId,
+        worldId: input.worldId,
+        agentId: fallbackAgentId,
+        playerId: '',
+      });
+      if (rows.length > 0) {
+        return rows;
+      }
+    }
+
+    return queryStoryRecords({
+      storyId: input.storyId,
+      worldId: input.worldId,
+      playerId: '',
+    });
+  }, [playerId, queryStoryRecords]);
 
   const loadRunRecovery = useCallback(async (input: {
     runId: string;
@@ -782,6 +1020,7 @@ export function useTextplayController(): TextplayShellProps {
   const applyRenderSuccessSurface = useCallback(async (input: {
     result: TextplayRenderSuccess;
     fallbackRecord: TextplayPersistRecord;
+    storyTitle: string;
     worldId: string;
     agentId: string;
     playerId: string;
@@ -802,6 +1041,11 @@ export function useTextplayController(): TextplayShellProps {
     setRecords(rows);
     const selected = rows.find((row) => row.runId === input.result.meta.runId) || input.fallbackRecord;
     applyRecordSurface(selected);
+    const nextHistory = toHistorySession({
+      record: selected,
+      storyTitle: input.storyTitle,
+    });
+    setHistorySessions((previous) => upsertHistorySessionByStory(previous, nextHistory));
 
     await loadRunRecovery({
       runId: input.result.meta.runId,
@@ -823,8 +1067,9 @@ export function useTextplayController(): TextplayShellProps {
       return null;
     }
 
-    if (startupPackage && startupPackage.storyId === targetStoryId) {
-      return startupPackage;
+    const cachedStartup = startupPackageRef.current;
+    if (cachedStartup && cachedStartup.storyId === targetStoryId) {
+      return cachedStartup;
     }
 
     setStartupLoading(true);
@@ -886,14 +1131,15 @@ export function useTextplayController(): TextplayShellProps {
     narrativeEngine,
     setRuntimeField,
     setStatusBanner,
-    startupPackage,
   ]);
 
   const hydrateStorySelection = useCallback(async (storyId: string, options?: {
     clearRunSurface?: boolean;
+    preferredRunId?: string;
+    forceWorldId?: string;
   }) => {
     const normalizedStoryId = storyId.trim();
-    const activeWorldId = (selectedWorldId || worldIdRuntime).trim();
+    const activeWorldId = (options?.forceWorldId || selectedWorldId || worldIdRuntime).trim();
     const normalizedPlayerId = playerId.trim();
     if (!normalizedStoryId || !activeWorldId) {
       setSelectedStory(null);
@@ -952,17 +1198,50 @@ export function useTextplayController(): TextplayShellProps {
       }
 
       const detailAgentId = (detail.primaryAgentId || agentIdRuntime).trim();
-      const rows = await queryStoryRecords({
+      const contextCandidatesByStory = await queryWorldAgentCandidatesByStory(detail.worldId);
+      const candidateAgentIds = mergeAgentCandidateIds([
+        ...detail.participants,
+        ...detail.characterRefs,
+        ...(contextCandidatesByStory[detail.storyId] || []),
+        ...(contextCandidatesByStory[WORLD_AGENT_CANDIDATE_KEY] || []),
+      ]);
+      const rows = await queryStoryRecordsWithAgentFallback({
         storyId: detail.storyId,
         worldId: detail.worldId,
-        agentId: detailAgentId,
+        preferredAgentId: detailAgentId,
+        candidateAgentIds,
       });
       if (storyHydrationSeqRef.current !== seq) {
         return;
       }
 
+      const recoveredAgentId = (
+        detailAgentId
+        || String(rows[0]?.agentId || '').trim()
+      );
+      if (!detailAgentId && isEntityId(recoveredAgentId)) {
+        setSelectedStory((previous) => {
+          if (!previous || previous.storyId !== detail.storyId) {
+            return previous;
+          }
+          return {
+            ...previous,
+            primaryAgentId: recoveredAgentId,
+            agentBindingMissing: false,
+          };
+        });
+        if (typeof setRuntimeField === 'function' && !agentIdRuntime) {
+          setRuntimeField('agentId', recoveredAgentId);
+        }
+      }
+
       setRecords(rows);
-      const nextSelectedRunId = rows[0]?.runId || null;
+      const preferredRunId = String(options?.preferredRunId || selectedRecordRunIdRef.current || '').trim();
+      const nextSelectedRunId = (
+        preferredRunId && rows.some((row) => row.runId === preferredRunId)
+          ? preferredRunId
+          : rows[0]?.runId || null
+      );
       setSelectedRecordRunId(nextSelectedRunId);
       setFailure(null);
       setStartupError(null);
@@ -977,11 +1256,12 @@ export function useTextplayController(): TextplayShellProps {
       if (nextSelectedRunId) {
         const selected = rows.find((row) => row.runId === nextSelectedRunId) || null;
         applyRecordSurface(selected);
+        const recoveryAgentId = (String(selected?.agentId || '').trim() || detailAgentId || recoveredAgentId || '').trim();
         await loadRunRecovery({
           runId: nextSelectedRunId,
           storyId: detail.storyId,
           worldId: detail.worldId,
-          agentId: detailAgentId,
+          agentId: recoveryAgentId,
           playerId: normalizedPlayerId,
           afterSeq: 0,
           append: false,
@@ -1012,7 +1292,8 @@ export function useTextplayController(): TextplayShellProps {
     hookClient,
     loadRunRecovery,
     playerId,
-    queryStoryRecords,
+    queryStoryRecordsWithAgentFallback,
+    queryWorldAgentCandidatesByStory,
     resetRunSurface,
     setRuntimeField,
     setStatusBanner,
@@ -1073,6 +1354,62 @@ export function useTextplayController(): TextplayShellProps {
       }
     }
   }, [agentIdRuntime, hookClient, selectedWorldId, setRuntimeField, setStatusBanner, worldIdRuntime]);
+
+  const refreshHistorySessions = useCallback(async (input?: {
+    refresh?: boolean;
+  }) => {
+    const normalizedPlayerId = playerId.trim();
+    if (!normalizedPlayerId) {
+      setHistorySessions([]);
+      setSelectedHistoryRunId(null);
+      setHistoryError(null);
+      setHistoryLoading(false);
+      return;
+    }
+    if (historyRefreshInFlightRef.current) {
+      return;
+    }
+    historyRefreshInFlightRef.current = true;
+
+    const seq = historyHydrationSeqRef.current + 1;
+    historyHydrationSeqRef.current = seq;
+    setHistoryLoading(true);
+    setHistoryError(null);
+
+    try {
+      const result = await listMyHistorySessions({
+        hookClient,
+        playerId: normalizedPlayerId,
+        limit: 100,
+        refresh: input?.refresh === true,
+      });
+      if (historyHydrationSeqRef.current !== seq) {
+        return;
+      }
+      const sorted = sortHistorySessions(result.items);
+      setHistorySessions(sorted);
+      setHistoryError(null);
+      setSelectedHistoryRunId((previous) => {
+        if (previous && sorted.some((item) => item.runId === previous)) {
+          return previous;
+        }
+        return sorted[0]?.runId || null;
+      });
+    } catch (error) {
+      if (historyHydrationSeqRef.current !== seq) {
+        return;
+      }
+      setHistoryError(error instanceof Error ? error.message : String(error || ''));
+    } finally {
+      if (historyHydrationSeqRef.current === seq) {
+        setHistoryLoading(false);
+      }
+      historyRefreshInFlightRef.current = false;
+    }
+  }, [
+    hookClient,
+    playerId,
+  ]);
 
   const loadWorldList = useCallback(async () => {
     setWorldsLoading(true);
@@ -1297,6 +1634,73 @@ export function useTextplayController(): TextplayShellProps {
     controller.abort();
   }, []);
 
+  const onSelectHistorySession = useCallback((runId: string) => {
+    const normalized = runId.trim();
+    setSelectedHistoryRunId(normalized || null);
+  }, []);
+
+  const onContinueHistorySession = useCallback(() => {
+    void (async () => {
+      if (isRunning) {
+        return;
+      }
+      const targetRunId = (selectedHistoryRunId || '').trim();
+      if (!targetRunId) {
+        return;
+      }
+
+      const target = historySessions.find((item) => item.runId === targetRunId) || null;
+      if (!target) {
+        return;
+      }
+
+      setSelectedWorldId(target.worldId);
+      setSelectedStoryId(target.storyId);
+      setSelectedRecordRunId(target.runId);
+      setStartupError(null);
+      setWorldsError(null);
+
+      if (typeof setRuntimeField === 'function') {
+        setRuntimeField('worldId', target.worldId);
+        setRuntimeField('storyId', target.storyId);
+        if (isEntityId(target.agentId)) {
+          setRuntimeField('agentId', target.agentId);
+        }
+      }
+
+      await hydrateStorySelection(target.storyId, {
+        clearRunSurface: true,
+        preferredRunId: target.runId,
+        forceWorldId: target.worldId,
+      });
+
+      if (typeof setStatusBanner === 'function') {
+        setStatusBanner({
+          kind: 'success',
+          message: `Resumed session: ${target.storyTitle}`,
+        });
+      }
+    })().catch((error) => {
+      if (typeof setStatusBanner === 'function') {
+        setStatusBanner({
+          kind: 'warn',
+          message: `Resume session failed: ${error instanceof Error ? error.message : String(error || '')}`,
+        });
+      }
+    });
+  }, [
+    historySessions,
+    hydrateStorySelection,
+    isRunning,
+    selectedHistoryRunId,
+    setRuntimeField,
+    setStatusBanner,
+  ]);
+
+  const onRequestHistorySessions = useCallback(() => {
+    void refreshHistorySessions();
+  }, [refreshHistorySessions]);
+
   const onSelectWorld = useCallback((worldId: string) => {
     if (isRunning) {
       return;
@@ -1478,12 +1882,38 @@ export function useTextplayController(): TextplayShellProps {
       const traceId = createUlid();
       const controller = new AbortController();
       abortRef.current = controller;
+      const sendFlowId = createTextplayFlowId('textplay-send');
+      const sendStartedAt = performance.now();
+
+      emitTextplayLog({
+        level: 'info',
+        message: 'action:send:start',
+        flowId: sendFlowId,
+        source: 'useTextplayController.onSend',
+        details: {
+          storyId: activeStory.storyId,
+          worldId: normalizedWorldId,
+          agentId: resolvedAgentId,
+          playerId: normalizedPlayerId,
+          runId: nextRunId,
+          traceId,
+          triggerSource: 'UserTurn',
+          messagePreview: normalizedMessage.slice(0, 240),
+          messageChars: normalizedMessage.length,
+        },
+      });
 
       setIsRunning(true);
       setRunId(nextRunId);
       setFailure(null);
       setStoryBrief(null);
       setGapRefillApplied(false);
+      setPendingUserTurn({
+        message: normalizedMessage,
+        runId: nextRunId,
+        traceId,
+        status: 'rendering',
+      });
       setInputTextState('');
 
       const presenceMark = presenceMachine.mark();
@@ -1520,6 +1950,7 @@ export function useTextplayController(): TextplayShellProps {
         });
 
         if (result.ok) {
+          setPendingUserTurn(null);
           const fallbackRecord = createFallbackPersistRecord({
             result,
             worldId: normalizedWorldId,
@@ -1533,6 +1964,7 @@ export function useTextplayController(): TextplayShellProps {
           await applyRenderSuccessSurface({
             result,
             fallbackRecord,
+            storyTitle: activeStory.title,
             worldId: normalizedWorldId,
             agentId: resolvedAgentId,
             playerId: normalizedPlayerId,
@@ -1549,9 +1981,34 @@ export function useTextplayController(): TextplayShellProps {
             });
           }
 
+          const lastEvent = result.runEvents[result.runEvents.length - 1];
+          emitTextplayLog({
+            level: 'info',
+            message: 'action:send:done',
+            flowId: sendFlowId,
+            source: 'useTextplayController.onSend',
+            costMs: Number((performance.now() - sendStartedAt).toFixed(2)),
+            details: {
+              runId: nextRunId,
+              traceId,
+              ok: true,
+              warnings: result.meta.warnings.length,
+              lastEventType: lastEvent?.eventType || null,
+              lastStep: lastEvent?.step || null,
+              runEventCount: result.runEvents.length,
+            },
+          });
+
           return;
         }
 
+        setPendingUserTurn({
+          message: normalizedMessage,
+          runId: nextRunId,
+          traceId,
+          status: 'failed',
+          reasonCode: result.reasonCode,
+        });
         setFailure(result);
         setWarnings(result.warnings);
         setRunSnapshot(result.runSnapshot);
@@ -1560,6 +2017,25 @@ export function useTextplayController(): TextplayShellProps {
         setLastRenderedText('');
         setInputTextState(normalizedMessage);
 
+        const lastEvent = result.runEvents[result.runEvents.length - 1];
+        emitTextplayLog({
+          level: 'warn',
+          message: 'action:send:failed',
+          flowId: sendFlowId,
+          source: 'useTextplayController.onSend',
+          costMs: Number((performance.now() - sendStartedAt).toFixed(2)),
+          details: {
+            runId: nextRunId,
+            traceId,
+            ok: false,
+            reasonCode: result.reasonCode,
+            actionHint: result.actionHint,
+            runEventCount: result.runEvents.length,
+            lastEventType: lastEvent?.eventType || null,
+            lastStep: lastEvent?.step || null,
+          },
+        });
+
         if (typeof setStatusBanner === 'function') {
           setStatusBanner({
             kind: result.reasonCode === TEXTPLAY_REASON.RUN_CANCELED ? 'warn' : 'error',
@@ -1567,7 +2043,26 @@ export function useTextplayController(): TextplayShellProps {
           });
         }
       } catch (error) {
+        setPendingUserTurn({
+          message: normalizedMessage,
+          runId: nextRunId,
+          traceId,
+          status: 'failed',
+          reasonCode: SEND_RUNTIME_ERROR_REASON,
+        });
         setInputTextState(normalizedMessage);
+        emitTextplayLog({
+          level: 'error',
+          message: 'action:send:exception',
+          flowId: sendFlowId,
+          source: 'useTextplayController.onSend',
+          costMs: Number((performance.now() - sendStartedAt).toFixed(2)),
+          details: {
+            runId: nextRunId,
+            traceId,
+            error: error instanceof Error ? error.message : String(error || ''),
+          },
+        });
         if (typeof setStatusBanner === 'function') {
           setStatusBanner({
             kind: 'error',
@@ -1625,6 +2120,8 @@ export function useTextplayController(): TextplayShellProps {
       const traceId = createUlid();
       const controller = new AbortController();
       abortRef.current = controller;
+      const initiativeFlowId = createTextplayFlowId('textplay-initiative');
+      const initiativeStartedAt = performance.now();
       const initiativeDirector = buildInitiativeDirectorMessage({
         startup: startupPackage,
         records,
@@ -1649,6 +2146,25 @@ export function useTextplayController(): TextplayShellProps {
       setRunId(nextRunId);
       setFailure(null);
       setGapRefillApplied(false);
+      setPendingUserTurn(null);
+
+      emitTextplayLog({
+        level: 'info',
+        message: 'action:initiative:start',
+        flowId: initiativeFlowId,
+        source: 'useTextplayController.triggerInitiativeRender',
+        details: {
+          storyId: activeStory.storyId,
+          worldId: normalizedWorldId,
+          agentId: normalizedAgentId,
+          playerId: normalizedPlayerId,
+          runId: nextRunId,
+          traceId,
+          triggerSource: 'AgentInitiative',
+          inactiveMs,
+          strategy: initiativeDirector.strategy,
+        },
+      });
 
       const nowMs = Date.now();
       lastInitiativeAtMsRef.current = nowMs;
@@ -1697,6 +2213,7 @@ export function useTextplayController(): TextplayShellProps {
           await applyRenderSuccessSurface({
             result,
             fallbackRecord,
+            storyTitle: activeStory.title,
             worldId: normalizedWorldId,
             agentId: normalizedAgentId,
             playerId: normalizedPlayerId,
@@ -1713,6 +2230,24 @@ export function useTextplayController(): TextplayShellProps {
             });
           }
 
+          const lastEvent = result.runEvents[result.runEvents.length - 1];
+          emitTextplayLog({
+            level: 'info',
+            message: 'action:initiative:done',
+            flowId: initiativeFlowId,
+            source: 'useTextplayController.triggerInitiativeRender',
+            costMs: Number((performance.now() - initiativeStartedAt).toFixed(2)),
+            details: {
+              runId: nextRunId,
+              traceId,
+              ok: true,
+              warnings: result.meta.warnings.length,
+              lastEventType: lastEvent?.eventType || null,
+              lastStep: lastEvent?.step || null,
+              runEventCount: result.runEvents.length,
+            },
+          });
+
           return;
         }
 
@@ -1723,6 +2258,25 @@ export function useTextplayController(): TextplayShellProps {
         setGapRefillApplied(Boolean(result.runSnapshot.gapRefillApplied));
         setLastRenderedText('');
 
+        const lastEvent = result.runEvents[result.runEvents.length - 1];
+        emitTextplayLog({
+          level: 'warn',
+          message: 'action:initiative:failed',
+          flowId: initiativeFlowId,
+          source: 'useTextplayController.triggerInitiativeRender',
+          costMs: Number((performance.now() - initiativeStartedAt).toFixed(2)),
+          details: {
+            runId: nextRunId,
+            traceId,
+            ok: false,
+            reasonCode: result.reasonCode,
+            actionHint: result.actionHint,
+            runEventCount: result.runEvents.length,
+            lastEventType: lastEvent?.eventType || null,
+            lastStep: lastEvent?.step || null,
+          },
+        });
+
         if (typeof setStatusBanner === 'function') {
           setStatusBanner({
             kind: result.reasonCode === TEXTPLAY_REASON.RUN_CANCELED ? 'warn' : 'error',
@@ -1730,6 +2284,18 @@ export function useTextplayController(): TextplayShellProps {
           });
         }
       } catch (error) {
+        emitTextplayLog({
+          level: 'error',
+          message: 'action:initiative:exception',
+          flowId: initiativeFlowId,
+          source: 'useTextplayController.triggerInitiativeRender',
+          costMs: Number((performance.now() - initiativeStartedAt).toFixed(2)),
+          details: {
+            runId: nextRunId,
+            traceId,
+            error: error instanceof Error ? error.message : String(error || ''),
+          },
+        });
         if (typeof setStatusBanner === 'function') {
           setStatusBanner({
             kind: 'error',
@@ -1773,12 +2339,12 @@ export function useTextplayController(): TextplayShellProps {
 
       const activeStory = selectedStory;
       let startup = startupPackage;
+      let timelineRecords = records;
       const normalizedPlayerId = playerId.trim();
       const normalizedPlayerName = playerName.trim();
       const normalizedPlayerIdentity = playerIdentity.trim();
       const normalizedWorldId = (activeStory?.worldId || selectedWorldId || worldIdRuntime).trim();
       const normalizedAgentId = (agentIdRuntime || activeStory?.primaryAgentId || '').trim();
-      const started = records.length > 0;
 
       if (!activeStory) {
         if (typeof setStatusBanner === 'function') {
@@ -1816,12 +2382,77 @@ export function useTextplayController(): TextplayShellProps {
         return;
       }
 
+      if (timelineRecords.length === 0) {
+        try {
+          const fallbackAgentId = normalizedAgentId
+            || String(startup.cast.primaryAgentId || '').trim();
+          const contextCandidatesByStory = await queryWorldAgentCandidatesByStory(normalizedWorldId);
+          const restoredRows = await queryStoryRecordsWithAgentFallback({
+            storyId: activeStory.storyId,
+            worldId: normalizedWorldId,
+            preferredAgentId: fallbackAgentId,
+            candidateAgentIds: mergeAgentCandidateIds([
+              ...activeStory.participants,
+              ...activeStory.characterRefs,
+              ...(contextCandidatesByStory[activeStory.storyId] || []),
+              ...(contextCandidatesByStory[WORLD_AGENT_CANDIDATE_KEY] || []),
+            ]),
+          });
+          if (restoredRows.length > 0) {
+            timelineRecords = restoredRows;
+            setRecords(restoredRows);
+            const restoredSelected = restoredRows[0] || null;
+            const restoredRunId = restoredSelected?.runId || null;
+            setSelectedRecordRunId(restoredRunId);
+            setFailure(null);
+            applyRecordSurface(restoredSelected);
+            if (restoredSelected && restoredRunId) {
+              const recoveryAgentId = (
+                String(restoredSelected.agentId || '').trim()
+                || fallbackAgentId
+              ).trim();
+              if (recoveryAgentId) {
+                await loadRunRecovery({
+                  runId: restoredRunId,
+                  storyId: activeStory.storyId,
+                  worldId: normalizedWorldId,
+                  agentId: recoveryAgentId,
+                  playerId: normalizedPlayerId,
+                  afterSeq: 0,
+                  append: false,
+                });
+              }
+            }
+          }
+        } catch {
+          // Fall back to opening flow when persisted timeline prefetch is unavailable.
+        }
+      }
+
+      const started = timelineRecords.length > 0;
+
       if (started) {
         const controller = new AbortController();
         abortRef.current = controller;
+        const recapFlowId = createTextplayFlowId('textplay-recap');
+        const recapStartedAt = performance.now();
         setIsRunning(true);
         setFailure(null);
         setStoryBrief(null);
+        setPendingUserTurn(null);
+        emitTextplayLog({
+          level: 'info',
+          message: 'action:recap:start',
+          flowId: recapFlowId,
+          source: 'useTextplayController.onStartStory',
+          details: {
+            storyId: activeStory.storyId,
+            worldId: normalizedWorldId,
+            playerId: normalizedPlayerId,
+            triggerSource: 'SystemEvent',
+            mode: 'story-recap',
+          },
+        });
         try {
           let canonicalTurns: NarrativeTurnWindowResponse['turns'] = [];
           try {
@@ -1842,7 +2473,7 @@ export function useTextplayController(): TextplayShellProps {
             startup,
             playerName: normalizedPlayerName,
             playerIdentity: normalizedPlayerIdentity,
-            records,
+            records: timelineRecords,
             canonicalTurns,
           });
           const recapResult = await aiClient.generateText({
@@ -1863,6 +2494,18 @@ export function useTextplayController(): TextplayShellProps {
             generatedAt: new Date().toISOString(),
           });
           setLastRenderedText(recapText);
+          emitTextplayLog({
+            level: 'info',
+            message: 'action:recap:done',
+            flowId: recapFlowId,
+            source: 'useTextplayController.onStartStory',
+            costMs: Number((performance.now() - recapStartedAt).toFixed(2)),
+            details: {
+              storyId: activeStory.storyId,
+              worldId: normalizedWorldId,
+              chars: recapText.length,
+            },
+          });
           if (typeof setStatusBanner === 'function') {
             setStatusBanner({
               kind: 'info',
@@ -1870,6 +2513,18 @@ export function useTextplayController(): TextplayShellProps {
             });
           }
         } catch (error) {
+          emitTextplayLog({
+            level: 'warn',
+            message: 'action:recap:failed',
+            flowId: recapFlowId,
+            source: 'useTextplayController.onStartStory',
+            costMs: Number((performance.now() - recapStartedAt).toFixed(2)),
+            details: {
+              storyId: activeStory.storyId,
+              worldId: normalizedWorldId,
+              error: error instanceof Error ? error.message : String(error || ''),
+            },
+          });
           if (typeof setStatusBanner === 'function') {
             setStatusBanner({
               kind: 'warn',
@@ -1901,6 +2556,8 @@ export function useTextplayController(): TextplayShellProps {
       const traceId = createUlid();
       const controller = new AbortController();
       abortRef.current = controller;
+      const startFlowId = createTextplayFlowId('textplay-start');
+      const startStartedAt = performance.now();
 
       const openingPayload = buildOpeningSystemPayload({
         story: activeStory,
@@ -1921,6 +2578,24 @@ export function useTextplayController(): TextplayShellProps {
       setFailure(null);
       setStoryBrief(null);
       setGapRefillApplied(false);
+      setPendingUserTurn(null);
+
+      emitTextplayLog({
+        level: 'info',
+        message: 'action:start-story:start',
+        flowId: startFlowId,
+        source: 'useTextplayController.onStartStory',
+        details: {
+          storyId: activeStory.storyId,
+          worldId: normalizedWorldId,
+          agentId: resolvedAgentId,
+          playerId: normalizedPlayerId,
+          runId: nextRunId,
+          traceId,
+          triggerSource: 'SystemEvent',
+          mode: 'story-start',
+        },
+      });
 
       const presenceMark = presenceMachine.mark();
       presenceMachine.dispatch('onUserActive');
@@ -1970,6 +2645,7 @@ export function useTextplayController(): TextplayShellProps {
           await applyRenderSuccessSurface({
             result,
             fallbackRecord,
+            storyTitle: activeStory.title,
             worldId: normalizedWorldId,
             agentId: resolvedAgentId,
             playerId: normalizedPlayerId,
@@ -1986,6 +2662,24 @@ export function useTextplayController(): TextplayShellProps {
             });
           }
 
+          const lastEvent = result.runEvents[result.runEvents.length - 1];
+          emitTextplayLog({
+            level: 'info',
+            message: 'action:start-story:done',
+            flowId: startFlowId,
+            source: 'useTextplayController.onStartStory',
+            costMs: Number((performance.now() - startStartedAt).toFixed(2)),
+            details: {
+              runId: nextRunId,
+              traceId,
+              ok: true,
+              warnings: result.meta.warnings.length,
+              lastEventType: lastEvent?.eventType || null,
+              lastStep: lastEvent?.step || null,
+              runEventCount: result.runEvents.length,
+            },
+          });
+
           return;
         }
 
@@ -1996,6 +2690,25 @@ export function useTextplayController(): TextplayShellProps {
         setGapRefillApplied(Boolean(result.runSnapshot.gapRefillApplied));
         setLastRenderedText('');
 
+        const lastEvent = result.runEvents[result.runEvents.length - 1];
+        emitTextplayLog({
+          level: 'warn',
+          message: 'action:start-story:failed',
+          flowId: startFlowId,
+          source: 'useTextplayController.onStartStory',
+          costMs: Number((performance.now() - startStartedAt).toFixed(2)),
+          details: {
+            runId: nextRunId,
+            traceId,
+            ok: false,
+            reasonCode: result.reasonCode,
+            actionHint: result.actionHint,
+            runEventCount: result.runEvents.length,
+            lastEventType: lastEvent?.eventType || null,
+            lastStep: lastEvent?.step || null,
+          },
+        });
+
         if (typeof setStatusBanner === 'function') {
           setStatusBanner({
             kind: result.reasonCode === TEXTPLAY_REASON.RUN_CANCELED ? 'warn' : 'error',
@@ -2003,6 +2716,18 @@ export function useTextplayController(): TextplayShellProps {
           });
         }
       } catch (error) {
+        emitTextplayLog({
+          level: 'error',
+          message: 'action:start-story:exception',
+          flowId: startFlowId,
+          source: 'useTextplayController.onStartStory',
+          costMs: Number((performance.now() - startStartedAt).toFixed(2)),
+          details: {
+            runId: nextRunId,
+            traceId,
+            error: error instanceof Error ? error.message : String(error || ''),
+          },
+        });
         if (typeof setStatusBanner === 'function') {
           setStatusBanner({
             kind: 'error',
@@ -2020,15 +2745,19 @@ export function useTextplayController(): TextplayShellProps {
   }, [
     agentIdRuntime,
     aiClient,
+    applyRecordSurface,
     applyRenderSuccessSurface,
     ensureStartupPackage,
     hookClient,
     isRunning,
+    loadRunRecovery,
     narrativeEngine,
     playerId,
     playerIdentity,
     playerName,
     presenceMachine,
+    queryStoryRecordsWithAgentFallback,
+    queryWorldAgentCandidatesByStory,
     queryNarrativeTurnWindow,
     records,
     routeOverride,
@@ -2046,6 +2775,7 @@ export function useTextplayController(): TextplayShellProps {
     void (async () => {
       await loadWorldList();
       await loadStoryList();
+      await refreshHistorySessions({ refresh: true });
       if (selectedStoryId) {
         await hydrateStorySelection(selectedStoryId, {
           clearRunSurface: false,
@@ -2088,10 +2818,157 @@ export function useTextplayController(): TextplayShellProps {
     loadWorldList,
     loadStoryList,
     loadRunRecovery,
+    refreshHistorySessions,
     refreshRouteAvailability,
     selectedRecordRunId,
     selectedStoryId,
     setStatusBanner,
+  ]);
+
+  const onCopyDiagnostics = useCallback(() => {
+    void (async () => {
+      const selected = records.find((item) => item.runId === selectedRecordRunId) || null;
+      const latest = records[0] || null;
+      const payload = {
+        capturedAt: new Date().toISOString(),
+        story: {
+          worldId,
+          storyId,
+          agentId,
+          selectedWorldId,
+          selectedStoryId,
+        },
+        session: {
+          playerId,
+          playerName,
+          playerIdentity,
+          presenceState,
+        },
+        route: {
+          routeLabel,
+          routeSource,
+          routeConnectorId,
+          routeModel,
+          routeOverrideActive: Boolean(routeOverride),
+        },
+        runtime: {
+          runId,
+          selectedRecordRunId,
+          storyStarted: records.length > 0,
+          isRunning,
+          startupLoading,
+          startupError,
+          pendingUserTurn,
+        },
+        startupSnapshot: storySnapshot
+          ? {
+            storyId: storySnapshot.storyId,
+            entryEventId: storySnapshot.entryEventId,
+            primaryAgentId: storySnapshot.primaryAgentId,
+            version: storySnapshot.version,
+            source: storySnapshot.source,
+            loadedAt: storySnapshot.loadedAt,
+            contextCoverage: storySnapshot.contextCoverage,
+            gapWarnings: storySnapshot.gapWarnings,
+          }
+          : null,
+        diagnostics: {
+          gapRefillApplied,
+          deltaStatus,
+          runSnapshot,
+          warningCount: warnings.length,
+          failure: failure
+            ? {
+              reasonCode: failure.reasonCode,
+              actionHint: failure.actionHint,
+              traceId: failure.traceId,
+              warningCount: failure.warnings.length,
+            }
+            : null,
+          selectedRecord: selected
+            ? {
+              runId: selected.runId,
+              turnId: selected.turnId,
+              traceId: selected.traceId,
+              promptTraceId: selected.meta.promptTraceId || '',
+              triggerSource: selected.triggerSource,
+              textPreview: String(selected.text || '').slice(0, 600),
+              userMessage: selected.userMessage,
+            }
+            : null,
+          latestRecord: latest
+            ? {
+              runId: latest.runId,
+              turnId: latest.turnId,
+              traceId: latest.traceId,
+              promptTraceId: latest.meta.promptTraceId || '',
+              triggerSource: latest.triggerSource,
+              textPreview: String(latest.text || '').slice(0, 600),
+              userMessage: latest.userMessage,
+            }
+            : null,
+          runSteps: runEvents.slice(-40),
+        },
+      };
+
+      const text = JSON.stringify(payload, null, 2);
+      const canWriteClipboard = typeof navigator !== 'undefined'
+        && Boolean(navigator.clipboard)
+        && typeof navigator.clipboard.writeText === 'function';
+      if (!canWriteClipboard) {
+        if (typeof setStatusBanner === 'function') {
+          setStatusBanner({
+            kind: 'warn',
+            message: 'Clipboard unavailable in this runtime. Copy Diag is not supported here.',
+          });
+        }
+        return;
+      }
+      await navigator.clipboard.writeText(text);
+      if (typeof setStatusBanner === 'function') {
+        setStatusBanner({
+          kind: 'success',
+          message: 'TextPlay diagnostics copied to clipboard.',
+        });
+      }
+    })().catch((error) => {
+      if (typeof setStatusBanner === 'function') {
+        setStatusBanner({
+          kind: 'warn',
+          message: `Copy diagnostics failed: ${error instanceof Error ? error.message : String(error || '')}`,
+        });
+      }
+    });
+  }, [
+    agentId,
+    deltaStatus,
+    failure,
+    gapRefillApplied,
+    isRunning,
+    playerId,
+    playerIdentity,
+    playerName,
+    presenceState,
+    records,
+    routeConnectorId,
+    routeLabel,
+    routeModel,
+    routeOverride,
+    routeSource,
+    runEvents,
+    runId,
+    runSnapshot,
+    selectedRecordRunId,
+    selectedStoryId,
+    selectedWorldId,
+    setStatusBanner,
+    startupError,
+    startupLoading,
+    pendingUserTurn,
+    storyId,
+    storySnapshot,
+    warnings.length,
+    worldId,
   ]);
 
   useEffect(() => {
@@ -2143,10 +3020,31 @@ export function useTextplayController(): TextplayShellProps {
   }, [fallbackPlayerNameSeed, playerProfileScope, playerProfilesByScope]);
 
   useEffect(() => {
+    setSelectedHistoryRunId((previous) => {
+      if (previous && historySessions.some((item) => item.runId === previous)) {
+        return previous;
+      }
+      return historySessions[0]?.runId || null;
+    });
+  }, [historySessions]);
+
+  useEffect(() => {
     if (typeof setRuntimeField === 'function' && playerId.trim()) {
       setRuntimeField('playerId', playerId.trim());
     }
   }, [playerId, setRuntimeField]);
+
+  useEffect(() => {
+    if (typeof setRuntimeField === 'function') {
+      setRuntimeField('playerName', playerName.trim());
+    }
+  }, [playerName, setRuntimeField]);
+
+  useEffect(() => {
+    if (typeof setRuntimeField === 'function') {
+      setRuntimeField('playerIdentity', playerIdentity.trim());
+    }
+  }, [playerIdentity, setRuntimeField]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -2272,6 +3170,9 @@ export function useTextplayController(): TextplayShellProps {
     && hasStoryRuntimeBinding
     && hasPlayerName
     && inputText.trim().length > 0;
+  const canContinueHistory = !isRunning
+    && historySessions.length > 0
+    && Boolean(selectedHistoryRunId);
 
   return {
     storyId,
@@ -2286,6 +3187,10 @@ export function useTextplayController(): TextplayShellProps {
     selectedWorldId,
     worldsLoading,
     worldsError,
+    historySessions,
+    historyLoading,
+    historyError,
+    selectedHistoryRunId,
     stories,
     selectedStoryId,
     selectedStory,
@@ -2305,6 +3210,7 @@ export function useTextplayController(): TextplayShellProps {
     isRunning,
     canStartStory,
     canSend,
+    canContinueHistory,
     canSelectStory: !isRunning,
     routeSource,
     routeConnectorId,
@@ -2322,6 +3228,7 @@ export function useTextplayController(): TextplayShellProps {
     gapRefillApplied,
     deltaStatus,
     failure,
+    pendingUserTurn,
     setPlayerName,
     setPlayerIdentity,
     setInputText,
@@ -2331,7 +3238,11 @@ export function useTextplayController(): TextplayShellProps {
     onSend,
     onCancel,
     onRefresh,
+    onCopyDiagnostics,
     onInitiativeReceived,
+    onRequestHistorySessions,
+    onSelectHistorySession,
+    onContinueHistorySession,
     onSelectWorld,
     onSelectStory,
     onSelectRecord,

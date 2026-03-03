@@ -10,6 +10,7 @@
   - `kismet/spec/**`
   - `local-chat/spec/**`
   - `re-life/spec/**`
+  - `mint-you/spec/**`
   - `test-chat-tts/spec/**`
   - `narrative-engine/spec/**`
   - `textplay/spec/**`

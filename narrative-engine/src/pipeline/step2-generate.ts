@@ -1,5 +1,9 @@
 import { asRecord } from '@nimiplatform/sdk/mod/utils';
-import { NARRATIVE_REASON_CODES } from '../contracts.js';
+import {
+  NARRATIVE_REASON_CODES,
+  NARRATIVE_SPINE_EVENT_TYPES,
+  NARRATIVE_VISIBILITY_VALUES,
+} from '../contracts.js';
 import { NarrativeCoreOutputSchema } from '../schemas.js';
 import type {
   NarrativeCoreOutput,
@@ -9,8 +13,8 @@ import type {
 import type { NarrativeStep1AssemblyResult } from './step1-assembly.js';
 import { createUlid } from '../utils/ulid.js';
 
-const SPINE_EVENT_TYPES = ['scene-beat', 'dialogue', 'action', 'state-change'] as const;
-const VISIBILITY_TYPES = ['public', 'internal', 'sensory'] as const;
+const SPINE_EVENT_TYPES = NARRATIVE_SPINE_EVENT_TYPES;
+const VISIBILITY_TYPES = NARRATIVE_VISIBILITY_VALUES;
 const SPINE_EVENT_TYPE_SET = new Set<string>(SPINE_EVENT_TYPES);
 const VISIBILITY_TYPE_SET = new Set<string>(VISIBILITY_TYPES);
 
@@ -48,6 +52,23 @@ function buildGeneratePrompt(input: {
     '- spineEvents length MUST be between 1 and 12.',
     '- metrics values MUST be finite numbers in [0, 1].',
     '',
+    '# Spine Event Type Guide',
+    '- scene-beat: Environment establishing, scene transition, atmosphere shot.',
+    '- dialogue: Character speech with tone/body-language/subtext.',
+    '- action: Physical movement, combat, locomotion with cause-effect.',
+    '- state-change: World state mutation (lock/unlock, item gain/loss).',
+    '- thought: Inner monologue; default visibility=internal, actor=thinker.',
+    '- decision: Choice moment; default visibility=internal/public, actor=decider.',
+    '- discovery: Revelation; default visibility=public, actor=experiencer.',
+    '- relation-shift: Relationship change; default visibility=sensory, actor=owner.',
+    '- emotion: Embodied feeling; default visibility=internal/sensory, actor=experiencer.',
+    '- observation: Sensory perception; default visibility=sensory, actor=experiencer.',
+    '- memory: Flashback/recall; default visibility=internal, actor=owner.',
+    '- gravity: World-level cataclysm/rule-shift; default visibility=public.',
+    '- timeskip: Time jump/fast-forward; default visibility=public.',
+    '- branch-point: Narrative fork with stakes; default visibility=public, actor=decider.',
+    '- system: System-level narrative marker; default visibility=internal.',
+    '',
     '# Generation Policy',
     '- Keep canon consistency and scene coherence.',
     '- Keep tension progression smooth; avoid abrupt jumps.',
@@ -59,6 +80,20 @@ function buildGeneratePrompt(input: {
     '- Preserve unresolved pressure/open threads to keep narrative continuity.',
     '- Future notes from context are hidden author notes: never narrate them as established facts.',
     '- Anti-people-pleasing rule: prioritize believable world reaction over player wish-fulfillment.',
+    '',
+    '# NPC Reaction Gradient',
+    '- Plausible claim: Minor verification (NPC accepts with small caveat).',
+    '- Unlikely claim: Persistent skepticism for 3+ turns (NPC tests, questions, demands proof).',
+    '- Impossible claim: Active challenge or refusal (NPC resists, blocks, or tests).',
+    '- World-breaking claim: Hostility or suspicion (NPC treats player as threat or liar).',
+    '- NPC skepticism is the world functioning correctly; extraordinary feats MUST face extraordinary scrutiny.',
+    '',
+    '# Dramatic Tension Guidelines',
+    '- Power Hierarchy: Respect established power levels. A novice cannot trivially overpower a master.',
+    '- Villain Autonomy: Antagonists adapt tactics, escape, reveal hidden powers, pursue their own agenda.',
+    '- Tension Flow: When tension > 0.7, do NOT resolve in a single turn. Require multi-turn progression.',
+    '- Anti-People-Pleasing: Player must earn victories through strategy, sacrifice, or accumulated advantage.',
+    '- Consequence Proportionality: Easy victories yield shallow rewards; costly victories yield significant progress.',
     '',
     '# Constraint Priority (P0-P4)',
     '- P0 Safety: no policy-violating content.',
@@ -84,7 +119,7 @@ function buildGeneratePrompt(input: {
       spineEvents: [
         {
           id: 'ULID-like string',
-          type: 'scene-beat|dialogue|action|state-change',
+          type: SPINE_EVENT_TYPES.join('|'),
           visibility: 'public|internal|sensory',
           payload: {},
           sourceEventIds: ['string'],

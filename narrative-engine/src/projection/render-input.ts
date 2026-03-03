@@ -36,6 +36,13 @@ export function buildNarrativeRenderInput(input: {
       || payload.text
       || payload.description
       || payload.action
+      || payload.choice
+      || payload.emotion
+      || payload.subject
+      || payload.detail
+      || payload.skipLabel
+      || payload.branchReason
+      || payload.memoryType
       || event.type,
     ).trim();
     const sourceEventIds = Array.isArray(event.sourceEventIds)

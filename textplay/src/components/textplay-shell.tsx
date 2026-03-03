@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import type { RuntimeRouteSource } from '@nimiplatform/sdk/mod/runtime-route';
 import type {
+  TextplayHistorySession,
   TextplayPersistRecord,
   TextplayPresenceReport,
   TextplayPresenceState,
@@ -28,6 +29,10 @@ export type TextplayShellProps = {
   selectedWorldId: string | null;
   worldsLoading: boolean;
   worldsError: string | null;
+  historySessions: TextplayHistorySession[];
+  historyLoading: boolean;
+  historyError: string | null;
+  selectedHistoryRunId: string | null;
   stories: TextplayStorySummary[];
   selectedStoryId: string | null;
   selectedStory: TextplayStoryDetail | null;
@@ -44,6 +49,7 @@ export type TextplayShellProps = {
   isRunning: boolean;
   canStartStory: boolean;
   canSend: boolean;
+  canContinueHistory: boolean;
   canSelectStory: boolean;
   routeSource: RuntimeRouteSource;
   routeConnectorId: string;
@@ -68,6 +74,13 @@ export type TextplayShellProps = {
     message: string;
   } | null;
   failure: TextplayRenderFailure | null;
+  pendingUserTurn: {
+    message: string;
+    runId: string;
+    traceId: string;
+    status: 'rendering' | 'failed';
+    reasonCode?: string;
+  } | null;
   setPlayerName: (value: string) => void;
   setPlayerIdentity: (value: string) => void;
   setInputText: (value: string) => void;
@@ -77,7 +90,11 @@ export type TextplayShellProps = {
   onSend: () => void;
   onCancel: () => void;
   onRefresh: () => void;
+  onCopyDiagnostics: () => void;
   onInitiativeReceived: () => void;
+  onRequestHistorySessions: () => void;
+  onSelectHistorySession: (runId: string) => void;
+  onContinueHistorySession: () => void;
   onSelectWorld: (worldId: string) => void;
   onSelectStory: (storyId: string) => void;
   onSelectRecord: (runId: string) => void;
@@ -137,6 +154,24 @@ function formatRouteLabelFromRecord(record: TextplayPersistRecord): string {
     return 'unknown';
   }
   return `${route.source || 'unknown'}/${route.connectorId || 'default'}:${route.model || 'unknown'}`;
+}
+
+function formatHistorySessionTitle(session: TextplayHistorySession): string {
+  const storyLabel = session.storyTitle.trim() || session.storyId;
+  return `${storyLabel} · ${session.runId}`;
+}
+
+function formatHistorySessionUpdatedAt(updatedAt: string): string {
+  const date = new Date(updatedAt);
+  if (Number.isNaN(date.getTime())) {
+    return updatedAt || '-';
+  }
+  return date.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function findLastStepError(events: TextplayRunEvent[]): TextplayRunEvent | null {
@@ -206,6 +241,64 @@ function resolveStoryBrief(props: TextplayShellProps): TextplayStoryBrief | null
     }
   }
   return null;
+}
+
+function resolveOpeningMode(record: TextplayPersistRecord): string {
+  const openingPayload = asRecord(asRecord(record.systemPayload)?.opening);
+  return String(openingPayload?.mode || '').trim();
+}
+
+function normalizeUserTurnMessage(message: string): string {
+  const trimmed = String(message || '').trim();
+  if (!trimmed) {
+    return '';
+  }
+  const stripped = trimmed.replace(/^\[[^\]]+\]\s*[:：]\s*/, '').trim();
+  return stripped || trimmed;
+}
+
+function formatTimelineStageLabel(record: TextplayPersistRecord): string {
+  if (record.triggerSource === 'UserTurn') {
+    return 'Player Turn';
+  }
+  if (record.triggerSource === 'AgentInitiative') {
+    return 'World Event';
+  }
+  const openingMode = resolveOpeningMode(record);
+  if (openingMode === 'story-start') {
+    return 'Opening';
+  }
+  if (openingMode === 'story-recap') {
+    return 'Story Recap';
+  }
+  return 'System';
+}
+
+function formatTimelineResponseLabel(record: TextplayPersistRecord): string {
+  if (record.triggerSource === 'UserTurn') {
+    return 'Narrative Response';
+  }
+  if (record.triggerSource === 'AgentInitiative') {
+    return 'World Event';
+  }
+  const openingMode = resolveOpeningMode(record);
+  if (openingMode === 'story-start') {
+    return 'Opening Narration';
+  }
+  if (openingMode === 'story-recap') {
+    return 'Story Recap';
+  }
+  return 'System Narration';
+}
+
+function responsePanelClass(record: TextplayPersistRecord): string {
+  if (record.triggerSource === 'AgentInitiative') {
+    return 'border-violet-200 bg-violet-50';
+  }
+  if (record.triggerSource === 'SystemEvent') {
+    return 'border-emerald-200 bg-emerald-50';
+  }
+  return 'border-slate-200 bg-slate-50';
 }
 
 function renderOpeningCard(props: TextplayShellProps): React.ReactNode {
@@ -390,13 +483,17 @@ function renderStorySummary(story: TextplayStoryDetail | null) {
 export function TextplayShell(props: TextplayShellProps) {
   const routeModelListId = 'textplay-route-model-list';
   const activeConnector = props.routeConnectors.find((item) => item.id === props.routeConnectorId) || null;
-  const storyBrief = resolveStoryBrief(props);
-  const openingNarration = storyBrief?.text || '';
-  const currentReplyText = String(props.lastRenderedText || '').trim();
-  const showCurrentReplyCard = currentReplyText.length > 0 && currentReplyText !== openingNarration;
+  const timelineRecords = [...props.records].sort((left, right) => left.updatedAt.localeCompare(right.updatedAt));
+  const selectedHistorySession = props.historySessions.find((item) => item.runId === props.selectedHistoryRunId)
+    || props.historySessions[0]
+    || null;
+  const transientRecapText = props.storyBrief?.mode === 'recap'
+    ? String(props.storyBrief.text || '').trim()
+    : '';
   const selectedRecord = props.records.find((record) => record.runId === props.selectedRecordRunId) || null;
-  const initiativeRecords = props.records.filter((record) => record.triggerSource === 'AgentInitiative');
-  const latestSourceLabel = selectedRecord ? formatTriggerSourceLabel(selectedRecord.triggerSource) : 'Latest';
+  const pendingUserTurn = props.pendingUserTurn && props.pendingUserTurn.message.trim().length > 0
+    ? props.pendingUserTurn
+    : null;
   const lastErrorEvent = findLastStepError(props.failure?.runEvents || props.runEvents);
   const diagnosticReasonCode = props.failure?.reasonCode || lastErrorEvent?.reasonCode || '';
   const diagnosticTraceId = props.failure?.traceId
@@ -406,262 +503,407 @@ export function TextplayShell(props: TextplayShellProps) {
   const playerNameMissingForStart = Boolean(props.selectedStoryId)
     && !props.storyStarted
     && props.playerName.trim().length === 0;
+  const [sessionEntryExpanded, setSessionEntryExpanded] = useState<boolean>(() => !props.storyStarted);
+  const [sessionEntryTab, setSessionEntryTab] = useState<'continue' | 'new'>(() => (
+    props.storyStarted ? 'continue' : 'new'
+  ));
+
+  useEffect(() => {
+    if (props.storyStarted) {
+      setSessionEntryExpanded(false);
+      return;
+    }
+    setSessionEntryExpanded(true);
+  }, [props.storyStarted]);
+
+  useEffect(() => {
+    if (!props.storyStarted && props.historySessions.length === 0) {
+      setSessionEntryTab('new');
+    }
+  }, [props.historySessions.length, props.storyStarted]);
+
+  const onToggleSessionEntry = () => {
+    const next = !sessionEntryExpanded;
+    setSessionEntryExpanded(next);
+    if (next) {
+      setSessionEntryTab('continue');
+      props.onRequestHistorySessions();
+    }
+  };
+
+  const onSelectSessionTab = (tab: 'continue' | 'new') => {
+    setSessionEntryTab(tab);
+    if (tab === 'continue') {
+      props.onRequestHistorySessions();
+    }
+  };
+
+  const onContinueSelectedSession = () => {
+    props.onContinueHistorySession();
+    setSessionEntryExpanded(false);
+  };
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex-row">
       <aside className="w-full overflow-y-auto border-b border-gray-200 bg-slate-50 p-3 lg:w-80 lg:border-b-0 lg:border-r">
         <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">World</div>
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
-              stories {props.stories.length}
-            </span>
-          </div>
-
-          <label className="mt-3 block text-xs text-gray-600">
-            World
-            <select
-              className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm"
-              value={props.selectedWorldId || ''}
-              onChange={(event) => props.onSelectWorld(event.target.value)}
-              disabled={props.isRunning || props.worldsLoading || props.worlds.length === 0}
-            >
-              <option value="" disabled>
-                {props.worlds.length > 0 ? 'Select world' : (props.worldsLoading ? 'Loading worlds...' : 'No world')}
-              </option>
-              {props.worlds.map((world) => (
-                <option key={world.id} value={world.id}>
-                  {world.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {props.worldsError ? (
-            <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-xs text-rose-700">
-              {props.worldsError}
-            </div>
-          ) : null}
-
-          <label className="mt-3 block text-xs text-gray-600">
-            Story
-            <select
-              className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm"
-              value={props.selectedStoryId || ''}
-              onChange={(event) => props.onSelectStory(event.target.value)}
-              disabled={!props.canSelectStory || props.stories.length === 0 || !props.selectedWorldId}
-            >
-              <option value="" disabled>
-                {props.stories.length > 0 ? 'Select a playable story' : 'No playable story'}
-              </option>
-              {props.stories.map((story) => (
-                <option key={story.storyId} value={story.storyId}>
-                  {story.title}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {props.stories.length === 0 ? (
-            <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-800">
-              No PRIMARY world events available for play.
-            </div>
-          ) : null}
-
-          <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
-            {renderStorySummary(props.selectedStory)}
-          </div>
-
-          <div className="mt-3 rounded-lg border border-slate-200 bg-white p-2.5 text-xs text-gray-600">
-            <div className="font-medium text-gray-800">Story Startup</div>
-            {props.startupLoading ? <div className="mt-1 text-gray-500">Loading startup package...</div> : null}
-            {!props.startupLoading && props.startupError ? (
-              <div className="mt-1 rounded bg-rose-50 px-1.5 py-1 text-rose-700">{props.startupError}</div>
-            ) : null}
-            {!props.startupLoading && !props.startupError && props.startupPackage ? (
-              <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-gray-600">
-                <div>phase: {String(props.startupPackage.narrativeScopes.STORY.phase || 'opening')}</div>
-                <div>objective: {String(props.startupPackage.narrativeScopes.STORY.objective || 'advance-story')}</div>
-                <div>lorebooks: {props.startupPackage.materials.lorebooks.length}</div>
-                <div>memories: {props.startupPackage.materials.memories.length}</div>
-                <div>scenes: {props.startupPackage.materials.scenes.length}</div>
-                <div>contexts: {props.startupPackage.materials.contexts.length}</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Current Session</div>
+          {props.storyStarted ? (
+            <div className="mt-3 space-y-1 text-xs text-slate-700">
+              <div>
+                World: {props.worlds.find((world) => world.id === props.worldId)?.name || props.worldId || '(unknown)'}
               </div>
-            ) : null}
-          </div>
+              <div>Story: {props.selectedStory?.title || props.storyId || '(unknown)'}</div>
+              <div>Player: {props.playerName || '(missing)'} · {props.playerIdentity || 'default'}</div>
+              <div>Run: {props.selectedRecordRunId || props.runId || '(none)'}</div>
+              <div>
+                Updated: {selectedRecord?.updatedAt ? formatHistorySessionUpdatedAt(selectedRecord.updatedAt) : '-'}
+              </div>
+            </div>
+          ) : (
+            <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs text-slate-500">
+              No active session.
+            </div>
+          )}
         </div>
 
-        <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Session</div>
-          <div className="block text-xs text-gray-600">
-            Player ID
-            <div className="mt-1.5 break-all rounded-lg border border-slate-300 bg-slate-50 px-2.5 py-2 text-sm text-slate-700">
-              {props.playerId || '(missing)'}
+        <button
+          type="button"
+          className="mt-3 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          onClick={onToggleSessionEntry}
+        >
+          {sessionEntryExpanded ? 'Hide Session Entry' : 'Change Session'}
+        </button>
+
+        {sessionEntryExpanded ? (
+          <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Session Entry</div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                className={`rounded-lg border px-2 py-1.5 text-xs font-medium ${
+                  sessionEntryTab === 'continue'
+                    ? 'border-blue-300 bg-blue-50 text-blue-700'
+                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+                onClick={() => onSelectSessionTab('continue')}
+              >
+                Continue
+              </button>
+              <button
+                type="button"
+                className={`rounded-lg border px-2 py-1.5 text-xs font-medium ${
+                  sessionEntryTab === 'new'
+                    ? 'border-blue-300 bg-blue-50 text-blue-700'
+                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+                onClick={() => onSelectSessionTab('new')}
+              >
+                New
+              </button>
             </div>
-          </div>
 
-          <label className="mt-2 block text-xs text-gray-600">
-            Player Name
-            <input
-              className={`mt-1.5 w-full rounded-lg border bg-white px-2.5 py-2 text-sm ${
-                playerNameMissingForStart ? 'border-rose-300' : 'border-slate-300'
-              }`}
-              value={props.playerName}
-              onChange={(event) => props.setPlayerName(event.target.value)}
-              placeholder="输入你的角色名/称呼"
-              disabled={props.isRunning}
-              required
-              aria-invalid={playerNameMissingForStart}
-            />
-            {playerNameMissingForStart ? (
-              <div className="mt-1 text-[11px] text-rose-600">Player Name is required before Start.</div>
-            ) : null}
-          </label>
-
-          <label className="mt-2 block text-xs text-gray-600">
-            Player Identity
-            <input
-              className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm"
-              value={props.playerIdentity}
-              onChange={(event) => props.setPlayerIdentity(event.target.value)}
-              placeholder="例如：天南散修 / 玄门弟子 / 游历剑修"
-              disabled={props.isRunning}
-            />
-            <div className="mt-1 text-[11px] text-gray-500">用于叙事身份绑定；留空将使用剧情上下文默认身份。</div>
-          </label>
-
-          <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-gray-600">
-            <div className="font-medium text-gray-800">Route</div>
-            <div className="mt-1 break-all text-[11px]">{props.routeLabel}</div>
-          </div>
-
-          <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-gray-600">
-            <div className="flex items-center justify-between">
-              <div className="font-medium text-gray-800">Presence</div>
-              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
-                {props.presenceState}
-              </span>
-            </div>
-            <div className="mt-2 max-h-20 overflow-auto border-t border-slate-200 pt-2">
-              {props.presenceReports.slice(-3).map((report) => (
-                <div key={report.id} className="mb-1 text-[11px] text-gray-500">
-                  {report.fromState} {'->'} {report.toState}
+            {sessionEntryTab === 'continue' ? (
+              <>
+                <div className="mt-3 flex items-center justify-between">
+                  <div className="text-xs text-gray-600">History Session</div>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                    history {props.historySessions.length}
+                  </span>
                 </div>
-              ))}
-            </div>
-          </div>
+                <select
+                  className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm"
+                  value={props.selectedHistoryRunId || ''}
+                  onChange={(event) => props.onSelectHistorySession(event.target.value)}
+                  disabled={props.isRunning || props.historyLoading || props.historySessions.length === 0}
+                >
+                  <option value="" disabled>
+                    {props.historyLoading
+                      ? 'Loading history sessions...'
+                      : (props.historySessions.length > 0 ? 'Select session' : 'No historical session')}
+                  </option>
+                  {props.historySessions.map((session) => (
+                    <option key={session.runId} value={session.runId}>
+                      {formatHistorySessionTitle(session)}
+                    </option>
+                  ))}
+                </select>
 
-          <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-[11px] text-gray-500">
-            <div className="break-all">world: {props.worldId || '(missing)'}</div>
-            <div className="mt-1 break-all">agent: {props.agentId || '(missing)'}</div>
-          </div>
+                {props.historyError ? (
+                  <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-xs text-rose-700">
+                    {props.historyError}
+                  </div>
+                ) : null}
 
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-              onClick={props.onRefresh}
-            >
-              Refresh
-            </button>
-            <button
-              type="button"
-              className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-              onClick={props.onInitiativeReceived}
-            >
-              Initiative
-            </button>
+                {selectedHistorySession ? (
+                  <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                    <div className="text-xs font-medium text-slate-800">{selectedHistorySession.storyTitle}</div>
+                    <div className="mt-1 text-[11px] text-slate-500">
+                      updated: {formatHistorySessionUpdatedAt(selectedHistorySession.updatedAt)}
+                    </div>
+                    <div className="mt-2 text-xs leading-5 text-slate-700">{selectedHistorySession.preview}</div>
+                    <div className="mt-2 break-all text-[10px] text-slate-500">
+                      world: {selectedHistorySession.worldId} · story: {selectedHistorySession.storyId}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs text-slate-500">
+                    No historical session for current player.
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  className="mt-3 w-full rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={onContinueSelectedSession}
+                  disabled={!props.canContinueHistory}
+                >
+                  {props.historyLoading ? 'Loading...' : 'Continue Selected Session'}
+                </button>
+              </>
+            ) : (
+              <>
+                <label className="mt-3 block text-xs text-gray-600">
+                  World
+                  <select
+                    className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm"
+                    value={props.selectedWorldId || ''}
+                    onChange={(event) => props.onSelectWorld(event.target.value)}
+                    disabled={props.isRunning || props.worldsLoading || props.worlds.length === 0}
+                  >
+                    <option value="" disabled>
+                      {props.worlds.length > 0 ? 'Select world' : (props.worldsLoading ? 'Loading worlds...' : 'No world')}
+                    </option>
+                    {props.worlds.map((world) => (
+                      <option key={world.id} value={world.id}>
+                        {world.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {props.worldsError ? (
+                  <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-xs text-rose-700">
+                    {props.worldsError}
+                  </div>
+                ) : null}
+
+                <label className="mt-3 block text-xs text-gray-600">
+                  Story
+                  <select
+                    className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm"
+                    value={props.selectedStoryId || ''}
+                    onChange={(event) => props.onSelectStory(event.target.value)}
+                    disabled={!props.canSelectStory || props.stories.length === 0 || !props.selectedWorldId}
+                  >
+                    <option value="" disabled>
+                      {props.stories.length > 0 ? 'Select a playable story' : 'No playable story'}
+                    </option>
+                    {props.stories.map((story) => (
+                      <option key={story.storyId} value={story.storyId}>
+                        {story.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {props.stories.length === 0 ? (
+                  <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-800">
+                    No PRIMARY world events available for play.
+                  </div>
+                ) : null}
+
+                <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                  {renderStorySummary(props.selectedStory)}
+                </div>
+
+                <div className="mt-3 block text-xs text-gray-600">
+                  Player ID
+                  <div className="mt-1.5 break-all rounded-lg border border-slate-300 bg-slate-50 px-2.5 py-2 text-sm text-slate-700">
+                    {props.playerId || '(missing)'}
+                  </div>
+                </div>
+
+                <label className="mt-2 block text-xs text-gray-600">
+                  Player Name
+                  <input
+                    className={`mt-1.5 w-full rounded-lg border bg-white px-2.5 py-2 text-sm ${
+                      playerNameMissingForStart ? 'border-rose-300' : 'border-slate-300'
+                    }`}
+                    value={props.playerName}
+                    onChange={(event) => props.setPlayerName(event.target.value)}
+                    placeholder="输入你的角色名/称呼"
+                    disabled={props.isRunning}
+                    required
+                    aria-invalid={playerNameMissingForStart}
+                  />
+                  {playerNameMissingForStart ? (
+                    <div className="mt-1 text-[11px] text-rose-600">Player Name is required before Start.</div>
+                  ) : null}
+                </label>
+
+                <label className="mt-2 block text-xs text-gray-600">
+                  Player Identity
+                  <input
+                    className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm"
+                    value={props.playerIdentity}
+                    onChange={(event) => props.setPlayerIdentity(event.target.value)}
+                    placeholder="例如：天南散修 / 玄门弟子 / 游历剑修"
+                    disabled={props.isRunning}
+                  />
+                  <div className="mt-1 text-[11px] text-gray-500">用于叙事身份绑定；留空将使用剧情上下文默认身份。</div>
+                </label>
+
+                <button
+                  type="button"
+                  className="mt-3 w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  onClick={props.onRefresh}
+                >
+                  Refresh
+                </button>
+              </>
+            )}
           </div>
-        </div>
+        ) : null}
       </aside>
 
       <main className="flex min-h-0 min-w-0 flex-1 flex-col border-b border-gray-200 lg:border-b-0 lg:border-r">
         <div className="border-b border-gray-200 px-3 py-2 text-xs text-gray-500">
-          Runs ({props.records.length})
+          Narrative Timeline ({timelineRecords.length})
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto bg-white">
           <div className="space-y-3 p-3">
-            {renderOpeningCard(props)}
-
-            {showCurrentReplyCard ? (
-              <section className="rounded-xl border border-blue-200 bg-blue-50 p-3">
-                <div className="text-[11px] font-medium uppercase tracking-wide text-blue-700">
-                  Latest Response · {latestSourceLabel}
+            {transientRecapText ? (
+              <section className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-amber-700">
+                  Story Recap (Current)
                 </div>
-                <div className="mt-1 whitespace-pre-line text-sm leading-6 text-blue-900">
-                  {currentReplyText}
+                <div className="mt-1 whitespace-pre-line text-sm leading-6 text-amber-900">
+                  {transientRecapText}
                 </div>
               </section>
             ) : null}
 
-            <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-              <div className="border-b border-gray-100 bg-gray-50 px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-gray-500">
-                Run History
-              </div>
-              {props.records.length === 0 ? (
-                <div className="p-3 text-sm text-gray-500">No runs yet.</div>
-              ) : (
-                <div className="divide-y divide-gray-100">
-                  {props.records.map((record) => {
-                    const active = record.runId === props.selectedRecordRunId;
-                    const snippet = String(record.text || '').trim();
-                    const snippetText = snippet ? snippet.slice(0, 120) : '(empty)';
-                    const routeLabel = formatRouteLabelFromRecord(record);
-                    return (
-                      <button
-                        key={record.id}
-                        type="button"
-                        className={`w-full px-3 py-2 text-left ${active ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
-                        onClick={() => props.onSelectRecord(record.runId)}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="text-sm font-medium text-gray-900">{formatRecordTitle(record)}</div>
-                          <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${triggerSourceBadgeClass(record.triggerSource)}`}>
-                            {formatTriggerSourceLabel(record.triggerSource)}
-                          </span>
-                        </div>
-                        <div className="mt-1 text-[11px] text-gray-500">
-                          turn={record.turnId} · run={record.runId}
-                        </div>
-                        <div className="mt-1 text-[11px] text-gray-500">
-                          status={record.runSnapshot.status} · seq={record.runSnapshot.lastSeq} · route={routeLabel}
-                        </div>
-                        <div className="mt-1 break-all text-[11px] text-gray-500">
-                          traceId={record.traceId} · promptTraceId={record.meta.promptTraceId || '(none)'}
-                        </div>
-                        <div className="mt-1 text-xs text-gray-700">{snippetText}</div>
-                      </button>
-                    );
-                  })}
+            {pendingUserTurn ? (
+              <section className={`rounded-xl border p-3 ${
+                pendingUserTurn.status === 'failed'
+                  ? 'border-rose-200 bg-rose-50'
+                  : 'border-blue-200 bg-blue-50'
+              }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className={`text-[11px] font-medium uppercase tracking-wide ${
+                    pendingUserTurn.status === 'failed' ? 'text-rose-700' : 'text-blue-700'
+                  }`}
+                  >
+                    Pending Player Action
+                  </div>
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                    pendingUserTurn.status === 'failed'
+                      ? 'bg-rose-100 text-rose-700'
+                      : 'bg-blue-100 text-blue-700'
+                  }`}
+                  >
+                    {pendingUserTurn.status === 'failed' ? 'render failed' : 'rendering'}
+                  </span>
                 </div>
-              )}
-            </section>
+                <div className={`mt-1 whitespace-pre-line text-sm leading-6 ${
+                  pendingUserTurn.status === 'failed' ? 'text-rose-900' : 'text-blue-900'
+                }`}
+                >
+                  {pendingUserTurn.message}
+                </div>
+                <div className={`mt-2 text-[11px] ${
+                  pendingUserTurn.status === 'failed' ? 'text-rose-700' : 'text-blue-700'
+                }`}
+                >
+                  run={pendingUserTurn.runId} · traceId={pendingUserTurn.traceId}
+                </div>
+                {pendingUserTurn.reasonCode ? (
+                  <div className="mt-1 text-[11px] text-rose-700">
+                    reasonCode: {pendingUserTurn.reasonCode}
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
 
-            {initiativeRecords.length > 0 ? (
-              <section className="overflow-hidden rounded-xl border border-violet-200 bg-violet-50">
-                <div className="border-b border-violet-200 bg-violet-100 px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-violet-700">
-                  World Event Channel ({initiativeRecords.length})
-                </div>
-                <div className="max-h-48 divide-y divide-violet-200 overflow-auto">
-                  {initiativeRecords.slice(0, 8).map((record) => (
+            {timelineRecords.length === 0 ? (
+              <section className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm text-gray-500">
+                {!props.selectedStoryId
+                  ? 'Select a playable story to load timeline.'
+                  : (props.storyStarted
+                    ? 'No persisted timeline records yet.'
+                    : 'Click Start to generate opening narration and begin timeline.')}
+              </section>
+            ) : (
+              <section className="space-y-2">
+                {timelineRecords.map((record) => {
+                  const active = record.runId === props.selectedRecordRunId;
+                  const routeLabel = formatRouteLabelFromRecord(record);
+                  const userTurnMessage = record.triggerSource === 'UserTurn'
+                    ? normalizeUserTurnMessage(String(record.userMessage || ''))
+                    : '';
+                  const responseText = String(record.text || '').trim();
+                  const responseTextClass = record.triggerSource === 'AgentInitiative'
+                    ? 'text-violet-900'
+                    : record.triggerSource === 'SystemEvent'
+                      ? 'text-emerald-900'
+                      : 'text-slate-900';
+                  const responseLabelClass = record.triggerSource === 'AgentInitiative'
+                    ? 'text-violet-700'
+                    : record.triggerSource === 'SystemEvent'
+                      ? 'text-emerald-700'
+                      : 'text-slate-600';
+                  return (
                     <button
-                      key={`initiative-${record.id}`}
+                      key={record.id}
                       type="button"
-                      className="w-full px-3 py-2 text-left hover:bg-violet-100"
+                      className={`w-full rounded-xl border px-3 py-2 text-left ${
+                        active
+                          ? 'border-blue-300 bg-blue-50'
+                          : 'border-gray-200 bg-white hover:bg-gray-50'
+                      }`}
                       onClick={() => props.onSelectRecord(record.runId)}
                     >
-                      <div className="text-[11px] text-violet-700">
-                        run={record.runId} · turn={record.turnId}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="text-[11px] font-medium uppercase tracking-wide text-slate-700">
+                          {formatTimelineStageLabel(record)}
+                        </div>
+                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${triggerSourceBadgeClass(record.triggerSource)}`}>
+                          {formatTriggerSourceLabel(record.triggerSource)}
+                        </span>
                       </div>
-                      <div className="mt-1 text-sm text-violet-900">
-                        {String(record.text || '').slice(0, 140) || '(empty)'}
+                      <div className="mt-1 text-[11px] text-gray-500">
+                        turn={record.turnId} · run={record.runId}
+                      </div>
+                      <div className="mt-1 text-[11px] text-gray-500">
+                        status={record.runSnapshot.status} · seq={record.runSnapshot.lastSeq} · route={routeLabel}
+                      </div>
+                      {userTurnMessage ? (
+                        <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+                          <div className="text-[11px] font-medium uppercase tracking-wide text-blue-700">
+                            {props.playerName || 'Player'} · Action
+                          </div>
+                          <div className="mt-1 whitespace-pre-line text-sm leading-6 text-blue-900">
+                            {userTurnMessage}
+                          </div>
+                        </div>
+                      ) : null}
+                      <div className={`mt-2 rounded-lg border px-3 py-2 ${responsePanelClass(record)}`}>
+                        <div className={`text-[11px] font-medium uppercase tracking-wide ${responseLabelClass}`}>
+                          {formatTimelineResponseLabel(record)}
+                        </div>
+                        <div className={`mt-1 whitespace-pre-line text-sm leading-6 ${responseTextClass}`}>
+                          {responseText || '(empty response)'}
+                        </div>
                       </div>
                     </button>
-                  ))}
-                </div>
+                  );
+                })}
               </section>
-            ) : null}
+            )}
           </div>
         </div>
 
@@ -889,7 +1131,8 @@ export function TextplayShell(props: TextplayShellProps) {
         </div>
 
         <div className="mt-3 rounded-lg border border-gray-200 bg-white p-2">
-          <div className="text-xs font-medium text-gray-800">Events ({props.runEvents.length})</div>
+          <div className="text-xs font-medium text-gray-800">Run Steps ({props.runEvents.length})</div>
+          <div className="mt-1 text-[11px] text-gray-500">System pipeline events (not narrative cards).</div>
           <div className="mt-1 max-h-[40vh] overflow-auto text-[11px] text-gray-600">
             {props.runEvents.length === 0 ? 'none' : props.runEvents.map((event) => (
               <div key={`${event.runId}-${event.seq}`} className="mb-1 rounded border border-gray-100 bg-gray-50 px-2 py-1">

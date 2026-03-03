@@ -21,6 +21,7 @@ Metrics ranges are enforced and out-of-range values reject.
 ## N-GUARD-005 Unsupported Event Handling
 
 Unsupported spine event type or empty payload rejects.
+Supported event types: `scene-beat`, `dialogue`, `action`, `state-change`, `thought`, `decision`, `discovery`, `relation-shift`, `emotion`, `observation`, `memory`, `gravity`, `timeskip`, `branch-point`, `system`.
 
 ## N-GUARD-006 Adjustment Traceability
 

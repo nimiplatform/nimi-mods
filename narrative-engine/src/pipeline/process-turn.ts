@@ -447,8 +447,10 @@ export async function processNarrativeTurn(input: {
   });
 
   eventLog.startStep('step1-assembly');
+  const step1SpineHistory = getNarrativeSpineByStoryId(normalized.storyId).slice(-10);
   const step1 = await runNarrativeStep1Assembly({
     turn: normalized,
+    recentSpineEvents: step1SpineHistory,
     queryRuntimeRouteOptions: () => deps.queryData(
       NARRATIVE_ENGINE_DATA_API_RUNTIME_ROUTE_OPTIONS,
       {},

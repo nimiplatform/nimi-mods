@@ -1,18 +1,27 @@
 import {
+  TEXTPLAY_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST,
   TEXTPLAY_DATA_API_WORLD_SATELLITES_BY_SPINE_LIST,
   TEXTPLAY_DATA_API_WORLD_SATELLITES_CREATE,
   TEXTPLAY_DATA_API_WORLD_SPINE_GET_OR_CREATE,
+  TEXTPLAY_DATA_API_WORLD_WORLDS_MINE,
 } from '../contracts.js';
 import { createUlid } from '../utils/ulid.js';
-import type { TextplayPersistRecord, TextplayRunEvent } from '../types.js';
+import type { TextplayHistorySession, TextplayPersistRecord, TextplayRunEvent } from '../types.js';
 
 const TEXTPLAY_SATELLITE_SCHEMA = 'textplay.persist.v1';
 const TEXTPLAY_SATELLITE_MARKER = 'textplay.persist';
+const MAX_HISTORY_SYNC_WORLDS = 3;
+const MAX_HISTORY_SYNC_AGENTS_PER_WORLD = 3;
+const MAX_HISTORY_SCOPE_RECORDS = 200;
+const MAX_HISTORY_SESSION_ITEMS = 200;
+const ENTITY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{1,}$/;
 
 type TextplayPersistStoreState = {
   recordsByKey: Record<string, TextplayPersistRecord>;
   runIdToKey: Record<string, string>;
   spineIdByScope: Record<string, string>;
+  sessionIndexByStory: Record<string, TextplayHistorySession>;
+  historySyncedAtByPlayer: Record<string, string>;
 };
 
 type TextplayDataQuery = (input: {
@@ -68,6 +77,8 @@ function emptyState(): TextplayPersistStoreState {
     recordsByKey: {},
     runIdToKey: {},
     spineIdByScope: {},
+    sessionIndexByStory: {},
+    historySyncedAtByPlayer: {},
   };
 }
 
@@ -131,6 +142,107 @@ function normalizeRecord(
   };
 }
 
+function isEntityId(value: string): boolean {
+  return ENTITY_ID_PATTERN.test(value);
+}
+
+function abbreviateText(value: string, maxLength = 72): string {
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return '';
+  }
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  return `${normalized.slice(0, maxLength)}...`;
+}
+
+function buildHistoryPreview(record: TextplayPersistRecord): string {
+  const renderText = abbreviateText(String(record.text || ''));
+  if (renderText) {
+    return renderText;
+  }
+  const userMessage = abbreviateText(String(record.userMessage || ''));
+  if (userMessage) {
+    return userMessage;
+  }
+  return '(no preview)';
+}
+
+function toHistoryStoryKey(input: {
+  playerId: string;
+  worldId: string;
+  storyId: string;
+}): string {
+  return `${input.playerId}::${input.worldId}::${input.storyId}`;
+}
+
+function toHistorySessionFromRecord(record: TextplayPersistRecord): TextplayHistorySession | null {
+  const playerId = asString(record.playerId);
+  const runId = asString(record.runId);
+  const storyId = asString(record.storyId);
+  const worldId = asString(record.worldId) || parseWorldIdFromStoryId(storyId);
+  const agentId = asString(record.agentId);
+  const updatedAt = asString(record.updatedAt) || nowIso();
+  if (!playerId || !runId || !storyId || !worldId || !agentId) {
+    return null;
+  }
+  return {
+    runId,
+    storyId,
+    worldId,
+    agentId,
+    storyTitle: storyId,
+    updatedAt,
+    triggerSource: record.triggerSource,
+    preview: buildHistoryPreview(record),
+  };
+}
+
+function upsertHistorySessionIndex(state: TextplayPersistStoreState, record: TextplayPersistRecord): void {
+  const playerId = asString(record.playerId);
+  const session = toHistorySessionFromRecord(record);
+  if (!playerId || !session) {
+    return;
+  }
+  const key = toHistoryStoryKey({
+    playerId,
+    worldId: session.worldId,
+    storyId: session.storyId,
+  });
+  const existing = state.sessionIndexByStory[key];
+  if (existing && existing.updatedAt.localeCompare(session.updatedAt) >= 0) {
+    return;
+  }
+  state.sessionIndexByStory[key] = session;
+}
+
+function sortHistorySessions(sessions: TextplayHistorySession[]): TextplayHistorySession[] {
+  return [...sessions].sort((left, right) => (
+    right.updatedAt.localeCompare(left.updatedAt)
+    || left.storyId.localeCompare(right.storyId)
+    || left.runId.localeCompare(right.runId)
+  ));
+}
+
+function listHistorySessionsFromState(input: {
+  state: TextplayPersistStoreState;
+  playerId: string;
+  worldId?: string;
+}): TextplayHistorySession[] {
+  const normalizedPlayerId = asString(input.playerId);
+  const normalizedWorldId = asString(input.worldId);
+  if (!normalizedPlayerId) {
+    return [];
+  }
+  const prefix = `${normalizedPlayerId}::`;
+  const rows = Object.entries(input.state.sessionIndexByStory)
+    .filter(([key]) => key.startsWith(prefix))
+    .map(([, value]) => value)
+    .filter((value) => !normalizedWorldId || value.worldId === normalizedWorldId);
+  return sortHistorySessions(rows);
+}
+
 function sortByUpdatedDesc(records: TextplayPersistRecord[]): TextplayPersistRecord[] {
   return [...records].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 }
@@ -147,6 +259,7 @@ function upsertCacheRecord(record: TextplayPersistRecord): TextplayPersistRecord
   };
   state.recordsByKey[key] = merged;
   state.runIdToKey[merged.runId] = key;
+  upsertHistorySessionIndex(state, merged);
   saveState(state);
   return merged;
 }
@@ -167,6 +280,48 @@ function dedupeLatestByRunId(records: TextplayPersistRecord[]): TextplayPersistR
   }
   return sortByUpdatedDesc([...latestByRunId.values()]);
 }
+
+function parseWorldRows(payload: unknown): Array<{ id: string; updatedAt: string }> {
+  const root = asRecord(payload);
+  const rows = Array.isArray(root.items)
+    ? root.items
+    : (Array.isArray(payload) ? payload : []);
+  return rows
+    .map((row) => asRecord(row))
+    .map((row) => ({
+      id: asString(row.id),
+      updatedAt: asString(row.updatedAt) || nowIso(),
+    }))
+    .filter((row) => Boolean(row.id))
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
+
+function parseNarrativeContextRows(payload: unknown): Record<string, unknown>[] {
+  const root = asRecord(payload);
+  const rows = Array.isArray(root.items)
+    ? root.items
+    : (Array.isArray(payload) ? payload : []);
+  return rows.map((row) => asRecord(row));
+}
+
+function collectAgentCandidates(rows: Record<string, unknown>[]): string[] {
+  const out = new Set<string>();
+  for (const row of rows) {
+    const subjectType = asString(row.subjectType).toUpperCase();
+    const targetType = asString(row.targetSubjectType).toUpperCase();
+    const subjectId = asString(row.subjectId);
+    const targetSubjectId = asString(row.targetSubjectId);
+    if (subjectType === 'AGENT' && isEntityId(subjectId)) {
+      out.add(subjectId);
+    }
+    if (targetType === 'AGENT' && isEntityId(targetSubjectId)) {
+      out.add(targetSubjectId);
+    }
+  }
+  return [...out];
+}
+
+const historySyncInFlightByPlayer = new Map<string, Promise<void>>();
 
 function normalizeSatelliteRows(payload: unknown): Record<string, unknown>[] {
   if (Array.isArray(payload)) {
@@ -225,9 +380,11 @@ async function ensureSpineId(input: {
   queryData: TextplayDataQuery;
   worldId: string;
   agentId: string;
+  createIfMissing?: boolean;
 }): Promise<string> {
   const worldId = asString(input.worldId);
   const agentId = asString(input.agentId);
+  const createIfMissing = input.createIfMissing !== false;
   if (!worldId || !agentId) {
     throw new Error('TEXTPLAY_PERSIST_SCOPE_MISSING_WORLD_OR_AGENT');
   }
@@ -239,7 +396,11 @@ async function ensureSpineId(input: {
   }
   const payload = await input.queryData({
     capability: TEXTPLAY_DATA_API_WORLD_SPINE_GET_OR_CREATE,
-    query: { worldId, agentId },
+    query: {
+      worldId,
+      agentId,
+      ...(createIfMissing ? {} : { createIfMissing: false }),
+    },
   });
   const record = asRecord(payload);
   const spineRecord = asRecord(record.spine);
@@ -249,7 +410,10 @@ async function ensureSpineId(input: {
     || asString(spineRecord.id)
     || asString(dataRecord.id);
   if (!id) {
-    throw new Error('TEXTPLAY_PERSIST_SPINE_ID_MISSING');
+    if (createIfMissing) {
+      throw new Error('TEXTPLAY_PERSIST_SPINE_ID_MISSING');
+    }
+    return '';
   }
   state.spineIdByScope[scopeKey] = id;
   saveState(state);
@@ -260,12 +424,17 @@ async function fetchRemoteRecordsByScope(input: {
   queryData: TextplayDataQuery;
   worldId: string;
   agentId: string;
+  createIfMissing?: boolean;
 }): Promise<TextplayPersistRecord[]> {
   const spineId = await ensureSpineId({
     queryData: input.queryData,
     worldId: input.worldId,
     agentId: input.agentId,
+    createIfMissing: input.createIfMissing,
   });
+  if (!spineId) {
+    return [];
+  }
   const payload = await input.queryData({
     capability: TEXTPLAY_DATA_API_WORLD_SATELLITES_BY_SPINE_LIST,
     query: { spineId },
@@ -375,6 +544,7 @@ export async function upsertTextplayPersistRecord(input: {
     queryData: input.queryData,
     worldId: upserted.worldId,
     agentId: upserted.agentId,
+    createIfMissing: true,
   });
 
   await input.queryData({
@@ -423,6 +593,7 @@ export async function getTextplayPersistRecordsByTurn(input: {
         queryData: input.queryData,
         worldId,
         agentId,
+        createIfMissing: false,
       });
       return sortByUpdatedDesc(remote.filter((record) => (
         record.storyId === storyId && record.turnId === turnId
@@ -462,6 +633,7 @@ export async function listTextplayPersistRecordsByStory(input: {
         queryData: input.queryData,
         worldId,
         agentId,
+        createIfMissing: false,
       });
       return filterRecordsByStory({
         records: remote,
@@ -479,6 +651,225 @@ export async function listTextplayPersistRecordsByStory(input: {
     playerId: input.playerId,
     limit,
   });
+}
+
+export async function listTextplayPersistRecordsByScope(input: {
+  queryData: TextplayDataQuery;
+  worldId: string;
+  agentId: string;
+  playerId?: string;
+  limit?: number;
+  createIfMissing?: boolean;
+}): Promise<TextplayPersistRecord[]> {
+  const worldId = asString(input.worldId);
+  const agentId = asString(input.agentId);
+  if (!worldId || !agentId) {
+    return [];
+  }
+
+  const playerId = asString(input.playerId);
+  const createIfMissing = input.createIfMissing === true;
+  const limitRaw = Number.isFinite(input.limit) ? Number(input.limit) : 200;
+  const limit = Math.max(1, Math.min(500, Math.floor(limitRaw)));
+
+  try {
+    const remote = await fetchRemoteRecordsByScope({
+      queryData: input.queryData,
+      worldId,
+      agentId,
+      createIfMissing,
+    });
+    const filtered = sortByUpdatedDesc(remote.filter((record) => (
+      !playerId || record.playerId === playerId
+    )));
+    return filtered.slice(0, limit);
+  } catch {
+    const local = sortByUpdatedDesc(
+      Object.values(loadState().recordsByKey).filter((record) => (
+        record.worldId === worldId
+        && record.agentId === agentId
+        && (!playerId || record.playerId === playerId)
+      )),
+    );
+    return local.slice(0, limit);
+  }
+}
+
+function paginateHistorySessions(input: {
+  sessions: TextplayHistorySession[];
+  limit: number;
+  cursor?: string;
+}): {
+  items: TextplayHistorySession[];
+  nextCursor: string | null;
+} {
+  const normalizedCursor = asString(input.cursor);
+  const startIndex = normalizedCursor
+    ? (() => {
+      const index = input.sessions.findIndex((session) => session.runId === normalizedCursor);
+      return index >= 0 ? index + 1 : 0;
+    })()
+    : 0;
+  const items = input.sessions.slice(startIndex, startIndex + input.limit);
+  const hasMore = startIndex + items.length < input.sessions.length;
+  return {
+    items,
+    nextCursor: hasMore && items.length > 0 ? items[items.length - 1]!.runId : null,
+  };
+}
+
+async function syncHistorySessionsRemote(input: {
+  queryData: TextplayDataQuery;
+  playerId: string;
+  worldId?: string;
+}): Promise<void> {
+  const normalizedPlayerId = asString(input.playerId);
+  if (!normalizedPlayerId) {
+    return;
+  }
+
+  const preferredWorldId = asString(input.worldId);
+  let worldsPayload: unknown;
+  try {
+    worldsPayload = await input.queryData({
+      capability: TEXTPLAY_DATA_API_WORLD_WORLDS_MINE,
+      query: {},
+    });
+  } catch {
+    return;
+  }
+
+  const allWorldRows = parseWorldRows(worldsPayload);
+  const prioritizedWorldIds = allWorldRows.map((row) => row.id);
+  const targetWorldIds = preferredWorldId
+    ? [
+      preferredWorldId,
+      ...prioritizedWorldIds.filter((id) => id !== preferredWorldId),
+    ]
+    : prioritizedWorldIds;
+
+  for (const worldId of targetWorldIds.slice(0, MAX_HISTORY_SYNC_WORLDS)) {
+    let contextPayload: unknown;
+    try {
+      contextPayload = await input.queryData({
+        capability: TEXTPLAY_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST,
+        query: { worldId },
+      });
+    } catch {
+      continue;
+    }
+
+    const contextRows = parseNarrativeContextRows(contextPayload);
+    const agentCandidates = collectAgentCandidates(contextRows).slice(0, MAX_HISTORY_SYNC_AGENTS_PER_WORLD);
+    for (const agentId of agentCandidates) {
+      try {
+        await listTextplayPersistRecordsByScope({
+          queryData: input.queryData,
+          worldId,
+          agentId,
+          playerId: normalizedPlayerId,
+          limit: MAX_HISTORY_SCOPE_RECORDS,
+          createIfMissing: false,
+        });
+      } catch {
+        // Keep best-effort behavior for history aggregation.
+      }
+    }
+  }
+
+  const state = loadState();
+  state.historySyncedAtByPlayer[normalizedPlayerId] = nowIso();
+  saveState(state);
+}
+
+async function ensureHistorySessionsSynced(input: {
+  queryData: TextplayDataQuery;
+  playerId: string;
+  worldId?: string;
+  forceRefresh?: boolean;
+}): Promise<void> {
+  const normalizedPlayerId = asString(input.playerId);
+  if (!normalizedPlayerId) {
+    return;
+  }
+  const state = loadState();
+  const hasLocalSessions = listHistorySessionsFromState({
+    state,
+    playerId: normalizedPlayerId,
+    worldId: input.worldId,
+  }).length > 0;
+  const hasSyncedBefore = Boolean(asString(state.historySyncedAtByPlayer[normalizedPlayerId]));
+  if (!input.forceRefresh && hasLocalSessions) {
+    return;
+  }
+  if (!input.forceRefresh && !hasLocalSessions && hasSyncedBefore) {
+    return;
+  }
+
+  const inFlight = historySyncInFlightByPlayer.get(normalizedPlayerId);
+  if (inFlight) {
+    await inFlight;
+    return;
+  }
+
+  const task = syncHistorySessionsRemote({
+    queryData: input.queryData,
+    playerId: normalizedPlayerId,
+    worldId: input.worldId,
+  });
+  historySyncInFlightByPlayer.set(normalizedPlayerId, task);
+  try {
+    await task;
+  } finally {
+    historySyncInFlightByPlayer.delete(normalizedPlayerId);
+  }
+}
+
+export async function listTextplayHistorySessionsMine(input: {
+  queryData: TextplayDataQuery;
+  playerId: string;
+  worldId?: string;
+  limit?: number;
+  cursor?: string;
+  refresh?: boolean;
+}): Promise<{
+  items: TextplayHistorySession[];
+  nextCursor: string | null;
+  total: number;
+}> {
+  const normalizedPlayerId = asString(input.playerId);
+  if (!normalizedPlayerId) {
+    return {
+      items: [],
+      nextCursor: null,
+      total: 0,
+    };
+  }
+  const limitRaw = Number.isFinite(input.limit) ? Number(input.limit) : 40;
+  const limit = Math.max(1, Math.min(MAX_HISTORY_SESSION_ITEMS, Math.floor(limitRaw)));
+
+  await ensureHistorySessionsSynced({
+    queryData: input.queryData,
+    playerId: normalizedPlayerId,
+    worldId: input.worldId,
+    forceRefresh: input.refresh === true,
+  });
+
+  const sessions = listHistorySessionsFromState({
+    state: loadState(),
+    playerId: normalizedPlayerId,
+    worldId: input.worldId,
+  });
+  const paged = paginateHistorySessions({
+    sessions,
+    limit,
+    cursor: input.cursor,
+  });
+  return {
+    items: paged.items,
+    nextCursor: paged.nextCursor,
+    total: sessions.length,
+  };
 }
 
 export async function getTextplayPersistRunEvents(input: {

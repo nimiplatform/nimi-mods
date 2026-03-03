@@ -819,11 +819,17 @@ function hasEscalationSignal(text: string): boolean {
   return /(crisis|collapse|deadline|siege|injury|fatal|urgent|危机|失控|崩|迫近|倒计时|重伤|灭|围城|逼近|绝境)/i.test(text);
 }
 
+type SpineEventLike = {
+  type?: string;
+  [key: string]: unknown;
+};
+
 function buildAdvanceHints(input: {
   turn: NarrativeTurnInputNormalized;
   snapshot: NarrativeContextSnapshot;
   timelineEvents: Array<Record<string, unknown>>;
   futureEvents: Array<Record<string, unknown>>;
+  recentSpineEvents?: SpineEventLike[];
 }): string[] {
   const hints: string[] = [];
   const recentTimeline = input.timelineEvents.slice(0, 6);
@@ -851,7 +857,28 @@ function buildAdvanceHints(input: {
     hints.push('P3 initiative_guard: No open thread; prefer subtle world pressure over hard plot leap.');
   }
 
-  return uniqueStrings(hints).slice(0, 6);
+  // Spine-history-based rhythm hints
+  const spine = Array.isArray(input.recentSpineEvents) ? input.recentSpineEvents : [];
+  if (spine.length >= 5) {
+    const last5 = spine.slice(-5);
+    const typeCounts = new Map<string, number>();
+    for (const event of last5) {
+      const eventType = toString(event.type || 'scene-beat');
+      typeCounts.set(eventType, (typeCounts.get(eventType) || 0) + 1);
+    }
+    for (const [eventType, count] of typeCounts) {
+      if (count >= 3) {
+        hints.push(`P2 rhythm_monotony: Last 5 spine events have ${count}x "${eventType}"; vary event types for narrative rhythm.`);
+        break;
+      }
+    }
+    const dialogueCount = typeCounts.get('dialogue') || 0;
+    if (dialogueCount >= 4) {
+      hints.push('P2 dialogue_stagnation: 4+ of last 5 spine events are dialogue; inject action, observation, or scene-beat.');
+    }
+  }
+
+  return uniqueStrings(hints).slice(0, 8);
 }
 
 function buildCompiledPromptContext(input: {
@@ -972,6 +999,7 @@ export async function runNarrativeStep1Assembly(input: {
   queryWorldScenes: () => Promise<unknown>;
   queryNarrativeContexts: () => Promise<unknown>;
   queryAgentMemoryRecall: () => Promise<unknown>;
+  recentSpineEvents?: SpineEventLike[];
 }): Promise<NarrativeStepResult<NarrativeStep1AssemblyResult>> {
   try {
     const [
@@ -1104,6 +1132,7 @@ export async function runNarrativeStep1Assembly(input: {
       snapshot,
       timelineEvents,
       futureEvents,
+      recentSpineEvents: input.recentSpineEvents,
     });
     const lorebooks = selectLorebooks({
       worldLorebooks,

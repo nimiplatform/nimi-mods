@@ -37,8 +37,17 @@ export type TextplayPersistListByStoryOp = {
   limit?: number;
 };
 
+export type TextplayPersistListByScopeOp = {
+  op: 'listByScope';
+  worldId: string;
+  agentId: string;
+  playerId?: string;
+  limit?: number;
+};
+
 export type TextplayPersistQuery =
   | TextplayPersistUpsertOp
   | TextplayPersistGetByTurnOp
   | TextplayPersistGetRunOp
-  | TextplayPersistListByStoryOp;
+  | TextplayPersistListByStoryOp
+  | TextplayPersistListByScopeOp;

@@ -1,6 +1,7 @@
 import {
   TEXTPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY,
   TEXTPLAY_DATA_API_RENDER_PERSIST,
+  TEXTPLAY_DATA_API_SESSIONS_MINE,
   TEXTPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS,
   TEXTPLAY_DATA_API_WORLD_ACCESS_ME,
   TEXTPLAY_DATA_API_WORLD_WORLDS_MINE,
@@ -83,6 +84,10 @@ export const TEXTPLAY_MANIFEST = {
         name: TEXTPLAY_DATA_API_RENDER_PERSIST,
         description: 'Persist and query textplay render records with run snapshots',
       },
+      {
+        name: TEXTPLAY_DATA_API_SESSIONS_MINE,
+        description: 'Read paginated history sessions for continue flow via single-query aggregation',
+      },
     ],
     uiExtensions: [
       {
@@ -97,5 +102,19 @@ export const TEXTPLAY_MANIFEST = {
   },
   ai: {
     consume: ['chat'],
+    dependencies: {
+      required: [
+        {
+          dependencyId: 'textplay/chat-default',
+          kind: 'model',
+          capability: 'chat',
+          engine: 'openai-compatible',
+          title: 'Default Chat Model (runtime-resolved)',
+        },
+      ],
+      preferred: {
+        chat: 'textplay/chat-default',
+      },
+    },
   },
 } as const;

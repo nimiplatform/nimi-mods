@@ -33,6 +33,10 @@ required_capabilities:
     source_rule: T-CAP-004
   - key: data.query.data-api.textplay.render.persist
     source_rule: T-CAP-004
+  - key: data.register.data-api.textplay.sessions.mine
+    source_rule: T-CAP-004
+  - key: data.query.data-api.textplay.sessions.mine
+    source_rule: T-CAP-004
   - key: ui.register.ui-extension.app.sidebar.mods
     source_rule: T-CAP-001
   - key: ui.register.ui-extension.app.content.routes

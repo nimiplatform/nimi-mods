@@ -28,4 +28,13 @@ projection_mapping:
   - from: orchestration_context
     to: player|scene|agent|worldStyle
     source_rule: T-FACT-003
+  - from: CoreOutput.spineEvents[*].type
+    to: RenderInput.events[*].type
+    source_rule: T-FACT-005
+  - from: CoreOutput.spineEvents[*].payload
+    to: RenderInput.events[*].payload
+    source_rule: T-FACT-005
+  - from: CoreOutput.metrics.tension
+    to: RenderInput.pacingContext
+    source_rule: T-FACT-006
 ```

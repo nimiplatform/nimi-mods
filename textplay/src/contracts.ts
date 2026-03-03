@@ -16,6 +16,7 @@ export const TEXTPLAY_DATA_API_WORLD_SATELLITES_BY_SPINE_LIST = 'data-api.world.
 export const TEXTPLAY_DATA_API_WORLD_SATELLITES_CREATE = 'data-api.world.satellites.create';
 export const TEXTPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY = 'data-api.core.agent.memory.recall.for-entity';
 export const TEXTPLAY_DATA_API_RENDER_PERSIST = 'data-api.textplay.render.persist';
+export const TEXTPLAY_DATA_API_SESSIONS_MINE = 'data-api.textplay.sessions.mine';
 
 export const TEXTPLAY_CAPABILITIES = [
   'llm.text.generate',
@@ -32,6 +33,8 @@ export const TEXTPLAY_CAPABILITIES = [
   `data.query.${TEXTPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY}`,
   `data.register.${TEXTPLAY_DATA_API_RENDER_PERSIST}`,
   `data.query.${TEXTPLAY_DATA_API_RENDER_PERSIST}`,
+  `data.register.${TEXTPLAY_DATA_API_SESSIONS_MINE}`,
+  `data.query.${TEXTPLAY_DATA_API_SESSIONS_MINE}`,
   `ui.register.${TEXTPLAY_NAV_SLOT}`,
   `ui.register.${TEXTPLAY_ROUTE_SLOT}`,
 ] as const;

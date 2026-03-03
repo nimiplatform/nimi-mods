@@ -21,6 +21,40 @@ const CLICHE_REPLACEMENT_EXAMPLES = [
   '嘴角微扬 -> 唇线先绷紧再缓缓放松',
 ] as const;
 
+const EVENT_TYPE_RENDERING_GUIDANCE: Record<string, string> = {
+  'dialogue': '对白：写自然话语，嵌入语气/肢体/呼吸节奏，避免纯台词罗列。',
+  'action': '动作：写肢体运动链，突出因果冲击和物理后果。',
+  'scene-beat': '场景节拍：写环境氛围建立镜头，强调感官细节。',
+  'state-change': '状态变化：用环境或角色微表情暗示变化，不要直述。',
+  'thought': '内心独白：用意识流笔法写玩家内心，可碎片化、可自问自答。',
+  'decision': '抉择时刻：铺设选项的重量感和后果暗示。',
+  'discovery': '发现/揭示：用感官细节层层递进揭开，制造认知冲击。',
+  'relation-shift': '关系变化：通过行为/态度/称呼变化体现，不要明说。',
+  'emotion': '情绪：化为身体反应（心跳/呼吸/肌肉），绝不写抽象标签。',
+  'observation': '感知：写角色五感接收到的信息流，避免旁白化。',
+  'memory': '记忆闪回：用碎片化感官意象呈现，区别于当前时间线的叙事节奏。',
+  'gravity': '世界级事件：写大尺度环境变化的冲击波及，角色是见证者不是旁白者。',
+  'timeskip': '时间跳跃：用简洁过渡句衔接，落笔在新时间点的第一个感官印象。',
+  'branch-point': '分支点：铺设两难困境的张力，让每个选项都有明确代价和诱惑。',
+  'system': '系统标记：简洁描述系统级变化对角色可感知的影响。',
+};
+
+function buildPacingConstraints(band: 'HIGH' | 'MODERATE' | 'LOW'): string[] {
+  if (band === 'HIGH') {
+    return [
+      '- HIGH tension: 短促有力的句子，快节奏，每个字推进或升级。',
+    ];
+  }
+  if (band === 'MODERATE') {
+    return [
+      '- MODERATE tension: 自由变化句长，动作与氛围交替。',
+    ];
+  }
+  return [
+    '- LOW tension: 流畅描写，感官细节丰富，建立环境和角色内心。',
+  ];
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object') {
     return null;
@@ -44,7 +78,12 @@ function formatEvents(events: TextplayProjectionEvent[]): string {
   }
 
   return events
-    .map((event, index) => `${index + 1}. [${event.visibility}] ${event.content}`)
+    .map((event, index) => {
+      const typeTag = event.type ? `[${event.type}]` : '';
+      const guidance = EVENT_TYPE_RENDERING_GUIDANCE[event.type] || '';
+      const suffix = guidance ? `\n   Rendering hint: ${guidance}` : '';
+      return `${index + 1}. ${typeTag}[${event.visibility}] ${event.content}${suffix}`;
+    })
     .join('\n');
 }
 
@@ -102,6 +141,12 @@ export function buildTextplayPrompt(input: {
     constraints.push(
       '- Non-user trigger: focus on world/NPC-driven development; player may witness or be affected but should not become forced driver.',
     );
+  }
+
+  // Tension-driven pacing constraints
+  const pacingBand = input.normalized.pacingContext?.tensionBand;
+  if (pacingBand) {
+    constraints.push(...buildPacingConstraints(pacingBand));
   }
 
   if (isStoryStart) {

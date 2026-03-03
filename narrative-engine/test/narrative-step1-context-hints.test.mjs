@@ -156,3 +156,67 @@ test('step1 compiles hidden future notes and advance hints for stagnation contro
   assert.match(prompt, /anti-spoiler/i);
   assert.equal(result.value.assets.promptStats.selectedCounts.advanceHints > 0, true);
 });
+
+test('step1 detects rhythm monotony when 3+ of last 5 spine events share same type', async () => {
+  const recentSpineEvents = [
+    { id: 'se-1', type: 'dialogue', visibility: 'public', payload: { content: 'a' } },
+    { id: 'se-2', type: 'dialogue', visibility: 'public', payload: { content: 'b' } },
+    { id: 'se-3', type: 'dialogue', visibility: 'public', payload: { content: 'c' } },
+    { id: 'se-4', type: 'scene-beat', visibility: 'public', payload: { content: 'd' } },
+    { id: 'se-5', type: 'dialogue', visibility: 'public', payload: { content: 'e' } },
+  ];
+  const result = await runNarrativeStep1Assembly({
+    turn: makeTurn(),
+    recentSpineEvents,
+    queryRuntimeRouteOptions: async () => ({
+      selected: { source: 'token-api', model: 'models/gemini-3-flash-preview', connectorId: 'c-1' },
+    }),
+    queryWorldEvents: async () => ([
+      { id: 'event-1', title: '城门戒严', summary: '守军封锁。', eventHorizon: 'PAST', level: 'PRIMARY', characterRefs: ['agent-1', 'player-1'], updatedAt: '2026-03-02T12:00:00.000Z' },
+    ]),
+    queryWorldLorebooks: async () => ([
+      { id: 'lore-1', key: 'rule.city', content: '夜禁。', constant: true },
+    ]),
+    queryWorldScenes: async () => ({ items: [
+      { id: 'scene-1', name: '北城门', description: '城门半掩。', activeEntities: ['agent-1'] },
+    ]}),
+    queryNarrativeContexts: async () => ({ items: [
+      { scope: 'CANON', narrativeSetting: { worldviewRules: ['夜禁'] }, narrativeState: {}, updatedAt: '2026-03-02T10:00:00.000Z' },
+      { scope: 'STORY', storyId: 'story.world.event-1', narrativeSetting: {}, narrativeState: { phase: 'rising', objective: '突围', tension: 0.5, openThreads: [] }, updatedAt: '2026-03-02T10:10:00.000Z' },
+    ]}),
+    queryAgentMemoryRecall: async () => ({ core: [], e2e: [] }),
+  });
+
+  assert.equal(result.ok, true);
+  const prompt = result.value.assets.compiledPrompt;
+  assert.match(prompt, /rhythm_monotony/i);
+  assert.match(prompt, /dialogue_stagnation/i);
+});
+
+test('step1 does not generate rhythm hints when no spine history provided', async () => {
+  const result = await runNarrativeStep1Assembly({
+    turn: makeTurn(),
+    queryRuntimeRouteOptions: async () => ({
+      selected: { source: 'token-api', model: 'models/gemini-3-flash-preview', connectorId: 'c-1' },
+    }),
+    queryWorldEvents: async () => ([
+      { id: 'event-1', title: '城门戒严', summary: '守军封锁。', eventHorizon: 'PAST', level: 'PRIMARY', characterRefs: ['agent-1', 'player-1'], updatedAt: '2026-03-02T12:00:00.000Z' },
+    ]),
+    queryWorldLorebooks: async () => ([
+      { id: 'lore-1', key: 'rule.city', content: '夜禁。', constant: true },
+    ]),
+    queryWorldScenes: async () => ({ items: [
+      { id: 'scene-1', name: '北城门', description: '城门半掩。', activeEntities: ['agent-1'] },
+    ]}),
+    queryNarrativeContexts: async () => ({ items: [
+      { scope: 'CANON', narrativeSetting: { worldviewRules: ['夜禁'] }, narrativeState: {}, updatedAt: '2026-03-02T10:00:00.000Z' },
+      { scope: 'STORY', storyId: 'story.world.event-1', narrativeSetting: {}, narrativeState: { phase: 'rising', objective: '突围', tension: 0.5, openThreads: [] }, updatedAt: '2026-03-02T10:10:00.000Z' },
+    ]}),
+    queryAgentMemoryRecall: async () => ({ core: [], e2e: [] }),
+  });
+
+  assert.equal(result.ok, true);
+  const prompt = result.value.assets.compiledPrompt;
+  assert.equal(prompt.includes('rhythm_monotony'), false);
+  assert.equal(prompt.includes('dialogue_stagnation'), false);
+});
