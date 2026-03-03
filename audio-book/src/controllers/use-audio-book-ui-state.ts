@@ -17,6 +17,7 @@ export type AnalysisProgress = {
 export type PlaybackState = {
   playing: boolean;
   currentSegmentIndex: number;
+  currentSegmentId?: string;
   currentTime: number;
   duration: number;
 };

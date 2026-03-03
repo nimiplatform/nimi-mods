@@ -21,9 +21,18 @@ export function useStepNavigation(input: {
   currentStep: AudioBookStep;
   setCurrentStep: (step: AudioBookStep) => void;
   projectState: ProjectState | null;
+  segmentsCount?: number;
+  castingsCount?: number;
   onConfirmBacktrack?: (targetStep: AudioBookStep, callback: () => void) => void;
 }) {
-  const { currentStep, setCurrentStep, projectState, onConfirmBacktrack } = input;
+  const {
+    currentStep,
+    setCurrentStep,
+    projectState,
+    segmentsCount = 0,
+    castingsCount = 0,
+    onConfirmBacktrack,
+  } = input;
 
   const currentIndex = STEPS.indexOf(currentStep);
 
@@ -38,8 +47,11 @@ export function useStepNavigation(input: {
   const canAdvance = useMemo(() => {
     if (currentIndex >= STEPS.length - 1) return false;
     const next = STEPS[currentIndex + 1]!;
+    if (currentStep === 'cast' && next === 'synth') {
+      return canEnterStep(next) && segmentsCount > 0 && castingsCount > 0;
+    }
     return canEnterStep(next);
-  }, [currentIndex, canEnterStep]);
+  }, [currentIndex, currentStep, canEnterStep, segmentsCount, castingsCount]);
 
   const canRetreat = currentIndex > 0;
 
@@ -59,9 +71,33 @@ export function useStepNavigation(input: {
   );
 
   const goNext = useCallback(() => {
-    if (!canAdvance) return;
-    setCurrentStep(STEPS[currentIndex + 1]!);
-  }, [canAdvance, currentIndex, setCurrentStep]);
+    const next = STEPS[currentIndex + 1];
+    if (!next) return;
+    if (!canAdvance) {
+      console.info('[audio-book:flow]', 'nav:next:blocked', {
+        currentStep,
+        targetStep: next,
+        projectState: projectState || '(none)',
+        segmentsCount,
+        castingsCount,
+        ...(currentStep === 'cast' && next === 'synth' && segmentsCount === 0
+          ? { reason: 'segments-empty' }
+          : {}),
+        ...(currentStep === 'cast' && next === 'synth' && segmentsCount > 0 && castingsCount === 0
+          ? { reason: 'castings-empty' }
+          : {}),
+      });
+      return;
+    }
+    console.info('[audio-book:flow]', 'nav:next', {
+      currentStep,
+      targetStep: next,
+      projectState: projectState || '(none)',
+      segmentsCount,
+      castingsCount,
+    });
+    setCurrentStep(next);
+  }, [canAdvance, castingsCount, currentIndex, currentStep, projectState, segmentsCount, setCurrentStep]);
 
   const goPrev = useCallback(() => {
     if (!canRetreat) return;

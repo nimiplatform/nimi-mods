@@ -191,12 +191,17 @@ export type LlmClient = {
     userPrompt: string;
     maxTokens?: number;
     temperature?: number;
+    routeOverride?: { source?: string; connectorId?: string; model?: string };
   }): Promise<{ text: string }>;
 };
 
 /** TTS synthesis client abstraction */
 export type TtsClient = {
-  listVoices(): Promise<Array<{
+  listVoices(options?: {
+    connectorId?: string;
+    routeSource?: 'auto' | 'local-runtime' | 'token-api';
+    model?: string;
+  }): Promise<Array<{
     providerId: string;
     voiceId: string;
     voiceName: string;
@@ -211,6 +216,9 @@ export type TtsClient = {
     speakingRate?: number;
     pitch?: number;
     emotion?: string;
+    connectorId?: string;
+    routeSource?: 'auto' | 'local-runtime' | 'token-api';
+    model?: string;
   }): Promise<{ audioBlob: Blob; durationMs: number }>;
 };
 

@@ -445,6 +445,25 @@ function normalizeExistingSegments(
   return repaired.sort((a, b) => a.index - b.index);
 }
 
+function buildFallbackChapterSegments(input: {
+  chapter: SourceChapter;
+  chapterIndex: number;
+  startGlobalIndex: number;
+}): ScriptSegment[] {
+  const text = String(input.chapter.rawText || '').trim();
+  if (!text) return [];
+  return [{
+    id: `seg-${input.chapterIndex}-fallback-0`,
+    chapterIndex: input.chapterIndex,
+    index: input.startGlobalIndex,
+    type: 'narration',
+    speaker: 'narrator',
+    text,
+    startOffset: 0,
+    endOffset: text.length,
+  }];
+}
+
 /**
  * Analyze all chapters sequentially with accumulated context.
  * Supports resumption via `startFromChapter` parameter.
@@ -560,14 +579,23 @@ export async function analyzeAllChapters(
       lastProcessedChapter = i;
 
     } catch (err) {
+      const fallbackSegments = buildFallbackChapterSegments({
+        chapter,
+        chapterIndex: i,
+        startGlobalIndex: globalSegmentIndex,
+      });
+      if (fallbackSegments.length > 0) {
+        allSegments.push(...fallbackSegments);
+        globalSegmentIndex += fallbackSegments.length;
+      }
       chapterResults.push({
         chapterIndex: i,
-        segmentCount: 0,
+        segmentCount: fallbackSegments.length,
         newCharacters: 0,
         retryCount: 2,
-        error: summarizeModelError(err),
+        error: `analysis_failed_fallback_used: ${summarizeModelError(err)}`,
       });
-      // Continue to next chapter — failed chapter doesn't block pipeline
+      // Continue to next chapter — failed chapter falls back to narration segment
     }
 
     // Report progress
@@ -590,6 +618,18 @@ export async function analyzeAllChapters(
     ...ch,
     segmentCount: segmentCountMap.get(ch.name) ?? 0,
   }));
+
+  if (allSegments.length === 0) {
+    const failures = chapterResults
+      .filter((item) => Boolean(item.error))
+      .map((item) => `chapter ${item.chapterIndex + 1}: ${item.error}`)
+      .join('; ');
+    throw new Error(
+      failures
+        ? `AB_ANALYSIS_EMPTY_SEGMENTS: ${failures}`
+        : 'AB_ANALYSIS_EMPTY_SEGMENTS: no segments produced',
+    );
+  }
 
   return {
     segments: allSegments,

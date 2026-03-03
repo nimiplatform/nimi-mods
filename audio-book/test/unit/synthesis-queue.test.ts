@@ -202,6 +202,238 @@ describe('runSynthesisJob', () => {
     expect(job.segmentJobs).toHaveLength(0);
   });
 
+  it('passes distinct voice parameters per speaker to TTS', async () => {
+    // Use real DashScope voice IDs from step3 casting results
+    const segments = [
+      makeSegment('s1', 'narrator', 0, 0),
+      makeSegment('s2', '叶文洁', 0, 1),
+      makeSegment('s3', 'narrator', 0, 2),
+      makeSegment('s4', '史强', 0, 3),
+    ];
+
+    const narratorCasting: VoiceCasting = {
+      characterName: 'narrator',
+      voiceSource: 'preset',
+      providerId: 'dashscope',
+      voiceId: 'Neil',
+      voiceName: '阿闻（字正腔圆、专业新闻主持人）',
+      speakingRate: 1.0,
+      pitch: 0,
+    };
+    const yeWenjieCasting: VoiceCasting = {
+      characterName: '叶文洁',
+      voiceSource: 'preset',
+      providerId: 'dashscope',
+      voiceId: 'Seren',
+      voiceName: '小婉（温和舒缓、助眠系声线）',
+      speakingRate: 0.97,
+      pitch: -1,
+      emotion: 'calm',
+    };
+    const shiQiangCasting: VoiceCasting = {
+      characterName: '史强',
+      voiceSource: 'preset',
+      providerId: 'dashscope',
+      voiceId: 'Vincent',
+      voiceName: '田叔（沙哑烟嗓、千军万马江湖豪情）',
+      speakingRate: 1.04,
+      pitch: 1,
+      emotion: 'steady',
+    };
+
+    const castingMap = new Map<string, VoiceCasting>([
+      ['narrator', narratorCasting],
+      ['叶文洁', yeWenjieCasting],
+      ['史强', shiQiangCasting],
+    ]);
+
+    // Capture all synthesize() call inputs
+    const synthesizeCalls: Array<{
+      text: string;
+      voiceId: string;
+      providerId: string;
+      speakingRate?: number;
+      pitch?: number;
+      emotion?: string;
+    }> = [];
+
+    const tts: TtsClient = {
+      async listVoices() { return []; },
+      async synthesize(input) {
+        synthesizeCalls.push({ ...input });
+        return { audioBlob: new Blob([`audio-${input.voiceId}`]), durationMs: 1500 };
+      },
+    };
+
+    const { promise } = runSynthesisJob(tts, segments, castingMap, 'proj-voice-1', {
+      maxConcurrency: 1, // sequential for deterministic call order
+    });
+
+    const job = await promise;
+    expect(job.status).toBe('done');
+    expect(synthesizeCalls).toHaveLength(4);
+
+    // s1 → narrator → Neil
+    expect(synthesizeCalls[0]!.voiceId).toBe('Neil');
+    expect(synthesizeCalls[0]!.speakingRate).toBe(1.0);
+    expect(synthesizeCalls[0]!.pitch).toBe(0);
+
+    // s2 → 叶文洁 → Seren
+    expect(synthesizeCalls[1]!.voiceId).toBe('Seren');
+    expect(synthesizeCalls[1]!.speakingRate).toBe(0.97);
+    expect(synthesizeCalls[1]!.pitch).toBe(-1);
+    expect(synthesizeCalls[1]!.emotion).toBe('calm');
+
+    // s3 → narrator → Neil (same voice as s1)
+    expect(synthesizeCalls[2]!.voiceId).toBe('Neil');
+
+    // s4 → 史强 → Vincent
+    expect(synthesizeCalls[3]!.voiceId).toBe('Vincent');
+    expect(synthesizeCalls[3]!.speakingRate).toBe(1.04);
+    expect(synthesizeCalls[3]!.pitch).toBe(1);
+    expect(synthesizeCalls[3]!.emotion).toBe('steady');
+  });
+
+  it('applies segment-level emotion over casting-level emotion', async () => {
+    const segment: ScriptSegment = {
+      id: 's1',
+      chapterIndex: 0,
+      index: 0,
+      type: 'dialogue',
+      speaker: '丁仪',
+      text: '物理学不存在了。',
+      startOffset: 0,
+      endOffset: 8,
+      emotion: 'excited', // segment emotion overrides casting
+    };
+
+    const casting: VoiceCasting = {
+      characterName: '丁仪',
+      voiceSource: 'preset',
+      providerId: 'dashscope',
+      voiceId: 'Ryan',
+      voiceName: '甜茶（节奏拉满、戏感炸裂）',
+      speakingRate: 1.0,
+      pitch: 0,
+      emotion: 'calm', // casting default — should be overridden
+    };
+
+    const castingMap = new Map([['丁仪', casting]]);
+    let capturedEmotion: string | undefined;
+
+    const tts: TtsClient = {
+      async listVoices() { return []; },
+      async synthesize(input) {
+        capturedEmotion = input.emotion;
+        return { audioBlob: new Blob(['audio']), durationMs: 1000 };
+      },
+    };
+
+    const { promise } = runSynthesisJob(tts, [segment], castingMap, 'proj-voice-2');
+    await promise;
+
+    // synthesis-scheduler uses: segment.emotion ?? casting.emotion
+    // so segment-level "excited" wins over casting-level "calm"
+    expect(capturedEmotion).toBe('excited');
+  });
+
+  it('falls back to casting emotion when segment has no emotion', async () => {
+    const segment: ScriptSegment = {
+      id: 's1',
+      chapterIndex: 0,
+      index: 0,
+      type: 'narration',
+      speaker: 'narrator',
+      text: '红岸基地坐落在内蒙古大兴安岭的一座山峰上。',
+      startOffset: 0,
+      endOffset: 20,
+      // no emotion on segment
+    };
+
+    const casting: VoiceCasting = {
+      characterName: 'narrator',
+      voiceSource: 'preset',
+      providerId: 'dashscope',
+      voiceId: 'Neil',
+      voiceName: '阿闻（字正腔圆、专业新闻主持人）',
+      speakingRate: 1.0,
+      pitch: 0,
+      emotion: 'steady',
+    };
+
+    const castingMap = new Map([['narrator', casting]]);
+    let capturedEmotion: string | undefined;
+
+    const tts: TtsClient = {
+      async listVoices() { return []; },
+      async synthesize(input) {
+        capturedEmotion = input.emotion;
+        return { audioBlob: new Blob(['audio']), durationMs: 1000 };
+      },
+    };
+
+    const { promise } = runSynthesisJob(tts, [segment], castingMap, 'proj-voice-3');
+    await promise;
+
+    expect(capturedEmotion).toBe('steady');
+  });
+
+  it('routes different speakers to distinct audio via voiceId', async () => {
+    const segments = [
+      makeSegment('s1', '汪淼', 0, 0),
+      makeSegment('s2', '常伟思', 0, 1),
+    ];
+
+    const castingMap = new Map<string, VoiceCasting>([
+      ['汪淼', {
+        characterName: '汪淼',
+        voiceSource: 'preset',
+        providerId: 'dashscope',
+        voiceId: 'Kai',
+        voiceName: '凯（耳朵的一场SPA、治愈系）',
+        speakingRate: 1.0,
+        pitch: 0,
+      }],
+      ['常伟思', {
+        characterName: '常伟思',
+        voiceSource: 'preset',
+        providerId: 'dashscope',
+        voiceId: 'Eldric Sage',
+        voiceName: '沧明子（沉稳睿智的老者、沧桑如松）',
+        speakingRate: 0.95,
+        pitch: -2,
+      }],
+    ]);
+
+    // Mock TTS produces voice-dependent audio content so we can verify differentiation
+    const audioOutputs = new Map<string, Blob>();
+    const tts: TtsClient = {
+      async listVoices() { return []; },
+      async synthesize(input) {
+        const blob = new Blob([`audio-${input.voiceId}`], { type: 'audio/mp3' });
+        return { audioBlob: blob, durationMs: 2000 };
+      },
+    };
+
+    const { promise } = runSynthesisJob(tts, segments, castingMap, 'proj-voice-4', {
+      maxConcurrency: 1,
+      onAudioReady: async (segmentId, blob) => {
+        audioOutputs.set(segmentId, blob);
+      },
+    });
+
+    const job = await promise;
+    expect(job.status).toBe('done');
+    expect(audioOutputs.size).toBe(2);
+
+    const wangMiaoAudio = await audioOutputs.get('s1')!.text();
+    const changWeisiAudio = await audioOutputs.get('s2')!.text();
+
+    expect(wangMiaoAudio).toContain('Kai');
+    expect(changWeisiAudio).toContain('Eldric Sage');
+    expect(wangMiaoAudio).not.toBe(changWeisiAudio);
+  });
+
   it('preserves already-done segments on resume', async () => {
     const segments = [
       makeSegment('s1', 'Alice'),

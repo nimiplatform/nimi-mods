@@ -6,12 +6,16 @@ export const AUDIO_BOOK_TAB_ID = 'mod:audio-book';
 export const AUDIO_BOOK_NAV_SLOT = 'ui-extension.app.sidebar.mods';
 export const AUDIO_BOOK_ROUTE_SLOT = 'ui-extension.app.content.routes';
 
+/** Data query capability for fetching available TTS route options (connectors + local models). */
+export const AUDIO_BOOK_DATA_API_ROUTE_OPTIONS = 'data-api.runtime.route.options';
+
 export const AUDIO_BOOK_CAPABILITIES = [
   'llm.text.generate',
   'llm.text.stream',
   'llm.speech.voices.list',
   'llm.speech.providers.list',
   'llm.speech.synthesize',
+  `data.query.${AUDIO_BOOK_DATA_API_ROUTE_OPTIONS}`,
   `ui.register.${AUDIO_BOOK_NAV_SLOT}`,
   `ui.register.${AUDIO_BOOK_ROUTE_SLOT}`,
   'event.publish.ab:synthesis:progress',

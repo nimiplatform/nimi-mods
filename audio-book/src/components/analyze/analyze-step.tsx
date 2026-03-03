@@ -4,6 +4,7 @@
 
 import React from 'react';
 import type { AnalysisProgress } from '../../controllers/use-audio-book-ui-state.js';
+import type { TtsRouteState } from '../../controllers/use-tts-route.js';
 import type { CharacterProfile, SourceChapter, ScriptSegment } from '../../types.js';
 
 type AnalyzeStepProps = {
@@ -12,17 +13,43 @@ type AnalyzeStepProps = {
   progress: AnalysisProgress | null;
   characters: CharacterProfile[];
   segments: ScriptSegment[];
+  ttsRoute: TtsRouteState;
   onStart: () => void;
   onCancel: () => void;
 };
 
 export function AnalyzeStep(props: AnalyzeStepProps) {
-  const { chapters, analysisRunning, progress, characters, segments, onStart, onCancel } = props;
+  const { chapters, analysisRunning, progress, characters, segments, ttsRoute, onStart, onCancel } = props;
   const hasResults = characters.length > 0;
 
   return (
     <div className="mx-auto max-w-2xl p-6">
       <h3 className="mb-4 text-base font-semibold text-gray-900">Script Analysis</h3>
+
+      {/* Chat LLM connector selector */}
+      <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+        <label className="mb-1 block text-xs font-medium text-gray-600">LLM Provider (for analysis)</label>
+        {ttsRoute.loading ? (
+          <p className="text-xs text-gray-400">Loading providers...</p>
+        ) : ttsRoute.error ? (
+          <p className="text-xs text-red-500">{ttsRoute.error}</p>
+        ) : ttsRoute.chatConnectors.length === 0 ? (
+          <p className="text-xs text-gray-500">No LLM connectors available. Configure one in Settings.</p>
+        ) : (
+          <select
+            value={ttsRoute.chatSelection.connectorId}
+            onChange={(e) => ttsRoute.selectChatConnector(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-blue-500"
+          >
+            {ttsRoute.chatConnectors.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label || c.id}
+                {c.vendor ? ` (${c.vendor})` : ''}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
 
       {/* Chapter summary */}
       <div className="mb-4 rounded-lg border border-gray-200 bg-white p-3">

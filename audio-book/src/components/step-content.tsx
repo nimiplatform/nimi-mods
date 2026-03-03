@@ -36,6 +36,7 @@ export function StepContent({ controller }: StepContentProps) {
           progress={ui.analysisProgress}
           characters={store.characters}
           segments={store.script?.segments ?? []}
+          ttsRoute={controller.ttsRoute}
           onStart={actions.startAnalysis}
           onCancel={actions.cancelAnalysis}
         />
@@ -49,6 +50,7 @@ export function StepContent({ controller }: StepContentProps) {
           selectedCharacter={ui.selectedCharacter}
           previewPlaying={ui.previewPlaying}
           ttsClient={clients.ttsClient}
+          ttsRoute={controller.ttsRoute}
           onSelectCharacter={ui.setSelectedCharacter}
           onUpdateCasting={actions.updateCasting}
           onPreviewVoice={actions.previewVoice}
@@ -76,7 +78,9 @@ export function StepContent({ controller }: StepContentProps) {
           segments={store.script?.segments ?? []}
           synthesisJob={store.synthesisJob}
           playbackState={ui.playbackState}
+          synthRunning={ui.synthRunning}
           onPlaySegment={actions.playSegmentAudio}
+          onRetryFailed={actions.retryFailedSynthesis}
         />
       );
 

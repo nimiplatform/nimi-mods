@@ -21,6 +21,8 @@ const DEFAULT_MAX_CONCURRENCY = 3;
 const MAX_RETRIES = 2; // 3 total attempts
 const BACKOFF_MS = [1000, 3000];
 const RATE_LIMIT_BACKOFF_MS = [5000, 15000];
+// Keep chunk size conservative for Qwen TTS input limits to avoid AI_INPUT_INVALID.
+const MAX_TTS_TEXT_CHARS = 550;
 
 // ---------------------------------------------------------------------------
 // Error classification
@@ -57,6 +59,90 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
     const timer = setTimeout(resolve, ms);
     signal?.addEventListener('abort', () => { clearTimeout(timer); reject(new Error('aborted')); }, { once: true });
   });
+}
+
+function sanitizeEmotion(value?: string): string | undefined {
+  const normalized = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!normalized) return undefined;
+  if (normalized.length > 64) return undefined;
+  return normalized;
+}
+
+function splitTextForTts(text: string, maxChars = MAX_TTS_TEXT_CHARS): string[] {
+  const normalized = String(text || '').trim();
+  if (!normalized) return [];
+  if (normalized.length <= maxChars) return [normalized];
+
+  const sentenceParts = normalized
+    .split(/(?<=[。！？!?；;])/u)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const parts = sentenceParts.length > 0 ? sentenceParts : [normalized];
+
+  const chunks: string[] = [];
+  let current = '';
+  for (const part of parts) {
+    if (!current) {
+      current = part;
+      continue;
+    }
+    if (current.length + part.length <= maxChars) {
+      current += part;
+      continue;
+    }
+    chunks.push(current);
+    current = part;
+  }
+  if (current) chunks.push(current);
+
+  const hardSplitChunks: string[] = [];
+  for (const chunk of chunks) {
+    if (chunk.length <= maxChars) {
+      hardSplitChunks.push(chunk);
+      continue;
+    }
+    for (let i = 0; i < chunk.length; i += maxChars) {
+      hardSplitChunks.push(chunk.slice(i, i + maxChars));
+    }
+  }
+  return hardSplitChunks.filter(Boolean);
+}
+
+async function synthesizeWithChunking(
+  tts: TtsClient,
+  input: {
+    text: string;
+    voiceId: string;
+    providerId: string;
+    speakingRate?: number;
+    pitch?: number;
+    emotion?: string;
+    connectorId?: string;
+    routeSource?: 'auto' | 'local-runtime' | 'token-api';
+    model?: string;
+  },
+): Promise<{ audioBlob: Blob; durationMs: number }> {
+  const chunks = splitTextForTts(input.text);
+  if (chunks.length <= 1) {
+    return tts.synthesize(input);
+  }
+
+  const blobParts: BlobPart[] = [];
+  let totalDurationMs = 0;
+  let mimeType = 'audio/mpeg';
+  for (const chunk of chunks) {
+    const result = await tts.synthesize({
+      ...input,
+      text: chunk,
+    });
+    blobParts.push(result.audioBlob);
+    totalDurationMs += result.durationMs;
+    if (result.audioBlob.type) mimeType = result.audioBlob.type;
+  }
+  return {
+    audioBlob: new Blob(blobParts, { type: mimeType }),
+    durationMs: totalDurationMs,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -130,6 +216,8 @@ export function runSynthesisJob(
     onProgress?: SynthesisProgressCallback;
     onAudioReady?: (segmentId: string, audioBlob: Blob, durationMs: number) => void | Promise<void>;
     existingJobs?: SegmentJob[];
+    /** TTS routing options — connectorId and routeSource passed to every synthesize call. */
+    ttsRoute?: { connectorId?: string; routeSource?: 'auto' | 'local-runtime' | 'token-api'; model?: string };
   },
 ): SynthesisJobHandle {
   const maxConcurrency = options?.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY;
@@ -210,13 +298,16 @@ export function runSynthesisJob(
           if (cancelled) { segJob.status = 'pending'; return; }
 
           try {
-            const result = await tts.synthesize({
-              text: segment.text,
+            const result = await synthesizeWithChunking(tts, {
+              text: String(segment.text || '').replace(/\s+/g, ' ').trim(),
               voiceId: casting.voiceId,
               providerId: casting.providerId,
               speakingRate: casting.speakingRate,
               pitch: casting.pitch,
-              emotion: segment.emotion ?? casting.emotion,
+              emotion: sanitizeEmotion(segment.emotion ?? casting.emotion),
+              connectorId: options?.ttsRoute?.connectorId,
+              routeSource: options?.ttsRoute?.routeSource,
+              model: options?.ttsRoute?.model,
             });
 
             segJob.status = 'done';

@@ -37,7 +37,14 @@ export function SynthesisStep(props: SynthesisStepProps) {
       {!synthRunning && !isDone && (
         <button
           type="button"
-          onClick={onStart}
+          onClick={() => {
+            console.info('[audio-book:flow]', 'synth:click-start', {
+              hasSynthesisJob: Boolean(synthesisJob),
+              synthRunning,
+              isDone,
+            });
+            onStart();
+          }}
           className="mb-4 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
         >
           {synthesisJob ? 'Resume Synthesis' : 'Start Synthesis'}

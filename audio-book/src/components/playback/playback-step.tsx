@@ -11,11 +11,13 @@ type PlaybackStepProps = {
   segments: ScriptSegment[];
   synthesisJob: SynthesisJob | null;
   playbackState: PlaybackState | null;
+  synthRunning: boolean;
   onPlaySegment: (segmentId: string) => void;
+  onRetryFailed: () => void;
 };
 
 export function PlaybackStep(props: PlaybackStepProps) {
-  const { chapters, segments, synthesisJob, playbackState, onPlaySegment } = props;
+  const { chapters, segments, synthesisJob, playbackState, synthRunning, onPlaySegment, onRetryFailed } = props;
   const [selectedChapter, setSelectedChapter] = useState(0);
 
   const chapterSegments = useMemo(
@@ -32,9 +34,41 @@ export function PlaybackStep(props: PlaybackStepProps) {
     );
   }, [synthesisJob]);
 
+  const failedJobs = useMemo(
+    () => synthesisJob?.segmentJobs.filter((sj) => sj.status === 'failed') ?? [],
+    [synthesisJob],
+  );
+  const failedBySegmentId = useMemo(
+    () => new Map(failedJobs.map((job) => [job.segmentId, job])),
+    [failedJobs],
+  );
+
   return (
     <div className="mx-auto max-w-2xl p-6">
       <h3 className="mb-4 text-base font-semibold text-gray-900">Playback</h3>
+
+      {synthesisJob && (
+        <div className="mb-4 rounded-lg border border-gray-200 bg-white px-3 py-2">
+          <p className="text-xs text-gray-600">
+            {synthesisJob.segmentJobs.filter((sj) => sj.status === 'done').length} done
+            {failedJobs.length > 0 ? ` / ${failedJobs.length} failed` : ''}
+          </p>
+          {failedJobs.length > 0 && (
+            <button
+              type="button"
+              onClick={onRetryFailed}
+              disabled={synthRunning}
+              className={`mt-2 rounded-lg px-3 py-1.5 text-xs font-medium ${
+                synthRunning
+                  ? 'bg-gray-100 text-gray-400 cursor-default'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+            >
+              {synthRunning ? 'Retrying...' : `Retry Failed Segments (${failedJobs.length})`}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Chapter selector */}
       {chapters.length > 1 && (
@@ -61,7 +95,10 @@ export function PlaybackStep(props: PlaybackStepProps) {
         <div className="max-h-96 overflow-y-auto">
           {chapterSegments.map((seg, i) => {
             const hasAudio = doneSegmentIds.has(seg.id);
-            const isPlaying = playbackState?.playing && playbackState.currentSegmentIndex === i;
+            const isPlaying = Boolean(
+              playbackState?.playing
+              && (playbackState.currentSegmentId === seg.id || playbackState.currentSegmentIndex === i),
+            );
 
             return (
               <div
@@ -89,6 +126,11 @@ export function PlaybackStep(props: PlaybackStepProps) {
                   }`}>
                     {seg.text}
                   </p>
+                  {failedBySegmentId.has(seg.id) && (
+                    <p className="mt-1 text-[10px] text-red-600">
+                      Failed: {failedBySegmentId.get(seg.id)?.error || 'unknown error'}
+                    </p>
+                  )}
                 </div>
                 {hasAudio && (
                   <button

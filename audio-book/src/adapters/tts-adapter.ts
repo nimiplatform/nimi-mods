@@ -4,6 +4,7 @@
 
 import type { HookLlmClient } from '@nimiplatform/sdk/mod/types';
 import type { TtsClient } from '../types.js';
+import { getQwenSystemVoices, isQwenSystemTtsModel } from '../services/qwen-voice-catalog.js';
 
 type HookSpeech = HookLlmClient['speech'];
 
@@ -16,13 +17,25 @@ type HookSpeech = HookLlmClient['speech'];
  */
 export function createTtsClientAdapter(speech: HookSpeech): TtsClient {
   return {
-    async listVoices() {
-      const voices = await speech.listVoices();
-      return voices.map((v) => ({
+    async listVoices(options) {
+      const voices = await speech.listVoices({
+        connectorId: options?.connectorId,
+        routeSource: options?.routeSource,
+      });
+      const mapped = voices.map((v) => ({
         providerId: v.providerId,
         voiceId: v.id,
         voiceName: v.name,
         language: v.lang,
+      }));
+      if (mapped.length > 0) return mapped;
+      if (!isQwenSystemTtsModel(options?.model)) return mapped;
+      return getQwenSystemVoices().map((voice) => ({
+        providerId: voice.providerId,
+        voiceId: voice.voiceId,
+        voiceName: voice.voiceName,
+        language: voice.language,
+        gender: voice.gender,
       }));
     },
 
@@ -34,6 +47,9 @@ export function createTtsClientAdapter(speech: HookSpeech): TtsClient {
         speakingRate: input.speakingRate,
         pitch: input.pitch,
         stylePrompt: input.emotion,
+        connectorId: input.connectorId,
+        routeSource: input.routeSource,
+        model: input.model,
       });
 
       // audioUri may be a blob URL, data URL, or tauri:// protocol — fetch handles all

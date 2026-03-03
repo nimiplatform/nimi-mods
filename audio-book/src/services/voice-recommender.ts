@@ -11,6 +11,7 @@ import type {
 } from '../types.js';
 import { parseJsonRecord, summarizeModelError, buildRepairPrompt } from './json-repair.js';
 import { VOICE_RECOMMEND_SCHEMA_LINES, buildVoiceRecommendPrompt } from './voice-recommender-prompts.js';
+import { getQwenSystemVoices, isQwenSystemTtsModel } from './qwen-voice-catalog.js';
 
 // ---------------------------------------------------------------------------
 // Default voice fallbacks by gender
@@ -22,6 +23,47 @@ const DEFAULT_VOICE_MAP: Record<Gender, { voiceId: string; voiceName: string }> 
   neutral: { voiceId: 'Neil', voiceName: '阿闻（字正腔圆专业主持）' },
 };
 
+function hashString(input: string): number {
+  let hash = 0;
+  const text = String(input || '');
+  for (let i = 0; i < text.length; i += 1) {
+    hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+function styleFromCharacterName(characterName: string): Pick<VoiceCasting, 'speakingRate' | 'pitch' | 'emotion'> {
+  const hash = hashString(characterName);
+  const rateOptions = [0.92, 0.97, 1.0, 1.04, 1.08] as const;
+  const pitchOptions = [-2, -1, 0, 1, 2] as const;
+  const emotionOptions = ['calm', 'warm', 'steady', 'bright', 'serious'] as const;
+  return {
+    speakingRate: rateOptions[hash % rateOptions.length]!,
+    pitch: pitchOptions[Math.floor(hash / 7) % pitchOptions.length]!,
+    emotion: emotionOptions[Math.floor(hash / 13) % emotionOptions.length]!,
+  };
+}
+
+function assignAvailableVoice(
+  characterName: string,
+  availableVoices: Array<{ providerId: string; voiceId: string; voiceName: string }>,
+): VoiceCasting | null {
+  if (availableVoices.length === 0) return null;
+  const hash = hashString(characterName);
+  const picked = availableVoices[hash % availableVoices.length]!;
+  const style = styleFromCharacterName(characterName);
+  return {
+    characterName,
+    voiceSource: 'preset',
+    providerId: picked.providerId,
+    voiceId: picked.voiceId,
+    voiceName: picked.voiceName,
+    speakingRate: style.speakingRate,
+    pitch: style.pitch,
+    emotion: style.emotion,
+  };
+}
+
 /**
  * Assign a default voice based on gender.
  */
@@ -31,14 +73,16 @@ export function assignDefaultVoice(
   defaultProviderId: string,
 ): VoiceCasting {
   const defaultVoice = DEFAULT_VOICE_MAP[gender];
+  const style = styleFromCharacterName(characterName);
   return {
     characterName,
     voiceSource: 'preset',
     providerId: defaultProviderId,
     voiceId: defaultVoice.voiceId,
     voiceName: defaultVoice.voiceName,
-    speakingRate: 1.0,
-    pitch: 0,
+    speakingRate: style.speakingRate,
+    pitch: style.pitch,
+    emotion: style.emotion,
   };
 }
 
@@ -76,9 +120,25 @@ export async function recommendAllVoices(
   llm: LlmClient,
   tts: TtsClient,
   characters: CharacterProfile[],
+  options?: { connectorId?: string; routeSource?: 'auto' | 'local-runtime' | 'token-api'; model?: string },
 ): Promise<VoiceCasting[]> {
   // Fetch available voices from TTS provider
-  const availableVoices = await tts.listVoices();
+  const listedVoices = await tts.listVoices({
+    connectorId: options?.connectorId,
+    routeSource: options?.routeSource,
+    model: options?.model,
+  });
+  const availableVoices = listedVoices.length > 0
+    ? listedVoices
+    : (isQwenSystemTtsModel(options?.model)
+      ? getQwenSystemVoices().map((voice) => ({
+        providerId: voice.providerId,
+        voiceId: voice.voiceId,
+        voiceName: voice.voiceName,
+        gender: voice.gender,
+        language: voice.language,
+      }))
+      : []);
 
   if (availableVoices.length === 0) {
     // No voices available — assign all defaults
@@ -93,9 +153,10 @@ export async function recommendAllVoices(
   const minorChars = characters.filter((ch) => ch.tier === 'minor');
 
   // Minor characters get default voices
-  const minorCastings: VoiceCasting[] = minorChars.map((ch) =>
-    assignDefaultVoice(ch.name, ch.gender, defaultProviderId),
-  );
+  const minorCastings: VoiceCasting[] = minorChars.map((ch) => {
+    const fromAvailable = assignAvailableVoice(ch.name, availableVoices);
+    return fromAvailable ?? assignDefaultVoice(ch.name, ch.gender, defaultProviderId);
+  });
 
   if (llmEligible.length === 0) {
     return minorCastings;
@@ -144,18 +205,21 @@ export async function recommendAllVoices(
   const llmCastings: VoiceCasting[] = llmEligible.map((ch) => {
     const assignment = assignmentMap.get(ch.name);
     if (assignment) {
+      const style = styleFromCharacterName(ch.name);
       return {
         characterName: ch.name,
         voiceSource: 'preset' as const,
         providerId: assignment.providerId,
         voiceId: assignment.voiceId,
         voiceName: assignment.voiceName,
-        speakingRate: 1.0,
-        pitch: 0,
+        speakingRate: style.speakingRate,
+        pitch: style.pitch,
+        emotion: style.emotion,
       };
     }
     // Fallback to default if LLM didn't assign or assigned invalid voice
-    return assignDefaultVoice(ch.name, ch.gender, defaultProviderId);
+    const fromAvailable = assignAvailableVoice(ch.name, availableVoices);
+    return fromAvailable ?? assignDefaultVoice(ch.name, ch.gender, defaultProviderId);
   });
 
   return [...llmCastings, ...minorCastings];
