@@ -136,6 +136,7 @@ NarrativeContext 正式 scope 字段：
 7. 产线交付单位固定为 episode，不是单回合片段；发布包必须包含 video+poster+caption+metadata+trace 最小集。
 8. VideoPlay 的 story source 支持 `canonical-story` 与 `textplay-enriched-story` 双模式。
 9. `textplay-enriched-story` 仍必须来自 canonical turn/spine 累积事实，禁止读取 textplay 私有草稿或本地临时状态。
+10. VideoPlay 执行器必须支持 checkpoint/continue/rerun-step/cancel 的工业化阶段运行协议，允许在阶段交接点做人工微调后再推进。
 
 ### 4.3 Text/Video 一致性
 

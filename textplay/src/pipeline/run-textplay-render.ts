@@ -113,6 +113,84 @@ function firstNonEmpty(values: unknown[]): string {
   return '';
 }
 
+function truncateText(value: string, maxChars: number): string {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!text) {
+    return '';
+  }
+  if (text.length <= maxChars) {
+    return text;
+  }
+  return `${text.slice(0, maxChars)}...`;
+}
+
+function shouldUseRenderableFallback(input: {
+  error: TextplayPipelineError;
+  normalized: TextplayNormalizedRenderInput | null;
+  visibleEvents: TextplayNormalizedRenderInput['events'];
+}): boolean {
+  if (!input.normalized) {
+    return false;
+  }
+  if (
+    input.error.reasonCode === TEXTPLAY_REASON.RUN_CANCELED
+    || input.error.reasonCode === TEXTPLAY_REASON.ROUTE_UNAVAILABLE
+    || input.error.reasonCode === TEXTPLAY_REASON.CONTEXT_MISSING_CRITICAL
+  ) {
+    return false;
+  }
+  const hasEvent = input.visibleEvents.some((event) => String(event.content || '').trim().length > 0);
+  const hasContext = String(input.normalized.sceneSummary || '').trim().length > 0;
+  return hasEvent || hasContext;
+}
+
+function buildRenderableFallbackText(input: {
+  normalized: TextplayNormalizedRenderInput;
+  visibleEvents: TextplayNormalizedRenderInput['events'];
+}): string {
+  const playerName = String(input.normalized.playerName || '').trim() || '你';
+  const playerIdentity = String(input.normalized.playerIdentity || '').trim();
+  const identityText = playerIdentity ? `（${playerIdentity}）` : '';
+  const userAction = truncateText(String(input.normalized.userMessage || ''), 90);
+  const sceneSummary = truncateText(String(input.normalized.sceneSummary || ''), 120) || '局势仍在震荡，线索交错未明';
+  const pressure = input.visibleEvents
+    .map((event) => truncateText(String(event.content || ''), 120))
+    .filter((item) => item.length > 0)
+    .slice(0, 2)
+    .join('；');
+
+  if (input.normalized.triggerSource === 'UserTurn') {
+    return [
+      `${playerName}${identityText}方才的举动已在局中激起涟漪：${userAction || '你刚刚做出的选择仍在发酵'}。`,
+      pressure || sceneSummary,
+      '局势并未收束，暗涌仍在逼近，你准备如何应对下一步变化？',
+    ].join('');
+  }
+
+  return [
+    sceneSummary,
+    pressure || '可见征兆仍在扩散，局面尚未稳定。',
+    `${playerName}${identityText}正被这股变化裹挟向前，下一步选择将决定局势走向。`,
+  ].join('');
+}
+
+function toFallbackRoute(request: TextplayRenderExecutionInput['request']): {
+  source: string;
+  connectorId: string;
+  model: string;
+  provider: string;
+  endpoint: string;
+} {
+  const override = asRecord(request.routeOverride);
+  return {
+    source: firstNonEmpty([override.source, 'fallback']),
+    connectorId: String(override.connectorId || ''),
+    model: firstNonEmpty([override.model, 'fallback-model']),
+    provider: String(override.provider || 'fallback'),
+    endpoint: String(override.endpoint || ''),
+  };
+}
+
 function buildStartFallbackProjection(input: {
   request: TextplayRenderExecutionInput['request'];
   storyId: string;
@@ -149,6 +227,11 @@ function buildStartFallbackProjection(input: {
       name: firstNonEmpty([
         opening.playerName,
         input.request.playerName,
+      ]),
+      identity: firstNonEmpty([
+        opening.playerIdentity,
+        opening.playerRole,
+        input.request.playerIdentity,
       ]),
     },
     userMessage: String(input.request.userMessage || ''),
@@ -202,6 +285,7 @@ export async function runTextplayRender(input: TextplayRenderExecutionInput): Pr
     agentId: input.request.agentId,
     playerId: input.request.playerId,
     playerName: input.request.playerName || '',
+    playerIdentity: input.request.playerIdentity || '',
     runId: input.request.runId,
     traceId: input.request.traceId,
     triggerSource: input.request.triggerSource,
@@ -513,6 +597,92 @@ export async function runTextplayRender(input: TextplayRenderExecutionInput): Pr
         stage: 'renderer',
         retryClass: 'non-retryable',
       });
+
+    if (shouldUseRenderableFallback({
+      error: normalizedError,
+      normalized,
+      visibleEvents,
+    }) && normalized) {
+      appendStepStart('fallback-render');
+      const fallbackText = buildRenderableFallbackText({
+        normalized,
+        visibleEvents,
+      });
+      warnings.push({
+        code: TEXTPLAY_REASON.RENDER_FALLBACK_WARN,
+        stage: 'fallback-render',
+        actionHint: 'Renderer degraded to canonical-event fallback output.',
+        message: `${normalizedError.reasonCode}: ${normalizedError.actionHint}`,
+        at: new Date().toISOString(),
+      });
+      checkpointToken = createUlid();
+      appendStepComplete('fallback-render');
+
+      const persistIdempotencyKey = toPersistIdempotencyKey({
+        storyId: normalized.storyId,
+        turnId: normalized.turnId,
+        runId: normalized.runId,
+      });
+
+      runSnapshot.status = 'COMPLETED';
+      runSnapshot.terminalEventType = 'run.complete';
+
+      const fallbackMeta = {
+        storyId: normalized.storyId,
+        turnId: normalized.turnId,
+        runId: normalized.runId,
+        traceId: normalized.traceId,
+        promptTraceId: '',
+        route: toFallbackRoute(input.request),
+        sourceEventIds,
+        warnings,
+        presenceReports: input.presenceReports,
+        runSnapshot,
+      };
+
+      appendStepStart('persist-best-effort', persistIdempotencyKey);
+      const persistWarning = await persistTextplayRenderBestEffort({
+        hookClient: input.deps.hookClient,
+        normalized,
+        text: fallbackText,
+        meta: fallbackMeta,
+        runEvents,
+        runSnapshot,
+        warnings,
+        presenceReports: input.presenceReports,
+      });
+      if (persistWarning) {
+        warnings.push(persistWarning);
+      }
+      checkpointToken = createUlid();
+      appendStepComplete('persist-best-effort', persistIdempotencyKey);
+
+      appendEvent({
+        traceId: normalized.traceId,
+        runId: normalized.runId,
+        parentRunId: null,
+        stage: 'textplay',
+        step: 'persist-best-effort',
+        eventType: 'run.complete',
+        attempt: 1,
+        checkpointToken,
+        stepInputHash,
+        lastCompletedUnit,
+        idempotencyKey: persistIdempotencyKey,
+      });
+
+      const fallbackSuccess: TextplayRenderSuccess = {
+        ok: true,
+        text: fallbackText,
+        meta: {
+          ...fallbackMeta,
+          warnings,
+          runSnapshot,
+        },
+        runEvents,
+      };
+      return fallbackSuccess;
+    }
 
     const failedStep: TextplayPipelineStep = activeStep;
 

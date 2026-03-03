@@ -243,11 +243,14 @@ export type TextplayStartupPackage = {
 export type TextplayPersistRecord = {
   id: string;
   storyId: string;
+  worldId: string;
+  agentId: string;
   turnId: string;
   runId: string;
   traceId: string;
   triggerSource: TextplayTriggerSource;
   playerId: string;
+  playerIdentity?: string;
   userMessage: string;
   systemPayload: Record<string, unknown> | null;
   text: string;
@@ -281,6 +284,7 @@ export type TextplayNormalizedRenderInput = {
   triggerSource: TextplayTriggerSource;
   playerId: string;
   playerName: string;
+  playerIdentity: string;
   userMessage: string;
   systemPayload: Record<string, unknown> | null;
   sceneSummary: string;
@@ -288,4 +292,10 @@ export type TextplayNormalizedRenderInput = {
   worldStyleSummary: string;
   events: TextplayProjectionEvent[];
   metrics: Record<string, unknown>;
+};
+
+export type TextplayStoryBrief = {
+  mode: 'opening' | 'recap';
+  text: string;
+  generatedAt: string;
 };

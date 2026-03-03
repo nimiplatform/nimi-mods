@@ -1,5 +1,3 @@
-import { loadLocalStorageJson, saveLocalStorageJson } from '@nimiplatform/sdk/mod/utils';
-import { NARRATIVE_STORE_KEY } from '../contracts.js';
 import type {
   NarrativeSpineEvent,
   NarrativeRenderInput,
@@ -164,14 +162,12 @@ function normalizeStore(value: unknown): NarrativeStoreState {
   };
 }
 
+let narrativeStoreState: NarrativeStoreState = createEmptyNarrativeStoreState();
+
 export function loadNarrativeStoreState(): NarrativeStoreState {
-  return loadLocalStorageJson<NarrativeStoreState>(
-    NARRATIVE_STORE_KEY,
-    createEmptyNarrativeStoreState(),
-    (value) => normalizeStore(value),
-  );
+  return narrativeStoreState;
 }
 
 export function saveNarrativeStoreState(state: NarrativeStoreState): void {
-  saveLocalStorageJson(NARRATIVE_STORE_KEY, state);
+  narrativeStoreState = normalizeStore(state);
 }

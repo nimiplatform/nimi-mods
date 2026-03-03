@@ -151,6 +151,27 @@ function scoreScene(input: {
   return score;
 }
 
+function buildPreEventSummary(event: TextplayWorldEventRow): string {
+  const title = toText(event.title) || toText(event.id) || '关键事件';
+  const cause = toText(event.cause);
+  const process = toText(event.process);
+  const summary = toText(event.summary);
+  const timeRef = toText(event.timeRef);
+
+  const lines = [
+    `目标事件：${title}（尚未发生）`,
+    cause ? `导火索：${cause}` : '',
+    process ? `已知态势：${process}` : '',
+    timeRef ? `当前时点：${timeRef}` : '',
+    (!cause && !process && summary) ? `背景线索：${summary}` : '',
+  ].filter((item): item is string => Boolean(item));
+
+  if (lines.length === 0) {
+    return '目标事件即将发生，你正处于事件爆发前的关键窗口。';
+  }
+  return lines.join('；');
+}
+
 function extractMemoryText(value: unknown): string {
   if (typeof value === 'string') {
     return value.trim();
@@ -208,15 +229,18 @@ function toStorySummary(input: {
     characterRefs: participants,
   });
 
+  const horizon = toEventHorizon(input.event.eventHorizon);
+  const playableHorizon: TextplayStorySummary['eventHorizon'] = horizon === 'PAST' ? 'FUTURE' : horizon;
+
   return {
     storyId: toStoryId(worldId, eventId),
     worldId,
     entryEventId: eventId,
     title: toText(input.event.title) || eventId,
-    summary: toText(input.event.summary) || toText(input.event.process) || toText(input.event.result) || 'No summary yet.',
+    summary: buildPreEventSummary(input.event),
     primaryAgentId,
     participants: unique(primaryAgentId ? [primaryAgentId, ...participants] : participants),
-    eventHorizon: toEventHorizon(input.event.eventHorizon),
+    eventHorizon: playableHorizon,
     updatedAt: toIsoOrNow(input.event.updatedAt || input.event.createdAt),
     playable: true,
     agentBindingMissing: !primaryAgentId,

@@ -1,44 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TEXTPLAY_REASON } from '../src/contracts.ts';
+import {
+  TEXTPLAY_DATA_API_WORLD_SATELLITES_CREATE,
+  TEXTPLAY_DATA_API_WORLD_SPINE_GET_OR_CREATE,
+  TEXTPLAY_REASON,
+} from '../src/contracts.ts';
 import { persistTextplayRenderBestEffort } from '../src/pipeline/persist-best-effort.ts';
 import {
   getTextplayPersistRunEvents,
+  resetTextplayPersistStoreForTests,
   upsertTextplayPersistRecord,
 } from '../src/persist/store.ts';
 
-function installMemoryLocalStorage() {
-  const map = new Map();
-  const storage = {
-    get length() {
-      return map.size;
-    },
-    key(index) {
-      return [...map.keys()][index] || null;
-    },
-    getItem(key) {
-      return map.has(key) ? map.get(key) : null;
-    },
-    setItem(key, value) {
-      map.set(String(key), String(value));
-    },
-    removeItem(key) {
-      map.delete(String(key));
-    },
-    clear() {
-      map.clear();
-    },
-  };
-
-  const previous = globalThis.localStorage;
-  globalThis.localStorage = storage;
-
-  return () => {
-    if (previous) {
-      globalThis.localStorage = previous;
-      return;
+function createPersistQueryData() {
+  return async ({ capability }) => {
+    if (capability === TEXTPLAY_DATA_API_WORLD_SPINE_GET_OR_CREATE) {
+      return {
+        id: 'spine-1',
+      };
     }
-    delete globalThis.localStorage;
+    if (capability === TEXTPLAY_DATA_API_WORLD_SATELLITES_CREATE) {
+      return {
+        id: 'sat-1',
+      };
+    }
+    throw new Error(`unsupported-capability:${String(capability || '')}`);
   };
 }
 
@@ -89,6 +75,8 @@ function createPersistRecord() {
 
   return {
     storyId: 'story-1',
+    worldId: 'world-1',
+    agentId: 'agent-1',
     turnId: 'turn-1',
     runId: 'run-1',
     traceId: 'trace-1',
@@ -123,6 +111,7 @@ function createPersistRecord() {
 }
 
 test('persist best effort returns non-blocking warning on failure', async () => {
+  resetTextplayPersistStoreForTests();
   const warning = await persistTextplayRenderBestEffort({
     hookClient: {
       data: {
@@ -171,22 +160,42 @@ test('persist best effort returns non-blocking warning on failure', async () => 
   assert.equal(warning.code, TEXTPLAY_REASON.PERSISTENCE_FAILED_WARN);
 });
 
-test('getRun(afterSeq) reports gapRefillApplied when sequence gap is detected', () => {
-  const restoreStorage = installMemoryLocalStorage();
-  try {
-    upsertTextplayPersistRecord(createPersistRecord());
+test('getRun(afterSeq) reports gapRefillApplied when sequence gap is detected', async () => {
+  resetTextplayPersistStoreForTests();
+  const queryData = createPersistQueryData();
+  await upsertTextplayPersistRecord({
+    queryData,
+    record: createPersistRecord(),
+  });
 
-    const result = getTextplayPersistRunEvents({
-      runId: 'run-1',
-      afterSeq: 1,
-      limit: 20,
-    });
+  const result = await getTextplayPersistRunEvents({
+    queryData,
+    runId: 'run-1',
+    afterSeq: 1,
+    limit: 20,
+  });
 
-    assert.equal(result.record?.runId, 'run-1');
-    assert.equal(result.gapRefillApplied, true);
-    assert.equal(result.events.length > 0, true);
-    assert.equal(result.events[0].seq, 4);
-  } finally {
-    restoreStorage();
-  }
+  assert.equal(result.record?.runId, 'run-1');
+  assert.equal(result.gapRefillApplied, true);
+  assert.equal(result.events.length > 0, true);
+  assert.equal(result.events[0].seq, 4);
+});
+
+test('upsert rejects record when world/agent identity is missing', async () => {
+  resetTextplayPersistStoreForTests();
+  const queryData = createPersistQueryData();
+
+  await assert.rejects(
+    async () => {
+      await upsertTextplayPersistRecord({
+        queryData,
+        record: {
+          ...createPersistRecord(),
+          worldId: '',
+          agentId: '',
+        },
+      });
+    },
+    /TEXTPLAY_PERSIST_RECORD_INVALID/,
+  );
 });

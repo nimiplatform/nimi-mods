@@ -25,6 +25,7 @@ function createHookClient() {
                 level: 'PRIMARY',
                 title: 'Primary event',
                 summary: 'playable',
+                cause: 'Outer wall alarm is triggered',
                 characterRefs: ['npc-1', 'npc-2'],
                 createdAt: '2026-03-02T08:00:00.000Z',
                 updatedAt: '2026-03-02T09:00:00.000Z',
@@ -59,4 +60,7 @@ test('listPlayableStories keeps PRIMARY events only and yields stable story id',
   assert.equal(first[0].primaryAgentId, 'agent-runtime');
   assert.equal(first[0].participants.includes('agent-runtime'), true);
   assert.equal(first[0].playable, true);
+  assert.equal(first[0].eventHorizon, 'FUTURE');
+  assert.equal(first[0].summary.includes('尚未发生'), true);
+  assert.equal(first[0].summary.includes('Outer wall alarm is triggered'), true);
 });

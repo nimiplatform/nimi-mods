@@ -118,6 +118,58 @@ function createHookClient() {
   };
 }
 
+function createHookClientMissingStoryContext() {
+  return {
+    data: {
+      query: async ({ capability }) => {
+        if (capability === 'data-api.world.lorebooks.list') {
+          return { worldId: 'world-1', items: [] };
+        }
+        if (capability === 'data-api.world.scenes.list') {
+          return {
+            worldId: 'world-1',
+            items: [
+              {
+                id: 'scene-docks',
+                worldId: 'world-1',
+                name: 'Iron Docks',
+                description: 'Rain hammers the mooring towers.',
+                setting: { weather: 'rain' },
+                activeEntities: ['agent-1', 'player-1'],
+                updatedAt: '2026-03-02T09:00:00.000Z',
+              },
+            ],
+          };
+        }
+        if (capability === 'data-api.world.narrative-contexts.list') {
+          return {
+            worldId: 'world-1',
+            items: [
+              {
+                id: 'ctx-canon',
+                scope: 'CANON',
+                scopeKey: 'canon:world-1',
+                storyId: null,
+                narrativeSetting: { pacingPolicy: { curve: 'steady' } },
+                narrativeState: {},
+              },
+            ],
+          };
+        }
+        if (capability === 'data-api.core.agent.memory.recall.for-entity') {
+          return {
+            recallSource: 'remote-only',
+            items: [],
+            core: [],
+            e2e: [],
+          };
+        }
+        throw new Error(`unsupported-capability:${capability}`);
+      },
+    },
+  };
+}
+
 const detail = {
   storyId: 'story.world-1.evt-primary',
   worldId: 'world-1',
@@ -152,7 +204,7 @@ test('startup package composes summary/material/objective/snapshot and supports 
   });
 
   assert.equal(startup.storyId, detail.storyId);
-  assert.equal(startup.background.summary.includes('Cause: Contraband dispute'), true);
+  assert.equal(startup.background.summary.includes('Contraband dispute'), true);
   assert.equal(startup.narrativeScopes.STORY.phase, 'in-progress');
   assert.equal(startup.narrativeScopes.STORY.objective, 'Stabilize the negotiation');
   assert.equal(startup.materials.lorebooks.length > 0, true);
@@ -165,4 +217,20 @@ test('startup package composes summary/material/objective/snapshot and supports 
   assert.equal(startup.snapshot.contextCoverage.story, true);
   assert.equal(startup.startupPolicy.initiative.cooldownSeconds, 180);
   assert.equal(startup.snapshot.version.startsWith('h'), true);
+});
+
+test('startup package fails close when STORY context is missing', async () => {
+  await assert.rejects(
+    async () => {
+      await loadStoryStartupPackage({
+        hookClient: createHookClientMissingStoryContext(),
+        narrativeEngine: {
+          turnLatest: async () => null,
+        },
+        detail,
+        playerId: 'player-1',
+      });
+    },
+    /TEXTPLAY_CONTEXT_MISSING_CRITICAL/,
+  );
 });

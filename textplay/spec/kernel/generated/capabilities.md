@@ -27,6 +27,12 @@ required_capabilities:
     source_rule: T-CAP-003
   - key: data.query.data-api.world.narrative-contexts.list
     source_rule: T-CAP-003
+  - key: data.query.data-api.world.spine.get-or-create
+    source_rule: T-CAP-003
+  - key: data.query.data-api.world.satellites.by-spine.list
+    source_rule: T-CAP-003
+  - key: data.query.data-api.world.satellites.create
+    source_rule: T-CAP-003
   - key: data.query.data-api.core.agent.memory.recall.for-entity
     source_rule: T-CAP-003
   - key: data.register.data-api.textplay.render.persist

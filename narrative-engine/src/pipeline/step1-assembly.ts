@@ -22,6 +22,7 @@ type NarrativePromptStats = {
   selectedCounts: {
     timelineEvents: number;
     futureEvents: number;
+    advanceHints: number;
     lorebooks: number;
     scenes: number;
     relations: number;
@@ -785,6 +786,74 @@ function formatRelationLine(relation: Record<string, unknown>): string {
   return `${subjectId || '(subject)'} -> ${targetId || '(target)'}${relationType ? ` [${relationType}]` : ''} :: ${detail}`;
 }
 
+function formatFutureNoteLine(event: Record<string, unknown>): string {
+  const title = clipText(event.title || event.name || event.id, 80) || '(untitled)';
+  const pressure = clipText(event.summary || event.description || event.process, 120);
+  const consequence = clipText(event.result, 80);
+  return [
+    `[hidden-note] ${title}`,
+    pressure ? `pressure=${pressure}` : '',
+    consequence ? `possible-consequence=${consequence}` : '',
+  ].filter(Boolean).join(' | ');
+}
+
+function eventNarrativeText(event: Record<string, unknown>): string {
+  return normalizeWhitespace([
+    toString(event.title || event.name),
+    toString(event.summary || event.description || event.process),
+    toString(event.result),
+  ].join(' ')).toLowerCase();
+}
+
+function hasActionSignal(text: string): boolean {
+  if (!text) {
+    return false;
+  }
+  return /(attack|retreat|reveal|discover|decide|move|trigger|冲|杀|战|破|撤|突|追|逃|揭|现|决|转移|引爆|反击|围攻|封锁)/i.test(text);
+}
+
+function hasEscalationSignal(text: string): boolean {
+  if (!text) {
+    return false;
+  }
+  return /(crisis|collapse|deadline|siege|injury|fatal|urgent|危机|失控|崩|迫近|倒计时|重伤|灭|围城|逼近|绝境)/i.test(text);
+}
+
+function buildAdvanceHints(input: {
+  turn: NarrativeTurnInputNormalized;
+  snapshot: NarrativeContextSnapshot;
+  timelineEvents: Array<Record<string, unknown>>;
+  futureEvents: Array<Record<string, unknown>>;
+}): string[] {
+  const hints: string[] = [];
+  const recentTimeline = input.timelineEvents.slice(0, 6);
+  const recentTexts = recentTimeline.map(eventNarrativeText).filter(Boolean);
+  const actionCount = recentTexts.filter((text) => hasActionSignal(text)).length;
+  const escalationCount = recentTexts.filter((text) => hasEscalationSignal(text)).length;
+
+  if (recentTexts.length >= 4 && actionCount === 0) {
+    hints.push('P2 low_action_plateau: Inject at least one concrete ACTION/DECISION/DISCOVERY beat this turn.');
+  }
+
+  if (input.snapshot.tensionTarget >= 0.6 && recentTexts.length >= 3 && escalationCount === 0) {
+    hints.push('P2 tension_stagnation: Target tension is high; add pressure/escalation without instant resolution.');
+  }
+
+  if (input.snapshot.openThreads.length > 0) {
+    hints.push(`P2 unresolved_threads: Keep at least one thread unresolved -> ${input.snapshot.openThreads.slice(0, 3).map((item) => clipText(item, 70)).join(' | ')}`);
+  }
+
+  if (input.futureEvents.length > 0) {
+    hints.push('P2 anti-spoiler: Future notes are hidden; only foreshadow via atmosphere or NPC behavior.');
+  }
+
+  if (input.turn.triggerSource === 'AgentInitiative' && input.snapshot.openThreads.length === 0) {
+    hints.push('P3 initiative_guard: No open thread; prefer subtle world pressure over hard plot leap.');
+  }
+
+  return uniqueStrings(hints).slice(0, 6);
+}
+
 function buildCompiledPromptContext(input: {
   turn: NarrativeTurnInputNormalized;
   snapshot: NarrativeContextSnapshot;
@@ -792,6 +861,7 @@ function buildCompiledPromptContext(input: {
   resolvedScopes: NarrativeContextScopes;
   timelineEvents: Array<Record<string, unknown>>;
   futureEvents: Array<Record<string, unknown>>;
+  advanceHints: string[];
   lorebooks: Array<Record<string, unknown>>;
   scenes: Array<Record<string, unknown>>;
   relations: Array<Record<string, unknown>>;
@@ -831,8 +901,15 @@ function buildCompiledPromptContext(input: {
     ['timeline-events', input.timelineEvents.length > 0
       ? input.timelineEvents.map((event, index) => `${index + 1}. ${formatEventLine(event)}`).join('\n')
       : '(none)'],
-    ['future-events', input.futureEvents.length > 0
-      ? input.futureEvents.map((event, index) => `${index + 1}. ${formatEventLine(event)}`).join('\n')
+    ['future-foreshadowing-hidden-notes', input.futureEvents.length > 0
+      ? [
+        'IMPORTANT: Future events below are hidden author notes. Never narrate them as established facts.',
+        'Only use subtle foreshadowing through atmosphere, pacing pressure, or NPC behavior.',
+        ...input.futureEvents.map((event, index) => `${index + 1}. ${formatFutureNoteLine(event)}`),
+      ].join('\n')
+      : '(none)'],
+    ['advance-hints', input.advanceHints.length > 0
+      ? input.advanceHints.map((hint, index) => `${index + 1}. ${hint}`).join('\n')
       : '(none)'],
     ['world-lorebooks', input.lorebooks.length > 0
       ? input.lorebooks.map((lorebook, index) => `${index + 1}. ${formatLorebookLine(lorebook)}`).join('\n')
@@ -877,6 +954,7 @@ function buildCompiledPromptContext(input: {
       selectedCounts: {
         timelineEvents: input.timelineEvents.length,
         futureEvents: input.futureEvents.length,
+        advanceHints: input.advanceHints.length,
         lorebooks: input.lorebooks.length,
         scenes: input.scenes.length,
         relations: input.relations.length,
@@ -1021,6 +1099,12 @@ export async function runNarrativeStep1Assembly(input: {
       worldEvents,
       turn: input.turn,
     });
+    const advanceHints = buildAdvanceHints({
+      turn: input.turn,
+      snapshot,
+      timelineEvents,
+      futureEvents,
+    });
     const lorebooks = selectLorebooks({
       worldLorebooks,
       turn: input.turn,
@@ -1053,6 +1137,7 @@ export async function runNarrativeStep1Assembly(input: {
       resolvedScopes: resolved.scopes,
       timelineEvents,
       futureEvents,
+      advanceHints,
       lorebooks,
       scenes,
       relations,

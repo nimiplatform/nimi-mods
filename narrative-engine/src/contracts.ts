@@ -31,6 +31,7 @@ export const NARRATIVE_REASON_CODES = {
   NARRATIVE_EVENT_COUNT_UNDERFLOW: 'NARRATIVE_EVENT_COUNT_UNDERFLOW',
   NARRATIVE_EVENT_COUNT_OVERFLOW_ADJUSTED: 'NARRATIVE_EVENT_COUNT_OVERFLOW_ADJUSTED',
   NARRATIVE_TENSION_JUMP_ADJUSTED: 'NARRATIVE_TENSION_JUMP_ADJUSTED',
+  NARRATIVE_SEMANTIC_CONTRADICTION: 'NARRATIVE_SEMANTIC_CONTRADICTION',
   NARRATIVE_SPINE_WRITE_CONFLICT: 'NARRATIVE_SPINE_WRITE_CONFLICT',
   NARRATIVE_INITIATIVE_COOLDOWN_ACTIVE: 'NARRATIVE_INITIATIVE_COOLDOWN_ACTIVE',
   NARRATIVE_RUN_CANCELED: 'NARRATIVE_RUN_CANCELED',
@@ -46,6 +47,7 @@ export const NARRATIVE_ACTION_HINT_BY_REASON_CODE: Record<NarrativeReasonCode, s
   NARRATIVE_EVENT_COUNT_UNDERFLOW: 'Raise minimum event output and retry.',
   NARRATIVE_EVENT_COUNT_OVERFLOW_ADJUSTED: 'Output is truncated and adjusted before commit.',
   NARRATIVE_TENSION_JUMP_ADJUSTED: 'Tension delta is too large and has been adjusted.',
+  NARRATIVE_SEMANTIC_CONTRADICTION: 'Detected semantic contradiction against established spine; rewrite with additive progression.',
   NARRATIVE_SPINE_WRITE_CONFLICT: 'Resolve append conflict and retry.',
   NARRATIVE_INITIATIVE_COOLDOWN_ACTIVE: 'Wait for cooldown window before next initiative tick.',
   NARRATIVE_RUN_CANCELED: 'Run is canceled. Resume from checkpoint or start a new run.',
@@ -61,6 +63,8 @@ export const NARRATIVE_GUARD_DEFAULTS = {
 
 export const NARRATIVE_INITIATIVE_DEFAULTS = {
   cooldownWindowSeconds: 180,
+  maxConsecutive: 3,
+  requireOpenThreadForInitiative: true,
   blockedPresenceStates: ['composing', 'active'] as const,
 } as const;
 

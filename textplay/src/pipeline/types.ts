@@ -18,6 +18,7 @@ export type TextplayPipelineStep =
   | 'build-prompt'
   | 'generate'
   | 'wrap-output'
+  | 'fallback-render'
   | 'persist-best-effort';
 
 export type TextplayPipelineDependencies = {

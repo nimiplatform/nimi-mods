@@ -1,4 +1,5 @@
 import {
+  createEmptyNarrativeStoreState,
   loadNarrativeStoreState,
   saveNarrativeStoreState,
 } from './persistence.js';
@@ -83,6 +84,7 @@ function compareIsoDate(a: string, b: string): number {
 
 export function resetNarrativeRepositoryForTests(): void {
   writeGlobalStoreState(null);
+  saveNarrativeStoreState(createEmptyNarrativeStoreState());
 }
 
 export function readNarrativeStoreForDiagnostics(): NarrativeStoreState {

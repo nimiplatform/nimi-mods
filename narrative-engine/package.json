@@ -8,6 +8,9 @@
     "build": "tsc -p tsconfig.build.json --noEmit",
     "watch": "tsc -p tsconfig.build.json --noEmit --watch",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "test": "npx tsx --test test/*.mjs",
+    "verify:code": "pnpm run typecheck && pnpm run test",
+    "verify": "pnpm run verify:code",
     "clean": "rm -rf dist"
   }
 }

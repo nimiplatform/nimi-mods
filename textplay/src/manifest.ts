@@ -8,6 +8,9 @@ import {
   TEXTPLAY_DATA_API_WORLD_LOREBOOKS_LIST,
   TEXTPLAY_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST,
   TEXTPLAY_DATA_API_WORLD_SCENES_LIST,
+  TEXTPLAY_DATA_API_WORLD_SATELLITES_BY_SPINE_LIST,
+  TEXTPLAY_DATA_API_WORLD_SATELLITES_CREATE,
+  TEXTPLAY_DATA_API_WORLD_SPINE_GET_OR_CREATE,
   TEXTPLAY_MOD_ID,
   TEXTPLAY_NAV_SLOT,
   TEXTPLAY_PERMISSIONS,
@@ -59,6 +62,18 @@ export const TEXTPLAY_MANIFEST = {
       {
         name: TEXTPLAY_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST,
         description: 'Read narrative contexts required by story startup package and prompt policy assembly',
+      },
+      {
+        name: TEXTPLAY_DATA_API_WORLD_SPINE_GET_OR_CREATE,
+        description: 'Resolve canonical narrative spine id for world+agent persistence scope',
+      },
+      {
+        name: TEXTPLAY_DATA_API_WORLD_SATELLITES_BY_SPINE_LIST,
+        description: 'Read persisted run snapshots by narrative spine scope',
+      },
+      {
+        name: TEXTPLAY_DATA_API_WORLD_SATELLITES_CREATE,
+        description: 'Write persisted run snapshots as narrative satellites',
       },
       {
         name: TEXTPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY,

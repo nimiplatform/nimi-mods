@@ -117,3 +117,9 @@
 2. 禁止使用 `stage`/`message` 文本关键词推断 `step.complete` 或 `run.complete`。
 3. 映射无法确定终态时必须保持 `RUNNING` 并等待显式终态事件，不得猜测完成或失败。
 4. `runId` 查询与恢复接口必须支持 `afterSeq` 增量补拉，且在发现断档时先 `gapRefill` 再应用新事件。
+
+## 9. Renderer Stepwise Runtime（MUST）
+
+1. renderer 侧（textplay/videoplay）若提供创作型工作台，必须支持 `run-pipeline`、`continue-from-checkpoint`、`rerun-step`、`cancel-run` 四个动作的可观测协议语义。
+2. `rerun-step` 必须使下游 step 状态失效并从该步重算，且保留历史 attempt 审计事件。
+3. `continue-from-checkpoint` 只能推进下一待执行 step，不得隐式跳步或整链重放。

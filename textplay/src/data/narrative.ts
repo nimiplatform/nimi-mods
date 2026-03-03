@@ -7,6 +7,8 @@ import {
   NarrativeContextResolveResponseSchema,
   NarrativeProjectionRenderInputRequestSchema,
   NarrativeProjectionRenderInputResponseSchema,
+  NarrativeTurnWindowRequestSchema,
+  NarrativeTurnWindowResponseSchema,
   NarrativeTurnResultUpsertRequestSchema,
   NarrativeTurnResultUpsertResponseSchema,
   NarrativeTurnByIdRequestSchema,
@@ -15,6 +17,8 @@ import {
   type NarrativeContextResolveResponse,
   type NarrativeProjectionRenderInputRequest,
   type NarrativeProjectionRenderInputResponse,
+  type NarrativeTurnWindowRequest,
+  type NarrativeTurnWindowResponse,
   type NarrativeTurnResultUpsertRequest,
   type NarrativeTurnResultUpsertResponse,
   type NarrativeTurnByIdRequest,
@@ -175,6 +179,39 @@ export async function queryNarrativeTurnById(input: {
       reasonCode: TEXTPLAY_REASON.INPUT_INVALID,
       actionHint: 'Complete player, userMessage, and events, then retry.',
       message: parsedResponse.error.issues[0]?.message || 'TEXTPLAY_TURN_BY_ID_RESPONSE_INVALID',
+      stage: 'input',
+      retryClass: 'non-retryable',
+    });
+  }
+
+  return parsedResponse.data;
+}
+
+export async function queryNarrativeTurnWindow(input: {
+  narrativeEngine: NarrativeEngineModule;
+  request: NarrativeTurnWindowRequest;
+}): Promise<NarrativeTurnWindowResponse> {
+  const parsedRequest = NarrativeTurnWindowRequestSchema.safeParse(input.request);
+  if (!parsedRequest.success) {
+    throw new TextplayPipelineError({
+      reasonCode: TEXTPLAY_REASON.INPUT_INVALID,
+      actionHint: 'Complete player, userMessage, and events, then retry.',
+      message: parsedRequest.error.issues[0]?.message || 'TEXTPLAY_TURN_WINDOW_REQUEST_INVALID',
+      stage: 'input',
+      retryClass: 'non-retryable',
+    });
+  }
+
+  const payload = await input.narrativeEngine.turnWindow(parsedRequest.data).catch((error) => {
+    throw toContextMissingError(error, 'narrative.turn.window');
+  });
+
+  const parsedResponse = NarrativeTurnWindowResponseSchema.safeParse(payload);
+  if (!parsedResponse.success) {
+    throw new TextplayPipelineError({
+      reasonCode: TEXTPLAY_REASON.INPUT_INVALID,
+      actionHint: 'Complete player, userMessage, and events, then retry.',
+      message: parsedResponse.error.issues[0]?.message || 'TEXTPLAY_TURN_WINDOW_RESPONSE_INVALID',
       stage: 'input',
       retryClass: 'non-retryable',
     });

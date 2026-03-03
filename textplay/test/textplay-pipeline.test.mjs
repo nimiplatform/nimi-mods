@@ -240,6 +240,8 @@ function createNarrativeEngine(options = {}) {
 
 function createAiClient(options = {}) {
   const generateCalls = [];
+  const failGenerate = options.failGenerate === true;
+  const failMessage = typeof options.failMessage === 'string' ? options.failMessage : 'llm-temporary-failure';
   const endpoint = typeof options.endpoint === 'string'
     ? options.endpoint
     : 'https://example.invalid/v1/chat/completions';
@@ -247,6 +249,9 @@ function createAiClient(options = {}) {
   return {
     generateText: async (payload) => {
       generateCalls.push(payload);
+      if (failGenerate) {
+        throw new Error(failMessage);
+      }
       return {
         text: 'You push through the gate, and the courtyard answers with distant iron bells.',
         promptTraceId: 'prompt-trace-1',
@@ -492,6 +497,32 @@ test('textplay legacy null projection blocks fallback to safe context summaries'
   assert.equal(result.meta.storyId, 'story-1');
   assert.equal(result.meta.turnId, 'turn-1');
   assert.equal(result.text.length > 0, true);
+});
+
+test('textplay generate failure degrades to fallback-render and returns playable output', async () => {
+  const { hookClient, persistCalls } = createHookClient();
+  const narrativeEngine = createNarrativeEngine();
+  const aiClient = createAiClient({
+    failGenerate: true,
+    failMessage: 'provider-timeout',
+  });
+
+  const result = await runTextplayRender({
+    request: createBaseRequest(),
+    deps: {
+      hookClient,
+      aiClient,
+      narrativeEngine,
+    },
+    presenceReports: [],
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.meta.runSnapshot.status, 'COMPLETED');
+  assert.equal(result.meta.warnings.some((warning) => warning.code === TEXTPLAY_REASON.RENDER_FALLBACK_WARN), true);
+  assert.equal(result.runEvents.some((event) => event.step === 'fallback-render' && event.eventType === 'step.complete'), true);
+  assert.equal(result.text.length > 0, true);
+  assert.equal(persistCalls.length, 1);
 });
 
 test('textplay start-style request accepts SystemEvent with empty userMessage when systemPayload exists', async () => {

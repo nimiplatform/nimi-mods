@@ -109,6 +109,14 @@ function createNarrativeEngine() {
         if (storyId === 'story-context-missing' || storyId === 'story.world.event') {
           return { worldId: String(query.worldId || ''), items: [] };
         }
+        const storyInitiativePolicy = storyId === 'story-initiative-zero-cooldown'
+          ? {
+            enabled: true,
+            cooldownSeconds: 0,
+            cooldownWindowSeconds: 0,
+            maxConsecutive: 3,
+          }
+          : { enabled: true };
         return {
           worldId: String(query.worldId || ''),
           items: [
@@ -129,7 +137,7 @@ function createNarrativeEngine() {
               scopeKey: `story:${storyId}`,
               storyId,
               narrativeSetting: {
-                initiativePolicy: { enabled: true },
+                initiativePolicy: storyInitiativePolicy,
                 pacingPolicy: { targetTension: 0.6 },
                 materialHints: { conflicts: ['storm-front'] },
               },
@@ -378,6 +386,41 @@ test('NAR-005 Initiative cooldown returns NOOP and no additional spine write', a
   assert.equal(second.status, 'NOOP');
   assert.equal(second.reasonCode, NARRATIVE_REASON_CODES.NARRATIVE_INITIATIVE_COOLDOWN_ACTIVE);
   assert.equal(getNarrativeSpineByStoryId('story-initiative').length, 2);
+});
+
+test('NAR-009 Initiative cooldown=0 allows immediate follow-up initiative turn', async () => {
+  const narrativeEngine = createNarrativeEngine();
+  await upsertContext(narrativeEngine, 'story-initiative-zero-cooldown');
+
+  const first = await narrativeEngine.turnResultUpsert(makeTurnInput({
+    storyId: 'story-initiative-zero-cooldown',
+    triggerSource: 'AgentInitiative',
+    idempotencyKey: 'nar-009-fire-1',
+    nowMs: BASE_NOW_MS,
+    mockCoreOutput: makeCoreOutput({ eventCount: 2 }),
+  }));
+  assert.equal(first.status, 'APPROVED');
+
+  const bridge = await narrativeEngine.turnResultUpsert(makeTurnInput({
+    storyId: 'story-initiative-zero-cooldown',
+    triggerSource: 'UserTurn',
+    idempotencyKey: 'nar-009-bridge',
+    nowMs: BASE_NOW_MS + 1_000,
+    mockCoreOutput: makeCoreOutput({ eventCount: 2 }),
+  }));
+  assert.equal(bridge.status, 'APPROVED');
+
+  const second = await narrativeEngine.turnResultUpsert(makeTurnInput({
+    storyId: 'story-initiative-zero-cooldown',
+    triggerSource: 'AgentInitiative',
+    idempotencyKey: 'nar-009-fire-2',
+    nowMs: BASE_NOW_MS + 60_000,
+    mockCoreOutput: makeCoreOutput({ eventCount: 2 }),
+  }));
+
+  assert.equal(second.status, 'APPROVED');
+  assert.equal(second.reasonCode, null);
+  assert.equal(getNarrativeSpineByStoryId('story-initiative-zero-cooldown').length, 6);
 });
 
 test('NAR-006 Cancel reaches run.canceled terminal without run.error normalization', async () => {

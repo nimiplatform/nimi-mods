@@ -39,6 +39,7 @@
 4. 引用完整性：clip/shot/voice/episode 关系可解析。
 5. 字段联动一致性：`CoreOutput` 变更必须触发 narrative-engine/textplay/videoplay 联动校验。
 6. story package 与 canonical 事实一致性：允许读取 world/context/memory 辅料，但 episode/clip/beat/shot 的 `sourceEventIds` 必须可回溯到 canonical narrative projection。
+7. checkpoint 恢复一致性：`continue` 只能推进下一待执行步骤；`rerun-step` 必须使下游输出失效并重算。
 
 ## 4. 回归矩阵（MUST）
 

@@ -60,6 +60,7 @@ function resolveTurnConsistency(input: {
   turnId: string;
   playerId: string;
   playerName: string;
+  playerIdentity: string;
   agentId: string;
   triggerSource: TextplayRenderRequest['triggerSource'];
 } {
@@ -175,12 +176,19 @@ function resolveTurnConsistency(input: {
     input.request.playerName,
     openingPayload.playerName,
   ]);
+  const canonicalPlayerIdentity = firstNonEmpty([
+    projection.player.identity,
+    input.request.playerIdentity,
+    openingPayload.playerIdentity,
+    openingPayload.playerRole,
+  ]);
 
   return {
     storyId: upsertStoryId || requestStoryId,
     turnId: upsertTurnId,
     playerId: canonicalPlayerId,
     playerName: canonicalPlayerName,
+    playerIdentity: canonicalPlayerIdentity,
     agentId: canonicalAgentId,
     triggerSource: canonicalTriggerSource as TextplayRenderRequest['triggerSource'],
   };
@@ -257,6 +265,7 @@ export function normalizeTextplayRenderInput(input: {
     triggerSource: consistency.triggerSource,
     playerId: consistency.playerId,
     playerName: consistency.playerName,
+    playerIdentity: consistency.playerIdentity,
     userMessage: String(input.request.userMessage || input.projection.userMessage || ''),
     systemPayload,
     sceneSummary: contextSummary.sceneSummary,
@@ -278,6 +287,7 @@ export function normalizeTextplayRenderInput(input: {
     triggerSource: normalized.triggerSource,
     playerId: normalized.playerId,
     playerName: normalized.playerName,
+    playerIdentity: normalized.playerIdentity,
     userMessage: normalized.userMessage,
     systemPayload: normalized.systemPayload,
     events: normalized.events,

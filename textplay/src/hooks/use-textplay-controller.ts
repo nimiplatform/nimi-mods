@@ -23,17 +23,32 @@ import { listMyWorlds } from '../data/world-catalog.js';
 import { runTextplayRender } from '../pipeline/run-textplay-render.js';
 import { createTextplayPresenceMachine } from '../presence/state-machine.js';
 import type { TextplayShellProps } from '../components/textplay-shell.js';
+import type { NarrativeTurnWindowResponse } from '../data/schemas.js';
 import type {
   TextplayPersistRecord,
   TextplayPresenceReport,
+  TextplayStoryBrief,
   TextplayStoryDetail,
   TextplayStorySummary,
   TextplayWorldSummary,
   TextplayRunEvent,
   TextplayRunSnapshot,
+  TextplayRenderSuccess,
   TextplayWarning,
 } from '../types.js';
 import { createUlid } from '../utils/ulid.js';
+import { queryNarrativeTurnWindow } from '../data/narrative.js';
+import {
+  buildInitiativeDirectorMessage,
+  buildContextualUserMessage,
+  buildOpeningSystemPayload,
+  buildStoryRecapPrompt,
+  withPlayerContextSystemPayload,
+} from './story-briefing.js';
+import {
+  createFallbackPersistRecord,
+  hasPersistenceWarning,
+} from './session-orchestrator.js';
 
 type AppStoreShape = {
   runtimeFields?: Record<string, unknown>;
@@ -48,6 +63,13 @@ type AppStoreShape = {
     user?: Record<string, unknown> | null;
   };
 };
+
+type PlayerProfileDraft = {
+  playerName: string;
+  playerIdentity: string;
+};
+
+const GLOBAL_PLAYER_PROFILE_SCOPE = '__global__';
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object') {
@@ -68,6 +90,19 @@ function isEntityId(value: string): boolean {
 
 function uniqueStrings(values: string[]): string[] {
   return [...new Set(values.map((item) => item.trim()).filter(Boolean))];
+}
+
+function parseWorldIdFromStoryId(storyId: string): string {
+  const parts = storyId.split('.');
+  if (parts.length >= 3 && parts[0] === 'story') {
+    return parts[1] || '';
+  }
+  return '';
+}
+
+function toPlayerProfileScope(worldId: string): string {
+  const normalized = worldId.trim();
+  return normalized || GLOBAL_PLAYER_PROFILE_SCOPE;
 }
 
 function parseRunEvent(value: unknown): TextplayRunEvent | null {
@@ -223,10 +258,18 @@ function parsePersistRecord(value: unknown): TextplayPersistRecord | null {
   }
 
   const storyId = toTrimmedString(record.storyId);
+  const worldId = toTrimmedString(record.worldId) || parseWorldIdFromStoryId(storyId);
+  const agentId = toTrimmedString(record.agentId);
   const turnId = toTrimmedString(record.turnId);
   const runId = toTrimmedString(record.runId);
   const traceId = toTrimmedString(record.traceId);
   const playerId = toTrimmedString(record.playerId);
+  const openingPayload = asRecord(asRecord(record.systemPayload)?.opening);
+  const playerIdentity = firstNonEmptyText([
+    record.playerIdentity,
+    openingPayload?.playerIdentity,
+    openingPayload?.playerRole,
+  ]);
 
   if (!storyId || !turnId || !runId || !traceId || !playerId) {
     return null;
@@ -240,11 +283,14 @@ function parsePersistRecord(value: unknown): TextplayPersistRecord | null {
   return {
     id: toTrimmedString(record.id) || createUlid(),
     storyId,
+    worldId,
+    agentId,
     turnId,
     runId,
     traceId,
     triggerSource: (toTrimmedString(record.triggerSource) || 'UserTurn') as TextplayPersistRecord['triggerSource'],
     playerId,
+    playerIdentity: playerIdentity || undefined,
     userMessage: typeof record.userMessage === 'string' ? record.userMessage : '',
     systemPayload: record.systemPayload && typeof record.systemPayload === 'object'
       ? (record.systemPayload as Record<string, unknown>)
@@ -323,11 +369,11 @@ function deriveStoryPlaceholder(input: {
   if (!input.story) {
     return 'Select a world and story first...';
   }
+  if (!input.started) {
+    return 'Fill Player Name, then click Start to load background and opening narration...';
+  }
   if (!input.startupReady) {
     return 'Startup package is loading...';
-  }
-  if (!input.started) {
-    return 'Click Start to generate opening narration...';
   }
   return `在《${input.story.title}》中输入下一步行动...`;
 }
@@ -428,86 +474,6 @@ function firstNonEmptyText(values: unknown[]): string {
   return '';
 }
 
-function buildOpeningSystemPayload(input: {
-  story: TextplayStoryDetail;
-  startup: NonNullable<TextplayShellProps['startupPackage']>;
-  playerId: string;
-  playerName: string;
-}): Record<string, unknown> {
-  const storyScope = asRecord(input.startup.narrativeScopes.STORY) || {};
-  const subjectScope = asRecord(input.startup.narrativeScopes.SUBJECT) || {};
-  const relationScope = asRecord(input.startup.narrativeScopes.RELATION) || {};
-
-  const selectedScene = input.startup.materials.scenes.find((scene) => scene.id === input.startup.entry.recommendedSceneId)
-    || input.startup.materials.scenes[0]
-    || null;
-  const sceneLabel = firstNonEmptyText([
-    selectedScene?.name,
-    selectedScene?.id,
-    input.startup.entry.locationRefs[0],
-  ]) || '未知地点';
-
-  const playerRole = firstNonEmptyText([
-    relationScope.playerRole,
-    relationScope.playerIdentity,
-    relationScope.relationType,
-    relationScope.role,
-    subjectScope.playerRole,
-    subjectScope.identity,
-    subjectScope.role,
-  ]) || '未明身份的到访者';
-
-  const playerBackground = firstNonEmptyText([
-    relationScope.playerBackground,
-    relationScope.background,
-    relationScope.summary,
-    subjectScope.playerBackground,
-    subjectScope.background,
-    subjectScope.summary,
-    input.story.summary,
-  ]);
-
-  const currentSituation = [
-    input.startup.entry.summary,
-    input.startup.entry.cause ? `缘起：${input.startup.entry.cause}` : '',
-    input.startup.entry.process ? `局势：${input.startup.entry.process}` : '',
-    input.startup.entry.timeRef ? `时点：${input.startup.entry.timeRef}` : '',
-    `地点：${sceneLabel}`,
-  ].filter((line) => line.trim().length > 0).join('；');
-
-  const openingBackground = [
-    input.startup.background.summary || input.story.summary,
-    `玩家身份：${input.playerName || '你'}（${playerRole}）`,
-    playerBackground ? `玩家背景：${playerBackground}` : '',
-    currentSituation ? `当前处境：${currentSituation}` : '',
-  ].filter((line) => line.trim().length > 0).join('\n');
-
-  return {
-    opening: {
-      mode: 'story-start',
-      instruction: [
-        '你正在生成故事开场段落。',
-        '只允许描述已发生事实与当下可见信息，严禁剧透未来走向或提前揭示最终结果。',
-        '必须自然交代玩家是谁、为何在场、当前处境，并给出一个可行动的起手钩子。',
-      ].join(''),
-      playerId: input.playerId,
-      playerName: input.playerName,
-      playerRole,
-      playerBackground,
-      storyId: input.story.storyId,
-      storyTitle: input.story.title,
-      entryEventId: input.story.entryEventId,
-      entrySummary: input.story.summary,
-      phase: storyScope.phase || 'opening',
-      objective: storyScope.objective || 'advance-story',
-      background: openingBackground,
-      currentSituation,
-      recommendedSceneId: input.startup.entry.recommendedSceneId,
-      noSpoiler: true,
-    },
-  };
-}
-
 export function useTextplayController(): TextplayShellProps {
   const runtimeFields = useAppStore((state) => ((state as AppStoreShape).runtimeFields || {}));
   const setRuntimeField = useAppStore((state) => (state as AppStoreShape).setRuntimeField);
@@ -540,13 +506,27 @@ export function useTextplayController(): TextplayShellProps {
     || toTrimmedString(authUser?.id)
     || toTrimmedString(authUser?.userId)
     || toTrimmedString(authUser?.handle);
-  const playerNameSeed = toTrimmedString(runtimeFields.playerName)
-    || toTrimmedString(authUser?.displayName)
+  const fallbackPlayerNameSeed = toTrimmedString(authUser?.displayName)
     || toTrimmedString(authUser?.name)
     || toTrimmedString(authUser?.handle);
+  const legacyPlayerNameSeed = toTrimmedString(runtimeFields.playerName);
+  const legacyPlayerIdentitySeed = toTrimmedString(runtimeFields.playerIdentity);
 
   const [playerId, setPlayerIdState] = useState<string>(() => playerIdSeed);
-  const [playerName, setPlayerNameState] = useState<string>(() => playerNameSeed);
+  const [playerProfilesByScope, setPlayerProfilesByScope] = useState<Record<string, PlayerProfileDraft>>(() => {
+    const seededName = legacyPlayerNameSeed || fallbackPlayerNameSeed;
+    const seededIdentity = legacyPlayerIdentitySeed;
+    const seededProfiles: Record<string, PlayerProfileDraft> = {};
+    if (seededName || seededIdentity) {
+      seededProfiles[GLOBAL_PLAYER_PROFILE_SCOPE] = {
+        playerName: seededName,
+        playerIdentity: seededIdentity,
+      };
+    }
+    return seededProfiles;
+  });
+  const [playerName, setPlayerNameState] = useState<string>(() => legacyPlayerNameSeed || fallbackPlayerNameSeed);
+  const [playerIdentity, setPlayerIdentityState] = useState<string>(() => legacyPlayerIdentitySeed);
   const [worlds, setWorlds] = useState<TextplayWorldSummary[]>([]);
   const [worldsLoading, setWorldsLoading] = useState(false);
   const [worldsError, setWorldsError] = useState<string | null>(null);
@@ -576,7 +556,12 @@ export function useTextplayController(): TextplayShellProps {
   const [warnings, setWarnings] = useState<TextplayWarning[]>([]);
   const [runSnapshot, setRunSnapshot] = useState<TextplayRunSnapshot | null>(null);
   const [gapRefillApplied, setGapRefillApplied] = useState(false);
+  const [deltaStatus, setDeltaStatus] = useState<{
+    kind: 'info' | 'warn' | 'success' | 'error';
+    message: string;
+  } | null>(null);
   const [failure, setFailure] = useState<TextplayShellProps['failure']>(null);
+  const [storyBrief, setStoryBrief] = useState<TextplayStoryBrief | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
   const storyHydrationSeqRef = useRef(0);
@@ -586,6 +571,8 @@ export function useTextplayController(): TextplayShellProps {
 
   const storyId = selectedStory?.storyId || '';
   const worldId = selectedStory?.worldId || selectedWorldId || worldIdRuntime;
+  const playerProfileScope = toPlayerProfileScope(worldId);
+  const previousPlayerProfileScopeRef = useRef(playerProfileScope);
   const agentId = agentIdRuntime || selectedStory?.primaryAgentId || '';
   const effectiveRouteBinding = routeOverride || chatRouteOptions?.selected || null;
   const routeSource = effectiveRouteBinding?.source || 'local-runtime';
@@ -605,10 +592,12 @@ export function useTextplayController(): TextplayShellProps {
     setRecords([]);
     setSelectedRecordRunId(null);
     setLastRenderedText('');
+    setStoryBrief(null);
     setRunEvents([]);
     setWarnings([]);
     setRunSnapshot(null);
     setGapRefillApplied(false);
+    setDeltaStatus(null);
     setFailure(null);
     setRunId(null);
   }, []);
@@ -645,6 +634,10 @@ export function useTextplayController(): TextplayShellProps {
     setPlayerNameState(value);
   }, []);
 
+  const setPlayerIdentity = useCallback((value: string) => {
+    setPlayerIdentityState(value);
+  }, []);
+
   const refreshRouteAvailability = useCallback(async () => {
     try {
       const options = await queryTextplayChatRouteOptions({
@@ -666,9 +659,22 @@ export function useTextplayController(): TextplayShellProps {
     }
   }, [hookClient, routeOverride, setStatusBanner]);
 
-  const queryStoryRecords = useCallback(async (targetStoryId: string): Promise<TextplayPersistRecord[]> => {
-    const normalizedStoryId = targetStoryId.trim();
+  const queryStoryRecords = useCallback(async (input: {
+    storyId: string;
+    worldId: string;
+    agentId: string;
+  }): Promise<TextplayPersistRecord[]> => {
+    const normalizedStoryId = input.storyId.trim();
+    const normalizedWorldId = input.worldId.trim();
+    const normalizedAgentId = input.agentId.trim();
+    const normalizedPlayerId = playerId.trim();
     if (!normalizedStoryId) {
+      return [];
+    }
+    if (!normalizedPlayerId) {
+      return [];
+    }
+    if (!normalizedWorldId || !normalizedAgentId) {
       return [];
     }
 
@@ -677,15 +683,22 @@ export function useTextplayController(): TextplayShellProps {
       query: {
         op: 'listByStory',
         storyId: normalizedStoryId,
+        worldId: normalizedWorldId,
+        agentId: normalizedAgentId,
+        playerId: normalizedPlayerId,
         limit: 30,
       },
     });
 
     return parsePersistRecordList(payload);
-  }, [hookClient]);
+  }, [hookClient, playerId]);
 
   const loadRunRecovery = useCallback(async (input: {
     runId: string;
+    storyId: string;
+    worldId: string;
+    agentId: string;
+    playerId: string;
     afterSeq: number;
     append: boolean;
   }): Promise<{
@@ -711,6 +724,10 @@ export function useTextplayController(): TextplayShellProps {
       query: {
         op: 'getRun',
         runId: targetRunId,
+        storyId: input.storyId,
+        worldId: input.worldId,
+        agentId: input.agentId,
+        playerId: input.playerId,
         afterSeq: input.afterSeq,
         limit: 200,
       },
@@ -762,15 +779,127 @@ export function useTextplayController(): TextplayShellProps {
     };
   }, [hookClient]);
 
+  const applyRenderSuccessSurface = useCallback(async (input: {
+    result: TextplayRenderSuccess;
+    fallbackRecord: TextplayPersistRecord;
+    worldId: string;
+    agentId: string;
+    playerId: string;
+  }) => {
+    setLastRenderedText(input.result.text);
+    setRunEvents(input.result.runEvents);
+    setWarnings(input.result.meta.warnings);
+    setRunSnapshot(input.result.meta.runSnapshot);
+    setGapRefillApplied(Boolean(input.result.meta.runSnapshot.gapRefillApplied));
+    setRecords((previous) => upsertPersistRecord(previous, input.fallbackRecord));
+    setSelectedRecordRunId(input.result.meta.runId);
+
+    const rows = await queryStoryRecords({
+      storyId: input.result.meta.storyId,
+      worldId: input.worldId,
+      agentId: input.agentId,
+    });
+    setRecords(rows);
+    const selected = rows.find((row) => row.runId === input.result.meta.runId) || input.fallbackRecord;
+    applyRecordSurface(selected);
+
+    await loadRunRecovery({
+      runId: input.result.meta.runId,
+      storyId: input.result.meta.storyId,
+      worldId: input.worldId,
+      agentId: input.agentId,
+      playerId: input.playerId,
+      afterSeq: 0,
+      append: false,
+    });
+  }, [applyRecordSurface, loadRunRecovery, queryStoryRecords]);
+
+  const ensureStartupPackage = useCallback(async (input: {
+    story: TextplayStoryDetail;
+    normalizedPlayerId: string;
+  }): Promise<NonNullable<TextplayShellProps['startupPackage']> | null> => {
+    const targetStoryId = input.story.storyId.trim();
+    if (!targetStoryId) {
+      return null;
+    }
+
+    if (startupPackage && startupPackage.storyId === targetStoryId) {
+      return startupPackage;
+    }
+
+    setStartupLoading(true);
+    setStartupError(null);
+
+    try {
+      const startup = await loadStoryStartupPackage({
+        hookClient,
+        narrativeEngine,
+        detail: input.story,
+        playerId: input.normalizedPlayerId,
+      });
+
+      const resolvedAgentId = startup.cast.primaryAgentId.trim();
+      const nextDetail: TextplayStoryDetail = {
+        ...input.story,
+        primaryAgentId: resolvedAgentId,
+        participants: uniqueStrings([
+          ...input.story.participants,
+          ...startup.cast.participants,
+        ]),
+        agentBindingMissing: !resolvedAgentId,
+      };
+
+      setStartupPackage(startup);
+      setStorySnapshot(startup.snapshot);
+      setSelectedStory((previous) => {
+        if (!previous || previous.storyId !== nextDetail.storyId) {
+          return previous;
+        }
+        return nextDetail;
+      });
+      setStartupError(null);
+
+      if (typeof setRuntimeField === 'function' && !agentIdRuntime && isEntityId(resolvedAgentId)) {
+        setRuntimeField('agentId', resolvedAgentId);
+      }
+
+      return startup;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error || '');
+      setStartupPackage(null);
+      setStorySnapshot(null);
+      setStartupError(message || 'Failed to load startup package.');
+      if (typeof setStatusBanner === 'function') {
+        setStatusBanner({
+          kind: 'warn',
+          message: `TextPlay startup load failed: ${message || 'unknown error'}`,
+        });
+      }
+      return null;
+    } finally {
+      setStartupLoading(false);
+    }
+  }, [
+    agentIdRuntime,
+    hookClient,
+    loadStoryStartupPackage,
+    narrativeEngine,
+    setRuntimeField,
+    setStatusBanner,
+    startupPackage,
+  ]);
+
   const hydrateStorySelection = useCallback(async (storyId: string, options?: {
     clearRunSurface?: boolean;
   }) => {
     const normalizedStoryId = storyId.trim();
     const activeWorldId = (selectedWorldId || worldIdRuntime).trim();
+    const normalizedPlayerId = playerId.trim();
     if (!normalizedStoryId || !activeWorldId) {
       setSelectedStory(null);
       setStartupPackage(null);
       setStorySnapshot(null);
+      setStartupLoading(false);
       setStartupError(activeWorldId ? 'Story id is missing.' : 'worldId is missing from runtime context.');
       if (options?.clearRunSurface !== false) {
         resetRunSurface();
@@ -785,7 +914,7 @@ export function useTextplayController(): TextplayShellProps {
       resetRunSurface();
     }
 
-    setStartupLoading(true);
+    setStartupLoading(false);
     setStartupError(null);
 
     try {
@@ -804,12 +933,15 @@ export function useTextplayController(): TextplayShellProps {
         setSelectedStory(null);
         setStartupPackage(null);
         setStorySnapshot(null);
+        setStartupLoading(false);
         setStartupError('Story detail not found. Refresh and try again.');
         return;
       }
 
       setSelectedStory(detail);
+      setStartupPackage(null);
       setStorySnapshot(null);
+      setStartupLoading(false);
 
       if (typeof setRuntimeField === 'function') {
         setRuntimeField('worldId', detail.worldId);
@@ -819,38 +951,12 @@ export function useTextplayController(): TextplayShellProps {
         }
       }
 
-      const startup = await loadStoryStartupPackage({
-        hookClient,
-        narrativeEngine,
-        detail,
-        playerId: playerId.trim(),
+      const detailAgentId = (detail.primaryAgentId || agentIdRuntime).trim();
+      const rows = await queryStoryRecords({
+        storyId: detail.storyId,
+        worldId: detail.worldId,
+        agentId: detailAgentId,
       });
-
-      if (storyHydrationSeqRef.current !== seq) {
-        return;
-      }
-
-      const resolvedAgentId = startup.cast.primaryAgentId.trim();
-      const nextDetail: TextplayStoryDetail = {
-        ...detail,
-        primaryAgentId: resolvedAgentId,
-        participants: uniqueStrings([
-          ...detail.participants,
-          ...startup.cast.participants,
-        ]),
-        agentBindingMissing: !resolvedAgentId,
-      };
-
-      setStartupPackage(startup);
-      setStorySnapshot(startup.snapshot);
-      setSelectedStory(nextDetail);
-      setStartupError(null);
-
-      if (typeof setRuntimeField === 'function' && !agentIdRuntime && isEntityId(resolvedAgentId)) {
-        setRuntimeField('agentId', resolvedAgentId);
-      }
-
-      const rows = await queryStoryRecords(nextDetail.storyId);
       if (storyHydrationSeqRef.current !== seq) {
         return;
       }
@@ -859,12 +965,24 @@ export function useTextplayController(): TextplayShellProps {
       const nextSelectedRunId = rows[0]?.runId || null;
       setSelectedRecordRunId(nextSelectedRunId);
       setFailure(null);
+      setStartupError(null);
+
+      if (rows.length > 0 && normalizedPlayerId) {
+        void ensureStartupPackage({
+          story: detail,
+          normalizedPlayerId,
+        }).catch(() => {});
+      }
 
       if (nextSelectedRunId) {
         const selected = rows.find((row) => row.runId === nextSelectedRunId) || null;
         applyRecordSurface(selected);
         await loadRunRecovery({
           runId: nextSelectedRunId,
+          storyId: detail.storyId,
+          worldId: detail.worldId,
+          agentId: detailAgentId,
+          playerId: normalizedPlayerId,
           afterSeq: 0,
           append: false,
         });
@@ -876,18 +994,16 @@ export function useTextplayController(): TextplayShellProps {
         return;
       }
       const message = error instanceof Error ? error.message : String(error || '');
+      setSelectedStory(null);
       setStartupPackage(null);
       setStorySnapshot(null);
-      setStartupError(message || 'Failed to load startup package.');
+      setStartupLoading(false);
+      setStartupError(message || 'Failed to load story detail.');
       if (typeof setStatusBanner === 'function') {
         setStatusBanner({
           kind: 'warn',
-          message: `TextPlay startup load failed: ${message || 'unknown error'}`,
+          message: `TextPlay story detail load failed: ${message || 'unknown error'}`,
         });
-      }
-    } finally {
-      if (storyHydrationSeqRef.current === seq) {
-        setStartupLoading(false);
       }
     }
   }, [
@@ -895,12 +1011,12 @@ export function useTextplayController(): TextplayShellProps {
     applyRecordSurface,
     hookClient,
     loadRunRecovery,
-    narrativeEngine,
     playerId,
     queryStoryRecords,
     resetRunSurface,
     setRuntimeField,
     setStatusBanner,
+    ensureStartupPackage,
     selectedWorldId,
     worldIdRuntime,
   ]);
@@ -1038,20 +1154,37 @@ export function useTextplayController(): TextplayShellProps {
 
   const onSelectRecord = useCallback((nextRunId: string) => {
     setSelectedRecordRunId(nextRunId);
+    setStoryBrief(null);
     const selected = records.find((item) => item.runId === nextRunId) || null;
     applyRecordSurface(selected);
     setFailure(null);
 
+    const recoveryStoryId = (selected?.storyId || storyId).trim();
+    const recoveryWorldId = (selected?.worldId || worldId).trim();
+    const recoveryAgentId = (selected?.agentId || agentId).trim();
+    const recoveryPlayerId = (selected?.playerId || playerId).trim();
+    if (!recoveryStoryId || !recoveryWorldId || !recoveryAgentId || !recoveryPlayerId) {
+      return;
+    }
+
     void loadRunRecovery({
       runId: nextRunId,
+      storyId: recoveryStoryId,
+      worldId: recoveryWorldId,
+      agentId: recoveryAgentId,
+      playerId: recoveryPlayerId,
       afterSeq: 0,
       append: false,
     }).catch(() => {});
-  }, [applyRecordSurface, loadRunRecovery, records]);
+  }, [agentId, applyRecordSurface, loadRunRecovery, playerId, records, storyId, worldId]);
 
   const onLoadRecoveryDelta = useCallback(() => {
     const targetRunId = (selectedRecordRunId || runId || '').trim();
     if (!targetRunId) {
+      setDeltaStatus({
+        kind: 'warn',
+        message: 'Select a run first, then click Load Delta.',
+      });
       if (typeof setStatusBanner === 'function') {
         setStatusBanner({
           kind: 'warn',
@@ -1063,8 +1196,31 @@ export function useTextplayController(): TextplayShellProps {
     const afterSeq = runEvents.length > 0
       ? runEvents[runEvents.length - 1]!.seq
       : 0;
+    const selected = records.find((item) => item.runId === targetRunId) || null;
+    const recoveryStoryId = (selected?.storyId || storyId).trim();
+    const recoveryWorldId = (selected?.worldId || worldId).trim();
+    const recoveryAgentId = (selected?.agentId || agentId).trim();
+    const recoveryPlayerId = (selected?.playerId || playerId).trim();
+    if (!recoveryStoryId || !recoveryWorldId || !recoveryAgentId || !recoveryPlayerId) {
+      setDeltaStatus({
+        kind: 'warn',
+        message: 'Missing story/world/agent/player context; select story again then retry Load Delta.',
+      });
+      if (typeof setStatusBanner === 'function') {
+        setStatusBanner({
+          kind: 'warn',
+          message: 'Missing story/world/agent/player context; select story again then retry Load Delta.',
+        });
+      }
+      return;
+    }
+
     void loadRunRecovery({
       runId: targetRunId,
+      storyId: recoveryStoryId,
+      worldId: recoveryWorldId,
+      agentId: recoveryAgentId,
+      playerId: recoveryPlayerId,
       afterSeq,
       append: true,
     }).then((summary) => {
@@ -1072,6 +1228,10 @@ export function useTextplayController(): TextplayShellProps {
         return;
       }
       if (!summary.hasRecord) {
+        setDeltaStatus({
+          kind: 'warn',
+          message: `No persisted run found for ${targetRunId}.`,
+        });
         setStatusBanner({
           kind: 'warn',
           message: `Load Delta found no persisted run for ${targetRunId}. This usually means persistence did not keep this run locally.`,
@@ -1079,17 +1239,29 @@ export function useTextplayController(): TextplayShellProps {
         return;
       }
       if (summary.receivedEventCount <= 0) {
+        setDeltaStatus({
+          kind: 'info',
+          message: `No new delta events for run ${targetRunId}.`,
+        });
         setStatusBanner({
           kind: 'info',
           message: `No new delta events for run ${targetRunId}.`,
         });
         return;
       }
+      setDeltaStatus({
+        kind: 'success',
+        message: `Loaded ${summary.receivedEventCount} delta event${summary.receivedEventCount === 1 ? '' : 's'}${summary.gapRefillApplied ? ' (gap refill applied)' : ''}.`,
+      });
       setStatusBanner({
         kind: 'success',
         message: `Loaded ${summary.receivedEventCount} delta event${summary.receivedEventCount === 1 ? '' : 's'} for run ${targetRunId}${summary.gapRefillApplied ? ' (gap refill applied).' : '.'}`,
       });
     }).catch((error) => {
+      setDeltaStatus({
+        kind: 'error',
+        message: `Recovery query failed: ${error instanceof Error ? error.message : String(error || '')}`,
+      });
       if (typeof setStatusBanner === 'function') {
         setStatusBanner({
           kind: 'warn',
@@ -1097,7 +1269,7 @@ export function useTextplayController(): TextplayShellProps {
         });
       }
     });
-  }, [loadRunRecovery, runEvents, runId, selectedRecordRunId, setStatusBanner]);
+  }, [agentId, loadRunRecovery, playerId, records, runEvents, runId, selectedRecordRunId, setStatusBanner, storyId, worldId]);
 
   const onInputFocus = useCallback(() => {
     lastUserActivityMsRef.current = Date.now();
@@ -1215,6 +1387,7 @@ export function useTextplayController(): TextplayShellProps {
       const activeStory = selectedStory;
       const normalizedPlayerId = playerId.trim();
       const normalizedPlayerName = playerName.trim();
+      const normalizedPlayerIdentity = playerIdentity.trim();
       const normalizedMessage = inputText.trim();
       const normalizedWorldId = (activeStory?.worldId || selectedWorldId || worldIdRuntime).trim();
       const normalizedAgentId = (agentIdRuntime || activeStory?.primaryAgentId || '').trim();
@@ -1235,26 +1408,6 @@ export function useTextplayController(): TextplayShellProps {
           setStatusBanner({
             kind: 'warn',
             message: 'Click Start to generate opening narration before sending.',
-          });
-        }
-        return;
-      }
-
-      if (!startupPackage) {
-        if (typeof setStatusBanner === 'function') {
-          setStatusBanner({
-            kind: 'warn',
-            message: 'Startup package is required before sending.',
-          });
-        }
-        return;
-      }
-
-      if (!normalizedAgentId) {
-        if (typeof setStatusBanner === 'function') {
-          setStatusBanner({
-            kind: 'warn',
-            message: 'Primary agent binding is missing for this playable story.',
           });
         }
         return;
@@ -1284,6 +1437,41 @@ export function useTextplayController(): TextplayShellProps {
         return;
       }
 
+      if (!normalizedPlayerName) {
+        if (typeof setStatusBanner === 'function') {
+          setStatusBanner({
+            kind: 'warn',
+            message: 'Player Name is required before sending.',
+          });
+        }
+        return;
+      }
+
+      const startup = await ensureStartupPackage({
+        story: activeStory,
+        normalizedPlayerId,
+      });
+      if (!startup) {
+        return;
+      }
+
+      const contextualMessage = buildContextualUserMessage({
+        playerName: normalizedPlayerName,
+        playerIdentity: normalizedPlayerIdentity,
+        userMessage: normalizedMessage,
+      });
+
+      const resolvedAgentId = (normalizedAgentId || startup.cast.primaryAgentId || '').trim();
+      if (!resolvedAgentId) {
+        if (typeof setStatusBanner === 'function') {
+          setStatusBanner({
+            kind: 'warn',
+            message: 'Primary agent binding is missing for this playable story.',
+          });
+        }
+        return;
+      }
+
       lastUserActivityMsRef.current = Date.now();
       consecutiveInitiativeRef.current = 0;
       const nextRunId = createUlid();
@@ -1294,6 +1482,7 @@ export function useTextplayController(): TextplayShellProps {
       setIsRunning(true);
       setRunId(nextRunId);
       setFailure(null);
+      setStoryBrief(null);
       setGapRefillApplied(false);
       setInputTextState('');
 
@@ -1306,11 +1495,17 @@ export function useTextplayController(): TextplayShellProps {
           request: {
             storyId: activeStory.storyId,
             worldId: normalizedWorldId,
-            agentId: normalizedAgentId,
+            agentId: resolvedAgentId,
             playerId: normalizedPlayerId,
             playerName: normalizedPlayerName,
+            playerIdentity: normalizedPlayerIdentity || undefined,
             triggerSource: 'UserTurn',
-            userMessage: normalizedMessage,
+            userMessage: contextualMessage || normalizedMessage,
+            systemPayload: withPlayerContextSystemPayload({
+              playerId: normalizedPlayerId,
+              playerName: normalizedPlayerName,
+              playerIdentity: normalizedPlayerIdentity,
+            }),
             routeOverride: toRouteOverrideRecord(routeOverride),
             runId: nextRunId,
             traceId,
@@ -1325,48 +1520,27 @@ export function useTextplayController(): TextplayShellProps {
         });
 
         if (result.ok) {
-          const fallbackRecord: TextplayPersistRecord = {
-            id: createUlid(),
-            storyId: result.meta.storyId,
-            turnId: result.meta.turnId,
-            runId: result.meta.runId,
-            traceId: result.meta.traceId,
+          const fallbackRecord = createFallbackPersistRecord({
+            result,
+            worldId: normalizedWorldId,
+            agentId: resolvedAgentId,
             triggerSource: 'UserTurn',
             playerId: normalizedPlayerId,
+            playerIdentity: normalizedPlayerIdentity || undefined,
             userMessage: normalizedMessage,
             systemPayload: null,
-            text: result.text,
-            meta: result.meta,
-            runEvents: result.runEvents,
-            runSnapshot: result.meta.runSnapshot,
-            warnings: result.meta.warnings,
-            presenceReports: result.meta.presenceReports,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-
-          setLastRenderedText(result.text);
-          setRunEvents(result.runEvents);
-          setWarnings(result.meta.warnings);
-          setRunSnapshot(result.meta.runSnapshot);
-          setGapRefillApplied(Boolean(result.meta.runSnapshot.gapRefillApplied));
-          setRecords((previous) => upsertPersistRecord(previous, fallbackRecord));
-          setSelectedRecordRunId(result.meta.runId);
-
-          const rows = await queryStoryRecords(result.meta.storyId);
-          setRecords(rows);
-          const selected = rows.find((row) => row.runId === result.meta.runId) || fallbackRecord;
-          applyRecordSurface(selected);
-
-          await loadRunRecovery({
-            runId: result.meta.runId,
-            afterSeq: 0,
-            append: false,
+          });
+          await applyRenderSuccessSurface({
+            result,
+            fallbackRecord,
+            worldId: normalizedWorldId,
+            agentId: resolvedAgentId,
+            playerId: normalizedPlayerId,
           });
 
           if (typeof setStatusBanner === 'function') {
             setStatusBanner({
-              kind: result.meta.warnings.some((warning) => warning.code === TEXTPLAY_REASON.PERSISTENCE_FAILED_WARN)
+              kind: hasPersistenceWarning(result.meta.warnings)
                 ? 'warn'
                 : 'success',
               message: result.meta.warnings.length > 0
@@ -1411,24 +1585,23 @@ export function useTextplayController(): TextplayShellProps {
   }, [
     agentIdRuntime,
     aiClient,
-    applyRecordSurface,
+    applyRenderSuccessSurface,
+    ensureStartupPackage,
     hookClient,
     inputText,
     isRunning,
-    loadRunRecovery,
     narrativeEngine,
     playerId,
+    playerIdentity,
     playerName,
     presenceMachine,
-    queryStoryRecords,
-    selectedStory,
-    setStatusBanner,
-    startupPackage,
+    records.length,
     routeOverride,
+    selectedStory,
     selectedWorldId,
+    setStatusBanner,
     syncPresenceView,
     worldIdRuntime,
-    records.length,
   ]);
 
   const triggerInitiativeRender = useCallback((inactiveMs: number) => {
@@ -1440,6 +1613,7 @@ export function useTextplayController(): TextplayShellProps {
       const activeStory = selectedStory;
       const normalizedPlayerId = playerId.trim();
       const normalizedPlayerName = playerName.trim();
+      const normalizedPlayerIdentity = playerIdentity.trim();
       const normalizedWorldId = (activeStory?.worldId || selectedWorldId || worldIdRuntime).trim();
       const normalizedAgentId = (agentIdRuntime || activeStory?.primaryAgentId || '').trim();
 
@@ -1451,13 +1625,25 @@ export function useTextplayController(): TextplayShellProps {
       const traceId = createUlid();
       const controller = new AbortController();
       abortRef.current = controller;
+      const initiativeDirector = buildInitiativeDirectorMessage({
+        startup: startupPackage,
+        records,
+        playerName: normalizedPlayerName,
+      });
 
-      const initiativePayload = {
-        initiative: {
-          source: 'textplay.auto-tick',
-          inactiveMs,
+      const initiativePayload = withPlayerContextSystemPayload({
+        basePayload: {
+          initiative: {
+            source: 'textplay.auto-tick',
+            inactiveMs,
+            strategy: initiativeDirector.strategy,
+            directive: initiativeDirector.directive,
+          },
         },
-      };
+        playerId: normalizedPlayerId,
+        playerName: normalizedPlayerName,
+        playerIdentity: normalizedPlayerIdentity,
+      });
 
       setIsRunning(true);
       setRunId(nextRunId);
@@ -1480,7 +1666,9 @@ export function useTextplayController(): TextplayShellProps {
             agentId: normalizedAgentId,
             playerId: normalizedPlayerId,
             playerName: normalizedPlayerName,
+            playerIdentity: normalizedPlayerIdentity || undefined,
             triggerSource: 'AgentInitiative',
+            userMessage: initiativeDirector.directive,
             systemPayload: initiativePayload,
             routeOverride: toRouteOverrideRecord(routeOverride),
             runId: nextRunId,
@@ -1496,48 +1684,27 @@ export function useTextplayController(): TextplayShellProps {
         });
 
         if (result.ok) {
-          const fallbackRecord: TextplayPersistRecord = {
-            id: createUlid(),
-            storyId: result.meta.storyId,
-            turnId: result.meta.turnId,
-            runId: result.meta.runId,
-            traceId: result.meta.traceId,
+          const fallbackRecord = createFallbackPersistRecord({
+            result,
+            worldId: normalizedWorldId,
+            agentId: normalizedAgentId,
             triggerSource: 'AgentInitiative',
             playerId: normalizedPlayerId,
-            userMessage: '',
-            systemPayload: initiativePayload,
-            text: result.text,
-            meta: result.meta,
-            runEvents: result.runEvents,
-            runSnapshot: result.meta.runSnapshot,
-            warnings: result.meta.warnings,
-            presenceReports: result.meta.presenceReports,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-
-          setLastRenderedText(result.text);
-          setRunEvents(result.runEvents);
-          setWarnings(result.meta.warnings);
-          setRunSnapshot(result.meta.runSnapshot);
-          setGapRefillApplied(Boolean(result.meta.runSnapshot.gapRefillApplied));
-          setRecords((previous) => upsertPersistRecord(previous, fallbackRecord));
-          setSelectedRecordRunId(result.meta.runId);
-
-          const rows = await queryStoryRecords(result.meta.storyId);
-          setRecords(rows);
-          const selected = rows.find((row) => row.runId === result.meta.runId) || fallbackRecord;
-          applyRecordSurface(selected);
-
-          await loadRunRecovery({
-            runId: result.meta.runId,
-            afterSeq: 0,
-            append: false,
+            playerIdentity: normalizedPlayerIdentity || undefined,
+            userMessage: initiativeDirector.directive,
+            systemPayload: initiativePayload || null,
+          });
+          await applyRenderSuccessSurface({
+            result,
+            fallbackRecord,
+            worldId: normalizedWorldId,
+            agentId: normalizedAgentId,
+            playerId: normalizedPlayerId,
           });
 
           if (typeof setStatusBanner === 'function') {
             setStatusBanner({
-              kind: result.meta.warnings.some((warning) => warning.code === TEXTPLAY_REASON.PERSISTENCE_FAILED_WARN)
+              kind: hasPersistenceWarning(result.meta.warnings)
                 ? 'warn'
                 : 'info',
               message: result.meta.warnings.length > 0
@@ -1580,21 +1747,21 @@ export function useTextplayController(): TextplayShellProps {
   }, [
     agentIdRuntime,
     aiClient,
-    applyRecordSurface,
+    applyRenderSuccessSurface,
     hookClient,
     isRunning,
-    loadRunRecovery,
     narrativeEngine,
     playerId,
+    playerIdentity,
     playerName,
     presenceMachine,
-    queryStoryRecords,
-    selectedStory,
-    setStatusBanner,
-    startupPackage,
     routeOverride,
+    records,
+    selectedStory,
     selectedWorldId,
+    setStatusBanner,
     syncPresenceView,
+    startupPackage,
     worldIdRuntime,
   ]);
 
@@ -1605,9 +1772,10 @@ export function useTextplayController(): TextplayShellProps {
       }
 
       const activeStory = selectedStory;
-      const startup = startupPackage;
+      let startup = startupPackage;
       const normalizedPlayerId = playerId.trim();
       const normalizedPlayerName = playerName.trim();
+      const normalizedPlayerIdentity = playerIdentity.trim();
       const normalizedWorldId = (activeStory?.worldId || selectedWorldId || worldIdRuntime).trim();
       const normalizedAgentId = (agentIdRuntime || activeStory?.primaryAgentId || '').trim();
       const started = records.length > 0;
@@ -1621,23 +1789,109 @@ export function useTextplayController(): TextplayShellProps {
         }
         return;
       }
-      if (!startup) {
+      if (!normalizedPlayerName) {
         if (typeof setStatusBanner === 'function') {
           setStatusBanner({
             kind: 'warn',
-            message: 'Startup package is required before start.',
+            message: 'Player Name is required before start.',
           });
         }
         return;
       }
-      if (started) {
-        return;
-      }
-      if (!normalizedPlayerId || !normalizedWorldId || !normalizedAgentId) {
+      if (!normalizedPlayerId || !normalizedWorldId) {
         if (typeof setStatusBanner === 'function') {
           setStatusBanner({
             kind: 'warn',
-            message: 'Missing player/world/agent binding for story start.',
+            message: 'Missing player/world binding for story start.',
+          });
+        }
+        return;
+      }
+
+      startup = startup || await ensureStartupPackage({
+        story: activeStory,
+        normalizedPlayerId,
+      });
+      if (!startup) {
+        return;
+      }
+
+      if (started) {
+        const controller = new AbortController();
+        abortRef.current = controller;
+        setIsRunning(true);
+        setFailure(null);
+        setStoryBrief(null);
+        try {
+          let canonicalTurns: NarrativeTurnWindowResponse['turns'] = [];
+          try {
+            const turnWindow = await queryNarrativeTurnWindow({
+              narrativeEngine,
+              request: {
+                storyId: activeStory.storyId,
+                limit: 20,
+              },
+            });
+            canonicalTurns = turnWindow.turns;
+          } catch {
+            canonicalTurns = [];
+          }
+
+          const recapPrompt = buildStoryRecapPrompt({
+            story: activeStory,
+            startup,
+            playerName: normalizedPlayerName,
+            playerIdentity: normalizedPlayerIdentity,
+            records,
+            canonicalTurns,
+          });
+          const recapResult = await aiClient.generateText({
+            routeHint: 'chat/default',
+            routeOverride: toRouteOverrideRecord(routeOverride),
+            prompt: recapPrompt,
+            mode: 'SCENE_TURN',
+            worldId: normalizedWorldId,
+            abortSignal: controller.signal,
+          });
+          const recapText = String(recapResult.text || '').trim();
+          if (!recapText) {
+            throw new Error('TEXTPLAY_RECAP_EMPTY_RESPONSE');
+          }
+          setStoryBrief({
+            mode: 'recap',
+            text: recapText,
+            generatedAt: new Date().toISOString(),
+          });
+          setLastRenderedText(recapText);
+          if (typeof setStatusBanner === 'function') {
+            setStatusBanner({
+              kind: 'info',
+              message: 'Story recap generated. You can continue playing now.',
+            });
+          }
+        } catch (error) {
+          if (typeof setStatusBanner === 'function') {
+            setStatusBanner({
+              kind: 'warn',
+              message: `TextPlay recap failed: ${error instanceof Error ? error.message : String(error || '')}`,
+            });
+          }
+        } finally {
+          if (abortRef.current === controller) {
+            abortRef.current = null;
+          }
+          setIsRunning(false);
+          syncPresenceView();
+        }
+        return;
+      }
+
+      const resolvedAgentId = (normalizedAgentId || startup.cast.primaryAgentId || '').trim();
+      if (!resolvedAgentId) {
+        if (typeof setStatusBanner === 'function') {
+          setStatusBanner({
+            kind: 'warn',
+            message: 'Primary agent binding is missing for this playable story.',
           });
         }
         return;
@@ -1653,11 +1907,19 @@ export function useTextplayController(): TextplayShellProps {
         startup,
         playerId: normalizedPlayerId,
         playerName: normalizedPlayerName,
+        playerIdentity: normalizedPlayerIdentity,
+      });
+      const openingSystemPayload = withPlayerContextSystemPayload({
+        basePayload: openingPayload,
+        playerId: normalizedPlayerId,
+        playerName: normalizedPlayerName,
+        playerIdentity: normalizedPlayerIdentity,
       });
 
       setIsRunning(true);
       setRunId(nextRunId);
       setFailure(null);
+      setStoryBrief(null);
       setGapRefillApplied(false);
 
       const presenceMark = presenceMachine.mark();
@@ -1669,11 +1931,12 @@ export function useTextplayController(): TextplayShellProps {
           request: {
             storyId: activeStory.storyId,
             worldId: normalizedWorldId,
-            agentId: normalizedAgentId,
+            agentId: resolvedAgentId,
             playerId: normalizedPlayerId,
             playerName: normalizedPlayerName,
+            playerIdentity: normalizedPlayerIdentity || undefined,
             triggerSource: 'SystemEvent',
-            systemPayload: openingPayload,
+            systemPayload: openingSystemPayload,
             routeOverride: toRouteOverrideRecord(routeOverride),
             runId: nextRunId,
             traceId,
@@ -1688,48 +1951,33 @@ export function useTextplayController(): TextplayShellProps {
         });
 
         if (result.ok) {
-          const fallbackRecord: TextplayPersistRecord = {
-            id: createUlid(),
-            storyId: result.meta.storyId,
-            turnId: result.meta.turnId,
-            runId: result.meta.runId,
-            traceId: result.meta.traceId,
+          const fallbackRecord = createFallbackPersistRecord({
+            result,
+            worldId: normalizedWorldId,
+            agentId: resolvedAgentId,
             triggerSource: 'SystemEvent',
             playerId: normalizedPlayerId,
+            playerIdentity: normalizedPlayerIdentity || undefined,
             userMessage: '',
-            systemPayload: openingPayload,
+            systemPayload: openingSystemPayload || null,
+          });
+
+          setStoryBrief({
+            mode: 'opening',
             text: result.text,
-            meta: result.meta,
-            runEvents: result.runEvents,
-            runSnapshot: result.meta.runSnapshot,
-            warnings: result.meta.warnings,
-            presenceReports: result.meta.presenceReports,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-
-          setLastRenderedText(result.text);
-          setRunEvents(result.runEvents);
-          setWarnings(result.meta.warnings);
-          setRunSnapshot(result.meta.runSnapshot);
-          setGapRefillApplied(Boolean(result.meta.runSnapshot.gapRefillApplied));
-          setRecords((previous) => upsertPersistRecord(previous, fallbackRecord));
-          setSelectedRecordRunId(result.meta.runId);
-
-          const rows = await queryStoryRecords(result.meta.storyId);
-          setRecords(rows);
-          const selected = rows.find((row) => row.runId === result.meta.runId) || fallbackRecord;
-          applyRecordSurface(selected);
-
-          await loadRunRecovery({
-            runId: result.meta.runId,
-            afterSeq: 0,
-            append: false,
+            generatedAt: new Date().toISOString(),
+          });
+          await applyRenderSuccessSurface({
+            result,
+            fallbackRecord,
+            worldId: normalizedWorldId,
+            agentId: resolvedAgentId,
+            playerId: normalizedPlayerId,
           });
 
           if (typeof setStatusBanner === 'function') {
             setStatusBanner({
-              kind: result.meta.warnings.some((warning) => warning.code === TEXTPLAY_REASON.PERSISTENCE_FAILED_WARN)
+              kind: hasPersistenceWarning(result.meta.warnings)
                 ? 'warn'
                 : 'success',
               message: result.meta.warnings.length > 0
@@ -1772,16 +2020,17 @@ export function useTextplayController(): TextplayShellProps {
   }, [
     agentIdRuntime,
     aiClient,
-    applyRecordSurface,
+    applyRenderSuccessSurface,
+    ensureStartupPackage,
     hookClient,
     isRunning,
-    loadRunRecovery,
     narrativeEngine,
     playerId,
+    playerIdentity,
     playerName,
     presenceMachine,
-    queryStoryRecords,
-    records.length,
+    queryNarrativeTurnWindow,
+    records,
     routeOverride,
     selectedStory,
     selectedWorldId,
@@ -1803,8 +2052,20 @@ export function useTextplayController(): TextplayShellProps {
         });
       }
       if (selectedRecordRunId) {
+        const selected = records.find((item) => item.runId === selectedRecordRunId) || null;
+        const recoveryStoryId = (selected?.storyId || storyId).trim();
+        const recoveryWorldId = (selected?.worldId || worldId).trim();
+        const recoveryAgentId = (selected?.agentId || agentId).trim();
+        const recoveryPlayerId = (selected?.playerId || playerId).trim();
+        if (!recoveryStoryId || !recoveryWorldId || !recoveryAgentId || !recoveryPlayerId) {
+          return;
+        }
         await loadRunRecovery({
           runId: selectedRecordRunId,
+          storyId: recoveryStoryId,
+          worldId: recoveryWorldId,
+          agentId: recoveryAgentId,
+          playerId: recoveryPlayerId,
           afterSeq: 0,
           append: false,
         });
@@ -1819,6 +2080,11 @@ export function useTextplayController(): TextplayShellProps {
     });
   }, [
     hydrateStorySelection,
+    records,
+    storyId,
+    worldId,
+    agentId,
+    playerId,
     loadWorldList,
     loadStoryList,
     loadRunRecovery,
@@ -1835,22 +2101,52 @@ export function useTextplayController(): TextplayShellProps {
   }, [playerId, playerIdSeed]);
 
   useEffect(() => {
-    if (!playerName && playerNameSeed) {
-      setPlayerNameState(playerNameSeed);
+    if (previousPlayerProfileScopeRef.current !== playerProfileScope) {
+      return;
     }
-  }, [playerName, playerNameSeed]);
+    const normalizedPlayerName = playerName.trim();
+    const normalizedPlayerIdentity = playerIdentity.trim();
+    setPlayerProfilesByScope((previous) => {
+      const existing = previous[playerProfileScope];
+      if (existing
+        && existing.playerName === normalizedPlayerName
+        && existing.playerIdentity === normalizedPlayerIdentity) {
+        return previous;
+      }
+      return {
+        ...previous,
+        [playerProfileScope]: {
+          playerName: normalizedPlayerName,
+          playerIdentity: normalizedPlayerIdentity,
+        },
+      };
+    });
+  }, [playerIdentity, playerName, playerProfileScope]);
+
+  useEffect(() => {
+    const previousScope = previousPlayerProfileScopeRef.current;
+    if (previousScope === playerProfileScope) {
+      return;
+    }
+    previousPlayerProfileScopeRef.current = playerProfileScope;
+    const nextProfile = playerProfilesByScope[playerProfileScope];
+    if (nextProfile) {
+      setPlayerNameState(nextProfile.playerName);
+      setPlayerIdentityState(nextProfile.playerIdentity);
+      return;
+    }
+    const carryOver = previousScope === GLOBAL_PLAYER_PROFILE_SCOPE
+      ? playerProfilesByScope[previousScope]
+      : null;
+    setPlayerNameState(carryOver?.playerName || fallbackPlayerNameSeed);
+    setPlayerIdentityState(carryOver?.playerIdentity || '');
+  }, [fallbackPlayerNameSeed, playerProfileScope, playerProfilesByScope]);
 
   useEffect(() => {
     if (typeof setRuntimeField === 'function' && playerId.trim()) {
       setRuntimeField('playerId', playerId.trim());
     }
   }, [playerId, setRuntimeField]);
-
-  useEffect(() => {
-    if (typeof setRuntimeField === 'function') {
-      setRuntimeField('playerName', playerName.trim());
-    }
-  }, [playerName, setRuntimeField]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -1956,22 +2252,25 @@ export function useTextplayController(): TextplayShellProps {
   }, [presenceMachine]);
 
   const storyStarted = records.length > 0;
+  const hasRouteConfig = routeLabel !== 'unavailable' && routeModel.trim().length > 0;
+  const hasStoryRuntimeBinding = storyId.trim().length > 0
+    && playerId.trim().length > 0
+    && worldId.trim().length > 0;
+  const hasPlayerName = playerName.trim().length > 0;
+
   const canStartStory = !isRunning
     && !!selectedStory
-    && !!startupPackage
     && !startupLoading
-    && !selectedStory?.agentBindingMissing
-    && routeLabel !== 'unavailable'
-    && routeModel.trim().length > 0
-    && startupPackage.snapshot.contextCoverage.canon
-    && startupPackage.snapshot.contextCoverage.story
-    && storyId.trim().length > 0
-    && playerId.trim().length > 0
-    && worldId.trim().length > 0
-    && agentId.trim().length > 0;
+    && hasRouteConfig
+    && hasStoryRuntimeBinding
+    && hasPlayerName;
 
-  const canSend = canStartStory
+  const canSend = !isRunning
+    && !!selectedStory
     && storyStarted
+    && hasRouteConfig
+    && hasStoryRuntimeBinding
+    && hasPlayerName
     && inputText.trim().length > 0;
 
   return {
@@ -1980,6 +2279,8 @@ export function useTextplayController(): TextplayShellProps {
     agentId,
     playerId,
     playerName,
+    playerIdentity,
+    storyBrief,
     routeLabel,
     worlds,
     selectedWorldId,
@@ -2019,8 +2320,10 @@ export function useTextplayController(): TextplayShellProps {
     warnings,
     runSnapshot,
     gapRefillApplied,
+    deltaStatus,
     failure,
     setPlayerName,
+    setPlayerIdentity,
     setInputText,
     onInputFocus,
     onInputBlur,

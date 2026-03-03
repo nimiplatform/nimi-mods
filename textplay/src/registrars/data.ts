@@ -30,18 +30,28 @@ export async function registerTextplayDataCapabilities(input: {
       }
 
       const payload = parsed.data;
+      const queryData = (request: {
+        capability: string;
+        query: Record<string, unknown>;
+      }) => input.hookClient.data.query(request);
       switch (payload.op) {
         case 'upsert': {
-          const record = upsertTextplayPersistRecord(payload.record);
+          const record = await upsertTextplayPersistRecord({
+            queryData,
+            record: payload.record,
+          });
           return {
             ok: true,
             record,
           };
         }
         case 'getByTurn': {
-          const records = getTextplayPersistRecordsByTurn({
+          const records = await getTextplayPersistRecordsByTurn({
+            queryData,
             storyId: payload.storyId,
             turnId: payload.turnId,
+            worldId: payload.worldId,
+            agentId: payload.agentId,
           });
           return {
             ok: true,
@@ -49,8 +59,13 @@ export async function registerTextplayDataCapabilities(input: {
           };
         }
         case 'getRun': {
-          const result = getTextplayPersistRunEvents({
+          const result = await getTextplayPersistRunEvents({
+            queryData,
             runId: payload.runId,
+            storyId: payload.storyId,
+            worldId: payload.worldId,
+            agentId: payload.agentId,
+            playerId: payload.playerId,
             afterSeq: payload.afterSeq,
             limit: payload.limit,
           });
@@ -69,8 +84,12 @@ export async function registerTextplayDataCapabilities(input: {
           };
         }
         case 'listByStory': {
-          const records = listTextplayPersistRecordsByStory({
+          const records = await listTextplayPersistRecordsByStory({
+            queryData,
             storyId: payload.storyId,
+            worldId: payload.worldId,
+            agentId: payload.agentId,
+            playerId: payload.playerId,
             limit: payload.limit,
           });
           return {

@@ -6,6 +6,7 @@ import type {
   TextplayPresenceState,
   TextplayRenderFailure,
   TextplayStoryDetail,
+  TextplayStoryBrief,
   TextplayStorySnapshot,
   TextplayStorySummary,
   TextplayWorldSummary,
@@ -21,6 +22,7 @@ export type TextplayShellProps = {
   agentId: string;
   playerId: string;
   playerName: string;
+  playerIdentity: string;
   routeLabel: string;
   worlds: TextplayWorldSummary[];
   selectedWorldId: string | null;
@@ -32,6 +34,7 @@ export type TextplayShellProps = {
   startupPackage: TextplayStartupPackage | null;
   startupLoading: boolean;
   startupError: string | null;
+  storyBrief: TextplayStoryBrief | null;
   storySnapshot: TextplayStorySnapshot | null;
   presenceState: TextplayPresenceState;
   presenceReports: TextplayPresenceReport[];
@@ -60,8 +63,13 @@ export type TextplayShellProps = {
   warnings: TextplayWarning[];
   runSnapshot: TextplayRunSnapshot | null;
   gapRefillApplied: boolean;
+  deltaStatus: {
+    kind: 'info' | 'warn' | 'success' | 'error';
+    message: string;
+  } | null;
   failure: TextplayRenderFailure | null;
   setPlayerName: (value: string) => void;
+  setPlayerIdentity: (value: string) => void;
   setInputText: (value: string) => void;
   onInputFocus: () => void;
   onInputBlur: () => void;
@@ -103,6 +111,44 @@ function formatRecordTitle(record: TextplayPersistRecord): string {
   return `${message.slice(0, 40)}...`;
 }
 
+function formatTriggerSourceLabel(triggerSource: TextplayPersistRecord['triggerSource']): string {
+  if (triggerSource === 'AgentInitiative') {
+    return 'World Event';
+  }
+  if (triggerSource === 'SystemEvent') {
+    return 'Opening / System';
+  }
+  return 'Player Turn';
+}
+
+function triggerSourceBadgeClass(triggerSource: TextplayPersistRecord['triggerSource']): string {
+  if (triggerSource === 'AgentInitiative') {
+    return 'bg-violet-50 text-violet-700';
+  }
+  if (triggerSource === 'SystemEvent') {
+    return 'bg-emerald-50 text-emerald-700';
+  }
+  return 'bg-blue-50 text-blue-700';
+}
+
+function formatRouteLabelFromRecord(record: TextplayPersistRecord): string {
+  const route = record.meta?.route;
+  if (!route) {
+    return 'unknown';
+  }
+  return `${route.source || 'unknown'}/${route.connectorId || 'default'}:${route.model || 'unknown'}`;
+}
+
+function findLastStepError(events: TextplayRunEvent[]): TextplayRunEvent | null {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event?.eventType === 'step.error') {
+      return event;
+    }
+  }
+  return null;
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object') {
     return null;
@@ -119,32 +165,61 @@ function firstNonEmptyText(values: unknown[]): string {
   return '';
 }
 
-function isStoryStartRecord(record: TextplayPersistRecord): boolean {
+function resolveRecordStoryBrief(record: TextplayPersistRecord): TextplayStoryBrief | null {
   if (record.triggerSource !== 'SystemEvent') {
-    return false;
+    return null;
   }
   const openingPayload = asRecord(asRecord(record.systemPayload)?.opening);
-  return String(openingPayload?.mode || '').trim() === 'story-start';
+  const mode = String(openingPayload?.mode || '').trim();
+  if (mode !== 'story-start' && mode !== 'story-recap') {
+    return null;
+  }
+  const text = String(record.text || '').trim();
+  if (!text) {
+    return null;
+  }
+  return {
+    mode: mode === 'story-recap' ? 'recap' : 'opening',
+    text,
+    generatedAt: record.updatedAt,
+  };
 }
 
-function resolveOpeningNarration(props: TextplayShellProps): string {
-  const openingRecord = props.records.find(isStoryStartRecord);
-  const openingText = String(openingRecord?.text || '').trim();
-  if (openingText) {
-    return openingText;
+function resolveStoryBrief(props: TextplayShellProps): TextplayStoryBrief | null {
+  if (props.storyBrief && props.storyBrief.text.trim()) {
+    return props.storyBrief;
+  }
+  for (const record of props.records) {
+    const brief = resolveRecordStoryBrief(record);
+    if (brief) {
+      return brief;
+    }
   }
   if (props.records.length <= 1) {
-    return String(props.lastRenderedText || '').trim();
+    const fallback = String(props.lastRenderedText || '').trim();
+    if (fallback) {
+      return {
+        mode: 'opening',
+        text: fallback,
+        generatedAt: '',
+      };
+    }
   }
-  return '';
+  return null;
 }
 
 function renderOpeningCard(props: TextplayShellProps): React.ReactNode {
   const startup = props.startupPackage;
   const story = props.selectedStory;
-  const openingNarration = resolveOpeningNarration(props);
+  const storyBrief = resolveStoryBrief(props);
+  const briefText = storyBrief?.text || '';
+  const briefMode = storyBrief?.mode || 'opening';
 
   if (!props.selectedStoryId) {
+    return null;
+  }
+
+  if (!props.storyStarted && !props.startupLoading && !props.startupPackage && !props.startupError) {
     return null;
   }
 
@@ -165,10 +240,31 @@ function renderOpeningCard(props: TextplayShellProps): React.ReactNode {
   }
 
   if (!startup || !story) {
+    if (!briefText) {
+      return (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          Startup package is required before showing opening brief.
+        </div>
+      );
+    }
+
     return (
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-        Startup package is required before showing opening brief.
-      </div>
+      <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-sm font-semibold text-emerald-900">Opening Brief</div>
+          <div className="text-[11px] text-emerald-700">
+            recovered from persisted run
+          </div>
+        </div>
+        <div className="mt-2 rounded-lg border border-emerald-200 bg-white p-2">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-emerald-700">
+            {briefMode === 'recap' ? 'Story Recap' : 'Opening Narration'}
+          </div>
+          <div className="mt-1 whitespace-pre-line text-sm leading-6 text-emerald-900">
+            {briefText}
+          </div>
+        </div>
+      </section>
     );
   }
 
@@ -213,7 +309,7 @@ function renderOpeningCard(props: TextplayShellProps): React.ReactNode {
   ].filter((line) => line.trim().length > 0).join('；');
   const backgroundLines = [
     startup.background.summary || story.summary || '暂无背景信息。',
-    `玩家身份：${props.playerName || '你'}（${playerRole}）`,
+    `玩家身份：${props.playerName || '你'}（${props.playerIdentity || playerRole}）`,
     playerBackground ? `玩家背景：${playerBackground}` : '',
     currentSituation ? `当前处境：${currentSituation}` : '',
   ].filter((line) => line.trim().length > 0);
@@ -221,7 +317,9 @@ function renderOpeningCard(props: TextplayShellProps): React.ReactNode {
   return (
     <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-sm font-semibold text-emerald-900">Opening Brief</div>
+        <div className="text-sm font-semibold text-emerald-900">
+          {briefMode === 'recap' ? 'Story Recap' : 'Opening Brief'}
+        </div>
         <div className="flex flex-wrap gap-1 text-[11px]">
           <span className="rounded-full bg-white px-2 py-0.5 text-emerald-700">phase: {phase}</span>
           <span className="rounded-full bg-white px-2 py-0.5 text-emerald-700">objective: {objective}</span>
@@ -230,6 +328,9 @@ function renderOpeningCard(props: TextplayShellProps): React.ReactNode {
 
       <div className="mt-2 grid grid-cols-1 gap-1 text-xs text-emerald-900 md:grid-cols-2">
         <div className="rounded bg-white px-2 py-1">玩家称呼: {props.playerName || '(未设置)'}</div>
+        <div className="rounded bg-white px-2 py-1">
+          玩家身份设定: {props.playerIdentity || '(未设置，将使用剧情默认身份)'}
+        </div>
         <div className="rounded bg-white px-2 py-1">主视角角色: {startup.cast.primaryAgentId || '(missing)'}</div>
         <div className="rounded bg-white px-2 py-1">玩家角色: {playerRole}</div>
         <div className="rounded bg-white px-2 py-1">当前地点: {sceneLabel}</div>
@@ -246,9 +347,13 @@ function renderOpeningCard(props: TextplayShellProps): React.ReactNode {
       </div>
 
       <div className="mt-2 rounded-lg border border-emerald-200 bg-white p-2">
-        <div className="text-[11px] font-medium uppercase tracking-wide text-emerald-700">Opening Narration</div>
+        <div className="text-[11px] font-medium uppercase tracking-wide text-emerald-700">
+          {briefMode === 'recap' ? 'Story Recap' : 'Opening Narration'}
+        </div>
         <div className="mt-1 whitespace-pre-line text-sm leading-6 text-emerald-900">
-          {openingNarration || 'Click Start to generate opening narration.'}
+          {briefText || (briefMode === 'recap'
+            ? 'Click Start to generate story recap.'
+            : 'Click Start to generate opening narration.')}
         </div>
       </div>
     </section>
@@ -285,9 +390,22 @@ function renderStorySummary(story: TextplayStoryDetail | null) {
 export function TextplayShell(props: TextplayShellProps) {
   const routeModelListId = 'textplay-route-model-list';
   const activeConnector = props.routeConnectors.find((item) => item.id === props.routeConnectorId) || null;
-  const openingNarration = resolveOpeningNarration(props);
+  const storyBrief = resolveStoryBrief(props);
+  const openingNarration = storyBrief?.text || '';
   const currentReplyText = String(props.lastRenderedText || '').trim();
   const showCurrentReplyCard = currentReplyText.length > 0 && currentReplyText !== openingNarration;
+  const selectedRecord = props.records.find((record) => record.runId === props.selectedRecordRunId) || null;
+  const initiativeRecords = props.records.filter((record) => record.triggerSource === 'AgentInitiative');
+  const latestSourceLabel = selectedRecord ? formatTriggerSourceLabel(selectedRecord.triggerSource) : 'Latest';
+  const lastErrorEvent = findLastStepError(props.failure?.runEvents || props.runEvents);
+  const diagnosticReasonCode = props.failure?.reasonCode || lastErrorEvent?.reasonCode || '';
+  const diagnosticTraceId = props.failure?.traceId
+    || selectedRecord?.traceId
+    || '';
+  const diagnosticStep = lastErrorEvent?.step || '';
+  const playerNameMissingForStart = Boolean(props.selectedStoryId)
+    && !props.storyStarted
+    && props.playerName.trim().length === 0;
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex-row">
@@ -385,12 +503,31 @@ export function TextplayShell(props: TextplayShellProps) {
           <label className="mt-2 block text-xs text-gray-600">
             Player Name
             <input
-              className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm"
+              className={`mt-1.5 w-full rounded-lg border bg-white px-2.5 py-2 text-sm ${
+                playerNameMissingForStart ? 'border-rose-300' : 'border-slate-300'
+              }`}
               value={props.playerName}
               onChange={(event) => props.setPlayerName(event.target.value)}
               placeholder="输入你的角色名/称呼"
               disabled={props.isRunning}
+              required
+              aria-invalid={playerNameMissingForStart}
             />
+            {playerNameMissingForStart ? (
+              <div className="mt-1 text-[11px] text-rose-600">Player Name is required before Start.</div>
+            ) : null}
+          </label>
+
+          <label className="mt-2 block text-xs text-gray-600">
+            Player Identity
+            <input
+              className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm"
+              value={props.playerIdentity}
+              onChange={(event) => props.setPlayerIdentity(event.target.value)}
+              placeholder="例如：天南散修 / 玄门弟子 / 游历剑修"
+              disabled={props.isRunning}
+            />
+            <div className="mt-1 text-[11px] text-gray-500">用于叙事身份绑定；留空将使用剧情上下文默认身份。</div>
           </label>
 
           <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-gray-600">
@@ -449,7 +586,9 @@ export function TextplayShell(props: TextplayShellProps) {
 
             {showCurrentReplyCard ? (
               <section className="rounded-xl border border-blue-200 bg-blue-50 p-3">
-                <div className="text-[11px] font-medium uppercase tracking-wide text-blue-700">Latest Response</div>
+                <div className="text-[11px] font-medium uppercase tracking-wide text-blue-700">
+                  Latest Response · {latestSourceLabel}
+                </div>
                 <div className="mt-1 whitespace-pre-line text-sm leading-6 text-blue-900">
                   {currentReplyText}
                 </div>
@@ -466,6 +605,9 @@ export function TextplayShell(props: TextplayShellProps) {
                 <div className="divide-y divide-gray-100">
                   {props.records.map((record) => {
                     const active = record.runId === props.selectedRecordRunId;
+                    const snippet = String(record.text || '').trim();
+                    const snippetText = snippet ? snippet.slice(0, 120) : '(empty)';
+                    const routeLabel = formatRouteLabelFromRecord(record);
                     return (
                       <button
                         key={record.id}
@@ -473,17 +615,53 @@ export function TextplayShell(props: TextplayShellProps) {
                         className={`w-full px-3 py-2 text-left ${active ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
                         onClick={() => props.onSelectRecord(record.runId)}
                       >
-                        <div className="text-sm font-medium text-gray-900">{formatRecordTitle(record)}</div>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="text-sm font-medium text-gray-900">{formatRecordTitle(record)}</div>
+                          <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${triggerSourceBadgeClass(record.triggerSource)}`}>
+                            {formatTriggerSourceLabel(record.triggerSource)}
+                          </span>
+                        </div>
                         <div className="mt-1 text-[11px] text-gray-500">
                           turn={record.turnId} · run={record.runId}
                         </div>
-                        <div className="mt-1 text-xs text-gray-700">{record.text.slice(0, 120)}</div>
+                        <div className="mt-1 text-[11px] text-gray-500">
+                          status={record.runSnapshot.status} · seq={record.runSnapshot.lastSeq} · route={routeLabel}
+                        </div>
+                        <div className="mt-1 break-all text-[11px] text-gray-500">
+                          traceId={record.traceId} · promptTraceId={record.meta.promptTraceId || '(none)'}
+                        </div>
+                        <div className="mt-1 text-xs text-gray-700">{snippetText}</div>
                       </button>
                     );
                   })}
                 </div>
               )}
             </section>
+
+            {initiativeRecords.length > 0 ? (
+              <section className="overflow-hidden rounded-xl border border-violet-200 bg-violet-50">
+                <div className="border-b border-violet-200 bg-violet-100 px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-violet-700">
+                  World Event Channel ({initiativeRecords.length})
+                </div>
+                <div className="max-h-48 divide-y divide-violet-200 overflow-auto">
+                  {initiativeRecords.slice(0, 8).map((record) => (
+                    <button
+                      key={`initiative-${record.id}`}
+                      type="button"
+                      className="w-full px-3 py-2 text-left hover:bg-violet-100"
+                      onClick={() => props.onSelectRecord(record.runId)}
+                    >
+                      <div className="text-[11px] text-violet-700">
+                        run={record.runId} · turn={record.turnId}
+                      </div>
+                      <div className="mt-1 text-sm text-violet-900">
+                        {String(record.text || '').slice(0, 140) || '(empty)'}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ) : null}
           </div>
         </div>
 
@@ -516,7 +694,7 @@ export function TextplayShell(props: TextplayShellProps) {
                 onClick={props.onStartStory}
                 disabled={!props.canStartStory}
               >
-                {props.storyStarted ? 'Started' : props.isRunning ? 'Starting...' : 'Start'}
+                {props.storyStarted ? (props.isRunning ? 'Recapping...' : 'Recap') : props.isRunning ? 'Starting...' : 'Start'}
               </button>
               <button
                 type="button"
@@ -532,11 +710,17 @@ export function TextplayShell(props: TextplayShellProps) {
           {!props.selectedStoryId ? (
             <div className="mt-2 text-xs text-amber-700">Select a playable story before sending.</div>
           ) : null}
-          {props.selectedStoryId && !props.startupPackage && !props.startupLoading ? (
-            <div className="mt-2 text-xs text-amber-700">Startup package is required before sending.</div>
+          {props.selectedStoryId && !props.storyStarted ? (
+            <div className="mt-2 text-xs text-amber-700">
+              {props.playerName.trim()
+                ? 'Click Start to load background and generate opening narration before sending.'
+                : 'Player Name is required. Fill Player Name first, then click Start.'}
+            </div>
           ) : null}
-          {props.selectedStoryId && props.startupPackage && !props.storyStarted ? (
-            <div className="mt-2 text-xs text-amber-700">Click Start to generate opening narration before sending.</div>
+          {props.selectedStoryId && props.storyStarted ? (
+            <div className="mt-2 text-xs text-gray-500">
+              Click Recap to refresh a concise "previously on" summary before your next move.
+            </div>
           ) : null}
 
           {props.failure ? (
@@ -660,6 +844,37 @@ export function TextplayShell(props: TextplayShellProps) {
           {props.runSnapshot ? (
             <div className="mt-1">
               status={props.runSnapshot.status} · lastSeq={props.runSnapshot.lastSeq}
+            </div>
+          ) : null}
+          {selectedRecord ? (
+            <div className="mt-2 space-y-1 border-t border-gray-100 pt-2 text-[11px]">
+              <div>selectedRun: {selectedRecord.runId}</div>
+              <div>selectedTurn: {selectedRecord.turnId}</div>
+              <div>trigger: {selectedRecord.triggerSource}</div>
+              <div>route: {formatRouteLabelFromRecord(selectedRecord)}</div>
+              <div>traceId: {selectedRecord.traceId}</div>
+              <div>promptTraceId: {selectedRecord.meta.promptTraceId || '(none)'}</div>
+            </div>
+          ) : null}
+          {(diagnosticReasonCode || diagnosticTraceId || diagnosticStep) ? (
+            <div className="mt-2 space-y-1 border-t border-gray-100 pt-2 text-[11px] text-rose-700">
+              {diagnosticReasonCode ? <div>reasonCode: {diagnosticReasonCode}</div> : null}
+              {diagnosticTraceId ? <div>traceId: {diagnosticTraceId}</div> : null}
+              {diagnosticStep ? <div>step: {diagnosticStep}</div> : null}
+            </div>
+          ) : null}
+          {props.deltaStatus ? (
+            <div className={`mt-2 rounded px-2 py-1 text-[11px] ${
+              props.deltaStatus.kind === 'success'
+                ? 'bg-emerald-50 text-emerald-700'
+                : props.deltaStatus.kind === 'warn'
+                  ? 'bg-amber-50 text-amber-700'
+                  : props.deltaStatus.kind === 'error'
+                    ? 'bg-rose-50 text-rose-700'
+                    : 'bg-slate-100 text-slate-700'
+            }`}
+            >
+              delta: {props.deltaStatus.message}
             </div>
           ) : null}
         </div>

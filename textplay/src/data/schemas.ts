@@ -59,6 +59,49 @@ export const NarrativeTurnByIdResponseSchema = z.strictObject({
   createdAt: z.union([z.string(), z.null()]).optional().transform((value) => value ?? undefined),
 }).passthrough();
 
+export const NarrativeTurnWindowRequestSchema = z.strictObject({
+  storyId: z.string().min(1),
+  afterTurnId: z.string().min(1).optional(),
+  limit: z.number().int().min(1).max(100).optional(),
+  ingestCursorStart: z.string().optional(),
+  projectId: z.string().optional(),
+});
+
+const NarrativeTurnWindowEventSchema = z.strictObject({
+  eventId: z.string().min(1),
+  type: z.string().min(1),
+  visibility: z.enum(['public', 'internal', 'sensory']),
+  summary: z.string().min(1),
+  sourceEventIds: z.array(z.string().min(1)).optional().default([]),
+}).passthrough();
+
+const NarrativeTurnWindowRowSchema = z.strictObject({
+  turnId: z.string().min(1),
+  turnIndex: z.number().int().min(0).optional(),
+  triggerSource: NarrativeTriggerSourceSchema.optional(),
+  userMessage: z.string().optional(),
+  systemContext: z.record(z.string(), z.unknown()).optional(),
+  spineEvents: z.array(NarrativeTurnWindowEventSchema).default([]),
+  stateChanges: z.record(z.string(), z.unknown()).optional(),
+  metrics: z.record(z.string(), z.unknown()).optional(),
+  createdAt: z.string().optional(),
+  status: z.string().optional(),
+  reasonCode: z.string().optional(),
+  traceId: z.string().optional(),
+  runId: z.string().optional(),
+}).passthrough();
+
+export const NarrativeTurnWindowResponseSchema = z.strictObject({
+  projectId: z.string().optional(),
+  storyId: z.string().min(1),
+  ingestCursorStart: z.string().optional(),
+  turns: z.array(NarrativeTurnWindowRowSchema).default([]),
+  items: z.array(NarrativeTurnWindowRowSchema).optional(),
+}).passthrough().transform((value) => ({
+  ...value,
+  turns: value.turns.length > 0 ? value.turns : (value.items || []),
+}));
+
 export const NarrativeProjectionRenderInputRequestSchema = z.strictObject({
   storyId: z.string().min(1),
   turnId: z.string().min(1),
@@ -85,6 +128,7 @@ export const NarrativeProjectionRenderInputResponseSchema = z.strictObject({
   player: z.strictObject({
     id: z.string().optional(),
     name: z.string().optional(),
+    identity: z.string().optional(),
   }).catch({}),
   userMessage: z.string().optional(),
   systemPayload: z.union([z.record(z.string(), z.unknown()), z.null()]).optional().transform((value) => value ?? undefined),
@@ -363,11 +407,14 @@ const PersistRecordInputSchema = z.strictObject({
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
   storyId: z.string().min(1),
+  worldId: z.string().min(1),
+  agentId: z.string().min(1),
   turnId: z.string().min(1),
   runId: z.string().min(1),
   traceId: z.string().min(1),
   triggerSource: NarrativeTriggerSourceSchema,
   playerId: z.string().min(1),
+  playerIdentity: z.string().optional(),
   userMessage: z.string(),
   systemPayload: z.record(z.string(), z.unknown()).nullable(),
   text: z.string(),
@@ -387,16 +434,25 @@ export const TextplayPersistQuerySchema = z.discriminatedUnion('op', [
     op: z.literal('getByTurn'),
     storyId: z.string().min(1),
     turnId: z.string().min(1),
+    worldId: z.string().min(1).optional(),
+    agentId: z.string().min(1).optional(),
   }),
   z.strictObject({
     op: z.literal('getRun'),
     runId: z.string().min(1),
+    storyId: z.string().min(1).optional(),
+    worldId: z.string().min(1).optional(),
+    agentId: z.string().min(1).optional(),
+    playerId: z.string().min(1).optional(),
     afterSeq: z.number().int().min(0).optional(),
     limit: z.number().int().min(1).max(500).optional(),
   }),
   z.strictObject({
     op: z.literal('listByStory'),
     storyId: z.string().min(1),
+    worldId: z.string().min(1).optional(),
+    agentId: z.string().min(1).optional(),
+    playerId: z.string().min(1).optional(),
     limit: z.number().int().min(1).max(200).optional(),
   }),
 ]);
@@ -407,6 +463,7 @@ export const TextplayRenderRequestSchema = z.strictObject({
   agentId: z.string().min(1),
   playerId: z.string().min(1),
   playerName: z.string().optional(),
+  playerIdentity: z.string().optional(),
   triggerSource: NarrativeTriggerSourceSchema,
   userMessage: z.string().optional(),
   systemPayload: z.record(z.string(), z.unknown()).optional(),
@@ -429,6 +486,8 @@ export type NarrativeTurnLatestLookupRequest = z.infer<typeof NarrativeTurnLates
 export type NarrativeTurnLatestLookupResponse = z.infer<typeof NarrativeTurnLatestLookupResponseSchema>;
 export type NarrativeTurnByIdRequest = z.infer<typeof NarrativeTurnByIdRequestSchema>;
 export type NarrativeTurnByIdResponse = z.infer<typeof NarrativeTurnByIdResponseSchema>;
+export type NarrativeTurnWindowRequest = z.infer<typeof NarrativeTurnWindowRequestSchema>;
+export type NarrativeTurnWindowResponse = z.infer<typeof NarrativeTurnWindowResponseSchema>;
 export type NarrativeProjectionRenderInputRequest = z.infer<typeof NarrativeProjectionRenderInputRequestSchema>;
 export type NarrativeProjectionRenderInputResponse = z.infer<typeof NarrativeProjectionRenderInputResponseSchema>;
 export type NarrativeContextScopes = z.infer<typeof NarrativeContextScopesSchema>;

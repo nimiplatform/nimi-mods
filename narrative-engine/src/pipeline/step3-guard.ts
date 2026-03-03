@@ -53,9 +53,124 @@ function cloneCoreOutput(coreOutput: NarrativeCoreOutput): NarrativeCoreOutput {
   };
 }
 
+const STRONG_RETCON_MARKERS = [
+  '其实',
+  '原来',
+  '并不存在',
+  '从未发生',
+  '都是幻觉',
+  '记忆是假的',
+  'never happened',
+  'false memory',
+] as const;
+
+const NEGATION_MARKERS = [
+  '并非',
+  '并不',
+  '并没有',
+  '从未',
+  '不是',
+  '不存在',
+  'never',
+  'did not',
+  'is not',
+  'was not',
+  'no longer',
+] as const;
+
+function extractEventNarrativeText(event: NarrativeSpineEvent): string {
+  const payload = event.payload || {};
+  const fragments = [
+    payload.description,
+    payload.summary,
+    payload.content,
+    payload.text,
+    payload.action,
+    payload.outcome,
+    payload.discovery,
+    payload.choice,
+  ]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+  return fragments.join(' ').toLowerCase();
+}
+
+function containsAny(text: string, markers: readonly string[]): boolean {
+  const normalized = String(text || '').toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  return markers.some((marker) => normalized.includes(marker.toLowerCase()));
+}
+
+function tokenize(text: string): string[] {
+  const normalized = String(text || '').toLowerCase();
+  const matches = normalized.match(/[a-z0-9\u4e00-\u9fff]{2,}/gu) || [];
+  return [...new Set(matches)];
+}
+
+function hasTokenOverlap(left: string, right: string): boolean {
+  const leftTokens = tokenize(left);
+  const rightTokens = new Set(tokenize(right));
+  let overlapCount = 0;
+  for (const token of leftTokens) {
+    if (rightTokens.has(token)) {
+      overlapCount += 1;
+      if (overlapCount >= 2) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function allowRetcon(event: NarrativeSpineEvent): boolean {
+  const payload = event.payload || {};
+  return payload.allowRetcon === true || payload.retconApproved === true;
+}
+
+function detectSemanticContradiction(input: {
+  generated: NarrativeSpineEvent[];
+  recent: NarrativeSpineEvent[];
+}): string | null {
+  const recentTexts = input.recent
+    .map(extractEventNarrativeText)
+    .filter((text) => text.length > 0)
+    .slice(-24);
+  if (recentTexts.length === 0) {
+    return null;
+  }
+
+  for (const event of input.generated) {
+    if (allowRetcon(event)) {
+      continue;
+    }
+    const text = extractEventNarrativeText(event);
+    if (!text) {
+      continue;
+    }
+    if (containsAny(text, STRONG_RETCON_MARKERS)) {
+      return 'retcon marker detected in generated event';
+    }
+    const newHasNegation = containsAny(text, NEGATION_MARKERS);
+    for (const oldText of recentTexts) {
+      if (!hasTokenOverlap(text, oldText)) {
+        continue;
+      }
+      const oldHasNegation = containsAny(oldText, NEGATION_MARKERS);
+      if (newHasNegation !== oldHasNegation) {
+        return 'semantic polarity reversal against recent spine facts';
+      }
+    }
+  }
+
+  return null;
+}
+
 export function runNarrativeStep3Guard(input: {
   coreOutput: NarrativeCoreOutput;
   tensionTarget?: number;
+  recentSpineEvents?: NarrativeSpineEvent[];
 }): NarrativeGuardResult {
   const coreOutput = cloneCoreOutput(input.coreOutput);
 
@@ -120,6 +235,20 @@ export function runNarrativeStep3Guard(input: {
         adjustmentReason: null,
       };
     }
+  }
+
+  const contradictionReason = detectSemanticContradiction({
+    generated: coreOutput.spineEvents,
+    recent: Array.isArray(input.recentSpineEvents) ? input.recentSpineEvents : [],
+  });
+  if (contradictionReason) {
+    return {
+      status: 'REJECTED',
+      reasonCode: NARRATIVE_REASON_CODES.NARRATIVE_SEMANTIC_CONTRADICTION,
+      actionHint: `Semantic contradiction detected: ${contradictionReason}`,
+      output: null,
+      adjustmentReason: null,
+    };
   }
 
   if (eventCount > NARRATIVE_GUARD_DEFAULTS.maxEvents) {

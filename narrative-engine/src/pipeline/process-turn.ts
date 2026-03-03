@@ -11,7 +11,11 @@ import {
   NARRATIVE_REASON_CODES,
   type NarrativeReasonCode,
 } from '../contracts.js';
-import { evaluateNarrativeInitiativePolicy, recordNarrativeInitiativeFired } from '../initiative/policy.js';
+import {
+  evaluateNarrativeInitiativePolicy,
+  recordNarrativeInitiativeFired,
+  recordNarrativeNonInitiativeTurn,
+} from '../initiative/policy.js';
 import { buildNarrativeRenderInput } from '../projection/render-input.js';
 import { NarrativeRunEventLog } from '../run/event-log.js';
 import {
@@ -51,6 +55,14 @@ function toRecord(value: unknown): Record<string, unknown> {
 function readStringField(input: unknown, key: string): string {
   const value = toRecord(input)[key];
   return String(value || '').trim();
+}
+
+function readFiniteNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
 }
 
 function countRowsLikePayload(value: unknown): number {
@@ -406,51 +418,6 @@ export async function processNarrativeTurn(input: {
     return buildConflictResponse({ normalized });
   }
 
-  const initiative = evaluateNarrativeInitiativePolicy({
-    storyId: normalized.storyId,
-    triggerSource: normalized.triggerSource,
-    presence: normalized.presence,
-    nowMs: normalized.nowMs,
-  });
-  if (!initiative.shouldProcessTurn && initiative.reasonCode) {
-    const eventLog = new NarrativeRunEventLog({
-      traceId: normalized.traceId,
-      runId: normalized.runId,
-      taskId: normalized.taskId,
-      parentRunId: normalized.parentRunId,
-      idempotencyKey: normalized.idempotencyKey,
-    });
-    eventLog.startRun({
-      storyId: normalized.storyId,
-      turnId: normalized.turnId,
-    });
-    eventLog.startStep('initiative', {
-      triggerSource: normalized.triggerSource,
-      presence: normalized.presence,
-    });
-    eventLog.completeStep('initiative', {
-      details: {
-        decision: 'NOOP',
-        reasonCode: initiative.reasonCode,
-      },
-    });
-    eventLog.completeRun({
-      status: 'NOOP',
-    });
-
-    return buildTurnResponse({
-      status: 'NOOP',
-      reasonCode: initiative.reasonCode,
-      actionHint: resolveActionHint(initiative.reasonCode, initiative.actionHint),
-      traceId: normalized.traceId,
-      turnId: normalized.turnId,
-      storyId: normalized.storyId,
-      runEnvelope: eventLog.getEnvelope(),
-      coreOutput: null,
-      projection: null,
-    });
-  }
-
   const eventLog = new NarrativeRunEventLog({
     traceId: normalized.traceId,
     runId: normalized.runId,
@@ -560,6 +527,55 @@ export async function processNarrativeTurn(input: {
     });
   }
 
+  const sceneFingerprint = createStableHash({
+    place: step1.value.snapshot.place,
+    sceneMaterial: step1.value.snapshot.sceneMaterial.slice(0, 8),
+    openThreads: step1.value.snapshot.openThreads.slice(0, 8),
+  });
+  const startupPolicy = toRecord(step1.value.snapshot.startupPolicy);
+  const initiativePolicy = toRecord(startupPolicy.initiative);
+  const parsedCooldown = readFiniteNumber(initiativePolicy.cooldownSeconds)
+    ?? readFiniteNumber(initiativePolicy.cooldownWindowSeconds);
+  const parsedMaxConsecutive = readFiniteNumber(initiativePolicy.maxConsecutive);
+  const initiative = evaluateNarrativeInitiativePolicy({
+    storyId: normalized.storyId,
+    triggerSource: normalized.triggerSource,
+    presence: normalized.presence,
+    nowMs: normalized.nowMs,
+    openThreadCount: step1.value.snapshot.openThreads.length,
+    sceneFingerprint,
+    cooldownWindowSeconds: parsedCooldown ?? undefined,
+    maxConsecutive: parsedMaxConsecutive ?? undefined,
+  });
+  eventLog.startStep('initiative', {
+    triggerSource: normalized.triggerSource,
+    presence: normalized.presence,
+    openThreadCount: step1.value.snapshot.openThreads.length,
+  });
+  eventLog.completeStep('initiative', {
+    details: {
+      decision: initiative.shouldProcessTurn ? 'CONTINUE' : 'NOOP',
+      reasonCode: initiative.reasonCode,
+      actionHint: initiative.actionHint,
+    },
+  });
+  if (!initiative.shouldProcessTurn && initiative.reasonCode) {
+    eventLog.completeRun({
+      status: 'NOOP',
+    });
+    return buildTurnResponse({
+      status: 'NOOP',
+      reasonCode: initiative.reasonCode,
+      actionHint: resolveActionHint(initiative.reasonCode, initiative.actionHint),
+      traceId: normalized.traceId,
+      turnId: normalized.turnId,
+      storyId: normalized.storyId,
+      runEnvelope: eventLog.getEnvelope(),
+      coreOutput: null,
+      projection: null,
+    });
+  }
+
   eventLog.startStep('step2-generate');
   const step2 = await runNarrativeStep2Generate({
     turn: normalized,
@@ -597,9 +613,11 @@ export async function processNarrativeTurn(input: {
   }
 
   eventLog.startStep('step3-guard');
+  const recentSpineEvents = getNarrativeSpineByStoryId(normalized.storyId).slice(-32);
   const guard = runNarrativeStep3Guard({
     coreOutput: step2.value,
     tensionTarget: step1.value.snapshot.tensionTarget,
+    recentSpineEvents,
   });
   if (guard.status === 'REJECTED' || !guard.output) {
     const reasonCode = guard.reasonCode || NARRATIVE_REASON_CODES.NARRATIVE_GENERATION_SCHEMA_INVALID;
@@ -677,6 +695,12 @@ export async function processNarrativeTurn(input: {
     recordNarrativeInitiativeFired({
       storyId: normalized.storyId,
       nowMs: normalized.nowMs,
+      sceneFingerprint,
+    });
+  } else {
+    recordNarrativeNonInitiativeTurn({
+      storyId: normalized.storyId,
+      sceneFingerprint,
     });
   }
 

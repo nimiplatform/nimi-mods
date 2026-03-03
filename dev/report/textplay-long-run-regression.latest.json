@@ -1,0 +1,959 @@
+{
+  "generatedAt": "2026-03-03T06:14:04.003Z",
+  "storyId": "story.01JKFANREN00000000000001.01JKEVTW000000000000049",
+  "worldId": "01JKFANREN00000000000001",
+  "playerId": "01KJQQEWVF3590N1VKGATZF49V",
+  "playerName": "云澜",
+  "model": "models/gemini-3-flash-preview",
+  "connectorId": "01KJPF2VWTYXQ0Y40Q3Y3EAHF0",
+  "invariants": [
+    "no-render-failure",
+    "snapshot-completed",
+    "opening-no-spoiler",
+    "no-meta-leak",
+    "open-thread-kept-alive",
+    "no-duplicate-turn-id"
+  ],
+  "summary": {
+    "totalTurns": 30,
+    "successTurns": 30,
+    "failureCount": 0,
+    "chainReasonHistogram": {
+      "none": 30
+    },
+    "warningHistogram": {}
+  },
+  "failures": [],
+  "turns": [
+    {
+      "index": 1,
+      "runId": "run-1-1772518443943-383840",
+      "traceId": "trace-1-1772518443943-290985",
+      "triggerSource": "SystemEvent",
+      "turnId": "01KJS5A2XDTTKE67CMKE2SHNRK",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "护阵灵纹在高空压制下反复震荡",
+        "后方补给线迟迟未到",
+        "真仙分身的方位仍未锁定"
+      ],
+      "openThreadsAfter": [
+        "护阵灵纹在高空压制下反复震荡",
+        "后方补给线迟迟未到",
+        "真仙分身的方位仍未锁定"
+      ],
+      "tensionBefore": 0.56,
+      "tensionAfter": 0.6100000000000001,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "血色裂缝压低了天幕，云澜立在残阵边缘，耳畔尽是金铁与雷鸣。韩立并未给出结论，只让你先盯住阵眼的细微震颤。局势尚未收束，你准备先稳阵还是先探敌锋？",
+      "ok": true
+    },
+    {
+      "index": 2,
+      "runId": "run-2-1772518443963-315369",
+      "traceId": "trace-2-1772518443963-244195",
+      "triggerSource": "UserTurn",
+      "turnId": "01KJS5A2XXVEKX77VCBVQDPP2H",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "护阵灵纹在高空压制下反复震荡",
+        "后方补给线迟迟未到",
+        "真仙分身的方位仍未锁定"
+      ],
+      "openThreadsAfter": [
+        "护阵灵纹在高空压制下反复震荡",
+        "后方补给线迟迟未到",
+        "真仙分身的方位仍未锁定"
+      ],
+      "tensionBefore": 0.6100000000000001,
+      "tensionAfter": 0.5800000000000001,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 3,
+      "runId": "run-3-1772518443964-711989",
+      "traceId": "trace-3-1772518443964-369875",
+      "triggerSource": "UserTurn",
+      "turnId": "01KJS5A2XY16VG5X4HH2R14DF4",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "护阵灵纹在高空压制下反复震荡",
+        "后方补给线迟迟未到",
+        "真仙分身的方位仍未锁定"
+      ],
+      "openThreadsAfter": [
+        "后方补给线迟迟未到",
+        "真仙分身的方位仍未锁定",
+        "新压力线索-3"
+      ],
+      "tensionBefore": 0.5800000000000001,
+      "tensionAfter": 0.6300000000000001,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 4,
+      "runId": "run-4-1772518443966-897087",
+      "traceId": "trace-4-1772518443966-339952",
+      "triggerSource": "UserTurn",
+      "turnId": "01KJS5A2Y0PKE0MMX4DP3SBYHQ",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "后方补给线迟迟未到",
+        "真仙分身的方位仍未锁定",
+        "新压力线索-3"
+      ],
+      "openThreadsAfter": [
+        "后方补给线迟迟未到",
+        "真仙分身的方位仍未锁定",
+        "新压力线索-3"
+      ],
+      "tensionBefore": 0.6300000000000001,
+      "tensionAfter": 0.6000000000000001,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 5,
+      "runId": "run-5-1772518443967-808767",
+      "traceId": "trace-5-1772518443967-183597",
+      "triggerSource": "AgentInitiative",
+      "turnId": "01KJS5A2Y1J139W1X4J017AD24",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "后方补给线迟迟未到",
+        "真仙分身的方位仍未锁定",
+        "新压力线索-3"
+      ],
+      "openThreadsAfter": [
+        "后方补给线迟迟未到",
+        "真仙分身的方位仍未锁定",
+        "新压力线索-3"
+      ],
+      "tensionBefore": 0.6000000000000001,
+      "tensionAfter": 0.6500000000000001,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 6,
+      "runId": "run-6-1772518443968-467185",
+      "traceId": "trace-6-1772518443968-922990",
+      "triggerSource": "UserTurn",
+      "turnId": "01KJS5A2Y3T14NQT1X0D93MS3D",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "后方补给线迟迟未到",
+        "真仙分身的方位仍未锁定",
+        "新压力线索-3"
+      ],
+      "openThreadsAfter": [
+        "真仙分身的方位仍未锁定",
+        "新压力线索-3",
+        "新压力线索-6"
+      ],
+      "tensionBefore": 0.6500000000000001,
+      "tensionAfter": 0.6200000000000001,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 7,
+      "runId": "run-7-1772518443970-307729",
+      "traceId": "trace-7-1772518443970-906940",
+      "triggerSource": "UserTurn",
+      "turnId": "01KJS5A2Y4V20TDPTXKJEN35T3",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "真仙分身的方位仍未锁定",
+        "新压力线索-3",
+        "新压力线索-6"
+      ],
+      "openThreadsAfter": [
+        "真仙分身的方位仍未锁定",
+        "新压力线索-3",
+        "新压力线索-6"
+      ],
+      "tensionBefore": 0.6200000000000001,
+      "tensionAfter": 0.6700000000000002,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 8,
+      "runId": "run-8-1772518443972-153327",
+      "traceId": "trace-8-1772518443972-381366",
+      "triggerSource": "UserTurn",
+      "turnId": "01KJS5A2Y6A1MAT3QSP75G7VVH",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "真仙分身的方位仍未锁定",
+        "新压力线索-3",
+        "新压力线索-6"
+      ],
+      "openThreadsAfter": [
+        "真仙分身的方位仍未锁定",
+        "新压力线索-3",
+        "新压力线索-6"
+      ],
+      "tensionBefore": 0.6700000000000002,
+      "tensionAfter": 0.6400000000000001,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 9,
+      "runId": "run-9-1772518443973-888516",
+      "traceId": "trace-9-1772518443973-276257",
+      "triggerSource": "UserTurn",
+      "turnId": "01KJS5A2Y75D4X4BRE2F9GK08C",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "真仙分身的方位仍未锁定",
+        "新压力线索-3",
+        "新压力线索-6"
+      ],
+      "openThreadsAfter": [
+        "新压力线索-3",
+        "新压力线索-6",
+        "新压力线索-9"
+      ],
+      "tensionBefore": 0.6400000000000001,
+      "tensionAfter": 0.6900000000000002,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 10,
+      "runId": "run-10-1772518443975-280781",
+      "traceId": "trace-10-1772518443975-114286",
+      "triggerSource": "AgentInitiative",
+      "turnId": "01KJS5A2Y97165VE9HD8WRFWAM",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "新压力线索-3",
+        "新压力线索-6",
+        "新压力线索-9"
+      ],
+      "openThreadsAfter": [
+        "新压力线索-3",
+        "新压力线索-6",
+        "新压力线索-9"
+      ],
+      "tensionBefore": 0.6900000000000002,
+      "tensionAfter": 0.6600000000000001,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 11,
+      "runId": "run-11-1772518443977-987341",
+      "traceId": "trace-11-1772518443977-774910",
+      "triggerSource": "UserTurn",
+      "turnId": "01KJS5A2YBSCRM7MC69GZZY9E4",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "新压力线索-3",
+        "新压力线索-6",
+        "新压力线索-9"
+      ],
+      "openThreadsAfter": [
+        "新压力线索-3",
+        "新压力线索-6",
+        "新压力线索-9"
+      ],
+      "tensionBefore": 0.6600000000000001,
+      "tensionAfter": 0.7100000000000002,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 12,
+      "runId": "run-12-1772518443979-162144",
+      "traceId": "trace-12-1772518443979-545717",
+      "triggerSource": "UserTurn",
+      "turnId": "01KJS5A2YDCC97WBNA3V5TCN7R",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "新压力线索-3",
+        "新压力线索-6",
+        "新压力线索-9"
+      ],
+      "openThreadsAfter": [
+        "新压力线索-6",
+        "新压力线索-9",
+        "新压力线索-12"
+      ],
+      "tensionBefore": 0.7100000000000002,
+      "tensionAfter": 0.6800000000000002,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 13,
+      "runId": "run-13-1772518443980-925101",
+      "traceId": "trace-13-1772518443980-558491",
+      "triggerSource": "UserTurn",
+      "turnId": "01KJS5A2YEH0ZDTCFASRH7EXZ5",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "新压力线索-6",
+        "新压力线索-9",
+        "新压力线索-12"
+      ],
+      "openThreadsAfter": [
+        "新压力线索-6",
+        "新压力线索-9",
+        "新压力线索-12"
+      ],
+      "tensionBefore": 0.6800000000000002,
+      "tensionAfter": 0.7300000000000002,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 14,
+      "runId": "run-14-1772518443981-474599",
+      "traceId": "trace-14-1772518443981-882760",
+      "triggerSource": "UserTurn",
+      "turnId": "01KJS5A2YF7CHXRNXQQ4CFE6ZW",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "新压力线索-6",
+        "新压力线索-9",
+        "新压力线索-12"
+      ],
+      "openThreadsAfter": [
+        "新压力线索-6",
+        "新压力线索-9",
+        "新压力线索-12"
+      ],
+      "tensionBefore": 0.7300000000000002,
+      "tensionAfter": 0.7000000000000002,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 15,
+      "runId": "run-15-1772518443982-135033",
+      "traceId": "trace-15-1772518443982-420120",
+      "triggerSource": "AgentInitiative",
+      "turnId": "01KJS5A2YGA369ERNS0TTRN69B",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "新压力线索-6",
+        "新压力线索-9",
+        "新压力线索-12"
+      ],
+      "openThreadsAfter": [
+        "新压力线索-9",
+        "新压力线索-12",
+        "新压力线索-15"
+      ],
+      "tensionBefore": 0.7000000000000002,
+      "tensionAfter": 0.7500000000000002,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 16,
+      "runId": "run-16-1772518443983-39238",
+      "traceId": "trace-16-1772518443983-37942",
+      "triggerSource": "UserTurn",
+      "turnId": "01KJS5A2YHEWA0SN3HVW3G2ZZ3",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "新压力线索-9",
+        "新压力线索-12",
+        "新压力线索-15"
+      ],
+      "openThreadsAfter": [
+        "新压力线索-9",
+        "新压力线索-12",
+        "新压力线索-15"
+      ],
+      "tensionBefore": 0.7500000000000002,
+      "tensionAfter": 0.7200000000000002,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 17,
+      "runId": "run-17-1772518443983-607834",
+      "traceId": "trace-17-1772518443983-866953",
+      "triggerSource": "UserTurn",
+      "turnId": "01KJS5A2YHARHF3KCYZ4XS2PPV",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "新压力线索-9",
+        "新压力线索-12",
+        "新压力线索-15"
+      ],
+      "openThreadsAfter": [
+        "新压力线索-9",
+        "新压力线索-12",
+        "新压力线索-15"
+      ],
+      "tensionBefore": 0.7200000000000002,
+      "tensionAfter": 0.7700000000000002,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 18,
+      "runId": "run-18-1772518443985-758968",
+      "traceId": "trace-18-1772518443985-430159",
+      "triggerSource": "UserTurn",
+      "turnId": "01KJS5A2YMARHF3KCYZ4XS2PPV",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "新压力线索-9",
+        "新压力线索-12",
+        "新压力线索-15"
+      ],
+      "openThreadsAfter": [
+        "新压力线索-12",
+        "新压力线索-15",
+        "新压力线索-18"
+      ],
+      "tensionBefore": 0.7700000000000002,
+      "tensionAfter": 0.7400000000000002,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 19,
+      "runId": "run-19-1772518443988-433339",
+      "traceId": "trace-19-1772518443988-552133",
+      "triggerSource": "UserTurn",
+      "turnId": "01KJS5A2YPDM1BKMVYZ2QYNGTY",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "新压力线索-12",
+        "新压力线索-15",
+        "新压力线索-18"
+      ],
+      "openThreadsAfter": [
+        "新压力线索-12",
+        "新压力线索-15",
+        "新压力线索-18"
+      ],
+      "tensionBefore": 0.7400000000000002,
+      "tensionAfter": 0.7900000000000003,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 20,
+      "runId": "run-20-1772518443989-820074",
+      "traceId": "trace-20-1772518443989-218363",
+      "triggerSource": "AgentInitiative",
+      "turnId": "01KJS5A2YQCXWFWNDEFV3J0856",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "新压力线索-12",
+        "新压力线索-15",
+        "新压力线索-18"
+      ],
+      "openThreadsAfter": [
+        "新压力线索-12",
+        "新压力线索-15",
+        "新压力线索-18"
+      ],
+      "tensionBefore": 0.7900000000000003,
+      "tensionAfter": 0.7600000000000002,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 21,
+      "runId": "run-21-1772518443990-447917",
+      "traceId": "trace-21-1772518443990-685745",
+      "triggerSource": "UserTurn",
+      "turnId": "01KJS5A2YR6PBV2NDAA8XEPNZ7",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "新压力线索-12",
+        "新压力线索-15",
+        "新压力线索-18"
+      ],
+      "openThreadsAfter": [
+        "新压力线索-15",
+        "新压力线索-18",
+        "新压力线索-21"
+      ],
+      "tensionBefore": 0.7600000000000002,
+      "tensionAfter": 0.8100000000000003,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 22,
+      "runId": "run-22-1772518443991-67897",
+      "traceId": "trace-22-1772518443991-618911",
+      "triggerSource": "UserTurn",
+      "turnId": "01KJS5A2YS9JZB0168DKSFREKT",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "新压力线索-15",
+        "新压力线索-18",
+        "新压力线索-21"
+      ],
+      "openThreadsAfter": [
+        "新压力线索-15",
+        "新压力线索-18",
+        "新压力线索-21"
+      ],
+      "tensionBefore": 0.8100000000000003,
+      "tensionAfter": 0.7800000000000002,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 23,
+      "runId": "run-23-1772518443992-991774",
+      "traceId": "trace-23-1772518443992-387131",
+      "triggerSource": "UserTurn",
+      "turnId": "01KJS5A2YT7MS1JN4EQ5J2YYB6",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "新压力线索-15",
+        "新压力线索-18",
+        "新压力线索-21"
+      ],
+      "openThreadsAfter": [
+        "新压力线索-15",
+        "新压力线索-18",
+        "新压力线索-21"
+      ],
+      "tensionBefore": 0.7800000000000002,
+      "tensionAfter": 0.8300000000000003,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 24,
+      "runId": "run-24-1772518443993-687163",
+      "traceId": "trace-24-1772518443993-554282",
+      "triggerSource": "UserTurn",
+      "turnId": "01KJS5A2YVY4M3G7EJY24J0HBC",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "新压力线索-15",
+        "新压力线索-18",
+        "新压力线索-21"
+      ],
+      "openThreadsAfter": [
+        "新压力线索-18",
+        "新压力线索-21",
+        "新压力线索-24"
+      ],
+      "tensionBefore": 0.8300000000000003,
+      "tensionAfter": 0.8000000000000003,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 25,
+      "runId": "run-25-1772518443994-394090",
+      "traceId": "trace-25-1772518443994-248098",
+      "triggerSource": "AgentInitiative",
+      "turnId": "01KJS5A2YWBBFV80TFASR6ZZ5D",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "新压力线索-18",
+        "新压力线索-21",
+        "新压力线索-24"
+      ],
+      "openThreadsAfter": [
+        "新压力线索-18",
+        "新压力线索-21",
+        "新压力线索-24"
+      ],
+      "tensionBefore": 0.8000000000000003,
+      "tensionAfter": 0.8500000000000003,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 26,
+      "runId": "run-26-1772518443995-556764",
+      "traceId": "trace-26-1772518443995-783333",
+      "triggerSource": "UserTurn",
+      "turnId": "01KJS5A2YXDCN6SC53AWS5ST88",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "新压力线索-18",
+        "新压力线索-21",
+        "新压力线索-24"
+      ],
+      "openThreadsAfter": [
+        "新压力线索-18",
+        "新压力线索-21",
+        "新压力线索-24"
+      ],
+      "tensionBefore": 0.8500000000000003,
+      "tensionAfter": 0.8200000000000003,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 27,
+      "runId": "run-27-1772518443997-438236",
+      "traceId": "trace-27-1772518443997-642265",
+      "triggerSource": "UserTurn",
+      "turnId": "01KJS5A2YZ0Q401RH2QPAKK1SZ",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "新压力线索-18",
+        "新压力线索-21",
+        "新压力线索-24"
+      ],
+      "openThreadsAfter": [
+        "新压力线索-21",
+        "新压力线索-24",
+        "新压力线索-27"
+      ],
+      "tensionBefore": 0.8200000000000003,
+      "tensionAfter": 0.86,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 28,
+      "runId": "run-28-1772518443998-736559",
+      "traceId": "trace-28-1772518443998-421112",
+      "triggerSource": "UserTurn",
+      "turnId": "01KJS5A2Z0C8GMN4HZXVRYNDXD",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "新压力线索-21",
+        "新压力线索-24",
+        "新压力线索-27"
+      ],
+      "openThreadsAfter": [
+        "新压力线索-21",
+        "新压力线索-24",
+        "新压力线索-27"
+      ],
+      "tensionBefore": 0.86,
+      "tensionAfter": 0.83,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 29,
+      "runId": "run-29-1772518444000-652312",
+      "traceId": "trace-29-1772518444000-440507",
+      "triggerSource": "UserTurn",
+      "turnId": "01KJS5A2Z256FP006DJ32FK64K",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "新压力线索-21",
+        "新压力线索-24",
+        "新压力线索-27"
+      ],
+      "openThreadsAfter": [
+        "新压力线索-21",
+        "新压力线索-24",
+        "新压力线索-27"
+      ],
+      "tensionBefore": 0.83,
+      "tensionAfter": 0.86,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    },
+    {
+      "index": 30,
+      "runId": "run-30-1772518444001-364568",
+      "traceId": "trace-30-1772518444001-557157",
+      "triggerSource": "AgentInitiative",
+      "turnId": "01KJS5A2Z3NEP999JSCZXQMJY0",
+      "narrativeStatus": "APPROVED",
+      "reasonCode": null,
+      "chainReasonCode": null,
+      "step": "persist-best-effort",
+      "stepReasonCode": "",
+      "stepActionHint": "",
+      "actionHint": null,
+      "guardAdjustment": false,
+      "openThreadsBefore": [
+        "新压力线索-21",
+        "新压力线索-24",
+        "新压力线索-27"
+      ],
+      "openThreadsAfter": [
+        "新压力线索-24",
+        "新压力线索-27",
+        "新压力线索-30"
+      ],
+      "tensionBefore": 0.86,
+      "tensionAfter": 0.83,
+      "runSnapshotStatus": "COMPLETED",
+      "warningCodes": [],
+      "textPreview": "阵线余波再起，云澜顺着韩立的指引捕捉到新的破绽。高空仙压仍在回落与反弹之间拉扯，眼前线索只被撬开一道口子。你要立刻追击这道口子，还是先加固后方退路？",
+      "ok": true
+    }
+  ]
+}

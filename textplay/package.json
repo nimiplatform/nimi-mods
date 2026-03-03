@@ -7,6 +7,15 @@
     "build": "node ../scripts/build-mod.mjs --mod textplay",
     "watch": "node ../scripts/build-mod.mjs --mod textplay --watch",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "test": "npx tsx --test test/*.mjs",
+    "test:smoke": "npx tsx --tsconfig scripts/tsconfig.smoke.json scripts/smoke-start-click.mjs && npx tsx --tsconfig scripts/tsconfig.smoke.json scripts/smoke-start-replay-conflict.mjs",
+    "test:regression:long": "npx tsx --tsconfig scripts/tsconfig.smoke.json scripts/regression-long-run.mjs",
+    "verify:spec": "pnpm -C .. run check:spec:textplay",
+    "verify:code": "pnpm run typecheck && pnpm run test && pnpm run test:regression:long && pnpm run build",
+    "verify": "pnpm run verify:spec && pnpm run verify:code",
     "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0"
   }
 }
