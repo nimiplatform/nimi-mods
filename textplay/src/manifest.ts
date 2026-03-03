@@ -3,6 +3,7 @@ import {
   TEXTPLAY_DATA_API_RENDER_PERSIST,
   TEXTPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS,
   TEXTPLAY_DATA_API_WORLD_ACCESS_ME,
+  TEXTPLAY_DATA_API_WORLD_WORLDS_MINE,
   TEXTPLAY_DATA_API_WORLD_EVENTS_LIST,
   TEXTPLAY_DATA_API_WORLD_LOREBOOKS_LIST,
   TEXTPLAY_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST,
@@ -38,6 +39,10 @@ export const TEXTPLAY_MANIFEST = {
       {
         name: TEXTPLAY_DATA_API_WORLD_ACCESS_ME,
         description: 'Read world access contract required by narrative compile context assembly',
+      },
+      {
+        name: TEXTPLAY_DATA_API_WORLD_WORLDS_MINE,
+        description: 'Read account world list required by world-first playable story selection',
       },
       {
         name: TEXTPLAY_DATA_API_WORLD_EVENTS_LIST,

@@ -41,6 +41,9 @@
 - `TXT-025`: Story startup package must include `startupPolicy` and snapshot `contextCoverage/gapWarnings` diagnostics.
 - `TXT-026`: Frontend auto tick may trigger `AgentInitiative` only when presence/cooldown/maxConsecutive policies are satisfied.
 - `TXT-027`: Missing `CANON/STORY` context is fail-close; missing `SUBJECT/RELATION/scene` is degraded with warnings.
+- `TXT-028`: Story selection is world-scoped and requires selecting account world first.
+- `TXT-029`: Fresh story requires explicit Start action that triggers one opening `SystemEvent` render before player input is accepted.
+- `TXT-030`: Left context panel must be independently scrollable to preserve access to session controls on small viewports.
 
 ## 3. No Over-Design Guard
 

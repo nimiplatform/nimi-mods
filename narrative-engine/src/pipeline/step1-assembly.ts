@@ -9,13 +9,30 @@ import type {
   NarrativeTurnInputNormalized,
 } from '../types.js';
 
+type NarrativePromptStats = {
+  sectionChars: Record<string, number>;
+  totalPromptChars: number;
+  sourceCounts: {
+    worldEvents: number;
+    worldLorebooks: number;
+    worldScenes: number;
+    narrativeContexts: number;
+    memoryItems: number;
+  };
+  selectedCounts: {
+    timelineEvents: number;
+    futureEvents: number;
+    lorebooks: number;
+    scenes: number;
+    relations: number;
+    memories: number;
+  };
+};
+
 type NarrativeAssemblyAssets = {
   routeOptions: NarrativeRouteOptionsSnapshot;
-  worldEvents: Array<Record<string, unknown>>;
-  worldLorebooks: Array<Record<string, unknown>>;
-  worldScenes: Array<Record<string, unknown>>;
-  narrativeContexts: Array<Record<string, unknown>>;
-  memoryRecall: Record<string, unknown>;
+  compiledPrompt: string;
+  promptStats: NarrativePromptStats;
 };
 
 export type NarrativeStep1AssemblyResult = {
@@ -25,6 +42,37 @@ export type NarrativeStep1AssemblyResult = {
 
 function toString(value: unknown): string {
   return String(value || '').trim();
+}
+
+function normalizeWhitespace(value: string): string {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function clipText(value: unknown, maxChars: number): string {
+  const normalized = normalizeWhitespace(toString(value));
+  if (!normalized) {
+    return '';
+  }
+  if (normalized.length <= maxChars) {
+    return normalized;
+  }
+  if (maxChars <= 3) {
+    return normalized.slice(0, maxChars);
+  }
+  return `${normalized.slice(0, maxChars - 3)}...`;
+}
+
+function clipJson(value: unknown, maxChars: number): string {
+  if (value == null) {
+    return '';
+  }
+  try {
+    return clipText(JSON.stringify(value), maxChars);
+  } catch {
+    return clipText(String(value), maxChars);
+  }
 }
 
 function toNumber(value: unknown, fallback: number): number {
@@ -44,6 +92,19 @@ function toStringArray(value: unknown): string[] {
 
 function uniqueStrings(values: string[]): string[] {
   return [...new Set(values.map((item) => toString(item)).filter(Boolean))];
+}
+
+function toTimestampMs(value: unknown): number {
+  const parsed = Date.parse(toString(value) || '1970-01-01T00:00:00.000Z');
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function extractStoryEntryEventId(storyId: string): string {
+  const parts = toString(storyId).split('.');
+  if (parts.length < 3) {
+    return '';
+  }
+  return toString(parts[parts.length - 1]);
 }
 
 function toRecordArray(value: unknown): Array<Record<string, unknown>> {
@@ -184,6 +245,7 @@ function pickLatestScopeRow(input: {
   rows: Array<Record<string, unknown>>;
   scope: 'CANON' | 'STORY' | 'SUBJECT' | 'RELATION';
   score?: (row: Record<string, unknown>) => number;
+  minimumScore?: number;
 }): Record<string, unknown> | null {
   const rows = input.rows.filter((row) => toString(row.scope).toUpperCase() === input.scope);
   if (rows.length === 0) {
@@ -205,7 +267,13 @@ function pickLatestScopeRow(input: {
       }
       return toString(right.row.id).localeCompare(toString(left.row.id));
     });
-  return ordered[0]?.row || null;
+  if (ordered.length === 0) {
+    return null;
+  }
+  if (typeof input.minimumScore === 'number' && ordered[0]!.score < input.minimumScore) {
+    return null;
+  }
+  return ordered[0]!.row;
 }
 
 function resolveNarrativeScopes(input: {
@@ -219,15 +287,24 @@ function resolveNarrativeScopes(input: {
     rows: input.rows,
     scope: 'CANON',
   });
-  const story = pickLatestScopeRow({
+  const storyExact = pickLatestScopeRow({
     rows: input.rows,
     scope: 'STORY',
-    score: (row) => (toString(row.storyId) === input.turn.storyId ? 1 : 0),
+    score: (row) => (toString(row.storyId) === input.turn.storyId ? 1 : -1),
+    minimumScore: 1,
   });
+  const storyFallback = storyExact
+    ? null
+    : pickLatestScopeRow({
+      rows: input.rows,
+      scope: 'STORY',
+    });
+  const story = storyExact || storyFallback;
   const subject = pickLatestScopeRow({
     rows: input.rows,
     scope: 'SUBJECT',
-    score: (row) => (toString(row.subjectId) === input.turn.agentId ? 1 : 0),
+    score: (row) => (toString(row.subjectId) === input.turn.agentId ? 1 : -1),
+    minimumScore: 1,
   });
   const relation = pickLatestScopeRow({
     rows: input.rows,
@@ -237,8 +314,9 @@ function resolveNarrativeScopes(input: {
       const targetSubjectId = toString(row.targetSubjectId);
       const direct = subjectId === input.turn.agentId && targetSubjectId === input.turn.playerId;
       const reverse = subjectId === input.turn.playerId && targetSubjectId === input.turn.agentId;
-      return direct || reverse ? 1 : 0;
+      return direct || reverse ? 1 : -1;
     },
+    minimumScore: 1,
   });
 
   const canonScope = {
@@ -259,6 +337,9 @@ function resolveNarrativeScopes(input: {
   };
 
   const warnings: string[] = [];
+  if (!storyExact && storyFallback) {
+    warnings.push('NARRATIVE_CONTEXT_STORY_SCOPE_FALLBACK_WARN');
+  }
   if (!subject) {
     warnings.push('NARRATIVE_CONTEXT_SUBJECT_MISSING_WARN');
   }
@@ -327,6 +408,484 @@ function hasSufficientContext(snapshot: NarrativeContextSnapshot): boolean {
   return true;
 }
 
+function selectTimelineEvents(input: {
+  worldEvents: Array<Record<string, unknown>>;
+  turn: NarrativeTurnInputNormalized;
+  entryEventId: string;
+}): Array<Record<string, unknown>> {
+  const rows = input.worldEvents
+    .filter((event) => toString(event.eventHorizon).toUpperCase() !== 'FUTURE')
+    .map((event) => {
+      const refs = toStringArray(event.characterRefs);
+      const level = toString(event.level).toUpperCase();
+      const horizon = toString(event.eventHorizon).toUpperCase();
+      const id = toString(event.id);
+      let score = 0;
+      if (id && id === input.entryEventId) {
+        score += 100;
+      }
+      if (level === 'PRIMARY') {
+        score += 30;
+      }
+      if (horizon === 'ONGOING') {
+        score += 16;
+      } else if (horizon === 'PAST') {
+        score += 8;
+      }
+      if (refs.includes(input.turn.agentId)) {
+        score += 12;
+      }
+      if (refs.includes(input.turn.playerId)) {
+        score += 10;
+      }
+      return {
+        event,
+        score,
+        updatedAt: toTimestampMs(event.updatedAt || event.createdAt),
+      };
+    })
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+      if (right.updatedAt !== left.updatedAt) {
+        return right.updatedAt - left.updatedAt;
+      }
+      return toString(left.event.id).localeCompare(toString(right.event.id));
+    })
+    .map((item) => item.event);
+  return rows.slice(0, 10);
+}
+
+function selectFutureEvents(input: {
+  worldEvents: Array<Record<string, unknown>>;
+  turn: NarrativeTurnInputNormalized;
+}): Array<Record<string, unknown>> {
+  const rows = input.worldEvents
+    .filter((event) => toString(event.eventHorizon).toUpperCase() === 'FUTURE')
+    .map((event) => {
+      const refs = toStringArray(event.characterRefs);
+      let score = 0;
+      if (toString(event.level).toUpperCase() === 'PRIMARY') {
+        score += 20;
+      }
+      if (refs.includes(input.turn.agentId)) {
+        score += 12;
+      }
+      if (refs.includes(input.turn.playerId)) {
+        score += 10;
+      }
+      return {
+        event,
+        score,
+        updatedAt: toTimestampMs(event.updatedAt || event.createdAt),
+      };
+    })
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+      if (right.updatedAt !== left.updatedAt) {
+        return right.updatedAt - left.updatedAt;
+      }
+      return toString(left.event.id).localeCompare(toString(right.event.id));
+    })
+    .map((item) => item.event);
+  return rows.slice(0, 6);
+}
+
+function extractKeywordCandidates(input: {
+  turn: NarrativeTurnInputNormalized;
+  snapshot: NarrativeContextSnapshot;
+  timelineEvents: Array<Record<string, unknown>>;
+}): string[] {
+  const candidates: string[] = [];
+  candidates.push(...input.snapshot.openThreads);
+  candidates.push(input.snapshot.place);
+  candidates.push(input.turn.userMessage);
+  for (const event of input.timelineEvents.slice(0, 4)) {
+    candidates.push(toString(event.title || event.name));
+    candidates.push(toString(event.summary || event.description || event.process));
+  }
+
+  const tokens: string[] = [];
+  for (const candidate of candidates) {
+    const trimmed = normalizeWhitespace(candidate);
+    if (!trimmed) {
+      continue;
+    }
+    tokens.push(trimmed);
+    for (const piece of trimmed.split(/[\s,，。；;：:、|/]+/g)) {
+      const token = piece.trim();
+      if (token.length >= 2) {
+        tokens.push(token);
+      }
+    }
+  }
+  return uniqueStrings(tokens).slice(0, 24);
+}
+
+function selectLorebooks(input: {
+  worldLorebooks: Array<Record<string, unknown>>;
+  turn: NarrativeTurnInputNormalized;
+  snapshot: NarrativeContextSnapshot;
+  timelineEvents: Array<Record<string, unknown>>;
+}): Array<Record<string, unknown>> {
+  const keywordCandidates = extractKeywordCandidates({
+    turn: input.turn,
+    snapshot: input.snapshot,
+    timelineEvents: input.timelineEvents,
+  }).map((item) => item.toLowerCase());
+
+  const scored = input.worldLorebooks
+    .map((lorebook) => {
+      const haystack = normalizeWhitespace([
+        toString(lorebook.key),
+        toString(lorebook.title),
+        toString(lorebook.summary),
+        toString(lorebook.content),
+      ].join(' ')).slice(0, 900).toLowerCase();
+      let score = 0;
+      if (Boolean(lorebook.constant)) {
+        score += 20;
+      }
+      for (const keyword of keywordCandidates) {
+        if (keyword && haystack.includes(keyword)) {
+          score += 3;
+        }
+      }
+      return {
+        lorebook,
+        score,
+        updatedAt: toTimestampMs(lorebook.updatedAt || lorebook.createdAt),
+      };
+    })
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+      if (right.updatedAt !== left.updatedAt) {
+        return right.updatedAt - left.updatedAt;
+      }
+      return toString(left.lorebook.id).localeCompare(toString(right.lorebook.id));
+    });
+
+  const constants = scored.filter((item) => Boolean(item.lorebook.constant)).slice(0, 4);
+  const matched = scored.filter((item) => item.score > 0 && !Boolean(item.lorebook.constant)).slice(0, 8);
+  const fallback = scored.slice(0, 8);
+  const selected = constants.length + matched.length > 0
+    ? [...constants, ...matched]
+    : fallback;
+  const ids = new Set<string>();
+  const rows: Array<Record<string, unknown>> = [];
+  for (const row of selected) {
+    const id = toString(row.lorebook.id || row.lorebook.key || row.lorebook.title);
+    if (id && ids.has(id)) {
+      continue;
+    }
+    if (id) {
+      ids.add(id);
+    }
+    rows.push(row.lorebook);
+    if (rows.length >= 12) {
+      break;
+    }
+  }
+  return rows;
+}
+
+function selectScenes(input: {
+  worldScenes: Array<Record<string, unknown>>;
+  selectedScene: Record<string, unknown> | null;
+  timelineEvents: Array<Record<string, unknown>>;
+  futureEvents: Array<Record<string, unknown>>;
+}): Array<Record<string, unknown>> {
+  const sceneById = new Map<string, Record<string, unknown>>();
+  for (const scene of input.worldScenes) {
+    const id = toString(scene.id);
+    if (id) {
+      sceneById.set(id, scene);
+    }
+  }
+
+  const orderedIds: string[] = [];
+  const pushSceneId = (id: string) => {
+    const normalized = toString(id);
+    if (!normalized) {
+      return;
+    }
+    if (!sceneById.has(normalized)) {
+      return;
+    }
+    if (orderedIds.includes(normalized)) {
+      return;
+    }
+    orderedIds.push(normalized);
+  };
+
+  pushSceneId(toString(input.selectedScene?.id));
+  const projectedEvents = [...input.timelineEvents, ...input.futureEvents];
+  for (const event of projectedEvents) {
+    for (const ref of toStringArray(event.locationRefs)) {
+      pushSceneId(ref);
+    }
+  }
+  for (const scene of input.worldScenes) {
+    pushSceneId(toString(scene.id));
+    if (orderedIds.length >= 4) {
+      break;
+    }
+  }
+
+  const rows: Array<Record<string, unknown>> = [];
+  for (const id of orderedIds) {
+    const row = sceneById.get(id);
+    if (row) {
+      rows.push(row);
+    }
+    if (rows.length >= 4) {
+      break;
+    }
+  }
+  return rows;
+}
+
+function selectRelationRows(input: {
+  snapshot: NarrativeContextSnapshot;
+  resolvedScopes: NarrativeContextScopes;
+}): Array<Record<string, unknown>> {
+  if (input.snapshot.characterRelations.length > 0) {
+    return input.snapshot.characterRelations.slice(0, 8);
+  }
+  const relationScope = asRecord(input.resolvedScopes.RELATION);
+  if (Object.keys(relationScope).length > 0) {
+    return [relationScope];
+  }
+  return [];
+}
+
+function countMemoryItems(memoryRecall: Record<string, unknown>): number {
+  const rows: unknown[] = [
+    memoryRecall.items,
+    memoryRecall.core,
+    memoryRecall.e2e,
+    memoryRecall.memories,
+    memoryRecall.rows,
+    memoryRecall.data,
+  ];
+  const count = rows.reduce<number>((sum, row) => (
+    sum + (Array.isArray(row) ? row.length : 0)
+  ), 0);
+  if (count > 0) {
+    return count;
+  }
+  return Object.keys(memoryRecall).length > 0 ? 1 : 0;
+}
+
+function extractMemorySnippets(memoryRecall: Record<string, unknown>): string[] {
+  const snippets: string[] = [];
+
+  const collect = (value: unknown) => {
+    if (value == null) {
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((item) => collect(item));
+      return;
+    }
+    if (typeof value === 'object') {
+      const record = asRecord(value);
+      const content = clipText(
+        record.content
+        || record.text
+        || record.summary
+        || record.memory
+        || record.fact
+        || record.value,
+        160,
+      );
+      if (content) {
+        snippets.push(content);
+      }
+      return;
+    }
+    const text = clipText(value, 160);
+    if (text) {
+      snippets.push(text);
+    }
+  };
+
+  collect(memoryRecall.items);
+  collect(memoryRecall.core);
+  collect(memoryRecall.e2e);
+  collect(memoryRecall.memories);
+  collect(memoryRecall.rows);
+  collect(memoryRecall.data);
+
+  if (snippets.length === 0 && Object.keys(memoryRecall).length > 0) {
+    snippets.push(clipJson(memoryRecall, 180));
+  }
+  return uniqueStrings(snippets).slice(0, 10);
+}
+
+function formatEventLine(event: Record<string, unknown>): string {
+  const id = toString(event.id || event.eventId || 'event');
+  const level = toString(event.level || 'PRIMARY').toUpperCase();
+  const horizon = toString(event.eventHorizon || 'ONGOING').toUpperCase();
+  const title = clipText(event.title || event.name || id, 80);
+  const summary = clipText(event.summary || event.description || event.process, 140);
+  const result = clipText(event.result, 90);
+  const characterRefs = toStringArray(event.characterRefs).slice(0, 5).join(',');
+  const locationRefs = toStringArray(event.locationRefs).slice(0, 4).join(',');
+
+  const details = [
+    `[${level}/${horizon}]`,
+    `${id}: ${title}`,
+    summary ? `summary=${summary}` : '',
+    result ? `result=${result}` : '',
+    characterRefs ? `characters=${characterRefs}` : '',
+    locationRefs ? `locations=${locationRefs}` : '',
+  ].filter(Boolean);
+  return details.join(' | ');
+}
+
+function formatLorebookLine(lorebook: Record<string, unknown>): string {
+  const id = toString(lorebook.key || lorebook.id || lorebook.title || 'lorebook');
+  const title = clipText(lorebook.title || lorebook.key || lorebook.id, 70);
+  const summary = clipText(lorebook.summary || lorebook.description || lorebook.content, 180);
+  const constantTag = Boolean(lorebook.constant) ? '[constant]' : '[dynamic]';
+  return `${constantTag} ${id}${title ? ` (${title})` : ''} :: ${summary || '(empty)'}`;
+}
+
+function formatSceneLine(scene: Record<string, unknown>): string {
+  const id = toString(scene.id || scene.sceneId || 'scene');
+  const name = clipText(scene.name || scene.title || id, 64);
+  const description = clipText(scene.description || asRecord(scene.setting).atmosphere, 150);
+  const activeEntities = toStringArray(scene.activeEntities).slice(0, 6).join(',');
+  return `${id}: ${name}${description ? ` | ${description}` : ''}${activeEntities ? ` | entities=${activeEntities}` : ''}`;
+}
+
+function formatRelationLine(relation: Record<string, unknown>): string {
+  const subjectId = toString(relation.subjectId || relation.sourceId || relation.sourceLabel);
+  const targetId = toString(relation.targetSubjectId || relation.targetId || relation.targetLabel);
+  const relationType = clipText(
+    relation.relationType
+    || asRecord(relation.relationContract).relationType
+    || asRecord(relation.narrativeSetting).relationType
+    || asRecord(relation.narrativeState).relationType,
+    60,
+  );
+  const detail = clipText(
+    relation.detail
+    || relation.summary
+    || relation.description
+    || clipJson(relation, 180),
+    180,
+  );
+  return `${subjectId || '(subject)'} -> ${targetId || '(target)'}${relationType ? ` [${relationType}]` : ''} :: ${detail}`;
+}
+
+function buildCompiledPromptContext(input: {
+  turn: NarrativeTurnInputNormalized;
+  snapshot: NarrativeContextSnapshot;
+  routeOptions: NarrativeRouteOptionsSnapshot;
+  resolvedScopes: NarrativeContextScopes;
+  timelineEvents: Array<Record<string, unknown>>;
+  futureEvents: Array<Record<string, unknown>>;
+  lorebooks: Array<Record<string, unknown>>;
+  scenes: Array<Record<string, unknown>>;
+  relations: Array<Record<string, unknown>>;
+  memories: string[];
+  sourceCounts: NarrativePromptStats['sourceCounts'];
+}): {
+  compiledPrompt: string;
+  promptStats: NarrativePromptStats;
+} {
+  const storyStateLines = [
+    `phase=${input.snapshot.phase}`,
+    `objective=${input.snapshot.objective}`,
+    `tensionTarget=${String(input.snapshot.tensionTarget)}`,
+    `openThreads=${input.snapshot.openThreads.join(' | ') || '(none)'}`,
+  ];
+
+  const sectionEntries: Array<[string, string]> = [
+    ['coordinates', [
+      `storyId=${input.turn.storyId}`,
+      `worldId=${input.turn.worldId}`,
+      `agentId=${input.turn.agentId}`,
+      `playerId=${input.turn.playerId}`,
+      `triggerSource=${input.turn.triggerSource}`,
+    ].join('\n')],
+    ['route', [
+      `source=${toString(input.routeOptions.selected.source || 'unknown')}`,
+      `model=${toString(input.routeOptions.selected.model || 'unknown')}`,
+      `connectorId=${toString(input.routeOptions.selected.connectorId || 'unknown')}`,
+    ].join('\n')],
+    ['story-state', storyStateLines.join('\n')],
+    ['scene-anchor', [
+      `place=${input.snapshot.place}`,
+      `sceneMaterial=${input.snapshot.sceneMaterial.slice(0, 8).map((item) => clipText(item, 110)).join(' | ') || '(none)'}`,
+      `availableActors=${input.snapshot.availableActors.slice(0, 16).join(' | ') || '(none)'}`,
+      `futurePressure=${input.snapshot.futurePressure.slice(0, 8).map((item) => clipText(item, 90)).join(' | ') || '(none)'}`,
+    ].join('\n')],
+    ['timeline-events', input.timelineEvents.length > 0
+      ? input.timelineEvents.map((event, index) => `${index + 1}. ${formatEventLine(event)}`).join('\n')
+      : '(none)'],
+    ['future-events', input.futureEvents.length > 0
+      ? input.futureEvents.map((event, index) => `${index + 1}. ${formatEventLine(event)}`).join('\n')
+      : '(none)'],
+    ['world-lorebooks', input.lorebooks.length > 0
+      ? input.lorebooks.map((lorebook, index) => `${index + 1}. ${formatLorebookLine(lorebook)}`).join('\n')
+      : '(none)'],
+    ['scene-options', input.scenes.length > 0
+      ? input.scenes.map((scene, index) => `${index + 1}. ${formatSceneLine(scene)}`).join('\n')
+      : '(none)'],
+    ['relation-hints', input.relations.length > 0
+      ? input.relations.map((relation, index) => `${index + 1}. ${formatRelationLine(relation)}`).join('\n')
+      : '(none)'],
+    ['memory-recall', input.memories.length > 0
+      ? input.memories.map((memory, index) => `${index + 1}. ${clipText(memory, 180)}`).join('\n')
+      : '(none)'],
+    ['context-scopes', [
+      `CANON=${clipJson(input.resolvedScopes.CANON, 280) || '{}'}`,
+      `STORY=${clipJson(input.resolvedScopes.STORY, 280) || '{}'}`,
+      `SUBJECT=${clipJson(input.resolvedScopes.SUBJECT, 220) || '{}'}`,
+      `RELATION=${clipJson(input.resolvedScopes.RELATION, 220) || '{}'}`,
+    ].join('\n')],
+    ['trigger-context', [
+      `userMessage=${clipText(input.turn.userMessage, 260) || '(empty)'}`,
+      `systemContext=${clipJson(input.turn.systemContext, 260) || '{}'}`,
+      `contextCoverage=${clipJson(input.snapshot.contextCoverage, 200)}`,
+    ].join('\n')],
+  ];
+
+  const compiledPrompt = sectionEntries
+    .map(([section, body]) => `## ${section}\n${body}`)
+    .join('\n\n');
+
+  const sectionChars: Record<string, number> = {};
+  for (const [section, body] of sectionEntries) {
+    sectionChars[section] = body.length;
+  }
+
+  return {
+    compiledPrompt,
+    promptStats: {
+      sectionChars,
+      totalPromptChars: compiledPrompt.length,
+      sourceCounts: input.sourceCounts,
+      selectedCounts: {
+        timelineEvents: input.timelineEvents.length,
+        futureEvents: input.futureEvents.length,
+        lorebooks: input.lorebooks.length,
+        scenes: input.scenes.length,
+        relations: input.relations.length,
+        memories: input.memories.length,
+      },
+    },
+  };
+}
+
 export async function runNarrativeStep1Assembly(input: {
   turn: NarrativeTurnInputNormalized;
   queryRuntimeRouteOptions: () => Promise<unknown>;
@@ -350,7 +909,12 @@ export async function runNarrativeStep1Assembly(input: {
       input.queryWorldLorebooks(),
       input.queryWorldScenes(),
       input.queryNarrativeContexts(),
-      input.queryAgentMemoryRecall(),
+      input.queryAgentMemoryRecall().catch(() => ({
+        items: [],
+        core: [],
+        e2e: [],
+        recallSource: 'unavailable',
+      })),
     ]);
 
     const worldEvents = toRecordArray(worldEventsPayload);
@@ -358,6 +922,7 @@ export async function runNarrativeStep1Assembly(input: {
     const worldScenes = toRecordArray(worldScenesPayload);
     const narrativeContexts = toRecordArray(narrativeContextsPayload);
     const memoryRecall = asRecord(memoryRecallPayload);
+    const routeOptions = toNarrativeRouteOptions(routePayload);
 
     const resolved = resolveNarrativeScopes({
       rows: narrativeContexts,
@@ -446,13 +1011,59 @@ export async function runNarrativeStep1Assembly(input: {
       };
     }
 
-    const assets: NarrativeAssemblyAssets = {
-      routeOptions: toNarrativeRouteOptions(routePayload),
+    const entryEventId = extractStoryEntryEventId(input.turn.storyId);
+    const timelineEvents = selectTimelineEvents({
       worldEvents,
+      turn: input.turn,
+      entryEventId,
+    });
+    const futureEvents = selectFutureEvents({
+      worldEvents,
+      turn: input.turn,
+    });
+    const lorebooks = selectLorebooks({
       worldLorebooks,
+      turn: input.turn,
+      snapshot,
+      timelineEvents,
+    });
+    const scenes = selectScenes({
       worldScenes,
-      narrativeContexts,
-      memoryRecall,
+      selectedScene: scene,
+      timelineEvents,
+      futureEvents,
+    });
+    const relations = selectRelationRows({
+      snapshot,
+      resolvedScopes: resolved.scopes,
+    });
+    const memories = extractMemorySnippets(memoryRecall);
+
+    const sourceCounts: NarrativePromptStats['sourceCounts'] = {
+      worldEvents: worldEvents.length,
+      worldLorebooks: worldLorebooks.length,
+      worldScenes: worldScenes.length,
+      narrativeContexts: narrativeContexts.length,
+      memoryItems: countMemoryItems(memoryRecall),
+    };
+    const compiled = buildCompiledPromptContext({
+      turn: input.turn,
+      snapshot,
+      routeOptions,
+      resolvedScopes: resolved.scopes,
+      timelineEvents,
+      futureEvents,
+      lorebooks,
+      scenes,
+      relations,
+      memories,
+      sourceCounts,
+    });
+
+    const assets: NarrativeAssemblyAssets = {
+      routeOptions,
+      compiledPrompt: compiled.compiledPrompt,
+      promptStats: compiled.promptStats,
     };
 
     return {

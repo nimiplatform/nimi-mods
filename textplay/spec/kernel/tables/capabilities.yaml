@@ -11,6 +11,8 @@ required_capabilities:
     source_rule: T-CAP-003
   - key: data.query.data-api.world.access.me
     source_rule: T-CAP-003
+  - key: data.query.data-api.world.worlds.mine
+    source_rule: T-CAP-003
   - key: data.query.data-api.world.events.list
     source_rule: T-CAP-003
   - key: data.query.data-api.world.lorebooks.list

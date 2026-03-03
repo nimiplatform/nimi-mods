@@ -85,6 +85,18 @@ cases:
     expected_ok: false
     reason_code: TEXTPLAY_CONTEXT_MISSING_CRITICAL
     source_rule: T-ACC-002
+  - id: TXT-015-WORLD-FIRST-STORY-SELECTION
+    description: Story list is loaded only after account world is selected and is scoped to selected world.
+    expected_ok: true
+    world_first_required: true
+    reason_code: null
+    source_rule: T-ACC-002
+  - id: TXT-016-START-OPENING-RUN
+    description: Fresh story requires Start action and Start triggers opening narration via SystemEvent render run.
+    expected_ok: true
+    trigger_source: SystemEvent
+    reason_code: null
+    source_rule: T-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:textplay-kernel-docs
     source_rule: T-ACC-003

@@ -30,6 +30,7 @@ import type {
 import { hashString } from '../utils/hash.js';
 
 const STARTUP_SOURCE = 'textplay:events+scenes+contexts+lorebooks+memory+narrative.turn.latest';
+const ENTITY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{1,}$/;
 
 function normalizeKey(value: string): string {
   return value
@@ -68,6 +69,10 @@ function toStoryId(worldId: string, eventId: string): string {
   return `story.${normalizeKey(worldId)}.${normalizeKey(eventId)}`;
 }
 
+function isEntityId(value: string): boolean {
+  return ENTITY_ID_PATTERN.test(value);
+}
+
 function toEventHorizon(value: unknown): 'PAST' | 'ONGOING' | 'FUTURE' {
   const upper = toText(value).toUpperCase();
   if (upper === 'ONGOING') {
@@ -84,10 +89,11 @@ function pickPrimaryAgentId(input: {
   characterRefs: string[];
 }): string {
   const runtimeAgentId = toText(input.runtimeAgentId);
-  if (runtimeAgentId) {
+  if (isEntityId(runtimeAgentId)) {
     return runtimeAgentId;
   }
-  return input.characterRefs[0] || '';
+  const candidate = input.characterRefs.find((item) => isEntityId(toText(item)));
+  return candidate ? toText(candidate) : '';
 }
 
 function tokenize(input: string): string[] {
@@ -237,11 +243,10 @@ function buildBackgroundSummary(detail: TextplayStoryDetail, sceneDescription: s
   const lines = [
     detail.title,
     detail.summary,
-    detail.cause && `Cause: ${detail.cause}`,
-    detail.process && `Process: ${detail.process}`,
-    detail.result && `Result: ${detail.result}`,
-    detail.timeRef && `TimeRef: ${detail.timeRef}`,
-    sceneDescription && `Scene: ${sceneDescription}`,
+    detail.cause && `背景起因: ${detail.cause}`,
+    detail.process && `已知局势: ${detail.process}`,
+    detail.timeRef && `时间锚点: ${detail.timeRef}`,
+    sceneDescription && `场景氛围: ${sceneDescription}`,
   ].filter((item): item is string => Boolean(item));
   return lines.join('\n');
 }
@@ -352,7 +357,6 @@ async function queryWorldScenes(input: {
     capability: TEXTPLAY_DATA_API_WORLD_SCENES_LIST,
     query: {
       worldId: input.worldId,
-      take: 200,
     },
   });
   const parsed = TextplayWorldSceneListResponseSchema.safeParse(payload);
@@ -365,14 +369,11 @@ async function queryWorldScenes(input: {
 async function queryNarrativeContexts(input: {
   hookClient: HookClient;
   worldId: string;
-  storyId: string;
 }): Promise<TextplayWorldNarrativeContextRow[]> {
   const payload = await input.hookClient.data.query({
     capability: TEXTPLAY_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST,
     query: {
       worldId: input.worldId,
-      storyId: input.storyId,
-      take: 200,
     },
   });
   const parsed = TextplayWorldNarrativeContextListResponseSchema.safeParse(payload);
@@ -387,7 +388,7 @@ async function queryMemoryRecall(input: {
   agentId: string;
   playerId: string;
 }): Promise<TextplayMemoryRecallResponse> {
-  if (!input.agentId || !input.playerId) {
+  if (!isEntityId(toText(input.agentId)) || !input.playerId) {
     return {
       items: [],
       core: [],
@@ -395,24 +396,33 @@ async function queryMemoryRecall(input: {
       recallSource: 'none',
     };
   }
-  const payload = await input.hookClient.data.query({
-    capability: TEXTPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY,
-    query: {
-      agentId: input.agentId,
-      entityId: input.playerId,
-      topK: 8,
-    },
-  });
-  const parsed = TextplayMemoryRecallResponseSchema.safeParse(payload);
-  if (!parsed.success) {
+  try {
+    const payload = await input.hookClient.data.query({
+      capability: TEXTPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY,
+      query: {
+        agentId: input.agentId,
+        entityId: input.playerId,
+        topK: 8,
+      },
+    });
+    const parsed = TextplayMemoryRecallResponseSchema.safeParse(payload);
+    if (!parsed.success) {
+      return {
+        items: [],
+        core: [],
+        e2e: [],
+        recallSource: 'invalid',
+      };
+    }
+    return parsed.data;
+  } catch {
     return {
       items: [],
       core: [],
       e2e: [],
-      recallSource: 'invalid',
+      recallSource: 'error',
     };
   }
-  return parsed.data;
 }
 
 async function queryNarrativeLatestTurn(input: {
@@ -466,6 +476,46 @@ function pickContextRow(input: {
     }) || candidates[0] || null;
   }
   return candidates[0] || null;
+}
+
+function resolvePrimaryAgentId(input: {
+  detail: TextplayStoryDetail;
+  storyRow: TextplayWorldNarrativeContextRow | null;
+  contexts: TextplayWorldNarrativeContextRow[];
+  playerId: string;
+}): string {
+  const detailAgentId = toText(input.detail.primaryAgentId);
+  if (isEntityId(detailAgentId)) {
+    return detailAgentId;
+  }
+
+  const storySetting = {
+    ...(input.storyRow?.narrativeSetting || {}),
+    ...(input.storyRow?.narrativeState || {}),
+  } as Record<string, unknown>;
+  const castPolicy = (storySetting.castPolicy || {}) as Record<string, unknown>;
+  const mandatorySubjectIds = toStringList(castPolicy.mandatorySubjectIds);
+  const optionalSubjectIds = toStringList(castPolicy.optionalSubjectIds);
+
+  const subjectAgentIds = input.contexts
+    .filter((row) => row.scope === 'SUBJECT' && toText(row.subjectType).toUpperCase() === 'AGENT')
+    .map((row) => toText(row.subjectId));
+
+  const relationAgentIds = input.contexts
+    .filter((row) => row.scope === 'RELATION')
+    .flatMap((row) => [
+      toText(row.subjectType).toUpperCase() === 'AGENT' ? toText(row.subjectId) : '',
+      toText(row.targetSubjectType).toUpperCase() === 'AGENT' ? toText(row.targetSubjectId) : '',
+    ]);
+
+  const fallback = unique([
+    ...mandatorySubjectIds,
+    ...optionalSubjectIds,
+    ...subjectAgentIds,
+    ...relationAgentIds,
+  ]).find((candidate) => isEntityId(candidate) && candidate !== input.playerId);
+
+  return fallback || '';
 }
 
 export async function listPlayableStories(input: {
@@ -527,7 +577,7 @@ export async function loadStoryStartupPackage(input: {
 }): Promise<TextplayStartupPackage> {
   const detail = input.detail;
 
-  const [lorebooks, scenes, contexts, memoryRecall, latestTurn] = await Promise.all([
+  const [lorebooks, scenes, contexts, latestTurn] = await Promise.all([
     queryWorldLorebooks({
       hookClient: input.hookClient,
       worldId: detail.worldId,
@@ -539,12 +589,6 @@ export async function loadStoryStartupPackage(input: {
     queryNarrativeContexts({
       hookClient: input.hookClient,
       worldId: detail.worldId,
-      storyId: detail.storyId,
-    }),
-    queryMemoryRecall({
-      hookClient: input.hookClient,
-      agentId: detail.primaryAgentId,
-      playerId: input.playerId,
     }),
     queryNarrativeLatestTurn({
       narrativeEngine: input.narrativeEngine,
@@ -566,37 +610,57 @@ export async function loadStoryStartupPackage(input: {
     primaryAgentId: detail.primaryAgentId,
     playerId: input.playerId,
   });
+
+  if (!canonRow || !storyRow) {
+    throw new Error('TEXTPLAY_CONTEXT_MISSING_CRITICAL');
+  }
+
+  const resolvedPrimaryAgentId = resolvePrimaryAgentId({
+    detail,
+    storyRow,
+    contexts,
+    playerId: input.playerId,
+  });
+
+  const storySetting = {
+    ...storyRow.narrativeSetting,
+    ...storyRow.narrativeState,
+  } as Record<string, unknown>;
   const subjectRow = pickContextRow({
     rows: contexts,
     scope: 'SUBJECT',
     storyId: detail.storyId,
-    primaryAgentId: detail.primaryAgentId,
+    primaryAgentId: resolvedPrimaryAgentId,
     playerId: input.playerId,
   });
   const relationRow = pickContextRow({
     rows: contexts,
     scope: 'RELATION',
     storyId: detail.storyId,
-    primaryAgentId: detail.primaryAgentId,
+    primaryAgentId: resolvedPrimaryAgentId,
     playerId: input.playerId,
   });
 
-  if (!canonRow || !storyRow) {
-    throw new Error('TEXTPLAY_CONTEXT_MISSING_CRITICAL');
-  }
+  const memoryRecall = await queryMemoryRecall({
+    hookClient: input.hookClient,
+    agentId: resolvedPrimaryAgentId,
+    playerId: input.playerId,
+  });
 
   const gapWarnings: string[] = [];
+  if (!resolvedPrimaryAgentId) {
+    gapWarnings.push('TEXTPLAY_AGENT_BINDING_MISSING_WARN');
+  }
   if (!subjectRow) {
     gapWarnings.push('TEXTPLAY_CONTEXT_SUBJECT_MISSING_WARN');
   }
   if (!relationRow) {
     gapWarnings.push('TEXTPLAY_CONTEXT_RELATION_MISSING_WARN');
   }
+  if (toText(memoryRecall.recallSource) === 'error') {
+    gapWarnings.push('TEXTPLAY_MEMORY_RECALL_FAILED_WARN');
+  }
 
-  const storySetting = {
-    ...storyRow.narrativeSetting,
-    ...storyRow.narrativeState,
-  } as Record<string, unknown>;
   const sceneIdFromContext = toText((storyRow.narrativeSetting as Record<string, unknown>).recommendedSceneId);
   const recommendedSceneId = sceneIdFromContext || detail.recommendedSceneId || null;
   const selectedScene = (
@@ -666,7 +730,7 @@ export async function loadStoryStartupPackage(input: {
     sceneIds: scoredScenes.map((item) => item.id),
     contextIds: contexts.map((item) => item.id),
     recallSource: toText(memoryRecall.recallSource),
-    primaryAgentId: detail.primaryAgentId,
+    primaryAgentId: resolvedPrimaryAgentId,
   });
 
   const narrativeScopes = {
@@ -702,8 +766,12 @@ export async function loadStoryStartupPackage(input: {
       recommendedSceneId: recommendedSceneId || (selectedScene ? toText(selectedScene.id) : null),
     },
     cast: {
-      primaryAgentId: detail.primaryAgentId,
-      participants: detail.participants,
+      primaryAgentId: resolvedPrimaryAgentId,
+      participants: unique(
+        resolvedPrimaryAgentId
+          ? [resolvedPrimaryAgentId, ...detail.participants]
+          : detail.participants,
+      ),
     },
     background: {
       summary: buildBackgroundSummary(detail, toText(selectedScene?.description)),
@@ -728,7 +796,7 @@ export async function loadStoryStartupPackage(input: {
     snapshot: {
       storyId: detail.storyId,
       entryEventId: detail.entryEventId,
-      primaryAgentId: detail.primaryAgentId,
+      primaryAgentId: resolvedPrimaryAgentId,
       version: hashString(snapshotVersionSeed),
       source: STARTUP_SOURCE,
       loadedAt: new Date().toISOString(),

@@ -53,6 +53,23 @@ function readStringField(input: unknown, key: string): string {
   return String(value || '').trim();
 }
 
+function countRowsLikePayload(value: unknown): number {
+  if (Array.isArray(value)) {
+    return value.length;
+  }
+  const record = toRecord(value);
+  if (Array.isArray(record.items)) {
+    return record.items.length;
+  }
+  if (Array.isArray(record.rows)) {
+    return record.rows.length;
+  }
+  if (Array.isArray(record.data)) {
+    return record.data.length;
+  }
+  return 0;
+}
+
 function resolveActionHint(reasonCode: NarrativeReasonCode | null, fallback: string): string {
   if (reasonCode) {
     return NARRATIVE_ACTION_HINT_BY_REASON_CODE[reasonCode] || fallback;
@@ -113,6 +130,66 @@ function toStepInputHash(input: NarrativeTurnInputNormalized): string {
     routeOverride: input.routeOverride,
     cancelRequested: input.cancelRequested,
   });
+}
+
+function createUniqueSpineEventId(input: {
+  usedIds: Set<string>;
+  nowMs: number;
+  index: number;
+}): string {
+  let attempt = 0;
+  while (attempt < 4_096) {
+    const candidate = `evt-${createUlid(input.nowMs + input.index + attempt)}`;
+    if (!input.usedIds.has(candidate)) {
+      return candidate;
+    }
+    attempt += 1;
+  }
+  return `evt-${createUlid(input.nowMs + input.index + 4_096)}`;
+}
+
+function rewriteConflictingSpineEventIds(input: {
+  storyId: string;
+  nowMs: number;
+  events: NarrativeCoreOutput['spineEvents'];
+}): {
+  events: NarrativeCoreOutput['spineEvents'];
+  remappedCount: number;
+} {
+  const usedIds = new Set(
+    getNarrativeSpineByStoryId(input.storyId)
+      .map((event) => String(event.id || '').trim())
+      .filter(Boolean),
+  );
+  let remappedCount = 0;
+
+  const events = input.events.map((event, index) => {
+    const sourceId = String(event.id || '').trim();
+    const needsRemap = !sourceId || usedIds.has(sourceId);
+    const nextId = needsRemap
+      ? createUniqueSpineEventId({
+        usedIds,
+        nowMs: input.nowMs,
+        index,
+      })
+      : sourceId;
+    if (needsRemap) {
+      remappedCount += 1;
+    }
+    usedIds.add(nextId);
+    if (nextId === sourceId) {
+      return event;
+    }
+    return {
+      ...event,
+      id: nextId,
+    };
+  });
+
+  return {
+    events,
+    remappedCount,
+  };
 }
 
 function toTurnRecord(input: {
@@ -419,16 +496,28 @@ export async function processNarrativeTurn(input: {
     ),
     queryWorldScenes: () => deps.queryData(
       NARRATIVE_ENGINE_DATA_API_WORLD_SCENES_LIST,
-      { worldId: normalized.worldId, take: 200 },
+      { worldId: normalized.worldId },
     ),
     queryNarrativeContexts: () => deps.queryData(
       NARRATIVE_ENGINE_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST,
       {
         worldId: normalized.worldId,
         storyId: normalized.storyId,
-        take: 200,
       },
-    ),
+    ).then(async (scopedPayload) => {
+      const scopedCount = countRowsLikePayload(scopedPayload);
+      const shouldFallbackToWorldScope = scopedCount === 0 && normalized.storyId.includes('.');
+      if (!shouldFallbackToWorldScope) {
+        return scopedPayload;
+      }
+      const worldScopedPayload = await deps.queryData(
+        NARRATIVE_ENGINE_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST,
+        {
+          worldId: normalized.worldId,
+        },
+      );
+      return countRowsLikePayload(worldScopedPayload) > 0 ? worldScopedPayload : scopedPayload;
+    }),
     queryAgentMemoryRecall: () => deps.queryData(
       NARRATIVE_ENGINE_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY,
       {
@@ -459,6 +548,9 @@ export async function processNarrativeTurn(input: {
     checkpointToken: createUlid(normalized.nowMs + 10),
     stepInputHash: step1Hash,
     lastCompletedUnit: 'snapshot',
+    details: {
+      promptStats: step1.value.assets.promptStats,
+    },
   });
 
   if (normalized.cancelRequested) {
@@ -532,27 +624,23 @@ export async function processNarrativeTurn(input: {
 
   const finalOutput = guard.output;
   eventLog.startStep('write-spine');
-  const existingSpineIds = new Set(
-    getNarrativeSpineByStoryId(normalized.storyId).map((event) => String(event.id || '').trim()),
-  );
-  const conflictEvent = finalOutput.spineEvents.find((event) => existingSpineIds.has(event.id));
-  if (conflictEvent) {
-    return buildStepFailureResponse({
-      normalized,
-      eventLog,
-      step: 'write-spine',
-      reasonCode: NARRATIVE_REASON_CODES.NARRATIVE_SPINE_WRITE_CONFLICT,
-      actionHint: `Conflicting spine event id: ${conflictEvent.id}`,
-      inputHash,
-      contextSnapshot: step1.value.snapshot,
-    });
-  }
+  const spineRewrite = rewriteConflictingSpineEventIds({
+    storyId: normalized.storyId,
+    nowMs: normalized.nowMs,
+    events: finalOutput.spineEvents,
+  });
+  const coreOutput = spineRewrite.remappedCount > 0
+    ? {
+      ...finalOutput,
+      spineEvents: spineRewrite.events,
+    }
+    : finalOutput;
 
   const appendResult = appendNarrativeSpine({
     storyId: normalized.storyId,
-    events: finalOutput.spineEvents,
+    events: coreOutput.spineEvents,
   });
-  if (appendResult.appendedCount !== finalOutput.spineEvents.length) {
+  if (appendResult.appendedCount !== coreOutput.spineEvents.length) {
     return buildStepFailureResponse({
       normalized,
       eventLog,
@@ -567,13 +655,14 @@ export async function processNarrativeTurn(input: {
     details: {
       appendedCount: appendResult.appendedCount,
       totalCount: appendResult.totalCount,
+      remappedCount: spineRewrite.remappedCount,
     },
   });
 
   const projection = buildNarrativeRenderInput({
     turn: normalized,
     snapshot: step1.value.snapshot,
-    coreOutput: finalOutput,
+    coreOutput,
   });
   const reasonCode = guard.status === 'ADJUSTED'
     ? (guard.reasonCode || NARRATIVE_REASON_CODES.NARRATIVE_EVENT_COUNT_OVERFLOW_ADJUSTED)
@@ -599,7 +688,7 @@ export async function processNarrativeTurn(input: {
     turnId: normalized.turnId,
     storyId: normalized.storyId,
     runEnvelope: eventLog.getEnvelope(),
-    coreOutput: finalOutput,
+    coreOutput,
     projection,
   });
 

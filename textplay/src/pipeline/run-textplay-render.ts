@@ -1,10 +1,15 @@
 import { TEXTPLAY_CHAIN_REASON, TEXTPLAY_REASON } from '../contracts.js';
+import { NARRATIVE_REASON_CODES } from '../../../narrative-engine/src/contracts.js';
 import {
   queryNarrativeProjectionRenderInput,
   queryNarrativeTurnById,
   queryNarrativeTurnResultUpsert,
 } from '../data/narrative.js';
 import { assertTextplayChatRouteAvailable } from '../data/route-options.js';
+import type {
+  NarrativeProjectionRenderInputResponse,
+  NarrativeTurnByIdResponse,
+} from '../data/schemas.js';
 import { TextplayRenderRequestSchema } from '../data/schemas.js';
 import type {
   TextplayNormalizedRenderInput,
@@ -67,9 +72,16 @@ function assertNarrativeTurnAccepted(input: {
   if (input.status === 'APPROVED' || input.status === 'ADJUSTED') {
     return;
   }
+  const narrativeReason = String(input.reasonCode || '').trim();
+  const textplayReason = narrativeReason === NARRATIVE_REASON_CODES.NARRATIVE_CONTEXT_INSUFFICIENT
+    ? TEXTPLAY_REASON.CONTEXT_MISSING_CRITICAL
+    : TEXTPLAY_REASON.PROMPT_BUILD_FAILED;
+  const defaultActionHint = textplayReason === TEXTPLAY_REASON.CONTEXT_MISSING_CRITICAL
+    ? 'Complete required context scopes and retry.'
+    : 'Repair narrative output contract and retry.';
   throw new TextplayPipelineError({
-    reasonCode: TEXTPLAY_REASON.CONTEXT_MISSING_CRITICAL,
-    actionHint: String(input.actionHint || 'Resolve narrative compile rejection and retry.'),
+    reasonCode: textplayReason,
+    actionHint: String(input.actionHint || defaultActionHint),
     message: `TEXTPLAY_NARRATIVE_COMPILE_REJECTED:${String(input.reasonCode || input.status || 'unknown')}`,
     stage: 'context',
     chainReasonCode: TEXTPLAY_CHAIN_REASON.NARRATIVE_REJECTED,
@@ -85,6 +97,97 @@ function toPersistIdempotencyKey(input: {
   return `textplay:${input.storyId}:${input.turnId}:${input.runId}`;
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function firstNonEmpty(values: unknown[]): string {
+  for (const value of values) {
+    const text = String(value || '').trim();
+    if (text) {
+      return text;
+    }
+  }
+  return '';
+}
+
+function buildStartFallbackProjection(input: {
+  request: TextplayRenderExecutionInput['request'];
+  storyId: string;
+  turnId: string;
+  playerId: string;
+  agentId: string;
+}): NarrativeProjectionRenderInputResponse {
+  const opening = asRecord(asRecord(input.request.systemPayload).opening);
+  const sceneSummary = firstNonEmpty([
+    opening.background,
+    opening.entrySummary,
+    `Scene anchored for ${input.storyId}.`,
+  ]);
+  const agentSummary = firstNonEmpty([
+    opening.objective && `Objective: ${opening.objective}`,
+    `Primary agent ${input.agentId}.`,
+  ]);
+  const worldStyleSummary = firstNonEmpty([
+    opening.phase && opening.objective ? `Phase ${opening.phase}, objective ${opening.objective}.` : '',
+    opening.instruction,
+    'Narrative style follows canonical world rules.',
+  ]);
+  const fallbackEventContent = firstNonEmpty([
+    opening.entrySummary,
+    opening.background,
+  ]);
+
+  return {
+    storyId: input.storyId,
+    turnId: input.turnId,
+    triggerSource: input.request.triggerSource,
+    player: {
+      id: input.playerId,
+      name: firstNonEmpty([
+        opening.playerName,
+        input.request.playerName,
+      ]),
+    },
+    userMessage: String(input.request.userMessage || ''),
+    systemPayload: input.request.systemPayload,
+    scene: {
+      summary: sceneSummary,
+    },
+    agent: {
+      id: input.agentId,
+      summary: agentSummary,
+    },
+    worldStyle: {
+      summary: worldStyleSummary,
+    },
+    events: fallbackEventContent
+      ? [{
+        eventId: `${input.turnId}:opening-fallback`,
+        visibility: 'public',
+        content: fallbackEventContent,
+        sourceEventIds: [String(opening.entryEventId || input.turnId).trim() || input.turnId],
+      }]
+      : [],
+    metrics: {},
+  };
+}
+
+function buildStartFallbackTurnById(input: {
+  storyId: string;
+  turnId: string;
+  triggerSource: TextplayRenderExecutionInput['request']['triggerSource'];
+}): NarrativeTurnByIdResponse {
+  return {
+    storyId: input.storyId,
+    turnId: input.turnId,
+    triggerSource: input.triggerSource,
+    createdAt: new Date().toISOString(),
+  };
+}
+
 export async function runTextplayRender(input: TextplayRenderExecutionInput): Promise<TextplayRenderResult> {
   const sequence = {
     value: 0,
@@ -98,6 +201,7 @@ export async function runTextplayRender(input: TextplayRenderExecutionInput): Pr
     worldId: input.request.worldId,
     agentId: input.request.agentId,
     playerId: input.request.playerId,
+    playerName: input.request.playerName || '',
     runId: input.request.runId,
     traceId: input.request.traceId,
     triggerSource: input.request.triggerSource,
@@ -253,6 +357,7 @@ export async function runTextplayRender(input: TextplayRenderExecutionInput): Pr
         triggerSource: input.request.triggerSource,
         userMessage: input.request.userMessage,
         systemContext: input.request.systemPayload,
+        routeOverride: input.request.routeOverride,
         runId: input.request.runId,
         traceId: input.request.traceId,
         idempotencyKey: `textplay:${input.request.storyId}:${input.request.runId}`,
@@ -319,13 +424,16 @@ export async function runTextplayRender(input: TextplayRenderExecutionInput): Pr
     assertNotAborted(input.deps.abortSignal);
 
     appendStepStart('generate');
-    await assertTextplayChatRouteAvailable({
-      hookClient: input.deps.hookClient,
-    });
+    if (!input.request.routeOverride) {
+      await assertTextplayChatRouteAvailable({
+        hookClient: input.deps.hookClient,
+      });
+    }
     const generated = await generateTextplayOutput({
       aiClient: input.deps.aiClient,
       worldId: normalized.worldId,
       prompt,
+      routeOverride: input.request.routeOverride,
       abortSignal: input.deps.abortSignal,
     });
     checkpointToken = createUlid();

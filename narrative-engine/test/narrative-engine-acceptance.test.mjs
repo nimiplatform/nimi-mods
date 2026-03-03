@@ -106,7 +106,7 @@ function createNarrativeEngine() {
       }
       if (capability === 'data-api.world.narrative-contexts.list') {
         const storyId = String(query.storyId || '');
-        if (storyId === 'story-context-missing') {
+        if (storyId === 'story-context-missing' || storyId === 'story.world.event') {
           return { worldId: String(query.worldId || ''), items: [] };
         }
         return {
@@ -341,6 +341,19 @@ test('NAR-004 Missing context rejects before write', async () => {
   assert.equal(getNarrativeSpineByStoryId('story-context-missing').length, 0);
 });
 
+test('NAR-008 Dotted story id falls back to world-level context when scoped rows are empty', async () => {
+  const narrativeEngine = createNarrativeEngine();
+  const response = await narrativeEngine.turnResultUpsert(makeTurnInput({
+    storyId: 'story.world.event',
+    idempotencyKey: 'nar-008',
+    mockCoreOutput: makeCoreOutput({ eventCount: 2 }),
+  }));
+
+  assert.equal(response.status, 'APPROVED');
+  assert.equal(response.reasonCode, null);
+  assert.equal(getNarrativeSpineByStoryId('story.world.event').length, 2);
+});
+
 test('NAR-005 Initiative cooldown returns NOOP and no additional spine write', async () => {
   const narrativeEngine = createNarrativeEngine();
   await upsertContext(narrativeEngine, 'story-initiative');
@@ -476,4 +489,38 @@ test('Idempotency replay returns existing result; conflicting payload returns sp
   }));
   assert.equal(conflict.status, 'REJECTED');
   assert.equal(conflict.reasonCode, NARRATIVE_REASON_CODES.NARRATIVE_SPINE_WRITE_CONFLICT);
+});
+
+test('Spine append auto-remaps conflicting ids instead of failing the run', async () => {
+  const narrativeEngine = createNarrativeEngine();
+  await upsertContext(narrativeEngine, 'story-remap');
+
+  const first = await narrativeEngine.turnResultUpsert(makeTurnInput({
+    storyId: 'story-remap',
+    idempotencyKey: 'idem-remap-1',
+    userMessage: 'start-1',
+    mockCoreOutput: makeCoreOutput({ eventCount: 2 }),
+  }));
+  assert.notEqual(first.status, 'REJECTED');
+
+  const second = await narrativeEngine.turnResultUpsert(makeTurnInput({
+    storyId: 'story-remap',
+    idempotencyKey: 'idem-remap-2',
+    userMessage: 'start-2',
+    mockCoreOutput: makeCoreOutput({ eventCount: 2 }),
+  }));
+  assert.notEqual(second.status, 'REJECTED');
+  assert.equal(Array.isArray(second.coreOutput?.spineEvents), true);
+
+  const firstIds = new Set((first.coreOutput?.spineEvents || []).map((event) => event.id));
+  const secondIds = (second.coreOutput?.spineEvents || []).map((event) => event.id);
+  assert.equal(secondIds.length, 2);
+  for (const id of secondIds) {
+    assert.equal(firstIds.has(id), false);
+  }
+
+  const spine = getNarrativeSpineByStoryId('story-remap');
+  assert.equal(spine.length, 4);
+  const uniqueIds = new Set(spine.map((event) => event.id));
+  assert.equal(uniqueIds.size, spine.length);
 });

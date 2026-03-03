@@ -115,6 +115,14 @@ export type TextplayRenderFailure = {
 
 export type TextplayRenderResult = TextplayRenderSuccess | TextplayRenderFailure;
 
+export type TextplayWorldSummary = {
+  id: string;
+  name: string;
+  status: string;
+  description: string | null;
+  updatedAt: string;
+};
+
 export type TextplayStorySummary = {
   storyId: string;
   worldId: string;
@@ -272,6 +280,7 @@ export type TextplayNormalizedRenderInput = {
   traceId: string;
   triggerSource: TextplayTriggerSource;
   playerId: string;
+  playerName: string;
   userMessage: string;
   systemPayload: Record<string, unknown> | null;
   sceneSummary: string;

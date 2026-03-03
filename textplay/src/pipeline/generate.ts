@@ -6,6 +6,7 @@ export async function generateTextplayOutput(input: {
   aiClient: {
     generateText: (input: {
       routeHint: 'chat/default';
+      routeOverride?: Record<string, unknown>;
       prompt: string;
       mode: 'SCENE_TURN';
       worldId?: string;
@@ -26,10 +27,12 @@ export async function generateTextplayOutput(input: {
   };
   worldId: string;
   prompt: string;
+  routeOverride?: Record<string, unknown>;
   abortSignal?: AbortSignal;
 }): Promise<TextplayGenerateResult> {
   const response = await input.aiClient.generateText({
     routeHint: 'chat/default',
+    routeOverride: input.routeOverride,
     prompt: input.prompt,
     mode: 'SCENE_TURN',
     worldId: input.worldId,

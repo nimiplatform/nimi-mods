@@ -7,46 +7,66 @@ import type {
   NarrativeTurnInputNormalized,
 } from '../types.js';
 import type { NarrativeStep1AssemblyResult } from './step1-assembly.js';
+import { createUlid } from '../utils/ulid.js';
+
+const SPINE_EVENT_TYPES = ['scene-beat', 'dialogue', 'action', 'state-change'] as const;
+const VISIBILITY_TYPES = ['public', 'internal', 'sensory'] as const;
+const SPINE_EVENT_TYPE_SET = new Set<string>(SPINE_EVENT_TYPES);
+const VISIBILITY_TYPE_SET = new Set<string>(VISIBILITY_TYPES);
+
+function sanitizePromptValue(value: string): string {
+  return String(value || '')
+    .replace(/\{\{/g, '{ {')
+    .replace(/\}\}/g, '} }')
+    .trim();
+}
 
 function buildGeneratePrompt(input: {
   turn: NarrativeTurnInputNormalized;
   assembly: NarrativeStep1AssemblyResult;
 }): string {
-  const payload = {
-    task: 'compile_narrative_turn',
-    constraints: {
-      topLevelWhitelist: ['spineEvents', 'stateChanges', 'metrics'],
-      visibilityEnum: ['public', 'internal', 'sensory'],
-      eventTypeWhitelist: ['scene-beat', 'dialogue', 'action', 'state-change'],
-      maxEvents: 12,
-      minEvents: 1,
-      metricRange: [0, 1],
-    },
-    input: {
-      triggerSource: input.turn.triggerSource,
-      userMessage: input.turn.userMessage,
-      systemContext: input.turn.systemContext,
-      storyId: input.turn.storyId,
-      worldId: input.turn.worldId,
-      agentId: input.turn.agentId,
-      playerId: input.turn.playerId,
-      snapshot: input.assembly.snapshot,
-      storyState: {
-        phase: input.assembly.snapshot.phase,
-        objective: input.assembly.snapshot.objective,
-        tensionTarget: input.assembly.snapshot.tensionTarget,
-        openThreads: input.assembly.snapshot.openThreads,
-      },
-      startupPolicy: input.assembly.snapshot.startupPolicy,
-      futurePressure: input.assembly.snapshot.futurePressure,
-      contextCoverage: input.assembly.snapshot.contextCoverage,
-      memoryRecall: input.assembly.assets.memoryRecall,
-      worldEvents: input.assembly.assets.worldEvents.slice(0, 20),
-      worldLorebooks: input.assembly.assets.worldLorebooks.slice(0, 20),
-      worldScenes: input.assembly.assets.worldScenes.slice(0, 20),
-      narrativeContexts: input.assembly.assets.narrativeContexts.slice(0, 20),
-    },
-    outputJsonShape: {
+  const openingRule = input.turn.triggerSource === 'SystemEvent' || input.turn.triggerSource === 'AgentInitiative'
+    ? [
+      '- This is a system/world driven turn. Produce an opening or proactive beat.',
+      '- Ensure the first spine event establishes place, current stakes, and immediate objective.',
+      '- Keep continuity with timeline/lore context. Do not reveal future events as facts.',
+    ].join('\n')
+    : [
+      '- This is a user driven turn. The first spine event must directly respond to the user move.',
+      '- Keep the response grounded in scene constraints and character capability.',
+    ].join('\n');
+
+  const sections = [
+    '# Role',
+    'You are the narrative compiler for a story turn.',
+    'Output must be strict JSON only (no markdown, no prose preface, no suffix text).',
+    '',
+    '# Output Contract',
+    '- Top-level keys MUST be exactly: spineEvents, stateChanges, metrics.',
+    `- spineEvents[*].type MUST be one of: ${SPINE_EVENT_TYPES.join(', ')}`,
+    `- spineEvents[*].visibility MUST be one of: ${VISIBILITY_TYPES.join(', ')}`,
+    '- spineEvents length MUST be between 1 and 12.',
+    '- metrics values MUST be finite numbers in [0, 1].',
+    '',
+    '# Generation Policy',
+    '- Keep canon consistency and scene coherence.',
+    '- Keep tension progression smooth; avoid abrupt jumps.',
+    '- Internal visibility is only for private cognition events.',
+    '- Return compact but semantically complete payload fields.',
+    '',
+    '# Trigger',
+    `triggerSource=${input.turn.triggerSource}`,
+    `userMessage=${sanitizePromptValue(input.turn.userMessage || '(empty)')}`,
+    `systemContext=${sanitizePromptValue(JSON.stringify(input.turn.systemContext || {}))}`,
+    '',
+    '# Opening Or Response Rule',
+    openingRule,
+    '',
+    '# Compiled Context',
+    sanitizePromptValue(input.assembly.assets.compiledPrompt),
+    '',
+    '# JSON Shape Reference',
+    JSON.stringify({
       spineEvents: [
         {
           id: 'ULID-like string',
@@ -62,14 +82,47 @@ function buildGeneratePrompt(input: {
       ],
       stateChanges: {},
       metrics: {
-        coherence: 0,
-        groundedRatio: 0,
-        tension: 0,
+        coherence: 0.7,
+        groundedRatio: 0.7,
+        tension: 0.5,
       },
-    },
-    outputRule: 'return strict JSON object only, without markdown fences',
-  };
-  return JSON.stringify(payload);
+    }),
+    '',
+    '# Final Rule',
+    'Return one JSON object only.',
+  ];
+
+  return sections.join('\n');
+}
+
+function buildRepairPrompt(input: {
+  turn: NarrativeTurnInputNormalized;
+  previousRawOutput: string;
+}): string {
+  const rawOutput = String(input.previousRawOutput || '').slice(0, 6000);
+  const sections = [
+    '# Task',
+    'Repair the malformed narrative JSON into a valid CoreOutput object.',
+    'Return strict JSON only (no markdown, no explanation).',
+    '',
+    '# Required Shape',
+    '- top-level keys: spineEvents, stateChanges, metrics',
+    '- spineEvents: non-empty array',
+    `- spineEvents[*].type in: ${SPINE_EVENT_TYPES.join(', ')}`,
+    `- spineEvents[*].visibility in: ${VISIBILITY_TYPES.join(', ')}`,
+    '- metrics values must be finite numbers',
+    '',
+    '# Trigger',
+    `triggerSource=${input.turn.triggerSource}`,
+    `userMessage=${sanitizePromptValue(input.turn.userMessage || '(empty)')}`,
+    '',
+    '# Malformed Candidate',
+    rawOutput || '(empty)',
+    '',
+    '# Final Rule',
+    'Output one valid JSON object only.',
+  ];
+  return sections.join('\n');
 }
 
 function extractJsonObjectText(text: string): string {
@@ -89,18 +142,145 @@ function extractJsonObjectText(text: string): string {
   return normalized;
 }
 
-function parseCoreOutput(text: string): NarrativeCoreOutput | null {
-  const jsonText = extractJsonObjectText(text);
+function tryParseJsonObject(text: string): unknown | null {
+  const candidate = String(text || '').trim();
+  if (!candidate) {
+    return null;
+  }
   try {
-    const parsed = JSON.parse(jsonText);
-    const result = NarrativeCoreOutputSchema.safeParse(parsed);
-    if (!result.success) {
-      return null;
-    }
-    return result.data as NarrativeCoreOutput;
+    return JSON.parse(candidate);
   } catch {
     return null;
   }
+}
+
+function repairLikelyTruncatedJson(text: string): string {
+  let repaired = String(text || '').trim();
+  if (!repaired) {
+    return repaired;
+  }
+  const curlyOpen = (repaired.match(/\{/g) || []).length;
+  const curlyClose = (repaired.match(/\}/g) || []).length;
+  const squareOpen = (repaired.match(/\[/g) || []).length;
+  const squareClose = (repaired.match(/\]/g) || []).length;
+  if (squareOpen > squareClose) {
+    repaired += ']'.repeat(squareOpen - squareClose);
+  }
+  if (curlyOpen > curlyClose) {
+    repaired += '}'.repeat(curlyOpen - curlyClose);
+  }
+  return repaired;
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+  return parsed;
+}
+
+function coerceCoreOutput(parsed: unknown): NarrativeCoreOutput | null {
+  const record = asRecord(parsed);
+  const rawEvents = Array.isArray(record.spineEvents) ? record.spineEvents : [];
+  if (rawEvents.length === 0) {
+    return null;
+  }
+
+  const seenIds = new Set<string>();
+  const events = rawEvents.map((item, index) => {
+    const eventRecord = asRecord(item);
+    let id = String(eventRecord.id || '').trim();
+    if (!id) {
+      id = `evt-${createUlid()}`;
+    }
+    if (seenIds.has(id)) {
+      id = `${id}-${index + 1}`;
+    }
+    seenIds.add(id);
+
+    const rawType = String(eventRecord.type || '').trim().toLowerCase();
+    const type = SPINE_EVENT_TYPE_SET.has(rawType) ? rawType : 'scene-beat';
+
+    const rawVisibility = String(eventRecord.visibility || '').trim().toLowerCase();
+    const visibility = VISIBILITY_TYPE_SET.has(rawVisibility) ? rawVisibility : 'public';
+
+    const payloadRecord = asRecord(eventRecord.payload);
+    const payload = Object.keys(payloadRecord).length > 0
+      ? payloadRecord
+      : {
+        description: String(
+          eventRecord.description
+          || eventRecord.summary
+          || eventRecord.content
+          || eventRecord.text
+          || '',
+        ).trim(),
+      };
+
+    const sourceEventIds = Array.isArray(eventRecord.sourceEventIds)
+      ? eventRecord.sourceEventIds
+        .map((sourceEventId) => String(sourceEventId || '').trim())
+        .filter(Boolean)
+      : undefined;
+
+    const thinker = String(eventRecord.thinker || '').trim() || undefined;
+    const decider = String(eventRecord.decider || '').trim() || undefined;
+    const experiencer = String(eventRecord.experiencer || '').trim() || undefined;
+    const owner = String(eventRecord.owner || '').trim() || undefined;
+
+    return {
+      id,
+      type,
+      visibility,
+      payload,
+      ...(sourceEventIds && sourceEventIds.length > 0 ? { sourceEventIds } : {}),
+      ...(thinker ? { thinker } : {}),
+      ...(decider ? { decider } : {}),
+      ...(experiencer ? { experiencer } : {}),
+      ...(owner ? { owner } : {}),
+    };
+  });
+
+  const stateChanges = asRecord(record.stateChanges);
+  const metricsRaw = asRecord(record.metrics);
+  const metrics: Record<string, number> = {};
+  for (const [key, value] of Object.entries(metricsRaw)) {
+    const numeric = toFiniteNumber(value);
+    if (numeric != null) {
+      metrics[key] = numeric;
+    }
+  }
+  if (Object.keys(metrics).length === 0) {
+    metrics.coherence = 0.6;
+    metrics.groundedRatio = 0.6;
+    metrics.tension = 0.5;
+  }
+
+  const candidate = {
+    spineEvents: events,
+    stateChanges,
+    metrics,
+  };
+  const validation = NarrativeCoreOutputSchema.safeParse(candidate);
+  if (!validation.success) {
+    return null;
+  }
+  return validation.data as NarrativeCoreOutput;
+}
+
+function parseCoreOutput(text: string): NarrativeCoreOutput | null {
+  const jsonText = extractJsonObjectText(text);
+  const parsedDirect = tryParseJsonObject(jsonText);
+  const parsedValue = parsedDirect ?? tryParseJsonObject(repairLikelyTruncatedJson(jsonText));
+  if (!parsedValue) {
+    return null;
+  }
+  const directValidation = NarrativeCoreOutputSchema.safeParse(parsedValue);
+  if (directValidation.success) {
+    return directValidation.data as NarrativeCoreOutput;
+  }
+  return coerceCoreOutput(parsedValue);
 }
 
 export async function runNarrativeStep2Generate(input: {
@@ -143,17 +323,35 @@ export async function runNarrativeStep2Generate(input: {
       routeOverride: asRecord(input.turn.routeOverride),
       worldId: input.turn.worldId,
       agentId: input.turn.agentId,
-      maxTokens: 1400,
-      temperature: 0.3,
+      maxTokens: 1600,
+      temperature: 0.2,
       mode: 'SCENE_TURN',
     });
 
-    const coreOutput = parseCoreOutput(response.text);
+    let coreOutput = parseCoreOutput(response.text);
+    if (!coreOutput) {
+      const repairPrompt = buildRepairPrompt({
+        turn: input.turn,
+        previousRawOutput: response.text,
+      });
+      const repairedResponse = await input.generateText({
+        prompt: repairPrompt,
+        systemPrompt: 'Repair malformed JSON into valid CoreOutput. Return JSON only.',
+        routeHint: input.turn.routeHint,
+        routeOverride: asRecord(input.turn.routeOverride),
+        worldId: input.turn.worldId,
+        agentId: input.turn.agentId,
+        maxTokens: 1000,
+        temperature: 0.1,
+        mode: 'SCENE_TURN',
+      });
+      coreOutput = parseCoreOutput(repairedResponse.text);
+    }
     if (!coreOutput) {
       return {
         ok: false,
         reasonCode: NARRATIVE_REASON_CODES.NARRATIVE_GENERATION_SCHEMA_INVALID,
-        actionHint: 'Repair CoreOutput schema contract and retry.',
+        actionHint: 'CoreOutput JSON invalid. Check schema contract and compile context budget.',
         value: null,
       };
     }
@@ -168,7 +366,7 @@ export async function runNarrativeStep2Generate(input: {
     return {
       ok: false,
       reasonCode: NARRATIVE_REASON_CODES.NARRATIVE_GENERATION_SCHEMA_INVALID,
-      actionHint: 'Repair CoreOutput schema contract and retry.',
+      actionHint: 'CoreOutput JSON invalid. Check schema contract and compile context budget.',
       value: null,
     };
   }

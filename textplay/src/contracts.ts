@@ -6,6 +6,7 @@ export const TEXTPLAY_ROUTE_SLOT = 'ui-extension.app.content.routes';
 
 export const TEXTPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS = 'data-api.runtime.route.options';
 export const TEXTPLAY_DATA_API_WORLD_ACCESS_ME = 'data-api.world.access.me';
+export const TEXTPLAY_DATA_API_WORLD_WORLDS_MINE = 'data-api.world.worlds.mine';
 export const TEXTPLAY_DATA_API_WORLD_EVENTS_LIST = 'data-api.world.events.list';
 export const TEXTPLAY_DATA_API_WORLD_LOREBOOKS_LIST = 'data-api.world.lorebooks.list';
 export const TEXTPLAY_DATA_API_WORLD_SCENES_LIST = 'data-api.world.scenes.list';
@@ -17,6 +18,7 @@ export const TEXTPLAY_CAPABILITIES = [
   'llm.text.generate',
   `data.query.${TEXTPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS}`,
   `data.query.${TEXTPLAY_DATA_API_WORLD_ACCESS_ME}`,
+  `data.query.${TEXTPLAY_DATA_API_WORLD_WORLDS_MINE}`,
   `data.query.${TEXTPLAY_DATA_API_WORLD_EVENTS_LIST}`,
   `data.query.${TEXTPLAY_DATA_API_WORLD_LOREBOOKS_LIST}`,
   `data.query.${TEXTPLAY_DATA_API_WORLD_SCENES_LIST}`,

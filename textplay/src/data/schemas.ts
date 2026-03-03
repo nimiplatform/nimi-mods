@@ -55,8 +55,8 @@ export const NarrativeTurnByIdRequestSchema = z.strictObject({
 export const NarrativeTurnByIdResponseSchema = z.strictObject({
   storyId: z.string().min(1),
   turnId: z.string().min(1),
-  triggerSource: NarrativeTriggerSourceSchema,
-  createdAt: z.string().min(1),
+  triggerSource: z.union([NarrativeTriggerSourceSchema, z.null()]).optional().transform((value) => value ?? undefined),
+  createdAt: z.union([z.string(), z.null()]).optional().transform((value) => value ?? undefined),
 }).passthrough();
 
 export const NarrativeProjectionRenderInputRequestSchema = z.strictObject({
@@ -81,25 +81,25 @@ export const NarrativeProjectionEventSchema = z.strictObject({
 export const NarrativeProjectionRenderInputResponseSchema = z.strictObject({
   storyId: z.string().min(1),
   turnId: z.string().min(1),
-  triggerSource: NarrativeTriggerSourceSchema,
+  triggerSource: NarrativeTriggerSourceSchema.optional(),
   player: z.strictObject({
-    id: z.string().min(1),
+    id: z.string().optional(),
     name: z.string().optional(),
-  }),
+  }).catch({}),
   userMessage: z.string().optional(),
-  systemPayload: z.record(z.string(), z.unknown()).optional(),
+  systemPayload: z.union([z.record(z.string(), z.unknown()), z.null()]).optional().transform((value) => value ?? undefined),
   scene: z.strictObject({
-    summary: z.string().min(1),
-  }),
+    summary: z.string().optional(),
+  }).catch({}),
   agent: z.strictObject({
     id: z.string().optional(),
-    summary: z.string().min(1),
-  }),
+    summary: z.string().optional(),
+  }).catch({}),
   worldStyle: z.strictObject({
-    summary: z.string().min(1),
-  }),
-  events: z.array(NarrativeProjectionEventSchema),
-  metrics: z.record(z.string(), z.unknown()),
+    summary: z.string().optional(),
+  }).catch({}),
+  events: z.array(NarrativeProjectionEventSchema).catch([]),
+  metrics: z.record(z.string(), z.unknown()).catch({}),
 }).passthrough();
 
 export const NarrativeContextScopesSchema = z.strictObject({
@@ -128,6 +128,7 @@ export const NarrativeTurnResultUpsertRequestSchema = z.strictObject({
   triggerSource: NarrativeTriggerSourceSchema,
   userMessage: z.string().optional(),
   systemContext: z.record(z.string(), z.unknown()).optional(),
+  routeOverride: z.record(z.string(), z.unknown()).optional(),
   idempotencyKey: z.string().min(1).optional(),
   runId: z.string().min(1).optional(),
   traceId: z.string().min(1).optional(),
@@ -150,6 +151,21 @@ export const NarrativeTurnResultUpsertResponseSchema = z.strictObject({
   turnId: z.string().min(1),
   storyId: z.string().min(1),
 }).passthrough();
+
+export const TextplayWorldMineRowSchema = z.strictObject({
+  id: z.string().min(1),
+  name: z.string().optional(),
+  status: z.string().optional(),
+  description: z.string().nullable().optional(),
+  updatedAt: z.string().optional(),
+}).passthrough();
+
+export const TextplayWorldMineListResponseSchema = z.union([
+  z.array(TextplayWorldMineRowSchema),
+  z.strictObject({
+    items: z.array(TextplayWorldMineRowSchema),
+  }).passthrough(),
+]);
 
 export const TextplayWorldEventRowSchema = z.strictObject({
   id: z.string().min(1),
@@ -230,9 +246,9 @@ export const TextplayWorldNarrativeContextRowSchema = z.strictObject({
   scope: z.enum(['CANON', 'STORY', 'SUBJECT', 'RELATION']),
   scopeKey: z.string().min(1),
   storyId: z.string().nullable().optional(),
-  subjectType: z.enum(['AGENT', 'PLAYER', 'WORLD']).nullable().optional(),
+  subjectType: z.enum(['AGENT', 'PLAYER', 'FACTION']).nullable().optional(),
   subjectId: z.string().nullable().optional(),
-  targetSubjectType: z.enum(['AGENT', 'PLAYER', 'WORLD']).nullable().optional(),
+  targetSubjectType: z.enum(['AGENT', 'PLAYER', 'FACTION']).nullable().optional(),
   targetSubjectId: z.string().nullable().optional(),
   narrativeSetting: z.record(z.string(), z.unknown()).default({}),
   narrativeState: z.record(z.string(), z.unknown()).default({}),
@@ -323,8 +339,9 @@ const PersistRouteSchema = z.strictObject({
   source: z.string().min(1),
   connectorId: z.string(),
   model: z.string().min(1),
-  provider: z.string().min(1),
-  endpoint: z.string().min(1),
+  // token-api route metadata can omit concrete endpoint in some connectors.
+  provider: z.string(),
+  endpoint: z.string(),
 });
 
 const PersistMetaSchema = z.strictObject({
@@ -389,9 +406,11 @@ export const TextplayRenderRequestSchema = z.strictObject({
   worldId: z.string().min(1),
   agentId: z.string().min(1),
   playerId: z.string().min(1),
+  playerName: z.string().optional(),
   triggerSource: NarrativeTriggerSourceSchema,
   userMessage: z.string().optional(),
   systemPayload: z.record(z.string(), z.unknown()).optional(),
+  routeOverride: z.record(z.string(), z.unknown()).optional(),
   runId: z.string().min(1),
   traceId: z.string().min(1),
 }).superRefine((value, context) => {
@@ -417,6 +436,8 @@ export type NarrativeContextResolveRequest = z.infer<typeof NarrativeContextReso
 export type NarrativeContextResolveResponse = z.infer<typeof NarrativeContextResolveResponseSchema>;
 export type NarrativeTurnResultUpsertRequest = z.infer<typeof NarrativeTurnResultUpsertRequestSchema>;
 export type NarrativeTurnResultUpsertResponse = z.infer<typeof NarrativeTurnResultUpsertResponseSchema>;
+export type TextplayWorldMineRow = z.infer<typeof TextplayWorldMineRowSchema>;
+export type TextplayWorldMineListResponse = z.infer<typeof TextplayWorldMineListResponseSchema>;
 export type TextplayWorldEventRow = z.infer<typeof TextplayWorldEventRowSchema>;
 export type TextplayWorldEventListResponse = z.infer<typeof TextplayWorldEventListResponseSchema>;
 export type TextplayWorldLorebookRow = z.infer<typeof TextplayWorldLorebookRowSchema>;

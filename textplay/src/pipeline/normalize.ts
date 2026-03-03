@@ -13,6 +13,26 @@ function normalizeActorField(value: string | undefined): string {
   return String(value || '').trim();
 }
 
+function normalizeId(value: string | undefined): string {
+  return String(value || '').trim();
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function firstNonEmpty(values: unknown[]): string {
+  for (const value of values) {
+    const text = String(value || '').trim();
+    if (text) {
+      return text;
+    }
+  }
+  return '';
+}
+
 function normalizeEvent(event: NarrativeProjectionRenderInputResponse['events'][number]): TextplayProjectionEvent {
   const sourceEventIds = Array.isArray(event.sourceEventIds) && event.sourceEventIds.length > 0
     ? event.sourceEventIds
@@ -30,87 +50,183 @@ function normalizeEvent(event: NarrativeProjectionRenderInputResponse['events'][
   };
 }
 
-function assertTurnConsistency(input: {
+function resolveTurnConsistency(input: {
   request: TextplayRenderRequest;
   upsertedTurn: NarrativeTurnResultUpsertResponse;
   turnById: NarrativeTurnByIdResponse;
   projection: NarrativeProjectionRenderInputResponse;
-}): void {
+}): {
+  storyId: string;
+  turnId: string;
+  playerId: string;
+  playerName: string;
+  agentId: string;
+  triggerSource: TextplayRenderRequest['triggerSource'];
+} {
   const {
-    request,
     upsertedTurn,
     turnById,
     projection,
   } = input;
 
-  if (upsertedTurn.storyId !== request.storyId || turnById.storyId !== request.storyId || projection.storyId !== request.storyId) {
+  const upsertStoryId = normalizeId(upsertedTurn.storyId);
+  const turnStoryId = normalizeId(turnById.storyId);
+  const projectionStoryId = normalizeId(projection.storyId);
+  const requestStoryId = normalizeId(input.request.storyId);
+
+  if (!upsertStoryId || !turnStoryId || !projectionStoryId) {
     throw new TextplayPipelineError({
       reasonCode: TEXTPLAY_REASON.INPUT_INVALID,
-      actionHint: 'Complete player, userMessage, and events, then retry.',
+      actionHint: 'Repair narrative identity binding and retry.',
+      message: 'TEXTPLAY_STORY_ID_EMPTY',
+      stage: 'input',
+      retryClass: 'non-retryable',
+    });
+  }
+
+  if (upsertStoryId !== turnStoryId || upsertStoryId !== projectionStoryId) {
+    throw new TextplayPipelineError({
+      reasonCode: TEXTPLAY_REASON.INPUT_INVALID,
+      actionHint: 'Repair narrative identity binding and retry.',
       message: 'TEXTPLAY_STORY_ID_MISMATCH',
       stage: 'input',
       retryClass: 'non-retryable',
     });
   }
 
-  if (upsertedTurn.turnId !== turnById.turnId || upsertedTurn.turnId !== projection.turnId) {
+  const upsertTurnId = normalizeId(upsertedTurn.turnId);
+  const turnByIdTurnId = normalizeId(turnById.turnId);
+  const projectionTurnId = normalizeId(projection.turnId);
+
+  if (!upsertTurnId || !turnByIdTurnId || !projectionTurnId) {
     throw new TextplayPipelineError({
       reasonCode: TEXTPLAY_REASON.INPUT_INVALID,
-      actionHint: 'Complete player, userMessage, and events, then retry.',
+      actionHint: 'Repair narrative identity binding and retry.',
+      message: 'TEXTPLAY_TURN_ID_EMPTY',
+      stage: 'input',
+      retryClass: 'non-retryable',
+    });
+  }
+
+  if (upsertTurnId !== turnByIdTurnId || upsertTurnId !== projectionTurnId) {
+    throw new TextplayPipelineError({
+      reasonCode: TEXTPLAY_REASON.INPUT_INVALID,
+      actionHint: 'Repair narrative identity binding and retry.',
       message: 'TEXTPLAY_TURN_ID_MISMATCH',
       stage: 'input',
       retryClass: 'non-retryable',
     });
   }
 
-  if (projection.player.id !== request.playerId) {
+  const projectionPlayerId = normalizeId(projection.player.id);
+  const requestPlayerId = normalizeId(input.request.playerId);
+  const canonicalPlayerId = projectionPlayerId || requestPlayerId;
+  if (!canonicalPlayerId) {
     throw new TextplayPipelineError({
       reasonCode: TEXTPLAY_REASON.INPUT_INVALID,
-      actionHint: 'Complete player, userMessage, and events, then retry.',
-      message: 'TEXTPLAY_PLAYER_ID_MISMATCH',
+      actionHint: 'Repair narrative identity binding and retry.',
+      message: 'TEXTPLAY_PLAYER_ID_EMPTY',
       stage: 'input',
       retryClass: 'non-retryable',
     });
   }
 
-  const projectionAgentId = String(projection.agent.id || '').trim();
-  if (projectionAgentId && projectionAgentId !== request.agentId) {
+  const projectionAgentId = normalizeId(projection.agent.id);
+  const requestAgentId = normalizeId(input.request.agentId);
+  const canonicalAgentId = projectionAgentId || requestAgentId;
+  if (!canonicalAgentId) {
     throw new TextplayPipelineError({
       reasonCode: TEXTPLAY_REASON.INPUT_INVALID,
-      actionHint: 'Complete player, userMessage, and events, then retry.',
-      message: 'TEXTPLAY_AGENT_ID_MISMATCH',
+      actionHint: 'Repair narrative identity binding and retry.',
+      message: 'TEXTPLAY_AGENT_ID_EMPTY',
       stage: 'input',
       retryClass: 'non-retryable',
     });
   }
 
-  if (projection.triggerSource !== request.triggerSource) {
+  const projectionTriggerSource = projection.triggerSource;
+  const turnTriggerSource = turnById.triggerSource;
+  if (projectionTriggerSource && turnTriggerSource && projectionTriggerSource !== turnTriggerSource) {
     throw new TextplayPipelineError({
       reasonCode: TEXTPLAY_REASON.INPUT_INVALID,
-      actionHint: 'Complete player, userMessage, and events, then retry.',
+      actionHint: 'Repair narrative identity binding and retry.',
       message: 'TEXTPLAY_TRIGGER_SOURCE_MISMATCH',
       stage: 'input',
       retryClass: 'non-retryable',
     });
   }
-}
 
-function assertContextComplete(input: {
-  projection: NarrativeProjectionRenderInputResponse;
-}): void {
-  const sceneSummary = String(input.projection.scene.summary || '').trim();
-  const agentSummary = String(input.projection.agent.summary || '').trim();
-  const worldStyleSummary = String(input.projection.worldStyle.summary || '').trim();
-
-  if (!sceneSummary || !agentSummary || !worldStyleSummary) {
+  const canonicalTriggerSource = projectionTriggerSource
+    || turnTriggerSource
+    || input.request.triggerSource;
+  if (!canonicalTriggerSource) {
     throw new TextplayPipelineError({
-      reasonCode: TEXTPLAY_REASON.CONTEXT_MISSING_CRITICAL,
-      actionHint: 'Complete scene, agent, and worldStyle summary.',
-      message: 'TEXTPLAY_CONTEXT_SUMMARY_INCOMPLETE',
-      stage: 'context',
+      reasonCode: TEXTPLAY_REASON.INPUT_INVALID,
+      actionHint: 'Repair narrative identity binding and retry.',
+      message: 'TEXTPLAY_TRIGGER_SOURCE_EMPTY',
+      stage: 'input',
       retryClass: 'non-retryable',
     });
   }
+
+  const openingPayload = asRecord(asRecord(input.request.systemPayload).opening);
+  const canonicalPlayerName = firstNonEmpty([
+    projection.player.name,
+    input.request.playerName,
+    openingPayload.playerName,
+  ]);
+
+  return {
+    storyId: upsertStoryId || requestStoryId,
+    turnId: upsertTurnId,
+    playerId: canonicalPlayerId,
+    playerName: canonicalPlayerName,
+    agentId: canonicalAgentId,
+    triggerSource: canonicalTriggerSource as TextplayRenderRequest['triggerSource'],
+  };
+}
+
+function assertContextComplete(input: {
+  request: TextplayRenderRequest;
+  projection: NarrativeProjectionRenderInputResponse;
+  agentId: string;
+}): {
+  sceneSummary: string;
+  agentSummary: string;
+  worldStyleSummary: string;
+} {
+  const systemPayload = input.request.systemPayload || input.projection.systemPayload || null;
+  const opening = asRecord(asRecord(systemPayload).opening);
+  const fallbackEventContent = String(input.projection.events[0]?.content || '').trim();
+
+  const sceneSummary = firstNonEmpty([
+    input.projection.scene.summary,
+    opening.background,
+    opening.entrySummary,
+    fallbackEventContent,
+    `Scene anchored for ${normalizeId(input.request.storyId) || 'current story'}.`,
+  ]);
+
+  const agentSummary = firstNonEmpty([
+    input.projection.agent.summary,
+    opening.objective && `Objective: ${opening.objective}`,
+    `Primary agent ${input.agentId || normalizeId(input.request.agentId) || 'active agent'}.`,
+  ]);
+
+  const worldStyleSummary = firstNonEmpty([
+    input.projection.worldStyle.summary,
+    opening.phase && opening.objective
+      ? `Phase ${opening.phase}, objective ${opening.objective}.`
+      : '',
+    opening.instruction,
+    'Narrative style follows canonical world rules.',
+  ]);
+
+  return {
+    sceneSummary,
+    agentSummary,
+    worldStyleSummary,
+  };
 }
 
 export function normalizeTextplayRenderInput(input: {
@@ -123,23 +239,29 @@ export function normalizeTextplayRenderInput(input: {
   sourceEventIds: string[];
   stepInputHash: string;
 } {
-  assertTurnConsistency(input);
-  assertContextComplete({ projection: input.projection });
+  const consistency = resolveTurnConsistency(input);
+  const contextSummary = assertContextComplete({
+    request: input.request,
+    projection: input.projection,
+    agentId: consistency.agentId,
+  });
+  const systemPayload = input.request.systemPayload || input.projection.systemPayload || null;
 
   const normalized: TextplayNormalizedRenderInput = {
-    storyId: input.request.storyId,
-    worldId: input.request.worldId,
-    agentId: input.request.agentId,
-    turnId: input.upsertedTurn.turnId,
-    runId: input.request.runId,
-    traceId: input.request.traceId,
-    triggerSource: input.projection.triggerSource,
-    playerId: input.projection.player.id,
+    storyId: consistency.storyId,
+    worldId: normalizeId(input.request.worldId),
+    agentId: consistency.agentId,
+    turnId: consistency.turnId,
+    runId: normalizeId(input.request.runId),
+    traceId: normalizeId(input.request.traceId),
+    triggerSource: consistency.triggerSource,
+    playerId: consistency.playerId,
+    playerName: consistency.playerName,
     userMessage: String(input.request.userMessage || input.projection.userMessage || ''),
-    systemPayload: input.request.systemPayload || input.projection.systemPayload || null,
-    sceneSummary: String(input.projection.scene.summary || '').trim(),
-    agentSummary: String(input.projection.agent.summary || '').trim(),
-    worldStyleSummary: String(input.projection.worldStyle.summary || '').trim(),
+    systemPayload,
+    sceneSummary: contextSummary.sceneSummary,
+    agentSummary: contextSummary.agentSummary,
+    worldStyleSummary: contextSummary.worldStyleSummary,
     events: input.projection.events.map(normalizeEvent),
     metrics: input.projection.metrics,
   };
@@ -155,6 +277,7 @@ export function normalizeTextplayRenderInput(input: {
     turnId: normalized.turnId,
     triggerSource: normalized.triggerSource,
     playerId: normalized.playerId,
+    playerName: normalized.playerName,
     userMessage: normalized.userMessage,
     systemPayload: normalized.systemPayload,
     events: normalized.events,

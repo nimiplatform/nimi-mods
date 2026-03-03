@@ -1,4 +1,7 @@
-import { parseRuntimeRouteOptions } from '@nimiplatform/sdk/mod/runtime-route';
+import {
+  parseRuntimeRouteOptions,
+  type RuntimeRouteOptionsSnapshot,
+} from '@nimiplatform/sdk/mod/runtime-route';
 import type { HookClient } from '@nimiplatform/sdk/mod/types';
 import {
   TEXTPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS,
@@ -13,9 +16,9 @@ export type TextplayRouteAvailability = {
   model: string;
 };
 
-export async function assertTextplayChatRouteAvailable(input: {
+export async function queryTextplayChatRouteOptions(input: {
   hookClient: HookClient;
-}): Promise<TextplayRouteAvailability> {
+}): Promise<RuntimeRouteOptionsSnapshot> {
   const payload = await input.hookClient.data.query({
     capability: TEXTPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS,
     query: {
@@ -46,6 +49,13 @@ export async function assertTextplayChatRouteAvailable(input: {
     });
   }
 
+  return parsed;
+}
+
+export async function assertTextplayChatRouteAvailable(input: {
+  hookClient: HookClient;
+}): Promise<TextplayRouteAvailability> {
+  const parsed = await queryTextplayChatRouteOptions(input);
   return {
     source: parsed.selected.source,
     connectorId: parsed.selected.connectorId,
