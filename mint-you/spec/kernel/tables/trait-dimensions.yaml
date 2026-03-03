@@ -1,0 +1,77 @@
+version: 1
+primary_archetypes:
+  - key: CARING
+    label: 关怀型
+    description: Warm, empathetic, prioritizes emotional connection.
+    source_rule: MY-PROF-001
+  - key: PLAYFUL
+    label: 活泼型
+    description: Energetic, spontaneous, values fun and novelty.
+    source_rule: MY-PROF-001
+  - key: INTELLECTUAL
+    label: 智慧型
+    description: Curious, analytical, values depth and ideas.
+    source_rule: MY-PROF-001
+  - key: CONFIDENT
+    label: 自信型
+    description: Decisive, assertive, values clarity and action.
+    source_rule: MY-PROF-001
+  - key: MYSTERIOUS
+    label: 神秘型
+    description: Reserved, introspective, values privacy and depth.
+    source_rule: MY-PROF-001
+  - key: ROMANTIC
+    label: 浪漫型
+    description: Idealistic, expressive, values beauty and emotional intensity.
+    source_rule: MY-PROF-001
+secondary_traits:
+  - key: HUMOROUS
+    source_rule: MY-PROF-002
+  - key: SARCASTIC
+    source_rule: MY-PROF-002
+  - key: GENTLE
+    source_rule: MY-PROF-002
+  - key: DIRECT
+    source_rule: MY-PROF-002
+  - key: OPTIMISTIC
+    source_rule: MY-PROF-002
+  - key: REALISTIC
+    source_rule: MY-PROF-002
+  - key: DRAMATIC
+    source_rule: MY-PROF-002
+  - key: PASSIONATE
+    source_rule: MY-PROF-002
+  - key: REBELLIOUS
+    source_rule: MY-PROF-002
+  - key: INNOCENT
+    source_rule: MY-PROF-002
+  - key: WISE
+    source_rule: MY-PROF-002
+  - key: ECCENTRIC
+    source_rule: MY-PROF-002
+resolvable_trait_groups:
+  - group: dnaPrimary
+    target_field: CreateAgentDto.dnaPrimary
+    resolution: highest aggregated score across primary archetypes
+    min_scenarios: 2
+    source_rule: MY-INT-004
+  - group: relationshipMode
+    target_field: CreateAgentDto.dna.personality.relationshipMode
+    resolution: LLM synthesis from scenario scores
+    min_scenarios: 2
+    source_rule: MY-INT-004
+  - group: communicationFormality
+    target_field: CreateAgentDto.dna.communication.formality
+    resolution: highest score among casual/formal/slang
+    min_scenarios: 2
+    source_rule: MY-INT-004
+  - group: communicationSentiment
+    target_field: CreateAgentDto.dna.communication.sentiment
+    resolution: highest score among positive/neutral/cynical
+    min_scenarios: 2
+    source_rule: MY-INT-004
+  - group: dnaSecondary
+    target_field: CreateAgentDto.dnaSecondary
+    resolution: top 2-3 secondary traits by score
+    min_scenarios: 2
+    source_rule: MY-INT-004

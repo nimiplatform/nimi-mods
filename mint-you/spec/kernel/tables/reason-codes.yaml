@@ -1,0 +1,47 @@
+version: 1
+codes:
+  - code: MINTYOU_INPUT_INVALID
+    stage: basic-info
+    blocking: true
+    action_hint: Complete all required basic info fields and retry.
+    source_rule: MY-ERR-001
+  - code: MINTYOU_SCENARIO_INCOMPLETE
+    stage: scenarios
+    blocking: true
+    action_hint: Complete all scenario choices before proceeding.
+    source_rule: MY-ERR-001
+  - code: MINTYOU_TRAIT_EXTRACTION_FAILED
+    stage: trait-extract
+    blocking: true
+    action_hint: Verify scenario data integrity and retry extraction.
+    source_rule: MY-ERR-001
+  - code: MINTYOU_DNA_SYNTHESIS_FAILED
+    stage: dna-synthesize
+    blocking: true
+    action_hint: Check LLM route availability and retry synthesis.
+    source_rule: MY-ERR-001
+  - code: MINTYOU_CONFIRM_REQUIRED
+    stage: user-confirm
+    blocking: true
+    action_hint: Review persona card and explicitly confirm before creating agent.
+    source_rule: MY-ERR-001
+  - code: MINTYOU_WORLD_NOT_SELECTED
+    stage: agent-create
+    blocking: true
+    action_hint: Select a target world before creating agent.
+    source_rule: MY-ERR-001
+  - code: MINTYOU_AGENT_CREATE_FAILED
+    stage: agent-create
+    blocking: true
+    action_hint: Check agent creation payload and backend availability.
+    source_rule: MY-ERR-001
+  - code: MINTYOU_HANDLE_UNAVAILABLE
+    stage: agent-create
+    blocking: true
+    action_hint: Choose a different handle for the agent.
+    source_rule: MY-ERR-001
+  - code: MINTYOU_SESSION_EXPIRED_WARN
+    stage: resume
+    blocking: false
+    action_hint: Session data expired. Restart intake flow.
+    source_rule: MY-ERR-003
