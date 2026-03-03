@@ -8,6 +8,8 @@ import type {
   VideoPlayReasonCode,
   VideoPlayRetryClass,
   VideoPlayRouteStage,
+  VideoPlayWorkbenchStage,
+  VideoPlayWorkbenchStageStatus,
   VideoStorySourceMode,
 } from './contracts.js';
 
@@ -421,6 +423,31 @@ export type VideoPlayPipelineStageProgress = {
   reasonCode: VideoPlayReasonCode | null;
   actionHint: string | null;
   updatedAt: string;
+};
+
+export type VideoPlayWorkbenchStageProgress = {
+  stage: VideoPlayWorkbenchStage;
+  status: VideoPlayWorkbenchStageStatus;
+  reasonCode: VideoPlayReasonCode | null;
+  actionHint: string | null;
+  stepStatuses: Partial<Record<VideoPlayPipelineStep, VideoPlayPipelineStageStatus>>;
+};
+
+export type VideoPlayStageAdvancePlan = {
+  stage: VideoPlayWorkbenchStage;
+  allowed: boolean;
+  stepBudget: number;
+  reasonCode: VideoPlayReasonCode | null;
+  actionHint: string | null;
+};
+
+export type VideoPlayRebuildImpactPreview = {
+  operationType: VideoPlayOperationType;
+  scope: 'shot' | 'adjacent-shots-plus-compose' | 'clip-plus-compose' | 'post-segmentation-full-chain';
+  recommendedRerunStep: VideoPlayPipelineStep;
+  stage: VideoPlayWorkbenchStage;
+  confirmed: boolean;
+  createdAt: string;
 };
 
 export type VideoPlayPipelineCheckpoint = {

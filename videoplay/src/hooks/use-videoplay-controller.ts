@@ -14,9 +14,11 @@ import {
   VIDEOPLAY_PIPELINE_CHAIN,
   VIDEOPLAY_REASON,
   VIDEOPLAY_STORY_SOURCE_MODE,
+  VIDEOPLAY_WORKBENCH_STAGE,
   type VideoPlayOperationType,
   type VideoPlayPipelineStep,
   type VideoPlayReasonCode,
+  type VideoPlayWorkbenchStage,
   type VideoStorySourceMode,
 } from '../contracts.js';
 import { toVideoPlayError } from '../errors.js';
@@ -37,12 +39,20 @@ import type {
   ReleasePackage,
   RenderedAsset,
   VideoPlayPipelineCheckpoint,
+  VideoPlayRebuildImpactPreview,
+  VideoPlayStageAdvancePlan,
   VideoPlayPipelineStageProgress,
   VideoPlayRunEvent,
+  VideoPlayWorkbenchStageProgress,
   VideoStoryPackage,
   VideoStorySummary,
 } from '../types.js';
 import type { VideoPlayWorkbenchProps } from '../ui/video-play-workbench.js';
+import {
+  buildRebuildImpactPreview,
+  computeStageAdvancePlan,
+  deriveWorkbenchStageProgress,
+} from '../workbench/stage-flow.js';
 
 type AppStoreState = {
   setStatusBanner?: (value: { kind: 'warn' | 'error' | 'success' | 'info'; message: string }) => void;
@@ -107,6 +117,31 @@ function createInitialStageProgress(): VideoPlayPipelineStageProgress[] {
   }));
 }
 
+function stageFromNextStep(step: VideoPlayPipelineStep | null): VideoPlayWorkbenchStage {
+  if (step === 'narrative-ingest') {
+    return VIDEOPLAY_WORKBENCH_STAGE.STORY_SOURCE;
+  }
+  if (step === 'episode-segmentation' || step === 'screenplay') {
+    return VIDEOPLAY_WORKBENCH_STAGE.SCRIPT;
+  }
+  if (step === 'storyboard') {
+    return VIDEOPLAY_WORKBENCH_STAGE.STORYBOARD;
+  }
+  if (step === 'asset-render') {
+    return VIDEOPLAY_WORKBENCH_STAGE.VOICE;
+  }
+  if (step === 'edit-compose') {
+    return VIDEOPLAY_WORKBENCH_STAGE.VIDEO;
+  }
+  if (step === 'qc-gate') {
+    return VIDEOPLAY_WORKBENCH_STAGE.QC;
+  }
+  if (step === 'release-package') {
+    return VIDEOPLAY_WORKBENCH_STAGE.PUBLISH;
+  }
+  return VIDEOPLAY_WORKBENCH_STAGE.STORY_SOURCE;
+}
+
 export function useVideoPlayController(): VideoPlayWorkbenchProps {
   const hookClient = useMemo(() => createHookClient(VIDEOPLAY_MOD_ID), []);
   const aiClient = useMemo(() => createAiClient(VIDEOPLAY_MOD_ID), []);
@@ -139,9 +174,13 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
   const [pipelineCheckpoint, setPipelineCheckpoint] = useState<VideoPlayPipelineCheckpoint | null>(null);
   const [stageProgress, setStageProgress] = useState<VideoPlayPipelineStageProgress[]>(createInitialStageProgress);
   const [nextStep, setNextStep] = useState<VideoPlayPipelineStep | null>(null);
+  const [selectedWorkbenchStage, setSelectedWorkbenchStage] = useState<VideoPlayWorkbenchStage>(
+    VIDEOPLAY_WORKBENCH_STAGE.STORY_SOURCE,
+  );
   const [rerunStep, setRerunStep] = useState<VideoPlayPipelineStep>('screenplay');
   const [operationType, setOperationType] = useState<VideoPlayOperationType>(VIDEOPLAY_OPERATION_TYPE.UPDATE_SHOT);
   const [operationPayload, setOperationPayload] = useState(defaultOperationPayload());
+  const [rebuildPreview, setRebuildPreview] = useState<VideoPlayRebuildImpactPreview | null>(null);
 
   const [episodes, setEpisodes] = useState<EpisodeRecord[]>([]);
   const [releases, setReleases] = useState<ReleasePackage[]>([]);
@@ -193,6 +232,39 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
   const activeBranchName = selectedEpisode
     ? selectedEpisode.editor.branches[selectedEpisode.editor.activeBranchId]?.name || selectedEpisode.editor.activeBranchId
     : '-';
+
+  const workbenchStages = useMemo<VideoPlayWorkbenchStageProgress[]>(
+    () => deriveWorkbenchStageProgress({
+      storySelected: Boolean(selectedStory),
+      storyPackageReady: Boolean(storyPackage) && !storyPackageLoading,
+      routeReady,
+      stageProgress,
+      selectedReleaseCandidate,
+    }),
+    [routeReady, selectedReleaseCandidate, selectedStory, stageProgress, storyPackage, storyPackageLoading],
+  );
+
+  const stageAdvancePlan = useMemo<VideoPlayStageAdvancePlan>(
+    () => computeStageAdvancePlan({
+      stage: selectedWorkbenchStage,
+      stageProgress,
+      checkpointAvailable: Boolean(pipelineCheckpoint),
+      storySelected: Boolean(selectedStory),
+      storyPackageReady: Boolean(storyPackage) && !storyPackageLoading,
+      routeReady,
+      selectedReleaseCandidate,
+    }),
+    [
+      pipelineCheckpoint,
+      routeReady,
+      selectedReleaseCandidate,
+      selectedStory,
+      selectedWorkbenchStage,
+      stageProgress,
+      storyPackage,
+      storyPackageLoading,
+    ],
+  );
 
   const refreshRouteStatuses = useCallback(async () => {
     const capabilities = ['chat', 'image', 'video', 'tts'] as const;
@@ -324,6 +396,8 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
     setEpisodes([]);
     setSelectedEpisodeId('');
     setLastRebuildScope(null);
+    setRebuildPreview(null);
+    setSelectedWorkbenchStage(VIDEOPLAY_WORKBENCH_STAGE.STORY_SOURCE);
     setError(null);
   }, []);
 
@@ -416,7 +490,27 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
     worldId,
   ]);
 
-  const executePipeline = useCallback(async (mode: 'run' | 'rerun-step' | 'continue') => {
+  useEffect(() => {
+    if (!nextStep) {
+      return;
+    }
+    setSelectedWorkbenchStage(stageFromNextStep(nextStep));
+  }, [nextStep]);
+
+  const executePipeline = useCallback(async (input: {
+    mode: 'run' | 'rerun-step' | 'continue';
+    stepBudget?: number;
+    rerunStepOverride?: VideoPlayPipelineStep;
+    checkpointOverride?: VideoPlayPipelineCheckpoint | null;
+  }) => {
+    const mode = input.mode;
+    const stepBudget = Number.isFinite(Number(input.stepBudget))
+      ? Math.max(1, Math.floor(Number(input.stepBudget)))
+      : 1;
+    const effectiveRerunStep = input.rerunStepOverride || rerunStep;
+    const effectiveCheckpoint = mode === 'run'
+      ? null
+      : (input.checkpointOverride !== undefined ? input.checkpointOverride : pipelineCheckpoint);
     if (!selectedStory) {
       const blockingError: ControllerError = {
         reasonCode: VIDEOPLAY_REASON.STORY_SOURCE_UNAVAILABLE,
@@ -447,7 +541,7 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
       setStatusBanner?.({ kind: 'warn', message: `${baseError.reasonCode}: ${baseError.actionHint}` });
       return;
     }
-    if ((mode === 'continue' || mode === 'rerun-step') && !pipelineCheckpoint) {
+    if ((mode === 'continue' || mode === 'rerun-step') && !effectiveCheckpoint) {
       const blockingError: ControllerError = {
         reasonCode: VIDEOPLAY_REASON.CHECKPOINT_INVALID,
         actionHint: 'Start pipeline first to create a checkpoint.',
@@ -480,9 +574,9 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
           operator: 'creator',
           execution: {
             mode: 'stepwise',
-            stepBudget: 1,
-            checkpoint: mode === 'run' ? null : pipelineCheckpoint,
-            ...(mode === 'rerun-step' ? { rerunStep } : {}),
+            stepBudget,
+            checkpoint: effectiveCheckpoint,
+            ...(mode === 'rerun-step' ? { rerunStep: effectiveRerunStep } : {}),
             shouldCancel: () => cancelRequestedRef.current,
           },
         },
@@ -495,6 +589,9 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
       setEpisodes(result.episodes);
       setRunEvents(result.runEvents);
       setFallbackAudits(result.fallbackAudits);
+      if (mode === 'rerun-step') {
+        setRebuildPreview(null);
+      }
       if (result.episodes.length > 0) {
         setSelectedEpisodeId(result.episodes[0]!.episodeId);
       }
@@ -652,11 +749,18 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
       }
 
       setLastRebuildScope(applied.rebuildScope);
+      const preview = buildRebuildImpactPreview({
+        operationType,
+        scope: applied.rebuildScope,
+      });
+      setRebuildPreview(preview);
+      setRerunStep(preview.recommendedRerunStep);
+      setSelectedWorkbenchStage(preview.stage);
       await refreshStorageView();
       setSelectedEpisodeId(applied.episode.episodeId);
       setStatusBanner?.({
         kind: 'info',
-        message: `Operation applied: ${operationType} · scope=${applied.rebuildScope}`,
+        message: `Operation applied: ${operationType} · scope=${applied.rebuildScope}. Confirm rebuild preview before rerun.`,
       });
     } catch (operationError) {
       const normalized = toControllerError(operationError, {
@@ -707,6 +811,85 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
     });
   }, [hookClient, refreshStorageView, selectedEpisode, selectedReleaseCandidate, setStatusBanner]);
 
+  const handleRunPipeline = useCallback(() => {
+    setSelectedWorkbenchStage(VIDEOPLAY_WORKBENCH_STAGE.STORY_SOURCE);
+    setRebuildPreview(null);
+    void executePipeline({
+      mode: 'run',
+      stepBudget: 1,
+      checkpointOverride: null,
+    });
+  }, [executePipeline]);
+
+  const handleAdvanceStage = useCallback(() => {
+    if (!stageAdvancePlan.allowed) {
+      const blockedError: ControllerError = {
+        reasonCode: stageAdvancePlan.reasonCode || VIDEOPLAY_REASON.STAGE_PRECONDITION_BLOCKED,
+        actionHint: stageAdvancePlan.actionHint || 'Complete required upstream outputs before advance.',
+        message: `Stage ${selectedWorkbenchStage} is blocked.`,
+      };
+      setError(blockedError);
+      setStatusBanner?.({
+        kind: 'warn',
+        message: `${blockedError.reasonCode}: ${blockedError.actionHint}`,
+      });
+      return;
+    }
+    setError(null);
+    setStatusBanner?.({
+      kind: 'info',
+      message: `Advance stage: ${selectedWorkbenchStage} (steps=${stageAdvancePlan.stepBudget})`,
+    });
+    if (selectedWorkbenchStage === VIDEOPLAY_WORKBENCH_STAGE.STORY_SOURCE && !pipelineCheckpoint) {
+      void executePipeline({
+        mode: 'run',
+        stepBudget: stageAdvancePlan.stepBudget,
+      });
+      return;
+    }
+    void executePipeline({
+      mode: 'continue',
+      stepBudget: stageAdvancePlan.stepBudget,
+    });
+  }, [
+    executePipeline,
+    pipelineCheckpoint,
+    selectedWorkbenchStage,
+    setStatusBanner,
+    stageAdvancePlan,
+  ]);
+
+  const handleConfirmRebuildPreview = useCallback(() => {
+    setRebuildPreview((current) => (current ? { ...current, confirmed: true } : current));
+    setStatusBanner?.({
+      kind: 'info',
+      message: 'Rebuild impact confirmed. Rerun step is now enabled.',
+    });
+  }, [setStatusBanner]);
+
+  const handleRerunStep = useCallback(() => {
+    if (rebuildPreview && !rebuildPreview.confirmed) {
+      const blockedError: ControllerError = {
+        reasonCode: VIDEOPLAY_REASON.STAGE_ADVANCE_REQUIRED,
+        actionHint: 'Review and confirm rebuild impact before rerun.',
+        message: 'Rebuild impact preview is not confirmed.',
+      };
+      setError(blockedError);
+      setStatusBanner?.({
+        kind: 'warn',
+        message: `${blockedError.reasonCode}: ${blockedError.actionHint}`,
+      });
+      return;
+    }
+    const targetStep = rebuildPreview?.recommendedRerunStep || rerunStep;
+    setStatusBanner?.({ kind: 'info', message: `Rerun step requested: ${targetStep}` });
+    void executePipeline({
+      mode: 'rerun-step',
+      stepBudget: 1,
+      rerunStepOverride: targetStep,
+    });
+  }, [executePipeline, rebuildPreview, rerunStep, setStatusBanner]);
+
   const operationOptions = useMemo(
     () => (Object.values(VIDEOPLAY_OPERATION_TYPE) as VideoPlayOperationType[]).map((value) => ({
       value,
@@ -730,8 +913,12 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
     storyPackageError,
     runStatus,
     stageProgress,
+    workbenchStages,
+    selectedWorkbenchStage,
+    stageAdvancePlan,
     nextStep,
     rerunStep,
+    rebuildPreview,
     operationType,
     operationPayload,
     selectedEpisodeId,
@@ -754,20 +941,25 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
     onIngestCursorStartChange: setIngestCursorStart,
     onSelectStory: setSelectedStoryId,
     onSourceModeChange: setSourceMode,
+    onSelectWorkbenchStage: setSelectedWorkbenchStage,
+    onAdvanceStage: () => {
+      handleAdvanceStage();
+    },
     onRerunStepChange: setRerunStep,
     onOperationTypeChange: setOperationType,
     onOperationPayloadChange: setOperationPayload,
     onSelectEpisode: setSelectedEpisodeId,
     onRunPipeline: () => {
-      void executePipeline('run');
+      handleRunPipeline();
     },
     onRerunStep: () => {
-      setStatusBanner?.({ kind: 'info', message: `Rerun step requested: ${rerunStep}` });
-      void executePipeline('rerun-step');
+      handleRerunStep();
     },
     onContinueFromCheckpoint: () => {
-      setStatusBanner?.({ kind: 'info', message: `Continue requested from ${nextStep || 'checkpoint'}` });
-      void executePipeline('continue');
+      handleAdvanceStage();
+    },
+    onConfirmRebuildPreview: () => {
+      handleConfirmRebuildPreview();
     },
     onCancelRun: () => {
       cancelRequestedRef.current = true;
@@ -775,10 +967,11 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
         setRunStatus('CANCEL_REQUESTED');
       } else {
         setRunStatus('CANCELED');
-        setPipelineCheckpoint(null);
-        setNextStep(null);
-        setStageProgress(createInitialStageProgress());
-      }
+      setPipelineCheckpoint(null);
+      setNextStep(null);
+      setStageProgress(createInitialStageProgress());
+      setSelectedWorkbenchStage(VIDEOPLAY_WORKBENCH_STAGE.STORY_SOURCE);
+    }
     },
     onApplyOperation: () => {
       void handleApplyOperation();

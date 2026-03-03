@@ -173,6 +173,128 @@ execution_controls:
     - action: cancel-run
       behavior: transition_to_run_canceled_terminal
       source_rule: V-PIPE-012
+workbench_stage_navigation:
+  stage_ids:
+    - story-source
+    - script
+    - storyboard
+    - voice
+    - video
+    - qc
+    - publish
+  stage_to_pipeline_steps:
+    - stage: story-source
+      maps_to:
+        - narrative-ingest
+    - stage: script
+      maps_to:
+        - episode-segmentation
+        - screenplay
+    - stage: storyboard
+      maps_to:
+        - storyboard
+    - stage: voice
+      maps_to:
+        - asset-render
+      render_phase_subset:
+        - voice-analyze
+        - voice-render
+        - lip-sync
+    - stage: video
+      maps_to:
+        - asset-render
+        - edit-compose
+      render_phase_subset:
+        - video-render
+        - batch-queue-plan
+        - batch-queue-execute
+    - stage: qc
+      maps_to:
+        - qc-gate
+    - stage: publish
+      maps_to:
+        - release-package
+  source_rule: V-PIPE-018
+stage_readiness:
+  status_enum:
+    - empty
+    - processing
+    - ready
+    - blocked
+  derivation:
+    - stage: story-source
+      ready_when:
+        - selected_story_exists
+        - story_package_ready
+    - stage: script
+      ready_when:
+        - segmentation_ready
+        - screenplay_ready
+    - stage: storyboard
+      ready_when:
+        - storyboard_ready
+    - stage: voice
+      ready_when:
+        - storyboard_ready
+        - voice_subflow_ready_for_required_shots
+    - stage: video
+      ready_when:
+        - rendered_video_assets_ready
+        - compose_output_ready
+    - stage: qc
+      ready_when:
+        - qc_report_ready
+    - stage: publish
+      ready_when:
+        - qc_status_approved_or_adjusted
+        - release_candidate_ready
+  source_rule: V-PIPE-019
+stage_entry_preconditions:
+  - stage: script
+    requires:
+      - selected_story_package_ready
+    block_reason_code: VIDEOPLAY_STAGE_PRECONDITION_BLOCKED
+    source_rule: V-PIPE-020
+  - stage: storyboard
+    requires:
+      - screenplay_ready
+    block_reason_code: VIDEOPLAY_STAGE_PRECONDITION_BLOCKED
+    source_rule: V-PIPE-020
+  - stage: voice
+    requires:
+      - storyboard_ready
+    block_reason_code: VIDEOPLAY_STAGE_PRECONDITION_BLOCKED
+    source_rule: V-PIPE-020
+  - stage: video
+    requires:
+      - storyboard_ready
+      - voice_lip_sync_ready_for_required_shots
+    block_reason_code: VIDEOPLAY_STAGE_PRECONDITION_BLOCKED
+    source_rule: V-PIPE-020
+  - stage: qc
+    requires:
+      - compose_output_ready
+    block_reason_code: VIDEOPLAY_STAGE_PRECONDITION_BLOCKED
+    source_rule: V-PIPE-020
+  - stage: publish
+    requires:
+      - qc_status_approved_or_adjusted
+      - release_candidate_ready
+    block_reason_code: VIDEOPLAY_STAGE_PRECONDITION_BLOCKED
+    source_rule: V-PIPE-020
+stage_advance_policy:
+  explicit_advance_required: true
+  auto_skip_editable_stages: false
+  requires_creator_confirmation_after_edit: true
+  source_rule: V-PIPE-021
+rerun_impact_preview:
+  required_before_rerun: true
+  scopes:
+    - shot
+    - adjacent-shots-plus-compose
+    - clip-plus-compose
+    - post-segmentation-full-chain
+  source_rule: V-PIPE-022
 checkpoint_contract:
   required_fields:
     - checkpointToken

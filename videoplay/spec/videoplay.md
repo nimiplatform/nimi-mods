@@ -49,6 +49,10 @@
 - `VID-030`: Voice coverage is a mandatory QC dimension when voice modality is planned.
 - `VID-031`: `asset-render` voice-required shots must follow voice-first subflow (`voice-analyze -> voice-render -> lip-sync -> video-render`) within the same stage.
 - `VID-032`: Creator-side `generate-voice-line` is completed only when real `voice-audio` is produced through runtime TTS contract.
+- `VID-033`: Workbench interaction must be stage-driven (`story-source -> script -> storyboard -> voice -> video -> qc -> publish`) with deterministic readiness semantics.
+- `VID-034`: Stage entry preconditions are fail-close; blocked stages must emit blocking reason code and actionable hint.
+- `VID-035`: Creator must be able to edit stage payloads before explicit `advance`, and downstream stages cannot auto-skip editable checkpoints.
+- `VID-036`: Before rerun after stage edits, rebuild impact scope must be previewed with canonical scope vocabulary (`shot|adjacent-shots-plus-compose|clip-plus-compose|post-segmentation-full-chain`).
 
 ## 3. No Over-Design Guard
 

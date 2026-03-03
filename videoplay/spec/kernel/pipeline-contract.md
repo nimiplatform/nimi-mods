@@ -75,3 +75,36 @@ Within `asset-render`, voice-related execution order is fixed:
 `voice-analyze -> voice-render -> lip-sync -> video-render`
 
 No step may render final shot video for a voice-required shot before its voice asset and lip-sync anchors are ready.
+
+## V-PIPE-018 Workbench Stage Navigation
+
+VideoPlay UI must expose an explicit industrial stage navigation with stable stage IDs:
+
+`story-source -> script -> storyboard -> voice -> video -> qc -> publish`
+
+The navigation layer maps onto the fixed execution chain and does not change backend stage order.
+
+## V-PIPE-019 Stage Readiness Semantics
+
+Each workbench stage must expose deterministic status semantics (`empty|processing|ready|blocked`) derived from canonical pipeline outputs and route readiness. Stage status must be auditable from run checkpoints/events.
+
+## V-PIPE-020 Stage Entry Preconditions
+
+Stage entry preconditions are mandatory:
+
+- `script` requires selected story package ready.
+- `storyboard` requires script payload and required assets readiness.
+- `voice` requires storyboard shot plans.
+- `video` requires storyboard shot plans and voice/lip-sync readiness for voice-required shots.
+- `qc` requires compose output.
+- `publish` requires qc status in `APPROVED|ADJUSTED`.
+
+Precondition miss is fail-close and blocks stage advance.
+
+## V-PIPE-021 Stage-Scoped Editing and Advance
+
+Each stage must allow creator edits before advancing downstream. `advance` action is explicit and cannot auto-skip intermediate editable stages.
+
+## V-PIPE-022 Rebuild Impact Preview Before Rerun
+
+When a stage edit triggers downstream rebuild, UI must display rebuild impact scope preview (`shot|adjacent-shots-plus-compose|clip-plus-compose|post-segmentation-full-chain`) before rerun execution.

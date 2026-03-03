@@ -3,14 +3,18 @@ import type {
   EpisodeRecord,
   FallbackAuditRecord,
   ReleasePackage,
+  VideoPlayRebuildImpactPreview,
+  VideoPlayStageAdvancePlan,
   VideoPlayPipelineStageProgress,
   VideoPlayRunEvent,
+  VideoPlayWorkbenchStageProgress,
   VideoStoryPackage,
   VideoStorySummary,
 } from '../types.js';
 import type {
   VideoPlayOperationType,
   VideoPlayPipelineStep,
+  VideoPlayWorkbenchStage,
   VideoStorySourceMode,
 } from '../contracts.js';
 
@@ -52,8 +56,12 @@ export type VideoPlayWorkbenchProps = {
   storyPackageError: VideoPlayErrorView | null;
   runStatus: string;
   stageProgress: VideoPlayPipelineStageProgress[];
+  workbenchStages: VideoPlayWorkbenchStageProgress[];
+  selectedWorkbenchStage: VideoPlayWorkbenchStage;
+  stageAdvancePlan: VideoPlayStageAdvancePlan;
   nextStep: VideoPlayPipelineStep | null;
   rerunStep: VideoPlayPipelineStep;
+  rebuildPreview: VideoPlayRebuildImpactPreview | null;
   operationType: VideoPlayOperationType;
   operationPayload: string;
   selectedEpisodeId: string;
@@ -76,6 +84,8 @@ export type VideoPlayWorkbenchProps = {
   onIngestCursorStartChange: (value: string) => void;
   onSelectStory: (storyId: string) => void;
   onSourceModeChange: (value: VideoStorySourceMode) => void;
+  onSelectWorkbenchStage: (value: VideoPlayWorkbenchStage) => void;
+  onAdvanceStage: () => void;
   onRerunStepChange: (value: VideoPlayPipelineStep) => void;
   onOperationTypeChange: (value: VideoPlayOperationType) => void;
   onOperationPayloadChange: (value: string) => void;
@@ -83,6 +93,7 @@ export type VideoPlayWorkbenchProps = {
   onRunPipeline: () => void;
   onRerunStep: () => void;
   onContinueFromCheckpoint: () => void;
+  onConfirmRebuildPreview: () => void;
   onCancelRun: () => void;
   onApplyOperation: () => void;
   onPublish: () => void;
@@ -101,6 +112,27 @@ function sourceModeLabel(mode: VideoStorySourceMode): string {
   return mode === 'textplay-enriched-story' ? 'TextPlay Enriched Story' : 'Canonical Story';
 }
 
+function workbenchStageLabel(stage: VideoPlayWorkbenchStage): string {
+  switch (stage) {
+    case 'story-source':
+      return 'Story Source';
+    case 'script':
+      return 'Script';
+    case 'storyboard':
+      return 'Storyboard';
+    case 'voice':
+      return 'Voice';
+    case 'video':
+      return 'Video';
+    case 'qc':
+      return 'QC';
+    case 'publish':
+      return 'Publish';
+    default:
+      return stage;
+  }
+}
+
 function packageCoverageText(pkg: VideoStoryPackage): string {
   const c = pkg.snapshot.contextCoverage;
   return `CANON=${c.canon ? 'Y' : 'N'} STORY=${c.story ? 'Y' : 'N'} SUBJECT=${c.subject ? 'Y' : 'N'} RELATION=${c.relation ? 'Y' : 'N'} SCENE=${c.scene ? 'Y' : 'N'}`;
@@ -111,7 +143,8 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
     props.selectedReleaseCandidate
     && (props.selectedReleaseCandidate.qcStatus === 'APPROVED' || props.selectedReleaseCandidate.qcStatus === 'ADJUSTED'),
   );
-  const canContinue = Boolean(!props.loading && props.nextStep);
+  const canAdvance = Boolean(!props.loading && props.stageAdvancePlan.allowed);
+  const rerunBlockedByPreview = Boolean(props.rebuildPreview && !props.rebuildPreview.confirmed);
   const canRun = Boolean(
     !props.loading
     && props.routeReady
@@ -119,6 +152,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
     && props.storyPackage
     && !props.storyPackageLoading,
   );
+  const canRerun = Boolean(!props.loading && props.stageProgress.length > 0 && !rerunBlockedByPreview);
   const renderQueueEvents = props.runEvents.filter(
     (event) => event.step === 'asset-render' && event.details?.phase === 'batch-queue-execute',
   );
@@ -145,18 +179,18 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
           <button
             type="button"
             onClick={props.onRerunStep}
-            disabled={props.loading || props.stageProgress.length === 0}
+            disabled={!canRerun}
             className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Rerun Step
           </button>
           <button
             type="button"
-            onClick={props.onContinueFromCheckpoint}
-            disabled={!canContinue}
+            onClick={props.onAdvanceStage}
+            disabled={!canAdvance}
             className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Continue from Checkpoint
+            Advance Stage
           </button>
           <button
             type="button"
@@ -313,6 +347,37 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
               {props.lastRebuildScope ? ` · last rebuild scope: ${props.lastRebuildScope}` : ''}
             </p>
             <div className="mt-2 grid grid-cols-2 gap-2">
+              {props.workbenchStages.map((stage) => (
+                <button
+                  key={stage.stage}
+                  type="button"
+                  onClick={() => props.onSelectWorkbenchStage(stage.stage)}
+                  className={`rounded-md border px-2 py-1 text-left text-xs ${
+                    props.selectedWorkbenchStage === stage.stage
+                      ? 'border-blue-400 bg-blue-50'
+                      : 'border-gray-200 bg-white hover:bg-gray-50'
+                  }`}
+                >
+                  <p className="font-medium text-gray-900">{workbenchStageLabel(stage.stage)}</p>
+                  <p className={stage.status === 'ready' ? 'text-emerald-600' : stage.status === 'blocked' ? 'text-rose-600' : 'text-slate-500'}>
+                    {stage.status}
+                  </p>
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700">
+              <p>Selected stage: <span className="font-medium">{workbenchStageLabel(props.selectedWorkbenchStage)}</span></p>
+              <p>
+                advance: {props.stageAdvancePlan.allowed ? 'allowed' : 'blocked'}
+                {props.stageAdvancePlan.allowed ? ` · stepBudget=${props.stageAdvancePlan.stepBudget}` : ''}
+              </p>
+              {!props.stageAdvancePlan.allowed && props.stageAdvancePlan.actionHint ? (
+                <p className="text-rose-600">
+                  {props.stageAdvancePlan.reasonCode}: {props.stageAdvancePlan.actionHint}
+                </p>
+              ) : null}
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
               {props.stageProgress.map((stage) => (
                 <div key={stage.step} className="rounded-md border border-gray-200 px-2 py-1 text-xs">
                   <p className="font-medium text-gray-900">{stage.step}</p>
@@ -337,6 +402,24 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
             <p className="mt-1 text-xs text-gray-500">
               Use rerun-step after editing to recompose downstream outputs.
             </p>
+            {props.rebuildPreview ? (
+              <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800">
+                <p className="font-medium">Rebuild impact preview</p>
+                <p>operation={props.rebuildPreview.operationType}</p>
+                <p>scope={props.rebuildPreview.scope}</p>
+                <p>recommended rerun={props.rebuildPreview.recommendedRerunStep}</p>
+                <p>confirmed={props.rebuildPreview.confirmed ? 'yes' : 'no'}</p>
+                {!props.rebuildPreview.confirmed ? (
+                  <button
+                    type="button"
+                    onClick={props.onConfirmRebuildPreview}
+                    className="mt-1 rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-medium text-amber-800 hover:bg-amber-100"
+                  >
+                    Confirm Rebuild Scope
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
             <div className="mt-3 grid grid-cols-3 gap-2">
               <label className="text-xs text-gray-600">
                 Rerun Step

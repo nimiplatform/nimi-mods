@@ -68,3 +68,31 @@ operation_audit_required_fields:
     - operator
     - timestamp
   source_rule: V-OPS-005
+stage_scoped_editability:
+  - stage: script
+    editable_payloads:
+      - episode-boundary
+      - segmentation-policy
+      - beat-structure
+    source_rule: V-OPS-007
+  - stage: storyboard
+    editable_payloads:
+      - shot-plan
+      - transition
+      - camera-motion
+    source_rule: V-OPS-007
+  - stage: voice
+    editable_payloads:
+      - voice-profile
+      - line-text
+      - lip-sync-anchor
+    source_rule: V-OPS-007
+  - stage: video
+    editable_payloads:
+      - shot-asset-selection
+      - timeline-adjustment
+    source_rule: V-OPS-007
+stage_advance:
+  explicit_advance_required: true
+  auto_advance_forbidden: true
+  source_rule: V-OPS-008

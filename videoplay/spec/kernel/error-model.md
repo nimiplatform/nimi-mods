@@ -25,3 +25,7 @@ Invalid checkpoint payload or resume hash mismatch must be treated as blocking f
 ## V-ERR-006 Render Orchestration Blocking Errors
 
 Asset analysis/queue orchestration errors and required voice rendering failures are blocking errors for release path.
+
+## V-ERR-007 Workbench Stage Blocking Errors
+
+Stage precondition miss and explicit advance violation must return blocking reason codes and action hints that indicate required upstream stage/output fixes.

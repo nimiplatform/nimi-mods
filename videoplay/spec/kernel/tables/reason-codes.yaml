@@ -20,6 +20,16 @@ codes:
     blocking: true
     action_hint: Select an available story source mode and retry.
     source_rule: V-ERR-004
+  - code: VIDEOPLAY_STAGE_PRECONDITION_BLOCKED
+    stage: workbench
+    blocking: true
+    action_hint: Complete required upstream stage outputs before advance.
+    source_rule: V-ERR-007
+  - code: VIDEOPLAY_STAGE_ADVANCE_REQUIRED
+    stage: workbench
+    blocking: true
+    action_hint: Confirm stage outputs and click advance before downstream execution.
+    source_rule: V-ERR-007
   - code: VIDEOPLAY_EPISODE_SEGMENTATION_FAILED
     stage: segment
     blocking: true

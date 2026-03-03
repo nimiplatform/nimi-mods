@@ -25,3 +25,11 @@ Every creator operation must emit auditable operation event with version and bra
 ## V-OPS-006 Generate-Voice-Line Must Be Real TTS
 
 `generate-voice-line` creator operation must execute runtime speech synthesis (`llm.speech.synthesize`) via route contracts and persist real voice audio assets. A synthetic script-only placeholder cannot be treated as completed voice generation.
+
+## V-OPS-007 Stage-Scoped Editing Contract
+
+Creator operations must be available through stage-scoped editing surfaces (`script|storyboard|voice|video`) and must emit rebuild scope preview before rerun.
+
+## V-OPS-008 Explicit Stage Advance Contract
+
+After stage edits, downstream progression must require explicit `advance` action and cannot auto-run subsequent stages without creator confirmation.

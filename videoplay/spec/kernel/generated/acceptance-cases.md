@@ -174,6 +174,34 @@ cases:
     disallowed_asset_only_mode:
       - voice-script-only
     source_rule: V-ACC-002
+  - id: VID-027-WORKBENCH-STAGE-PRECONDITION-BLOCK
+    description: Stage advance is blocked with blocking reason code when required upstream payload is missing.
+    expected_ok: false
+    reason_code: VIDEOPLAY_STAGE_PRECONDITION_BLOCKED
+    source_rule: V-ACC-002
+  - id: VID-028-WORKBENCH-STAGE-READINESS-DERIVATION
+    description: Workbench stage statuses are deterministically derived as empty/processing/ready/blocked from checkpoint and outputs.
+    expected_ok: true
+    readiness_status_enum:
+      - empty
+      - processing
+      - ready
+      - blocked
+    source_rule: V-ACC-002
+  - id: VID-029-WORKBENCH-ADVANCE-EXPLICIT
+    description: Stage edits require explicit advance and cannot auto-run downstream stages.
+    expected_ok: true
+    auto_advance_forbidden: true
+    source_rule: V-ACC-002
+  - id: VID-030-RERUN-IMPACT-PREVIEW-REQUIRED
+    description: Rerun after stage edit must surface rebuild impact scope before execution.
+    expected_ok: true
+    required_scope_values:
+      - shot
+      - adjacent-shots-plus-compose
+      - clip-plus-compose
+      - post-segmentation-full-chain
+    source_rule: V-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:videoplay-kernel-docs
     source_rule: V-ACC-003

@@ -39,6 +39,17 @@
 5. `spec/kernel/tables/acceptance-cases.yaml`
 6. `spec/videoplay.md`
 
+### Change workbench stage flow (story-source -> script -> storyboard -> voice -> video -> qc -> publish)
+
+1. `spec/kernel/pipeline-contract.md`
+2. `spec/kernel/creator-workflow-contract.md`
+3. `spec/kernel/error-model.md`
+4. `spec/kernel/tables/pipeline-states.yaml`
+5. `spec/kernel/tables/creator-operations.yaml`
+6. `spec/kernel/tables/reason-codes.yaml`
+7. `spec/kernel/tables/acceptance-cases.yaml`
+8. `spec/videoplay.md`
+
 ### Change capability boundary
 
 1. `spec/kernel/capability-contract.md`
