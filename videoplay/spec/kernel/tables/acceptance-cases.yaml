@@ -98,6 +98,76 @@ cases:
     expected_ok: false
     reason_code: VIDEOPLAY_STORY_PACKAGE_INVALID
     source_rule: V-ACC-002
+  - id: VID-017-STEPWISE-RUN-PAUSES-AT-CHECKPOINT
+    description: Run pipeline in stepwise mode executes one stage and pauses with checkpoint metadata.
+    expected_ok: true
+    paused: true
+    checkpoint_required_fields:
+      - checkpointToken
+      - stepInputHash
+      - lastCompletedUnit
+    reason_code: null
+    source_rule: V-ACC-002
+  - id: VID-018-CONTINUE-FROM-CHECKPOINT-ADVANCES-NEXT-STAGE
+    description: Continue from checkpoint advances exactly the next pending stage without replaying completed stages.
+    expected_ok: true
+    stage_replay: none
+    reason_code: null
+    source_rule: V-ACC-002
+  - id: VID-019-RERUN-STEP-INVALIDATES-DOWNSTREAM
+    description: Rerun step clears downstream outputs and recomputes from selected stage with incremented attempt.
+    expected_ok: true
+    downstream_invalidated: true
+    attempt_monotonic: true
+    reason_code: null
+    source_rule: V-ACC-002
+  - id: VID-020-RESUME-HASH-MISMATCH-FAIL-CLOSE
+    description: Resume rejects checkpoint when stepInputHash mismatches current stage input.
+    expected_ok: false
+    reason_code: VIDEOPLAY_STEP_RESUME_HASH_MISMATCH
+    source_rule: V-ACC-002
+  - id: VID-021-CANCEL-RUN-TERMINAL
+    description: Cancel run transitions to terminal CANCELED and emits run.canceled instead of run.error.
+    expected_ok: true
+    terminal_state: CANCELED
+    reason_code: VIDEOPLAY_RUN_CANCELED
+    source_rule: V-ACC-002
+  - id: VID-022-ASSET-ANALYSIS-QUEUE-TRACE
+    description: Asset render emits deterministic analysis plan and batch/queue execution trace.
+    expected_ok: true
+    analysis_trace_required: true
+    queue_trace_required: true
+    reason_code: null
+    source_rule: V-ACC-002
+  - id: VID-023-VOICE-ROUTE-FALLBACK-AUDITED
+    description: Voice rendering route fallback from local-runtime to token-api is auditable with required fields.
+    expected_ok: true
+    stage: asset-render-voice
+    fallback_visible: true
+    reason_code: null
+    source_rule: V-ACC-002
+  - id: VID-024-VOICE-COVERAGE-REJECT
+    description: Planned voice modality with insufficient rendered voice coverage fails close before release.
+    expected_ok: false
+    reason_code: VIDEOPLAY_VOICE_RENDER_FAILED
+    source_rule: V-ACC-002
+  - id: VID-025-VOICE-FIRST-SUBFLOW-ORDER
+    description: Asset render executes voice-analyze/voice-render/lip-sync before video-render for voice-required shots.
+    expected_ok: true
+    required_phase_order:
+      - voice-analyze
+      - voice-render
+      - lip-sync
+      - video-render
+    source_rule: V-ACC-002
+  - id: VID-026-CREATOR-GENERATE-VOICE-LINE-REAL-TTS
+    description: Creator generate-voice-line operation produces real voice-audio asset via runtime TTS rather than script-only placeholder.
+    expected_ok: true
+    required_assets:
+      - voice-audio
+    disallowed_asset_only_mode:
+      - voice-script-only
+    source_rule: V-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:videoplay-kernel-docs
     source_rule: V-ACC-003

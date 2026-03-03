@@ -47,6 +47,8 @@
     "check:spec:videoplay-kernel-docs-drift": "node scripts/generate-mod-spec-kernel-docs.mjs --mod videoplay --check",
     "check:spec:world-studio-kernel-docs-drift": "node scripts/generate-mod-spec-kernel-docs.mjs --mod world-studio --check",
     "check:dist": "node scripts/check-mods.mjs --require-dist",
+    "test:videoplay": "pnpm --filter @nimiplatform/mod-videoplay run test",
+    "verify:videoplay": "pnpm --filter @nimiplatform/mod-videoplay run verify",
     "typecheck": "pnpm --filter @nimiplatform/mod-kismet run typecheck && pnpm --filter @nimiplatform/mod-local-chat run typecheck && pnpm --filter @nimiplatform/mod-narrative-engine run typecheck && pnpm --filter @nimiplatform/mod-textplay run typecheck && pnpm --filter @nimiplatform/mod-videoplay run typecheck && pnpm --filter @nimiplatform/mod-re-life run typecheck && pnpm --filter @nimiplatform/mod-test-chat-tts run typecheck && pnpm --filter @nimiplatform/mod-audio-book run typecheck && pnpm --filter @nimiplatform/mod-world-studio run typecheck",
     "build": "node scripts/build-mod.mjs",
     "watch": "node scripts/build-mod.mjs --watch",
@@ -69,7 +71,7 @@
     "watch:audio-book": "node scripts/build-mod.mjs --mod audio-book --watch",
     "watch:world-studio": "node scripts/build-mod.mjs --mod world-studio --watch",
     "clean": "pnpm --filter @nimiplatform/mod-kismet run clean && pnpm --filter @nimiplatform/mod-local-chat run clean && pnpm --filter @nimiplatform/mod-narrative-engine run clean && pnpm --filter @nimiplatform/mod-textplay run clean && pnpm --filter @nimiplatform/mod-videoplay run clean && pnpm --filter @nimiplatform/mod-re-life run clean && pnpm --filter @nimiplatform/mod-test-chat-tts run clean && pnpm --filter @nimiplatform/mod-audio-book run clean && pnpm --filter @nimiplatform/mod-world-studio run clean",
-    "verify": "pnpm run check && pnpm run check:spec && pnpm run typecheck && pnpm run build -- --all && pnpm run check:dist"
+    "verify": "pnpm run check && pnpm run check:spec && pnpm run typecheck && pnpm run verify:videoplay && pnpm run build -- --all && pnpm run check:dist"
   },
   "devDependencies": {
     "@tanstack/react-query": "^5.90.16",

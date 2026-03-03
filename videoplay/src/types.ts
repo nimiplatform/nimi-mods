@@ -236,7 +236,7 @@ export type RenderedAsset = {
   episodeId: string;
   shotId: string;
   clipId: string;
-  assetType: 'video' | 'image' | 'voice-script' | 'lip-sync';
+  assetType: 'video' | 'image' | 'voice-audio' | 'voice-script' | 'lip-sync';
   uri: string;
   mimeType: string;
   durationMs: number;
@@ -257,6 +257,9 @@ export type AssetRenderOutput = {
     plannedShots: number;
     renderedShots: number;
     ratio: number;
+    plannedVoiceShots: number;
+    renderedVoiceShots: number;
+    voiceRatio: number;
   };
 };
 
@@ -309,6 +312,7 @@ export type QualityGateReport = {
   }>;
   groundedRatio: number;
   assetCoverageRatio: number;
+  voiceCoverageRatio: number;
   visualAttractionScore: number;
   visualAttractionComponents: {
     characterConsistency: number;
@@ -390,6 +394,52 @@ export type VideoPlayRunEvent = {
   retryClass?: VideoPlayRetryClass;
   taskId?: string;
   details?: Record<string, unknown>;
+};
+
+export type VideoPlayPipelineLifecycleStatus =
+  | 'RUNNING'
+  | 'PAUSED'
+  | 'FAILED'
+  | 'CANCELED'
+  | 'COMPLETED';
+
+export type VideoPlayPipelineStageStatus =
+  | 'PENDING'
+  | 'RUNNING'
+  | 'PAUSED'
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'CANCELED';
+
+export type VideoPlayPipelineStageProgress = {
+  step: VideoPlayPipelineStep;
+  status: VideoPlayPipelineStageStatus;
+  attempt: number;
+  checkpointToken: string | null;
+  stepInputHash: string | null;
+  lastCompletedUnit: string | null;
+  reasonCode: VideoPlayReasonCode | null;
+  actionHint: string | null;
+  updatedAt: string;
+};
+
+export type VideoPlayPipelineCheckpoint = {
+  traceId: string;
+  runId: string;
+  status: VideoPlayPipelineLifecycleStatus;
+  nextStepIndex: number;
+  stageProgress: VideoPlayPipelineStageProgress[];
+  runEvents: VideoPlayRunEvent[];
+  fallbackAudits: FallbackAuditRecord[];
+  snapshot: Record<string, unknown>;
+};
+
+export type VideoPlayPipelineExecutionControl = {
+  mode?: 'full' | 'stepwise';
+  checkpoint?: VideoPlayPipelineCheckpoint | null;
+  rerunStep?: VideoPlayPipelineStep;
+  stepBudget?: number;
+  shouldCancel?: () => boolean;
 };
 
 export type EpisodeRecord = {
@@ -491,13 +541,18 @@ export type VideoPlayPipelineInput = {
   policy?: Partial<SegmentationPolicy>;
   taskId?: string;
   operator?: string;
+  execution?: VideoPlayPipelineExecutionControl;
 };
 
 export type VideoPlayPipelineResult = {
   traceId: string;
   runId: string;
+  status: VideoPlayPipelineLifecycleStatus;
+  nextStep: VideoPlayPipelineStep | null;
   episodes: EpisodeRecord[];
   releaseCandidates: ReleasePackage[];
+  stageProgress: VideoPlayPipelineStageProgress[];
+  checkpoint: VideoPlayPipelineCheckpoint;
   runEvents: VideoPlayRunEvent[];
   fallbackAudits: FallbackAuditRecord[];
 };

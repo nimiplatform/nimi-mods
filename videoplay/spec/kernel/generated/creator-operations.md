@@ -33,6 +33,12 @@ minimum_closed_loop_operations:
   - operation: generate-voice-line
     required: true
     source_rule: V-OPS-002
+    completion_contract:
+      requires_runtime_tts: true
+      required_assets:
+        - voice-audio
+      synthetic_only_placeholder_allowed: false
+      source_rule: V-OPS-006
   - operation: apply-lip-sync
     required: true
     source_rule: V-OPS-002

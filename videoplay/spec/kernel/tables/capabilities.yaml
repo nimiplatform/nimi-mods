@@ -11,6 +11,8 @@ required_capabilities:
     source_rule: V-CAP-002
   - key: llm.video.generate
     source_rule: V-CAP-002
+  - key: llm.speech.synthesize
+    source_rule: V-CAP-007
   - key: data.query.data-api.runtime.route.options
     source_rule: V-CAP-003
   - key: data.query.data-api.world.events.list

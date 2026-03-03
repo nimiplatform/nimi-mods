@@ -55,6 +55,8 @@ states:
   - state: RENDER
     preconditions:
       - shot_plan_valid
+      - asset_analysis_ready
+      - render_queue_ready
     next: EDIT
     source_rule: V-PIPE-002
   - state: EDIT
@@ -91,3 +93,114 @@ story_source_modes:
     - has_user_or_agent_initiative_turn
     - latest_window_selected
   source_rule: V-PIPE-007
+asset_render_subflow:
+  phases:
+    - phase: asset-analysis
+      required_outputs:
+        - shot_analysis_plan
+        - modality_plan
+        - voice_line_plan
+      deterministic: true
+      source_rule: V-PIPE-014
+    - phase: voice-analyze
+      required_outputs:
+        - voice_line_plan
+        - shot_voice_requirement_map
+      source_rule: V-PIPE-017
+    - phase: voice-render
+      required_outputs:
+        - voice_audio_assets
+        - voice_route_audit
+      source_rule: V-PIPE-017
+    - phase: lip-sync
+      required_outputs:
+        - lip_sync_assets
+        - shot_lip_sync_map
+      source_rule: V-PIPE-017
+    - phase: video-render
+      required_inputs:
+        - shot_lip_sync_map
+      required_outputs:
+        - shot_video_assets
+      source_rule: V-PIPE-017
+    - phase: batch-queue-plan
+      required_outputs:
+        - batch_plan
+        - queue_items
+      source_rule: V-PIPE-015
+    - phase: batch-queue-execute
+      required_outputs:
+        - queue_execution_summary
+        - render_trace
+      source_rule: V-PIPE-015
+  queue_item_status:
+    - QUEUED
+    - RUNNING
+    - SUCCEEDED
+    - FAILED
+    - SKIPPED
+  source_rule: V-PIPE-015
+voice_rendering:
+  route_hint: tts/default
+  when_modality_required: must_render_or_fail_gate
+  video_dependency: video-render-must-wait-for-voice-and-lip-sync
+  source_rule: V-PIPE-016
+run_lifecycle:
+  states:
+    - RUNNING
+    - PAUSED
+    - FAILED
+    - CANCELED
+    - COMPLETED
+  source_rule: V-PIPE-008
+execution_controls:
+  actions:
+    - action: run-pipeline
+      behavior: start_new_run_with_checkpoint
+      source_rule: V-PIPE-008
+    - action: continue-from-checkpoint
+      behavior: resume_next_pending_step_only
+      source_rule: V-PIPE-009
+    - action: rerun-step
+      behavior: rerun_selected_step_and_invalidate_downstream
+      source_rule: V-PIPE-010
+    - action: cancel-run
+      behavior: transition_to_run_canceled_terminal
+      source_rule: V-PIPE-012
+checkpoint_contract:
+  required_fields:
+    - checkpointToken
+    - stepInputHash
+    - lastCompletedUnit
+  resume_hash_mismatch: fail_close
+  source_rule: V-PIPE-008
+attempt_policy:
+  attempt_index: monotonic
+  retry_allowed_for: retryable_only
+  preserve_failed_attempt_events: true
+  source_rule: V-PIPE-011
+editable_handoffs:
+  - after_step: narrative-ingest
+    next_step: episode-segmentation
+    editable_payload: story-window-and-source-mode
+    source_rule: V-PIPE-013
+  - after_step: episode-segmentation
+    next_step: screenplay
+    editable_payload: episode-boundary-and-segmentation-policy
+    source_rule: V-PIPE-013
+  - after_step: screenplay
+    next_step: storyboard
+    editable_payload: beat-structure-and-dialogue-cues
+    source_rule: V-PIPE-013
+  - after_step: storyboard
+    next_step: asset-render
+    editable_payload: shot-plan-motion-camera-continuity
+    source_rule: V-PIPE-013
+  - after_step: asset-render
+    next_step: edit-compose
+    editable_payload: clip-asset-selection-and-regeneration
+    source_rule: V-PIPE-013
+  - after_step: edit-compose
+    next_step: qc-gate
+    editable_payload: timeline-and-sync-adjustment
+    source_rule: V-PIPE-013

@@ -18,6 +18,27 @@
 2. `spec/kernel/tables/pipeline-states.yaml`
 3. `spec/videoplay.md`
 
+### Change asset analysis / batch queue / voice render
+
+1. `spec/kernel/pipeline-contract.md`
+2. `spec/kernel/routing-contract.md`
+3. `spec/kernel/quality-gate-contract.md`
+4. `spec/kernel/tables/pipeline-states.yaml`
+5. `spec/kernel/tables/routing-stages.yaml`
+6. `spec/kernel/tables/quality-gates.yaml`
+7. `spec/kernel/tables/reason-codes.yaml`
+8. `spec/kernel/tables/acceptance-cases.yaml`
+9. `spec/videoplay.md`
+
+### Change industrial step runtime (checkpoint / continue / rerun / cancel)
+
+1. `spec/kernel/pipeline-contract.md`
+2. `spec/kernel/error-model.md`
+3. `spec/kernel/tables/pipeline-states.yaml`
+4. `spec/kernel/tables/reason-codes.yaml`
+5. `spec/kernel/tables/acceptance-cases.yaml`
+6. `spec/videoplay.md`
+
 ### Change capability boundary
 
 1. `spec/kernel/capability-contract.md`

@@ -7,6 +7,11 @@
     "build": "node ../scripts/build-mod.mjs --mod videoplay",
     "watch": "node ../scripts/build-mod.mjs --mod videoplay --watch",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "test": "npx tsx --test test/*.test.mjs",
+    "test:smoke": "npx tsx --tsconfig scripts/tsconfig.smoke.json scripts/smoke-pipeline.mjs",
+    "verify:spec": "pnpm -C .. run check:spec:videoplay",
+    "verify:code": "pnpm run typecheck && pnpm run test && pnpm run build",
+    "verify": "pnpm run verify:spec && pnpm run verify:code && pnpm run test:smoke",
     "clean": "rm -rf dist"
   }
 }

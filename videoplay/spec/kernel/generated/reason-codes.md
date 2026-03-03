@@ -56,6 +56,21 @@ codes:
     blocking: false
     action_hint: Retry failed shot or switch route.
     source_rule: V-ERR-003
+  - code: VIDEOPLAY_ASSET_ANALYSIS_INVALID
+    stage: render
+    blocking: true
+    action_hint: Repair asset analysis inputs (storyboard/screenplay) and rerun render.
+    source_rule: V-ERR-006
+  - code: VIDEOPLAY_BATCH_QUEUE_ORCHESTRATION_FAILED
+    stage: render
+    blocking: true
+    action_hint: Repair render batch/queue plan and rerun render stage.
+    source_rule: V-ERR-006
+  - code: VIDEOPLAY_VOICE_RENDER_FAILED
+    stage: render
+    blocking: true
+    action_hint: Ensure TTS route/voice selection is available and rerun render.
+    source_rule: V-ERR-006
   - code: VIDEOPLAY_CLIP_RENDER_COVERAGE_LOW
     stage: render
     blocking: true
@@ -96,4 +111,24 @@ codes:
     blocking: false
     action_hint: Investigate persistence path. Completed output remains valid.
     source_rule: V-ERR-003
+  - code: VIDEOPLAY_RUN_CANCELED
+    stage: orchestrator
+    blocking: true
+    action_hint: Start a new run or continue from a non-canceled checkpoint.
+    source_rule: V-ERR-001
+  - code: VIDEOPLAY_PROMPT_CANARY_FAILED
+    stage: prompt
+    blocking: true
+    action_hint: Repair prompt registry/template drift and rerun.
+    source_rule: V-ERR-001
+  - code: VIDEOPLAY_CHECKPOINT_INVALID
+    stage: checkpoint
+    blocking: true
+    action_hint: Refresh checkpoint snapshot and rerun from an explicit stage.
+    source_rule: V-ERR-005
+  - code: VIDEOPLAY_STEP_RESUME_HASH_MISMATCH
+    stage: checkpoint
+    blocking: true
+    action_hint: Rerun the selected step to rebuild downstream outputs.
+    source_rule: V-ERR-005
 ```

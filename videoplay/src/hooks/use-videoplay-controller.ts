@@ -26,12 +26,18 @@ import {
   loadVideoStoryPackage,
 } from '../data/story-package.js';
 import { runVideoPlayEpisodeProduction } from '../pipeline/orchestrator.js';
+import {
+  buildGeneratedVoiceAssets,
+  buildManualLipSyncAssets,
+} from '../operations/voice-assets.js';
 import { applyCreatorOperation } from '../storage/operations.js';
 import type {
   EpisodeRecord,
   FallbackAuditRecord,
   ReleasePackage,
   RenderedAsset,
+  VideoPlayPipelineCheckpoint,
+  VideoPlayPipelineStageProgress,
   VideoPlayRunEvent,
   VideoStoryPackage,
   VideoStorySummary,
@@ -74,89 +80,6 @@ function parsePayload(raw: string): Record<string, unknown> {
   return parsed as Record<string, unknown>;
 }
 
-function buildSyntheticVoiceAssets(input: {
-  episode: EpisodeRecord;
-  operationType: VideoPlayOperationType;
-  payload: Record<string, unknown>;
-}): RenderedAsset[] {
-  const shotId = String(input.payload.shotId || input.payload.baseShotId || '').trim();
-  if (!shotId) {
-    return [];
-  }
-  const shot = input.episode.storyboard.shotPlans.find((item) => item.shotId === shotId);
-  if (!shot) {
-    return [];
-  }
-
-  const anchors = [
-    { t: 0, viseme: 'A' },
-    { t: 320, viseme: 'O' },
-    { t: 640, viseme: 'M' },
-  ];
-  const voiceLine = String(input.payload.voiceLine || `Voice line for ${shot.shotId}`).trim() || `Voice line for ${shot.shotId}`;
-
-  const assets: RenderedAsset[] = [];
-  if (input.operationType === VIDEOPLAY_OPERATION_TYPE.GENERATE_VOICE_LINE) {
-    assets.push({
-      assetId: createUlid(),
-      episodeId: input.episode.episodeId,
-      shotId: shot.shotId,
-      clipId: shot.clipId,
-      assetType: 'voice-script',
-      uri: `videoplay://voice-script/${input.episode.episodeId}/${shot.shotId}.json`,
-      mimeType: 'application/json',
-      durationMs: shot.durationMs,
-      fps: 1,
-      resolution: 'n/a',
-      sourceEventIds: [...shot.sourceEventIds],
-      routeSource: 'local-runtime',
-      metadata: {
-        text: voiceLine,
-        locale: 'zh',
-        fallbackLocale: 'zh',
-      },
-    });
-    assets.push({
-      assetId: createUlid(),
-      episodeId: input.episode.episodeId,
-      shotId: shot.shotId,
-      clipId: shot.clipId,
-      assetType: 'lip-sync',
-      uri: `videoplay://lip-sync/${input.episode.episodeId}/${shot.shotId}.json`,
-      mimeType: 'application/json',
-      durationMs: shot.durationMs,
-      fps: 30,
-      resolution: 'n/a',
-      sourceEventIds: [...shot.sourceEventIds],
-      routeSource: 'local-runtime',
-      metadata: {
-        anchors,
-        source: 'voice-line-generated',
-      },
-    });
-  } else if (input.operationType === VIDEOPLAY_OPERATION_TYPE.APPLY_LIP_SYNC) {
-    assets.push({
-      assetId: createUlid(),
-      episodeId: input.episode.episodeId,
-      shotId: shot.shotId,
-      clipId: shot.clipId,
-      assetType: 'lip-sync',
-      uri: `videoplay://lip-sync/${input.episode.episodeId}/${shot.shotId}.json`,
-      mimeType: 'application/json',
-      durationMs: shot.durationMs,
-      fps: 30,
-      resolution: 'n/a',
-      sourceEventIds: [...shot.sourceEventIds],
-      routeSource: 'local-runtime',
-      metadata: {
-        anchors,
-        source: 'manual-lip-sync',
-      },
-    });
-  }
-  return assets;
-}
-
 function toControllerError(
   error: unknown,
   fallback: { reasonCode: VideoPlayReasonCode; actionHint: string; stage: string },
@@ -167,6 +90,21 @@ function toControllerError(
     actionHint: normalized.actionHint,
     message: normalized.message,
   };
+}
+
+function createInitialStageProgress(): VideoPlayPipelineStageProgress[] {
+  const now = new Date().toISOString();
+  return [...VIDEOPLAY_PIPELINE_CHAIN].map((step) => ({
+    step,
+    status: 'PENDING',
+    attempt: 0,
+    checkpointToken: null,
+    stepInputHash: null,
+    lastCompletedUnit: null,
+    reasonCode: null,
+    actionHint: null,
+    updatedAt: now,
+  }));
 }
 
 export function useVideoPlayController(): VideoPlayWorkbenchProps {
@@ -198,6 +136,9 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
 
   const [runStatus, setRunStatus] = useState('IDLE');
   const [loading, setLoading] = useState(false);
+  const [pipelineCheckpoint, setPipelineCheckpoint] = useState<VideoPlayPipelineCheckpoint | null>(null);
+  const [stageProgress, setStageProgress] = useState<VideoPlayPipelineStageProgress[]>(createInitialStageProgress);
+  const [nextStep, setNextStep] = useState<VideoPlayPipelineStep | null>(null);
   const [rerunStep, setRerunStep] = useState<VideoPlayPipelineStep>('screenplay');
   const [operationType, setOperationType] = useState<VideoPlayOperationType>(VIDEOPLAY_OPERATION_TYPE.UPDATE_SHOT);
   const [operationPayload, setOperationPayload] = useState(defaultOperationPayload());
@@ -218,7 +159,7 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
   const [lastRebuildScope, setLastRebuildScope] = useState<string | null>(null);
   const [error, setError] = useState<ControllerError | null>(null);
   const [routeStatuses, setRouteStatuses] = useState<Array<{
-    capability: 'chat' | 'image' | 'video';
+    capability: 'chat' | 'image' | 'video' | 'tts';
     source: string;
     model: string;
     connectorId: string;
@@ -227,6 +168,7 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
     { capability: 'chat', source: 'unknown', model: '', connectorId: '', ready: false },
     { capability: 'image', source: 'unknown', model: '', connectorId: '', ready: false },
     { capability: 'video', source: 'unknown', model: '', connectorId: '', ready: false },
+    { capability: 'tts', source: 'unknown', model: '', connectorId: '', ready: false },
   ]);
 
   const cancelRequestedRef = useRef(false);
@@ -253,7 +195,7 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
     : '-';
 
   const refreshRouteStatuses = useCallback(async () => {
-    const capabilities = ['chat', 'image', 'video'] as const;
+    const capabilities = ['chat', 'image', 'video', 'tts'] as const;
     const next = await Promise.all(capabilities.map(async (capability) => {
       try {
         const raw = await hookClient.data.query({
@@ -376,6 +318,9 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
     setRuns([]);
     setRunEvents([]);
     setFallbackAudits([]);
+    setPipelineCheckpoint(null);
+    setStageProgress(createInitialStageProgress());
+    setNextStep(null);
     setEpisodes([]);
     setSelectedEpisodeId('');
     setLastRebuildScope(null);
@@ -485,7 +430,7 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
     if (!routeReady) {
       const blockingError: ControllerError = {
         reasonCode: VIDEOPLAY_REASON.ROUTE_UNAVAILABLE,
-        actionHint: 'Ensure chat/image/video routes are ready.',
+        actionHint: 'Ensure chat/image/video/tts routes are ready.',
         message: 'Route not ready for at least one capability.',
       };
       setError(blockingError);
@@ -500,6 +445,16 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
       };
       setError(baseError);
       setStatusBanner?.({ kind: 'warn', message: `${baseError.reasonCode}: ${baseError.actionHint}` });
+      return;
+    }
+    if ((mode === 'continue' || mode === 'rerun-step') && !pipelineCheckpoint) {
+      const blockingError: ControllerError = {
+        reasonCode: VIDEOPLAY_REASON.CHECKPOINT_INVALID,
+        actionHint: 'Start pipeline first to create a checkpoint.',
+        message: 'Checkpoint is not available.',
+      };
+      setError(blockingError);
+      setStatusBanner?.({ kind: 'warn', message: `${blockingError.reasonCode}: ${blockingError.actionHint}` });
       return;
     }
 
@@ -523,14 +478,20 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
           storyPackage,
           windowPolicy: storyPackage.windowPolicy,
           operator: 'creator',
+          execution: {
+            mode: 'stepwise',
+            stepBudget: 1,
+            checkpoint: mode === 'run' ? null : pipelineCheckpoint,
+            ...(mode === 'rerun-step' ? { rerunStep } : {}),
+            shouldCancel: () => cancelRequestedRef.current,
+          },
         },
       );
 
-      if (cancelRequestedRef.current) {
-        setRunStatus('CANCELED');
-        return;
-      }
-
+      setRunStatus(result.status);
+      setPipelineCheckpoint(result.checkpoint);
+      setStageProgress(result.stageProgress);
+      setNextStep(result.nextStep);
       setEpisodes(result.episodes);
       setRunEvents(result.runEvents);
       setFallbackAudits(result.fallbackAudits);
@@ -538,24 +499,53 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
         setSelectedEpisodeId(result.episodes[0]!.episodeId);
       }
 
-      setRuns((current) => [{
-        runId: result.runId,
-        traceId: result.traceId,
-        status: 'COMPLETED',
-        createdAt: new Date().toISOString(),
-        episodeCount: result.episodes.length,
-        releaseCandidateCount: result.releaseCandidates.length,
-      }, ...current].slice(0, 12));
-
-      await refreshStorageView();
-      setRunStatus('COMPLETED');
-      setStatusBanner?.({
-        kind: 'success',
-        message: mode === 'run'
-          ? `VideoPlay pipeline completed (${result.episodes.length} episode)`
-          : `VideoPlay ${mode} completed (${result.episodes.length} episode)`,
+      setRuns((current) => {
+        const nextRecord = {
+          runId: result.runId,
+          traceId: result.traceId,
+          status: result.status,
+          createdAt: new Date().toISOString(),
+          episodeCount: result.episodes.length,
+          releaseCandidateCount: result.releaseCandidates.length,
+        };
+        const exists = current.some((item) => item.runId === result.runId);
+        if (exists) {
+          return current.map((item) => (item.runId === result.runId ? nextRecord : item));
+        }
+        return [nextRecord, ...current].slice(0, 12);
       });
+
+      if (result.status === 'COMPLETED') {
+        await refreshStorageView();
+        setStatusBanner?.({
+          kind: 'success',
+          message: `VideoPlay pipeline completed (${result.episodes.length} episode)`,
+        });
+      } else if (result.status === 'PAUSED') {
+        setStatusBanner?.({
+          kind: 'info',
+          message: `Checkpoint ready at ${result.nextStep || 'completed'}. Continue to advance next stage.`,
+        });
+      } else if (result.status === 'CANCELED') {
+        setStatusBanner?.({
+          kind: 'warn',
+          message: 'Run canceled.',
+        });
+      }
     } catch (pipelineError) {
+      const checkpointFromError = (
+        pipelineError && typeof pipelineError === 'object'
+          ? (pipelineError as { details?: { checkpoint?: VideoPlayPipelineCheckpoint } }).details?.checkpoint
+          : undefined
+      ) || null;
+      if (checkpointFromError) {
+        setPipelineCheckpoint(checkpointFromError);
+        setStageProgress(checkpointFromError.stageProgress);
+        setRunEvents(checkpointFromError.runEvents);
+        setFallbackAudits(checkpointFromError.fallbackAudits);
+        setNextStep(VIDEOPLAY_PIPELINE_CHAIN[checkpointFromError.nextStepIndex] || null);
+      }
+
       const normalized = toControllerError(pipelineError, {
         reasonCode: VIDEOPLAY_REASON.INPUT_INVALID,
         actionHint: 'Fix pipeline input and retry.',
@@ -590,6 +580,8 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
     selectedStory,
     setStatusBanner,
     sourceMode,
+    pipelineCheckpoint,
+    rerunStep,
     storyPackage,
     storyPackageError,
     storyPackageLoading,
@@ -601,6 +593,12 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
     }
     try {
       const payload = parsePayload(operationPayload);
+      if (operationType === VIDEOPLAY_OPERATION_TYPE.GENERATE_VOICE_LINE) {
+        const ttsReady = routeStatuses.find((item) => item.capability === 'tts')?.ready;
+        if (!ttsReady) {
+          throw new Error('VIDEOPLAY_TTS_ROUTE_NOT_READY');
+        }
+      }
       const applied = applyCreatorOperation({
         episode: selectedEpisode,
         operationType,
@@ -618,12 +616,29 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
         },
       });
 
-      const syntheticAssets = buildSyntheticVoiceAssets({
-        episode: applied.episode,
-        operationType,
-        payload,
-      });
-      if (syntheticAssets.length > 0) {
+      let operationAssets: RenderedAsset[] = [];
+      if (operationType === VIDEOPLAY_OPERATION_TYPE.GENERATE_VOICE_LINE) {
+        const generated = await buildGeneratedVoiceAssets({
+          hookClient,
+          aiClient,
+          traceId: createUlid(),
+          episode: applied.episode,
+          payload,
+        });
+        operationAssets = generated.assets;
+        const fallbackAudit = generated.fallbackAudit;
+        if (fallbackAudit) {
+          setFallbackAudits((current) => [fallbackAudit, ...current].slice(0, 50));
+        }
+      } else if (operationType === VIDEOPLAY_OPERATION_TYPE.APPLY_LIP_SYNC) {
+        operationAssets = buildManualLipSyncAssets({
+          episode: applied.episode,
+          operationType,
+          payload,
+        });
+      }
+
+      if (operationAssets.length > 0) {
         const assetIdempotencyKey = createHash(`operation:assets:${selectedEpisode.episodeId}:${operationType}:${JSON.stringify(payload)}`);
         await hookClient.data.query({
           capability: VIDEOPLAY_DATA_API_ASSET_BATCH_UPSERT,
@@ -631,7 +646,7 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
             operation: 'upsert',
             idempotencyKey: assetIdempotencyKey,
             episodeId: selectedEpisode.episodeId,
-            assets: syntheticAssets,
+            assets: operationAssets,
           },
         });
       }
@@ -645,18 +660,25 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
       });
     } catch (operationError) {
       const normalized = toControllerError(operationError, {
-        reasonCode: VIDEOPLAY_REASON.INPUT_INVALID,
-        actionHint: 'Fix operation payload and retry.',
+        reasonCode: operationType === VIDEOPLAY_OPERATION_TYPE.GENERATE_VOICE_LINE
+          ? VIDEOPLAY_REASON.ROUTE_UNAVAILABLE
+          : VIDEOPLAY_REASON.INPUT_INVALID,
+        actionHint: operationType === VIDEOPLAY_OPERATION_TYPE.GENERATE_VOICE_LINE
+          ? 'Ensure TTS route/voice profile is ready and retry.'
+          : 'Fix operation payload and retry.',
         stage: 'operation',
       });
       setError(normalized);
     }
   }, [
+    aiClient,
     hookClient,
     operationPayload,
     operationType,
+    routeStatuses,
     refreshStorageView,
     selectedEpisode,
+    setFallbackAudits,
     setStatusBanner,
   ]);
 
@@ -707,6 +729,8 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
     storyPackageLoading,
     storyPackageError,
     runStatus,
+    stageProgress,
+    nextStep,
     rerunStep,
     operationType,
     operationPayload,
@@ -742,12 +766,19 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
       void executePipeline('rerun-step');
     },
     onContinueFromCheckpoint: () => {
-      setStatusBanner?.({ kind: 'info', message: `Continue requested from ${rerunStep}` });
+      setStatusBanner?.({ kind: 'info', message: `Continue requested from ${nextStep || 'checkpoint'}` });
       void executePipeline('continue');
     },
     onCancelRun: () => {
       cancelRequestedRef.current = true;
-      setRunStatus('CANCEL_REQUESTED');
+      if (loading) {
+        setRunStatus('CANCEL_REQUESTED');
+      } else {
+        setRunStatus('CANCELED');
+        setPipelineCheckpoint(null);
+        setNextStep(null);
+        setStageProgress(createInitialStageProgress());
+      }
     },
     onApplyOperation: () => {
       void handleApplyOperation();

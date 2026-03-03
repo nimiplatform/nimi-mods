@@ -62,6 +62,8 @@ traceability:
       source_rule: V-FACT-004
     - rule: supplementary_fields_cannot_be_used_as_grounding_source
       source_rule: V-FACT-006
+    - rule: rerun_after_manual_edit_must_preserve_source_event_subset
+      source_rule: V-FACT-007
 cross_renderer_consistency:
   same_canonical_core_output: true
   allow_style_divergence: true

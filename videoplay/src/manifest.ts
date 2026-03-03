@@ -75,7 +75,7 @@ export const VIDEOPLAY_MANIFEST = {
     ],
   },
   ai: {
-    consume: ['chat', 'image', 'video'],
+    consume: ['chat', 'image', 'video', 'tts'],
     dependencies: {
       required: [
         {
@@ -99,11 +99,19 @@ export const VIDEOPLAY_MANIFEST = {
           engine: 'openai-compatible',
           title: 'Default Video Model (runtime-resolved)',
         },
+        {
+          dependencyId: 'videoplay/tts-default',
+          kind: 'model',
+          capability: 'tts',
+          engine: 'openai-compatible',
+          title: 'Default TTS Model (runtime-resolved)',
+        },
       ],
       preferred: {
         chat: 'videoplay/chat-default',
         image: 'videoplay/image-default',
         video: 'videoplay/video-default',
+        tts: 'videoplay/tts-default',
       },
     },
   },

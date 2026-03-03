@@ -25,3 +25,7 @@ Any capability change must update table source and pass kernel consistency check
 ## V-CAP-006 Story Package Read Scope
 
 VideoPlay may read `world.events/scenes/narrative-contexts/lorebooks` and `core.agent.memory.recall` for `VideoStoryPackage` assembly, but these reads cannot extend write scope or narrative fact write permissions.
+
+## V-CAP-007 Speech Capability Boundary
+
+Voice generation must use runtime-managed speech capability (`llm.speech.synthesize`) and route resolution (`local-runtime -> token-api`) only.

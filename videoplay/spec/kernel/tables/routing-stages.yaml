@@ -26,7 +26,6 @@ stages:
     source_rule: V-ROUTE-002
   - stage: asset-render-voice
     capability: llm.speech.synthesize
-    optional: true
     fallback_on_unavailable: token-api
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002

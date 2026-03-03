@@ -29,3 +29,7 @@ Inferring runtime capability from model naming convention is forbidden.
 ## V-ROUTE-007 Capability Hardcoding Ban
 
 Business logic must not hardcode capability-to-stage branches outside runtime route contracts.
+
+## V-ROUTE-008 Voice Route Hint Contract
+
+Voice synthesis route hint is `tts/default` and must follow the same fallback-audit contract as other render stages.

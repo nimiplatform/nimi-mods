@@ -16,6 +16,11 @@ gates:
     max: null
     fail_code: VIDEOPLAY_CLIP_RENDER_COVERAGE_LOW
     source_rule: V-QC-001
+  - gate: voice_coverage_ratio
+    min: 0.9
+    max: null
+    fail_code: VIDEOPLAY_VOICE_RENDER_FAILED
+    source_rule: V-QC-004
   - gate: episode_master_duration_sec
     min: 15
     max: 180

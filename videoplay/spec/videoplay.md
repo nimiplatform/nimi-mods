@@ -40,6 +40,15 @@
 - `VID-017`: Story source mode is explicit (`canonical-story|textplay-enriched-story`) and resolved in `narrative-ingest`.
 - `VID-018`: `textplay-enriched-story` requires canonical turns containing at least one `UserTurn|AgentInitiative`.
 - `VID-019`: Story package assembly is fail-close; missing critical context or schema mismatch blocks pipeline.
+- `VID-024`: Pipeline runtime is checkpointed and stage-resumable. `Run Pipeline` starts stage execution, `Continue` advances from next pending stage, and `Rerun Step` invalidates downstream outputs.
+- `VID-025`: Stage attempts are monotonic and auditable; retry is only allowed for `retryable` failure class.
+- `VID-026`: Creator can inspect and adjust stage outputs at handoff points before advancing.
+- `VID-027`: Cancel semantics are terminal fail-close for the run (`run.canceled`), and must not be normalized to `run.error`.
+- `VID-028`: `asset-render` includes deterministic asset analysis and auditable batch/queue orchestration, not ad-hoc per-shot dispatch.
+- `VID-029`: Voice generation must use runtime speech capability and route fallback audit; no direct vendor TTS path is allowed.
+- `VID-030`: Voice coverage is a mandatory QC dimension when voice modality is planned.
+- `VID-031`: `asset-render` voice-required shots must follow voice-first subflow (`voice-analyze -> voice-render -> lip-sync -> video-render`) within the same stage.
+- `VID-032`: Creator-side `generate-voice-line` is completed only when real `voice-audio` is produced through runtime TTS contract.
 
 ## 3. No Over-Design Guard
 

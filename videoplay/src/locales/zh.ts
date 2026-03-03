@@ -6,6 +6,8 @@ const zhLocale = {
   },
   action: {
     runPipeline: '运行产线',
+    continueFromCheckpoint: '从检查点继续',
+    rerunStep: '重跑步骤',
     refresh: '刷新',
     reloadPackage: '重载故事包',
     publish: '发布',
@@ -24,6 +26,8 @@ const zhLocale = {
     quality: '质量门禁',
     fallbackAudit: '回退审计',
     runEvents: '运行事件',
+    pipelineFlow: '流程看板',
+    nextStep: '下一步',
     episodes: '分集',
     shots: '镜头',
     release: '发布',
@@ -33,6 +37,7 @@ const zhLocale = {
     failClose: '质量门禁失败会阻断 release package 生成。',
     enrichedGate: 'enriched 模式要求窗口内至少包含 UserTurn 或 AgentInitiative。',
     packageGuard: 'story package 未就绪时必须阻断流水线运行。',
+    checkpointRuntime: 'Run/Continue/RerunStep 均基于 checkpoint 执行并可审计。',
   },
 } as const;
 

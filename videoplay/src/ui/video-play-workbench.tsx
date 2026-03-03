@@ -3,6 +3,7 @@ import type {
   EpisodeRecord,
   FallbackAuditRecord,
   ReleasePackage,
+  VideoPlayPipelineStageProgress,
   VideoPlayRunEvent,
   VideoStoryPackage,
   VideoStorySummary,
@@ -14,7 +15,7 @@ import type {
 } from '../contracts.js';
 
 type RouteStatusView = {
-  capability: 'chat' | 'image' | 'video';
+  capability: 'chat' | 'image' | 'video' | 'tts';
   source: string;
   model: string;
   connectorId: string;
@@ -50,6 +51,8 @@ export type VideoPlayWorkbenchProps = {
   storyPackageLoading: boolean;
   storyPackageError: VideoPlayErrorView | null;
   runStatus: string;
+  stageProgress: VideoPlayPipelineStageProgress[];
+  nextStep: VideoPlayPipelineStep | null;
   rerunStep: VideoPlayPipelineStep;
   operationType: VideoPlayOperationType;
   operationPayload: string;
@@ -108,6 +111,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
     props.selectedReleaseCandidate
     && (props.selectedReleaseCandidate.qcStatus === 'APPROVED' || props.selectedReleaseCandidate.qcStatus === 'ADJUSTED'),
   );
+  const canContinue = Boolean(!props.loading && props.nextStep);
   const canRun = Boolean(
     !props.loading
     && props.routeReady
@@ -115,6 +119,12 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
     && props.storyPackage
     && !props.storyPackageLoading,
   );
+  const renderQueueEvents = props.runEvents.filter(
+    (event) => event.step === 'asset-render' && event.details?.phase === 'batch-queue-execute',
+  );
+  const renderCoverageEvent = [...props.runEvents]
+    .reverse()
+    .find((event) => event.step === 'asset-render' && typeof event.details?.coverage === 'number');
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-gray-50">
@@ -135,7 +145,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
           <button
             type="button"
             onClick={props.onRerunStep}
-            disabled={props.loading}
+            disabled={props.loading || props.stageProgress.length === 0}
             className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Rerun Step
@@ -143,7 +153,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
           <button
             type="button"
             onClick={props.onContinueFromCheckpoint}
-            disabled={props.loading}
+            disabled={!canContinue}
             className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Continue from Checkpoint
@@ -295,12 +305,37 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
         <main className="min-h-0 overflow-y-auto p-3">
           <section className="rounded-lg border border-gray-200 bg-white p-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-900">Shot/Clip Workbench</h3>
+              <h3 className="text-sm font-semibold text-gray-900">Pipeline Flow</h3>
               <p className={`text-xs font-medium ${statusTone(props.runStatus)}`}>{props.runStatus}</p>
             </div>
             <p className="mt-1 text-xs text-gray-500">
-              Active branch: <span className="font-medium text-gray-700">{props.activeBranchName}</span>
-              {props.lastRebuildScope ? ` · rebuild scope: ${props.lastRebuildScope}` : ''}
+              Next step: <span className="font-medium text-gray-700">{props.nextStep || 'none'}</span>
+              {props.lastRebuildScope ? ` · last rebuild scope: ${props.lastRebuildScope}` : ''}
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {props.stageProgress.map((stage) => (
+                <div key={stage.step} className="rounded-md border border-gray-200 px-2 py-1 text-xs">
+                  <p className="font-medium text-gray-900">{stage.step}</p>
+                  <p className={statusTone(stage.status)}>{stage.status}</p>
+                  <p className="text-gray-500">attempt={stage.attempt}</p>
+                  <p className="text-gray-500">unit={stage.lastCompletedUnit || '-'}</p>
+                  {stage.reasonCode ? <p className="text-rose-600">{stage.reasonCode}</p> : null}
+                  {stage.actionHint ? <p className="text-gray-500">{stage.actionHint}</p> : null}
+                </div>
+              ))}
+              {props.stageProgress.length === 0 ? <p className="text-xs text-gray-500">No stage progress yet.</p> : null}
+            </div>
+          </section>
+
+          <section className="mt-3 rounded-lg border border-gray-200 bg-white p-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-900">Shot/Clip Workbench</h3>
+              <p className="text-xs text-gray-500">
+                Active branch: <span className="font-medium text-gray-700">{props.activeBranchName}</span>
+              </p>
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              Use rerun-step after editing to recompose downstream outputs.
             </p>
             <div className="mt-3 grid grid-cols-3 gap-2">
               <label className="text-xs text-gray-600">
@@ -415,6 +450,36 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
               </div>
             ))}
             {!props.selectedEpisode ? <p className="text-xs text-gray-500">No quality report selected.</p> : null}
+          </section>
+
+          <section className="mt-3 space-y-2 rounded-lg border border-gray-200 p-3">
+            <h3 className="text-sm font-semibold text-gray-900">Asset Analysis / Queue</h3>
+            {renderCoverageEvent ? (
+              <p className="text-xs text-gray-600">
+                coverage={Number(renderCoverageEvent.details?.coverage ?? 0).toFixed(3)}
+                {' '}voiceCoverage={Number(renderCoverageEvent.details?.voiceCoverage ?? 0).toFixed(3)}
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500">No render coverage record yet.</p>
+            )}
+            <div className="max-h-32 space-y-1 overflow-y-auto">
+              {renderQueueEvents.map((event) => (
+                <div key={`${event.runId}:${event.seq}`} className="rounded-md border border-gray-200 px-2 py-1 text-xs">
+                  <p className="font-medium text-gray-900">
+                    batch={String(event.details?.batchId || '-')}
+                  </p>
+                  <p className="text-gray-500">
+                    modality={String(event.details?.modality || '-')}
+                    {' '}jobs={Number(event.details?.queueItems || 0)}
+                  </p>
+                  <p className="text-gray-500">
+                    succeeded={Number(event.details?.succeeded || 0)}
+                    {' '}failed={Number(event.details?.failed || 0)}
+                  </p>
+                </div>
+              ))}
+              {renderQueueEvents.length === 0 ? <p className="text-xs text-gray-500">No batch queue records.</p> : null}
+            </div>
           </section>
 
           <section className="mt-3 space-y-2 rounded-lg border border-gray-200 p-3">

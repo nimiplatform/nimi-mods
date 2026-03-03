@@ -37,6 +37,7 @@ import { runPromptCanaryCases } from '../prompt/canary.js';
 import {
   resolvePromptLocale,
   renderPromptTemplate,
+  type VideoPlayPromptLocale,
   validatePromptVariables,
 } from '../prompt/registry.js';
 import type {
@@ -48,6 +49,7 @@ import type {
   NarrativeTurn,
   NarrativeTurnWindow,
   QualityGateReport,
+  RenderedAsset,
   ReleasePackage,
   RouteInvokeInput,
   ScreenplayBeat,
@@ -58,8 +60,12 @@ import type {
   StoryboardOutput,
   StoryboardShot,
   VideoPlayPipelineDeps,
+  VideoPlayPipelineExecutionControl,
   VideoPlayPipelineInput,
+  VideoPlayPipelineLifecycleStatus,
+  VideoPlayPipelineCheckpoint,
   VideoPlayPipelineResult,
+  VideoPlayPipelineStageProgress,
   VideoPlayRunEvent,
   VideoPlayRunEventType,
 } from '../types.js';
@@ -75,6 +81,8 @@ type RuntimeRouteCatalogSnapshot = {
     model: string;
   };
 };
+
+type RuntimeRouteCatalog = Record<'chat' | 'image' | 'video' | 'tts', RuntimeRouteCatalogSnapshot>;
 
 function parseRuntimeRouteCatalogSnapshot(value: unknown): RuntimeRouteCatalogSnapshot | null {
   if (!value || typeof value !== 'object') {
@@ -134,6 +142,12 @@ function actionHintByReasonCode(reasonCode: string): string {
       return 'Restore available route source and retry.';
     case VIDEOPLAY_REASON.COVERAGE_LOW:
       return 'Fill missing shot coverage before QC.';
+    case VIDEOPLAY_REASON.ASSET_ANALYSIS_INVALID:
+      return 'Repair asset analysis inputs and rerun render.';
+    case VIDEOPLAY_REASON.BATCH_QUEUE_ORCHESTRATION_FAILED:
+      return 'Repair render queue orchestration and rerun render stage.';
+    case VIDEOPLAY_REASON.VOICE_RENDER_FAILED:
+      return 'Fix TTS route or voice profile, then rerun render.';
     case VIDEOPLAY_REASON.TIMELINE_SCHEMA_INVALID:
       return 'Repair timeline constraints and retry.';
     case VIDEOPLAY_REASON.AV_SYNC_DRIFT:
@@ -148,6 +162,12 @@ function actionHintByReasonCode(reasonCode: string): string {
       return 'Complete release package minimum set and retry.';
     case VIDEOPLAY_REASON.PROMPT_CANARY_FAILED:
       return 'Repair prompt catalog/template drift and rerun.';
+    case VIDEOPLAY_REASON.CHECKPOINT_INVALID:
+      return 'Refresh checkpoint snapshot and rerun from an explicit stage.';
+    case VIDEOPLAY_REASON.STEP_RESUME_HASH_MISMATCH:
+      return 'Rerun the selected step to rebuild downstream outputs.';
+    case VIDEOPLAY_REASON.RUN_CANCELED:
+      return 'Start a new run or continue from a non-canceled checkpoint.';
     default:
       return 'Retry after fixing upstream dependency.';
   }
@@ -206,7 +226,7 @@ function ensureNonOverlappingTurnWindow(turns: NarrativeTurn[]): void {
 async function loadRuntimeRouteCatalog(input: {
   deps: VideoPlayPipelineDeps;
   modId: string;
-}): Promise<Record<'chat' | 'image' | 'video', RuntimeRouteCatalogSnapshot>> {
+}): Promise<RuntimeRouteCatalog> {
   const chatRaw = await input.deps.hookClient.data.query({
     capability: VIDEOPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS,
     query: {
@@ -228,12 +248,20 @@ async function loadRuntimeRouteCatalog(input: {
       modId: input.modId,
     },
   });
+  const ttsRaw = await input.deps.hookClient.data.query({
+    capability: VIDEOPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS,
+    query: {
+      capability: 'tts',
+      modId: input.modId,
+    },
+  });
 
   const chat = parseRuntimeRouteCatalogSnapshot(chatRaw);
   const image = parseRuntimeRouteCatalogSnapshot(imageRaw);
   const video = parseRuntimeRouteCatalogSnapshot(videoRaw);
+  const tts = parseRuntimeRouteCatalogSnapshot(ttsRaw);
 
-  if (!chat || !image || !video) {
+  if (!chat || !image || !video || !tts) {
     throw new VideoPlayError({
       reasonCode: VIDEOPLAY_REASON.ROUTE_UNAVAILABLE,
       actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.ROUTE_UNAVAILABLE),
@@ -247,6 +275,7 @@ async function loadRuntimeRouteCatalog(input: {
     chat,
     image,
     video,
+    tts,
   };
 }
 
@@ -630,6 +659,7 @@ export function evaluateQualityGates(input: {
   const durationSec = input.composeOutput.episodeMasterVideo.durationMs / 1000;
   const visual = evaluateVisualAttraction(input.storyboard, input.assetOutput);
   const visualAttractionScore = Number(input.forceVisualAttractionScore ?? visual.score);
+  const voiceCoverageRatio = Number(input.assetOutput.coverage.voiceRatio ?? 1);
 
   const coverage = {
     episode: input.episode.sourceEventIds,
@@ -673,6 +703,14 @@ export function evaluateQualityGates(input: {
       min: QUALITY_GATE_POLICY.assetCoverageRatioMin,
       max: null,
       reasonCode: VIDEOPLAY_REASON.COVERAGE_LOW,
+    },
+    {
+      gate: 'voice_coverage_ratio',
+      passed: voiceCoverageRatio >= QUALITY_GATE_POLICY.voiceCoverageRatioMin,
+      value: voiceCoverageRatio,
+      min: QUALITY_GATE_POLICY.voiceCoverageRatioMin,
+      max: null,
+      reasonCode: VIDEOPLAY_REASON.VOICE_RENDER_FAILED,
     },
     {
       gate: 'episode_master_duration_sec',
@@ -727,6 +765,7 @@ export function evaluateQualityGates(input: {
     gates,
     groundedRatio,
     assetCoverageRatio: input.assetOutput.coverage.ratio,
+    voiceCoverageRatio,
     visualAttractionScore,
     visualAttractionComponents: visual.components,
     avDriftMs: input.composeOutput.composeTrace.avDriftMs,
@@ -836,9 +875,10 @@ function createRunEventFactory(input: {
   traceId: string;
   runId: string;
   taskId?: string;
+  seedEvents?: VideoPlayRunEvent[];
 }) {
-  let seq = 0;
-  const events: VideoPlayRunEvent[] = [];
+  let seq = (input.seedEvents || []).reduce((max, event) => Math.max(max, event.seq), 0);
+  const events: VideoPlayRunEvent[] = [...(input.seedEvents || [])];
 
   function pushEvent(event: {
     step: VideoPlayPipelineStep;
@@ -886,6 +926,542 @@ function createRunEventFactory(input: {
   };
 }
 
+type EpisodeRuntimeContext = {
+  segmentedEpisode: SegmentedEpisode;
+  baselineSourceEventIds: string[];
+  projectionLocale: VideoPlayPromptLocale;
+  screenplay: ScreenplayOutput | null;
+  storyboard: StoryboardOutput | null;
+  assetOutput: AssetRenderOutput | null;
+  composeOutput: EditComposeOutput | null;
+  qcReport: QualityGateReport | null;
+  releaseCandidate: ReleasePackage | null;
+  episodeRecord: EpisodeRecord | null;
+};
+
+type RuntimeSnapshot = {
+  policy: SegmentationPolicy;
+  sourceMode: VideoPlayPipelineInput['sourceMode'];
+  storyPackageVersion: string;
+  promptCanaryPassed: boolean;
+  turnWindow: NarrativeTurnWindow | null;
+  projection: NarrativeProjectionRenderInput | null;
+  routeCatalog: RuntimeRouteCatalog | null;
+  segmentation: SegmentationOutput | null;
+  episodeContexts: EpisodeRuntimeContext[];
+  episodes: EpisodeRecord[];
+  releaseCandidates: ReleasePackage[];
+};
+
+type StageProgressMap = Record<VideoPlayPipelineStep, VideoPlayPipelineStageProgress>;
+
+type NormalizedExecutionControl = {
+  mode: 'full' | 'stepwise';
+  checkpoint: VideoPlayPipelineCheckpoint | null;
+  rerunStep: VideoPlayPipelineStep | null;
+  stepBudget: number;
+  shouldCancel: (() => boolean) | null;
+};
+
+type StepExecutionResult = {
+  details?: Record<string, unknown>;
+  lastCompletedUnit?: string;
+};
+
+function cloneJson<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function isPipelineStep(value: string): value is VideoPlayPipelineStep {
+  return (VIDEOPLAY_PIPELINE_CHAIN as readonly string[]).includes(value);
+}
+
+function createInitialStageProgressMap(): StageProgressMap {
+  const now = nowIso();
+  return VIDEOPLAY_PIPELINE_CHAIN.reduce((acc, step) => {
+    acc[step] = {
+      step,
+      status: 'PENDING',
+      attempt: 0,
+      checkpointToken: null,
+      stepInputHash: null,
+      lastCompletedUnit: null,
+      reasonCode: null,
+      actionHint: null,
+      updatedAt: now,
+    };
+    return acc;
+  }, {} as StageProgressMap);
+}
+
+function toStageProgressMap(progress: VideoPlayPipelineStageProgress[] | undefined): StageProgressMap {
+  const map = createInitialStageProgressMap();
+  if (!Array.isArray(progress)) {
+    return map;
+  }
+  for (const row of progress) {
+    if (!row || typeof row !== 'object') {
+      continue;
+    }
+    const step = String(row.step || '').trim();
+    if (!isPipelineStep(step)) {
+      continue;
+    }
+    map[step] = {
+      step,
+      status: row.status,
+      attempt: Number.isFinite(row.attempt) ? Math.max(0, Math.floor(row.attempt)) : 0,
+      checkpointToken: row.checkpointToken || null,
+      stepInputHash: row.stepInputHash || null,
+      lastCompletedUnit: row.lastCompletedUnit || null,
+      reasonCode: row.reasonCode || null,
+      actionHint: row.actionHint || null,
+      updatedAt: row.updatedAt || nowIso(),
+    };
+  }
+  return map;
+}
+
+function toStageProgressList(progressMap: StageProgressMap): VideoPlayPipelineStageProgress[] {
+  return VIDEOPLAY_PIPELINE_CHAIN.map((step) => ({ ...progressMap[step] }));
+}
+
+function createInitialRuntimeSnapshot(input: {
+  policy: SegmentationPolicy;
+  sourceMode: VideoPlayPipelineInput['sourceMode'];
+}): RuntimeSnapshot {
+  return {
+    policy: input.policy,
+    sourceMode: input.sourceMode,
+    storyPackageVersion: '',
+    promptCanaryPassed: false,
+    turnWindow: null,
+    projection: null,
+    routeCatalog: null,
+    segmentation: null,
+    episodeContexts: [],
+    episodes: [],
+    releaseCandidates: [],
+  };
+}
+
+function parseRuntimeSnapshot(input: {
+  raw: unknown;
+  fallbackPolicy: SegmentationPolicy;
+  fallbackSourceMode: VideoPlayPipelineInput['sourceMode'];
+}): RuntimeSnapshot {
+  if (!input.raw || typeof input.raw !== 'object') {
+    throw new VideoPlayError({
+      reasonCode: VIDEOPLAY_REASON.CHECKPOINT_INVALID,
+      actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.CHECKPOINT_INVALID),
+      stage: 'orchestrator',
+      message: 'VIDEOPLAY_CHECKPOINT_SNAPSHOT_INVALID',
+    });
+  }
+  const record = input.raw as Record<string, unknown>;
+  const policyCandidate = record.policy && typeof record.policy === 'object'
+    ? (record.policy as Partial<SegmentationPolicy>)
+    : input.fallbackPolicy;
+
+  return {
+    policy: normalizeSegmentationPolicy(policyCandidate),
+    sourceMode: String(record.sourceMode || input.fallbackSourceMode).trim() === 'textplay-enriched-story'
+      ? 'textplay-enriched-story'
+      : 'canonical-story',
+    storyPackageVersion: String(record.storyPackageVersion || '').trim(),
+    promptCanaryPassed: Boolean(record.promptCanaryPassed),
+    turnWindow: record.turnWindow && typeof record.turnWindow === 'object'
+      ? (record.turnWindow as NarrativeTurnWindow)
+      : null,
+    projection: record.projection && typeof record.projection === 'object'
+      ? (record.projection as NarrativeProjectionRenderInput)
+      : null,
+    routeCatalog: (() => {
+      if (!record.routeCatalog || typeof record.routeCatalog !== 'object') {
+        return null;
+      }
+      const candidate = record.routeCatalog as Partial<RuntimeRouteCatalog>;
+      if (!candidate.chat || !candidate.image || !candidate.video || !candidate.tts) {
+        return null;
+      }
+      return candidate as RuntimeRouteCatalog;
+    })(),
+    segmentation: record.segmentation && typeof record.segmentation === 'object'
+      ? (record.segmentation as SegmentationOutput)
+      : null,
+    episodeContexts: Array.isArray(record.episodeContexts)
+      ? (record.episodeContexts as EpisodeRuntimeContext[])
+      : [],
+    episodes: Array.isArray(record.episodes)
+      ? (record.episodes as EpisodeRecord[])
+      : [],
+    releaseCandidates: Array.isArray(record.releaseCandidates)
+      ? (record.releaseCandidates as ReleasePackage[])
+      : [],
+  };
+}
+
+function normalizeExecutionControl(control: VideoPlayPipelineExecutionControl | undefined): NormalizedExecutionControl {
+  const mode = control?.mode === 'stepwise' ? 'stepwise' : 'full';
+  const stepBudgetFromInput = Number(control?.stepBudget);
+  const stepBudget = Number.isFinite(stepBudgetFromInput)
+    ? Math.max(1, Math.floor(stepBudgetFromInput))
+    : (mode === 'stepwise' ? 1 : Number.POSITIVE_INFINITY);
+  const rerunStep = control?.rerunStep && isPipelineStep(control.rerunStep)
+    ? control.rerunStep
+    : null;
+  return {
+    mode,
+    checkpoint: control?.checkpoint || null,
+    rerunStep,
+    stepBudget,
+    shouldCancel: typeof control?.shouldCancel === 'function' ? control.shouldCancel : null,
+  };
+}
+
+function findNextStepIndex(progressMap: StageProgressMap): number {
+  for (let index = 0; index < VIDEOPLAY_PIPELINE_CHAIN.length; index += 1) {
+    const step = VIDEOPLAY_PIPELINE_CHAIN[index]!;
+    const status = progressMap[step].status;
+    if (status !== 'COMPLETED') {
+      return index;
+    }
+  }
+  return VIDEOPLAY_PIPELINE_CHAIN.length;
+}
+
+function resolveNextStep(nextStepIndex: number): VideoPlayPipelineStep | null {
+  return nextStepIndex < VIDEOPLAY_PIPELINE_CHAIN.length
+    ? VIDEOPLAY_PIPELINE_CHAIN[nextStepIndex]!
+    : null;
+}
+
+function computeStepInputHash(
+  step: VideoPlayPipelineStep,
+  snapshot: RuntimeSnapshot,
+  input: VideoPlayPipelineInput,
+): string {
+  switch (step) {
+    case 'narrative-ingest':
+      return createHash(JSON.stringify({
+        storyId: input.storyId,
+        sourceMode: input.sourceMode,
+        ingestCursorStart: input.ingestCursorStart,
+        windowPolicy: input.windowPolicy || null,
+        storyPackageVersion: snapshot.storyPackageVersion
+          || String((input.storyPackage as { snapshot?: { version?: string } })?.snapshot?.version || ''),
+      }));
+    case 'episode-segmentation':
+      return createHash(JSON.stringify({
+        policy: snapshot.policy,
+        turnIds: snapshot.turnWindow?.turns.map((turn) => turn.turnId) || [],
+      }));
+    case 'screenplay':
+      return createHash(JSON.stringify(snapshot.episodeContexts.map((context) => ({
+        episodeId: context.segmentedEpisode.episodeId,
+        sourceTurnIds: context.segmentedEpisode.sourceTurnIds,
+      }))));
+    case 'storyboard':
+      return createHash(JSON.stringify(snapshot.episodeContexts.map((context) => ({
+        episodeId: context.segmentedEpisode.episodeId,
+        beatIds: context.screenplay?.beats.map((beat) => beat.beatId) || [],
+      }))));
+    case 'asset-render':
+      return createHash(JSON.stringify(snapshot.episodeContexts.map((context) => ({
+        episodeId: context.segmentedEpisode.episodeId,
+        shots: context.storyboard?.shotPlans.map((shot) => ({
+          shotId: shot.shotId,
+          beatId: shot.beatId,
+          visualPrompt: shot.visualPrompt,
+          motionCue: shot.motionCue,
+          durationMs: shot.durationMs,
+        })) || [],
+        beatSummaries: context.screenplay?.beats.map((beat) => ({
+          beatId: beat.beatId,
+          summary: beat.summary,
+        })) || [],
+        projectionLocale: context.projectionLocale,
+      }))));
+    case 'edit-compose':
+      return createHash(JSON.stringify(snapshot.episodeContexts.map((context) => ({
+        episodeId: context.segmentedEpisode.episodeId,
+        storyboardShots: context.storyboard?.shotPlans.map((shot) => shot.shotId) || [],
+        assetShots: context.assetOutput?.shotAssets.map((asset) => asset.assetId) || [],
+      }))));
+    case 'qc-gate':
+      return createHash(JSON.stringify(snapshot.episodeContexts.map((context) => ({
+        episodeId: context.segmentedEpisode.episodeId,
+        timelineHash: context.composeOutput?.episodeMasterVideo.timelineHash || '',
+        coverage: context.assetOutput?.coverage.ratio ?? 0,
+      }))));
+    case 'release-package':
+      return createHash(JSON.stringify(snapshot.episodeContexts.map((context) => ({
+        episodeId: context.segmentedEpisode.episodeId,
+        qcStatus: context.qcReport?.status || 'NONE',
+        durationSec: context.qcReport?.durationSec ?? 0,
+      }))));
+    default:
+      return createHash(step);
+  }
+}
+
+function createCheckpointToken(input: {
+  runId: string;
+  step: VideoPlayPipelineStep;
+  attempt: number;
+  stepInputHash: string;
+  eventCount: number;
+}): string {
+  return createHash(`${input.runId}:${input.step}:${input.attempt}:${input.stepInputHash}:${input.eventCount}`);
+}
+
+function markStepRunning(progressMap: StageProgressMap, input: {
+  step: VideoPlayPipelineStep;
+  stepInputHash: string;
+}): number {
+  const current = progressMap[input.step];
+  const attempt = current.attempt + 1;
+  progressMap[input.step] = {
+    ...current,
+    status: 'RUNNING',
+    attempt,
+    stepInputHash: input.stepInputHash,
+    reasonCode: null,
+    actionHint: null,
+    updatedAt: nowIso(),
+  };
+  return attempt;
+}
+
+function markStepComplete(progressMap: StageProgressMap, input: {
+  step: VideoPlayPipelineStep;
+  checkpointToken: string;
+  stepInputHash: string;
+  lastCompletedUnit: string | null;
+}): void {
+  const current = progressMap[input.step];
+  progressMap[input.step] = {
+    ...current,
+    status: 'COMPLETED',
+    checkpointToken: input.checkpointToken,
+    stepInputHash: input.stepInputHash,
+    lastCompletedUnit: input.lastCompletedUnit,
+    reasonCode: null,
+    actionHint: null,
+    updatedAt: nowIso(),
+  };
+}
+
+function markStepError(progressMap: StageProgressMap, input: {
+  step: VideoPlayPipelineStep;
+  reasonCode: VideoPlayReasonCode;
+  actionHint: string;
+}): void {
+  const current = progressMap[input.step];
+  progressMap[input.step] = {
+    ...current,
+    status: 'FAILED',
+    reasonCode: input.reasonCode,
+    actionHint: input.actionHint,
+    updatedAt: nowIso(),
+  };
+}
+
+function clearDownstreamFromStep(input: {
+  step: VideoPlayPipelineStep;
+  progressMap: StageProgressMap;
+  snapshot: RuntimeSnapshot;
+}): void {
+  const rerunIndex = VIDEOPLAY_PIPELINE_CHAIN.indexOf(input.step);
+  for (let index = rerunIndex; index < VIDEOPLAY_PIPELINE_CHAIN.length; index += 1) {
+    const step = VIDEOPLAY_PIPELINE_CHAIN[index]!;
+    const current = input.progressMap[step];
+    input.progressMap[step] = {
+      ...current,
+      status: 'PENDING',
+      checkpointToken: null,
+      stepInputHash: null,
+      lastCompletedUnit: null,
+      reasonCode: null,
+      actionHint: null,
+      updatedAt: nowIso(),
+    };
+  }
+
+  if (rerunIndex <= 0) {
+    input.snapshot.turnWindow = null;
+    input.snapshot.projection = null;
+    input.snapshot.routeCatalog = null;
+    input.snapshot.segmentation = null;
+    input.snapshot.episodeContexts = [];
+    input.snapshot.episodes = [];
+    input.snapshot.releaseCandidates = [];
+    return;
+  }
+
+  if (rerunIndex <= 1) {
+    input.snapshot.segmentation = null;
+    input.snapshot.episodeContexts = [];
+    input.snapshot.episodes = [];
+    input.snapshot.releaseCandidates = [];
+    return;
+  }
+
+  for (const context of input.snapshot.episodeContexts) {
+    if (rerunIndex <= 2) {
+      context.screenplay = null;
+    }
+    if (rerunIndex <= 3) {
+      context.storyboard = null;
+    }
+    if (rerunIndex <= 4) {
+      context.assetOutput = null;
+    }
+    if (rerunIndex <= 5) {
+      context.composeOutput = null;
+    }
+    if (rerunIndex <= 6) {
+      context.qcReport = null;
+    }
+    if (rerunIndex <= 7) {
+      context.releaseCandidate = null;
+      context.episodeRecord = null;
+    }
+  }
+
+  input.snapshot.episodes = [];
+  input.snapshot.releaseCandidates = [];
+}
+
+function validateResumeBoundary(input: {
+  nextStepIndex: number;
+  progressMap: StageProgressMap;
+  snapshot: RuntimeSnapshot;
+  pipelineInput: VideoPlayPipelineInput;
+}): void {
+  if (input.nextStepIndex <= 0 || input.nextStepIndex > VIDEOPLAY_PIPELINE_CHAIN.length) {
+    return;
+  }
+  const previousStep = VIDEOPLAY_PIPELINE_CHAIN[input.nextStepIndex - 1]!;
+  const previousProgress = input.progressMap[previousStep];
+  if (!previousProgress.stepInputHash) {
+    throw new VideoPlayError({
+      reasonCode: VIDEOPLAY_REASON.CHECKPOINT_INVALID,
+      actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.CHECKPOINT_INVALID),
+      stage: 'orchestrator',
+      message: 'VIDEOPLAY_CHECKPOINT_STEP_HASH_MISSING',
+      details: { previousStep },
+    });
+  }
+  const currentHash = computeStepInputHash(previousStep, input.snapshot, input.pipelineInput);
+  if (currentHash !== previousProgress.stepInputHash) {
+    throw new VideoPlayError({
+      reasonCode: VIDEOPLAY_REASON.STEP_RESUME_HASH_MISMATCH,
+      actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.STEP_RESUME_HASH_MISMATCH),
+      stage: 'orchestrator',
+      message: 'VIDEOPLAY_CHECKPOINT_RESUME_HASH_MISMATCH',
+      details: {
+        step: previousStep,
+        expected: previousProgress.stepInputHash,
+        current: currentHash,
+      },
+    });
+  }
+}
+
+function buildCheckpoint(input: {
+  traceId: string;
+  runId: string;
+  status: VideoPlayPipelineLifecycleStatus;
+  nextStepIndex: number;
+  progressMap: StageProgressMap;
+  runEvents: VideoPlayRunEvent[];
+  fallbackAudits: FallbackAuditRecord[];
+  snapshot: RuntimeSnapshot;
+}): VideoPlayPipelineCheckpoint {
+  return {
+    traceId: input.traceId,
+    runId: input.runId,
+    status: input.status,
+    nextStepIndex: input.nextStepIndex,
+    stageProgress: toStageProgressList(input.progressMap),
+    runEvents: [...input.runEvents],
+    fallbackAudits: [...input.fallbackAudits],
+    snapshot: cloneJson(input.snapshot) as Record<string, unknown>,
+  };
+}
+
+function fallbackForStep(step: VideoPlayPipelineStep): { reasonCode: VideoPlayReasonCode; actionHint: string; stage: string } {
+  switch (step) {
+    case 'narrative-ingest':
+      return {
+        reasonCode: VIDEOPLAY_REASON.FACT_PROJECTION_INVALID,
+        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.FACT_PROJECTION_INVALID),
+        stage: 'narrative-bridge',
+      };
+    case 'episode-segmentation':
+      return {
+        reasonCode: VIDEOPLAY_REASON.SEGMENTATION_FAILED,
+        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.SEGMENTATION_FAILED),
+        stage: 'segment',
+      };
+    case 'screenplay':
+      return {
+        reasonCode: VIDEOPLAY_REASON.SCREENPLAY_SCHEMA_INVALID,
+        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.SCREENPLAY_SCHEMA_INVALID),
+        stage: 'screenplay',
+      };
+    case 'storyboard':
+      return {
+        reasonCode: VIDEOPLAY_REASON.STORYBOARD_SCHEMA_INVALID,
+        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.STORYBOARD_SCHEMA_INVALID),
+        stage: 'storyboard',
+      };
+    case 'asset-render':
+      return {
+        reasonCode: VIDEOPLAY_REASON.SHOT_RENDER_FAILED,
+        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.SHOT_RENDER_FAILED),
+        stage: 'render',
+      };
+    case 'edit-compose':
+      return {
+        reasonCode: VIDEOPLAY_REASON.EDIT_COMPOSE_FAILED,
+        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.EDIT_COMPOSE_FAILED),
+        stage: 'edit',
+      };
+    case 'qc-gate':
+      return {
+        reasonCode: VIDEOPLAY_REASON.QC_FAILED,
+        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.QC_FAILED),
+        stage: 'qc',
+      };
+    case 'release-package':
+      return {
+        reasonCode: VIDEOPLAY_REASON.RELEASE_PACKAGE_INVALID,
+        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.RELEASE_PACKAGE_INVALID),
+        stage: 'package',
+      };
+    default:
+      return {
+        reasonCode: VIDEOPLAY_REASON.INPUT_INVALID,
+        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.INPUT_INVALID),
+        stage: 'orchestrator',
+      };
+  }
+}
+
+function throwIfCanceled(control: NormalizedExecutionControl, step: VideoPlayPipelineStep): void {
+  if (control.shouldCancel?.()) {
+    throw new VideoPlayError({
+      reasonCode: VIDEOPLAY_REASON.RUN_CANCELED,
+      actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.RUN_CANCELED),
+      stage: step,
+      retryClass: VIDEOPLAY_RETRY_CLASS.NON_RETRYABLE,
+      message: 'VIDEOPLAY_RUN_CANCEL_REQUESTED',
+    });
+  }
+}
+
 function buildTraceCoverage(input: {
   episode: SegmentedEpisode;
   screenplay: ScreenplayOutput;
@@ -917,796 +1493,1660 @@ function parseStructuredModelOutput(text: string): Record<string, unknown> | nul
   return parseJsonObject(text);
 }
 
-export async function runVideoPlayEpisodeProduction(
-  deps: VideoPlayPipelineDeps,
-  input: VideoPlayPipelineInput,
-): Promise<VideoPlayPipelineResult> {
-  const traceId = createUlid();
-  const runId = createUlid();
-  const runEventFactory = createRunEventFactory({
-    traceId,
-    runId,
-    ...(input.taskId ? { taskId: input.taskId } : {}),
-  });
-  const fallbackAudits: FallbackAuditRecord[] = [];
+type AssetRenderModality = 'image' | 'video' | 'voice';
 
-  runEventFactory.pushEvent({
-    step: 'narrative-ingest',
-    eventType: 'run.start',
-  });
+type AssetAnalysisShotPlan = {
+  shotId: string;
+  clipId: string;
+  beatId: string;
+  durationMs: number;
+  sourceEventIds: string[];
+  complexity: 'low' | 'medium' | 'high';
+  priority: number;
+  requiredModalities: AssetRenderModality[];
+  voiceLineText: string;
+  language: string;
+};
 
-  const canaryReport = runPromptCanaryCases();
-  if (!canaryReport.ok) {
-    runEventFactory.pushEvent({
-      step: 'narrative-ingest',
-      eventType: 'run.error',
-      reasonCode: VIDEOPLAY_REASON.PROMPT_CANARY_FAILED,
-      actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.PROMPT_CANARY_FAILED),
-      retryClass: 'non-retryable',
-      details: { failures: canaryReport.failures },
+type AssetRenderBatch = {
+  batchId: string;
+  modality: AssetRenderModality;
+  queueItemIds: string[];
+  shotIds: string[];
+};
+
+type AssetRenderQueueItem = {
+  queueItemId: string;
+  batchId: string;
+  episodeId: string;
+  shotId: string;
+  clipId: string;
+  modality: AssetRenderModality;
+  status: 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'SKIPPED';
+  routeSource: 'local-runtime' | 'token-api' | 'unknown';
+  errorMessage: string | null;
+};
+
+function normalizeLanguageTag(input: string): string {
+  const normalized = String(input || '').trim().toLowerCase();
+  if (!normalized) {
+    return 'zh';
+  }
+  if (normalized.startsWith('zh')) {
+    return 'zh';
+  }
+  if (normalized.startsWith('en')) {
+    return 'en';
+  }
+  return normalized;
+}
+
+function inferShotComplexity(shot: StoryboardShot): 'low' | 'medium' | 'high' {
+  if (shot.durationMs >= 5000 || shot.continuityAnchors.length >= 3) {
+    return 'high';
+  }
+  if (shot.durationMs >= 3000 || shot.continuityAnchors.length >= 1) {
+    return 'medium';
+  }
+  return 'low';
+}
+
+function buildLipSyncAnchors(input: {
+  text: string;
+  durationMs: number;
+}): Array<{ t: number; viseme: string }> {
+  const durationMs = Math.max(300, Math.floor(input.durationMs));
+  const tokenCount = Math.max(3, Math.min(24, Math.ceil(String(input.text || '').length / 4)));
+  const visemes = ['A', 'E', 'I', 'O', 'U', 'M'];
+  const anchors: Array<{ t: number; viseme: string }> = [];
+  for (let index = 0; index < tokenCount; index += 1) {
+    const t = index === tokenCount - 1
+      ? durationMs
+      : Math.floor((durationMs * index) / Math.max(1, tokenCount - 1));
+    anchors.push({
+      t,
+      viseme: visemes[index % visemes.length]!,
     });
+  }
+  return anchors;
+}
+
+function buildAssetAnalysisPlan(input: {
+  storyboard: StoryboardOutput;
+  screenplay: ScreenplayOutput;
+  projectionLocale: string;
+}): AssetAnalysisShotPlan[] {
+  const beatSummaryById = new Map(
+    input.screenplay.beats.map((beat) => [beat.beatId, beat.summary] as const),
+  );
+  const language = normalizeLanguageTag(input.projectionLocale);
+  const plans: AssetAnalysisShotPlan[] = input.storyboard.shotPlans.map((shot, index) => {
+    const beatSummary = String(beatSummaryById.get(shot.beatId) || '').trim();
+    const voiceLineText = beatSummary || shot.visualPrompt;
+    const complexity = inferShotComplexity(shot);
+    const requiredModalities: AssetRenderModality[] = voiceLineText
+      ? ['voice', 'image', 'video']
+      : ['image', 'video'];
+    return {
+      shotId: shot.shotId,
+      clipId: shot.clipId,
+      beatId: shot.beatId,
+      durationMs: shot.durationMs,
+      sourceEventIds: [...shot.sourceEventIds],
+      complexity,
+      priority: index + 1,
+      requiredModalities,
+      voiceLineText,
+      language,
+    };
+  });
+
+  if (plans.length === 0) {
     throw new VideoPlayError({
-      reasonCode: VIDEOPLAY_REASON.PROMPT_CANARY_FAILED,
-      actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.PROMPT_CANARY_FAILED),
-      stage: 'prompt',
-      message: canaryReport.failures.join(';'),
+      reasonCode: VIDEOPLAY_REASON.ASSET_ANALYSIS_INVALID,
+      actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.ASSET_ANALYSIS_INVALID),
+      stage: 'render',
+      message: 'VIDEOPLAY_ASSET_ANALYSIS_EMPTY',
     });
   }
 
-  let turnWindow: NarrativeTurnWindow;
-  let projection: NarrativeProjectionRenderInput;
-  let routeCatalog: Record<'chat' | 'image' | 'video', RuntimeRouteCatalogSnapshot>;
-  const policy = normalizeSegmentationPolicy(input.policy);
-  const sourceMode = input.sourceMode;
+  return plans;
+}
 
-  try {
-    runEventFactory.pushEvent({
-      step: 'narrative-ingest',
-      eventType: 'step.start',
+function buildAssetRenderQueue(input: {
+  episodeId: string;
+  plans: AssetAnalysisShotPlan[];
+}): {
+  batches: AssetRenderBatch[];
+  queueItems: AssetRenderQueueItem[];
+} {
+  const modalities: AssetRenderModality[] = ['voice', 'image', 'video'];
+  const queueItems: AssetRenderQueueItem[] = [];
+  const batches: AssetRenderBatch[] = [];
+
+  for (const modality of modalities) {
+    const scopedPlans = input.plans.filter((plan) => plan.requiredModalities.includes(modality));
+    if (scopedPlans.length === 0) {
+      continue;
+    }
+    const batchId = createDeterministicUlid(`${input.episodeId}:batch:${modality}`);
+    const queueItemIds: string[] = [];
+    const shotIds: string[] = [];
+    for (const plan of scopedPlans) {
+      const queueItemId = createDeterministicUlid(`${batchId}:${plan.shotId}`);
+      queueItemIds.push(queueItemId);
+      shotIds.push(plan.shotId);
+      queueItems.push({
+        queueItemId,
+        batchId,
+        episodeId: input.episodeId,
+        shotId: plan.shotId,
+        clipId: plan.clipId,
+        modality,
+        status: 'QUEUED',
+        routeSource: 'unknown',
+        errorMessage: null,
+      });
+    }
+    batches.push({
+      batchId,
+      modality,
+      queueItemIds,
+      shotIds,
+    });
+  }
+
+  if (queueItems.length === 0 || !queueItems.some((item) => item.modality === 'video')) {
+    throw new VideoPlayError({
+      reasonCode: VIDEOPLAY_REASON.BATCH_QUEUE_ORCHESTRATION_FAILED,
+      actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.BATCH_QUEUE_ORCHESTRATION_FAILED),
+      stage: 'render',
+      message: 'VIDEOPLAY_RENDER_QUEUE_EMPTY',
+    });
+  }
+
+  return {
+    batches,
+    queueItems,
+  };
+}
+
+type VoiceProfile = {
+  voiceId: string;
+  providerId?: string;
+  language?: string;
+};
+
+async function resolveVoiceProfile(input: {
+  deps: VideoPlayPipelineDeps;
+  routeOverride: RuntimeRouteOverride | undefined;
+  preferredLanguage: string;
+}): Promise<VoiceProfile> {
+  const routeSource = input.routeOverride?.source === 'token-api' ? 'token-api' : 'local-runtime';
+  const voices = await input.deps.hookClient.llm.speech.listVoices({
+    routeSource,
+  });
+
+  if (!Array.isArray(voices) || voices.length === 0) {
+    throw new VideoPlayError({
+      reasonCode: VIDEOPLAY_REASON.VOICE_RENDER_FAILED,
+      actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.VOICE_RENDER_FAILED),
+      stage: 'render',
+      message: 'VIDEOPLAY_TTS_VOICE_LIST_EMPTY',
+      retryClass: VIDEOPLAY_RETRY_CLASS.RETRYABLE,
       details: {
-        storyId: input.storyId,
-        sourceMode,
+        routeSource,
       },
     });
+  }
 
-    const storyPackageParsed = VideoStoryPackageSchema.safeParse(input.storyPackage);
-    if (!storyPackageParsed.success) {
-      throw new VideoPlayError({
-        reasonCode: VIDEOPLAY_REASON.STORY_PACKAGE_INVALID,
-        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.STORY_PACKAGE_INVALID),
-        stage: 'story-package',
-        message: 'VIDEOPLAY_STORY_PACKAGE_SCHEMA_INVALID',
-        details: {
-          issues: storyPackageParsed.error.issues.map((item) => `${item.path.join('.')}:${item.message}`),
-        },
-      });
-    }
-    const storyPackage = storyPackageParsed.data;
-    if (storyPackage.storyId !== input.storyId) {
-      throw new VideoPlayError({
-        reasonCode: VIDEOPLAY_REASON.STORY_PACKAGE_INVALID,
-        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.STORY_PACKAGE_INVALID),
-        stage: 'story-package',
-        message: 'VIDEOPLAY_STORY_PACKAGE_STORY_ID_MISMATCH',
-        details: {
-          packageStoryId: storyPackage.storyId,
-          inputStoryId: input.storyId,
-        },
-      });
-    }
-    if (storyPackage.sourceMode !== sourceMode) {
-      throw new VideoPlayError({
-        reasonCode: VIDEOPLAY_REASON.STORY_PACKAGE_INVALID,
-        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.STORY_PACKAGE_INVALID),
-        stage: 'story-package',
-        message: 'VIDEOPLAY_STORY_PACKAGE_SOURCE_MODE_MISMATCH',
-        details: {
-          packageSourceMode: storyPackage.sourceMode,
-          inputSourceMode: sourceMode,
-        },
-      });
-    }
+  const preferred = normalizeLanguageTag(input.preferredLanguage);
+  const selected = voices.find((voice) => normalizeLanguageTag(String(voice.lang || '')) === preferred) || voices[0]!;
 
-    const maxTurns = Number.isFinite(Number(input.windowPolicy?.maxTurns))
-      ? Math.max(1, Math.floor(Number(input.windowPolicy?.maxTurns)))
-      : storyPackage.windowPolicy.maxTurns;
-    const requiredTriggerSources = Array.isArray(input.windowPolicy?.enrichedRequiredTriggerSources)
-      ? [...new Set(input.windowPolicy.enrichedRequiredTriggerSources
-        .map((item) => String(item || '').trim())
-        .filter((item): item is 'UserTurn' | 'AgentInitiative' => item === 'UserTurn' || item === 'AgentInitiative'))]
-      : storyPackage.windowPolicy.enrichedRequiredTriggerSources;
-    const trimmedTurns = storyPackage.turnWindow.turns.slice(-maxTurns);
-    if (trimmedTurns.length === 0) {
-      throw new VideoPlayError({
-        reasonCode: VIDEOPLAY_REASON.STORY_SOURCE_UNAVAILABLE,
-        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.STORY_SOURCE_UNAVAILABLE),
-        stage: 'narrative-ingest',
-        message: 'VIDEOPLAY_STORY_WINDOW_EMPTY',
-      });
-    }
-    const turnWindowParsed = NarrativeTurnWindowSchema.safeParse({
-      ...storyPackage.turnWindow,
-      ingestCursorStart: trimmedTurns[0]!.turnId,
-      turns: trimmedTurns,
-    });
-    if (!turnWindowParsed.success) {
-      throw new VideoPlayError({
-        reasonCode: VIDEOPLAY_REASON.STORY_PACKAGE_INVALID,
-        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.STORY_PACKAGE_INVALID),
-        stage: 'story-package',
-        message: 'VIDEOPLAY_STORY_TURN_WINDOW_SCHEMA_INVALID',
-        details: {
-          issues: turnWindowParsed.error.issues.map((item) => `${item.path.join('.')}:${item.message}`),
-        },
-      });
-    }
-    turnWindow = turnWindowParsed.data;
+  return {
+    voiceId: String(selected.id || '').trim(),
+    ...(String(selected.providerId || '').trim()
+      ? { providerId: String(selected.providerId || '').trim() }
+      : {}),
+    ...(String(selected.lang || '').trim()
+      ? { language: normalizeLanguageTag(String(selected.lang || '').trim()) }
+      : {}),
+  };
+}
 
-    if (sourceMode === 'textplay-enriched-story') {
-      const required = new Set(requiredTriggerSources);
-      const hasEnrichedTurn = turnWindow.turns.some((turn) => required.has(String(turn.triggerSource || '').trim() as 'UserTurn' | 'AgentInitiative'));
-      if (!hasEnrichedTurn) {
+async function executeStep(input: {
+  step: VideoPlayPipelineStep;
+  deps: VideoPlayPipelineDeps;
+  pipelineInput: VideoPlayPipelineInput;
+  snapshot: RuntimeSnapshot;
+  runEventFactory: ReturnType<typeof createRunEventFactory>;
+  fallbackAudits: FallbackAuditRecord[];
+  attempt: number;
+  stepInputHash: string;
+  control: NormalizedExecutionControl;
+  traceId: string;
+  runId: string;
+}): Promise<StepExecutionResult> {
+  switch (input.step) {
+    case 'narrative-ingest': {
+      const storyPackageParsed = VideoStoryPackageSchema.safeParse(input.pipelineInput.storyPackage);
+      if (!storyPackageParsed.success) {
+        throw new VideoPlayError({
+          reasonCode: VIDEOPLAY_REASON.STORY_PACKAGE_INVALID,
+          actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.STORY_PACKAGE_INVALID),
+          stage: 'story-package',
+          message: 'VIDEOPLAY_STORY_PACKAGE_SCHEMA_INVALID',
+          details: {
+            issues: storyPackageParsed.error.issues.map((item) => `${item.path.join('.')}:${item.message}`),
+          },
+        });
+      }
+
+      const storyPackage = storyPackageParsed.data;
+      if (storyPackage.storyId !== input.pipelineInput.storyId) {
+        throw new VideoPlayError({
+          reasonCode: VIDEOPLAY_REASON.STORY_PACKAGE_INVALID,
+          actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.STORY_PACKAGE_INVALID),
+          stage: 'story-package',
+          message: 'VIDEOPLAY_STORY_PACKAGE_STORY_ID_MISMATCH',
+          details: {
+            packageStoryId: storyPackage.storyId,
+            inputStoryId: input.pipelineInput.storyId,
+          },
+        });
+      }
+      if (storyPackage.sourceMode !== input.pipelineInput.sourceMode) {
+        throw new VideoPlayError({
+          reasonCode: VIDEOPLAY_REASON.STORY_PACKAGE_INVALID,
+          actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.STORY_PACKAGE_INVALID),
+          stage: 'story-package',
+          message: 'VIDEOPLAY_STORY_PACKAGE_SOURCE_MODE_MISMATCH',
+          details: {
+            packageSourceMode: storyPackage.sourceMode,
+            inputSourceMode: input.pipelineInput.sourceMode,
+          },
+        });
+      }
+
+      const maxTurns = Number.isFinite(Number(input.pipelineInput.windowPolicy?.maxTurns))
+        ? Math.max(1, Math.floor(Number(input.pipelineInput.windowPolicy?.maxTurns)))
+        : storyPackage.windowPolicy.maxTurns;
+      const requiredTriggerSources = Array.isArray(input.pipelineInput.windowPolicy?.enrichedRequiredTriggerSources)
+        ? [...new Set(input.pipelineInput.windowPolicy.enrichedRequiredTriggerSources
+          .map((item) => String(item || '').trim())
+          .filter((item): item is 'UserTurn' | 'AgentInitiative' => item === 'UserTurn' || item === 'AgentInitiative'))]
+        : storyPackage.windowPolicy.enrichedRequiredTriggerSources;
+
+      const trimmedTurns = storyPackage.turnWindow.turns.slice(-maxTurns);
+      if (trimmedTurns.length === 0) {
         throw new VideoPlayError({
           reasonCode: VIDEOPLAY_REASON.STORY_SOURCE_UNAVAILABLE,
           actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.STORY_SOURCE_UNAVAILABLE),
           stage: 'narrative-ingest',
-          message: 'VIDEOPLAY_ENRICHED_SOURCE_TRIGGER_MISSING',
+          message: 'VIDEOPLAY_STORY_WINDOW_EMPTY',
+        });
+      }
+
+      const turnWindowParsed = NarrativeTurnWindowSchema.safeParse({
+        ...storyPackage.turnWindow,
+        ingestCursorStart: trimmedTurns[0]!.turnId,
+        turns: trimmedTurns,
+      });
+      if (!turnWindowParsed.success) {
+        throw new VideoPlayError({
+          reasonCode: VIDEOPLAY_REASON.STORY_PACKAGE_INVALID,
+          actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.STORY_PACKAGE_INVALID),
+          stage: 'story-package',
+          message: 'VIDEOPLAY_STORY_TURN_WINDOW_SCHEMA_INVALID',
           details: {
-            requiredTriggerSources,
+            issues: turnWindowParsed.error.issues.map((item) => `${item.path.join('.')}:${item.message}`),
           },
         });
       }
-    }
+      const turnWindow = turnWindowParsed.data;
 
-    const projectionParsed = NarrativeProjectionRenderInputSchema.safeParse(storyPackage.projection);
-    if (!projectionParsed.success) {
-      throw new VideoPlayError({
-        reasonCode: VIDEOPLAY_REASON.STORY_PACKAGE_INVALID,
-        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.STORY_PACKAGE_INVALID),
-        stage: 'story-package',
-        message: 'VIDEOPLAY_STORY_PROJECTION_SCHEMA_INVALID',
+      if (input.pipelineInput.sourceMode === 'textplay-enriched-story') {
+        const required = new Set(requiredTriggerSources);
+        const hasEnrichedTurn = turnWindow.turns.some((turn) => required.has(String(turn.triggerSource || '').trim() as 'UserTurn' | 'AgentInitiative'));
+        if (!hasEnrichedTurn) {
+          throw new VideoPlayError({
+            reasonCode: VIDEOPLAY_REASON.STORY_SOURCE_UNAVAILABLE,
+            actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.STORY_SOURCE_UNAVAILABLE),
+            stage: 'narrative-ingest',
+            message: 'VIDEOPLAY_ENRICHED_SOURCE_TRIGGER_MISSING',
+            details: {
+              requiredTriggerSources,
+            },
+          });
+        }
+      }
+
+      const projectionParsed = NarrativeProjectionRenderInputSchema.safeParse(storyPackage.projection);
+      if (!projectionParsed.success) {
+        throw new VideoPlayError({
+          reasonCode: VIDEOPLAY_REASON.STORY_PACKAGE_INVALID,
+          actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.STORY_PACKAGE_INVALID),
+          stage: 'story-package',
+          message: 'VIDEOPLAY_STORY_PROJECTION_SCHEMA_INVALID',
+          details: {
+            issues: projectionParsed.error.issues.map((item) => `${item.path.join('.')}:${item.message}`),
+          },
+        });
+      }
+
+      input.snapshot.turnWindow = turnWindow;
+      input.snapshot.projection = projectionParsed.data;
+      input.snapshot.routeCatalog = await loadRuntimeRouteCatalog({
+        deps: input.deps,
+        modId: 'world.nimi.videoplay',
+      });
+      input.snapshot.storyPackageVersion = storyPackage.snapshot.version;
+      input.snapshot.sourceMode = storyPackage.sourceMode;
+      input.snapshot.episodes = [];
+      input.snapshot.releaseCandidates = [];
+
+      return {
+        lastCompletedUnit: turnWindow.turns[turnWindow.turns.length - 1]?.turnId ?? undefined,
         details: {
-          issues: projectionParsed.error.issues.map((item) => `${item.path.join('.')}:${item.message}`),
+          sourceMode: storyPackage.sourceMode,
+          storyPackageVersion: storyPackage.snapshot.version,
+          turnCount: turnWindow.turns.length,
+          projectionEvents: input.snapshot.projection.events.length,
+          routeSelected: {
+            chat: input.snapshot.routeCatalog.chat.selected.source,
+            image: input.snapshot.routeCatalog.image.selected.source,
+            video: input.snapshot.routeCatalog.video.selected.source,
+            tts: input.snapshot.routeCatalog.tts.selected.source,
+          },
         },
-      });
-    }
-    projection = projectionParsed.data;
-    routeCatalog = await loadRuntimeRouteCatalog({
-      deps,
-      modId: 'world.nimi.videoplay',
-    });
-
-    runEventFactory.pushEvent({
-      step: 'narrative-ingest',
-      eventType: 'step.complete',
-      details: {
-        sourceMode,
-        storyPackageVersion: storyPackage.snapshot.version,
-        turnCount: turnWindow.turns.length,
-        projectionEvents: projection.events.length,
-        routeSelected: {
-          chat: routeCatalog.chat?.selected.source || 'unknown',
-          image: routeCatalog.image?.selected.source || 'unknown',
-          video: routeCatalog.video?.selected.source || 'unknown',
-        },
-      },
-    });
-  } catch (error) {
-    const normalized = toVideoPlayError(error, {
-      reasonCode: VIDEOPLAY_REASON.FACT_PROJECTION_INVALID,
-      actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.FACT_PROJECTION_INVALID),
-      stage: 'narrative-bridge',
-    });
-    runEventFactory.pushEvent({
-      step: 'narrative-ingest',
-      eventType: 'step.error',
-      reasonCode: normalized.reasonCode,
-      actionHint: normalized.actionHint,
-      retryClass: normalized.retryClass,
-      details: normalized.details,
-    });
-    runEventFactory.pushEvent({
-      step: 'narrative-ingest',
-      eventType: 'run.error',
-      reasonCode: normalized.reasonCode,
-      actionHint: normalized.actionHint,
-      retryClass: normalized.retryClass,
-      details: normalized.details,
-    });
-    throw normalized;
-  }
-
-  runEventFactory.pushEvent({
-    step: 'episode-segmentation',
-    eventType: 'step.start',
-    details: {
-      storyId: input.storyId,
-      policyHash: createHash(JSON.stringify(policy)),
-    },
-  });
-
-  const segmentation = segmentEpisodes({
-    storyId: input.storyId,
-    ingestCursorStart: input.ingestCursorStart,
-    turns: turnWindow.turns,
-    policy,
-  });
-
-  const secondPass = segmentEpisodes({
-    storyId: input.storyId,
-    ingestCursorStart: input.ingestCursorStart,
-    turns: turnWindow.turns,
-    policy,
-  });
-  if (JSON.stringify(segmentation) !== JSON.stringify(secondPass)) {
-    throw new VideoPlayError({
-      reasonCode: VIDEOPLAY_REASON.SEGMENTATION_NON_DETERMINISTIC,
-      actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.SEGMENTATION_NON_DETERMINISTIC),
-      stage: 'segment',
-      message: 'VIDEOPLAY_SEGMENT_NON_DETERMINISTIC',
-    });
-  }
-
-  runEventFactory.pushEvent({
-    step: 'episode-segmentation',
-    eventType: 'step.complete',
-    details: {
-      episodeCount: segmentation.episodes.length,
-      backlogTurnCount: segmentation.backlogTurnIds.length,
-      nextIngestCursor: segmentation.nextIngestCursor,
-    },
-  });
-
-  const episodes: EpisodeRecord[] = [];
-  const releaseCandidates: ReleasePackage[] = [];
-
-  for (const segmentedEpisode of segmentation.episodes) {
-    const baselineSourceEventIds = new Set<string>(segmentedEpisode.sourceEventIds);
-    const projectionLocale = resolvePromptLocale(
-      (projection.systemContext as Record<string, unknown> | undefined)?.locale as string
-      || (projection.systemContext as Record<string, unknown> | undefined)?.language as string
-      || (projection.systemContext as Record<string, unknown> | undefined)?.promptLocale as string
-      || '',
-    );
-
-    runEventFactory.pushEvent({
-      step: 'screenplay',
-      eventType: 'step.start',
-      details: { episodeId: segmentedEpisode.episodeId },
-    });
-
-    const screenplayVars = {
-      storyId: input.storyId,
-      episodeId: segmentedEpisode.episodeId,
-      worldStyle: JSON.stringify(projection.worldStyle),
-      beatsJson: JSON.stringify(segmentedEpisode.turns.map((turn) => ({ turnId: turn.turnId, message: turn.userMessage }))),
-    };
-    const screenplayValidated = validatePromptVariables('storyboard-plan', screenplayVars);
-    if (!screenplayValidated.ok) {
-      throw new VideoPlayError({
-        reasonCode: VIDEOPLAY_REASON.SCREENPLAY_SCHEMA_INVALID,
-        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.SCREENPLAY_SCHEMA_INVALID),
-        stage: 'screenplay',
-        message: screenplayValidated.issues.join(';'),
-      });
-    }
-
-    const screenplayPrompt = renderPromptTemplate('storyboard-plan', projectionLocale, screenplayValidated.data);
-
-    const screenplayInvoke = await invokeWithRouteFallback({
-      stage: 'screenplay',
-      capability: 'llm.text.generate',
-      traceId,
-      routeHint: 'chat/fine',
-      checkHealth: async (routeHint, routeOverride) => deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
-      invoke: async (routeOverride) => deps.aiClient.generateText({
-        prompt: screenplayPrompt,
-        systemPrompt: 'Return concise structured planning hints in JSON.',
-        routeHint: 'chat/fine',
-        routeOverride,
-        maxTokens: 1024,
-      }),
-    });
-    if (screenplayInvoke.fallbackAudit) {
-      fallbackAudits.push(screenplayInvoke.fallbackAudit);
-    }
-
-    const screenplayStructured = parseStructuredModelOutput(screenplayInvoke.result.text);
-    let screenplay = buildDeterministicScreenplay(segmentedEpisode);
-    if (screenplayStructured && Array.isArray(screenplayStructured.beats)) {
-      const beatsPayload = screenplayStructured.beats as unknown[];
-      const deterministic = buildDeterministicScreenplay(segmentedEpisode);
-      screenplay = {
-        ...deterministic,
-        beats: deterministic.beats.map((beat, index) => {
-          const src = beatsPayload[index];
-          if (src && typeof src === 'object') {
-            return {
-              ...beat,
-              summary: String((src as Record<string, unknown>).summary || beat.summary),
-            };
-          }
-          return beat;
-        }),
       };
     }
 
-    const screenplayParsed = ScreenplaySchema.safeParse(screenplay);
-    if (!screenplayParsed.success) {
-      throw new VideoPlayError({
-        reasonCode: VIDEOPLAY_REASON.SCREENPLAY_SCHEMA_INVALID,
-        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.SCREENPLAY_SCHEMA_INVALID),
-        stage: 'screenplay',
-        message: 'VIDEOPLAY_SCREENPLAY_SCHEMA_INVALID',
+    case 'episode-segmentation': {
+      if (!input.snapshot.turnWindow) {
+        throw new VideoPlayError({
+          reasonCode: VIDEOPLAY_REASON.CHECKPOINT_INVALID,
+          actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.CHECKPOINT_INVALID),
+          stage: 'segment',
+          message: 'VIDEOPLAY_SEGMENT_REQUIRES_TURN_WINDOW',
+        });
+      }
+
+      const segmentation = segmentEpisodes({
+        storyId: input.pipelineInput.storyId,
+        ingestCursorStart: input.pipelineInput.ingestCursorStart,
+        turns: input.snapshot.turnWindow.turns,
+        policy: input.snapshot.policy,
       });
+
+      const secondPass = segmentEpisodes({
+        storyId: input.pipelineInput.storyId,
+        ingestCursorStart: input.pipelineInput.ingestCursorStart,
+        turns: input.snapshot.turnWindow.turns,
+        policy: input.snapshot.policy,
+      });
+      if (JSON.stringify(segmentation) !== JSON.stringify(secondPass)) {
+        throw new VideoPlayError({
+          reasonCode: VIDEOPLAY_REASON.SEGMENTATION_NON_DETERMINISTIC,
+          actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.SEGMENTATION_NON_DETERMINISTIC),
+          stage: 'segment',
+          message: 'VIDEOPLAY_SEGMENT_NON_DETERMINISTIC',
+        });
+      }
+
+      const projectionLocale = resolvePromptLocale(
+        (input.snapshot.projection?.systemContext as Record<string, unknown> | undefined)?.locale as string
+        || (input.snapshot.projection?.systemContext as Record<string, unknown> | undefined)?.language as string
+        || (input.snapshot.projection?.systemContext as Record<string, unknown> | undefined)?.promptLocale as string
+        || '',
+      );
+
+      input.snapshot.segmentation = segmentation;
+      input.snapshot.episodeContexts = segmentation.episodes.map((episode) => ({
+        segmentedEpisode: episode,
+        baselineSourceEventIds: [...episode.sourceEventIds],
+        projectionLocale,
+        screenplay: null,
+        storyboard: null,
+        assetOutput: null,
+        composeOutput: null,
+        qcReport: null,
+        releaseCandidate: null,
+        episodeRecord: null,
+      }));
+      input.snapshot.episodes = [];
+      input.snapshot.releaseCandidates = [];
+
+      return {
+        lastCompletedUnit: segmentation.episodes[segmentation.episodes.length - 1]?.episodeId ?? undefined,
+        details: {
+          episodeCount: segmentation.episodes.length,
+          backlogTurnCount: segmentation.backlogTurnIds.length,
+          nextIngestCursor: segmentation.nextIngestCursor,
+        },
+      };
     }
-    screenplay = screenplayParsed.data;
 
-    runEventFactory.pushEvent({
-      step: 'screenplay',
-      eventType: 'step.complete',
-      details: {
-        episodeId: segmentedEpisode.episodeId,
-        routeSource: screenplayInvoke.routeSource,
-      },
-    });
+    case 'screenplay': {
+      if (!input.snapshot.projection || input.snapshot.episodeContexts.length === 0) {
+        throw new VideoPlayError({
+          reasonCode: VIDEOPLAY_REASON.CHECKPOINT_INVALID,
+          actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.CHECKPOINT_INVALID),
+          stage: 'screenplay',
+          message: 'VIDEOPLAY_SCREENPLAY_CONTEXT_MISSING',
+        });
+      }
 
-    runEventFactory.pushEvent({
-      step: 'storyboard',
-      eventType: 'step.start',
-      details: { episodeId: segmentedEpisode.episodeId },
-    });
+      for (const context of input.snapshot.episodeContexts) {
+        throwIfCanceled(input.control, input.step);
+        const screenplayVars = {
+          storyId: input.pipelineInput.storyId,
+          episodeId: context.segmentedEpisode.episodeId,
+          worldStyle: JSON.stringify(input.snapshot.projection.worldStyle),
+          beatsJson: JSON.stringify(context.segmentedEpisode.turns.map((turn) => ({ turnId: turn.turnId, message: turn.userMessage }))),
+        };
+        const screenplayValidated = validatePromptVariables('storyboard-plan', screenplayVars);
+        if (!screenplayValidated.ok) {
+          throw new VideoPlayError({
+            reasonCode: VIDEOPLAY_REASON.SCREENPLAY_SCHEMA_INVALID,
+            actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.SCREENPLAY_SCHEMA_INVALID),
+            stage: 'screenplay',
+            message: screenplayValidated.issues.join(';'),
+          });
+        }
 
-    const storyboardInvoke = await invokeWithRouteFallback({
-      stage: 'storyboard',
-      capability: 'llm.text.generate',
-      traceId,
-      routeHint: 'chat/fine',
-      checkHealth: async (routeHint, routeOverride) => deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
-      invoke: async (routeOverride) => deps.aiClient.generateText({
-        prompt: renderPromptTemplate('storyboard-plan', projectionLocale, {
-          storyId: input.storyId,
-          episodeId: segmentedEpisode.episodeId,
-          worldStyle: JSON.stringify(projection.worldStyle),
-          beatsJson: JSON.stringify(screenplay.beats.map((beat) => ({
-            beatId: beat.beatId,
-            summary: beat.summary,
-            sourceEventIds: beat.sourceEventIds,
-          }))),
-        }),
-        systemPrompt: 'Return JSON with episodeId, clipPlans, shotPlans, sourceEventIds.',
-        routeHint: 'chat/fine',
-        routeOverride,
-        maxTokens: 1024,
-      }),
-    });
-    if (storyboardInvoke.fallbackAudit) {
-      fallbackAudits.push(storyboardInvoke.fallbackAudit);
-    }
+        const screenplayPrompt = renderPromptTemplate('storyboard-plan', context.projectionLocale, screenplayValidated.data);
 
-    let storyboard = buildDeterministicStoryboard(screenplay);
-    const storyboardStructured = parseStructuredModelOutput(storyboardInvoke.result.text);
-    if (storyboardStructured && Array.isArray(storyboardStructured.shotPlans)) {
-      const shotPlansPayload = storyboardStructured.shotPlans as unknown[];
-      storyboard = {
-        ...storyboard,
-        shotPlans: storyboard.shotPlans.map((shot, index) => {
-          const src = shotPlansPayload[index];
-          if (!src || typeof src !== 'object') {
-            return shot;
-          }
-          return {
-            ...shot,
-            visualPrompt: String((src as Record<string, unknown>).visualPrompt || shot.visualPrompt),
-            motionCue: String((src as Record<string, unknown>).motionCue || shot.motionCue),
+        const screenplayInvoke = await invokeWithRouteFallback({
+          stage: 'screenplay',
+          capability: 'llm.text.generate',
+          traceId: input.traceId,
+          routeHint: 'chat/fine',
+          checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
+          invoke: async (routeOverride) => input.deps.aiClient.generateText({
+            prompt: screenplayPrompt,
+            systemPrompt: 'Return concise structured planning hints in JSON.',
+            routeHint: 'chat/fine',
+            routeOverride,
+            maxTokens: 1024,
+          }),
+        });
+        if (screenplayInvoke.fallbackAudit) {
+          input.fallbackAudits.push(screenplayInvoke.fallbackAudit);
+        }
+
+        const screenplayStructured = parseStructuredModelOutput(screenplayInvoke.result.text);
+        let screenplay = buildDeterministicScreenplay(context.segmentedEpisode);
+        if (screenplayStructured && Array.isArray(screenplayStructured.beats)) {
+          const beatsPayload = screenplayStructured.beats as unknown[];
+          const deterministic = buildDeterministicScreenplay(context.segmentedEpisode);
+          screenplay = {
+            ...deterministic,
+            beats: deterministic.beats.map((beat, index) => {
+              const src = beatsPayload[index];
+              if (src && typeof src === 'object') {
+                return {
+                  ...beat,
+                  summary: String((src as Record<string, unknown>).summary || beat.summary),
+                };
+              }
+              return beat;
+            }),
           };
-        }),
+        }
+
+        const screenplayParsed = ScreenplaySchema.safeParse(screenplay);
+        if (!screenplayParsed.success) {
+          throw new VideoPlayError({
+            reasonCode: VIDEOPLAY_REASON.SCREENPLAY_SCHEMA_INVALID,
+            actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.SCREENPLAY_SCHEMA_INVALID),
+            stage: 'screenplay',
+            message: 'VIDEOPLAY_SCREENPLAY_SCHEMA_INVALID',
+          });
+        }
+
+        context.screenplay = screenplayParsed.data;
+
+        input.runEventFactory.pushEvent({
+          step: input.step,
+          eventType: 'step.chunk',
+          attempt: input.attempt,
+          stepInputHash: input.stepInputHash,
+          lastCompletedUnit: context.segmentedEpisode.episodeId,
+          details: {
+            episodeId: context.segmentedEpisode.episodeId,
+            routeSource: screenplayInvoke.routeSource,
+          },
+        });
+      }
+
+      return {
+        lastCompletedUnit: input.snapshot.episodeContexts[input.snapshot.episodeContexts.length - 1]?.segmentedEpisode.episodeId ?? undefined,
+        details: {
+          episodeCount: input.snapshot.episodeContexts.length,
+        },
       };
     }
 
-    const storyboardParsed = StoryboardSchema.safeParse(storyboard);
-    if (!storyboardParsed.success) {
-      throw new VideoPlayError({
-        reasonCode: VIDEOPLAY_REASON.STORYBOARD_SCHEMA_INVALID,
-        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.STORYBOARD_SCHEMA_INVALID),
-        stage: 'storyboard',
-        message: 'VIDEOPLAY_STORYBOARD_SCHEMA_INVALID',
-      });
-    }
-    storyboard = storyboardParsed.data;
+    case 'storyboard': {
+      if (input.snapshot.episodeContexts.length === 0) {
+        throw new VideoPlayError({
+          reasonCode: VIDEOPLAY_REASON.CHECKPOINT_INVALID,
+          actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.CHECKPOINT_INVALID),
+          stage: 'storyboard',
+          message: 'VIDEOPLAY_STORYBOARD_CONTEXT_MISSING',
+        });
+      }
 
-    ensureSourceEventTraceability({
-      baseline: baselineSourceEventIds,
-      episode: segmentedEpisode,
-      screenplay,
-      storyboard,
-    });
+      for (const context of input.snapshot.episodeContexts) {
+        throwIfCanceled(input.control, input.step);
+        if (!context.screenplay) {
+          throw new VideoPlayError({
+            reasonCode: VIDEOPLAY_REASON.CHECKPOINT_INVALID,
+            actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.CHECKPOINT_INVALID),
+            stage: 'storyboard',
+            message: 'VIDEOPLAY_STORYBOARD_REQUIRES_SCREENPLAY',
+            details: { episodeId: context.segmentedEpisode.episodeId },
+          });
+        }
+        const screenplay = context.screenplay;
 
-    runEventFactory.pushEvent({
-      step: 'storyboard',
-      eventType: 'step.complete',
-      details: {
-        episodeId: segmentedEpisode.episodeId,
-        routeSource: storyboardInvoke.routeSource,
-        shotCount: storyboard.shotPlans.length,
-      },
-    });
-
-    runEventFactory.pushEvent({
-      step: 'asset-render',
-      eventType: 'step.start',
-      details: { episodeId: segmentedEpisode.episodeId },
-    });
-
-    const shotAssets = [] as AssetRenderOutput['shotAssets'];
-    const clipAssets = [] as AssetRenderOutput['clipAssets'];
-    const sourceEventMap: Record<string, string[]> = {};
-    let renderedShots = 0;
-
-    for (const shot of storyboard.shotPlans) {
-      sourceEventMap[shot.shotId] = [...shot.sourceEventIds];
-      let imageUri = '';
-      let imageMime = 'image/png';
-      let imageRouteSource: 'local-runtime' | 'token-api' | 'unknown' = 'unknown';
-      let videoUri = '';
-      let videoMime = 'video/mp4';
-      let videoRouteSource: 'local-runtime' | 'token-api' | 'unknown' = 'unknown';
-
-      try {
-        const imageResult = await invokeWithRouteFallback({
-          stage: 'asset-render-image',
-          capability: 'llm.image.generate',
-          traceId,
-          routeHint: 'image/default',
-          checkHealth: async (routeHint, routeOverride) => deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
-          invoke: async (routeOverride) => deps.aiClient.generateImage({
-            prompt: shot.visualPrompt,
-            routeHint: 'image/default',
+        const storyboardInvoke = await invokeWithRouteFallback({
+          stage: 'storyboard',
+          capability: 'llm.text.generate',
+          traceId: input.traceId,
+          routeHint: 'chat/fine',
+          checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
+          invoke: async (routeOverride) => input.deps.aiClient.generateText({
+            prompt: renderPromptTemplate('storyboard-plan', context.projectionLocale, {
+              storyId: input.pipelineInput.storyId,
+              episodeId: context.segmentedEpisode.episodeId,
+              worldStyle: JSON.stringify(input.snapshot.projection?.worldStyle || {}),
+              beatsJson: JSON.stringify(screenplay.beats.map((beat) => ({
+                beatId: beat.beatId,
+                summary: beat.summary,
+                sourceEventIds: beat.sourceEventIds,
+              }))),
+            }),
+            systemPrompt: 'Return JSON with episodeId, clipPlans, shotPlans, sourceEventIds.',
+            routeHint: 'chat/fine',
             routeOverride,
+            maxTokens: 1024,
           }),
         });
-        if (imageResult.fallbackAudit) {
-          fallbackAudits.push(imageResult.fallbackAudit);
+        if (storyboardInvoke.fallbackAudit) {
+          input.fallbackAudits.push(storyboardInvoke.fallbackAudit);
         }
-        imageUri = String(imageResult.result.images[0]?.uri || `videoplay://image/${segmentedEpisode.episodeId}/${shot.shotId}.png`);
-        imageMime = String(imageResult.result.images[0]?.mimeType || 'image/png');
-        imageRouteSource = imageResult.routeSource;
-      } catch (error) {
-        emitVideoPlayLog({
-          level: 'warn',
-          message: 'videoplay:asset-render:image-failed',
-          details: {
-            shotId: shot.shotId,
-            error: error instanceof Error ? error.message : String(error || ''),
-          },
-        });
-      }
 
-      try {
-        const videoResult = await invokeWithRouteFallback({
-          stage: 'asset-render-video',
-          capability: 'llm.video.generate',
-          traceId,
-          routeHint: 'video/default',
-          checkHealth: async (routeHint, routeOverride) => deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
-          invoke: async (routeOverride) => deps.aiClient.generateVideo({
-            prompt: `${shot.visualPrompt}. motion=${shot.motionCue}`,
-            routeHint: 'video/default',
-            routeOverride,
-            durationSeconds: Math.max(1, Math.round(shot.durationMs / 1000)),
-          }),
-        });
-        if (videoResult.fallbackAudit) {
-          fallbackAudits.push(videoResult.fallbackAudit);
+        let storyboard = buildDeterministicStoryboard(screenplay);
+        const storyboardStructured = parseStructuredModelOutput(storyboardInvoke.result.text);
+        if (storyboardStructured && Array.isArray(storyboardStructured.shotPlans)) {
+          const shotPlansPayload = storyboardStructured.shotPlans as unknown[];
+          storyboard = {
+            ...storyboard,
+            shotPlans: storyboard.shotPlans.map((shot, index) => {
+              const src = shotPlansPayload[index];
+              if (!src || typeof src !== 'object') {
+                return shot;
+              }
+              return {
+                ...shot,
+                visualPrompt: String((src as Record<string, unknown>).visualPrompt || shot.visualPrompt),
+                motionCue: String((src as Record<string, unknown>).motionCue || shot.motionCue),
+              };
+            }),
+          };
         }
-        videoUri = String(videoResult.result.videos[0]?.uri || `videoplay://video/${segmentedEpisode.episodeId}/${shot.shotId}.mp4`);
-        videoMime = String(videoResult.result.videos[0]?.mimeType || 'video/mp4');
-        videoRouteSource = videoResult.routeSource;
-      } catch (error) {
-        emitVideoPlayLog({
-          level: 'warn',
-          message: 'videoplay:asset-render:video-failed',
+
+        const storyboardParsed = StoryboardSchema.safeParse(storyboard);
+        if (!storyboardParsed.success) {
+          throw new VideoPlayError({
+            reasonCode: VIDEOPLAY_REASON.STORYBOARD_SCHEMA_INVALID,
+            actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.STORYBOARD_SCHEMA_INVALID),
+            stage: 'storyboard',
+            message: 'VIDEOPLAY_STORYBOARD_SCHEMA_INVALID',
+          });
+        }
+
+        ensureSourceEventTraceability({
+          baseline: new Set<string>(context.baselineSourceEventIds),
+          episode: context.segmentedEpisode,
+          screenplay,
+          storyboard: storyboardParsed.data,
+        });
+
+        context.storyboard = storyboardParsed.data;
+
+        input.runEventFactory.pushEvent({
+          step: input.step,
+          eventType: 'step.chunk',
+          attempt: input.attempt,
+          stepInputHash: input.stepInputHash,
+          lastCompletedUnit: context.segmentedEpisode.episodeId,
           details: {
-            shotId: shot.shotId,
-            error: error instanceof Error ? error.message : String(error || ''),
+            episodeId: context.segmentedEpisode.episodeId,
+            routeSource: storyboardInvoke.routeSource,
+            shotCount: storyboardParsed.data.shotPlans.length,
           },
         });
       }
 
-      if (imageUri) {
-        shotAssets.push({
-          assetId: createUlid(),
-          episodeId: segmentedEpisode.episodeId,
-          shotId: shot.shotId,
-          clipId: shot.clipId,
-          assetType: 'image',
-          uri: imageUri,
-          mimeType: imageMime,
-          durationMs: shot.durationMs,
-          fps: 30,
-          resolution: '1920x1080',
-          sourceEventIds: [...shot.sourceEventIds],
-          routeSource: imageRouteSource,
-          metadata: {
-            promptId: VIDEOPLAY_PROMPT_ID.STORYBOARD_PLAN,
-          },
-        });
-      }
-
-      if (videoUri) {
-        shotAssets.push({
-          assetId: createUlid(),
-          episodeId: segmentedEpisode.episodeId,
-          shotId: shot.shotId,
-          clipId: shot.clipId,
-          assetType: 'video',
-          uri: videoUri,
-          mimeType: videoMime,
-          durationMs: shot.durationMs,
-          fps: 30,
-          resolution: '1920x1080',
-          sourceEventIds: [...shot.sourceEventIds],
-          routeSource: videoRouteSource,
-          metadata: {
-            motionCue: shot.motionCue,
-          },
-        });
-        renderedShots += 1;
-      }
-    }
-
-    for (const clip of storyboard.clipPlans) {
-      const representative = shotAssets.find((asset) => asset.clipId === clip.clipId && asset.assetType === 'video');
-      if (representative) {
-        clipAssets.push({
-          ...representative,
-          assetId: createUlid(),
-          shotId: representative.shotId,
-        });
-      }
-    }
-
-    const assetOutput: AssetRenderOutput = {
-      episodeId: segmentedEpisode.episodeId,
-      clipAssets,
-      shotAssets,
-      sourceEventMap,
-      renderTrace: {
-        plannedShots: storyboard.shotPlans.length,
-        renderedShots,
-      },
-      coverage: {
-        plannedShots: storyboard.shotPlans.length,
-        renderedShots,
-        ratio: storyboard.shotPlans.length > 0
-          ? Number((renderedShots / storyboard.shotPlans.length).toFixed(6))
-          : 0,
-      },
-    };
-
-    const assetParsed = AssetRenderOutputSchema.safeParse(assetOutput);
-    if (!assetParsed.success) {
-      throw new VideoPlayError({
-        reasonCode: VIDEOPLAY_REASON.SHOT_RENDER_FAILED,
-        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.SHOT_RENDER_FAILED),
-        stage: 'render',
-        retryClass: VIDEOPLAY_RETRY_CLASS.RETRYABLE,
-        message: 'VIDEOPLAY_ASSET_OUTPUT_INVALID',
-      });
-    }
-
-    runEventFactory.pushEvent({
-      step: 'asset-render',
-      eventType: 'step.complete',
-      details: {
-        episodeId: segmentedEpisode.episodeId,
-        coverage: assetParsed.data.coverage.ratio,
-      },
-    });
-
-    runEventFactory.pushEvent({
-      step: 'edit-compose',
-      eventType: 'step.start',
-      details: { episodeId: segmentedEpisode.episodeId },
-    });
-
-    const composeOutput = composeEpisode({
-      episodeId: segmentedEpisode.episodeId,
-      storyboard,
-      assetOutput: assetParsed.data,
-    });
-
-    runEventFactory.pushEvent({
-      step: 'edit-compose',
-      eventType: 'step.complete',
-      details: {
-        episodeId: segmentedEpisode.episodeId,
-        durationMs: composeOutput.episodeMasterVideo.durationMs,
-      },
-    });
-
-    runEventFactory.pushEvent({
-      step: 'qc-gate',
-      eventType: 'step.start',
-      details: { episodeId: segmentedEpisode.episodeId },
-    });
-
-    const qcReport = evaluateQualityGates({
-      baselineSourceEventIds,
-      episode: segmentedEpisode,
-      screenplay,
-      storyboard,
-      assetOutput: assetParsed.data,
-      composeOutput,
-    });
-
-    if (qcReport.status === 'REJECTED') {
-      const reasonCode = qcReport.failReasonCode || VIDEOPLAY_REASON.QC_FAILED;
-      runEventFactory.pushEvent({
-        step: 'qc-gate',
-        eventType: 'step.error',
-        reasonCode,
-        actionHint: actionHintByReasonCode(reasonCode),
-        retryClass: 'non-retryable',
-        details: { gates: qcReport.gates },
-      });
-      throw new VideoPlayError({
-        reasonCode,
-        actionHint: actionHintByReasonCode(reasonCode),
-        stage: 'qc',
-        message: 'VIDEOPLAY_QC_REJECTED_FAIL_CLOSE',
+      return {
+        lastCompletedUnit: input.snapshot.episodeContexts[input.snapshot.episodeContexts.length - 1]?.segmentedEpisode.episodeId ?? undefined,
         details: {
-          gates: qcReport.gates,
+          episodeCount: input.snapshot.episodeContexts.length,
         },
-      });
+      };
     }
 
+    case 'asset-render': {
+      if (input.snapshot.episodeContexts.length === 0) {
+        throw new VideoPlayError({
+          reasonCode: VIDEOPLAY_REASON.CHECKPOINT_INVALID,
+          actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.CHECKPOINT_INVALID),
+          stage: 'render',
+          message: 'VIDEOPLAY_RENDER_CONTEXT_MISSING',
+        });
+      }
+
+      for (const context of input.snapshot.episodeContexts) {
+        throwIfCanceled(input.control, input.step);
+        if (!context.storyboard || !context.screenplay) {
+          throw new VideoPlayError({
+            reasonCode: VIDEOPLAY_REASON.CHECKPOINT_INVALID,
+            actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.CHECKPOINT_INVALID),
+            stage: 'render',
+            message: 'VIDEOPLAY_RENDER_REQUIRES_STORYBOARD_AND_SCREENPLAY',
+            details: { episodeId: context.segmentedEpisode.episodeId },
+          });
+        }
+
+        const analysisPlans = buildAssetAnalysisPlan({
+          storyboard: context.storyboard,
+          screenplay: context.screenplay,
+          projectionLocale: context.projectionLocale,
+        });
+        const queuePlan = buildAssetRenderQueue({
+          episodeId: context.segmentedEpisode.episodeId,
+          plans: analysisPlans,
+        });
+        const analysisByShotId = new Map(analysisPlans.map((plan) => [plan.shotId, plan] as const));
+        const queueItems = queuePlan.queueItems.map((item) => ({ ...item }));
+        const voiceProfileCache = new Map<string, VoiceProfile>();
+
+        const shotAssets: AssetRenderOutput['shotAssets'] = [];
+        const clipAssets: AssetRenderOutput['clipAssets'] = [];
+        const sourceEventMap: Record<string, string[]> = {};
+        const renderedShotIds = new Set<string>();
+        const renderedVoiceShotIds = new Set<string>();
+        const lipSyncByShotId = new Map<string, RenderedAsset>();
+
+        for (const plan of analysisPlans) {
+          sourceEventMap[plan.shotId] = [...plan.sourceEventIds];
+        }
+        const plannedVoiceShots = analysisPlans.filter((plan) => plan.requiredModalities.includes('voice')).length;
+
+        input.runEventFactory.pushEvent({
+          step: input.step,
+          eventType: 'step.chunk',
+          attempt: input.attempt,
+          stepInputHash: input.stepInputHash,
+          lastCompletedUnit: context.segmentedEpisode.episodeId,
+          details: {
+            episodeId: context.segmentedEpisode.episodeId,
+            phase: 'voice-analyze',
+            plannedShots: analysisPlans.length,
+            plannedVoiceShots,
+          },
+        });
+
+        for (const batch of queuePlan.batches) {
+          let batchSucceeded = 0;
+          let batchFailed = 0;
+          let batchLipSyncGenerated = 0;
+          for (const queueItem of queueItems.filter((item) => item.batchId === batch.batchId)) {
+            throwIfCanceled(input.control, input.step);
+            const plan = analysisByShotId.get(queueItem.shotId);
+            if (!plan) {
+              queueItem.status = 'FAILED';
+              queueItem.errorMessage = 'VIDEOPLAY_RENDER_QUEUE_PLAN_MISSING';
+              batchFailed += 1;
+              continue;
+            }
+            const storyboardShot = context.storyboard.shotPlans.find((shot) => shot.shotId === plan.shotId);
+            if (!storyboardShot) {
+              queueItem.status = 'FAILED';
+              queueItem.errorMessage = 'VIDEOPLAY_RENDER_QUEUE_SHOT_MISSING';
+              batchFailed += 1;
+              continue;
+            }
+
+            queueItem.status = 'RUNNING';
+
+            try {
+              if (queueItem.modality === 'image') {
+                const imageResult = await invokeWithRouteFallback({
+                  stage: 'asset-render-image',
+                  capability: 'llm.image.generate',
+                  traceId: input.traceId,
+                  routeHint: 'image/default',
+                  checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
+                  invoke: async (routeOverride) => input.deps.aiClient.generateImage({
+                    prompt: storyboardShot.visualPrompt,
+                    routeHint: 'image/default',
+                    routeOverride,
+                  }),
+                });
+                if (imageResult.fallbackAudit) {
+                  input.fallbackAudits.push(imageResult.fallbackAudit);
+                }
+                queueItem.status = 'SUCCEEDED';
+                queueItem.routeSource = imageResult.routeSource;
+                shotAssets.push({
+                  assetId: createUlid(),
+                  episodeId: context.segmentedEpisode.episodeId,
+                  shotId: storyboardShot.shotId,
+                  clipId: storyboardShot.clipId,
+                  assetType: 'image',
+                  uri: String(imageResult.result.images[0]?.uri || `videoplay://image/${context.segmentedEpisode.episodeId}/${storyboardShot.shotId}.png`),
+                  mimeType: String(imageResult.result.images[0]?.mimeType || 'image/png'),
+                  durationMs: storyboardShot.durationMs,
+                  fps: 30,
+                  resolution: '1920x1080',
+                  sourceEventIds: [...storyboardShot.sourceEventIds],
+                  routeSource: imageResult.routeSource,
+                  metadata: {
+                    promptId: VIDEOPLAY_PROMPT_ID.STORYBOARD_PLAN,
+                    queueItemId: queueItem.queueItemId,
+                  },
+                });
+                batchSucceeded += 1;
+                continue;
+              }
+
+              if (queueItem.modality === 'video') {
+                const shotRequiresVoice = plan.requiredModalities.includes('voice');
+                const lipSyncAsset = lipSyncByShotId.get(storyboardShot.shotId);
+                if (shotRequiresVoice && !lipSyncAsset) {
+                  throw new VideoPlayError({
+                    reasonCode: VIDEOPLAY_REASON.VOICE_RENDER_FAILED,
+                    actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.VOICE_RENDER_FAILED),
+                    stage: 'render',
+                    message: 'VIDEOPLAY_LIP_SYNC_REQUIRED_BEFORE_VIDEO',
+                    details: {
+                      shotId: storyboardShot.shotId,
+                    },
+                  });
+                }
+                const videoResult = await invokeWithRouteFallback({
+                  stage: 'asset-render-video',
+                  capability: 'llm.video.generate',
+                  traceId: input.traceId,
+                  routeHint: 'video/default',
+                  checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
+                  invoke: async (routeOverride) => input.deps.aiClient.generateVideo({
+                    prompt: `${storyboardShot.visualPrompt}. motion=${storyboardShot.motionCue}${lipSyncAsset ? `. lipSyncAnchors=${JSON.stringify((lipSyncAsset.metadata as Record<string, unknown>).anchors || [])}` : ''}`,
+                    routeHint: 'video/default',
+                    routeOverride,
+                    durationSeconds: Math.max(1, Math.round(storyboardShot.durationMs / 1000)),
+                  }),
+                });
+                if (videoResult.fallbackAudit) {
+                  input.fallbackAudits.push(videoResult.fallbackAudit);
+                }
+                queueItem.status = 'SUCCEEDED';
+                queueItem.routeSource = videoResult.routeSource;
+                shotAssets.push({
+                  assetId: createUlid(),
+                  episodeId: context.segmentedEpisode.episodeId,
+                  shotId: storyboardShot.shotId,
+                  clipId: storyboardShot.clipId,
+                  assetType: 'video',
+                  uri: String(videoResult.result.videos[0]?.uri || `videoplay://video/${context.segmentedEpisode.episodeId}/${storyboardShot.shotId}.mp4`),
+                  mimeType: String(videoResult.result.videos[0]?.mimeType || 'video/mp4'),
+                  durationMs: storyboardShot.durationMs,
+                  fps: 30,
+                  resolution: '1920x1080',
+                  sourceEventIds: [...storyboardShot.sourceEventIds],
+                  routeSource: videoResult.routeSource,
+                  metadata: {
+                    motionCue: storyboardShot.motionCue,
+                    queueItemId: queueItem.queueItemId,
+                  },
+                });
+                renderedShotIds.add(storyboardShot.shotId);
+                batchSucceeded += 1;
+                continue;
+              }
+
+              const voiceResult = await invokeWithRouteFallback({
+                stage: 'asset-render-voice',
+                capability: 'llm.speech.synthesize',
+                traceId: input.traceId,
+                routeHint: 'tts/default',
+                checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
+                invoke: async (routeOverride) => {
+                  const routeSource = routeOverride?.source === 'token-api' ? 'token-api' : 'local-runtime';
+                  const cacheKey = `${routeSource}:${plan.language}`;
+                  let profile = voiceProfileCache.get(cacheKey);
+                  if (!profile) {
+                    profile = await resolveVoiceProfile({
+                      deps: input.deps,
+                      routeOverride,
+                      preferredLanguage: plan.language,
+                    });
+                    voiceProfileCache.set(cacheKey, profile);
+                  }
+                  const speech = await input.deps.aiClient.synthesizeSpeech({
+                    text: plan.voiceLineText,
+                    voiceId: profile.voiceId,
+                    ...(profile.providerId ? { providerId: profile.providerId } : {}),
+                    language: profile.language || plan.language,
+                    format: 'mp3',
+                    routeHint: 'tts/default',
+                    routeOverride,
+                  });
+                  return {
+                    speech,
+                    profile,
+                  };
+                },
+              });
+              if (voiceResult.fallbackAudit) {
+                input.fallbackAudits.push(voiceResult.fallbackAudit);
+              }
+              queueItem.status = 'SUCCEEDED';
+              queueItem.routeSource = voiceResult.routeSource;
+              const voiceDurationMs = Number(voiceResult.result.speech.durationMs ?? storyboardShot.durationMs);
+              const voiceAssetId = createUlid();
+              shotAssets.push({
+                assetId: createUlid(),
+                episodeId: context.segmentedEpisode.episodeId,
+                shotId: storyboardShot.shotId,
+                clipId: storyboardShot.clipId,
+                assetType: 'voice-script',
+                uri: `videoplay://voice-script/${context.segmentedEpisode.episodeId}/${storyboardShot.shotId}.json`,
+                mimeType: 'application/json',
+                durationMs: voiceDurationMs,
+                fps: 1,
+                resolution: 'n/a',
+                sourceEventIds: [...storyboardShot.sourceEventIds],
+                routeSource: voiceResult.routeSource,
+                metadata: {
+                  queueItemId: queueItem.queueItemId,
+                  language: voiceResult.result.profile.language || plan.language,
+                  voiceId: voiceResult.result.profile.voiceId,
+                  providerId: voiceResult.result.profile.providerId || '',
+                  text: plan.voiceLineText,
+                  source: 'runtime-tts',
+                },
+              });
+              shotAssets.push({
+                assetId: voiceAssetId,
+                episodeId: context.segmentedEpisode.episodeId,
+                shotId: storyboardShot.shotId,
+                clipId: storyboardShot.clipId,
+                assetType: 'voice-audio',
+                uri: String(voiceResult.result.speech.audioUri || `videoplay://voice/${context.segmentedEpisode.episodeId}/${storyboardShot.shotId}.mp3`),
+                mimeType: String(voiceResult.result.speech.mimeType || 'audio/mpeg'),
+                durationMs: voiceDurationMs,
+                fps: 1,
+                resolution: 'audio-only',
+                sourceEventIds: [...storyboardShot.sourceEventIds],
+                routeSource: voiceResult.routeSource,
+                metadata: {
+                  queueItemId: queueItem.queueItemId,
+                  voiceId: voiceResult.result.profile.voiceId,
+                  providerId: voiceResult.result.profile.providerId || '',
+                  language: voiceResult.result.profile.language || plan.language,
+                  transcriptHash: createHash(plan.voiceLineText),
+                },
+              });
+              const lipSyncAsset: RenderedAsset = {
+                assetId: createUlid(),
+                episodeId: context.segmentedEpisode.episodeId,
+                shotId: storyboardShot.shotId,
+                clipId: storyboardShot.clipId,
+                assetType: 'lip-sync',
+                uri: `videoplay://lip-sync/${context.segmentedEpisode.episodeId}/${storyboardShot.shotId}.json`,
+                mimeType: 'application/json',
+                durationMs: voiceDurationMs,
+                fps: 30,
+                resolution: 'n/a',
+                sourceEventIds: [...storyboardShot.sourceEventIds],
+                routeSource: voiceResult.routeSource,
+                metadata: {
+                  queueItemId: queueItem.queueItemId,
+                  source: 'voice-audio-derived',
+                  anchors: buildLipSyncAnchors({
+                    text: plan.voiceLineText,
+                    durationMs: voiceDurationMs,
+                  }),
+                  voiceAssetId,
+                  transcriptHash: createHash(plan.voiceLineText),
+                },
+              };
+              shotAssets.push(lipSyncAsset);
+              lipSyncByShotId.set(storyboardShot.shotId, lipSyncAsset);
+              renderedVoiceShotIds.add(storyboardShot.shotId);
+              batchLipSyncGenerated += 1;
+              batchSucceeded += 1;
+            } catch (error) {
+              queueItem.status = 'FAILED';
+              queueItem.errorMessage = error instanceof Error ? error.message : String(error || '');
+              batchFailed += 1;
+              emitVideoPlayLog({
+                level: 'warn',
+                message: `videoplay:asset-render:${queueItem.modality}-failed`,
+                details: {
+                  shotId: queueItem.shotId,
+                  queueItemId: queueItem.queueItemId,
+                  error: queueItem.errorMessage,
+                },
+              });
+            }
+          }
+
+          input.runEventFactory.pushEvent({
+            step: input.step,
+            eventType: 'step.chunk',
+            attempt: input.attempt,
+            stepInputHash: input.stepInputHash,
+            lastCompletedUnit: context.segmentedEpisode.episodeId,
+            details: {
+              episodeId: context.segmentedEpisode.episodeId,
+              phase: 'batch-queue-execute',
+              batchId: batch.batchId,
+              modality: batch.modality,
+              queueItems: batch.queueItemIds.length,
+              succeeded: batchSucceeded,
+              failed: batchFailed,
+            },
+          });
+
+          if (batch.modality === 'voice') {
+            input.runEventFactory.pushEvent({
+              step: input.step,
+              eventType: 'step.chunk',
+              attempt: input.attempt,
+              stepInputHash: input.stepInputHash,
+              lastCompletedUnit: context.segmentedEpisode.episodeId,
+              details: {
+                episodeId: context.segmentedEpisode.episodeId,
+                phase: 'voice-render',
+                succeeded: batchSucceeded,
+                failed: batchFailed,
+              },
+            });
+            input.runEventFactory.pushEvent({
+              step: input.step,
+              eventType: 'step.chunk',
+              attempt: input.attempt,
+              stepInputHash: input.stepInputHash,
+              lastCompletedUnit: context.segmentedEpisode.episodeId,
+              details: {
+                episodeId: context.segmentedEpisode.episodeId,
+                phase: 'lip-sync',
+                generated: batchLipSyncGenerated,
+              },
+            });
+          } else if (batch.modality === 'video') {
+            input.runEventFactory.pushEvent({
+              step: input.step,
+              eventType: 'step.chunk',
+              attempt: input.attempt,
+              stepInputHash: input.stepInputHash,
+              lastCompletedUnit: context.segmentedEpisode.episodeId,
+              details: {
+                episodeId: context.segmentedEpisode.episodeId,
+                phase: 'video-render',
+                succeeded: batchSucceeded,
+                failed: batchFailed,
+              },
+            });
+          }
+        }
+
+        for (const clip of context.storyboard.clipPlans) {
+          const representative = shotAssets.find((asset) => asset.clipId === clip.clipId && asset.assetType === 'video');
+          if (representative) {
+            clipAssets.push({
+              ...representative,
+              assetId: createUlid(),
+              shotId: representative.shotId,
+            });
+          }
+        }
+
+        const plannedShots = context.storyboard.shotPlans.length;
+        const renderedShots = renderedShotIds.size;
+        const renderedVoiceShots = renderedVoiceShotIds.size;
+        const assetOutput: AssetRenderOutput = {
+          episodeId: context.segmentedEpisode.episodeId,
+          clipAssets,
+          shotAssets,
+          sourceEventMap,
+          renderTrace: {
+            plannedShots,
+            renderedShots,
+            analysis: {
+              shotPlans: analysisPlans.map((plan) => ({
+                shotId: plan.shotId,
+                beatId: plan.beatId,
+                complexity: plan.complexity,
+                priority: plan.priority,
+                requiredModalities: [...plan.requiredModalities],
+                voiceLineHash: createHash(plan.voiceLineText),
+              })),
+            },
+            queue: {
+              batches: queuePlan.batches,
+              items: queueItems,
+              totalJobs: queueItems.length,
+              succeededJobs: queueItems.filter((item) => item.status === 'SUCCEEDED').length,
+              failedJobs: queueItems.filter((item) => item.status === 'FAILED').length,
+            },
+          },
+          coverage: {
+            plannedShots,
+            renderedShots,
+            ratio: plannedShots > 0
+              ? Number((renderedShots / plannedShots).toFixed(6))
+              : 0,
+            plannedVoiceShots,
+            renderedVoiceShots,
+            voiceRatio: plannedVoiceShots > 0
+              ? Number((renderedVoiceShots / plannedVoiceShots).toFixed(6))
+              : 1,
+          },
+        };
+
+        const assetParsed = AssetRenderOutputSchema.safeParse(assetOutput);
+        if (!assetParsed.success) {
+          throw new VideoPlayError({
+            reasonCode: VIDEOPLAY_REASON.SHOT_RENDER_FAILED,
+            actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.SHOT_RENDER_FAILED),
+            stage: 'render',
+            retryClass: VIDEOPLAY_RETRY_CLASS.RETRYABLE,
+            message: 'VIDEOPLAY_ASSET_OUTPUT_INVALID',
+          });
+        }
+
+        context.assetOutput = assetParsed.data;
+
+        input.runEventFactory.pushEvent({
+          step: input.step,
+          eventType: 'step.chunk',
+          attempt: input.attempt,
+          stepInputHash: input.stepInputHash,
+          lastCompletedUnit: context.segmentedEpisode.episodeId,
+          details: {
+            episodeId: context.segmentedEpisode.episodeId,
+            coverage: assetParsed.data.coverage.ratio,
+            voiceCoverage: assetParsed.data.coverage.voiceRatio,
+            queueFailedJobs: queueItems.filter((item) => item.status === 'FAILED').length,
+          },
+        });
+      }
+
+      return {
+        lastCompletedUnit: input.snapshot.episodeContexts[input.snapshot.episodeContexts.length - 1]?.segmentedEpisode.episodeId ?? undefined,
+        details: {
+          episodeCount: input.snapshot.episodeContexts.length,
+        },
+      };
+    }
+
+    case 'edit-compose': {
+      for (const context of input.snapshot.episodeContexts) {
+        throwIfCanceled(input.control, input.step);
+        if (!context.storyboard || !context.assetOutput) {
+          throw new VideoPlayError({
+            reasonCode: VIDEOPLAY_REASON.CHECKPOINT_INVALID,
+            actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.CHECKPOINT_INVALID),
+            stage: 'edit',
+            message: 'VIDEOPLAY_EDIT_REQUIRES_STORYBOARD_AND_ASSET',
+            details: { episodeId: context.segmentedEpisode.episodeId },
+          });
+        }
+
+        const composeOutput = composeEpisode({
+          episodeId: context.segmentedEpisode.episodeId,
+          storyboard: context.storyboard,
+          assetOutput: context.assetOutput,
+        });
+
+        context.composeOutput = composeOutput;
+
+        input.runEventFactory.pushEvent({
+          step: input.step,
+          eventType: 'step.chunk',
+          attempt: input.attempt,
+          stepInputHash: input.stepInputHash,
+          lastCompletedUnit: context.segmentedEpisode.episodeId,
+          details: {
+            episodeId: context.segmentedEpisode.episodeId,
+            durationMs: composeOutput.episodeMasterVideo.durationMs,
+          },
+        });
+      }
+
+      return {
+        lastCompletedUnit: input.snapshot.episodeContexts[input.snapshot.episodeContexts.length - 1]?.segmentedEpisode.episodeId ?? undefined,
+        details: {
+          episodeCount: input.snapshot.episodeContexts.length,
+        },
+      };
+    }
+
+    case 'qc-gate': {
+      for (const context of input.snapshot.episodeContexts) {
+        throwIfCanceled(input.control, input.step);
+        if (!context.screenplay || !context.storyboard || !context.assetOutput || !context.composeOutput) {
+          throw new VideoPlayError({
+            reasonCode: VIDEOPLAY_REASON.CHECKPOINT_INVALID,
+            actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.CHECKPOINT_INVALID),
+            stage: 'qc',
+            message: 'VIDEOPLAY_QC_REQUIRES_UPSTREAM_OUTPUTS',
+            details: { episodeId: context.segmentedEpisode.episodeId },
+          });
+        }
+
+        const qcReport = evaluateQualityGates({
+          baselineSourceEventIds: new Set<string>(context.baselineSourceEventIds),
+          episode: context.segmentedEpisode,
+          screenplay: context.screenplay,
+          storyboard: context.storyboard,
+          assetOutput: context.assetOutput,
+          composeOutput: context.composeOutput,
+        });
+
+        if (qcReport.status === 'REJECTED') {
+          const reasonCode = qcReport.failReasonCode || VIDEOPLAY_REASON.QC_FAILED;
+          throw new VideoPlayError({
+            reasonCode,
+            actionHint: actionHintByReasonCode(reasonCode),
+            stage: 'qc',
+            message: 'VIDEOPLAY_QC_REJECTED_FAIL_CLOSE',
+            details: {
+              episodeId: context.segmentedEpisode.episodeId,
+              gates: qcReport.gates,
+            },
+          });
+        }
+
+        context.qcReport = qcReport;
+
+        input.runEventFactory.pushEvent({
+          step: input.step,
+          eventType: 'step.chunk',
+          attempt: input.attempt,
+          stepInputHash: input.stepInputHash,
+          lastCompletedUnit: context.segmentedEpisode.episodeId,
+          details: {
+            episodeId: context.segmentedEpisode.episodeId,
+            status: qcReport.status,
+          },
+        });
+      }
+
+      return {
+        lastCompletedUnit: input.snapshot.episodeContexts[input.snapshot.episodeContexts.length - 1]?.segmentedEpisode.episodeId ?? undefined,
+        details: {
+          episodeCount: input.snapshot.episodeContexts.length,
+        },
+      };
+    }
+
+    case 'release-package': {
+      const episodes: EpisodeRecord[] = [];
+      const releaseCandidates: ReleasePackage[] = [];
+
+      for (const context of input.snapshot.episodeContexts) {
+        throwIfCanceled(input.control, input.step);
+        if (!context.screenplay || !context.storyboard || !context.assetOutput || !context.composeOutput || !context.qcReport) {
+          throw new VideoPlayError({
+            reasonCode: VIDEOPLAY_REASON.CHECKPOINT_INVALID,
+            actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.CHECKPOINT_INVALID),
+            stage: 'package',
+            message: 'VIDEOPLAY_RELEASE_REQUIRES_UPSTREAM_OUTPUTS',
+            details: { episodeId: context.segmentedEpisode.episodeId },
+          });
+        }
+        if (!(context.qcReport.status === 'APPROVED' || context.qcReport.status === 'ADJUSTED')) {
+          throw new VideoPlayError({
+            reasonCode: VIDEOPLAY_REASON.RELEASE_PACKAGE_INVALID,
+            actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.RELEASE_PACKAGE_INVALID),
+            stage: 'package',
+            message: 'VIDEOPLAY_RELEASE_QC_STATUS_INVALID',
+            details: { episodeId: context.segmentedEpisode.episodeId },
+          });
+        }
+
+        const releaseCandidate: ReleasePackage = {
+          releaseId: createUlid(),
+          episodeId: context.segmentedEpisode.episodeId,
+          qcStatus: context.qcReport.status,
+          episodeMasterVideo: context.composeOutput.episodeMasterVideo,
+          episodePoster: context.composeOutput.episodePoster,
+          episodeCaptionTrack: context.composeOutput.episodeCaptionTrack,
+          episodeMetadata: {
+            storyId: input.pipelineInput.storyId,
+            sourceTurnIds: [...context.segmentedEpisode.sourceTurnIds],
+            sourceEventIds: [...context.segmentedEpisode.sourceEventIds],
+            durationSec: context.qcReport.durationSec,
+            policyHash: context.segmentedEpisode.policyHash,
+          },
+          episodeTraceBundle: {
+            traceId: input.traceId,
+            runId: input.runId,
+            fallbackAudits: [...input.fallbackAudits],
+            runEvents: [...input.runEventFactory.events],
+            sourceCoverage: buildTraceCoverage({
+              episode: context.segmentedEpisode,
+              screenplay: context.screenplay,
+              storyboard: context.storyboard,
+            }),
+          },
+          published: false,
+          publishedAt: null,
+          createdAt: nowIso(),
+        };
+
+        const releaseParsed = ReleasePackageSchema.safeParse(releaseCandidate);
+        if (!releaseParsed.success) {
+          throw new VideoPlayError({
+            reasonCode: VIDEOPLAY_REASON.RELEASE_PACKAGE_INVALID,
+            actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.RELEASE_PACKAGE_INVALID),
+            stage: 'package',
+            message: 'VIDEOPLAY_RELEASE_CANDIDATE_INVALID',
+          });
+        }
+
+        const branchId = createUlid();
+        const baseVersionId = createUlid();
+        const episodeRecord: EpisodeRecord = {
+          episodeId: context.segmentedEpisode.episodeId,
+          storyId: input.pipelineInput.storyId,
+          sourceTurnIds: [...context.segmentedEpisode.sourceTurnIds],
+          sourceEventIds: [...context.segmentedEpisode.sourceEventIds],
+          policyHash: context.segmentedEpisode.policyHash,
+          segmentationReason: context.segmentedEpisode.segmentationReason,
+          screenplay: context.screenplay,
+          storyboard: context.storyboard,
+          quality: context.qcReport,
+          candidateRelease: releaseParsed.data,
+          createdAt: nowIso(),
+          updatedAt: nowIso(),
+          editor: {
+            activeBranchId: branchId,
+            branches: {
+              [branchId]: {
+                branchId,
+                name: 'main',
+                headVersionId: baseVersionId,
+                createdAt: nowIso(),
+              },
+            },
+            lineage: [
+              {
+                versionId: baseVersionId,
+                parentVersionId: null,
+                branchId,
+                operationType: 'insert-shot',
+                deltaSummary: 'bootstrap-lineage',
+                operator: input.pipelineInput.operator || 'system',
+                timestamp: nowIso(),
+              },
+            ],
+            conflictRecords: [],
+          },
+        };
+
+        const episodeIdempotencyKey = createHash(`${input.runId}:${episodeRecord.episodeId}:episode-upsert`);
+        const assetIdempotencyKey = createHash(`${input.runId}:${episodeRecord.episodeId}:asset-upsert`);
+
+        await input.deps.hookClient.data.query({
+          capability: VIDEOPLAY_DATA_API_EPISODE_UPSERT,
+          query: {
+            operation: 'upsert',
+            idempotencyKey: episodeIdempotencyKey,
+            episode: episodeRecord,
+          },
+        });
+
+        await input.deps.hookClient.data.query({
+          capability: VIDEOPLAY_DATA_API_ASSET_BATCH_UPSERT,
+          query: {
+            operation: 'upsert',
+            idempotencyKey: assetIdempotencyKey,
+            episodeId: episodeRecord.episodeId,
+            assets: context.assetOutput.shotAssets,
+          },
+        });
+
+        context.releaseCandidate = releaseParsed.data;
+        context.episodeRecord = episodeRecord;
+
+        episodes.push(episodeRecord);
+        releaseCandidates.push(releaseParsed.data);
+
+        input.runEventFactory.pushEvent({
+          step: input.step,
+          eventType: 'step.chunk',
+          attempt: input.attempt,
+          stepInputHash: input.stepInputHash,
+          lastCompletedUnit: context.segmentedEpisode.episodeId,
+          idempotencyKey: episodeIdempotencyKey,
+          details: {
+            episodeId: context.segmentedEpisode.episodeId,
+            releaseId: releaseParsed.data.releaseId,
+            assetIdempotencyKey,
+          },
+        });
+      }
+
+      input.snapshot.episodes = episodes;
+      input.snapshot.releaseCandidates = releaseCandidates;
+
+      return {
+        lastCompletedUnit: episodes[episodes.length - 1]?.episodeId ?? undefined,
+        details: {
+          episodeCount: episodes.length,
+          releaseCandidateCount: releaseCandidates.length,
+        },
+      };
+    }
+
+    default:
+      return {};
+  }
+}
+
+export async function runVideoPlayEpisodeProduction(
+  deps: VideoPlayPipelineDeps,
+  input: VideoPlayPipelineInput,
+): Promise<VideoPlayPipelineResult> {
+  const control = normalizeExecutionControl(input.execution);
+  const incomingPolicy = normalizeSegmentationPolicy(input.policy);
+
+  let traceId = createUlid();
+  let runId = createUlid();
+  let snapshot = createInitialRuntimeSnapshot({
+    policy: incomingPolicy,
+    sourceMode: input.sourceMode,
+  });
+  let progressMap = createInitialStageProgressMap();
+  let seededEvents: VideoPlayRunEvent[] = [];
+  let fallbackAudits: FallbackAuditRecord[] = [];
+
+  if (control.checkpoint) {
+    traceId = control.checkpoint.traceId;
+    runId = control.checkpoint.runId;
+    progressMap = toStageProgressMap(control.checkpoint.stageProgress);
+    seededEvents = [...control.checkpoint.runEvents];
+    fallbackAudits = [...control.checkpoint.fallbackAudits];
+    snapshot = parseRuntimeSnapshot({
+      raw: control.checkpoint.snapshot,
+      fallbackPolicy: incomingPolicy,
+      fallbackSourceMode: input.sourceMode,
+    });
+
+    for (const step of VIDEOPLAY_PIPELINE_CHAIN) {
+      if (progressMap[step].status === 'PAUSED') {
+        progressMap[step] = {
+          ...progressMap[step],
+          status: 'PENDING',
+          updatedAt: nowIso(),
+        };
+      }
+    }
+  }
+
+  snapshot.policy = control.checkpoint ? snapshot.policy : incomingPolicy;
+  snapshot.sourceMode = input.sourceMode;
+
+  const runEventFactory = createRunEventFactory({
+    traceId,
+    runId,
+    ...(input.taskId ? { taskId: input.taskId } : {}),
+    seedEvents: seededEvents,
+  });
+
+  if (!control.checkpoint) {
     runEventFactory.pushEvent({
-      step: 'qc-gate',
-      eventType: 'step.complete',
-      details: {
-        episodeId: segmentedEpisode.episodeId,
-        status: qcReport.status,
-      },
+      step: 'narrative-ingest',
+      eventType: 'run.start',
+    });
+  }
+
+  if (control.rerunStep) {
+    clearDownstreamFromStep({
+      step: control.rerunStep,
+      progressMap,
+      snapshot,
+    });
+  }
+
+  let nextStepIndex = control.rerunStep
+    ? VIDEOPLAY_PIPELINE_CHAIN.indexOf(control.rerunStep)
+    : findNextStepIndex(progressMap);
+
+  if (control.checkpoint && !control.rerunStep) {
+    validateResumeBoundary({
+      nextStepIndex,
+      progressMap,
+      snapshot,
+      pipelineInput: input,
+    });
+  }
+
+  let remainingBudget = control.stepBudget;
+  let status: VideoPlayPipelineLifecycleStatus = 'RUNNING';
+
+  while (nextStepIndex < VIDEOPLAY_PIPELINE_CHAIN.length) {
+    if (remainingBudget <= 0) {
+      status = 'PAUSED';
+      break;
+    }
+
+    const step = VIDEOPLAY_PIPELINE_CHAIN[nextStepIndex]!;
+    const stepInputHash = computeStepInputHash(step, snapshot, input);
+    const attempt = markStepRunning(progressMap, {
+      step,
+      stepInputHash,
     });
 
     runEventFactory.pushEvent({
-      step: 'release-package',
+      step,
       eventType: 'step.start',
-      details: { episodeId: segmentedEpisode.episodeId },
+      attempt,
+      stepInputHash,
+      details: {
+        rerunStep: control.rerunStep,
+      },
     });
 
-    const releaseCandidate: ReleasePackage = {
-      releaseId: createUlid(),
-      episodeId: segmentedEpisode.episodeId,
-      qcStatus: qcReport.status,
-      episodeMasterVideo: composeOutput.episodeMasterVideo,
-      episodePoster: composeOutput.episodePoster,
-      episodeCaptionTrack: composeOutput.episodeCaptionTrack,
-      episodeMetadata: {
-        storyId: input.storyId,
-        sourceTurnIds: [...segmentedEpisode.sourceTurnIds],
-        sourceEventIds: [...segmentedEpisode.sourceEventIds],
-        durationSec: qcReport.durationSec,
-        policyHash: segmentedEpisode.policyHash,
-      },
-      episodeTraceBundle: {
+    try {
+      throwIfCanceled(control, step);
+      if (!snapshot.promptCanaryPassed) {
+        const canaryReport = runPromptCanaryCases();
+        if (!canaryReport.ok) {
+          throw new VideoPlayError({
+            reasonCode: VIDEOPLAY_REASON.PROMPT_CANARY_FAILED,
+            actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.PROMPT_CANARY_FAILED),
+            stage: 'prompt',
+            message: canaryReport.failures.join(';'),
+          });
+        }
+        snapshot.promptCanaryPassed = true;
+      }
+
+      const stepResult = await executeStep({
+        step,
+        deps,
+        pipelineInput: input,
+        snapshot,
+        runEventFactory,
+        fallbackAudits,
+        attempt,
+        stepInputHash,
+        control,
         traceId,
         runId,
-        fallbackAudits: [...fallbackAudits],
-        runEvents: [...runEventFactory.events],
-        sourceCoverage: buildTraceCoverage({
-          episode: segmentedEpisode,
-          screenplay,
-          storyboard,
-        }),
-      },
-      published: false,
-      publishedAt: null,
-      createdAt: nowIso(),
-    };
+      });
 
-    const releaseParsed = ReleasePackageSchema.safeParse(releaseCandidate);
-    if (!releaseParsed.success) {
+      const checkpointToken = createCheckpointToken({
+        runId,
+        step,
+        attempt,
+        stepInputHash,
+        eventCount: runEventFactory.events.length,
+      });
+
+      markStepComplete(progressMap, {
+        step,
+        checkpointToken,
+        stepInputHash,
+        lastCompletedUnit: stepResult.lastCompletedUnit || null,
+      });
+
+      runEventFactory.pushEvent({
+        step,
+        eventType: 'step.complete',
+        attempt,
+        checkpointToken,
+        stepInputHash,
+        ...(stepResult.lastCompletedUnit ? { lastCompletedUnit: stepResult.lastCompletedUnit } : {}),
+        ...(stepResult.details ? { details: stepResult.details } : {}),
+      });
+
+      nextStepIndex += 1;
+      remainingBudget -= 1;
+    } catch (error) {
+      const normalized = toVideoPlayError(error, fallbackForStep(step));
+      if (normalized.reasonCode === VIDEOPLAY_REASON.RUN_CANCELED) {
+        status = 'CANCELED';
+        break;
+      }
+
+      markStepError(progressMap, {
+        step,
+        reasonCode: normalized.reasonCode,
+        actionHint: normalized.actionHint,
+      });
+
+      runEventFactory.pushEvent({
+        step,
+        eventType: 'step.error',
+        attempt,
+        reasonCode: normalized.reasonCode,
+        actionHint: normalized.actionHint,
+        retryClass: normalized.retryClass,
+        stepInputHash,
+        details: normalized.details,
+      });
+      runEventFactory.pushEvent({
+        step,
+        eventType: 'run.error',
+        attempt,
+        reasonCode: normalized.reasonCode,
+        actionHint: normalized.actionHint,
+        retryClass: normalized.retryClass,
+        details: normalized.details,
+      });
+
+      const failedCheckpoint = buildCheckpoint({
+        traceId,
+        runId,
+        status: 'FAILED',
+        nextStepIndex,
+        progressMap,
+        runEvents: runEventFactory.events,
+        fallbackAudits,
+        snapshot,
+      });
       throw new VideoPlayError({
-        reasonCode: VIDEOPLAY_REASON.RELEASE_PACKAGE_INVALID,
-        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.RELEASE_PACKAGE_INVALID),
-        stage: 'package',
-        message: 'VIDEOPLAY_RELEASE_CANDIDATE_INVALID',
+        reasonCode: normalized.reasonCode,
+        actionHint: normalized.actionHint,
+        retryClass: normalized.retryClass,
+        stage: normalized.stage,
+        message: normalized.message,
+        details: {
+          ...(normalized.details || {}),
+          checkpoint: failedCheckpoint,
+        },
       });
     }
-
-    const branchId = createUlid();
-    const baseVersionId = createUlid();
-    const episodeRecord: EpisodeRecord = {
-      episodeId: segmentedEpisode.episodeId,
-      storyId: input.storyId,
-      sourceTurnIds: [...segmentedEpisode.sourceTurnIds],
-      sourceEventIds: [...segmentedEpisode.sourceEventIds],
-      policyHash: segmentedEpisode.policyHash,
-      segmentationReason: segmentedEpisode.segmentationReason,
-      screenplay,
-      storyboard,
-      quality: qcReport,
-      candidateRelease: releaseParsed.data,
-      createdAt: nowIso(),
-      updatedAt: nowIso(),
-      editor: {
-        activeBranchId: branchId,
-        branches: {
-          [branchId]: {
-            branchId,
-            name: 'main',
-            headVersionId: baseVersionId,
-            createdAt: nowIso(),
-          },
-        },
-        lineage: [
-          {
-            versionId: baseVersionId,
-            parentVersionId: null,
-            branchId,
-            operationType: 'insert-shot',
-            deltaSummary: 'bootstrap-lineage',
-            operator: input.operator || 'system',
-            timestamp: nowIso(),
-          },
-        ],
-        conflictRecords: [],
-      },
-    };
-
-    const episodeIdempotencyKey = createHash(`${runId}:${episodeRecord.episodeId}:episode-upsert`);
-    const assetIdempotencyKey = createHash(`${runId}:${episodeRecord.episodeId}:asset-upsert`);
-
-    await deps.hookClient.data.query({
-      capability: VIDEOPLAY_DATA_API_EPISODE_UPSERT,
-      query: {
-        operation: 'upsert',
-        idempotencyKey: episodeIdempotencyKey,
-        episode: episodeRecord,
-      },
-    });
-
-    await deps.hookClient.data.query({
-      capability: VIDEOPLAY_DATA_API_ASSET_BATCH_UPSERT,
-      query: {
-        operation: 'upsert',
-        idempotencyKey: assetIdempotencyKey,
-        episodeId: episodeRecord.episodeId,
-        assets: assetParsed.data.shotAssets,
-      },
-    });
-
-    runEventFactory.pushEvent({
-      step: 'release-package',
-      eventType: 'step.complete',
-      idempotencyKey: episodeIdempotencyKey,
-      details: {
-        episodeId: episodeRecord.episodeId,
-        releaseId: releaseParsed.data.releaseId,
-      },
-    });
-
-    episodes.push(episodeRecord);
-    releaseCandidates.push(releaseParsed.data);
   }
 
-  runEventFactory.pushEvent({
-    step: 'release-package',
-    eventType: 'run.complete',
-    details: {
-      episodeCount: episodes.length,
-      releaseCandidateCount: releaseCandidates.length,
-    },
+  if (status === 'RUNNING') {
+    status = nextStepIndex >= VIDEOPLAY_PIPELINE_CHAIN.length
+      ? 'COMPLETED'
+      : 'PAUSED';
+  }
+
+  if (status === 'PAUSED' && nextStepIndex < VIDEOPLAY_PIPELINE_CHAIN.length) {
+    const pausedStep = VIDEOPLAY_PIPELINE_CHAIN[nextStepIndex]!;
+    progressMap[pausedStep] = {
+      ...progressMap[pausedStep],
+      status: 'PAUSED',
+      updatedAt: nowIso(),
+    };
+  }
+
+  if (status === 'CANCELED') {
+    const canceledStep = resolveNextStep(nextStepIndex)
+      || VIDEOPLAY_PIPELINE_CHAIN[VIDEOPLAY_PIPELINE_CHAIN.length - 1]!;
+    progressMap[canceledStep] = {
+      ...progressMap[canceledStep],
+      status: 'CANCELED',
+      reasonCode: VIDEOPLAY_REASON.RUN_CANCELED,
+      actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.RUN_CANCELED),
+      updatedAt: nowIso(),
+    };
+
+    runEventFactory.pushEvent({
+      step: canceledStep,
+      eventType: 'run.canceled',
+      reasonCode: VIDEOPLAY_REASON.RUN_CANCELED,
+      actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.RUN_CANCELED),
+      retryClass: 'non-retryable',
+    });
+  }
+
+  if (status === 'COMPLETED') {
+    runEventFactory.pushEvent({
+      step: 'release-package',
+      eventType: 'run.complete',
+      details: {
+        episodeCount: snapshot.episodes.length,
+        releaseCandidateCount: snapshot.releaseCandidates.length,
+      },
+    });
+  }
+
+  const checkpoint = buildCheckpoint({
+    traceId,
+    runId,
+    status,
+    nextStepIndex,
+    progressMap,
+    runEvents: runEventFactory.events,
+    fallbackAudits,
+    snapshot,
   });
 
   return {
     traceId,
     runId,
-    episodes,
-    releaseCandidates,
+    status,
+    nextStep: resolveNextStep(nextStepIndex),
+    episodes: [...snapshot.episodes],
+    releaseCandidates: [...snapshot.releaseCandidates],
+    stageProgress: toStageProgressList(progressMap),
+    checkpoint,
     runEvents: [...runEventFactory.events],
-    fallbackAudits,
+    fallbackAudits: [...fallbackAudits],
   };
 }

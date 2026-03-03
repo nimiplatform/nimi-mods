@@ -299,6 +299,9 @@ function makeQualityFixture(overrides = {}) {
       plannedShots: 2,
       renderedShots: 2,
       ratio: 1,
+      plannedVoiceShots: 2,
+      renderedVoiceShots: 2,
+      voiceRatio: 1,
     },
   };
 
@@ -313,7 +316,7 @@ function makeQualityFixture(overrides = {}) {
   };
 }
 
-function createPipelineDeps() {
+function createPipelineDeps(options = {}) {
   const writes = {
     episodes: [],
     assets: [],
@@ -354,6 +357,19 @@ function createPipelineDeps() {
         throw new Error(`unhandled capability: ${capability}`);
       },
     },
+    llm: {
+      speech: {
+        listVoices: async () => {
+          if (typeof options.listVoices === 'function') {
+            return options.listVoices();
+          }
+          return [
+            { id: 'voice-zh-1', providerId: 'provider-main', name: 'ZH Voice', lang: 'zh' },
+            { id: 'voice-en-1', providerId: 'provider-main', name: 'EN Voice', lang: 'en' },
+          ];
+        },
+      },
+    },
   };
 
   const narrativeEngine = {
@@ -384,7 +400,10 @@ function createPipelineDeps() {
   };
 
   const aiClient = {
-    checkRouteHealth: async ({ routeOverride }) => {
+    checkRouteHealth: async ({ routeHint, routeOverride }) => {
+      if (typeof options.checkRouteHealth === 'function') {
+        return options.checkRouteHealth({ routeHint, routeOverride });
+      }
       if (routeOverride?.source === 'local-runtime') {
         return {
           status: 'healthy',
@@ -399,6 +418,16 @@ function createPipelineDeps() {
     generateText: async () => ({ text: '{}', route: { source: 'local-runtime', connectorId: '', model: 'mock-model' } }),
     generateImage: async () => ({ images: [{ uri: 'image://x', mimeType: 'image/png' }], route: { source: 'local-runtime', connectorId: '', model: 'mock-model' } }),
     generateVideo: async () => ({ videos: [{ uri: 'video://x', mimeType: 'video/mp4' }], route: { source: 'local-runtime', connectorId: '', model: 'mock-model' } }),
+    synthesizeSpeech: async () => ({
+      ...(typeof options.synthesizeSpeech === 'function'
+        ? await options.synthesizeSpeech()
+        : {
+          audioUri: 'audio://x',
+          mimeType: 'audio/mpeg',
+          durationMs: 3000,
+          route: { source: 'local-runtime', connectorId: '', model: 'mock-model' },
+        }),
+    }),
   };
 
   return {
@@ -445,6 +474,9 @@ test('sourceEventIds out-of-baseline fails close in quality gate', () => {
         plannedShots: 1,
         renderedShots: 1,
         ratio: 1,
+        plannedVoiceShots: 1,
+        renderedVoiceShots: 1,
+        voiceRatio: 1,
       },
     },
   });
@@ -513,6 +545,7 @@ test('idempotent replay does not duplicate episode write side effects', () => {
       gates: [{ gate: 'grounded_ratio', passed: true, value: 1, min: 0.98, max: null, reasonCode: 'VIDEOPLAY_QC_FAILED' }],
       groundedRatio: 1,
       assetCoverageRatio: 1,
+      voiceCoverageRatio: 1,
       visualAttractionScore: 0.9,
       visualAttractionComponents: {
         characterConsistency: 0.9,
@@ -638,6 +671,9 @@ test('timeline overlap is rejected', () => {
         plannedShots: 2,
         renderedShots: 2,
         ratio: 1,
+        plannedVoiceShots: 2,
+        renderedVoiceShots: 2,
+        voiceRatio: 1,
       },
     },
   }), /VIDEOPLAY_TIMELINE_OVERLAP_FORBIDDEN/);
@@ -677,6 +713,9 @@ test('asset coverage below 0.90 is rejected by QC', () => {
         plannedShots: 10,
         renderedShots: 5,
         ratio: 0.5,
+        plannedVoiceShots: 10,
+        renderedVoiceShots: 5,
+        voiceRatio: 0.5,
       },
     },
   });
@@ -684,6 +723,95 @@ test('asset coverage below 0.90 is rejected by QC', () => {
   const report = evaluateQualityGates(fixture);
   assert.equal(report.status, 'REJECTED');
   assert.equal(report.failReasonCode, VIDEOPLAY_REASON.COVERAGE_LOW);
+});
+
+test('voice coverage below 0.90 is rejected by QC', () => {
+  const fixture = makeQualityFixture({
+    assetOutput: {
+      ...makeQualityFixture().assetOutput,
+      coverage: {
+        plannedShots: 2,
+        renderedShots: 2,
+        ratio: 1,
+        plannedVoiceShots: 2,
+        renderedVoiceShots: 1,
+        voiceRatio: 0.5,
+      },
+    },
+  });
+
+  const report = evaluateQualityGates(fixture);
+  assert.equal(report.status, 'REJECTED');
+  assert.equal(report.failReasonCode, VIDEOPLAY_REASON.VOICE_RENDER_FAILED);
+});
+
+test('asset render emits analysis/queue trace and voice assets', async () => {
+  const { deps, writes } = createPipelineDeps();
+  const result = await runVideoPlayEpisodeProduction(deps, {
+    projectId: 'project-main',
+    storyId: 'story-main',
+    ingestCursorStart: 'turn-0',
+    sourceMode: 'canonical-story',
+    storyPackage: makeStoryPackage(),
+  });
+
+  assert.equal(result.status, 'COMPLETED');
+  assert.ok(result.episodes.length > 0);
+  const analysis = result.runEvents.find(
+    (event) => event.step === 'asset-render' && event.details?.phase === 'batch-queue-execute',
+  );
+  assert.ok(analysis, 'asset-render batch queue trace missing');
+  const voiceBatchEvents = result.runEvents.filter(
+    (event) => event.step === 'asset-render' && event.details?.modality === 'voice',
+  );
+  assert.ok(voiceBatchEvents.length > 0, 'voice batch events missing');
+  const subflowPhases = [];
+  for (const event of result.runEvents) {
+    if (event.step !== 'asset-render') {
+      continue;
+    }
+    const phase = String(event.details?.phase || '');
+    if (
+      phase
+      && ['voice-analyze', 'voice-render', 'lip-sync', 'video-render'].includes(phase)
+      && !subflowPhases.includes(phase)
+    ) {
+      subflowPhases.push(phase);
+    }
+  }
+  assert.deepEqual(
+    subflowPhases.slice(0, 4),
+    ['voice-analyze', 'voice-render', 'lip-sync', 'video-render'],
+  );
+  const voiceAssets = writes.assets.filter((asset) => asset.assetType === 'voice-audio');
+  assert.ok(voiceAssets.length > 0, 'voice audio assets missing');
+  const lipSyncAssets = writes.assets.filter((asset) => asset.assetType === 'lip-sync');
+  assert.ok(lipSyncAssets.length > 0, 'lip sync assets missing');
+});
+
+test('voice route fallback is audited in pipeline', async () => {
+  const { deps } = createPipelineDeps({
+    checkRouteHealth: ({ routeHint, routeOverride }) => {
+      if (routeHint === 'tts/default' && routeOverride?.source === 'local-runtime') {
+        return { status: 'unhealthy', reasonCode: 'RUNTIME_ROUTE_DOWN' };
+      }
+      return { status: 'healthy', reasonCode: 'RUNTIME_ROUTE_HEALTHY' };
+    },
+  });
+
+  const result = await runVideoPlayEpisodeProduction(deps, {
+    projectId: 'project-main',
+    storyId: 'story-main',
+    ingestCursorStart: 'turn-0',
+    sourceMode: 'canonical-story',
+    storyPackage: makeStoryPackage(),
+  });
+
+  const voiceFallback = result.fallbackAudits.find((item) => item.stage === 'asset-render-voice');
+  assert.ok(voiceFallback);
+  assert.equal(voiceFallback.from, 'local-runtime');
+  assert.equal(voiceFallback.to, 'token-api');
+  assert.equal(voiceFallback.capability, 'llm.speech.synthesize');
 });
 
 test('release package contains mandatory minimum fields', async () => {
@@ -717,6 +845,161 @@ test('run blocks when story package is missing', async () => {
     }),
     /VIDEOPLAY_STORY_PACKAGE_SCHEMA_INVALID/,
   );
+});
+
+test('stepwise run pauses with checkpoint metadata', async () => {
+  const { deps } = createPipelineDeps();
+  const result = await runVideoPlayEpisodeProduction(deps, {
+    projectId: 'project-main',
+    storyId: 'story-main',
+    ingestCursorStart: 'turn-0',
+    sourceMode: 'canonical-story',
+    storyPackage: makeStoryPackage(),
+    execution: {
+      mode: 'stepwise',
+      stepBudget: 1,
+    },
+  });
+
+  assert.equal(result.status, 'PAUSED');
+  assert.equal(result.nextStep, 'episode-segmentation');
+  const ingest = result.stageProgress.find((item) => item.step === 'narrative-ingest');
+  assert.ok(ingest);
+  assert.equal(ingest.status, 'COMPLETED');
+  assert.ok(ingest.checkpointToken);
+  assert.ok(ingest.stepInputHash);
+});
+
+test('continue from checkpoint advances the next stage only', async () => {
+  const { deps } = createPipelineDeps();
+  const first = await runVideoPlayEpisodeProduction(deps, {
+    projectId: 'project-main',
+    storyId: 'story-main',
+    ingestCursorStart: 'turn-0',
+    sourceMode: 'canonical-story',
+    storyPackage: makeStoryPackage(),
+    execution: {
+      mode: 'stepwise',
+      stepBudget: 1,
+    },
+  });
+
+  const second = await runVideoPlayEpisodeProduction(deps, {
+    projectId: 'project-main',
+    storyId: 'story-main',
+    ingestCursorStart: 'turn-0',
+    sourceMode: 'canonical-story',
+    storyPackage: makeStoryPackage(),
+    execution: {
+      mode: 'stepwise',
+      stepBudget: 1,
+      checkpoint: first.checkpoint,
+    },
+  });
+
+  assert.equal(second.runId, first.runId);
+  assert.equal(second.status, 'PAUSED');
+  assert.equal(second.nextStep, 'screenplay');
+  const segmented = second.stageProgress.find((item) => item.step === 'episode-segmentation');
+  assert.ok(segmented);
+  assert.equal(segmented.status, 'COMPLETED');
+});
+
+test('rerun step invalidates downstream and increments attempt', async () => {
+  const { deps } = createPipelineDeps();
+  const full = await runVideoPlayEpisodeProduction(deps, {
+    projectId: 'project-main',
+    storyId: 'story-main',
+    ingestCursorStart: 'turn-0',
+    sourceMode: 'canonical-story',
+    storyPackage: makeStoryPackage(),
+  });
+
+  const rerun = await runVideoPlayEpisodeProduction(deps, {
+    projectId: 'project-main',
+    storyId: 'story-main',
+    ingestCursorStart: 'turn-0',
+    sourceMode: 'canonical-story',
+    storyPackage: makeStoryPackage(),
+    execution: {
+      mode: 'stepwise',
+      stepBudget: 1,
+      checkpoint: full.checkpoint,
+      rerunStep: 'screenplay',
+    },
+  });
+
+  assert.equal(rerun.status, 'PAUSED');
+  assert.equal(rerun.nextStep, 'storyboard');
+  const screenplay = rerun.stageProgress.find((item) => item.step === 'screenplay');
+  assert.ok(screenplay);
+  assert.equal(screenplay.attempt, 2);
+  assert.equal(screenplay.status, 'COMPLETED');
+
+  const storyboard = rerun.stageProgress.find((item) => item.step === 'storyboard');
+  assert.ok(storyboard);
+  assert.equal(storyboard.status, 'PAUSED');
+  assert.equal(storyboard.checkpointToken, null);
+});
+
+test('resume hash mismatch fails close', async () => {
+  const { deps } = createPipelineDeps();
+  const first = await runVideoPlayEpisodeProduction(deps, {
+    projectId: 'project-main',
+    storyId: 'story-main',
+    ingestCursorStart: 'turn-0',
+    sourceMode: 'canonical-story',
+    storyPackage: makeStoryPackage(),
+    execution: {
+      mode: 'stepwise',
+      stepBudget: 1,
+    },
+  });
+
+  const brokenCheckpoint = JSON.parse(JSON.stringify(first.checkpoint));
+  brokenCheckpoint.stageProgress = brokenCheckpoint.stageProgress.map((item) => (
+    item.step === 'narrative-ingest'
+      ? { ...item, stepInputHash: 'broken-hash' }
+      : item
+  ));
+
+  await assert.rejects(
+    runVideoPlayEpisodeProduction(deps, {
+      projectId: 'project-main',
+      storyId: 'story-main',
+      ingestCursorStart: 'turn-0',
+      sourceMode: 'canonical-story',
+      storyPackage: makeStoryPackage(),
+      execution: {
+        mode: 'stepwise',
+        stepBudget: 1,
+        checkpoint: brokenCheckpoint,
+      },
+    }),
+    (error) => {
+      assert.equal(error.reasonCode, VIDEOPLAY_REASON.STEP_RESUME_HASH_MISMATCH);
+      return true;
+    },
+  );
+});
+
+test('cancel run enters terminal canceled state', async () => {
+  const { deps } = createPipelineDeps();
+  const result = await runVideoPlayEpisodeProduction(deps, {
+    projectId: 'project-main',
+    storyId: 'story-main',
+    ingestCursorStart: 'turn-0',
+    sourceMode: 'canonical-story',
+    storyPackage: makeStoryPackage(),
+    execution: {
+      mode: 'stepwise',
+      stepBudget: 1,
+      shouldCancel: () => true,
+    },
+  });
+
+  assert.equal(result.status, 'CANCELED');
+  assert.equal(result.runEvents.some((event) => event.eventType === 'run.canceled'), true);
 });
 
 test('prompt canary covers shape/locale-parity/registry-drift cases', () => {

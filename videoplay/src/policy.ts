@@ -23,6 +23,7 @@ export const SEGMENTATION_POLICY_BOUNDS = {
 type QualityGatePolicy = {
   groundedRatioMin: number;
   assetCoverageRatioMin: number;
+  voiceCoverageRatioMin: number;
   durationSecMin: number;
   durationSecMax: number;
   maxAvDriftMs: number;
@@ -61,6 +62,7 @@ export const EDIT_COMPOSE_POLICY = {
 export const QUALITY_GATE_POLICY = {
   groundedRatioMin: VIDEOPLAY_QUALITY_RULE.GROUNDED_RATIO_MIN,
   assetCoverageRatioMin: VIDEOPLAY_QUALITY_RULE.ASSET_COVERAGE_RATIO_MIN,
+  voiceCoverageRatioMin: VIDEOPLAY_QUALITY_RULE.VOICE_COVERAGE_RATIO_MIN,
   durationSecMin: VIDEOPLAY_QUALITY_RULE.EPISODE_DURATION_SEC_MIN,
   durationSecMax: VIDEOPLAY_QUALITY_RULE.EPISODE_DURATION_SEC_MAX,
   maxAvDriftMs: VIDEOPLAY_QUALITY_RULE.MAX_AV_DRIFT_MS,

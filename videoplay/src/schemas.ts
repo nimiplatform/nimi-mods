@@ -18,6 +18,9 @@ const VideoPlayReasonCodeSchema = z.enum([
   VIDEOPLAY_REASON.STORYBOARD_SCHEMA_INVALID,
   VIDEOPLAY_REASON.ROUTE_UNAVAILABLE,
   VIDEOPLAY_REASON.SHOT_RENDER_FAILED,
+  VIDEOPLAY_REASON.ASSET_ANALYSIS_INVALID,
+  VIDEOPLAY_REASON.BATCH_QUEUE_ORCHESTRATION_FAILED,
+  VIDEOPLAY_REASON.VOICE_RENDER_FAILED,
   VIDEOPLAY_REASON.COVERAGE_LOW,
   VIDEOPLAY_REASON.TIMELINE_SCHEMA_INVALID,
   VIDEOPLAY_REASON.AV_SYNC_DRIFT,
@@ -28,6 +31,8 @@ const VideoPlayReasonCodeSchema = z.enum([
   VIDEOPLAY_REASON.PERSIST_WARN,
   VIDEOPLAY_REASON.RUN_CANCELED,
   VIDEOPLAY_REASON.PROMPT_CANARY_FAILED,
+  VIDEOPLAY_REASON.CHECKPOINT_INVALID,
+  VIDEOPLAY_REASON.STEP_RESUME_HASH_MISMATCH,
 ]);
 
 const VideoPlayOperationTypeSchema = z.enum([
@@ -273,7 +278,7 @@ export const RenderedAssetSchema = z.object({
   episodeId: z.string().min(1),
   shotId: z.string().min(1),
   clipId: z.string().min(1),
-  assetType: z.enum(['video', 'image', 'voice-script', 'lip-sync']),
+  assetType: z.enum(['video', 'image', 'voice-audio', 'voice-script', 'lip-sync']),
   uri: z.string().min(1),
   mimeType: z.string().min(1),
   durationMs: z.number().int().nonnegative(),
@@ -294,6 +299,9 @@ export const AssetRenderOutputSchema = z.object({
     plannedShots: z.number().int().nonnegative(),
     renderedShots: z.number().int().nonnegative(),
     ratio: z.number().min(0).max(1),
+    plannedVoiceShots: z.number().int().nonnegative(),
+    renderedVoiceShots: z.number().int().nonnegative(),
+    voiceRatio: z.number().min(0).max(1),
   }),
 });
 
@@ -352,6 +360,7 @@ export const QualityGateReportSchema = z.object({
   })),
   groundedRatio: z.number().min(0).max(1),
   assetCoverageRatio: z.number().min(0).max(1),
+  voiceCoverageRatio: z.number().min(0).max(1),
   visualAttractionScore: z.number().min(0).max(1),
   visualAttractionComponents: z.object({
     characterConsistency: z.number().min(0).max(1),

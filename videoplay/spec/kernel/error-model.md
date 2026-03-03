@@ -17,3 +17,11 @@ Warning reason codes cannot mask blocking failures in release gate path.
 ## V-ERR-004 Story Source Blocking Errors
 
 Invalid story package payload or unavailable story source must return blocking reason codes and explicit action hints.
+
+## V-ERR-005 Checkpoint Resume Blocking Errors
+
+Invalid checkpoint payload or resume hash mismatch must be treated as blocking failures and require rerun from an explicit stage.
+
+## V-ERR-006 Render Orchestration Blocking Errors
+
+Asset analysis/queue orchestration errors and required voice rendering failures are blocking errors for release path.

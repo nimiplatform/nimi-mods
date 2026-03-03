@@ -6,6 +6,8 @@ const enLocale = {
   },
   action: {
     runPipeline: 'Run Pipeline',
+    continueFromCheckpoint: 'Continue from Checkpoint',
+    rerunStep: 'Rerun Step',
     refresh: 'Refresh',
     reloadPackage: 'Reload Package',
     publish: 'Publish',
@@ -24,6 +26,8 @@ const enLocale = {
     quality: 'Quality Gates',
     fallbackAudit: 'Fallback Audit',
     runEvents: 'Run Events',
+    pipelineFlow: 'Pipeline Flow',
+    nextStep: 'Next Step',
     episodes: 'Episodes',
     shots: 'Shots',
     release: 'Release',
@@ -33,6 +37,7 @@ const enLocale = {
     failClose: 'Failed quality gates block release package generation.',
     enrichedGate: 'Enriched source requires UserTurn or AgentInitiative in the selected turn window.',
     packageGuard: 'Pipeline is blocked until selected story package is fully ready.',
+    checkpointRuntime: 'Run/continue/rerun-step are checkpoint-driven and auditable.',
   },
 } as const;
 
