@@ -5,6 +5,7 @@ import {
   type AiRuntimeDependencySnapshot,
 } from '@nimiplatform/sdk/mod/ai';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
+import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import { useAppStore } from '@nimiplatform/sdk/mod/ui';
 import { LOCAL_CHAT_MOD_ID } from '../../contracts.js';
 import type { LocalChatPromptTrace, LocalChatTurnAudit } from '../../session-store.js';
@@ -18,7 +19,13 @@ import { useSpeechPlayback } from '../use-speech-playback.js';
 import { useSpeechTranscribe } from '../use-speech-transcribe.js';
 import { buildAgentVoiceStylePrompt } from '../../services/voice/agent-voice-style.js';
 import { resolveModelsForScenario, resolvePreferredModelForScenario } from '../../services/route/connector-model-capabilities.js';
-import { extractTtsFailureReasonCode, isRetryableTtsModelFailure, selectNextTtsModelCandidate } from '../../services/tts/recovery.js';
+import {
+  extractTtsFailureActionHint,
+  extractTtsFailureReasonCode,
+  isRetryableTtsModelFailure,
+  isVoiceUnsupportedTtsFailure,
+  selectNextTtsModelCandidate,
+} from '../../services/tts/recovery.js';
 import { ReasonCode } from '@nimiplatform/sdk/types';
 
 type RuntimeFieldsMap = {
@@ -356,7 +363,34 @@ export function useLocalChatPageState() {
       return await synthesizeVoiceOnce(text, currentModel);
     } catch (error) {
       const reasonCode = extractTtsFailureReasonCode(error);
+      const actionHint = extractTtsFailureActionHint(error);
       const connectorId = String(effectiveTtsConnectorId || '').trim();
+      if (isVoiceUnsupportedTtsFailure(reasonCode, actionHint)) {
+        setStatusBanner({
+          kind: 'warn',
+          message: 'Current voice is not supported by the selected TTS model. Please choose another voice or refresh voice list.',
+          actionLabel: 'Refresh Voice List',
+          onAction: () => {
+            void speechSettingsState.loadSpeechCatalog();
+          },
+        });
+        logRendererEvent({
+          level: 'warn',
+          area: 'local-chat',
+          message: 'local-chat-voice-unsupported',
+          details: {
+            targetId: targetsState.selectedTargetId,
+            worldId: targetsState.selectedTarget?.worldId || null,
+            connectorId: connectorId || null,
+            model: currentModel || null,
+            voiceId: speechSettingsState.defaultSettings.voiceName,
+            reasonCode,
+            actionHint,
+            error: error instanceof Error ? error.message : String(error || ''),
+          },
+        });
+        throw error;
+      }
       if (!isRetryableTtsModelFailure(reasonCode) || !connectorId) {
         throw error;
       }
@@ -373,7 +407,12 @@ export function useLocalChatPageState() {
   }, [
     effectiveTtsModel,
     effectiveTtsConnectorId,
+    setStatusBanner,
     ttsConnectorCandidates,
+    targetsState.selectedTarget,
+    targetsState.selectedTargetId,
+    speechSettingsState.defaultSettings.voiceName,
+    speechSettingsState.loadSpeechCatalog,
     speechSettingsState.handleTtsModelChange,
     synthesizeVoiceOnce,
   ]);
@@ -388,6 +427,10 @@ export function useLocalChatPageState() {
     selectedTarget: targetsState.selectedTarget,
     setStatusBanner,
     synthesizeVoice,
+    onVoiceUnsupported: () => {
+      setIsRuntimeSidebarOpen(true);
+      void speechSettingsState.loadSpeechCatalog();
+    },
   });
 
   const speechTranscribeState = useSpeechTranscribe({

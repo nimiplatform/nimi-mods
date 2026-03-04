@@ -1,7 +1,6 @@
 const TTS_CORRECTABLE_REASON_CODES = new Set<string>([
   'AI_MODEL_NOT_FOUND',
   'AI_MODALITY_NOT_SUPPORTED',
-  'AI_MEDIA_OPTION_UNSUPPORTED',
 ]);
 
 function readObjectReasonCode(input: unknown): string {
@@ -14,6 +13,14 @@ function readObjectReasonCode(input: unknown): string {
     return reasonCode;
   }
   return '';
+}
+
+function readObjectActionHint(input: unknown): string {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return '';
+  }
+  const record = input as Record<string, unknown>;
+  return String(record.actionHint || record.action_hint || '').trim();
 }
 
 function readObjectMessage(input: unknown): string {
@@ -50,8 +57,31 @@ export function extractTtsFailureReasonCode(error: unknown): string {
   return matched?.[1] || fromObject;
 }
 
+export function extractTtsFailureActionHint(error: unknown): string {
+  const fromObject = readObjectActionHint(error);
+  if (fromObject) {
+    return fromObject;
+  }
+  const message = String(
+    error instanceof Error
+      ? error.message
+      : readObjectMessage(error) || error || '',
+  ).trim();
+  if (!message) {
+    return '';
+  }
+  const matched = message.match(/"actionHint"\s*:\s*"([^"]+)"/i)
+    || message.match(/"action_hint"\s*:\s*"([^"]+)"/i);
+  return String(matched?.[1] || '').trim();
+}
+
 export function isRetryableTtsModelFailure(reasonCode: string): boolean {
   return TTS_CORRECTABLE_REASON_CODES.has(String(reasonCode || '').trim());
+}
+
+export function isVoiceUnsupportedTtsFailure(reasonCode: string, actionHint: string): boolean {
+  return String(reasonCode || '').trim() === 'AI_MEDIA_OPTION_UNSUPPORTED'
+    && String(actionHint || '').trim() === 'adjust_tts_voice_or_audio_options';
 }
 
 export function selectNextTtsModelCandidate(models: string[], currentModel: string): string {

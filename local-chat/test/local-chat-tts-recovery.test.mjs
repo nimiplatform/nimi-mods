@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  extractTtsFailureActionHint,
   extractTtsFailureReasonCode,
+  isVoiceUnsupportedTtsFailure,
   isRetryableTtsModelFailure,
   selectNextTtsModelCandidate,
 } from '../src/services/tts/recovery.ts';
@@ -31,8 +33,32 @@ test('extractTtsFailureReasonCode prefers AI reason from message over non-AI obj
 test('isRetryableTtsModelFailure only allows model-correctable categories', () => {
   assert.equal(isRetryableTtsModelFailure('AI_MODEL_NOT_FOUND'), true);
   assert.equal(isRetryableTtsModelFailure('AI_MODALITY_NOT_SUPPORTED'), true);
-  assert.equal(isRetryableTtsModelFailure('AI_MEDIA_OPTION_UNSUPPORTED'), true);
+  assert.equal(isRetryableTtsModelFailure('AI_MEDIA_OPTION_UNSUPPORTED'), false);
   assert.equal(isRetryableTtsModelFailure('AI_INPUT_INVALID'), false);
+});
+
+test('extractTtsFailureActionHint reads actionHint from payload and message', () => {
+  assert.equal(
+    extractTtsFailureActionHint({
+      actionHint: 'adjust_tts_voice_or_audio_options',
+    }),
+    'adjust_tts_voice_or_audio_options',
+  );
+  assert.equal(
+    extractTtsFailureActionHint(new Error('rpc error: {"actionHint":"adjust_tts_voice_or_audio_options"}')),
+    'adjust_tts_voice_or_audio_options',
+  );
+});
+
+test('isVoiceUnsupportedTtsFailure matches reason + hint exactly', () => {
+  assert.equal(
+    isVoiceUnsupportedTtsFailure('AI_MEDIA_OPTION_UNSUPPORTED', 'adjust_tts_voice_or_audio_options'),
+    true,
+  );
+  assert.equal(
+    isVoiceUnsupportedTtsFailure('AI_MEDIA_OPTION_UNSUPPORTED', 'switch_tts_model_or_refresh_connector_models'),
+    false,
+  );
 });
 
 test('selectNextTtsModelCandidate returns next model once and does not loop', () => {
