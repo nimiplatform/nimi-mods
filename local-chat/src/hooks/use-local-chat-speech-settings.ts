@@ -26,7 +26,12 @@ type UseLocalChatSpeechSettingsInput = {
     llm: {
       speech: {
         listProviders: () => Promise<SpeechProvider[]>;
-        listVoices: (input?: { providerId?: string; routeSource?: 'auto' | 'local-runtime' | 'token-api'; connectorId?: string }) => Promise<SpeechVoice[]>;
+        listVoices: (input?: {
+          providerId?: string;
+          routeSource?: 'auto' | 'local-runtime' | 'token-api';
+          connectorId?: string;
+          model?: string;
+        }) => Promise<SpeechVoice[]>;
       };
     };
   };
@@ -51,8 +56,17 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
       setSpeechProviders(providers);
       const preferredProviderId = providers[0]?.id || '';
       setSelectedSpeechProviderId((previous) => previous || preferredProviderId);
+      const voiceInput = defaultSettings.ttsRouteSource === 'token-api' && defaultSettings.ttsConnectorId
+        ? {
+          routeSource: defaultSettings.ttsRouteSource as 'token-api',
+          connectorId: defaultSettings.ttsConnectorId,
+          model: defaultSettings.ttsModel || undefined,
+        }
+        : preferredProviderId
+          ? { providerId: preferredProviderId }
+          : undefined;
       const voices = await input.hookClient.llm.speech.listVoices({
-        providerId: preferredProviderId || undefined,
+        ...(voiceInput || {}),
       });
       setSpeechVoices(voices);
     } catch (error) {
@@ -67,7 +81,12 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
         },
       });
     }
-  }, [input.hookClient.llm.speech]);
+  }, [
+    input.hookClient.llm.speech,
+    defaultSettings.ttsRouteSource,
+    defaultSettings.ttsConnectorId,
+    defaultSettings.ttsModel,
+  ]);
 
   useEffect(() => {
     void loadSpeechCatalog();
@@ -78,7 +97,11 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
     const ttsRouteSource = defaultSettings.ttsRouteSource;
     const ttsConnectorId = defaultSettings.ttsConnectorId;
     const voiceInput = ttsRouteSource === 'token-api' && ttsConnectorId
-      ? { routeSource: ttsRouteSource as 'token-api', connectorId: ttsConnectorId }
+      ? {
+        routeSource: ttsRouteSource as 'token-api',
+        connectorId: ttsConnectorId,
+        model: defaultSettings.ttsModel || undefined,
+      }
       : selectedSpeechProviderId
         ? { providerId: selectedSpeechProviderId }
         : undefined;
@@ -92,7 +115,13 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
     return () => {
       cancelled = true;
     };
-  }, [input.hookClient.llm.speech, selectedSpeechProviderId, defaultSettings.ttsRouteSource, defaultSettings.ttsConnectorId]);
+  }, [
+    input.hookClient.llm.speech,
+    selectedSpeechProviderId,
+    defaultSettings.ttsRouteSource,
+    defaultSettings.ttsConnectorId,
+    defaultSettings.ttsModel,
+  ]);
 
   // Auto-select first voice when voice list changes and current selection is not in the list
   useEffect(() => {
