@@ -6,6 +6,8 @@
   "scripts": {
     "build": "node ../scripts/build-mod.mjs --mod local-chat",
     "watch": "node ../scripts/build-mod.mjs --mod local-chat --watch",
+    "test:e2e": "tsx --test test/*.e2e.test.ts",
+    "test:live-smoke": "tsx --test test/local-chat-live-smoke.test.ts",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
     "clean": "rm -rf dist"
   }
