@@ -1,4 +1,5 @@
 import type { EventNodeDraft, Phase1Option } from '../contracts.js';
+import { isSyntheticEntityName } from '../engine/errors.js';
 
 type EventBuckets = {
   primary: EventNodeDraft[];
@@ -44,6 +45,44 @@ function uniqueStrings(values: string[]): string[] {
     output.push(next);
   });
   return output;
+}
+
+const TITLE_PUNCTUATION_RE = /[\s,.;:!?，。！？；：“”"'`~\-—_()[\]{}<>《》【】、]/g;
+const TITLE_ACTION_SYNONYM_RE = /(捡获|捡到|发现|拾得|获得|得到|获取|拿到|找到|意外发现|意外捡到)/g;
+const TITLE_OPEN_SYNONYM_RE = /(开启|开瓶|打开|拧开|尝试开启|尝试开瓶)/g;
+const TITLE_FAIL_SYNONYM_RE = /(失败|未果|未能|不成)/g;
+const TITLE_GREEN_BOTTLE_RE = /(神秘)?(墨绿|碧绿|绿色?|绿)(色)?(小)?瓶(子)?/g;
+const NUMERIC_TOKEN_RE = /(\d+(?:\.\d+)?|[零一二两三四五六七八九十百千万半]+)(?:岁|年|个月|月|周|天|日|层|次)?/g;
+
+function normalizeEventTitleForDedupe(value: unknown): string {
+  const source = normalizeKey(value).toLowerCase();
+  if (!source) return '';
+  return source
+    .replace(TITLE_ACTION_SYNONYM_RE, '获得')
+    .replace(TITLE_OPEN_SYNONYM_RE, '开瓶')
+    .replace(TITLE_FAIL_SYNONYM_RE, '失败')
+    .replace(TITLE_GREEN_BOTTLE_RE, '绿瓶')
+    .replace(TITLE_PUNCTUATION_RE, '');
+}
+
+function isSyntheticTemporalRef(value: unknown): boolean {
+  const source = normalizeKey(value);
+  if (!source) return false;
+  if (isSyntheticEntityName(source)) return true;
+  return /^(?:timeline|time|tl|evt|event)[-_:][a-z0-9-]+$/i.test(source);
+}
+
+function normalizeTimeRefForDisplay(value: unknown): string {
+  const source = normalizeKey(value);
+  if (!source) return '';
+  return isSyntheticTemporalRef(source) ? '' : source;
+}
+
+function extractNumericTokens(value: string): string[] {
+  const tokens = Array.from(value.matchAll(NUMERIC_TOKEN_RE))
+    .map((match) => String(match[0] || '').trim())
+    .filter(Boolean);
+  return uniqueStrings(tokens);
 }
 
 const ZH_NUM_MAP: Record<string, number> = {
@@ -123,8 +162,8 @@ function toTimeOfDayBias(text: string): number {
   if (source.includes('正午') || source.includes('中午')) return 0;
   if (source.includes('下午')) return 0.15;
   if (source.includes('傍晚') || source.includes('黄昏')) return 0.35;
-  if (source.includes('夜') || source.includes('晚上')) return 0.55;
   if (source.includes('深夜')) return 0.75;
+  if (source.includes('夜') || source.includes('晚上')) return 0.55;
   return 0;
 }
 
@@ -138,8 +177,65 @@ function toAgeDays(text: string): number | null {
   return age * 365;
 }
 
+function toSeasonBias(text: string): number {
+  const source = normalizeKey(text);
+  if (!source) return 0;
+  if (source.includes('春')) return -0.2;
+  if (source.includes('夏')) return -0.05;
+  if (source.includes('秋')) return 0.15;
+  if (source.includes('冬')) return 0.3;
+  return 0;
+}
+
+function toTemporalDedupeBucket(text: string): string {
+  const source = normalizeTimeRefForDisplay(text);
+  if (!source) return 'na';
+  const parts: string[] = [];
+  if (/前/.test(source) && !/后/.test(source)) {
+    parts.push('before');
+  } else if (/后|之后|以后|后来|次日|翌日|隔日/.test(source)) {
+    parts.push('after');
+  }
+  const duration = toDurationDays(source);
+  if (duration != null) {
+    parts.push(`d:${Math.round(duration * 10) / 10}`);
+  }
+  const age = toAgeDays(source);
+  if (age != null) {
+    parts.push(`age:${Math.round((age / 365) * 10) / 10}`);
+  }
+  if (source.includes('春')) parts.push('spring');
+  if (source.includes('夏')) parts.push('summer');
+  if (source.includes('秋')) parts.push('autumn');
+  if (source.includes('冬')) parts.push('winter');
+  if (source.includes('凌晨')) parts.push('before-dawn');
+  else if (source.includes('清晨') || source.includes('黎明')) parts.push('dawn');
+  else if (source.includes('早晨') || source.includes('上午')) parts.push('morning');
+  else if (source.includes('正午') || source.includes('中午')) parts.push('noon');
+  else if (source.includes('下午')) parts.push('afternoon');
+  else if (source.includes('傍晚') || source.includes('黄昏')) parts.push('evening');
+  else if (source.includes('深夜')) parts.push('late-night');
+  else if (source.includes('夜') || source.includes('晚上')) parts.push('night');
+
+  return parts.length > 0 ? parts.join('|') : 'na';
+}
+
+function buildStartTimeSemanticKey(event: EventNodeDraft): string {
+  const titleRaw = normalizeKey(event.title || '');
+  const titleCore = normalizeEventTitleForDedupe(titleRaw);
+  if (!titleCore) return '';
+  const temporalBucket = toTemporalDedupeBucket(normalizeTimeRefForDisplay(event.timeRef));
+  const numericTokens = extractNumericTokens(`${titleRaw} ${String(event.summary || '')} ${String(event.timeRef || '')}`)
+    .join(',');
+  return [
+    titleCore,
+    temporalBucket !== 'na' ? `t:${temporalBucket}` : '',
+    numericTokens ? `n:${numericTokens}` : '',
+  ].filter(Boolean).join('|');
+}
+
 function inferTemporalHint(event: EventNodeDraft): TemporalHint | null {
-  const timeRef = normalizeKey(event.timeRef);
+  const timeRef = normalizeTimeRefForDisplay(event.timeRef);
   if (!timeRef) return null;
   const durationDays = toDurationDays(timeRef);
   const ageDays = toAgeDays(timeRef);
@@ -153,12 +249,13 @@ function inferTemporalHint(event: EventNodeDraft): TemporalHint | null {
     : direction === 1
       ? 100000
       : 0;
-  if (durationDays == null && ageDays == null && coarseBias === 0 && !/[晨午晚夜日天月年岁]/.test(timeRef)) {
+  if (durationDays == null && ageDays == null && coarseBias === 0 && !/[晨午晚夜日天月年岁春夏秋冬]/.test(timeRef)) {
     return null;
   }
   const score = coarseBias
     + (durationDays ?? 0)
     + (ageDays ?? 0)
+    + toSeasonBias(timeRef)
     + toTimeOfDayBias(timeRef);
   const confidence = durationDays != null || ageDays != null
     ? 1
@@ -230,6 +327,10 @@ function topologicalOrder(events: EventBuckets): TemporalOrderResult {
   sequence.forEach((item) => {
     byId.set(item.event.id, item);
   });
+  const temporalHintById = new Map<string, TemporalHint | null>();
+  byId.forEach((item, id) => {
+    temporalHintById.set(id, inferTemporalHint(item.event));
+  });
   const compare = eventSortComparator(byId);
 
   const adjacency = new Map<string, Set<string>>();
@@ -245,6 +346,15 @@ function topologicalOrder(events: EventBuckets): TemporalOrderResult {
     const dst = normalizeKey(to);
     if (!src || !dst || src === dst) return;
     if (!byId.has(src) || !byId.has(dst)) return;
+    // Drop obviously contradictory edges when both sides have strong temporal hints.
+    // This prevents noisy model links from forcing severe mis-ordering in start-time selection.
+    const srcHint = temporalHintById.get(src) || null;
+    const dstHint = temporalHintById.get(dst) || null;
+    if (srcHint && dstHint) {
+      const contradictory = srcHint.score > (dstHint.score + 1);
+      const highConfidence = srcHint.confidence >= 0.7 && dstHint.confidence >= 0.7;
+      if (contradictory && highConfidence) return;
+    }
     const edgeKey = `${src}->${dst}`;
     if (edgeSet.has(edgeKey)) return;
     edgeSet.add(edgeKey);
@@ -317,12 +427,23 @@ export function buildStartTimeOptionsFromEvents(events: EventBuckets): Phase1Opt
   const order = topologicalOrder(events);
   if (order.orderedPrimaryIds.length === 0) return [];
   const primaryById = new Map(events.primary.map((event) => [event.id, event]));
+  const seenSemanticKeys = new Set<string>();
   return order.orderedPrimaryIds
     .map((eventId, index) => {
       const event = primaryById.get(eventId);
       if (!event) return null;
-      const timeRef = normalizeKey(event.timeRef);
+      const timeRef = normalizeTimeRefForDisplay(event.timeRef);
       const title = normalizeKey(event.title) || `Primary Event ${index + 1}`;
+      if (isSyntheticEntityName(title)) {
+        return null;
+      }
+      const semanticKey = buildStartTimeSemanticKey(event);
+      if (semanticKey && seenSemanticKeys.has(semanticKey)) {
+        return null;
+      }
+      if (semanticKey) {
+        seenSemanticKeys.add(semanticKey);
+      }
       const label = timeRef
         ? `${index + 1}. ${timeRef} · ${title}`
         : `${index + 1}. ${title}`;

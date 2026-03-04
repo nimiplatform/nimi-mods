@@ -123,6 +123,51 @@ test('upsertMergeExtraction keeps placeholder-id events when semantics differ ac
   );
 });
 
+test('mergeExtractions merges semantically duplicated primary events from different chunk ids', () => {
+  const merged = mergeExtractions([
+    {
+      worldSetting: '修仙世界',
+      timeline: [],
+      locations: [{ id: 'loc-1', name: '神手谷外林间小路', description: 'path', importance: 0.8 }],
+      characters: [{ id: 'char-1', name: '韩立', summary: '主角', significance: 1 }],
+      events: {
+        primary: [makePrimaryEvent({
+          id: 'evt-find-green-bottle',
+          title: '发现神秘绿色小瓶',
+          summary: '韩立在深秋某日于林间发现绿瓶。',
+          timeRef: '深秋某日',
+          characterRefs: ['韩立'],
+          locationRefs: ['神手谷外林间小路'],
+        })],
+        secondary: [],
+      },
+      characterRelations: [],
+    },
+    {
+      worldSetting: '修仙世界',
+      timeline: [],
+      locations: [{ id: 'loc-1', name: '神手谷外林间小路', description: 'path', importance: 0.8 }],
+      characters: [{ id: 'char-1', name: '韩立', summary: '主角', significance: 1 }],
+      events: {
+        primary: [makePrimaryEvent({
+          id: 'evt-picked-green-bottle',
+          title: '捡获神秘绿瓶',
+          summary: '韩立在深秋时分意外拾得绿瓶。',
+          timeRef: '深秋',
+          characterRefs: ['韩立'],
+          locationRefs: ['神手谷外林间小路'],
+        })],
+        secondary: [],
+      },
+      characterRelations: [],
+    },
+  ]);
+
+  assert.equal(merged.events.primary.length, 1);
+  assert.equal(merged.events.primary[0].characterRefs.includes('韩立'), true);
+  assert.equal(merged.events.primary[0].locationRefs.includes('神手谷外林间小路'), true);
+});
+
 test('runPhase1GlobalRefine builds narrative arc from distinct events', () => {
   const graph = {
     worldSetting: '修仙世界',
@@ -381,4 +426,84 @@ test('buildStartTimeOptionsFromEvents orders by temporal hint before source orde
   assert.equal(options[0].id, 'event:evt-1');
   assert.equal(options[1].id, 'event:evt-2');
   assert.equal(options[2].id, 'event:evt-3');
+});
+
+test('buildStartTimeOptionsFromEvents removes semantically duplicated options', () => {
+  const options = buildStartTimeOptionsFromEvents({
+    primary: [
+      makePrimaryEvent({
+        id: 'evt-1',
+        title: '发现神秘绿色小瓶',
+        summary: '韩立在深秋某日发现绿瓶',
+        timeRef: '深秋某日',
+        characterRefs: ['韩立'],
+        locationRefs: ['神手谷外林间小路'],
+      }),
+      makePrimaryEvent({
+        id: 'evt-2',
+        title: '捡获神秘绿瓶',
+        summary: '韩立在深秋拾得绿瓶',
+        timeRef: '深秋',
+        characterRefs: [],
+        locationRefs: ['神手谷外林间小路'],
+      }),
+      makePrimaryEvent({
+        id: 'evt-3',
+        title: '四年闭关突破第三层',
+        summary: '韩立四年后突破',
+        timeRef: '四年后',
+        characterRefs: ['韩立'],
+      }),
+    ],
+    secondary: [],
+  });
+
+  assert.equal(options.length, 2);
+  assert.equal(options[0].id, 'event:evt-1');
+  assert.equal(options[1].id, 'event:evt-3');
+});
+
+test('buildStartTimeOptionsFromEvents strips synthetic temporal refs in labels', () => {
+  const options = buildStartTimeOptionsFromEvents({
+    primary: [
+      makePrimaryEvent({
+        id: 'evt-1',
+        title: '选拔考核集结',
+        timeRef: 'timeline-selection-morning',
+      }),
+      makePrimaryEvent({
+        id: 'evt-2',
+        title: '落日峰下交接弟子',
+        timeRef: 'tl-6-1',
+      }),
+    ],
+    secondary: [],
+  });
+
+  assert.equal(options.length, 2);
+  assert.equal(options[0].label, '1. 选拔考核集结');
+  assert.equal(options[1].label, '2. 落日峰下交接弟子');
+});
+
+test('buildStartTimeOptionsFromEvents ignores contradictory dependency edges when time hints are strong', () => {
+  const options = buildStartTimeOptionsFromEvents({
+    primary: [
+      makePrimaryEvent({
+        id: 'evt-late',
+        title: '四年闭关突破第三层',
+        timeRef: '四年后',
+      }),
+      makePrimaryEvent({
+        id: 'evt-early',
+        title: '深秋捡获神秘绿瓶',
+        timeRef: '深秋',
+        dependsOnEventIds: ['evt-late'],
+      }),
+    ],
+    secondary: [],
+  });
+
+  assert.equal(options.length, 2);
+  assert.equal(options[0].id, 'event:evt-early');
+  assert.equal(options[1].id, 'event:evt-late');
 });

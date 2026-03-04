@@ -328,7 +328,11 @@ export async function executePhase1ExtractionLoop(
       qualityGateReasons: effectiveResult.qualityGate.reasons,
       metrics: effectiveResult.qualityGate.metrics,
       selectedCharacterCandidates: effectiveResult.characterCandidates.slice(0, 10).map((item) => item.name),
-      startTimeOptions: effectiveResult.startTimeOptions.slice(0, 10).map((item) => item.id),
+      startTimeOptionsCount: effectiveResult.startTimeOptions.length,
+      startTimeOptionsPreview: effectiveResult.startTimeOptions.slice(0, 30).map((item) => ({
+        id: item.id,
+        label: item.label,
+      })),
     });
     applyPhase1ResultSnapshot(input, {
       result: effectiveResult,

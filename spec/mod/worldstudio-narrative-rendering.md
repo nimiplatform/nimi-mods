@@ -130,7 +130,7 @@ NarrativeContext 正式 scope 字段：
 1. 输出镜头级结构（shot plan / beat / style prompt / motion cue）。
 2. 以 `CoreOutput` 为事实锚点，不得增加世界事实。
 3. 允许在表现层补充镜头语法字段（camera/motion/lens），但这些字段不回写 Narrative。
-4. 固定执行主链：`narrative-ingest -> episode-segmentation -> screenplay -> storyboard -> asset-render -> edit-compose -> qc-gate -> release-package`。
+4. 固定执行主链：`narrative-ingest -> character-casting -> scene-planning -> episode-segmentation -> screenplay -> storyboard -> asset-render -> candidate-selection -> audio-design -> edit-compose -> qc-gate -> release-package`。
 5. 每个 beat/shot 必须携带 `sourceEventIds`，并可回溯到输入 `spineEvents`。
 6. `groundedRatio` 与 `assetCoverageRatio` 未达门槛时必须 fail-close。
 7. 产线交付单位固定为 episode，不是单回合片段；发布包必须包含 video+poster+caption+metadata+trace 最小集。

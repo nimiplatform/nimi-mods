@@ -507,11 +507,33 @@ export async function publishWorldDraft(
       input.queries.maintenanceQuery.refetch(),
     ]);
   } catch (publishError) {
+    const errorMessage = publishError instanceof Error ? publishError.message : String(publishError);
+    const errorRecord = asRecord(publishError);
+    const reasonCode = String(errorRecord.reasonCode || '').trim();
+    const traceId = String(errorRecord.traceId || '').trim();
+    const detailsRecord = asRecord(errorRecord.details);
+    const statusCode = Number(detailsRecord.statusCode || detailsRecord.status || NaN);
+    const isBackend500 = Number.isFinite(statusCode)
+      ? statusCode >= 500
+      : errorMessage.toLowerCase().includes('internal server error');
+
     diagLog('publishWorldDraft EXCEPTION', {
-      error: publishError instanceof Error ? publishError.message : String(publishError),
+      error: errorMessage,
+      reasonCode: reasonCode || null,
+      traceId: traceId || null,
+      statusCode: Number.isFinite(statusCode) ? statusCode : null,
       stack: publishError instanceof Error ? publishError.stack?.slice(0, 500) : null,
     });
     input.taskController.failTask(started.taskId, publishError);
-    input.setError(publishError instanceof Error ? publishError.message : String(publishError));
+    const structuredError = [
+      'WORLD_STUDIO_PUBLISH_FAILED',
+      `draft=${input.selectedDraftId}`,
+      reasonCode ? `reason=${reasonCode}` : '',
+      traceId ? `trace=${traceId}` : '',
+    ].filter(Boolean).join(' | ');
+    input.setError(`${structuredError}: ${errorMessage}`);
+    if (isBackend500) {
+      input.setNotice(`Publish request reached backend but failed (HTTP 500). Draft ${input.selectedDraftId} is still saved.`);
+    }
   }
 }
