@@ -17,6 +17,7 @@ import { useLocalChatTurnSend } from '../use-local-chat-turn-send.js';
 import { useSpeechPlayback } from '../use-speech-playback.js';
 import { useSpeechTranscribe } from '../use-speech-transcribe.js';
 import { buildAgentVoiceStylePrompt } from '../../services/voice/agent-voice-style.js';
+import { resolvePreferredModelForScenario } from '../../services/route/connector-model-capabilities.js';
 import { ReasonCode } from '@nimiplatform/sdk/types';
 
 type RuntimeFieldsMap = {
@@ -160,7 +161,11 @@ export function useLocalChatPageState() {
     if (currentModel && connector.models.includes(currentModel)) {
       return;
     }
-    const fallbackModel = connector.models[0] || '';
+    const fallbackModel = resolvePreferredModelForScenario({
+      models: connector.models || [],
+      modelCapabilities: connector.modelCapabilities,
+      scenario: 'tts',
+    });
     if (!fallbackModel || fallbackModel === currentModel) {
       return;
     }

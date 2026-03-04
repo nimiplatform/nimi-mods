@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import { useAppStore } from '@nimiplatform/sdk/mod/ui';
-import { filterModelOptions, filterModelsForSpeechSynthesis } from '@nimiplatform/sdk/mod/model-options';
+import { filterModelOptions } from '@nimiplatform/sdk/mod/model-options';
+import { resolveModelsForScenario } from '../../services/route/connector-model-capabilities.js';
 
 type Props = {
   open: boolean;
@@ -15,7 +16,7 @@ type Props = {
   sttRouteSource: 'auto' | 'local-runtime' | 'token-api';
   sttConnectorId: string;
   sttModel: string;
-  connectors: Array<{ id: string; label: string; models: string[] }>;
+  connectors: Array<{ id: string; label: string; models: string[]; modelCapabilities?: Record<string, string[]> }>;
   localTtsRouteAvailable: boolean;
   localSttRouteAvailable: boolean;
   speechProviders: Array<{ id: string; name: string; status: 'available' | 'unavailable' }>;
@@ -68,14 +69,24 @@ export function VoicePanel(props: Props) {
 
   const ttsConnectorModels = useMemo(() => {
     if (!ttsConnectorId) return [];
-    const allModels = connectors.find((c) => c.id === ttsConnectorId)?.models || [];
-    const ttsModels = filterModelsForSpeechSynthesis(allModels);
-    return ttsModels.length > 0 ? ttsModels : allModels;
+    const connector = connectors.find((c) => c.id === ttsConnectorId);
+    if (!connector) return [];
+    return resolveModelsForScenario({
+      models: connector.models || [],
+      modelCapabilities: connector.modelCapabilities,
+      scenario: 'tts',
+    });
   }, [connectors, ttsConnectorId]);
 
   const sttConnectorModels = useMemo(() => {
     if (!sttConnectorId) return [];
-    return connectors.find((c) => c.id === sttConnectorId)?.models || [];
+    const connector = connectors.find((c) => c.id === sttConnectorId);
+    if (!connector) return [];
+    return resolveModelsForScenario({
+      models: connector.models || [],
+      modelCapabilities: connector.modelCapabilities,
+      scenario: 'stt',
+    });
   }, [connectors, sttConnectorId]);
 
   const filteredTtsModels = useMemo(

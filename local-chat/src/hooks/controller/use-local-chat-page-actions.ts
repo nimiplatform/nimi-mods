@@ -245,6 +245,7 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
           id: c.id,
           label: c.label || c.id,
           models: c.models || [],
+          modelCapabilities: c.modelCapabilities,
         })),
         onTtsRouteSourceChange: state.speechSettingsState.handleTtsRouteSourceChange,
         onTtsConnectorChange: state.speechSettingsState.handleTtsConnectorChange,
