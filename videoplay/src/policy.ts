@@ -71,6 +71,28 @@ export const QUALITY_GATE_POLICY = {
   visualAttractionWeight: VIDEOPLAY_VISUAL_COMPONENT_WEIGHT,
 } satisfies QualityGatePolicy;
 
+export const CHARACTER_CASTING_POLICY = {
+  maxCandidateImages: 3,
+  defaultRoleLevel: 'B' as const,
+  roleLevelOrder: ['S', 'A', 'B', 'C', 'D'] as const,
+} as const;
+
+export const SCENE_PLANNING_POLICY = {
+  maxCandidateImages: 3,
+} as const;
+
+export const CANDIDATE_SELECTION_POLICY = {
+  autoSelectAllRenderedVideo: true,
+  trimRangeRequired: false,
+} as const;
+
+export const AUDIO_DESIGN_POLICY = {
+  defaultBgmVolume: 0.3,
+  defaultSfxVolume: 0.6,
+  defaultFadeInMs: 1000,
+  defaultFadeOutMs: 2000,
+} as const;
+
 export const REBUILD_IMPACT_SCOPE = {
   'shot-content-change': 'shot',
   'shot-link-change': 'adjacent-shots-plus-compose',

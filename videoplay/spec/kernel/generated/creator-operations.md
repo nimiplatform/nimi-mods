@@ -64,6 +64,21 @@ extended_operations:
   - operation: merge-branch
     required: false
     source_rule: V-OPS-001
+  - operation: select-candidate
+    required: true
+    source_rule: V-OPS-002
+  - operation: regenerate-candidate
+    required: true
+    source_rule: V-OPS-002
+  - operation: update-character-appearance
+    required: true
+    source_rule: V-OPS-002
+  - operation: select-bgm-track
+    required: true
+    source_rule: V-OPS-002
+  - operation: update-sfx-layer
+    required: true
+    source_rule: V-OPS-002
 operation_audit_required_fields:
   fields:
     - versionId
@@ -93,9 +108,23 @@ stage_scoped_editability:
       - line-text
       - lip-sync-anchor
     source_rule: V-OPS-007
+  - stage: casting
+    editable_payloads:
+      - character-appearance
+      - role-level
+    source_rule: V-OPS-007
+  - stage: selection
+    editable_payloads:
+      - selected-segment-ids
+      - timeline-order-and-trim
+    source_rule: V-OPS-007
+  - stage: audio
+    editable_payloads:
+      - bgm-track-selection
+      - sfx-layer-adjustment
+    source_rule: V-OPS-007
   - stage: video
     editable_payloads:
-      - shot-asset-selection
       - timeline-adjustment
     source_rule: V-OPS-007
 stage_advance:

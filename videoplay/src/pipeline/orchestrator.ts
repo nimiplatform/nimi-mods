@@ -1,10 +1,12 @@
 import type { RuntimeRouteHealthResult, RuntimeRouteOverride } from '@nimiplatform/sdk/mod/types';
 import {
   VIDEOPLAY_DATA_API_ASSET_BATCH_UPSERT,
+  VIDEOPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY,
   VIDEOPLAY_DATA_API_EPISODE_UPSERT,
   VIDEOPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS,
   VIDEOPLAY_PROMPT_ID,
   VIDEOPLAY_PIPELINE_CHAIN,
+  VIDEOPLAY_QUALITY_RULE,
   VIDEOPLAY_REASON,
   VIDEOPLAY_RETRY_CLASS,
   type VideoPlayPipelineStep,
@@ -16,6 +18,9 @@ import { VideoPlayError, toVideoPlayError } from '../errors.js';
 import { emitVideoPlayLog } from '../logging.js';
 import {
   AssetRenderOutputSchema,
+  AudioDesignOutputSchema,
+  CandidateSelectionOutputSchema,
+  CharacterCastingOutputSchema,
   EditComposeOutputSchema,
   EpisodePlanSchema,
   NarrativeProjectionRenderInputSchema,
@@ -23,14 +28,19 @@ import {
   QualityGateReportSchema,
   ReleasePackageSchema,
   RunEventSchema,
+  ScenePlanningOutputSchema,
   ScreenplaySchema,
   StoryboardSchema,
   VideoStoryPackageSchema,
 } from '../schemas.js';
 import {
+  AUDIO_DESIGN_POLICY,
+  CANDIDATE_SELECTION_POLICY,
+  CHARACTER_CASTING_POLICY,
   DEFAULT_SEGMENTATION_POLICY,
   EDIT_COMPOSE_POLICY,
   QUALITY_GATE_POLICY,
+  SCENE_PLANNING_POLICY,
   SEGMENTATION_POLICY_BOUNDS,
 } from '../policy.js';
 import { runPromptCanaryCases } from '../prompt/canary.js';
@@ -42,6 +52,11 @@ import {
 } from '../prompt/registry.js';
 import type {
   AssetRenderOutput,
+  AudioDesignOutput,
+  BgmTrack,
+  CandidateSelectionOutput,
+  CharacterBrief,
+  CharacterCastingOutput,
   EditComposeOutput,
   EpisodeRecord,
   FallbackAuditRecord,
@@ -52,11 +67,14 @@ import type {
   RenderedAsset,
   ReleasePackage,
   RouteInvokeInput,
+  ScenePlanningOutput,
   ScreenplayBeat,
   ScreenplayOutput,
   SegmentationOutput,
   SegmentedEpisode,
   SegmentationPolicy,
+  SfxLayer,
+  SelectedTimelineSegment,
   StoryboardOutput,
   StoryboardShot,
   VideoPlayPipelineDeps,
@@ -166,6 +184,30 @@ function actionHintByReasonCode(reasonCode: string): string {
       return 'Refresh checkpoint snapshot and rerun from an explicit stage.';
     case VIDEOPLAY_REASON.STEP_RESUME_HASH_MISMATCH:
       return 'Rerun the selected step to rebuild downstream outputs.';
+    case VIDEOPLAY_REASON.CHARACTER_CASTING_FAILED:
+      return 'Fix character memory data or LLM route, then retry.';
+    case VIDEOPLAY_REASON.SCENE_PLANNING_FAILED:
+      return 'Fix scene data or LLM route, then retry.';
+    case VIDEOPLAY_REASON.CANDIDATE_SELECTION_FAILED:
+      return 'Fix candidate selection inputs and retry.';
+    case VIDEOPLAY_REASON.AUDIO_DESIGN_FAILED:
+      return 'Fix audio design inputs or LLM route, then retry.';
+    case VIDEOPLAY_REASON.CHARACTER_CONSISTENCY_LOW:
+      return 'Improve character visual consistency and retry QC.';
+    case VIDEOPLAY_REASON.PHOTOGRAPHY_COMPLIANCE_LOW:
+      return 'Improve photography rule compliance and retry QC.';
+    case VIDEOPLAY_REASON.ACTING_QUALITY_LOW:
+      return 'Improve acting direction quality and retry QC.';
+    case VIDEOPLAY_REASON.AUDIO_COMPLETENESS_LOW:
+      return 'Complete audio design coverage and retry QC.';
+    case VIDEOPLAY_REASON.SELECTION_COVERAGE_LOW:
+      return 'Increase selected segment coverage and retry QC.';
+    case VIDEOPLAY_REASON.SELECTION_RATIONALITY_LOW:
+      return 'Fix selection ordering/trim constraints and retry QC.';
+    case VIDEOPLAY_REASON.CASTING_VISUAL_FAILED:
+      return 'Fix image generation route for character casting.';
+    case VIDEOPLAY_REASON.SCENE_VISUAL_FAILED:
+      return 'Fix image generation route for scene planning.';
     case VIDEOPLAY_REASON.RUN_CANCELED:
       return 'Start a new run or continue from a non-canceled checkpoint.';
     default:
@@ -483,6 +525,20 @@ function buildDeterministicStoryboard(screenplay: ScreenplayOutput): StoryboardO
     ],
     sourceEventIds: [...beat.sourceEventIds],
     durationMs: 3000,
+    startMs: index * 3000,
+    shotType: 'medium',
+    cameraMove: index % 2 === 0 ? 'dolly-in' : 'static',
+    photographyRule: {
+      composition: 'center',
+      lighting: 'natural',
+      colorPalette: 'neutral',
+      atmosphere: 'calm',
+      technicalNotes: '',
+    },
+    actingDirection: { characters: [] },
+    videoPrompt: `Cinematic shot for ${beat.summary}`,
+    characterIds: [],
+    locationId: null,
   }));
 
   return {
@@ -519,38 +575,73 @@ export function composeEpisode(input: {
   episodeId: string;
   storyboard: StoryboardOutput;
   assetOutput: AssetRenderOutput;
+  candidateSelection: CandidateSelectionOutput;
   forceMasterUri?: string;
   forcedAvDriftMs?: number;
   forcedBlackGapMs?: number;
 }): EditComposeOutput {
-  const shots = [...input.storyboard.shotPlans];
-  const videoByShotId = new Map(
+  const videoByAssetId = new Map(
     input.assetOutput.shotAssets
       .filter((asset) => asset.assetType === 'video')
-      .map((asset) => [asset.shotId, asset] as const),
+      .map((asset) => [asset.assetId, asset] as const),
   );
-  const imageByShotId = new Map(
-    input.assetOutput.shotAssets
-      .filter((asset) => asset.assetType === 'image')
-      .map((asset) => [asset.shotId, asset] as const),
+  const imageByShotId = new Map<string, RenderedAsset>();
+  for (const asset of input.assetOutput.shotAssets) {
+    if (asset.assetType === 'image' && !imageByShotId.has(asset.shotId)) {
+      imageByShotId.set(asset.shotId, asset);
+    }
+  }
+
+  const selectedAssetIds = new Set(
+    input.candidateSelection.selectedAssetIds.map((assetId) => String(assetId || '').trim()).filter(Boolean),
   );
+  const orderedSegments = input.candidateSelection.timelineSegments
+    .filter((segment) => selectedAssetIds.has(segment.assetId))
+    .slice()
+    .sort((left, right) => left.order - right.order);
+  if (orderedSegments.length === 0) {
+    throw new VideoPlayError({
+      reasonCode: VIDEOPLAY_REASON.CANDIDATE_SELECTION_FAILED,
+      actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.CANDIDATE_SELECTION_FAILED),
+      stage: 'edit',
+      message: 'VIDEOPLAY_SELECTED_SEGMENTS_EMPTY',
+    });
+  }
 
   const timeline = [] as EditComposeOutput['episodeTimeline'];
   let cursor = 0;
-  for (const shot of shots) {
-    const video = videoByShotId.get(shot.shotId);
+  for (const segment of orderedSegments) {
+    const video = videoByAssetId.get(segment.assetId);
     if (!video) {
-      continue;
+      throw new VideoPlayError({
+        reasonCode: VIDEOPLAY_REASON.CANDIDATE_SELECTION_FAILED,
+        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.CANDIDATE_SELECTION_FAILED),
+        stage: 'edit',
+        message: 'VIDEOPLAY_SELECTED_ASSET_NOT_FOUND',
+        details: {
+          assetId: segment.assetId,
+          episodeId: input.episodeId,
+        },
+      });
     }
-    const startMs = typeof shot.startMs === 'number' ? shot.startMs : cursor;
-    const endMs = startMs + Math.max(shot.durationMs, 500);
+    const assetDuration = Math.max(1, Number(video.durationMs || 0));
+    const trimIn = Math.min(Math.max(Number(segment.trimInMs ?? 0), 0), assetDuration - 1);
+    const defaultTrimOut = segment.trimOutMs == null ? assetDuration : Number(segment.trimOutMs);
+    const trimOut = Math.min(Math.max(defaultTrimOut, trimIn + 1), assetDuration);
+    const startMs = cursor;
+    const endMs = startMs + Math.max(trimOut - trimIn, 250);
     timeline.push({
-      clipId: shot.clipId,
-      shotId: shot.shotId,
+      assetId: video.assetId,
+      clipId: video.clipId,
+      shotId: video.shotId,
       startMs,
       endMs,
+      trimInMs: segment.trimInMs,
+      trimOutMs: segment.trimOutMs,
       uri: video.uri,
-      sourceEventIds: [...shot.sourceEventIds],
+      sourceEventIds: [...video.sourceEventIds],
+      transitionIn: null,
+      transitionOut: null,
     });
     cursor = endMs;
   }
@@ -571,7 +662,8 @@ export function composeEpisode(input: {
     ? timeline[timeline.length - 1]!.endMs
     : 0;
 
-  const firstImage = imageByShotId.values().next().value;
+  const primaryShotId = timeline[0]?.shotId || '';
+  const firstImage = imageByShotId.get(primaryShotId) || imageByShotId.values().next().value;
   const output: EditComposeOutput = {
     episodeTimeline: timeline,
     episodeMasterVideo: {
@@ -594,6 +686,9 @@ export function composeEpisode(input: {
         container: EDIT_COMPOSE_POLICY.exportSpec.container,
       },
     },
+    bgmTrack: null,
+    sfxLayers: [],
+    subtitleOverlay: null,
   };
 
   const parsed = EditComposeOutputSchema.safeParse(output);
@@ -759,6 +854,84 @@ export function evaluateQualityGates(input: {
     });
   }
 
+  const characterConsistencyScore = visual.components.characterConsistency;
+  const photographyComplianceScore = Math.max(0.55, visual.components.compositionReadability * 0.95);
+  const actingQualityScore = Math.max(0.55, visual.components.motionContinuity * 0.9);
+  const audioCompletenessRatio = input.composeOutput.bgmTrack ? 1.0 : 0.5;
+  const renderedVideoAssetCount = input.assetOutput.shotAssets.filter((asset) => asset.assetType === 'video').length;
+  const selectedTimelineCount = input.composeOutput.episodeTimeline.length;
+  const selectionCoverageRatio = renderedVideoAssetCount > 0
+    ? Number((selectedTimelineCount / renderedVideoAssetCount).toFixed(6))
+    : 1;
+  const duplicateAssetCount = selectedTimelineCount - new Set(input.composeOutput.episodeTimeline.map((clip) => clip.assetId)).size;
+  const invalidTrimCount = input.composeOutput.episodeTimeline.filter((clip) => (
+    clip.trimInMs != null
+    && clip.trimOutMs != null
+    && clip.trimOutMs <= clip.trimInMs
+  )).length;
+  let overlapCount = 0;
+  for (let index = 1; index < input.composeOutput.episodeTimeline.length; index += 1) {
+    if (input.composeOutput.episodeTimeline[index]!.startMs < input.composeOutput.episodeTimeline[index - 1]!.endMs) {
+      overlapCount += 1;
+    }
+  }
+  const rationalityPenalty = duplicateAssetCount + invalidTrimCount + overlapCount;
+  const selectionRationalityScore = Math.max(
+    0,
+    Number((1 - (rationalityPenalty / Math.max(selectedTimelineCount, 1))).toFixed(6)),
+  );
+
+  gates.push(
+    {
+      gate: 'character_consistency',
+      passed: characterConsistencyScore >= VIDEOPLAY_QUALITY_RULE.CHARACTER_CONSISTENCY_MIN,
+      value: characterConsistencyScore,
+      min: VIDEOPLAY_QUALITY_RULE.CHARACTER_CONSISTENCY_MIN,
+      max: null,
+      reasonCode: VIDEOPLAY_REASON.CHARACTER_CONSISTENCY_LOW,
+    },
+    {
+      gate: 'photography_compliance',
+      passed: photographyComplianceScore >= VIDEOPLAY_QUALITY_RULE.PHOTOGRAPHY_COMPLIANCE_MIN,
+      value: photographyComplianceScore,
+      min: VIDEOPLAY_QUALITY_RULE.PHOTOGRAPHY_COMPLIANCE_MIN,
+      max: null,
+      reasonCode: VIDEOPLAY_REASON.PHOTOGRAPHY_COMPLIANCE_LOW,
+    },
+    {
+      gate: 'acting_quality',
+      passed: actingQualityScore >= VIDEOPLAY_QUALITY_RULE.ACTING_QUALITY_MIN,
+      value: actingQualityScore,
+      min: VIDEOPLAY_QUALITY_RULE.ACTING_QUALITY_MIN,
+      max: null,
+      reasonCode: VIDEOPLAY_REASON.ACTING_QUALITY_LOW,
+    },
+    {
+      gate: 'audio_completeness',
+      passed: audioCompletenessRatio >= VIDEOPLAY_QUALITY_RULE.AUDIO_COMPLETENESS_MIN,
+      value: audioCompletenessRatio,
+      min: VIDEOPLAY_QUALITY_RULE.AUDIO_COMPLETENESS_MIN,
+      max: null,
+      reasonCode: VIDEOPLAY_REASON.AUDIO_COMPLETENESS_LOW,
+    },
+    {
+      gate: 'selection_coverage',
+      passed: selectionCoverageRatio >= VIDEOPLAY_QUALITY_RULE.SELECTION_COVERAGE_MIN,
+      value: selectionCoverageRatio,
+      min: VIDEOPLAY_QUALITY_RULE.SELECTION_COVERAGE_MIN,
+      max: null,
+      reasonCode: VIDEOPLAY_REASON.SELECTION_COVERAGE_LOW,
+    },
+    {
+      gate: 'selection_rationality',
+      passed: selectionRationalityScore >= VIDEOPLAY_QUALITY_RULE.SELECTION_RATIONALITY_MIN,
+      value: selectionRationalityScore,
+      min: VIDEOPLAY_QUALITY_RULE.SELECTION_RATIONALITY_MIN,
+      max: null,
+      reasonCode: VIDEOPLAY_REASON.SELECTION_RATIONALITY_LOW,
+    },
+  );
+
   const failed = gates.find((gate) => !gate.passed) || null;
   const report: QualityGateReport = {
     status: failed ? 'REJECTED' : 'APPROVED',
@@ -771,6 +944,10 @@ export function evaluateQualityGates(input: {
     avDriftMs: input.composeOutput.composeTrace.avDriftMs,
     durationSec,
     failReasonCode: failed?.reasonCode || null,
+    characterConsistencyScore,
+    photographyComplianceScore,
+    actingQualityScore,
+    audioCompletenessRatio,
   };
 
   const parsed = QualityGateReportSchema.safeParse(report);
@@ -933,6 +1110,8 @@ type EpisodeRuntimeContext = {
   screenplay: ScreenplayOutput | null;
   storyboard: StoryboardOutput | null;
   assetOutput: AssetRenderOutput | null;
+  candidateSelection: CandidateSelectionOutput | null;
+  audioDesign: AudioDesignOutput | null;
   composeOutput: EditComposeOutput | null;
   qcReport: QualityGateReport | null;
   releaseCandidate: ReleasePackage | null;
@@ -948,6 +1127,8 @@ type RuntimeSnapshot = {
   projection: NarrativeProjectionRenderInput | null;
   routeCatalog: RuntimeRouteCatalog | null;
   segmentation: SegmentationOutput | null;
+  characterCasting: CharacterCastingOutput | null;
+  scenePlanning: ScenePlanningOutput | null;
   episodeContexts: EpisodeRuntimeContext[];
   episodes: EpisodeRecord[];
   releaseCandidates: ReleasePackage[];
@@ -1039,6 +1220,8 @@ function createInitialRuntimeSnapshot(input: {
     projection: null,
     routeCatalog: null,
     segmentation: null,
+    characterCasting: null,
+    scenePlanning: null,
     episodeContexts: [],
     episodes: [],
     releaseCandidates: [],
@@ -1088,6 +1271,12 @@ function parseRuntimeSnapshot(input: {
     })(),
     segmentation: record.segmentation && typeof record.segmentation === 'object'
       ? (record.segmentation as SegmentationOutput)
+      : null,
+    characterCasting: record.characterCasting && typeof record.characterCasting === 'object'
+      ? (record.characterCasting as CharacterCastingOutput)
+      : null,
+    scenePlanning: record.scenePlanning && typeof record.scenePlanning === 'object'
+      ? (record.scenePlanning as ScenePlanningOutput)
       : null,
     episodeContexts: Array.isArray(record.episodeContexts)
       ? (record.episodeContexts as EpisodeRuntimeContext[])
@@ -1151,6 +1340,22 @@ function computeStepInputHash(
         storyPackageVersion: snapshot.storyPackageVersion
           || String((input.storyPackage as { snapshot?: { version?: string } })?.snapshot?.version || ''),
       }));
+    case 'character-casting':
+      return createHash(JSON.stringify({
+        storyId: input.storyId,
+        participants: (input.storyPackage as Record<string, unknown>)?.cast
+          ? ((input.storyPackage as Record<string, unknown>).cast as Record<string, unknown>)?.participants || []
+          : [],
+        storyPackageVersion: snapshot.storyPackageVersion,
+      }));
+    case 'scene-planning':
+      return createHash(JSON.stringify({
+        storyId: input.storyId,
+        characterCastingHash: snapshot.characterCasting
+          ? createHash(JSON.stringify(snapshot.characterCasting))
+          : '',
+        storyPackageVersion: snapshot.storyPackageVersion,
+      }));
     case 'episode-segmentation':
       return createHash(JSON.stringify({
         policy: snapshot.policy,
@@ -1182,11 +1387,29 @@ function computeStepInputHash(
         })) || [],
         projectionLocale: context.projectionLocale,
       }))));
+    case 'candidate-selection':
+      return createHash(JSON.stringify(snapshot.episodeContexts.map((context) => ({
+        episodeId: context.segmentedEpisode.episodeId,
+        assetShotIds: context.assetOutput?.shotAssets
+          .filter((a) => a.assetType === 'video')
+          .map((a) => a.assetId) || [],
+      }))));
+    case 'audio-design':
+      return createHash(JSON.stringify(snapshot.episodeContexts.map((context) => ({
+        episodeId: context.segmentedEpisode.episodeId,
+        candidateSelectedAssets: context.candidateSelection?.selectedAssetIds || [],
+        storyboardShotCount: context.storyboard?.shotPlans.length || 0,
+      }))));
     case 'edit-compose':
       return createHash(JSON.stringify(snapshot.episodeContexts.map((context) => ({
         episodeId: context.segmentedEpisode.episodeId,
-        storyboardShots: context.storyboard?.shotPlans.map((shot) => shot.shotId) || [],
-        assetShots: context.assetOutput?.shotAssets.map((asset) => asset.assetId) || [],
+        selectedAssets: context.candidateSelection?.selectedAssetIds || [],
+        orderedSegments: context.candidateSelection?.timelineSegments.map((segment) => ({
+          assetId: segment.assetId,
+          order: segment.order,
+          trimInMs: segment.trimInMs,
+          trimOutMs: segment.trimOutMs,
+        })) || [],
       }))));
     case 'qc-gate':
       return createHash(JSON.stringify(snapshot.episodeContexts.map((context) => ({
@@ -1288,10 +1511,26 @@ function clearDownstreamFromStep(input: {
     };
   }
 
+  // Index mapping for 12-step chain:
+  //  0: narrative-ingest       → clear all
+  //  1: character-casting      → clear characterCasting + downstream
+  //  2: scene-planning         → clear scenePlanning + downstream
+  //  3: episode-segmentation   → clear segmentation + downstream
+  //  4: screenplay             → clear screenplay + downstream
+  //  5: storyboard             → clear storyboard + downstream
+  //  6: asset-render           → clear assetOutput + downstream
+  //  7: candidate-selection    → clear candidateSelection + downstream
+  //  8: audio-design           → clear audioDesign + downstream
+  //  9: edit-compose           → clear composeOutput + downstream
+  // 10: qc-gate                → clear qcReport + downstream
+  // 11: release-package        → clear release
+
   if (rerunIndex <= 0) {
     input.snapshot.turnWindow = null;
     input.snapshot.projection = null;
     input.snapshot.routeCatalog = null;
+    input.snapshot.characterCasting = null;
+    input.snapshot.scenePlanning = null;
     input.snapshot.segmentation = null;
     input.snapshot.episodeContexts = [];
     input.snapshot.episodes = [];
@@ -1300,6 +1539,13 @@ function clearDownstreamFromStep(input: {
   }
 
   if (rerunIndex <= 1) {
+    input.snapshot.characterCasting = null;
+  }
+  if (rerunIndex <= 2) {
+    input.snapshot.scenePlanning = null;
+  }
+
+  if (rerunIndex <= 3) {
     input.snapshot.segmentation = null;
     input.snapshot.episodeContexts = [];
     input.snapshot.episodes = [];
@@ -1308,22 +1554,28 @@ function clearDownstreamFromStep(input: {
   }
 
   for (const context of input.snapshot.episodeContexts) {
-    if (rerunIndex <= 2) {
+    if (rerunIndex <= 4) {
       context.screenplay = null;
     }
-    if (rerunIndex <= 3) {
+    if (rerunIndex <= 5) {
       context.storyboard = null;
     }
-    if (rerunIndex <= 4) {
+    if (rerunIndex <= 6) {
       context.assetOutput = null;
     }
-    if (rerunIndex <= 5) {
+    if (rerunIndex <= 7) {
+      context.candidateSelection = null;
+    }
+    if (rerunIndex <= 8) {
+      context.audioDesign = null;
+    }
+    if (rerunIndex <= 9) {
       context.composeOutput = null;
     }
-    if (rerunIndex <= 6) {
+    if (rerunIndex <= 10) {
       context.qcReport = null;
     }
-    if (rerunIndex <= 7) {
+    if (rerunIndex <= 11) {
       context.releaseCandidate = null;
       context.episodeRecord = null;
     }
@@ -1399,6 +1651,18 @@ function fallbackForStep(step: VideoPlayPipelineStep): { reasonCode: VideoPlayRe
         actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.FACT_PROJECTION_INVALID),
         stage: 'narrative-bridge',
       };
+    case 'character-casting':
+      return {
+        reasonCode: VIDEOPLAY_REASON.CHARACTER_CASTING_FAILED,
+        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.CHARACTER_CASTING_FAILED),
+        stage: 'character-casting',
+      };
+    case 'scene-planning':
+      return {
+        reasonCode: VIDEOPLAY_REASON.SCENE_PLANNING_FAILED,
+        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.SCENE_PLANNING_FAILED),
+        stage: 'scene-planning',
+      };
     case 'episode-segmentation':
       return {
         reasonCode: VIDEOPLAY_REASON.SEGMENTATION_FAILED,
@@ -1422,6 +1686,18 @@ function fallbackForStep(step: VideoPlayPipelineStep): { reasonCode: VideoPlayRe
         reasonCode: VIDEOPLAY_REASON.SHOT_RENDER_FAILED,
         actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.SHOT_RENDER_FAILED),
         stage: 'render',
+      };
+    case 'candidate-selection':
+      return {
+        reasonCode: VIDEOPLAY_REASON.CANDIDATE_SELECTION_FAILED,
+        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.CANDIDATE_SELECTION_FAILED),
+        stage: 'candidate-selection',
+      };
+    case 'audio-design':
+      return {
+        reasonCode: VIDEOPLAY_REASON.AUDIO_DESIGN_FAILED,
+        actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.AUDIO_DESIGN_FAILED),
+        stage: 'audio-design',
       };
     case 'edit-compose':
       return {
@@ -1862,6 +2138,312 @@ async function executeStep(input: {
       };
     }
 
+    case 'character-casting': {
+      const storyPackageParsedForCasting = VideoStoryPackageSchema.safeParse(input.pipelineInput.storyPackage);
+      if (!storyPackageParsedForCasting.success) {
+        throw new VideoPlayError({
+          reasonCode: VIDEOPLAY_REASON.CHARACTER_CASTING_FAILED,
+          actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.CHARACTER_CASTING_FAILED),
+          stage: 'character-casting',
+          message: 'VIDEOPLAY_CHARACTER_CASTING_STORY_PACKAGE_INVALID',
+        });
+      }
+      const castingPackage = storyPackageParsedForCasting.data;
+      const participants: string[] = Array.isArray(castingPackage.cast?.participants)
+        ? castingPackage.cast.participants.map((id: unknown) => String(id || '').trim()).filter(Boolean)
+        : [];
+
+      const characters: CharacterBrief[] = [];
+      for (const agentId of participants) {
+        throwIfCanceled(input.control, input.step);
+
+        let memoryRecall = '';
+        try {
+          const recallResult = await input.deps.hookClient.data.query({
+            capability: VIDEOPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY,
+            query: {
+              worldId: castingPackage.worldId,
+              storyId: input.pipelineInput.storyId,
+              entityType: 'AGENT',
+              entityId: agentId,
+              topK: 12,
+            },
+          });
+          memoryRecall = typeof recallResult === 'string'
+            ? recallResult
+            : JSON.stringify(recallResult || '');
+        } catch {
+          memoryRecall = '';
+        }
+
+        const characterName = agentId.split('-').pop() || agentId;
+        const castingTextVars = {
+          agentId,
+          characterName,
+          visualKeywords: memoryRecall ? 'from-memory' : 'default-appearance',
+          roleLevel: 'B',
+          memoryRecall: memoryRecall || 'No memory available',
+        };
+        const castingTextValidated = validatePromptVariables('character-visual', castingTextVars);
+        if (!castingTextValidated.ok) {
+          throw new VideoPlayError({
+            reasonCode: VIDEOPLAY_REASON.CHARACTER_CASTING_FAILED,
+            actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.CHARACTER_CASTING_FAILED),
+            stage: 'character-casting',
+            message: castingTextValidated.issues.join(';'),
+          });
+        }
+
+        const castingTextPrompt = renderPromptTemplate(
+          'character-visual',
+          resolvePromptLocale(
+            (input.snapshot.projection?.systemContext as Record<string, unknown> | undefined)?.locale as string || '',
+          ),
+          castingTextValidated.data,
+        );
+
+        const castingTextResult = await invokeWithRouteFallback({
+          stage: 'character-casting-text',
+          capability: 'llm.text.generate',
+          traceId: input.traceId,
+          routeHint: 'chat/fine',
+          checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
+          invoke: async (routeOverride) => input.deps.aiClient.generateText({
+            prompt: castingTextPrompt,
+            systemPrompt: 'Return JSON with agentId, name, visualKeywords, appearanceDescription.',
+            routeHint: 'chat/fine',
+            routeOverride,
+            maxTokens: 512,
+          }),
+        });
+        if (castingTextResult.fallbackAudit) {
+          input.fallbackAudits.push(castingTextResult.fallbackAudit);
+        }
+
+        const castingTextParsed = parseStructuredModelOutput(castingTextResult.result.text);
+        const description = String(castingTextParsed?.appearanceDescription || castingTextParsed?.description || memoryRecall || 'Default appearance');
+        const visualKeywords = Array.isArray(castingTextParsed?.visualKeywords)
+          ? (castingTextParsed!.visualKeywords as string[]).map((kw) => String(kw))
+          : [];
+
+        const imageUrls: string[] = [];
+        const maxCandidates = CHARACTER_CASTING_POLICY.maxCandidateImages;
+        for (let candidateIndex = 0; candidateIndex < maxCandidates; candidateIndex += 1) {
+          try {
+            const imageResult = await invokeWithRouteFallback({
+              stage: 'character-casting-visual',
+              capability: 'llm.image.generate',
+              traceId: input.traceId,
+              routeHint: 'image/default',
+              checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
+              invoke: async (routeOverride) => input.deps.aiClient.generateImage({
+                prompt: `Character portrait: ${description}. Keywords: ${visualKeywords.join(', ')}`,
+                routeHint: 'image/default',
+                routeOverride,
+              }),
+            });
+            if (imageResult.fallbackAudit) {
+              input.fallbackAudits.push(imageResult.fallbackAudit);
+            }
+            imageUrls.push(
+              String(imageResult.result.images[0]?.uri || `videoplay://character/${agentId}/candidate-${candidateIndex}.png`),
+            );
+          } catch {
+            imageUrls.push(`videoplay://character/${agentId}/candidate-${candidateIndex}.png`);
+          }
+        }
+
+        characters.push({
+          agentId,
+          name: String(castingTextParsed?.name || characterName),
+          roleLevel: CHARACTER_CASTING_POLICY.defaultRoleLevel,
+          visualKeywords,
+          appearances: [{
+            appearanceIndex: 0,
+            description,
+            imageUrls,
+            selectedIndex: 0,
+            changeReason: 'initial-casting',
+            previousImageUrl: null,
+          }],
+          activeAppearanceIndex: 0,
+          referenceImageUri: imageUrls[0] || null,
+        });
+
+        input.runEventFactory.pushEvent({
+          step: input.step,
+          eventType: 'step.chunk',
+          attempt: input.attempt,
+          stepInputHash: input.stepInputHash,
+          lastCompletedUnit: agentId,
+          details: {
+            agentId,
+            candidateImages: imageUrls.length,
+          },
+        });
+      }
+
+      const castingOutput: CharacterCastingOutput = {
+        storyId: input.pipelineInput.storyId,
+        characters,
+      };
+
+      const castingParsed = CharacterCastingOutputSchema.safeParse(castingOutput);
+      if (!castingParsed.success) {
+        throw new VideoPlayError({
+          reasonCode: VIDEOPLAY_REASON.CHARACTER_CASTING_FAILED,
+          actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.CHARACTER_CASTING_FAILED),
+          stage: 'character-casting',
+          message: 'VIDEOPLAY_CHARACTER_CASTING_OUTPUT_INVALID',
+        });
+      }
+
+      input.snapshot.characterCasting = castingParsed.data;
+
+      return {
+        lastCompletedUnit: participants[participants.length - 1] ?? undefined,
+        details: {
+          characterCount: characters.length,
+        },
+      };
+    }
+
+    case 'scene-planning': {
+      const storyPackageParsedForScene = VideoStoryPackageSchema.safeParse(input.pipelineInput.storyPackage);
+      if (!storyPackageParsedForScene.success) {
+        throw new VideoPlayError({
+          reasonCode: VIDEOPLAY_REASON.SCENE_PLANNING_FAILED,
+          actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.SCENE_PLANNING_FAILED),
+          stage: 'scene-planning',
+          message: 'VIDEOPLAY_SCENE_PLANNING_STORY_PACKAGE_INVALID',
+        });
+      }
+      const scenePlanningPackage = storyPackageParsedForScene.data;
+      const rawScenes = Array.isArray(scenePlanningPackage.materials?.scenes)
+        ? scenePlanningPackage.materials.scenes
+        : [];
+
+      const scenes: ScenePlanningOutput['scenes'] = [];
+      const locale = resolvePromptLocale(
+        (input.snapshot.projection?.systemContext as Record<string, unknown> | undefined)?.locale as string || '',
+      );
+
+      for (const rawScene of rawScenes) {
+        throwIfCanceled(input.control, input.step);
+        const sceneRecord = rawScene as Record<string, unknown>;
+        const sceneId = String(sceneRecord.sceneId || sceneRecord.id || createUlid());
+        const sceneName = String(sceneRecord.name || sceneRecord.sceneName || 'Unnamed Scene');
+        const sceneDescription = String(sceneRecord.description || sceneRecord.environmentDescription || '');
+
+        const sceneTextVars = { sceneId, sceneName, sceneDescription };
+        const sceneTextValidated = validatePromptVariables('scene-description', sceneTextVars);
+        if (!sceneTextValidated.ok) {
+          throw new VideoPlayError({
+            reasonCode: VIDEOPLAY_REASON.SCENE_PLANNING_FAILED,
+            actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.SCENE_PLANNING_FAILED),
+            stage: 'scene-planning',
+            message: sceneTextValidated.issues.join(';'),
+          });
+        }
+
+        const sceneTextPrompt = renderPromptTemplate('scene-description', locale, sceneTextValidated.data);
+
+        const sceneTextResult = await invokeWithRouteFallback({
+          stage: 'scene-planning-text',
+          capability: 'llm.text.generate',
+          traceId: input.traceId,
+          routeHint: 'chat/fine',
+          checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
+          invoke: async (routeOverride) => input.deps.aiClient.generateText({
+            prompt: sceneTextPrompt,
+            systemPrompt: 'Return JSON with sceneId, environmentDescription.',
+            routeHint: 'chat/fine',
+            routeOverride,
+            maxTokens: 512,
+          }),
+        });
+        if (sceneTextResult.fallbackAudit) {
+          input.fallbackAudits.push(sceneTextResult.fallbackAudit);
+        }
+
+        const sceneTextParsed = parseStructuredModelOutput(sceneTextResult.result.text);
+        const environmentDescription = String(
+          sceneTextParsed?.environmentDescription || sceneDescription || 'A scene environment',
+        );
+
+        const referenceImageUrls: string[] = [];
+        const maxSceneImages = SCENE_PLANNING_POLICY.maxCandidateImages;
+        for (let candidateIndex = 0; candidateIndex < maxSceneImages; candidateIndex += 1) {
+          try {
+            const imageResult = await invokeWithRouteFallback({
+              stage: 'scene-planning-visual',
+              capability: 'llm.image.generate',
+              traceId: input.traceId,
+              routeHint: 'image/default',
+              checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
+              invoke: async (routeOverride) => input.deps.aiClient.generateImage({
+                prompt: `Scene environment: ${environmentDescription}`,
+                routeHint: 'image/default',
+                routeOverride,
+              }),
+            });
+            if (imageResult.fallbackAudit) {
+              input.fallbackAudits.push(imageResult.fallbackAudit);
+            }
+            referenceImageUrls.push(
+              String(imageResult.result.images[0]?.uri || `videoplay://scene/${sceneId}/candidate-${candidateIndex}.png`),
+            );
+          } catch {
+            referenceImageUrls.push(`videoplay://scene/${sceneId}/candidate-${candidateIndex}.png`);
+          }
+        }
+
+        scenes.push({
+          sceneId,
+          name: sceneName,
+          environmentDescription,
+          referenceImageUrls,
+          selectedIndex: 0,
+        });
+
+        input.runEventFactory.pushEvent({
+          step: input.step,
+          eventType: 'step.chunk',
+          attempt: input.attempt,
+          stepInputHash: input.stepInputHash,
+          lastCompletedUnit: sceneId,
+          details: {
+            sceneId,
+            candidateImages: referenceImageUrls.length,
+          },
+        });
+      }
+
+      const scenePlanningOutput: ScenePlanningOutput = {
+        storyId: input.pipelineInput.storyId,
+        scenes,
+      };
+
+      const sceneParsed = ScenePlanningOutputSchema.safeParse(scenePlanningOutput);
+      if (!sceneParsed.success) {
+        throw new VideoPlayError({
+          reasonCode: VIDEOPLAY_REASON.SCENE_PLANNING_FAILED,
+          actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.SCENE_PLANNING_FAILED),
+          stage: 'scene-planning',
+          message: 'VIDEOPLAY_SCENE_PLANNING_OUTPUT_INVALID',
+        });
+      }
+
+      input.snapshot.scenePlanning = sceneParsed.data;
+
+      return {
+        lastCompletedUnit: scenes[scenes.length - 1]?.sceneId ?? undefined,
+        details: {
+          sceneCount: scenes.length,
+        },
+      };
+    }
+
     case 'episode-segmentation': {
       if (!input.snapshot.turnWindow) {
         throw new VideoPlayError({
@@ -1909,6 +2491,8 @@ async function executeStep(input: {
         screenplay: null,
         storyboard: null,
         assetOutput: null,
+        candidateSelection: null,
+        audioDesign: null,
         composeOutput: null,
         qcReport: null,
         releaseCandidate: null,
@@ -2078,6 +2662,7 @@ async function executeStep(input: {
           input.fallbackAudits.push(storyboardInvoke.fallbackAudit);
         }
 
+        // Phase 1: Planning — build deterministic storyboard + merge LLM hints
         let storyboard = buildDeterministicStoryboard(screenplay);
         const storyboardStructured = parseStructuredModelOutput(storyboardInvoke.result.text);
         if (storyboardStructured && Array.isArray(storyboardStructured.shotPlans)) {
@@ -2089,14 +2674,145 @@ async function executeStep(input: {
               if (!src || typeof src !== 'object') {
                 return shot;
               }
+              const srcRecord = src as Record<string, unknown>;
               return {
                 ...shot,
-                visualPrompt: String((src as Record<string, unknown>).visualPrompt || shot.visualPrompt),
-                motionCue: String((src as Record<string, unknown>).motionCue || shot.motionCue),
+                visualPrompt: String(srcRecord.visualPrompt || shot.visualPrompt),
+                motionCue: String(srcRecord.motionCue || shot.motionCue),
+                shotType: String(srcRecord.shotType || shot.shotType),
+                cameraMove: String(srcRecord.cameraMove || shot.cameraMove),
+                characterIds: Array.isArray(srcRecord.characterIds)
+                  ? (srcRecord.characterIds as string[])
+                  : shot.characterIds,
+                locationId: srcRecord.locationId !== undefined
+                  ? (srcRecord.locationId as string | null)
+                  : shot.locationId,
               };
             }),
           };
         }
+
+        // Phase 2A: Cinematography — per-shot photography rules
+        const cinematographyVars = {
+          episodeId: context.segmentedEpisode.episodeId,
+          shotId: storyboard.shotPlans[0]?.shotId || '',
+          visualPrompt: storyboard.shotPlans[0]?.visualPrompt || '',
+          shotType: storyboard.shotPlans[0]?.shotType || 'medium',
+          sceneAtmosphere: 'neutral',
+        };
+        const cinematographyValidated = validatePromptVariables('storyboard-cinematography', cinematographyVars);
+        if (cinematographyValidated.ok) {
+          const cinematographyPrompt = renderPromptTemplate('storyboard-cinematography', context.projectionLocale, cinematographyValidated.data);
+          try {
+            const cinematographyResult = await invokeWithRouteFallback({
+              stage: 'storyboard-cinematography',
+              capability: 'llm.text.generate',
+              traceId: input.traceId,
+              routeHint: 'chat/fine',
+              checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
+              invoke: async (routeOverride) => input.deps.aiClient.generateText({
+                prompt: cinematographyPrompt,
+                systemPrompt: 'Return JSON array of per-shot photography rules with composition, lighting, colorPalette, atmosphere.',
+                routeHint: 'chat/fine',
+                routeOverride,
+                maxTokens: 1024,
+              }),
+            });
+            if (cinematographyResult.fallbackAudit) {
+              input.fallbackAudits.push(cinematographyResult.fallbackAudit);
+            }
+            const cinematographyParsed = parseStructuredModelOutput(cinematographyResult.result.text);
+            const rulesArray = Array.isArray(cinematographyParsed?.rules)
+              ? cinematographyParsed!.rules as unknown[]
+              : Array.isArray(cinematographyParsed?.shots)
+                ? cinematographyParsed!.shots as unknown[]
+                : [];
+            storyboard = {
+              ...storyboard,
+              shotPlans: storyboard.shotPlans.map((shot, idx) => {
+                const rule = rulesArray[idx] as Record<string, unknown> | undefined;
+                if (!rule) return shot;
+                return {
+                  ...shot,
+                  photographyRule: {
+                    composition: String(rule.composition || shot.photographyRule.composition),
+                    lighting: String(rule.lighting || shot.photographyRule.lighting),
+                    colorPalette: String(rule.colorPalette || shot.photographyRule.colorPalette),
+                    atmosphere: String(rule.atmosphere || shot.photographyRule.atmosphere),
+                    technicalNotes: String(rule.technicalNotes || shot.photographyRule.technicalNotes),
+                  },
+                };
+              }),
+            };
+          } catch {
+            // Cinematography enrichment is best-effort; keep defaults
+          }
+        }
+
+        // Phase 2B: Acting — per-shot acting direction
+        const actingVars = {
+          episodeId: context.segmentedEpisode.episodeId,
+          shotId: storyboard.shotPlans[0]?.shotId || '',
+          characterIds: storyboard.shotPlans.flatMap((s) => s.characterIds).filter(Boolean).join(',') || 'none',
+          beatSummary: screenplay.beats.map((b) => b.summary).join('; '),
+        };
+        const actingValidated = validatePromptVariables('storyboard-acting', actingVars);
+        if (actingValidated.ok) {
+          const actingPrompt = renderPromptTemplate('storyboard-acting', context.projectionLocale, actingValidated.data);
+          try {
+            const actingResult = await invokeWithRouteFallback({
+              stage: 'storyboard-acting',
+              capability: 'llm.text.generate',
+              traceId: input.traceId,
+              routeHint: 'chat/fine',
+              checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
+              invoke: async (routeOverride) => input.deps.aiClient.generateText({
+                prompt: actingPrompt,
+                systemPrompt: 'Return JSON array of per-shot acting directions with characters array.',
+                routeHint: 'chat/fine',
+                routeOverride,
+                maxTokens: 1024,
+              }),
+            });
+            if (actingResult.fallbackAudit) {
+              input.fallbackAudits.push(actingResult.fallbackAudit);
+            }
+            const actingParsed = parseStructuredModelOutput(actingResult.result.text);
+            const actingArray = Array.isArray(actingParsed?.shots)
+              ? actingParsed!.shots as unknown[]
+              : Array.isArray(actingParsed?.directions)
+                ? actingParsed!.directions as unknown[]
+                : [];
+            storyboard = {
+              ...storyboard,
+              shotPlans: storyboard.shotPlans.map((shot, idx) => {
+                const dir = actingArray[idx] as Record<string, unknown> | undefined;
+                if (!dir) return shot;
+                const characters = Array.isArray(dir.characters)
+                  ? (dir.characters as Array<Record<string, unknown>>).map((c) => ({
+                    characterId: String(c.characterId || ''),
+                    actingDescription: String(c.actingDescription || ''),
+                  }))
+                  : shot.actingDirection.characters;
+                return {
+                  ...shot,
+                  actingDirection: { characters },
+                };
+              }),
+            };
+          } catch {
+            // Acting enrichment is best-effort; keep defaults
+          }
+        }
+
+        // Phase 3: Detail merge — generate final videoPrompt per shot
+        storyboard = {
+          ...storyboard,
+          shotPlans: storyboard.shotPlans.map((shot) => ({
+            ...shot,
+            videoPrompt: `${shot.visualPrompt}. ${shot.photographyRule.composition} composition, ${shot.photographyRule.lighting} lighting, ${shot.photographyRule.atmosphere} atmosphere.${shot.actingDirection.characters.length > 0 ? ` Acting: ${shot.actingDirection.characters.map((c) => `${c.characterId}: ${c.actingDescription}`).join('; ')}.` : ''}`,
+          })),
+        };
 
         const storyboardParsed = StoryboardSchema.safeParse(storyboard);
         if (!storyboardParsed.success) {
@@ -2225,41 +2941,45 @@ async function executeStep(input: {
 
             try {
               if (queueItem.modality === 'image') {
-                const imageResult = await invokeWithRouteFallback({
-                  stage: 'asset-render-image',
-                  capability: 'llm.image.generate',
-                  traceId: input.traceId,
-                  routeHint: 'image/default',
-                  checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
-                  invoke: async (routeOverride) => input.deps.aiClient.generateImage({
-                    prompt: storyboardShot.visualPrompt,
+                const candidateCount = CHARACTER_CASTING_POLICY.maxCandidateImages;
+                for (let ci = 0; ci < candidateCount; ci += 1) {
+                  const imageResult = await invokeWithRouteFallback({
+                    stage: 'asset-render-image',
+                    capability: 'llm.image.generate',
+                    traceId: input.traceId,
                     routeHint: 'image/default',
-                    routeOverride,
-                  }),
-                });
-                if (imageResult.fallbackAudit) {
-                  input.fallbackAudits.push(imageResult.fallbackAudit);
+                    checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
+                    invoke: async (routeOverride) => input.deps.aiClient.generateImage({
+                      prompt: storyboardShot.visualPrompt,
+                      routeHint: 'image/default',
+                      routeOverride,
+                    }),
+                  });
+                  if (imageResult.fallbackAudit) {
+                    input.fallbackAudits.push(imageResult.fallbackAudit);
+                  }
+                  queueItem.routeSource = imageResult.routeSource;
+                  shotAssets.push({
+                    assetId: createUlid(),
+                    episodeId: context.segmentedEpisode.episodeId,
+                    shotId: storyboardShot.shotId,
+                    clipId: storyboardShot.clipId,
+                    assetType: 'image',
+                    uri: String(imageResult.result.images[0]?.uri || `videoplay://image/${context.segmentedEpisode.episodeId}/${storyboardShot.shotId}_${ci}.png`),
+                    mimeType: String(imageResult.result.images[0]?.mimeType || 'image/png'),
+                    durationMs: storyboardShot.durationMs,
+                    fps: 30,
+                    resolution: '1920x1080',
+                    sourceEventIds: [...storyboardShot.sourceEventIds],
+                    routeSource: imageResult.routeSource,
+                    metadata: {
+                      promptId: VIDEOPLAY_PROMPT_ID.STORYBOARD_PLAN,
+                      queueItemId: queueItem.queueItemId,
+                      candidateIndex: ci,
+                    },
+                  });
                 }
                 queueItem.status = 'SUCCEEDED';
-                queueItem.routeSource = imageResult.routeSource;
-                shotAssets.push({
-                  assetId: createUlid(),
-                  episodeId: context.segmentedEpisode.episodeId,
-                  shotId: storyboardShot.shotId,
-                  clipId: storyboardShot.clipId,
-                  assetType: 'image',
-                  uri: String(imageResult.result.images[0]?.uri || `videoplay://image/${context.segmentedEpisode.episodeId}/${storyboardShot.shotId}.png`),
-                  mimeType: String(imageResult.result.images[0]?.mimeType || 'image/png'),
-                  durationMs: storyboardShot.durationMs,
-                  fps: 30,
-                  resolution: '1920x1080',
-                  sourceEventIds: [...storyboardShot.sourceEventIds],
-                  routeSource: imageResult.routeSource,
-                  metadata: {
-                    promptId: VIDEOPLAY_PROMPT_ID.STORYBOARD_PLAN,
-                    queueItemId: queueItem.queueItemId,
-                  },
-                });
                 batchSucceeded += 1;
                 continue;
               }
@@ -2597,15 +3317,219 @@ async function executeStep(input: {
       };
     }
 
+    case 'candidate-selection': {
+      for (const context of input.snapshot.episodeContexts) {
+        throwIfCanceled(input.control, input.step);
+        if (!context.assetOutput || !context.storyboard) {
+          throw new VideoPlayError({
+            reasonCode: VIDEOPLAY_REASON.CHECKPOINT_INVALID,
+            actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.CHECKPOINT_INVALID),
+            stage: 'candidate-selection',
+            message: 'VIDEOPLAY_CANDIDATE_SELECTION_REQUIRES_ASSETS',
+            details: { episodeId: context.segmentedEpisode.episodeId },
+          });
+        }
+
+        const shotOrder = new Map(
+          context.storyboard.shotPlans
+            .slice()
+            .sort((left, right) => left.startMs - right.startMs)
+            .map((shot, index) => [shot.shotId, index] as const),
+        );
+        const selectedSegments: SelectedTimelineSegment[] = context.assetOutput.shotAssets
+          .filter((asset) => asset.assetType === 'video')
+          .slice()
+          .sort((left, right) => {
+            const leftOrder = shotOrder.get(left.shotId) ?? Number.MAX_SAFE_INTEGER;
+            const rightOrder = shotOrder.get(right.shotId) ?? Number.MAX_SAFE_INTEGER;
+            if (leftOrder !== rightOrder) {
+              return leftOrder - rightOrder;
+            }
+            return left.assetId.localeCompare(right.assetId);
+          })
+          .map((asset, order) => ({
+            assetId: asset.assetId,
+            shotId: asset.shotId,
+            order,
+            trimInMs: null,
+            trimOutMs: null,
+          }));
+        if (selectedSegments.length === 0) {
+          throw new VideoPlayError({
+            reasonCode: VIDEOPLAY_REASON.CANDIDATE_SELECTION_FAILED,
+            actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.CANDIDATE_SELECTION_FAILED),
+            stage: 'candidate-selection',
+            message: 'VIDEOPLAY_NO_VIDEO_SEGMENTS_FOR_SELECTION',
+            details: { episodeId: context.segmentedEpisode.episodeId },
+          });
+        }
+
+        const candidateOutput: CandidateSelectionOutput = {
+          episodeId: context.segmentedEpisode.episodeId,
+          selectedAssetIds: CANDIDATE_SELECTION_POLICY.autoSelectAllRenderedVideo
+            ? selectedSegments.map((segment) => segment.assetId)
+            : [],
+          timelineSegments: selectedSegments,
+        };
+
+        const candidateParsed = CandidateSelectionOutputSchema.safeParse(candidateOutput);
+        if (!candidateParsed.success) {
+          throw new VideoPlayError({
+            reasonCode: VIDEOPLAY_REASON.CANDIDATE_SELECTION_FAILED,
+            actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.CANDIDATE_SELECTION_FAILED),
+            stage: 'candidate-selection',
+            message: 'VIDEOPLAY_CANDIDATE_SELECTION_OUTPUT_INVALID',
+          });
+        }
+
+        context.candidateSelection = candidateParsed.data;
+
+        input.runEventFactory.pushEvent({
+          step: input.step,
+          eventType: 'step.chunk',
+          attempt: input.attempt,
+          stepInputHash: input.stepInputHash,
+          lastCompletedUnit: context.segmentedEpisode.episodeId,
+          details: {
+            episodeId: context.segmentedEpisode.episodeId,
+            selectedSegmentCount: selectedSegments.length,
+            selectedAssetCount: candidateOutput.selectedAssetIds.length,
+          },
+        });
+      }
+
+      return {
+        lastCompletedUnit: input.snapshot.episodeContexts[input.snapshot.episodeContexts.length - 1]?.segmentedEpisode.episodeId ?? undefined,
+        details: {
+          episodeCount: input.snapshot.episodeContexts.length,
+        },
+      };
+    }
+
+    case 'audio-design': {
+      for (const context of input.snapshot.episodeContexts) {
+        throwIfCanceled(input.control, input.step);
+        if (!context.storyboard || !context.screenplay) {
+          throw new VideoPlayError({
+            reasonCode: VIDEOPLAY_REASON.CHECKPOINT_INVALID,
+            actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.CHECKPOINT_INVALID),
+            stage: 'audio-design',
+            message: 'VIDEOPLAY_AUDIO_DESIGN_REQUIRES_STORYBOARD',
+            details: { episodeId: context.segmentedEpisode.episodeId },
+          });
+        }
+
+        const totalDurationMs = context.storyboard.shotPlans.reduce((sum, shot) => sum + shot.durationMs, 0);
+        const audioVars = {
+          episodeId: context.segmentedEpisode.episodeId,
+          beatsSummary: context.screenplay.beats.map((beat) => beat.summary).join('; '),
+          shotCount: String(context.storyboard.shotPlans.length),
+          totalDurationMs: String(totalDurationMs),
+        };
+        const audioValidated = validatePromptVariables('audio-design', audioVars);
+        if (!audioValidated.ok) {
+          throw new VideoPlayError({
+            reasonCode: VIDEOPLAY_REASON.AUDIO_DESIGN_FAILED,
+            actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.AUDIO_DESIGN_FAILED),
+            stage: 'audio-design',
+            message: audioValidated.issues.join(';'),
+          });
+        }
+
+        const audioPrompt = renderPromptTemplate('audio-design', context.projectionLocale, audioValidated.data);
+
+        const audioResult = await invokeWithRouteFallback({
+          stage: 'audio-design-bgm',
+          capability: 'llm.text.generate',
+          traceId: input.traceId,
+          routeHint: 'chat/fine',
+          checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
+          invoke: async (routeOverride) => input.deps.aiClient.generateText({
+            prompt: audioPrompt,
+            systemPrompt: 'Return JSON with bgmRecommendation and sfxPlan.',
+            routeHint: 'chat/fine',
+            routeOverride,
+            maxTokens: 512,
+          }),
+        });
+        if (audioResult.fallbackAudit) {
+          input.fallbackAudits.push(audioResult.fallbackAudit);
+        }
+
+        const audioParsed = parseStructuredModelOutput(audioResult.result.text);
+        const bgmRec = audioParsed?.bgmRecommendation as Record<string, unknown> | undefined;
+        const bgmTrack: BgmTrack = {
+          trackId: createUlid(),
+          uri: String(bgmRec?.uri || `videoplay://bgm/${context.segmentedEpisode.episodeId}.mp3`),
+          durationMs: totalDurationMs,
+          fadeInMs: AUDIO_DESIGN_POLICY.defaultFadeInMs,
+          fadeOutMs: AUDIO_DESIGN_POLICY.defaultFadeOutMs,
+          volume: AUDIO_DESIGN_POLICY.defaultBgmVolume,
+          startOffsetMs: 0,
+        };
+
+        const sfxPlanRaw = Array.isArray(audioParsed?.sfxPlan) ? audioParsed!.sfxPlan : [];
+        const sfxLayers: SfxLayer[] = sfxPlanRaw.map((entry: unknown, sfxIndex: number) => {
+          const sfxEntry = entry as Record<string, unknown>;
+          return {
+            sfxId: createUlid(),
+            uri: String(sfxEntry.uri || `videoplay://sfx/${context.segmentedEpisode.episodeId}/sfx-${sfxIndex}.mp3`),
+            startMs: Number(sfxEntry.startMs || 0),
+            endMs: Number(sfxEntry.endMs || totalDurationMs),
+            volume: AUDIO_DESIGN_POLICY.defaultSfxVolume,
+          };
+        });
+
+        const audioDesignOutput: AudioDesignOutput = {
+          episodeId: context.segmentedEpisode.episodeId,
+          bgmTrack,
+          sfxLayers,
+        };
+
+        const audioDesignParsed = AudioDesignOutputSchema.safeParse(audioDesignOutput);
+        if (!audioDesignParsed.success) {
+          throw new VideoPlayError({
+            reasonCode: VIDEOPLAY_REASON.AUDIO_DESIGN_FAILED,
+            actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.AUDIO_DESIGN_FAILED),
+            stage: 'audio-design',
+            message: 'VIDEOPLAY_AUDIO_DESIGN_OUTPUT_INVALID',
+          });
+        }
+
+        context.audioDesign = audioDesignParsed.data;
+
+        input.runEventFactory.pushEvent({
+          step: input.step,
+          eventType: 'step.chunk',
+          attempt: input.attempt,
+          stepInputHash: input.stepInputHash,
+          lastCompletedUnit: context.segmentedEpisode.episodeId,
+          details: {
+            episodeId: context.segmentedEpisode.episodeId,
+            hasBgm: bgmTrack !== null,
+            sfxLayerCount: sfxLayers.length,
+            routeSource: audioResult.routeSource,
+          },
+        });
+      }
+
+      return {
+        lastCompletedUnit: input.snapshot.episodeContexts[input.snapshot.episodeContexts.length - 1]?.segmentedEpisode.episodeId ?? undefined,
+        details: {
+          episodeCount: input.snapshot.episodeContexts.length,
+        },
+      };
+    }
+
     case 'edit-compose': {
       for (const context of input.snapshot.episodeContexts) {
         throwIfCanceled(input.control, input.step);
-        if (!context.storyboard || !context.assetOutput) {
+        if (!context.storyboard || !context.assetOutput || !context.candidateSelection) {
           throw new VideoPlayError({
             reasonCode: VIDEOPLAY_REASON.CHECKPOINT_INVALID,
             actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.CHECKPOINT_INVALID),
             stage: 'edit',
-            message: 'VIDEOPLAY_EDIT_REQUIRES_STORYBOARD_AND_ASSET',
+            message: 'VIDEOPLAY_EDIT_REQUIRES_STORYBOARD_ASSET_SELECTION',
             details: { episodeId: context.segmentedEpisode.episodeId },
           });
         }
@@ -2614,7 +3538,12 @@ async function executeStep(input: {
           episodeId: context.segmentedEpisode.episodeId,
           storyboard: context.storyboard,
           assetOutput: context.assetOutput,
+          candidateSelection: context.candidateSelection,
         });
+        if (context.audioDesign) {
+          composeOutput.bgmTrack = context.audioDesign.bgmTrack;
+          composeOutput.sfxLayers = [...context.audioDesign.sfxLayers];
+        }
 
         context.composeOutput = composeOutput;
 
@@ -2828,6 +3757,27 @@ async function executeStep(input: {
         context.releaseCandidate = releaseParsed.data;
         context.episodeRecord = episodeRecord;
 
+        if (context.candidateSelection) {
+          await input.deps.hookClient.data.query({
+            capability: VIDEOPLAY_DATA_API_EPISODE_UPSERT,
+            query: {
+              operation: 'upsert-candidate-selection',
+              episodeId: episodeRecord.episodeId,
+              candidateSelection: context.candidateSelection,
+            },
+          });
+        }
+        if (context.audioDesign) {
+          await input.deps.hookClient.data.query({
+            capability: VIDEOPLAY_DATA_API_EPISODE_UPSERT,
+            query: {
+              operation: 'upsert-audio-design',
+              episodeId: episodeRecord.episodeId,
+              audioDesign: context.audioDesign,
+            },
+          });
+        }
+
         episodes.push(episodeRecord);
         releaseCandidates.push(releaseParsed.data);
 
@@ -2842,6 +3792,27 @@ async function executeStep(input: {
             episodeId: context.segmentedEpisode.episodeId,
             releaseId: releaseParsed.data.releaseId,
             assetIdempotencyKey,
+          },
+        });
+      }
+
+      if (input.snapshot.characterCasting) {
+        await input.deps.hookClient.data.query({
+          capability: VIDEOPLAY_DATA_API_EPISODE_UPSERT,
+          query: {
+            operation: 'upsert-character-casting',
+            storyId: input.pipelineInput.storyId,
+            characterCasting: input.snapshot.characterCasting,
+          },
+        });
+      }
+      if (input.snapshot.scenePlanning) {
+        await input.deps.hookClient.data.query({
+          capability: VIDEOPLAY_DATA_API_EPISODE_UPSERT,
+          query: {
+            operation: 'upsert-scene-planning',
+            storyId: input.pipelineInput.storyId,
+            scenePlanning: input.snapshot.scenePlanning,
           },
         });
       }

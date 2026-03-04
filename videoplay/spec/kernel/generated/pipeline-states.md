@@ -9,26 +9,38 @@ execution_chain:
   - step: narrative-ingest
     order: 1
     source_rule: V-PIPE-001
-  - step: episode-segmentation
+  - step: character-casting
     order: 2
     source_rule: V-PIPE-001
-  - step: screenplay
+  - step: scene-planning
     order: 3
     source_rule: V-PIPE-001
-  - step: storyboard
+  - step: episode-segmentation
     order: 4
     source_rule: V-PIPE-001
-  - step: asset-render
+  - step: screenplay
     order: 5
     source_rule: V-PIPE-001
-  - step: edit-compose
+  - step: storyboard
     order: 6
     source_rule: V-PIPE-001
-  - step: qc-gate
+  - step: asset-render
     order: 7
     source_rule: V-PIPE-001
-  - step: release-package
+  - step: candidate-selection
     order: 8
+    source_rule: V-PIPE-001
+  - step: audio-design
+    order: 9
+    source_rule: V-PIPE-001
+  - step: edit-compose
+    order: 10
+    source_rule: V-PIPE-001
+  - step: qc-gate
+    order: 11
+    source_rule: V-PIPE-001
+  - step: release-package
+    order: 12
     source_rule: V-PIPE-001
 states:
   - state: RECEIVED
@@ -176,9 +188,12 @@ execution_controls:
 workbench_stage_navigation:
   stage_ids:
     - story-source
+    - casting
     - script
     - storyboard
     - voice
+    - selection
+    - audio
     - video
     - qc
     - publish
@@ -186,6 +201,10 @@ workbench_stage_navigation:
     - stage: story-source
       maps_to:
         - narrative-ingest
+    - stage: casting
+      maps_to:
+        - character-casting
+        - scene-planning
     - stage: script
       maps_to:
         - episode-segmentation
@@ -200,14 +219,15 @@ workbench_stage_navigation:
         - voice-analyze
         - voice-render
         - lip-sync
+    - stage: selection
+      maps_to:
+        - candidate-selection
+    - stage: audio
+      maps_to:
+        - audio-design
     - stage: video
       maps_to:
-        - asset-render
         - edit-compose
-      render_phase_subset:
-        - video-render
-        - batch-queue-plan
-        - batch-queue-execute
     - stage: qc
       maps_to:
         - qc-gate
@@ -226,6 +246,10 @@ stage_readiness:
       ready_when:
         - selected_story_exists
         - story_package_ready
+    - stage: casting
+      ready_when:
+        - character_casting_ready
+        - scene_planning_ready
     - stage: script
       ready_when:
         - segmentation_ready
@@ -237,9 +261,14 @@ stage_readiness:
       ready_when:
         - storyboard_ready
         - voice_subflow_ready_for_required_shots
+    - stage: selection
+      ready_when:
+        - candidate_selection_ready
+    - stage: audio
+      ready_when:
+        - audio_design_ready
     - stage: video
       ready_when:
-        - rendered_video_assets_ready
         - compose_output_ready
     - stage: qc
       ready_when:
@@ -250,9 +279,14 @@ stage_readiness:
         - release_candidate_ready
   source_rule: V-PIPE-019
 stage_entry_preconditions:
+  - stage: casting
+    requires:
+      - narrative_ingest_completed
+    block_reason_code: VIDEOPLAY_STAGE_PRECONDITION_BLOCKED
+    source_rule: V-PIPE-020
   - stage: script
     requires:
-      - selected_story_package_ready
+      - scene_planning_completed
     block_reason_code: VIDEOPLAY_STAGE_PRECONDITION_BLOCKED
     source_rule: V-PIPE-020
   - stage: storyboard
@@ -263,12 +297,23 @@ stage_entry_preconditions:
   - stage: voice
     requires:
       - storyboard_ready
+      - route_ready
+    block_reason_code: VIDEOPLAY_STAGE_PRECONDITION_BLOCKED
+    source_rule: V-PIPE-020
+  - stage: selection
+    requires:
+      - asset_render_completed
+    block_reason_code: VIDEOPLAY_STAGE_PRECONDITION_BLOCKED
+    source_rule: V-PIPE-020
+  - stage: audio
+    requires:
+      - candidate_selection_completed
     block_reason_code: VIDEOPLAY_STAGE_PRECONDITION_BLOCKED
     source_rule: V-PIPE-020
   - stage: video
     requires:
-      - storyboard_ready
-      - voice_lip_sync_ready_for_required_shots
+      - audio_design_completed
+      - route_ready
     block_reason_code: VIDEOPLAY_STAGE_PRECONDITION_BLOCKED
     source_rule: V-PIPE-020
   - stage: qc
@@ -309,8 +354,16 @@ attempt_policy:
   source_rule: V-PIPE-011
 editable_handoffs:
   - after_step: narrative-ingest
-    next_step: episode-segmentation
+    next_step: character-casting
     editable_payload: story-window-and-source-mode
+    source_rule: V-PIPE-013
+  - after_step: character-casting
+    next_step: scene-planning
+    editable_payload: character-appearance-and-role-level
+    source_rule: V-PIPE-013
+  - after_step: scene-planning
+    next_step: episode-segmentation
+    editable_payload: scene-environment-and-reference-images
     source_rule: V-PIPE-013
   - after_step: episode-segmentation
     next_step: screenplay
@@ -325,8 +378,16 @@ editable_handoffs:
     editable_payload: shot-plan-motion-camera-continuity
     source_rule: V-PIPE-013
   - after_step: asset-render
+    next_step: candidate-selection
+    editable_payload: shot-candidate-images-and-videos
+    source_rule: V-PIPE-013
+  - after_step: candidate-selection
+    next_step: audio-design
+    editable_payload: selected-candidates-per-shot
+    source_rule: V-PIPE-013
+  - after_step: audio-design
     next_step: edit-compose
-    editable_payload: clip-asset-selection-and-regeneration
+    editable_payload: bgm-sfx-selection-and-volume
     source_rule: V-PIPE-013
   - after_step: edit-compose
     next_step: qc-gate

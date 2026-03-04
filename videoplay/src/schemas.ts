@@ -35,6 +35,18 @@ const VideoPlayReasonCodeSchema = z.enum([
   VIDEOPLAY_REASON.PROMPT_CANARY_FAILED,
   VIDEOPLAY_REASON.CHECKPOINT_INVALID,
   VIDEOPLAY_REASON.STEP_RESUME_HASH_MISMATCH,
+  VIDEOPLAY_REASON.CHARACTER_CASTING_FAILED,
+  VIDEOPLAY_REASON.SCENE_PLANNING_FAILED,
+  VIDEOPLAY_REASON.CANDIDATE_SELECTION_FAILED,
+  VIDEOPLAY_REASON.AUDIO_DESIGN_FAILED,
+  VIDEOPLAY_REASON.CHARACTER_CONSISTENCY_LOW,
+  VIDEOPLAY_REASON.PHOTOGRAPHY_COMPLIANCE_LOW,
+  VIDEOPLAY_REASON.ACTING_QUALITY_LOW,
+  VIDEOPLAY_REASON.AUDIO_COMPLETENESS_LOW,
+  VIDEOPLAY_REASON.SELECTION_COVERAGE_LOW,
+  VIDEOPLAY_REASON.SELECTION_RATIONALITY_LOW,
+  VIDEOPLAY_REASON.CASTING_VISUAL_FAILED,
+  VIDEOPLAY_REASON.SCENE_VISUAL_FAILED,
 ]);
 
 const VideoPlayOperationTypeSchema = z.enum([
@@ -52,6 +64,11 @@ const VideoPlayOperationTypeSchema = z.enum([
   VIDEOPLAY_OPERATION_TYPE.SWITCH_BRANCH,
   VIDEOPLAY_OPERATION_TYPE.REDO,
   VIDEOPLAY_OPERATION_TYPE.MERGE_BRANCH,
+  VIDEOPLAY_OPERATION_TYPE.SELECT_CANDIDATE,
+  VIDEOPLAY_OPERATION_TYPE.REGENERATE_CANDIDATE,
+  VIDEOPLAY_OPERATION_TYPE.UPDATE_CHARACTER_APPEARANCE,
+  VIDEOPLAY_OPERATION_TYPE.SELECT_BGM_TRACK,
+  VIDEOPLAY_OPERATION_TYPE.UPDATE_SFX_LAYER,
 ]);
 
 export const SourceEventIdsSchema = z.array(z.string().min(1)).min(1);
@@ -252,6 +269,118 @@ export const ScreenplaySchema = z.object({
   beats: z.array(ScreenplayBeatSchema).min(1),
 });
 
+// --- New schemas for 12-stage pipeline ---
+
+export const PhotographyRuleSchema = z.object({
+  composition: z.string(),
+  lighting: z.string(),
+  colorPalette: z.string(),
+  atmosphere: z.string(),
+  technicalNotes: z.string(),
+});
+
+export const ActingDirectionSchema = z.object({
+  characters: z.array(z.object({
+    characterId: z.string().min(1),
+    actingDescription: z.string(),
+  })),
+});
+
+export const CharacterAppearanceVersionSchema = z.object({
+  appearanceIndex: z.number().int().nonnegative(),
+  description: z.string(),
+  imageUrls: z.array(z.string()),
+  selectedIndex: z.number().int().nonnegative(),
+  changeReason: z.string(),
+  previousImageUrl: z.string().nullable(),
+});
+
+export const CharacterBriefSchema = z.object({
+  agentId: z.string().min(1),
+  name: z.string().min(1),
+  roleLevel: z.enum(['S', 'A', 'B', 'C', 'D']),
+  visualKeywords: z.array(z.string()),
+  appearances: z.array(CharacterAppearanceVersionSchema),
+  activeAppearanceIndex: z.number().int().nonnegative(),
+  referenceImageUri: z.string().nullable(),
+});
+
+export const CharacterCastingOutputSchema = z.object({
+  storyId: z.string().min(1),
+  characters: z.array(CharacterBriefSchema),
+});
+
+export const SceneEnvironmentBriefSchema = z.object({
+  sceneId: z.string().min(1),
+  name: z.string().min(1),
+  environmentDescription: z.string(),
+  referenceImageUrls: z.array(z.string()),
+  selectedIndex: z.number().int().nonnegative(),
+});
+
+export const ScenePlanningOutputSchema = z.object({
+  storyId: z.string().min(1),
+  scenes: z.array(SceneEnvironmentBriefSchema),
+});
+
+export const VoiceEmotionConfigSchema = z.object({
+  emotionPrompt: z.string(),
+  emotionStrength: z.number().min(0).max(1),
+  referenceAudioUrl: z.string().nullable(),
+});
+
+export const SelectedTimelineSegmentSchema = z.object({
+  assetId: z.string().min(1),
+  shotId: z.string().min(1),
+  order: z.number().int().nonnegative(),
+  trimInMs: z.number().int().nonnegative().nullable(),
+  trimOutMs: z.number().int().nonnegative().nullable(),
+}).refine((value) => {
+  if (value.trimInMs == null || value.trimOutMs == null) {
+    return true;
+  }
+  return value.trimOutMs > value.trimInMs;
+}, {
+  message: 'timeline_segment_trim_out_must_be_greater_than_trim_in',
+});
+
+export const CandidateSelectionOutputSchema = z.object({
+  episodeId: z.string().min(1),
+  selectedAssetIds: z.array(z.string().min(1)),
+  timelineSegments: z.array(SelectedTimelineSegmentSchema),
+});
+
+export const BgmTrackSchema = z.object({
+  trackId: z.string().min(1),
+  uri: z.string().min(1),
+  durationMs: z.number().int().nonnegative(),
+  fadeInMs: z.number().int().nonnegative(),
+  fadeOutMs: z.number().int().nonnegative(),
+  volume: z.number().min(0).max(1),
+  startOffsetMs: z.number().int().nonnegative(),
+});
+
+export const SfxLayerSchema = z.object({
+  sfxId: z.string().min(1),
+  uri: z.string().min(1),
+  startMs: z.number().int().nonnegative(),
+  endMs: z.number().int().nonnegative(),
+  volume: z.number().min(0).max(1),
+});
+
+export const AudioDesignOutputSchema = z.object({
+  episodeId: z.string().min(1),
+  bgmTrack: BgmTrackSchema.nullable(),
+  sfxLayers: z.array(SfxLayerSchema),
+});
+
+export const TimelineTransitionSchema = z.object({
+  type: z.enum(['cut', 'dissolve', 'fade-black', 'fade-white']),
+  durationMs: z.number().int().nonnegative(),
+});
+
+// --- Enhanced existing schemas ---
+
 export const StoryboardShotSchema = z.object({
   shotId: z.string().min(1),
   clipId: z.string().min(1),
@@ -261,7 +390,14 @@ export const StoryboardShotSchema = z.object({
   continuityAnchors: z.array(z.string().min(1)),
   sourceEventIds: SourceEventIdsSchema,
   durationMs: z.number().int().positive(),
-  startMs: z.number().int().nonnegative().optional(),
+  startMs: z.number().int().nonnegative(),
+  shotType: z.string().min(1),
+  cameraMove: z.string().min(1),
+  photographyRule: PhotographyRuleSchema,
+  actingDirection: ActingDirectionSchema,
+  videoPrompt: z.string().min(1),
+  characterIds: z.array(z.string()),
+  locationId: z.string().nullable(),
 });
 
 export const StoryboardSchema = z.object({
@@ -308,12 +444,17 @@ export const AssetRenderOutputSchema = z.object({
 });
 
 export const TimelineClipSchema = z.object({
+  assetId: z.string().min(1),
   clipId: z.string().min(1),
   shotId: z.string().min(1),
   startMs: z.number().int().nonnegative(),
   endMs: z.number().int().nonnegative(),
+  trimInMs: z.number().int().nonnegative().nullable(),
+  trimOutMs: z.number().int().nonnegative().nullable(),
   uri: z.string().min(1),
   sourceEventIds: SourceEventIdsSchema,
+  transitionIn: TimelineTransitionSchema.nullable(),
+  transitionOut: TimelineTransitionSchema.nullable(),
 }).refine((value) => value.endMs > value.startMs, {
   message: 'timeline_clip_end_must_be_greater_than_start',
 });
@@ -348,6 +489,12 @@ export const EditComposeOutputSchema = z.object({
       container: z.literal('mp4'),
     }),
   }),
+  bgmTrack: BgmTrackSchema.nullable(),
+  sfxLayers: z.array(SfxLayerSchema),
+  subtitleOverlay: z.object({
+    uri: z.string().min(1),
+    mimeType: z.string().min(1),
+  }).nullable(),
 });
 
 export const QualityGateReportSchema = z.object({
@@ -373,6 +520,10 @@ export const QualityGateReportSchema = z.object({
   avDriftMs: z.number().nonnegative(),
   durationSec: z.number().nonnegative(),
   failReasonCode: VideoPlayReasonCodeSchema.nullable(),
+  characterConsistencyScore: z.number().min(0).max(1),
+  photographyComplianceScore: z.number().min(0).max(1),
+  actingQualityScore: z.number().min(0).max(1),
+  audioCompletenessRatio: z.number().min(0).max(1),
 });
 
 export const RunEventSchema = z.object({
@@ -487,4 +638,8 @@ export const VideoPlayStorageStateSchema = z.object({
   releaseIdsByEpisodeId: z.record(z.string(), z.array(z.string().min(1))),
   idempotency: z.record(z.string(), z.unknown()),
   operationAudit: z.array(VersionLineageNodeSchema),
+  characterCastingByStoryId: z.record(z.string(), CharacterCastingOutputSchema),
+  scenePlanningByStoryId: z.record(z.string(), ScenePlanningOutputSchema),
+  candidateSelectionByEpisodeId: z.record(z.string(), CandidateSelectionOutputSchema),
+  audioDesignByEpisodeId: z.record(z.string(), AudioDesignOutputSchema),
 });

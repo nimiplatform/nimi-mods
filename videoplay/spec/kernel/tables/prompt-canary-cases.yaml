@@ -46,6 +46,50 @@ cases:
     registry_scope_alignment_required: true
     placeholder_set_alignment_required: true
     source_rule: V-PROMPT-006
+  - id: VPROMPT-007-CHARACTER-VISUAL-SHAPE
+    description: Character visual prompt returns required structured fields.
+    prompt_scope: character-visual
+    required_output_fields:
+      - agentId
+      - name
+      - visualKeywords
+      - appearanceDescription
+    source_rule: V-PROMPT-003
+  - id: VPROMPT-008-SCENE-DESCRIPTION-SHAPE
+    description: Scene description prompt returns required structured fields.
+    prompt_scope: scene-description
+    required_output_fields:
+      - sceneId
+      - environmentDescription
+    source_rule: V-PROMPT-003
+  - id: VPROMPT-009-CINEMATOGRAPHY-SHAPE
+    description: Storyboard cinematography prompt returns PhotographyRule fields.
+    prompt_scope: storyboard-cinematography
+    required_output_fields:
+      - composition
+      - lighting
+      - colorPalette
+      - atmosphere
+    source_rule: V-PROMPT-003
+  - id: VPROMPT-010-ACTING-SHAPE
+    description: Storyboard acting prompt returns ActingDirection fields.
+    prompt_scope: storyboard-acting
+    required_output_fields:
+      - characters
+    source_rule: V-PROMPT-003
+  - id: VPROMPT-011-DETAIL-SHAPE
+    description: Storyboard detail prompt returns merged videoPrompt field.
+    prompt_scope: storyboard-detail
+    required_output_fields:
+      - videoPrompt
+    source_rule: V-PROMPT-003
+  - id: VPROMPT-012-AUDIO-DESIGN-SHAPE
+    description: Audio design prompt returns BGM recommendation and SFX plan.
+    prompt_scope: audio-design
+    required_output_fields:
+      - bgmRecommendation
+      - sfxPlan
+    source_rule: V-PROMPT-003
 drift_guard:
   registry_and_template_alignment_required: true
   placeholder_set_parity_required: true

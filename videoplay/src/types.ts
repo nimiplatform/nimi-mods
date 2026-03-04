@@ -210,6 +210,111 @@ export type ScreenplayOutput = {
   beats: ScreenplayBeat[];
 };
 
+// --- New types for 12-stage pipeline ---
+
+export type CharacterAppearanceVersion = {
+  appearanceIndex: number;
+  description: string;
+  imageUrls: string[];
+  selectedIndex: number;
+  changeReason: string;
+  previousImageUrl: string | null;
+};
+
+export type CharacterBrief = {
+  agentId: string;
+  name: string;
+  roleLevel: 'S' | 'A' | 'B' | 'C' | 'D';
+  visualKeywords: string[];
+  appearances: CharacterAppearanceVersion[];
+  activeAppearanceIndex: number;
+  referenceImageUri: string | null;
+};
+
+export type CharacterCastingOutput = {
+  storyId: string;
+  characters: CharacterBrief[];
+};
+
+export type SceneEnvironmentBrief = {
+  sceneId: string;
+  name: string;
+  environmentDescription: string;
+  referenceImageUrls: string[];
+  selectedIndex: number;
+};
+
+export type ScenePlanningOutput = {
+  storyId: string;
+  scenes: SceneEnvironmentBrief[];
+};
+
+export type PhotographyRule = {
+  composition: string;
+  lighting: string;
+  colorPalette: string;
+  atmosphere: string;
+  technicalNotes: string;
+};
+
+export type ActingDirection = {
+  characters: Array<{
+    characterId: string;
+    actingDescription: string;
+  }>;
+};
+
+export type VoiceEmotionConfig = {
+  emotionPrompt: string;
+  emotionStrength: number;
+  referenceAudioUrl: string | null;
+};
+
+export type SelectedTimelineSegment = {
+  assetId: string;
+  shotId: string;
+  order: number;
+  trimInMs: number | null;
+  trimOutMs: number | null;
+};
+
+export type CandidateSelectionOutput = {
+  episodeId: string;
+  selectedAssetIds: string[];
+  timelineSegments: SelectedTimelineSegment[];
+};
+
+export type BgmTrack = {
+  trackId: string;
+  uri: string;
+  durationMs: number;
+  fadeInMs: number;
+  fadeOutMs: number;
+  volume: number;
+  startOffsetMs: number;
+};
+
+export type SfxLayer = {
+  sfxId: string;
+  uri: string;
+  startMs: number;
+  endMs: number;
+  volume: number;
+};
+
+export type AudioDesignOutput = {
+  episodeId: string;
+  bgmTrack: BgmTrack | null;
+  sfxLayers: SfxLayer[];
+};
+
+export type TimelineTransition = {
+  type: 'cut' | 'dissolve' | 'fade-black' | 'fade-white';
+  durationMs: number;
+};
+
+// --- Enhanced existing types ---
+
 export type StoryboardShot = {
   shotId: string;
   clipId: string;
@@ -219,7 +324,14 @@ export type StoryboardShot = {
   continuityAnchors: string[];
   sourceEventIds: string[];
   durationMs: number;
-  startMs?: number;
+  startMs: number;
+  shotType: string;
+  cameraMove: string;
+  photographyRule: PhotographyRule;
+  actingDirection: ActingDirection;
+  videoPrompt: string;
+  characterIds: string[];
+  locationId: string | null;
 };
 
 export type StoryboardOutput = {
@@ -266,12 +378,17 @@ export type AssetRenderOutput = {
 };
 
 export type TimelineClip = {
+  assetId: string;
   clipId: string;
   shotId: string;
   startMs: number;
   endMs: number;
+  trimInMs: number | null;
+  trimOutMs: number | null;
   uri: string;
   sourceEventIds: string[];
+  transitionIn: TimelineTransition | null;
+  transitionOut: TimelineTransition | null;
 };
 
 export type EditComposeOutput = {
@@ -300,6 +417,9 @@ export type EditComposeOutput = {
       container: 'mp4';
     };
   };
+  bgmTrack: BgmTrack | null;
+  sfxLayers: SfxLayer[];
+  subtitleOverlay: { uri: string; mimeType: string } | null;
 };
 
 export type QualityGateReport = {
@@ -325,6 +445,10 @@ export type QualityGateReport = {
   avDriftMs: number;
   durationSec: number;
   failReasonCode: VideoPlayReasonCode | null;
+  characterConsistencyScore: number;
+  photographyComplianceScore: number;
+  actingQualityScore: number;
+  audioCompletenessRatio: number;
 };
 
 export type FallbackAuditRecord = {
@@ -517,6 +641,10 @@ export type VideoPlayStorageState = {
   releaseIdsByEpisodeId: Record<string, string[]>;
   idempotency: Record<string, unknown>;
   operationAudit: Array<VersionLineageNode>;
+  characterCastingByStoryId: Record<string, CharacterCastingOutput>;
+  scenePlanningByStoryId: Record<string, ScenePlanningOutput>;
+  candidateSelectionByEpisodeId: Record<string, CandidateSelectionOutput>;
+  audioDesignByEpisodeId: Record<string, AudioDesignOutput>;
 };
 
 export type VideoPlayDataOperation =

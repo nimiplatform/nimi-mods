@@ -64,6 +64,19 @@ export const VIDEOPLAY_REASON = {
   PROMPT_CANARY_FAILED: 'VIDEOPLAY_PROMPT_CANARY_FAILED',
   CHECKPOINT_INVALID: 'VIDEOPLAY_CHECKPOINT_INVALID',
   STEP_RESUME_HASH_MISMATCH: 'VIDEOPLAY_STEP_RESUME_HASH_MISMATCH',
+  // New reason codes for 12-stage pipeline
+  CHARACTER_CASTING_FAILED: 'VIDEOPLAY_CHARACTER_CASTING_FAILED',
+  SCENE_PLANNING_FAILED: 'VIDEOPLAY_SCENE_PLANNING_FAILED',
+  CANDIDATE_SELECTION_FAILED: 'VIDEOPLAY_CANDIDATE_SELECTION_FAILED',
+  AUDIO_DESIGN_FAILED: 'VIDEOPLAY_AUDIO_DESIGN_FAILED',
+  CHARACTER_CONSISTENCY_LOW: 'VIDEOPLAY_CHARACTER_CONSISTENCY_LOW',
+  PHOTOGRAPHY_COMPLIANCE_LOW: 'VIDEOPLAY_PHOTOGRAPHY_COMPLIANCE_LOW',
+  ACTING_QUALITY_LOW: 'VIDEOPLAY_ACTING_QUALITY_LOW',
+  AUDIO_COMPLETENESS_LOW: 'VIDEOPLAY_AUDIO_COMPLETENESS_LOW',
+  SELECTION_COVERAGE_LOW: 'VIDEOPLAY_SELECTION_COVERAGE_LOW',
+  SELECTION_RATIONALITY_LOW: 'VIDEOPLAY_SELECTION_RATIONALITY_LOW',
+  CASTING_VISUAL_FAILED: 'VIDEOPLAY_CASTING_VISUAL_FAILED',
+  SCENE_VISUAL_FAILED: 'VIDEOPLAY_SCENE_VISUAL_FAILED',
 } as const;
 
 export type VideoPlayReasonCode =
@@ -77,14 +90,18 @@ export const VIDEOPLAY_RETRY_CLASS = {
 export type VideoPlayRetryClass =
   typeof VIDEOPLAY_RETRY_CLASS[keyof typeof VIDEOPLAY_RETRY_CLASS];
 
-export const VIDEOPLAY_STORAGE_KEY = 'nimi.videoplay.state.v1';
+export const VIDEOPLAY_STORAGE_KEY = 'nimi.videoplay.state';
 
 export const VIDEOPLAY_PIPELINE_CHAIN = [
   'narrative-ingest',
+  'character-casting',
+  'scene-planning',
   'episode-segmentation',
   'screenplay',
   'storyboard',
   'asset-render',
+  'candidate-selection',
+  'audio-design',
   'edit-compose',
   'qc-gate',
   'release-package',
@@ -95,9 +112,12 @@ export type VideoPlayPipelineStep =
 
 export const VIDEOPLAY_WORKBENCH_STAGE = {
   STORY_SOURCE: 'story-source',
+  CASTING: 'casting',
   SCRIPT: 'script',
   STORYBOARD: 'storyboard',
   VOICE: 'voice',
+  SELECTION: 'selection',
+  AUDIO: 'audio',
   VIDEO: 'video',
   QC: 'qc',
   PUBLISH: 'publish',
@@ -105,9 +125,12 @@ export const VIDEOPLAY_WORKBENCH_STAGE = {
 
 export const VIDEOPLAY_WORKBENCH_STAGE_ORDER = [
   VIDEOPLAY_WORKBENCH_STAGE.STORY_SOURCE,
+  VIDEOPLAY_WORKBENCH_STAGE.CASTING,
   VIDEOPLAY_WORKBENCH_STAGE.SCRIPT,
   VIDEOPLAY_WORKBENCH_STAGE.STORYBOARD,
   VIDEOPLAY_WORKBENCH_STAGE.VOICE,
+  VIDEOPLAY_WORKBENCH_STAGE.SELECTION,
+  VIDEOPLAY_WORKBENCH_STAGE.AUDIO,
   VIDEOPLAY_WORKBENCH_STAGE.VIDEO,
   VIDEOPLAY_WORKBENCH_STAGE.QC,
   VIDEOPLAY_WORKBENCH_STAGE.PUBLISH,
@@ -132,14 +155,28 @@ export const VIDEOPLAY_ROUTE_STAGES = [
   'asset-render-image',
   'asset-render-video',
   'asset-render-voice',
+  'character-casting-text',
+  'character-casting-visual',
+  'scene-planning-text',
+  'scene-planning-visual',
+  'storyboard-cinematography',
+  'storyboard-acting',
+  'audio-design-bgm',
 ] as const;
 
 export const VIDEOPLAY_STAGE_CAPABILITY = {
-  screenplay: 'llm.text.generate',
-  storyboard: 'llm.text.generate',
+  'screenplay': 'llm.text.generate',
+  'storyboard': 'llm.text.generate',
   'asset-render-image': 'llm.image.generate',
   'asset-render-video': 'llm.video.generate',
   'asset-render-voice': 'llm.speech.synthesize',
+  'character-casting-text': 'llm.text.generate',
+  'character-casting-visual': 'llm.image.generate',
+  'scene-planning-text': 'llm.text.generate',
+  'scene-planning-visual': 'llm.image.generate',
+  'storyboard-cinematography': 'llm.text.generate',
+  'storyboard-acting': 'llm.text.generate',
+  'audio-design-bgm': 'llm.text.generate',
 } as const;
 
 export type VideoPlayRouteStage =
@@ -157,6 +194,12 @@ export const VIDEOPLAY_PROMPT_ID = {
   STORYBOARD_PLAN: 'VPROMPT-STORYBOARD-PLAN-V1',
   SHOT_REWRITE: 'VPROMPT-SHOT-REWRITE-V1',
   SHOT_VARIANT: 'VPROMPT-SHOT-VARIANT-V1',
+  CHARACTER_VISUAL: 'VPROMPT-CHARACTER-VISUAL-V1',
+  SCENE_DESCRIPTION: 'VPROMPT-SCENE-DESCRIPTION-V1',
+  STORYBOARD_CINEMATOGRAPHY: 'VPROMPT-STORYBOARD-CINEMATOGRAPHY-V1',
+  STORYBOARD_ACTING: 'VPROMPT-STORYBOARD-ACTING-V1',
+  STORYBOARD_DETAIL: 'VPROMPT-STORYBOARD-DETAIL-V1',
+  AUDIO_DESIGN: 'VPROMPT-AUDIO-DESIGN-V1',
 } as const;
 
 export type VideoPlayPromptId =
@@ -172,6 +215,12 @@ export const VIDEOPLAY_QUALITY_RULE = {
   MAX_BLACK_GAP_MS: 250,
   VISUAL_ATTRACTION_MIN: 0.72,
   VISUAL_COMPONENT_MIN: 0.55,
+  CHARACTER_CONSISTENCY_MIN: 0.70,
+  PHOTOGRAPHY_COMPLIANCE_MIN: 0.65,
+  ACTING_QUALITY_MIN: 0.60,
+  AUDIO_COMPLETENESS_MIN: 0.85,
+  SELECTION_COVERAGE_MIN: 0.70,
+  SELECTION_RATIONALITY_MIN: 0.80,
 } as const;
 
 export const VIDEOPLAY_VISUAL_COMPONENT_WEIGHT = {
@@ -196,6 +245,11 @@ export const VIDEOPLAY_OPERATION_TYPE = {
   SWITCH_BRANCH: 'switch-branch',
   REDO: 'redo',
   MERGE_BRANCH: 'merge-branch',
+  SELECT_CANDIDATE: 'select-candidate',
+  REGENERATE_CANDIDATE: 'regenerate-candidate',
+  UPDATE_CHARACTER_APPEARANCE: 'update-character-appearance',
+  SELECT_BGM_TRACK: 'select-bgm-track',
+  UPDATE_SFX_LAYER: 'update-sfx-layer',
 } as const;
 
 export type VideoPlayOperationType =

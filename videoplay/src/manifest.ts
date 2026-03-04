@@ -16,7 +16,7 @@ import {
 export const VIDEOPLAY_MANIFEST = {
   id: VIDEOPLAY_MOD_ID,
   name: 'VideoPlay',
-  version: '1.0.0',
+  version: '1.1.0',
   description: 'Episode-scale narrative video production workbench',
   author: { name: 'Nimi', url: 'https://nimi.xyz' },
   license: 'MIT',

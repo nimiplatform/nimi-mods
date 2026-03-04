@@ -4,7 +4,13 @@ import { VIDEOPLAY_PROMPT_ID } from '../contracts.js';
 export type VideoPlayPromptScope =
   | 'storyboard-plan'
   | 'shot-rewrite'
-  | 'shot-variant';
+  | 'shot-variant'
+  | 'character-visual'
+  | 'scene-description'
+  | 'storyboard-cinematography'
+  | 'storyboard-acting'
+  | 'storyboard-detail'
+  | 'audio-design';
 
 export type VideoPlayPromptLocale = 'zh' | 'en';
 
@@ -41,13 +47,63 @@ export const ShotVariantVariableSchema = z.object({
   variantInstruction: z.string().min(1),
 });
 
+export const CharacterVisualVariableSchema = z.object({
+  agentId: z.string().min(1),
+  characterName: z.string().min(1),
+  visualKeywords: z.string().min(1),
+  roleLevel: z.string().min(1),
+  memoryRecall: z.string().min(1),
+});
+
+export const SceneDescriptionVariableSchema = z.object({
+  sceneId: z.string().min(1),
+  sceneName: z.string().min(1),
+  sceneDescription: z.string().min(1),
+});
+
+export const StoryboardCinematographyVariableSchema = z.object({
+  episodeId: z.string().min(1),
+  shotId: z.string().min(1),
+  visualPrompt: z.string().min(1),
+  shotType: z.string().min(1),
+  sceneAtmosphere: z.string().min(1),
+});
+
+export const StoryboardActingVariableSchema = z.object({
+  episodeId: z.string().min(1),
+  shotId: z.string().min(1),
+  characterIds: z.string().min(1),
+  beatSummary: z.string().min(1),
+});
+
+export const StoryboardDetailVariableSchema = z.object({
+  episodeId: z.string().min(1),
+  shotId: z.string().min(1),
+  photographyRule: z.string().min(1),
+  actingDirection: z.string().min(1),
+});
+
+export const AudioDesignVariableSchema = z.object({
+  episodeId: z.string().min(1),
+  beatsSummary: z.string().min(1),
+  shotCount: z.string().min(1),
+  totalDurationMs: z.string().min(1),
+});
+
 export const PROMPT_VARIABLE_SCHEMA = {
   'storyboard-plan': StoryboardPlanVariableSchema,
   'shot-rewrite': ShotRewriteVariableSchema,
   'shot-variant': ShotVariantVariableSchema,
+  'character-visual': CharacterVisualVariableSchema,
+  'scene-description': SceneDescriptionVariableSchema,
+  'storyboard-cinematography': StoryboardCinematographyVariableSchema,
+  'storyboard-acting': StoryboardActingVariableSchema,
+  'storyboard-detail': StoryboardDetailVariableSchema,
+  'audio-design': AudioDesignVariableSchema,
 } as const;
 
 const TEMPLATES: VideoPlayPromptTemplate[] = [
+  // --- storyboard-plan ---
   {
     promptId: VIDEOPLAY_PROMPT_ID.STORYBOARD_PLAN,
     scope: 'storyboard-plan',
@@ -74,6 +130,7 @@ const TEMPLATES: VideoPlayPromptTemplate[] = [
       'Return JSON with required fields: episodeId, clipPlans, shotPlans, sourceEventIds.',
     ].join('\n'),
   },
+  // --- shot-rewrite ---
   {
     promptId: VIDEOPLAY_PROMPT_ID.SHOT_REWRITE,
     scope: 'shot-rewrite',
@@ -100,6 +157,7 @@ const TEMPLATES: VideoPlayPromptTemplate[] = [
       'Return JSON with fields: shotId, visualPrompt, motionCue, continuityAnchors.',
     ].join('\n'),
   },
+  // --- shot-variant ---
   {
     promptId: VIDEOPLAY_PROMPT_ID.SHOT_VARIANT,
     scope: 'shot-variant',
@@ -124,6 +182,170 @@ const TEMPLATES: VideoPlayPromptTemplate[] = [
       'sourceEventIds={{sourceEventIds}}',
       'variantInstruction={{variantInstruction}}',
       'Return JSON with fields: baseShotId, variantShotId, variantDelta, sourceEventIds.',
+    ].join('\n'),
+  },
+  // --- character-visual ---
+  {
+    promptId: VIDEOPLAY_PROMPT_ID.CHARACTER_VISUAL,
+    scope: 'character-visual',
+    locale: 'zh',
+    template: [
+      '你是角色外观设计师。',
+      'agentId={{agentId}}',
+      'characterName={{characterName}}',
+      'visualKeywords={{visualKeywords}}',
+      'roleLevel={{roleLevel}}',
+      'memoryRecall={{memoryRecall}}',
+      '输出角色外观描述 JSON，字段包含: agentId, name, visualKeywords, appearanceDescription, referencePrompt。',
+    ].join('\n'),
+  },
+  {
+    promptId: VIDEOPLAY_PROMPT_ID.CHARACTER_VISUAL,
+    scope: 'character-visual',
+    locale: 'en',
+    template: [
+      'You are a character appearance designer.',
+      'agentId={{agentId}}',
+      'characterName={{characterName}}',
+      'visualKeywords={{visualKeywords}}',
+      'roleLevel={{roleLevel}}',
+      'memoryRecall={{memoryRecall}}',
+      'Return character appearance JSON with fields: agentId, name, visualKeywords, appearanceDescription, referencePrompt.',
+    ].join('\n'),
+  },
+  // --- scene-description ---
+  {
+    promptId: VIDEOPLAY_PROMPT_ID.SCENE_DESCRIPTION,
+    scope: 'scene-description',
+    locale: 'zh',
+    template: [
+      '你是场景环境描述师。',
+      'sceneId={{sceneId}}',
+      'sceneName={{sceneName}}',
+      'sceneDescription={{sceneDescription}}',
+      '输出场景环境描述 JSON，字段包含: sceneId, environmentDescription, referencePrompt。',
+    ].join('\n'),
+  },
+  {
+    promptId: VIDEOPLAY_PROMPT_ID.SCENE_DESCRIPTION,
+    scope: 'scene-description',
+    locale: 'en',
+    template: [
+      'You are a scene environment designer.',
+      'sceneId={{sceneId}}',
+      'sceneName={{sceneName}}',
+      'sceneDescription={{sceneDescription}}',
+      'Return scene environment JSON with fields: sceneId, environmentDescription, referencePrompt.',
+    ].join('\n'),
+  },
+  // --- storyboard-cinematography ---
+  {
+    promptId: VIDEOPLAY_PROMPT_ID.STORYBOARD_CINEMATOGRAPHY,
+    scope: 'storyboard-cinematography',
+    locale: 'zh',
+    template: [
+      '你是摄影指导。',
+      'episodeId={{episodeId}}',
+      'shotId={{shotId}}',
+      'visualPrompt={{visualPrompt}}',
+      'shotType={{shotType}}',
+      'sceneAtmosphere={{sceneAtmosphere}}',
+      '输出摄影规则 JSON，字段包含: composition, lighting, colorPalette, atmosphere, technicalNotes。',
+    ].join('\n'),
+  },
+  {
+    promptId: VIDEOPLAY_PROMPT_ID.STORYBOARD_CINEMATOGRAPHY,
+    scope: 'storyboard-cinematography',
+    locale: 'en',
+    template: [
+      'You are a director of photography.',
+      'episodeId={{episodeId}}',
+      'shotId={{shotId}}',
+      'visualPrompt={{visualPrompt}}',
+      'shotType={{shotType}}',
+      'sceneAtmosphere={{sceneAtmosphere}}',
+      'Return photography rule JSON with fields: composition, lighting, colorPalette, atmosphere, technicalNotes.',
+    ].join('\n'),
+  },
+  // --- storyboard-acting ---
+  {
+    promptId: VIDEOPLAY_PROMPT_ID.STORYBOARD_ACTING,
+    scope: 'storyboard-acting',
+    locale: 'zh',
+    template: [
+      '你是演技指导。',
+      'episodeId={{episodeId}}',
+      'shotId={{shotId}}',
+      'characterIds={{characterIds}}',
+      'beatSummary={{beatSummary}}',
+      '输出演技指导 JSON，字段包含: characters (数组，每项含 characterId, actingDescription)。',
+    ].join('\n'),
+  },
+  {
+    promptId: VIDEOPLAY_PROMPT_ID.STORYBOARD_ACTING,
+    scope: 'storyboard-acting',
+    locale: 'en',
+    template: [
+      'You are an acting director.',
+      'episodeId={{episodeId}}',
+      'shotId={{shotId}}',
+      'characterIds={{characterIds}}',
+      'beatSummary={{beatSummary}}',
+      'Return acting direction JSON with fields: characters (array of characterId, actingDescription).',
+    ].join('\n'),
+  },
+  // --- storyboard-detail ---
+  {
+    promptId: VIDEOPLAY_PROMPT_ID.STORYBOARD_DETAIL,
+    scope: 'storyboard-detail',
+    locale: 'zh',
+    template: [
+      '你是分镜细节合并器。',
+      'episodeId={{episodeId}}',
+      'shotId={{shotId}}',
+      'photographyRule={{photographyRule}}',
+      'actingDirection={{actingDirection}}',
+      '输出最终 videoPrompt 字段：结合摄影规则和演技指导，生成用于图像/视频生成的完整提示词。',
+    ].join('\n'),
+  },
+  {
+    promptId: VIDEOPLAY_PROMPT_ID.STORYBOARD_DETAIL,
+    scope: 'storyboard-detail',
+    locale: 'en',
+    template: [
+      'You are a storyboard detail merger.',
+      'episodeId={{episodeId}}',
+      'shotId={{shotId}}',
+      'photographyRule={{photographyRule}}',
+      'actingDirection={{actingDirection}}',
+      'Output the final videoPrompt field: combine photography rules and acting direction into a complete generation prompt.',
+    ].join('\n'),
+  },
+  // --- audio-design ---
+  {
+    promptId: VIDEOPLAY_PROMPT_ID.AUDIO_DESIGN,
+    scope: 'audio-design',
+    locale: 'zh',
+    template: [
+      '你是音频设计师。',
+      'episodeId={{episodeId}}',
+      'beatsSummary={{beatsSummary}}',
+      'shotCount={{shotCount}}',
+      'totalDurationMs={{totalDurationMs}}',
+      '输出音频设计 JSON，字段包含: bgmRecommendation, sfxPlan, emotionArc。',
+    ].join('\n'),
+  },
+  {
+    promptId: VIDEOPLAY_PROMPT_ID.AUDIO_DESIGN,
+    scope: 'audio-design',
+    locale: 'en',
+    template: [
+      'You are an audio designer.',
+      'episodeId={{episodeId}}',
+      'beatsSummary={{beatsSummary}}',
+      'shotCount={{shotCount}}',
+      'totalDurationMs={{totalDurationMs}}',
+      'Return audio design JSON with fields: bgmRecommendation, sfxPlan, emotionArc.',
     ].join('\n'),
   },
 ];
@@ -157,7 +379,17 @@ export function resolvePromptLocale(locale: string | null | undefined): VideoPla
 }
 
 export function listPromptScopes(): VideoPlayPromptScope[] {
-  return ['storyboard-plan', 'shot-rewrite', 'shot-variant'];
+  return [
+    'storyboard-plan',
+    'shot-rewrite',
+    'shot-variant',
+    'character-visual',
+    'scene-description',
+    'storyboard-cinematography',
+    'storyboard-acting',
+    'storyboard-detail',
+    'audio-design',
+  ];
 }
 
 export function getPromptFallbackLocale(): VideoPlayPromptLocale {

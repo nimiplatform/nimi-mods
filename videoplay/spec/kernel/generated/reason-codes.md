@@ -141,4 +141,64 @@ codes:
     blocking: true
     action_hint: Rerun the selected step to rebuild downstream outputs.
     source_rule: V-ERR-005
+  - code: VIDEOPLAY_CHARACTER_CASTING_FAILED
+    stage: character-casting
+    blocking: true
+    action_hint: Fix character memory data or LLM route, then retry.
+    source_rule: V-ERR-001
+  - code: VIDEOPLAY_SCENE_PLANNING_FAILED
+    stage: scene-planning
+    blocking: true
+    action_hint: Fix scene data or LLM route, then retry.
+    source_rule: V-ERR-001
+  - code: VIDEOPLAY_CANDIDATE_SELECTION_FAILED
+    stage: candidate-selection
+    blocking: true
+    action_hint: Fix candidate selection inputs and retry.
+    source_rule: V-ERR-001
+  - code: VIDEOPLAY_AUDIO_DESIGN_FAILED
+    stage: audio-design
+    blocking: true
+    action_hint: Fix audio design LLM route and retry.
+    source_rule: V-ERR-001
+  - code: VIDEOPLAY_CHARACTER_CONSISTENCY_LOW
+    stage: qc
+    blocking: true
+    action_hint: Improve character consistency across shots and retry QC.
+    source_rule: V-ERR-001
+  - code: VIDEOPLAY_PHOTOGRAPHY_COMPLIANCE_LOW
+    stage: qc
+    blocking: true
+    action_hint: Improve photography compliance and retry QC.
+    source_rule: V-ERR-001
+  - code: VIDEOPLAY_ACTING_QUALITY_LOW
+    stage: qc
+    blocking: true
+    action_hint: Improve acting quality scores and retry QC.
+    source_rule: V-ERR-001
+  - code: VIDEOPLAY_AUDIO_COMPLETENESS_LOW
+    stage: qc
+    blocking: true
+    action_hint: Complete audio design coverage and retry QC.
+    source_rule: V-ERR-001
+  - code: VIDEOPLAY_SELECTION_COVERAGE_LOW
+    stage: qc
+    blocking: true
+    action_hint: Increase selected segment coverage and retry QC.
+    source_rule: V-ERR-001
+  - code: VIDEOPLAY_SELECTION_RATIONALITY_LOW
+    stage: qc
+    blocking: true
+    action_hint: Fix selection ordering or trim constraints and retry QC.
+    source_rule: V-ERR-001
+  - code: VIDEOPLAY_COVERAGE_LOW
+    stage: qc
+    blocking: true
+    action_hint: Fill missing shot coverage before QC.
+    source_rule: V-ERR-001
+  - code: VIDEOPLAY_STORY_PACKAGE_SCHEMA_INVALID
+    stage: narrative-ingest
+    blocking: true
+    action_hint: Repair story package schema and retry.
+    source_rule: V-ERR-004
 ```

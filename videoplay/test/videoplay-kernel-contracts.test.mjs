@@ -206,6 +206,14 @@ function makeQualityFixture(overrides = {}) {
         continuityAnchors: ['a'],
         sourceEventIds: ['ev-1'],
         durationMs: 8000,
+        startMs: 0,
+        shotType: 'medium',
+        cameraMove: 'static',
+        photographyRule: { composition: 'center', lighting: 'natural', colorPalette: 'neutral', atmosphere: 'calm', technicalNotes: '' },
+        actingDirection: { characters: [] },
+        videoPrompt: 'A',
+        characterIds: [],
+        locationId: null,
       },
       {
         shotId: 'shot-2',
@@ -216,6 +224,14 @@ function makeQualityFixture(overrides = {}) {
         continuityAnchors: ['b'],
         sourceEventIds: ['ev-2'],
         durationMs: 9000,
+        startMs: 8000,
+        shotType: 'medium',
+        cameraMove: 'static',
+        photographyRule: { composition: 'center', lighting: 'natural', colorPalette: 'neutral', atmosphere: 'calm', technicalNotes: '' },
+        actingDirection: { characters: [] },
+        videoPrompt: 'B',
+        characterIds: [],
+        locationId: null,
       },
     ],
     sourceEventIds: ['ev-1', 'ev-2'],
@@ -223,8 +239,32 @@ function makeQualityFixture(overrides = {}) {
 
   const composeOutput = {
     episodeTimeline: [
-      { clipId: 'clip-1', shotId: 'shot-1', startMs: 0, endMs: 8000, uri: 'video://1', sourceEventIds: ['ev-1'] },
-      { clipId: 'clip-1', shotId: 'shot-2', startMs: 8000, endMs: 17000, uri: 'video://2', sourceEventIds: ['ev-2'] },
+      {
+        assetId: 'asset-1',
+        clipId: 'clip-1',
+        shotId: 'shot-1',
+        startMs: 0,
+        endMs: 8000,
+        trimInMs: null,
+        trimOutMs: null,
+        uri: 'video://1',
+        sourceEventIds: ['ev-1'],
+        transitionIn: null,
+        transitionOut: null,
+      },
+      {
+        assetId: 'asset-2',
+        clipId: 'clip-1',
+        shotId: 'shot-2',
+        startMs: 8000,
+        endMs: 17000,
+        trimInMs: null,
+        trimOutMs: null,
+        uri: 'video://2',
+        sourceEventIds: ['ev-2'],
+        transitionIn: null,
+        transitionOut: null,
+      },
     ],
     episodeMasterVideo: {
       uri: 'video://master',
@@ -253,6 +293,9 @@ function makeQualityFixture(overrides = {}) {
         container: 'mp4',
       },
     },
+    bgmTrack: null,
+    sfxLayers: [],
+    subtitleOverlay: null,
   };
 
   const assetOutput = {
@@ -339,9 +382,14 @@ function createPipelineDeps(options = {}) {
           };
         }
 
-        if (capability === 'data-api.videoplay.episode.upsert' && query.operation === 'upsert') {
-          writes.episodes.push(query.episode);
-          return { episode: query.episode };
+        if (capability === 'data-api.videoplay.episode.upsert') {
+          if (query.operation === 'upsert') {
+            writes.episodes.push(query.episode);
+            return { episode: query.episode };
+          }
+          if (query.operation === 'upsert-candidate-selection' || query.operation === 'upsert-audio-design' || query.operation === 'upsert-character-casting' || query.operation === 'upsert-scene-planning') {
+            return { ok: true };
+          }
         }
 
         if (capability === 'data-api.videoplay.asset.batch-upsert' && query.operation === 'upsert') {
@@ -352,6 +400,10 @@ function createPipelineDeps(options = {}) {
               writeCount: query.assets.length,
             },
           };
+        }
+
+        if (capability === 'data-api.core.agent.memory.recall.for-entity') {
+          return { items: [{ content: 'mock memory' }], core: [], e2e: [], recallSource: 'mock' };
         }
 
         throw new Error(`unhandled capability: ${capability}`);
@@ -461,6 +513,14 @@ test('sourceEventIds out-of-baseline fails close in quality gate', () => {
         continuityAnchors: [],
         sourceEventIds: ['ev-999'],
         durationMs: 17000,
+        startMs: 0,
+        shotType: 'medium',
+        cameraMove: 'static',
+        photographyRule: { composition: 'center', lighting: 'natural', colorPalette: 'neutral', atmosphere: 'calm', technicalNotes: '' },
+        actingDirection: { characters: [] },
+        videoPrompt: 'bad',
+        characterIds: [],
+        locationId: null,
       }],
       sourceEventIds: ['ev-999'],
     },
@@ -537,6 +597,14 @@ test('idempotent replay does not duplicate episode write side effects', () => {
         continuityAnchors: ['a'],
         sourceEventIds: ['ev-1'],
         durationMs: 17000,
+        startMs: 0,
+        shotType: 'medium',
+        cameraMove: 'static',
+        photographyRule: { composition: 'center', lighting: 'natural', colorPalette: 'neutral', atmosphere: 'calm', technicalNotes: '' },
+        actingDirection: { characters: [] },
+        videoPrompt: 'v',
+        characterIds: [],
+        locationId: null,
       }],
       sourceEventIds: ['ev-1'],
     },
@@ -556,6 +624,10 @@ test('idempotent replay does not duplicate episode write side effects', () => {
       avDriftMs: 0,
       durationSec: 17,
       failReasonCode: null,
+      characterConsistencyScore: 0.9,
+      photographyComplianceScore: 0.9,
+      actingQualityScore: 0.9,
+      audioCompletenessRatio: 1,
     },
     candidateRelease: null,
     createdAt: new Date().toISOString(),
@@ -595,7 +667,7 @@ test('idempotent replay does not duplicate episode write side effects', () => {
   assert.equal(Object.keys(state.episodesById).length, 1);
 });
 
-test('timeline overlap is rejected', () => {
+test('compose requires selected timeline segments', () => {
   assert.throws(() => composeEpisode({
     episodeId: 'episode-1',
     storyboard: {
@@ -612,6 +684,13 @@ test('timeline overlap is rejected', () => {
           sourceEventIds: ['ev-1'],
           durationMs: 5000,
           startMs: 0,
+          shotType: 'medium',
+          cameraMove: 'static',
+          photographyRule: { composition: 'center', lighting: 'natural', colorPalette: 'neutral', atmosphere: 'calm', technicalNotes: '' },
+          actingDirection: { characters: [] },
+          videoPrompt: 'a',
+          characterIds: [],
+          locationId: null,
         },
         {
           shotId: 'shot-2',
@@ -623,6 +702,13 @@ test('timeline overlap is rejected', () => {
           sourceEventIds: ['ev-1'],
           durationMs: 5000,
           startMs: 1000,
+          shotType: 'medium',
+          cameraMove: 'static',
+          photographyRule: { composition: 'center', lighting: 'natural', colorPalette: 'neutral', atmosphere: 'calm', technicalNotes: '' },
+          actingDirection: { characters: [] },
+          videoPrompt: 'b',
+          characterIds: [],
+          locationId: null,
         },
       ],
       sourceEventIds: ['ev-1'],
@@ -676,7 +762,12 @@ test('timeline overlap is rejected', () => {
         voiceRatio: 1,
       },
     },
-  }), /VIDEOPLAY_TIMELINE_OVERLAP_FORBIDDEN/);
+    candidateSelection: {
+      episodeId: 'episode-1',
+      selectedAssetIds: [],
+      timelineSegments: [],
+    },
+  }), /VIDEOPLAY_SELECTED_SEGMENTS_EMPTY/);
 });
 
 test('AV drift above 80ms is rejected by QC', () => {
@@ -862,7 +953,7 @@ test('stepwise run pauses with checkpoint metadata', async () => {
   });
 
   assert.equal(result.status, 'PAUSED');
-  assert.equal(result.nextStep, 'episode-segmentation');
+  assert.equal(result.nextStep, 'character-casting');
   const ingest = result.stageProgress.find((item) => item.step === 'narrative-ingest');
   assert.ok(ingest);
   assert.equal(ingest.status, 'COMPLETED');
@@ -899,10 +990,10 @@ test('continue from checkpoint advances the next stage only', async () => {
 
   assert.equal(second.runId, first.runId);
   assert.equal(second.status, 'PAUSED');
-  assert.equal(second.nextStep, 'screenplay');
-  const segmented = second.stageProgress.find((item) => item.step === 'episode-segmentation');
-  assert.ok(segmented);
-  assert.equal(segmented.status, 'COMPLETED');
+  assert.equal(second.nextStep, 'scene-planning');
+  const casted = second.stageProgress.find((item) => item.step === 'character-casting');
+  assert.ok(casted);
+  assert.equal(casted.status, 'COMPLETED');
 });
 
 test('rerun step invalidates downstream and increments attempt', async () => {
@@ -1013,6 +1104,12 @@ test('prompt canary covers shape/locale-parity/registry-drift cases', () => {
     'VPROMPT-004-PLACEHOLDER-PARITY-ZH-EN',
     'VPROMPT-005-VARIABLE-SCHEMA-VALIDATION',
     'VPROMPT-006-CATALOG-TEMPLATE-DRIFT',
+    'VPROMPT-007-CHARACTER-VISUAL-SHAPE',
+    'VPROMPT-008-SCENE-DESCRIPTION-SHAPE',
+    'VPROMPT-009-CINEMATOGRAPHY-SHAPE',
+    'VPROMPT-010-ACTING-SHAPE',
+    'VPROMPT-011-DETAIL-SHAPE',
+    'VPROMPT-012-AUDIO-DESIGN-SHAPE',
   ];
   for (const caseId of requiredCaseIds) {
     assert.ok(report.executedCaseIds.includes(caseId), `missing case: ${caseId}`);

@@ -11,9 +11,11 @@ import {
   upsertEpisode,
 } from '../src/storage/state.ts';
 import {
+  VIDEOPLAY_DATA_API_EPISODE_UPSERT,
   VIDEOPLAY_REASON,
   VIDEOPLAY_STORAGE_KEY,
 } from '../src/contracts.ts';
+import { registerVideoPlayDataCapabilities } from '../src/registrars/data.ts';
 
 function nowIso() {
   return new Date().toISOString();
@@ -66,6 +68,14 @@ function makeEpisodeRecord(overrides = {}) {
           continuityAnchors: ['anchor-1'],
           sourceEventIds: ['ev-1'],
           durationMs: 2400,
+          startMs: 0,
+          shotType: 'medium',
+          cameraMove: 'static',
+          photographyRule: { composition: 'center', lighting: 'natural', colorPalette: 'neutral', atmosphere: 'calm', technicalNotes: '' },
+          actingDirection: { characters: [] },
+          videoPrompt: 'visual',
+          characterIds: [],
+          locationId: null,
         },
       ],
       sourceEventIds: ['ev-1'],
@@ -95,6 +105,10 @@ function makeEpisodeRecord(overrides = {}) {
       avDriftMs: 0,
       durationSec: 24,
       failReasonCode: null,
+      characterConsistencyScore: 0.9,
+      photographyComplianceScore: 0.9,
+      actingQualityScore: 0.9,
+      audioCompletenessRatio: 1,
     },
     candidateRelease: null,
     createdAt: now,
@@ -331,4 +345,155 @@ test('persist failure branch swallows localStorage write error and falls back to
     assert.equal(Object.keys(loaded.episodesById).length, 0);
     assert.equal(Object.keys(loaded.releasesById).length, 0);
   });
+});
+
+test('data registrar round-trips extended pipeline state through get/upsert operations', async () => {
+  const handlers = new Map();
+  const hookClient = {
+    data: {
+      register: async ({ capability, handler }) => {
+        handlers.set(capability, handler);
+      },
+    },
+  };
+  const memory = new Map();
+  const localStorage = {
+    getItem: (key) => (memory.has(key) ? memory.get(key) : null),
+    setItem: (key, value) => {
+      memory.set(String(key), String(value));
+    },
+    removeItem: (key) => {
+      memory.delete(String(key));
+    },
+    clear: () => {
+      memory.clear();
+    },
+  };
+
+  const hasOwn = Object.prototype.hasOwnProperty.call(globalThis, 'localStorage');
+  const original = globalThis.localStorage;
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: localStorage,
+    configurable: true,
+    writable: true,
+  });
+  try {
+    await registerVideoPlayDataCapabilities({ hookClient });
+    const episodeHandler = handlers.get(VIDEOPLAY_DATA_API_EPISODE_UPSERT);
+    assert.ok(episodeHandler);
+
+    const characterCasting = {
+      storyId: 'story-1',
+      characters: [{
+        agentId: 'agent-1',
+        name: 'Agent One',
+        roleLevel: 'B',
+        visualKeywords: ['calm'],
+        appearances: [{
+          appearanceIndex: 0,
+          description: 'base look',
+          imageUrls: ['img://a'],
+          selectedIndex: 0,
+          changeReason: 'initial-casting',
+          previousImageUrl: null,
+        }],
+        activeAppearanceIndex: 0,
+        referenceImageUri: 'img://a',
+      }],
+    };
+    const scenePlanning = {
+      storyId: 'story-1',
+      scenes: [{
+        sceneId: 'scene-1',
+        name: 'Scene One',
+        environmentDescription: 'quiet room',
+        referenceImageUrls: ['img://scene-a'],
+        selectedIndex: 0,
+      }],
+    };
+    const candidateSelection = {
+      episodeId: 'episode-1',
+      selectedAssetIds: ['asset-video-1'],
+      timelineSegments: [{
+        assetId: 'asset-video-1',
+        shotId: 'shot-1',
+        order: 0,
+        trimInMs: 100,
+        trimOutMs: 900,
+      }],
+    };
+    const audioDesign = {
+      episodeId: 'episode-1',
+      bgmTrack: {
+        trackId: 'bgm-1',
+        uri: 'audio://bgm-1',
+        durationMs: 12000,
+        fadeInMs: 500,
+        fadeOutMs: 1000,
+        volume: 0.4,
+        startOffsetMs: 0,
+      },
+      sfxLayers: [{
+        sfxId: 'sfx-1',
+        uri: 'audio://sfx-1',
+        startMs: 1000,
+        endMs: 2000,
+        volume: 0.6,
+      }],
+    };
+
+    await episodeHandler({
+      operation: 'upsert-character-casting',
+      storyId: 'story-1',
+      characterCasting,
+    });
+    await episodeHandler({
+      operation: 'upsert-scene-planning',
+      storyId: 'story-1',
+      scenePlanning,
+    });
+    await episodeHandler({
+      operation: 'upsert-candidate-selection',
+      episodeId: 'episode-1',
+      candidateSelection,
+    });
+    await episodeHandler({
+      operation: 'upsert-audio-design',
+      episodeId: 'episode-1',
+      audioDesign,
+    });
+
+    const castRead = await episodeHandler({
+      operation: 'get-character-casting',
+      storyId: 'story-1',
+    });
+    const sceneRead = await episodeHandler({
+      operation: 'get-scene-planning',
+      storyId: 'story-1',
+    });
+    const candidateRead = await episodeHandler({
+      operation: 'get-candidate-selection',
+      episodeId: 'episode-1',
+    });
+    const audioRead = await episodeHandler({
+      operation: 'get-audio-design',
+      episodeId: 'episode-1',
+    });
+
+    assert.equal(castRead.characterCasting.storyId, 'story-1');
+    assert.equal(sceneRead.scenePlanning.scenes[0].sceneId, 'scene-1');
+    assert.equal(candidateRead.candidateSelection.timelineSegments[0].assetId, 'asset-video-1');
+    assert.equal(audioRead.audioDesign.bgmTrack.trackId, 'bgm-1');
+  } finally {
+    if (hasOwn) {
+      Object.defineProperty(globalThis, 'localStorage', {
+        value: original,
+        configurable: true,
+        writable: true,
+      });
+    } else {
+      // eslint-disable-next-line no-undef
+      delete globalThis.localStorage;
+    }
+  }
 });

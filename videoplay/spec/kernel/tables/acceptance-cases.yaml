@@ -196,6 +196,70 @@ cases:
       - clip-plus-compose
       - post-segmentation-full-chain
     source_rule: V-ACC-002
+  - id: VID-031-CHARACTER-CASTING-OUTPUT
+    description: Character casting produces CharacterCastingOutput with appearance candidates from agent memory.
+    expected_ok: true
+    required_output: character_casting_output
+    source_rule: V-ACC-002
+  - id: VID-032-SCENE-PLANNING-OUTPUT
+    description: Scene planning produces ScenePlanningOutput with environment descriptions and reference images.
+    expected_ok: true
+    required_output: scene_planning_output
+    source_rule: V-ACC-002
+  - id: VID-033-CANDIDATE-SELECTION-AUTO
+    description: Candidate selection auto-selects rendered video segment IDs and emits timeline order.
+    expected_ok: true
+    auto_select: true
+    source_rule: V-ACC-002
+  - id: VID-034-AUDIO-DESIGN-BGM-TRACK
+    description: Audio design produces BGM track and SFX layers from storyboard beat analysis.
+    expected_ok: true
+    required_output: audio_design_output
+    source_rule: V-ACC-002
+  - id: VID-035-STORYBOARD-3PHASE-CINEMATOGRAPHY
+    description: Storyboard 3-phase produces PhotographyRule per shot via cinematography LLM call.
+    expected_ok: true
+    phase: cinematography
+    source_rule: V-ACC-002
+  - id: VID-036-STORYBOARD-3PHASE-ACTING
+    description: Storyboard 3-phase produces ActingDirection per shot via acting LLM call.
+    expected_ok: true
+    phase: acting
+    source_rule: V-ACC-002
+  - id: VID-037-ASSET-RENDER-MULTI-CANDIDATE
+    description: Asset render outputs one primary video segment per shot for candidate-selection stage.
+    expected_ok: true
+    video_segment_per_shot: true
+    source_rule: V-ACC-002
+  - id: VID-038-EDIT-COMPOSE-BGM-INJECT
+    description: Edit compose injects audioDesign BGM and SFX into compose output.
+    expected_ok: true
+    bgm_injected: true
+    source_rule: V-ACC-002
+  - id: VID-039-QC-CHARACTER-CONSISTENCY
+    description: QC gate evaluates selection coverage ratio against threshold.
+    expected_ok: true
+    gate: selection_coverage
+    min: 0.70
+    source_rule: V-ACC-002
+  - id: VID-040-QC-PHOTOGRAPHY-COMPLIANCE
+    description: QC gate evaluates selection rationality score against threshold.
+    expected_ok: true
+    gate: selection_rationality
+    min: 0.80
+    source_rule: V-ACC-002
+  - id: VID-041-QC-ACTING-QUALITY
+    description: QC gate evaluates acting quality score against threshold.
+    expected_ok: true
+    gate: acting_quality
+    min: 0.60
+    source_rule: V-ACC-002
+  - id: VID-042-QC-AUDIO-COMPLETENESS
+    description: QC gate evaluates audio completeness ratio against threshold.
+    expected_ok: true
+    gate: audio_completeness
+    min: 0.85
+    source_rule: V-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:videoplay-kernel-docs
     source_rule: V-ACC-003

@@ -63,6 +63,10 @@ export function createInitialVideoPlayState(): VideoPlayStorageState {
     releaseIdsByEpisodeId: {},
     idempotency: {},
     operationAudit: [],
+    characterCastingByStoryId: {},
+    scenePlanningByStoryId: {},
+    candidateSelectionByEpisodeId: {},
+    audioDesignByEpisodeId: {},
   };
 }
 

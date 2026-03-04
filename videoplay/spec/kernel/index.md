@@ -11,7 +11,7 @@ Domain docs must reference kernel rule IDs and must not duplicate kernel prose.
 ## 2. Rule ID Format
 
 - Format: `V-<DOMAIN>-NNN`
-- Domain enum: `CAP`, `FACT`, `PIPE`, `SEG`, `EDIT`, `ROUTE`, `QC`, `OPS`, `LINEAGE`, `PROMPT`, `ERR`, `ACC`
+- Domain enum: `CAP`, `FACT`, `PIPE`, `SEG`, `EDIT`, `ROUTE`, `QC`, `OPS`, `LINEAGE`, `PROMPT`, `CHAR`, `SCENE`, `CAND`, `AUDIO`, `ERR`, `ACC`
 
 ## 3. Ownership
 
@@ -25,6 +25,10 @@ Domain docs must reference kernel rule IDs and must not duplicate kernel prose.
 - `creator-workflow-contract.md` -> `V-OPS-*`
 - `version-lineage-contract.md` -> `V-LINEAGE-*`
 - `prompt-governance-contract.md` -> `V-PROMPT-*`
+- `character-casting-contract.md` -> `V-CHAR-*`
+- `scene-planning-contract.md` -> `V-SCENE-*`
+- `candidate-selection-contract.md` -> `V-CAND-*`
+- `audio-design-contract.md` -> `V-AUDIO-*`
 - `error-model.md` -> `V-ERR-*`
 - `acceptance-contract.md` -> `V-ACC-*`
 

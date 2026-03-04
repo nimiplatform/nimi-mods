@@ -34,6 +34,9 @@ import {
 } from '../operations/voice-assets.js';
 import { applyCreatorOperation } from '../storage/operations.js';
 import type {
+  AudioDesignOutput,
+  CandidateSelectionOutput,
+  CharacterCastingOutput,
   EpisodeRecord,
   FallbackAuditRecord,
   ReleasePackage,
@@ -121,6 +124,9 @@ function stageFromNextStep(step: VideoPlayPipelineStep | null): VideoPlayWorkben
   if (step === 'narrative-ingest') {
     return VIDEOPLAY_WORKBENCH_STAGE.STORY_SOURCE;
   }
+  if (step === 'character-casting' || step === 'scene-planning') {
+    return VIDEOPLAY_WORKBENCH_STAGE.CASTING;
+  }
   if (step === 'episode-segmentation' || step === 'screenplay') {
     return VIDEOPLAY_WORKBENCH_STAGE.SCRIPT;
   }
@@ -129,6 +135,12 @@ function stageFromNextStep(step: VideoPlayPipelineStep | null): VideoPlayWorkben
   }
   if (step === 'asset-render') {
     return VIDEOPLAY_WORKBENCH_STAGE.VOICE;
+  }
+  if (step === 'candidate-selection') {
+    return VIDEOPLAY_WORKBENCH_STAGE.SELECTION;
+  }
+  if (step === 'audio-design') {
+    return VIDEOPLAY_WORKBENCH_STAGE.AUDIO;
   }
   if (step === 'edit-compose') {
     return VIDEOPLAY_WORKBENCH_STAGE.VIDEO;
@@ -696,11 +708,72 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
           throw new Error('VIDEOPLAY_TTS_ROUTE_NOT_READY');
         }
       }
+      let candidateSelection: CandidateSelectionOutput | null = null;
+      let characterCasting: CharacterCastingOutput | null = null;
+      let audioDesign: AudioDesignOutput | null = null;
+
+      if (
+        operationType === VIDEOPLAY_OPERATION_TYPE.SELECT_CANDIDATE
+        || operationType === VIDEOPLAY_OPERATION_TYPE.REGENERATE_CANDIDATE
+      ) {
+        const response = await hookClient.data.query({
+          capability: VIDEOPLAY_DATA_API_EPISODE_UPSERT,
+          query: {
+            operation: 'get-candidate-selection',
+            episodeId: selectedEpisode.episodeId,
+          },
+        });
+        candidateSelection = response && typeof response === 'object'
+          ? (response as { candidateSelection?: CandidateSelectionOutput | null }).candidateSelection || null
+          : null;
+        if (!candidateSelection) {
+          throw new Error('VIDEOPLAY_CANDIDATE_SELECTION_NOT_FOUND');
+        }
+      }
+
+      if (operationType === VIDEOPLAY_OPERATION_TYPE.UPDATE_CHARACTER_APPEARANCE) {
+        const response = await hookClient.data.query({
+          capability: VIDEOPLAY_DATA_API_EPISODE_UPSERT,
+          query: {
+            operation: 'get-character-casting',
+            storyId: selectedEpisode.storyId,
+          },
+        });
+        characterCasting = response && typeof response === 'object'
+          ? (response as { characterCasting?: CharacterCastingOutput | null }).characterCasting || null
+          : null;
+        if (!characterCasting) {
+          throw new Error('VIDEOPLAY_CHARACTER_CASTING_NOT_FOUND');
+        }
+      }
+
+      if (
+        operationType === VIDEOPLAY_OPERATION_TYPE.SELECT_BGM_TRACK
+        || operationType === VIDEOPLAY_OPERATION_TYPE.UPDATE_SFX_LAYER
+      ) {
+        const response = await hookClient.data.query({
+          capability: VIDEOPLAY_DATA_API_EPISODE_UPSERT,
+          query: {
+            operation: 'get-audio-design',
+            episodeId: selectedEpisode.episodeId,
+          },
+        });
+        audioDesign = response && typeof response === 'object'
+          ? (response as { audioDesign?: AudioDesignOutput | null }).audioDesign || null
+          : null;
+        if (!audioDesign) {
+          throw new Error('VIDEOPLAY_AUDIO_DESIGN_NOT_FOUND');
+        }
+      }
+
       const applied = applyCreatorOperation({
         episode: selectedEpisode,
         operationType,
         operator: 'creator',
         payload,
+        candidateSelection,
+        characterCasting,
+        audioDesign,
       });
 
       const episodeIdempotencyKey = createHash(`operation:${selectedEpisode.episodeId}:${operationType}:${JSON.stringify(payload)}`);
@@ -744,6 +817,37 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
             idempotencyKey: assetIdempotencyKey,
             episodeId: selectedEpisode.episodeId,
             assets: operationAssets,
+          },
+        });
+      }
+
+      if (applied.candidateSelection) {
+        await hookClient.data.query({
+          capability: VIDEOPLAY_DATA_API_EPISODE_UPSERT,
+          query: {
+            operation: 'upsert-candidate-selection',
+            episodeId: selectedEpisode.episodeId,
+            candidateSelection: applied.candidateSelection,
+          },
+        });
+      }
+      if (applied.characterCasting) {
+        await hookClient.data.query({
+          capability: VIDEOPLAY_DATA_API_EPISODE_UPSERT,
+          query: {
+            operation: 'upsert-character-casting',
+            storyId: selectedEpisode.storyId,
+            characterCasting: applied.characterCasting,
+          },
+        });
+      }
+      if (applied.audioDesign) {
+        await hookClient.data.query({
+          capability: VIDEOPLAY_DATA_API_EPISODE_UPSERT,
+          query: {
+            operation: 'upsert-audio-design',
+            episodeId: selectedEpisode.episodeId,
+            audioDesign: applied.audioDesign,
           },
         });
       }

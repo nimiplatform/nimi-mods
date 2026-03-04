@@ -35,6 +35,41 @@ stages:
     fallback_on_unavailable: token-api
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002
+  - stage: character-casting-text
+    capability: llm.text.generate
+    fallback_on_unavailable: token-api
+    fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
+    source_rule: V-ROUTE-002
+  - stage: character-casting-visual
+    capability: llm.image.generate
+    fallback_on_unavailable: token-api
+    fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
+    source_rule: V-ROUTE-002
+  - stage: scene-planning-text
+    capability: llm.text.generate
+    fallback_on_unavailable: token-api
+    fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
+    source_rule: V-ROUTE-002
+  - stage: scene-planning-visual
+    capability: llm.image.generate
+    fallback_on_unavailable: token-api
+    fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
+    source_rule: V-ROUTE-002
+  - stage: storyboard-cinematography
+    capability: llm.text.generate
+    fallback_on_unavailable: token-api
+    fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
+    source_rule: V-ROUTE-002
+  - stage: storyboard-acting
+    capability: llm.text.generate
+    fallback_on_unavailable: token-api
+    fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
+    source_rule: V-ROUTE-002
+  - stage: audio-design-bgm
+    capability: llm.text.generate
+    fallback_on_unavailable: token-api
+    fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
+    source_rule: V-ROUTE-002
 audit:
   fallback_event_required: true
   required_fields:

@@ -116,12 +116,18 @@ function workbenchStageLabel(stage: VideoPlayWorkbenchStage): string {
   switch (stage) {
     case 'story-source':
       return 'Story Source';
+    case 'casting':
+      return 'Casting';
     case 'script':
       return 'Script';
     case 'storyboard':
       return 'Storyboard';
     case 'voice':
       return 'Voice';
+    case 'selection':
+      return 'Selection';
+    case 'audio':
+      return 'Audio';
     case 'video':
       return 'Video';
     case 'qc':

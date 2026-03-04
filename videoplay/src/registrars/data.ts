@@ -63,6 +63,58 @@ export async function registerVideoPlayDataCapabilities(input: {
         return listEpisodes(state, storyId);
       }
 
+      if (operation === 'upsert-candidate-selection') {
+        const episodeId = readRequiredString(payload, 'episodeId');
+        state.candidateSelectionByEpisodeId[episodeId] = payload.candidateSelection as never;
+        saveVideoPlayState(state);
+        return { ok: true };
+      }
+      if (operation === 'get-candidate-selection') {
+        const episodeId = readRequiredString(payload, 'episodeId');
+        return {
+          candidateSelection: state.candidateSelectionByEpisodeId[episodeId] || null,
+        };
+      }
+
+      if (operation === 'upsert-audio-design') {
+        const episodeId = readRequiredString(payload, 'episodeId');
+        state.audioDesignByEpisodeId[episodeId] = payload.audioDesign as never;
+        saveVideoPlayState(state);
+        return { ok: true };
+      }
+      if (operation === 'get-audio-design') {
+        const episodeId = readRequiredString(payload, 'episodeId');
+        return {
+          audioDesign: state.audioDesignByEpisodeId[episodeId] || null,
+        };
+      }
+
+      if (operation === 'upsert-character-casting') {
+        const storyId = readRequiredString(payload, 'storyId');
+        state.characterCastingByStoryId[storyId] = payload.characterCasting as never;
+        saveVideoPlayState(state);
+        return { ok: true };
+      }
+      if (operation === 'get-character-casting') {
+        const storyId = readRequiredString(payload, 'storyId');
+        return {
+          characterCasting: state.characterCastingByStoryId[storyId] || null,
+        };
+      }
+
+      if (operation === 'upsert-scene-planning') {
+        const storyId = readRequiredString(payload, 'storyId');
+        state.scenePlanningByStoryId[storyId] = payload.scenePlanning as never;
+        saveVideoPlayState(state);
+        return { ok: true };
+      }
+      if (operation === 'get-scene-planning') {
+        const storyId = readRequiredString(payload, 'storyId');
+        return {
+          scenePlanning: state.scenePlanningByStoryId[storyId] || null,
+        };
+      }
+
       throw new Error(`VIDEOPLAY_UNSUPPORTED_OPERATION:${VIDEOPLAY_DATA_API_EPISODE_UPSERT}:${operation}`);
     },
   });

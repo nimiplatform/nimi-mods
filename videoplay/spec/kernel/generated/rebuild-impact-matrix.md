@@ -33,4 +33,21 @@ rules:
       - merge-branch
     minimum_rebuild_scope: post-segmentation-full-chain
     source_rule: V-OPS-004
+  - operation_group: candidate_selection_change
+    examples:
+      - select-candidate
+      - regenerate-candidate
+    minimum_rebuild_scope: adjacent-shots-plus-compose
+    source_rule: V-OPS-004
+  - operation_group: character_appearance_change
+    examples:
+      - update-character-appearance
+    minimum_rebuild_scope: clip-plus-compose
+    source_rule: V-OPS-004
+  - operation_group: audio_design_change
+    examples:
+      - select-bgm-track
+      - update-sfx-layer
+    minimum_rebuild_scope: adjacent-shots-plus-compose
+    source_rule: V-OPS-004
 ```

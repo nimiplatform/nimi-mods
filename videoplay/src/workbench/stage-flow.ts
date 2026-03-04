@@ -20,9 +20,12 @@ type StageStatus = VideoPlayPipelineStageProgress['status'];
 
 const STAGE_TO_STEPS: Record<VideoPlayWorkbenchStage, readonly VideoPlayPipelineStep[]> = {
   [VIDEOPLAY_WORKBENCH_STAGE.STORY_SOURCE]: ['narrative-ingest'],
+  [VIDEOPLAY_WORKBENCH_STAGE.CASTING]: ['character-casting', 'scene-planning'],
   [VIDEOPLAY_WORKBENCH_STAGE.SCRIPT]: ['episode-segmentation', 'screenplay'],
   [VIDEOPLAY_WORKBENCH_STAGE.STORYBOARD]: ['storyboard'],
   [VIDEOPLAY_WORKBENCH_STAGE.VOICE]: ['asset-render'],
+  [VIDEOPLAY_WORKBENCH_STAGE.SELECTION]: ['candidate-selection'],
+  [VIDEOPLAY_WORKBENCH_STAGE.AUDIO]: ['audio-design'],
   [VIDEOPLAY_WORKBENCH_STAGE.VIDEO]: ['edit-compose'],
   [VIDEOPLAY_WORKBENCH_STAGE.QC]: ['qc-gate'],
   [VIDEOPLAY_WORKBENCH_STAGE.PUBLISH]: ['release-package'],
@@ -114,9 +117,14 @@ function conditionForStage(input: {
         return toBlocked('Load and validate story package first.');
       }
       return toReady();
-    case VIDEOPLAY_WORKBENCH_STAGE.SCRIPT:
+    case VIDEOPLAY_WORKBENCH_STAGE.CASTING:
       if (!isCompleted('narrative-ingest')) {
-        return toBlocked('Complete story-source ingest before script stage.');
+        return toBlocked('Complete story-source ingest before casting stage.');
+      }
+      return toReady();
+    case VIDEOPLAY_WORKBENCH_STAGE.SCRIPT:
+      if (!isCompleted('scene-planning')) {
+        return toBlocked('Complete casting and scene planning before script stage.');
       }
       return toReady();
     case VIDEOPLAY_WORKBENCH_STAGE.STORYBOARD:
@@ -132,9 +140,19 @@ function conditionForStage(input: {
         return toBlocked('Ensure runtime routes are ready before voice stage.');
       }
       return toReady();
-    case VIDEOPLAY_WORKBENCH_STAGE.VIDEO:
+    case VIDEOPLAY_WORKBENCH_STAGE.SELECTION:
       if (!isCompleted('asset-render')) {
-        return toBlocked('Complete voice/asset-render before video stage.');
+        return toBlocked('Complete asset-render before candidate selection stage.');
+      }
+      return toReady();
+    case VIDEOPLAY_WORKBENCH_STAGE.AUDIO:
+      if (!isCompleted('candidate-selection')) {
+        return toBlocked('Complete candidate selection before audio design stage.');
+      }
+      return toReady();
+    case VIDEOPLAY_WORKBENCH_STAGE.VIDEO:
+      if (!isCompleted('audio-design')) {
+        return toBlocked('Complete audio design before video stage.');
       }
       if (!input.routeReady) {
         return toBlocked('Ensure runtime routes are ready before video stage.');
@@ -269,6 +287,14 @@ function stageForOperation(operationType: VideoPlayOperationType): VideoPlayWork
     case VIDEOPLAY_OPERATION_TYPE.SWITCH_BRANCH:
     case VIDEOPLAY_OPERATION_TYPE.MERGE_BRANCH:
       return VIDEOPLAY_WORKBENCH_STAGE.SCRIPT;
+    case VIDEOPLAY_OPERATION_TYPE.SELECT_CANDIDATE:
+    case VIDEOPLAY_OPERATION_TYPE.REGENERATE_CANDIDATE:
+      return VIDEOPLAY_WORKBENCH_STAGE.SELECTION;
+    case VIDEOPLAY_OPERATION_TYPE.UPDATE_CHARACTER_APPEARANCE:
+      return VIDEOPLAY_WORKBENCH_STAGE.CASTING;
+    case VIDEOPLAY_OPERATION_TYPE.SELECT_BGM_TRACK:
+    case VIDEOPLAY_OPERATION_TYPE.UPDATE_SFX_LAYER:
+      return VIDEOPLAY_WORKBENCH_STAGE.AUDIO;
     default:
       return VIDEOPLAY_WORKBENCH_STAGE.STORYBOARD;
   }

@@ -39,7 +39,7 @@
 5. `spec/kernel/tables/acceptance-cases.yaml`
 6. `spec/videoplay.md`
 
-### Change workbench stage flow (story-source -> script -> storyboard -> voice -> video -> qc -> publish)
+### Change workbench stage flow (story-source -> casting -> script -> storyboard -> voice -> selection -> audio -> video -> qc -> publish)
 
 1. `spec/kernel/pipeline-contract.md`
 2. `spec/kernel/creator-workflow-contract.md`

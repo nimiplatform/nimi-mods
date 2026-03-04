@@ -6,7 +6,7 @@
 
 Execution chain is fixed:
 
-`narrative-ingest -> episode-segmentation -> screenplay -> storyboard -> asset-render -> edit-compose -> qc-gate -> release-package`
+`narrative-ingest -> character-casting -> scene-planning -> episode-segmentation -> screenplay -> storyboard -> asset-render -> candidate-selection -> audio-design -> edit-compose -> qc-gate -> release-package`
 
 ## V-PIPE-002 Ordered Preconditions
 
@@ -80,7 +80,7 @@ No step may render final shot video for a voice-required shot before its voice a
 
 VideoPlay UI must expose an explicit industrial stage navigation with stable stage IDs:
 
-`story-source -> script -> storyboard -> voice -> video -> qc -> publish`
+`story-source -> casting -> script -> storyboard -> voice -> selection -> audio -> video -> qc -> publish`
 
 The navigation layer maps onto the fixed execution chain and does not change backend stage order.
 

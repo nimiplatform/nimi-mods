@@ -48,6 +48,8 @@ test('script stage becomes ready when segmentation and screenplay are completed'
     routeReady: true,
     stageProgress: makeStageProgress({
       'narrative-ingest': { status: 'COMPLETED', attempt: 1 },
+      'character-casting': { status: 'COMPLETED', attempt: 1 },
+      'scene-planning': { status: 'COMPLETED', attempt: 1 },
       'episode-segmentation': { status: 'COMPLETED', attempt: 1 },
       screenplay: { status: 'COMPLETED', attempt: 1 },
     }),
@@ -63,6 +65,8 @@ test('advance plan computes multi-step budget for script stage', () => {
     stage: VIDEOPLAY_WORKBENCH_STAGE.SCRIPT,
     stageProgress: makeStageProgress({
       'narrative-ingest': { status: 'COMPLETED', attempt: 1 },
+      'character-casting': { status: 'COMPLETED', attempt: 1 },
+      'scene-planning': { status: 'COMPLETED', attempt: 1 },
       'episode-segmentation': { status: 'PENDING', attempt: 0 },
       screenplay: { status: 'PENDING', attempt: 0 },
     }),
@@ -82,6 +86,8 @@ test('advance plan blocks completed stage with explicit-advance reason', () => {
     stage: VIDEOPLAY_WORKBENCH_STAGE.SCRIPT,
     stageProgress: makeStageProgress({
       'narrative-ingest': { status: 'COMPLETED', attempt: 1 },
+      'character-casting': { status: 'COMPLETED', attempt: 1 },
+      'scene-planning': { status: 'COMPLETED', attempt: 1 },
       'episode-segmentation': { status: 'COMPLETED', attempt: 1 },
       screenplay: { status: 'COMPLETED', attempt: 1 },
     }),

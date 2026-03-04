@@ -4,6 +4,9 @@ import {
 } from '../contracts.js';
 import { createUlid } from '../id.js';
 import type {
+  AudioDesignOutput,
+  CandidateSelectionOutput,
+  CharacterCastingOutput,
   EpisodeRecord,
   StoryboardOutput,
   StoryboardShot,
@@ -26,10 +29,25 @@ const SCOPE_BY_OPERATION: Record<VideoPlayOperationType, 'shot' | 'adjacent-shot
   [VIDEOPLAY_OPERATION_TYPE.SWITCH_BRANCH]: 'post-segmentation-full-chain',
   [VIDEOPLAY_OPERATION_TYPE.REDO]: 'shot',
   [VIDEOPLAY_OPERATION_TYPE.MERGE_BRANCH]: 'post-segmentation-full-chain',
+  [VIDEOPLAY_OPERATION_TYPE.SELECT_CANDIDATE]: 'adjacent-shots-plus-compose',
+  [VIDEOPLAY_OPERATION_TYPE.REGENERATE_CANDIDATE]: 'adjacent-shots-plus-compose',
+  [VIDEOPLAY_OPERATION_TYPE.UPDATE_CHARACTER_APPEARANCE]: 'clip-plus-compose',
+  [VIDEOPLAY_OPERATION_TYPE.SELECT_BGM_TRACK]: 'adjacent-shots-plus-compose',
+  [VIDEOPLAY_OPERATION_TYPE.UPDATE_SFX_LAYER]: 'adjacent-shots-plus-compose',
 };
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function computeNextStartMs(storyboard: StoryboardOutput): number {
+  if (storyboard.shotPlans.length === 0) return 0;
+  let maxEnd = 0;
+  for (const shot of storyboard.shotPlans) {
+    const end = shot.startMs + shot.durationMs;
+    if (end > maxEnd) maxEnd = end;
+  }
+  return maxEnd;
 }
 
 function cloneStoryboard(storyboard: StoryboardOutput): StoryboardOutput {
@@ -100,12 +118,18 @@ export type ApplyCreatorOperationInput = {
   operationType: VideoPlayOperationType;
   operator: string;
   payload?: Record<string, unknown>;
+  candidateSelection?: CandidateSelectionOutput | null;
+  characterCasting?: CharacterCastingOutput | null;
+  audioDesign?: AudioDesignOutput | null;
 };
 
 export type ApplyCreatorOperationResult = {
   episode: EpisodeRecord;
   rebuildScope: 'shot' | 'adjacent-shots-plus-compose' | 'clip-plus-compose' | 'post-segmentation-full-chain';
   versionNode: VersionLineageNode;
+  candidateSelection?: CandidateSelectionOutput | null;
+  characterCasting?: CharacterCastingOutput | null;
+  audioDesign?: AudioDesignOutput | null;
 };
 
 export function applyCreatorOperation(input: ApplyCreatorOperationInput): ApplyCreatorOperationResult {
@@ -121,6 +145,9 @@ export function applyCreatorOperation(input: ApplyCreatorOperationInput): ApplyC
   };
 
   let deltaSummary = '';
+  let mutatedCandidateSelection: CandidateSelectionOutput | null | undefined;
+  let mutatedCharacterCasting: CharacterCastingOutput | null | undefined;
+  let mutatedAudioDesign: AudioDesignOutput | null | undefined;
 
   if (input.operationType === VIDEOPLAY_OPERATION_TYPE.INSERT_SHOT) {
     const clipId = String(input.payload?.clipId || episode.storyboard.clipPlans[0]?.clipId || '').trim();
@@ -128,15 +155,30 @@ export function applyCreatorOperation(input: ApplyCreatorOperationInput): ApplyC
     const sourceEventIds = Array.isArray(input.payload?.sourceEventIds)
       ? input.payload?.sourceEventIds.map((item) => String(item || '').trim()).filter(Boolean)
       : [...episode.sourceEventIds.slice(0, 1)];
+    const visualPromptValue = String(input.payload?.visualPrompt || 'inserted shot').trim() || 'inserted shot';
     const shot: StoryboardShot = {
       shotId: createUlid(),
       clipId,
       beatId,
-      visualPrompt: String(input.payload?.visualPrompt || 'inserted shot').trim() || 'inserted shot',
+      visualPrompt: visualPromptValue,
       motionCue: String(input.payload?.motionCue || 'static').trim() || 'static',
       continuityAnchors: [],
       sourceEventIds: sourceEventIds.length > 0 ? sourceEventIds : [...episode.sourceEventIds.slice(0, 1)],
       durationMs: Number(input.payload?.durationMs || 3000),
+      startMs: computeNextStartMs(episode.storyboard),
+      shotType: String(input.payload?.shotType || 'medium'),
+      cameraMove: String(input.payload?.cameraMove || 'static'),
+      photographyRule: {
+        composition: 'center',
+        lighting: 'natural',
+        colorPalette: 'neutral',
+        atmosphere: 'calm',
+        technicalNotes: '',
+      },
+      actingDirection: { characters: [] },
+      videoPrompt: visualPromptValue,
+      characterIds: Array.isArray(input.payload?.characterIds) ? (input.payload!.characterIds as string[]) : [],
+      locationId: (input.payload?.locationId as string) ?? null,
     };
     episode.storyboard = upsertShot(episode.storyboard, shot);
     deltaSummary = `insert-shot:${shot.shotId}`;
@@ -175,6 +217,7 @@ export function applyCreatorOperation(input: ApplyCreatorOperationInput): ApplyC
         ...base,
         shotId: createUlid(),
         visualPrompt: `${base.visualPrompt} (variant)`,
+        startMs: computeNextStartMs(episode.storyboard),
       };
       episode.storyboard = upsertShot(episode.storyboard, variant);
       deltaSummary = `create-shot-variant:${baseShotId}->${variant.shotId}`;
@@ -222,6 +265,104 @@ export function applyCreatorOperation(input: ApplyCreatorOperationInput): ApplyC
       timestamp: nowIso(),
     });
     deltaSummary = `merge-branch:${sourceBranchId}->${targetBranchId}`;
+  } else if (input.operationType === VIDEOPLAY_OPERATION_TYPE.SELECT_CANDIDATE) {
+    const assetId = String(input.payload?.assetId || '').trim();
+    const shotId = String(input.payload?.shotId || '').trim();
+    const nextOrder = Number(input.payload?.order);
+    const trimInMsRaw = input.payload?.trimInMs;
+    const trimOutMsRaw = input.payload?.trimOutMs;
+    const trimInMs = trimInMsRaw == null ? null : Number(trimInMsRaw);
+    const trimOutMs = trimOutMsRaw == null ? null : Number(trimOutMsRaw);
+    if (input.candidateSelection && assetId) {
+      const hasAsset = input.candidateSelection.selectedAssetIds.includes(assetId);
+      const selectedAssetIds = hasAsset
+        ? [...input.candidateSelection.selectedAssetIds]
+        : [...input.candidateSelection.selectedAssetIds, assetId];
+      const existingIndex = input.candidateSelection.timelineSegments.findIndex((segment) => segment.assetId === assetId);
+      const baseOrder = Number.isFinite(nextOrder) ? Math.max(0, Math.floor(nextOrder)) : selectedAssetIds.length - 1;
+      const nextSegment = {
+        assetId,
+        shotId: shotId || input.candidateSelection.timelineSegments[existingIndex]?.shotId || 'unknown-shot',
+        order: baseOrder,
+        trimInMs: Number.isFinite(trimInMs as number) ? Math.max(0, Math.floor(trimInMs as number)) : null,
+        trimOutMs: Number.isFinite(trimOutMs as number) ? Math.max(0, Math.floor(trimOutMs as number)) : null,
+      };
+      const timelineSegments = existingIndex >= 0
+        ? input.candidateSelection.timelineSegments.map((segment, index) => (
+          index === existingIndex ? nextSegment : segment
+        ))
+        : [...input.candidateSelection.timelineSegments, nextSegment];
+      const normalizedSegments = timelineSegments
+        .slice()
+        .sort((left, right) => left.order - right.order)
+        .map((segment, index) => ({ ...segment, order: index }));
+      mutatedCandidateSelection = {
+        ...input.candidateSelection,
+        selectedAssetIds,
+        timelineSegments: normalizedSegments,
+      };
+    }
+    deltaSummary = `select-candidate:${assetId}`;
+  } else if (input.operationType === VIDEOPLAY_OPERATION_TYPE.REGENERATE_CANDIDATE) {
+    const assetId = String(input.payload?.assetId || '').trim();
+    if (input.candidateSelection && assetId) {
+      const selectedAssetIds = input.candidateSelection.selectedAssetIds.filter((id) => id !== assetId);
+      const timelineSegments = input.candidateSelection.timelineSegments
+        .filter((segment) => segment.assetId !== assetId)
+        .sort((left, right) => left.order - right.order)
+        .map((segment, index) => ({ ...segment, order: index }));
+      mutatedCandidateSelection = {
+        ...input.candidateSelection,
+        selectedAssetIds,
+        timelineSegments,
+      };
+    }
+    deltaSummary = `regenerate-candidate:${assetId}`;
+  } else if (input.operationType === VIDEOPLAY_OPERATION_TYPE.UPDATE_CHARACTER_APPEARANCE) {
+    const agentId = String(input.payload?.agentId || '').trim();
+    const description = String(input.payload?.description || '').trim();
+    if (input.characterCasting && agentId) {
+      const updatedCharacters = input.characterCasting.characters.map((c) => {
+        if (c.agentId !== agentId) return c;
+        const nextIndex = c.activeAppearanceIndex + 1;
+        const newAppearance = {
+          appearanceIndex: nextIndex,
+          description: description || c.appearances[c.activeAppearanceIndex]?.description || '',
+          imageUrls: [],
+          selectedIndex: 0,
+          changeReason: String(input.payload?.changeReason || 'creator-update'),
+          previousImageUrl: c.referenceImageUri,
+        };
+        return {
+          ...c,
+          appearances: [...c.appearances, newAppearance],
+          activeAppearanceIndex: nextIndex,
+        };
+      });
+      mutatedCharacterCasting = { ...input.characterCasting, characters: updatedCharacters };
+    }
+    deltaSummary = `update-character-appearance:${agentId}`;
+  } else if (input.operationType === VIDEOPLAY_OPERATION_TYPE.SELECT_BGM_TRACK) {
+    const trackId = String(input.payload?.trackId || '').trim();
+    if (input.audioDesign && trackId) {
+      mutatedAudioDesign = {
+        ...input.audioDesign,
+        bgmTrack: input.audioDesign.bgmTrack
+          ? { ...input.audioDesign.bgmTrack, trackId }
+          : null,
+      };
+    }
+    deltaSummary = `select-bgm-track:${trackId}`;
+  } else if (input.operationType === VIDEOPLAY_OPERATION_TYPE.UPDATE_SFX_LAYER) {
+    const sfxId = String(input.payload?.sfxId || '').trim();
+    const volume = input.payload?.volume != null ? Number(input.payload.volume) : undefined;
+    if (input.audioDesign && sfxId) {
+      const updatedLayers = input.audioDesign.sfxLayers.map((layer) =>
+        layer.sfxId === sfxId && volume !== undefined ? { ...layer, volume } : layer,
+      );
+      mutatedAudioDesign = { ...input.audioDesign, sfxLayers: updatedLayers };
+    }
+    deltaSummary = `update-sfx-layer:${sfxId}`;
   }
 
   if (!deltaSummary) {
@@ -250,5 +391,8 @@ export function applyCreatorOperation(input: ApplyCreatorOperationInput): ApplyC
     episode,
     rebuildScope: SCOPE_BY_OPERATION[input.operationType],
     versionNode: node,
+    ...(mutatedCandidateSelection !== undefined ? { candidateSelection: mutatedCandidateSelection } : {}),
+    ...(mutatedCharacterCasting !== undefined ? { characterCasting: mutatedCharacterCasting } : {}),
+    ...(mutatedAudioDesign !== undefined ? { audioDesign: mutatedAudioDesign } : {}),
   };
 }

@@ -36,6 +36,36 @@ gates:
     max: 1
     fail_code: VIDEOPLAY_VISUAL_ATTRACTION_LOW
     source_rule: V-QC-001
+  - gate: character_consistency
+    min: 0.7
+    max: null
+    fail_code: VIDEOPLAY_CHARACTER_CONSISTENCY_LOW
+    source_rule: V-QC-005
+  - gate: photography_compliance
+    min: 0.65
+    max: null
+    fail_code: VIDEOPLAY_PHOTOGRAPHY_COMPLIANCE_LOW
+    source_rule: V-QC-006
+  - gate: acting_quality
+    min: 0.6
+    max: null
+    fail_code: VIDEOPLAY_ACTING_QUALITY_LOW
+    source_rule: V-QC-007
+  - gate: audio_completeness
+    min: 0.85
+    max: null
+    fail_code: VIDEOPLAY_AUDIO_COMPLETENESS_LOW
+    source_rule: V-QC-008
+  - gate: selection_coverage
+    min: 0.7
+    max: null
+    fail_code: VIDEOPLAY_SELECTION_COVERAGE_LOW
+    source_rule: V-QC-009
+  - gate: selection_rationality
+    min: 0.8
+    max: null
+    fail_code: VIDEOPLAY_SELECTION_RATIONALITY_LOW
+    source_rule: V-QC-010
 visual_attraction_formula:
   score_range:
     min: 0
