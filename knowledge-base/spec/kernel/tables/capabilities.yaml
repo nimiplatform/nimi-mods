@@ -1,0 +1,74 @@
+version: 1
+description: Knowledge Base mod capability keys (manifest + runtime registration)
+source_rule: KB-CAP-001 ~ KB-CAP-008
+
+ai_capabilities:
+  - { key: "llm.text.generate",       description: "单轮文本生成（query rewriting、标题生成）" }
+  - { key: "llm.text.stream",         description: "流式文本生成（RAG 回答）" }
+  - { key: "llm.embedding.generate",  description: "向量化（chunk embedding + query embedding）" }
+
+data_capabilities:
+  - id: documents.list
+    register_key: "data.register.data-api.knowledge-base.documents.list"
+    query_key:    "data.query.data-api.knowledge-base.documents.list"
+    description:  "列出所有文档"
+    input:        "{ status?, tags?, sortBy?, sortOrder? }"
+    output:       "KBDocument[]"
+
+  - id: documents.import
+    register_key: "data.register.data-api.knowledge-base.documents.import"
+    query_key:    "data.query.data-api.knowledge-base.documents.import"
+    description:  "导入文档（file/text/url 三选一）"
+    input:        "{ file?, text?, url?, title?, tags? }"
+    output:       "KBDocument"
+
+  - id: documents.delete
+    register_key: "data.register.data-api.knowledge-base.documents.delete"
+    query_key:    "data.query.data-api.knowledge-base.documents.delete"
+    description:  "删除文档（级联清理 chunk + vector）"
+    input:        "{ documentId }"
+    output:       "void"
+
+  - id: search
+    register_key: "data.register.data-api.knowledge-base.search"
+    query_key:    "data.query.data-api.knowledge-base.search"
+    description:  "向量语义检索（跨 mod 主消费入口）"
+    input:        "{ query, topK?, documentIds?, threshold? }"
+    output:       "{ chunks: Array<KBChunk & { score, documentTitle }> }"
+
+  - id: conversations.list
+    register_key: "data.register.data-api.knowledge-base.conversations.list"
+    query_key:    "data.query.data-api.knowledge-base.conversations.list"
+    description:  "列出对话（不含 turns）"
+    input:        "{}"
+    output:       "KBConversation[]"
+
+  - id: conversations.get
+    register_key: "data.register.data-api.knowledge-base.conversations.get"
+    query_key:    "data.query.data-api.knowledge-base.conversations.get"
+    description:  "获取完整对话（含 turns）"
+    input:        "{ conversationId }"
+    output:       "KBConversation"
+
+  - id: conversations.upsert
+    register_key: "data.register.data-api.knowledge-base.conversations.upsert"
+    query_key:    "data.query.data-api.knowledge-base.conversations.upsert"
+    description:  "创建或更新对话"
+    input:        "{ conversation: Partial<KBConversation> }"
+    output:       "KBConversation"
+
+  - id: conversations.delete
+    register_key: "data.register.data-api.knowledge-base.conversations.delete"
+    query_key:    "data.query.data-api.knowledge-base.conversations.delete"
+    description:  "删除对话"
+    input:        "{ conversationId }"
+    output:       "void"
+
+route_capabilities:
+  - { key: "data.query.data-api.runtime.route.options", description: "查询可用 chat/embedding 路由" }
+
+ui_capabilities:
+  - { key: "ui.register.ui-extension.app.sidebar.mods",    description: "侧边栏图标入口" }
+  - { key: "ui.register.ui-extension.app.content.routes",  description: "内容路由页面" }
+
+total_capability_count: 22

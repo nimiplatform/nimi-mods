@@ -1,0 +1,96 @@
+version: 1
+description: Knowledge Base core entity definitions
+source_rule: KB-DOM-001 ~ KB-DOM-007
+
+entities:
+  - name: KBDocument
+    rule_id: KB-DOM-001
+    fields:
+      - { name: id,           type: string,   format: ULID,  required: true,  description: "文档唯一标识" }
+      - { name: title,        type: string,                  required: true,  description: "文档标题（文件名推导或用户编辑）" }
+      - { name: sourceUri,    type: string,                  required: true,  description: "来源 URI（文件路径/粘贴标识/URL）" }
+      - { name: sourceKind,   type: string,   ref: source-kinds, required: true, description: "'file' | 'paste' | 'url'" }
+      - { name: mimeType,     type: string,                  required: true,  description: "MIME 类型" }
+      - { name: fileSize,     type: number,                  required: true,  description: "原始文件大小（字节）" }
+      - { name: status,       type: string,   ref: document-states.yaml, required: true, description: "文档处理状态" }
+      - { name: chunkCount,   type: number,                  required: true,  default: 0, description: "分块数量（ready 后固定）" }
+      - { name: tags,         type: "string[]",              required: true,  default: "[]", description: "用户标签" }
+      - { name: errorReason,  type: string,   ref: error-codes.yaml, required: false, description: "失败 reasonCode（仅 error 状态）" }
+      - { name: createdAt,    type: string,   format: ISO8601, required: true, description: "创建时间" }
+      - { name: updatedAt,    type: string,   format: ISO8601, required: true, description: "最后更新时间" }
+
+  - name: KBChunk
+    rule_id: KB-DOM-002
+    fields:
+      - { name: id,           type: string,   format: ULID,  required: true,  description: "分块唯一标识" }
+      - { name: documentId,   type: string,   ref: KBDocument, required: true, description: "所属文档 ID" }
+      - { name: text,         type: string,                  required: true,  description: "分块文本内容" }
+      - { name: chunkIndex,   type: number,                  required: true,  description: "文档中的序号（从 0 开始）" }
+      - { name: tokenCount,   type: number,                  required: true,  description: "估算 token 数" }
+      - { name: metadata,     type: object,                  required: true,  description: "结构化位置元数据" }
+    metadata_fields:
+      - { name: heading,      type: string,   required: false, description: "所属标题" }
+      - { name: pageNumber,   type: number,   required: false, description: "页码" }
+      - { name: rowRange,     type: "[number, number]", required: false, description: "CSV 行范围" }
+
+  - name: KBVector
+    rule_id: KB-DOM-003
+    fields:
+      - { name: id,           type: string,   format: ULID,  required: true,  description: "向量记录唯一标识" }
+      - { name: chunkId,      type: string,   ref: KBChunk,  required: true,  description: "关联的 chunk ID" }
+      - { name: documentId,   type: string,   ref: KBDocument, required: true, description: "关联的文档 ID（冗余，用于按文档过滤）" }
+      - { name: embedding,    type: Float32Array,            required: true,  description: "嵌入向量" }
+      - { name: model,        type: string,                  required: true,  description: "生成向量的模型标识" }
+      - { name: dimensions,   type: number,                  required: true,  description: "向量维度" }
+
+  - name: KBConversation
+    rule_id: KB-DOM-004
+    fields:
+      - { name: id,           type: string,   format: ULID,  required: true,  description: "对话唯一标识" }
+      - { name: title,        type: string,                  required: true,  description: "对话标题（自动生成或用户编辑）" }
+      - { name: turns,        type: "KBTurn[]", ref: KBTurn, required: true,  default: "[]", description: "回合列表" }
+      - { name: scopeDocumentIds, type: "string[]",          required: false, description: "文档范围限定（空则检索全部）" }
+      - { name: createdAt,    type: string,   format: ISO8601, required: true, description: "创建时间" }
+      - { name: updatedAt,    type: string,   format: ISO8601, required: true, description: "最后更新时间" }
+
+  - name: KBTurn
+    rule_id: KB-DOM-005
+    fields:
+      - { name: id,           type: string,   format: ULID,  required: true,  description: "回合唯一标识" }
+      - { name: role,         type: string,                  required: true,  description: "'user' | 'assistant'" }
+      - { name: content,      type: string,                  required: true,  description: "回合文本内容" }
+      - { name: citations,    type: "KBCitation[]", ref: KBCitation, required: true, default: "[]", description: "引用列表（仅 assistant）" }
+      - { name: rewrittenQuery, type: string,                required: false, description: "query rewriting 结果（仅 assistant）" }
+      - { name: retrievedChunkIds, type: "string[]",         required: true,  default: "[]", description: "本轮检索命中的 chunk ID 列表" }
+      - { name: timestamp,    type: string,   format: ISO8601, required: true, description: "回合时间" }
+
+  - name: KBCitation
+    rule_id: KB-DOM-006
+    fields:
+      - { name: chunkId,      type: string,   ref: KBChunk,  required: true,  description: "引用的 chunk ID" }
+      - { name: documentId,   type: string,   ref: KBDocument, required: true, description: "引用的文档 ID" }
+      - { name: documentTitle, type: string,                 required: true,  description: "引用的文档标题（冗余，方便 UI）" }
+      - { name: snippet,      type: string,                  required: true,  description: "引用片段文本" }
+      - { name: score,        type: number,                  required: true,  description: "相似度分数（0-1，cosine similarity）" }
+      - { name: refIndex,     type: number,                  required: true,  description: "引用序号（从 1 开始）" }
+
+  - name: KBSettings
+    rule_id: KB-DOM-007
+    fields:
+      - { name: chunkSize,          type: number,  required: true, default: 512,  description: "分块目标大小（tokens）" }
+      - { name: chunkOverlap,       type: number,  required: true, default: 64,   description: "分块重叠（tokens）" }
+      - { name: topK,               type: number,  required: true, default: 5,    description: "检索返回前 K 个结果" }
+      - { name: similarityThreshold, type: number, required: true, default: 0.3,  description: "最低相似度阈值" }
+      - { name: maxContextChunks,   type: number,  required: true, default: 8,    description: "注入 prompt 的最大 chunk 数" }
+      - { name: queryRewritingEnabled, type: boolean, required: true, default: true, description: "是否启用多轮 query rewriting" }
+      - { name: chatRouteSource,    type: string,  required: true, default: "'auto'", description: "'auto' | 'local-runtime' | 'token-api'" }
+      - { name: chatConnectorId,    type: string,  required: true, default: "''", description: "Chat connector 指定（空则自动）" }
+      - { name: chatModel,          type: string,  required: true, default: "''", description: "Chat model 指定（空则自动）" }
+      - { name: embeddingRouteSource, type: string, required: true, default: "'auto'", description: "'auto' | 'local-runtime' | 'token-api'" }
+      - { name: embeddingConnectorId, type: string, required: true, default: "''", description: "Embedding connector 指定（空则自动）" }
+      - { name: embeddingModel,     type: string,  required: true, default: "''", description: "Embedding model 指定（空则自动）" }
+
+source_kinds:
+  - { id: file,  label: "File upload",  description: "本地文件上传" }
+  - { id: paste, label: "Text paste",   description: "粘贴文本内容" }
+  - { id: url,   label: "URL import",   description: "URL 抓取" }
