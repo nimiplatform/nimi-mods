@@ -3,11 +3,12 @@ import { useMintYouStore } from '../state/mint-you-store.js';
 import { StepProgressBar } from './step-progress-bar.js';
 import { StepBasicInfo } from './step-basic-info.js';
 import { StepInterestTags } from './step-interest-tags.js';
-import { StepScenarios } from './step-scenarios.js';
+import { StepInterview } from './step-interview.js';
 import { StepProcessing } from './step-processing.js';
 import { StepPreviewCard } from './step-preview-card.js';
 import { StepConfirm } from './step-confirm.js';
 import { StepResult } from './step-result.js';
+import { MintYouRouteSidebar } from './mint-you-route-sidebar.js';
 
 function renderStep(step: string) {
   switch (step) {
@@ -15,8 +16,8 @@ function renderStep(step: string) {
       return <StepBasicInfo />;
     case 'interest-tags':
       return <StepInterestTags />;
-    case 'scenarios':
-      return <StepScenarios />;
+    case 'interview':
+      return <StepInterview />;
     case 'trait-extract':
     case 'dna-synthesize':
       return <StepProcessing />;
@@ -35,11 +36,14 @@ export function MintYouShell() {
   const currentStep = useMintYouStore((s) => s.currentStep);
 
   return (
-    <div className="flex h-full flex-col">
-      <StepProgressBar currentStep={currentStep} />
-      <div className="flex-1 overflow-y-auto">
-        {renderStep(currentStep)}
+    <div className="relative flex h-full min-h-0">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <StepProgressBar currentStep={currentStep} />
+        <div className="flex-1 overflow-y-auto">
+          {renderStep(currentStep)}
+        </div>
       </div>
+      <MintYouRouteSidebar />
     </div>
   );
 }

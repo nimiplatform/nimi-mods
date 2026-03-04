@@ -4,9 +4,15 @@ import { useMintYouStore } from '../state/mint-you-store.js';
 import {
   PRIMARY_ARCHETYPES,
   SECONDARY_TRAITS,
+  RELATIONSHIP_MODES,
+  FORMALITY_VALUES,
+  SENTIMENT_VALUES,
   MINTYOU_AUDIT,
   type DnaPrimaryType,
   type DnaSecondaryTrait,
+  type RelationshipMode,
+  type FormalityValue,
+  type SentimentValue,
 } from '../contracts.js';
 import { getMintYouAiClient } from '../runtime-mod.js';
 import { synthesizeDna } from '../pipeline/dna-synthesize.js';
@@ -17,7 +23,16 @@ import { ErrorBanner } from './error-banner.js';
 export function StepPreviewCard() {
   const { t } = useModTranslation('mint-you');
   const store = useMintYouStore();
-  const { traitResult, dnaSynthesis, basicInfo, selectedInterests, traitOverrides, referenceImageUrl, error } = store;
+  const {
+    traitResult,
+    dnaSynthesis,
+    basicInfo,
+    selectedInterests,
+    traitOverrides,
+    referenceImageUrl,
+    error,
+    routeOverride,
+  } = store;
   const [resynthesizing, setResynthesizing] = useState(false);
   const [editingPrimary, setEditingPrimary] = useState(false);
   const [editingSecondary, setEditingSecondary] = useState(false);
@@ -26,6 +41,9 @@ export function StepPreviewCard() {
 
   const effectivePrimary = traitOverrides?.dnaPrimary ?? traitResult.dnaPrimary;
   const effectiveSecondary = traitOverrides?.dnaSecondary ?? traitResult.dnaSecondary;
+  const effectiveRelationship = traitOverrides?.relationshipMode ?? traitResult.relationshipMode;
+  const effectiveFormality = traitOverrides?.formality ?? traitResult.formality;
+  const effectiveSentiment = traitOverrides?.sentiment ?? traitResult.sentiment;
 
   const handlePrimaryChange = (primary: DnaPrimaryType) => {
     store.setTraitOverrides({
@@ -53,6 +71,33 @@ export function StepPreviewCard() {
     });
   };
 
+  const handleRelationshipChange = (mode: RelationshipMode) => {
+    store.setTraitOverrides({ ...traitOverrides, relationshipMode: mode });
+    emitMintYouLog({
+      message: MINTYOU_AUDIT.TRAIT_OVERRIDE,
+      source: 'StepPreviewCard',
+      details: { field: 'relationshipMode', value: mode },
+    });
+  };
+
+  const handleFormalityChange = (value: FormalityValue) => {
+    store.setTraitOverrides({ ...traitOverrides, formality: value });
+    emitMintYouLog({
+      message: MINTYOU_AUDIT.TRAIT_OVERRIDE,
+      source: 'StepPreviewCard',
+      details: { field: 'formality', value },
+    });
+  };
+
+  const handleSentimentChange = (value: SentimentValue) => {
+    store.setTraitOverrides({ ...traitOverrides, sentiment: value });
+    emitMintYouLog({
+      message: MINTYOU_AUDIT.TRAIT_OVERRIDE,
+      source: 'StepPreviewCard',
+      details: { field: 'sentiment', value },
+    });
+  };
+
   const handleResynthesize = useCallback(async () => {
     if (!basicInfo || !traitResult) return;
     setResynthesizing(true);
@@ -65,6 +110,9 @@ export function StepPreviewCard() {
       ...traitResult,
       dnaPrimary: traitOverrides?.dnaPrimary ?? traitResult.dnaPrimary,
       dnaSecondary: traitOverrides?.dnaSecondary ?? traitResult.dnaSecondary,
+      relationshipMode: traitOverrides?.relationshipMode ?? traitResult.relationshipMode,
+      formality: traitOverrides?.formality ?? traitResult.formality,
+      sentiment: traitOverrides?.sentiment ?? traitResult.sentiment,
     };
 
     const aiClient = getMintYouAiClient();
@@ -73,6 +121,7 @@ export function StepPreviewCard() {
       basicInfo,
       traitResult: effectiveTraitResult,
       interests: selectedInterests,
+      routeOverride,
     });
 
     setResynthesizing(false);
@@ -82,10 +131,15 @@ export function StepPreviewCard() {
     } else {
       store.setError(result.error);
     }
-  }, [basicInfo, traitResult, traitOverrides, selectedInterests, store]);
+  }, [basicInfo, traitResult, traitOverrides, selectedInterests, routeOverride, store]);
 
-  const hasOverrides = traitOverrides &&
-    (traitOverrides.dnaPrimary !== undefined || traitOverrides.dnaSecondary !== undefined);
+  const hasOverrides = traitOverrides && (
+    traitOverrides.dnaPrimary !== undefined
+    || traitOverrides.dnaSecondary !== undefined
+    || traitOverrides.relationshipMode !== undefined
+    || traitOverrides.formality !== undefined
+    || traitOverrides.sentiment !== undefined
+  );
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -117,9 +171,9 @@ export function StepPreviewCard() {
         mbti={dnaSynthesis.personality.mbti}
         greeting={dnaSynthesis.greeting}
         personalitySummary={dnaSynthesis.personality.summary}
-        formality={traitResult.formality}
-        sentiment={traitResult.sentiment}
-        relationshipMode={traitResult.relationshipMode}
+        formality={effectiveFormality}
+        sentiment={effectiveSentiment}
+        relationshipMode={effectiveRelationship}
         interests={selectedInterests}
         referenceImageUrl={referenceImageUrl}
       />
@@ -156,7 +210,7 @@ export function StepPreviewCard() {
         </div>
 
         {/* Secondary traits editor */}
-        <div>
+        <div className="mb-3">
           <button
             onClick={() => setEditingSecondary(!editingSecondary)}
             className="text-xs text-[#4ECCA3] hover:underline"
@@ -180,6 +234,66 @@ export function StepPreviewCard() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Relationship mode editor */}
+        <div className="mb-2">
+          <p className="mb-1 text-xs text-gray-500">{t('Preview.relationshipMode')}</p>
+          <div className="flex gap-1">
+            {RELATIONSHIP_MODES.map((mode) => (
+              <button
+                key={mode}
+                onClick={() => handleRelationshipChange(mode)}
+                className={`flex-1 rounded-lg border px-2 py-1.5 text-xs transition-colors ${
+                  effectiveRelationship === mode
+                    ? 'border-[#4ECCA3] bg-[#4ECCA3]/10 font-medium text-[#4ECCA3]'
+                    : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Formality editor */}
+        <div className="mb-2">
+          <p className="mb-1 text-xs text-gray-500">{t('Preview.formality')}</p>
+          <div className="flex gap-1">
+            {FORMALITY_VALUES.map((val) => (
+              <button
+                key={val}
+                onClick={() => handleFormalityChange(val)}
+                className={`flex-1 rounded-lg border px-2 py-1.5 text-xs transition-colors ${
+                  effectiveFormality === val
+                    ? 'border-[#4ECCA3] bg-[#4ECCA3]/10 font-medium text-[#4ECCA3]'
+                    : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {val}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Sentiment editor */}
+        <div className="mb-2">
+          <p className="mb-1 text-xs text-gray-500">{t('Preview.sentiment')}</p>
+          <div className="flex gap-1">
+            {SENTIMENT_VALUES.map((val) => (
+              <button
+                key={val}
+                onClick={() => handleSentimentChange(val)}
+                className={`flex-1 rounded-lg border px-2 py-1.5 text-xs transition-colors ${
+                  effectiveSentiment === val
+                    ? 'border-[#4ECCA3] bg-[#4ECCA3]/10 font-medium text-[#4ECCA3]'
+                    : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {val}
+              </button>
+            ))}
+          </div>
         </div>
 
         {hasOverrides && (

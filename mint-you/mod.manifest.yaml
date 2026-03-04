@@ -12,8 +12,16 @@ description: >
 capabilities:
   - llm.text.generate
   - data.query.data-api.creator.agents.create
-  - data.query.data-api.world.worlds.mine
+  - data.query.data-api.world.access.me
+  - data.query.data-api.world.oasis.get
+  - data.query.data-api.runtime.route.options
   - hook.agent-profile.read
   - data.store.mod-state
   - ui.register.ui-extension.app.sidebar.mods
   - ui.register.ui-extension.app.content.routes
+ai:
+  consume:
+    - chat
+  dependencies:
+    required: []
+    optional: []

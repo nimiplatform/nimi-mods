@@ -16,29 +16,29 @@
 
 ## 1. Domain Invariants
 
-- `MY-DOM-001`: Mint-You creates a `WORLD_OWNED` agent that represents the user's social persona within a target world. The agent serves all social scenarios — dating, friendship, professional networking, casual exploration.
-- `MY-DOM-002`: Personality inference relies on behavioral scenario choices, not direct self-assessment questionnaires. Scenarios are the primary intake method.
-- `MY-DOM-003`: Every scenario choice must map to at least one AgentDna dimension via `trait_weights`. Unmapped scenarios are forbidden.
+- `MY-DOM-001`: Mint-You creates a `WORLD_OWNED` agent that represents the user's social persona and is always mounted in OASIS (main world). The agent serves all social scenarios — dating, friendship, professional networking, casual exploration.
+- `MY-DOM-002`: Personality inference relies on conversational AI interviews, not direct self-assessment questionnaires. The interview extracts trait signals from natural dialogue.
+- `MY-DOM-003`: Every valid interview turn must produce at least one trait signal mapped to an AgentDna dimension. Turns without signals are not counted as valid turns.
 - `MY-DOM-004`: Agent creation requires explicit user confirmation after persona card preview. No agent is created without user approval.
 - `MY-DOM-005`: Generated DNA must conform to the nimi-realm AgentDna 5-dimensional schema (identity, biological, appearance, personality, communication). Every required field must have a defined provenance — user input, deterministic extraction, LLM synthesis, or hard-coded default.
 - `MY-DOM-006`: The persona card is the primary user-facing artifact and must be renderable as a shareable image.
 - `MY-DOM-007`: User can modify any inferred trait before agent creation. Modification triggers LLM re-synthesis of dependent fields only.
-- `MY-DOM-008`: Agent `worldId` binding is mandatory. User selects target world before agent creation.
+- `MY-DOM-008`: Agent `worldId` binding is mandatory and fixed to OASIS. The world is resolved from platform OASIS endpoint and is not user-selectable.
 - `MY-DOM-009`: The user's real photo is private-by-default. It is stored via `referenceImageUrl` but never exposed to other users or agents without explicit mutual authorization. Agent behavior is never influenced by photo data.
 
 ## 2. Domain Increments — Intake & Creation
 
-- `MY-DOM-010`: Intake flow collects data in three phases: basic info (form), interests (tag selection), behavioral scenarios (situational choices).
+- `MY-DOM-010`: Intake flow collects data in three phases: basic info (form), interests (tag selection), conversational AI interview (7-12 turns).
 - `MY-DOM-011`: Basic info phase collects: display name, gender, age range, social intent. These map directly to `identity.name`, `biological.gender`, `biological.visualAge`, `personality.goals[0]`.
 - `MY-DOM-012`: Interest tags phase provides a multi-select pool from a predefined tag list (see `tables/scenario-intake.yaml#interest_tag_pool`). Selected tags map to `personality.interests`.
-- `MY-DOM-013`: Scenario phase presents 7-10 situational stories covering general social contexts. Each scenario has 3-4 choices, each choice carrying hidden trait weights across one or more dimensions.
-- `MY-DOM-014`: Trait extraction aggregates weighted scores from all scenario choices, then resolves `dnaPrimary` (highest-scoring archetype) and `dnaSecondary` (top 2-3 modifying traits).
+- `MY-DOM-013`: Interview phase conducts a 7-12 turn conversation. The AI interviewer opens based on user interests, follows the user's energy, and infers trait signals from conversational content. Each turn produces signals with integer weights (-2, -1, 1, 2).
+- `MY-DOM-014`: Trait extraction aggregates weighted signals from all interview turns, then resolves `dnaPrimary` (highest-scoring archetype) and `dnaSecondary` (top 2-3 modifying traits). Degraded extraction (< 7 valid turns) fills missing dimensions with defaults.
 - `MY-DOM-015`: LLM synthesis takes structured trait scores + basic info + interests and generates all natural-language and inferred fields. Full output scope is defined in `tables/field-provenance.yaml`.
 - `MY-DOM-016`: LLM synthesis also generates Identity Card fields: `greeting`, `exampleDialogue`, `systemPromptBase`, `rules`, `scenario`, `description`, `concept`. Note: `handle` is auto-generated programmatically (see `MY-PROF-007`), not LLM-synthesized.
 - `MY-DOM-017`: Persona card preview displays: display name, primary archetype, secondary traits, social mode summary, communication style summary, and a sample greeting.
 - `MY-DOM-018`: Agent creation payload assembles full `CreateAgentDto` including pre-built `dna` object to skip backend LLM generation.
 - `MY-DOM-019`: Appearance and non-behavioral biological fields use hard-coded defaults appropriate for the social-persona context (see `tables/field-provenance.yaml`). These fields exist to satisfy AgentDna schema requirements but do not influence agent behavior.
-- `MY-DOM-020`: Scenario content is stored as static data within the mod. No external data dependency for intake scenarios.
+- `MY-DOM-020`: Interview prompts are generated dynamically per turn. No static scenario data is required for the interview phase.
 
 ## 3. Domain Increments — Photo Trust
 

@@ -4,12 +4,16 @@ export const MINTYOU_NAV_SLOT = 'ui-extension.app.sidebar.mods';
 export const MINTYOU_ROUTE_SLOT = 'ui-extension.app.content.routes';
 
 export const MINTYOU_DATA_API_AGENTS_CREATE = 'data-api.creator.agents.create';
-export const MINTYOU_DATA_API_WORLDS_MINE = 'data-api.world.worlds.mine';
+export const MINTYOU_DATA_API_WORLD_ACCESS_ME = 'data-api.world.access.me';
+export const MINTYOU_DATA_API_WORLD_OASIS_GET = 'data-api.world.oasis.get';
+export const MINTYOU_DATA_API_RUNTIME_ROUTE_OPTIONS = 'data-api.runtime.route.options';
 
 export const MINTYOU_CAPABILITIES = [
   'llm.text.generate',
   `data.query.${MINTYOU_DATA_API_AGENTS_CREATE}`,
-  `data.query.${MINTYOU_DATA_API_WORLDS_MINE}`,
+  `data.query.${MINTYOU_DATA_API_WORLD_ACCESS_ME}`,
+  `data.query.${MINTYOU_DATA_API_WORLD_OASIS_GET}`,
+  `data.query.${MINTYOU_DATA_API_RUNTIME_ROUTE_OPTIONS}`,
   'hook.agent-profile.read',
   'data.store.mod-state',
   `ui.register.${MINTYOU_NAV_SLOT}`,
@@ -20,7 +24,9 @@ export const MINTYOU_PERMISSIONS = [...MINTYOU_CAPABILITIES] as const;
 
 export const MINTYOU_REASON = {
   INPUT_INVALID: 'MINTYOU_INPUT_INVALID',
-  SCENARIO_INCOMPLETE: 'MINTYOU_SCENARIO_INCOMPLETE',
+  INTERVIEW_INCOMPLETE: 'MINTYOU_INTERVIEW_INCOMPLETE',
+  INTERVIEW_DEGRADED: 'MINTYOU_INTERVIEW_DEGRADED',
+  INTERVIEW_TURN_FAILED: 'MINTYOU_INTERVIEW_TURN_FAILED',
   TRAIT_EXTRACTION_FAILED: 'MINTYOU_TRAIT_EXTRACTION_FAILED',
   DNA_SYNTHESIS_FAILED: 'MINTYOU_DNA_SYNTHESIS_FAILED',
   CONFIRM_REQUIRED: 'MINTYOU_CONFIRM_REQUIRED',
@@ -39,7 +45,9 @@ export const MINTYOU_AUDIT = {
   SESSION_RESUMED: 'mint-you.session.resumed',
   BASIC_INFO_SUBMITTED: 'mint-you.basic-info.submitted',
   INTERESTS_SELECTED: 'mint-you.interests.selected',
-  SCENARIOS_COMPLETED: 'mint-you.scenarios.completed',
+  INTERVIEW_STARTED: 'mint-you.interview.started',
+  INTERVIEW_TURN_COMPLETED: 'mint-you.interview.turn-completed',
+  INTERVIEW_COMPLETED: 'mint-you.interview.completed',
   TRAIT_EXTRACT_STARTED: 'mint-you.trait-extract.started',
   TRAIT_EXTRACT_DONE: 'mint-you.trait-extract.done',
   DNA_SYNTHESIS_STARTED: 'mint-you.dna-synthesis.started',
@@ -60,7 +68,7 @@ export const MINTYOU_AUDIT = {
 export const MINTYOU_PIPELINE_STEPS = [
   'basic-info',
   'interest-tags',
-  'scenarios',
+  'interview',
   'trait-extract',
   'dna-synthesize',
   'preview-card',

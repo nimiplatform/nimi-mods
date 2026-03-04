@@ -81,29 +81,29 @@ resolvable_trait_groups:
   - group: dnaPrimary
     target_field: CreateAgentDto.dnaPrimary (DnaPrimaryType enum, top-level)
     resolution: highest aggregated score across primary archetypes
-    tie_breaker: scenario presentation order (earlier wins)
-    min_scenarios: 2
+    tie_breaker: turn order (earlier wins)
+    min_turns: 2
     source_rule: MY-INT-004
   - group: relationshipMode
     target_field: AgentDna.personality.relationshipMode
     resolution: highest aggregated score among SECURE/PASSIONATE/INDEPENDENT
-    tie_breaker: scenario presentation order (earlier wins)
-    min_scenarios: 2
+    tie_breaker: turn order (earlier wins)
+    min_turns: 2
     source_rule: MY-INT-004
   - group: communicationFormality
     target_field: AgentDna.communication.formality
     resolution: highest score among casual/formal/slang
     tie_breaker: defaults to casual
-    min_scenarios: 2
+    min_turns: 2
     source_rule: MY-INT-004
   - group: communicationSentiment
     target_field: AgentDna.communication.sentiment
     resolution: highest score among positive/neutral/cynical
     tie_breaker: defaults to neutral
-    min_scenarios: 2
+    min_turns: 2
     source_rule: MY-INT-004
   - group: dnaSecondary
     target_field: CreateAgentDto.dnaSecondary (DnaSecondaryTrait[] enum, top-level, max 3)
     resolution: top 2-3 secondary traits by score
-    min_scenarios: 2
+    min_turns: 2
     source_rule: MY-INT-004

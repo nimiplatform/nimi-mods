@@ -10,7 +10,13 @@ import type {
   DnaSynthesisOutput,
   MintYouResult,
 } from '../types.js';
-import type { DnaPrimaryType, DnaSecondaryTrait } from '../contracts.js';
+import type {
+  DnaPrimaryType,
+  DnaSecondaryTrait,
+  RelationshipMode,
+  FormalityValue,
+  SentimentValue,
+} from '../contracts.js';
 import { assembleCreateAgentDto } from './dto-assemble.js';
 import { generateHandle } from '../utils/slug.js';
 
@@ -27,6 +33,9 @@ type AgentCreateInput = {
   traitOverrides?: {
     dnaPrimary?: DnaPrimaryType;
     dnaSecondary?: DnaSecondaryTrait[];
+    relationshipMode?: RelationshipMode;
+    formality?: FormalityValue;
+    sentiment?: SentimentValue;
   } | null;
   existingAgentId?: string | null;
 };
@@ -37,7 +46,7 @@ type AgentCreateResult = {
 
 function isHandleConflictError(error: unknown): boolean {
   const msg = error instanceof Error ? error.message : String(error || '');
-  return msg.includes('409') || msg.includes('CONFLICT') || msg.toLowerCase().includes('handle');
+  return /(\b409\b|conflict|already exists|already taken|duplicate key|handle[_\s-]?(taken|exists|unavailable)|mintyou_handle_unavailable)/i.test(msg);
 }
 
 function isAgentLimitError(error: unknown): boolean {
@@ -65,7 +74,7 @@ async function tryCreateAgent(
         error: {
           reasonCode: MINTYOU_REASON.HANDLE_UNAVAILABLE,
           message: 'Handle is already taken.',
-          actionHint: 'Retrying with a different handle.',
+          actionHint: 'Retrying automatically with a new handle.',
         },
       };
     }
@@ -171,7 +180,7 @@ export async function createAgent(
     error: {
       reasonCode: MINTYOU_REASON.HANDLE_UNAVAILABLE,
       message: `Failed to generate a unique handle after ${MAX_HANDLE_RETRIES} attempts.`,
-      actionHint: 'Choose a different handle for the agent. Auto-retry up to 3 times.',
+      actionHint: 'Retry creation. The system will generate a new handle automatically.',
     },
   };
 }

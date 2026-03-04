@@ -9,16 +9,20 @@ export const BasicInfoSchema = z.object({
 
 export const InterestSelectionSchema = z.array(z.string().min(1)).min(3).max(8);
 
-export const ScenarioChoicesSchema = z.record(
-  z.string().regex(/^MY-S\d{2}$/),
-  z.string().regex(/^MY-S\d{2}-[A-D]$/),
-).refine(
-  (choices) => Object.keys(choices).length >= 7,
-  { message: 'At least 7 scenario choices are required' },
-).refine(
-  (choices) => Object.keys(choices).length <= 10,
-  { message: 'At most 10 scenario choices allowed' },
-);
+export const InterviewTurnOutputSchema = z.object({
+  assistantReply: z.string().min(1),
+  traitSignals: z.array(z.object({
+    key: z.string().min(1),
+    weight: z.number().int(),
+    evidence: z.string().max(200),
+  })).max(8),
+  turnControl: z.object({
+    suggestedEnd: z.boolean(),
+    phase: z.enum(['opening', 'exploring', 'deepening', 'wrapping']),
+    nextQuestionFocus: z.string(),
+  }),
+  memoryDigest: z.string().max(2000),
+});
 
 export const DnaSynthesisOutputSchema = z.object({
   concept: z.string().min(1),

@@ -14,9 +14,15 @@ required_capabilities:
   - key: data.query.data-api.creator.agents.create
     purpose: Create agent with pre-built DNA payload
     source_rule: MY-CAP-004
-  - key: data.query.data-api.world.worlds.mine
-    purpose: List user worlds for world selection gate
+  - key: data.query.data-api.world.access.me
+    purpose: Resolve current user access summary for session scope key
     source_rule: MY-CAP-002
+  - key: data.query.data-api.world.oasis.get
+    purpose: Resolve deterministic OASIS world target for agent worldId binding
+    source_rule: MY-CAP-002
+  - key: data.query.data-api.runtime.route.options
+    purpose: Query runtime route source/connector/model options for Mint-You synthesis routing controls
+    source_rule: MY-CAP-003
   # Photo trust
   - key: hook.agent-profile.read
     purpose: Intercept agent profile reads to filter referenceImageUrl based on photo authorization state

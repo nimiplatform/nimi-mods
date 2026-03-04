@@ -5,11 +5,11 @@
 ## MY-PIPE-001 Creation Execution Chain
 
 Creation execution chain is fixed:
-`basic-info -> interest-tags -> scenarios -> trait-extract -> dna-synthesize -> preview-card -> user-confirm -> agent-create`
+`basic-info -> interest-tags -> interview -> trait-extract -> dna-synthesize -> preview-card -> user-confirm -> agent-create`
 
 ## MY-PIPE-002 Ordered Preconditions
 
-Each step precondition is mandatory and skip paths are forbidden. `trait-extract` requires all scenario choices completed. `dna-synthesize` requires trait extraction output. `agent-create` requires user confirmation.
+Each step precondition is mandatory and skip paths are forbidden. `trait-extract` requires interview completion (minimum 7 valid turns or degraded end at turn 12). `dna-synthesize` requires trait extraction output. `agent-create` requires user confirmation.
 
 ## MY-PIPE-003 Idempotent Agent Creation
 
@@ -19,9 +19,9 @@ Agent creation is idempotent per intake session. Re-confirming the same persona 
 
 Intake progress is persisted per step to the mod's local state store (platform-provided key-value storage scoped to userId + modId). Users can resume an interrupted intake session from the last completed step. Session data expires after 7 days of inactivity.
 
-## MY-PIPE-005 World Selection Gate
+## MY-PIPE-005 OASIS World Binding Gate
 
-`agent-create` step requires a valid `worldId`. World selection is presented as a dropdown within the `user-confirm` step UI, populated from `data-api.world.worlds.mine`. It must be resolved before the create call.
+`agent-create` step requires a valid `worldId` resolved from `data-api.world.oasis.get`. Target world is fixed to OASIS and displayed as read-only in `user-confirm`; manual world selection is forbidden.
 
 ## MY-PIPE-006 Photo Upload Step
 

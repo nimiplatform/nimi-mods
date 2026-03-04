@@ -11,11 +11,21 @@ codes:
     blocking: true
     action_hint: Complete all required basic info fields and retry.
     source_rule: MY-ERR-001
-  - code: MINTYOU_SCENARIO_INCOMPLETE
-    stage: scenarios
+  - code: MINTYOU_INTERVIEW_INCOMPLETE
+    stage: interview
     blocking: true
-    action_hint: Complete all scenario choices before proceeding.
+    action_hint: Continue the interview conversation until enough valid turns are completed.
     source_rule: MY-ERR-001
+  - code: MINTYOU_INTERVIEW_DEGRADED
+    stage: trait-extract
+    blocking: false
+    action_hint: Interview ended with fewer valid turns than ideal. Some traits use default values.
+    source_rule: MY-ERR-003
+  - code: MINTYOU_INTERVIEW_TURN_FAILED
+    stage: interview
+    blocking: false
+    action_hint: A single interview turn failed. Retry the message.
+    source_rule: MY-ERR-003
   - code: MINTYOU_TRAIT_EXTRACTION_FAILED
     stage: trait-extract
     blocking: true
@@ -34,7 +44,7 @@ codes:
   - code: MINTYOU_WORLD_NOT_SELECTED
     stage: agent-create
     blocking: true
-    action_hint: Select a target world before creating agent.
+    action_hint: OASIS world is unavailable. Retry after world data capability is ready.
     source_rule: MY-ERR-001
   - code: MINTYOU_AGENT_CREATE_FAILED
     stage: agent-create

@@ -4,15 +4,15 @@
 
 ## MY-INT-001 Three-Phase Intake
 
-Intake flow is fixed: `basic-info -> interest-tags -> scenarios`. Phases execute sequentially; earlier phases provide context for later ones.
+Intake flow is fixed: `basic-info -> interest-tags -> interview`. Phases execute sequentially; earlier phases provide context for later ones. The interview phase replaces the former scenario-based intake with a conversational AI interview.
 
-## MY-INT-002 Scenario Structure
+## MY-INT-002 Conversational Interview Structure
 
-Each scenario must declare: a situational narrative, 3-4 mutually exclusive choices, and per-choice trait weight mappings. Scenarios without trait mappings are forbidden. Scenario narratives must cover general social contexts (not exclusively dating).
+The interview is a multi-turn conversation between the user and an AI interviewer. Each turn produces structured output via `generateObject`: an assistant reply, trait signals, turn control metadata, and a memory digest. The interview runs for 7-12 turns (7 minimum valid turns required, 12 hard maximum).
 
-## MY-INT-003 Trait Weight Key Format
+## MY-INT-003 Trait Signal Key Format
 
-Each choice carries a weight map: `Record<TraitWeightKey, number>`. Keys use dot-notation namespaces:
+Each turn may produce trait signals using dot-notation keys:
 
 - `primary.<DnaPrimaryType>` — maps to `dnaPrimary` group (e.g. `primary.CARING`)
 - `relationship.<Mode>` — maps to `relationshipMode` group (e.g. `relationship.SECURE`)
@@ -20,16 +20,16 @@ Each choice carries a weight map: `Record<TraitWeightKey, number>`. Keys use dot
 - `communication.sentiment.<Value>` — maps to `communicationSentiment` group (e.g. `communication.sentiment.positive`)
 - `secondary.<DnaSecondaryTrait>` — maps to `dnaSecondary` group (e.g. `secondary.HUMOROUS`)
 
-Weights are additive across all scenarios. The final score per dimension is the sum of all selected choice weights for that dimension.
+Weights are integers from {-2, -1, 1, 2} and are additive across all turns. The final score per dimension is the sum of all signal weights for that dimension.
 
-## MY-INT-004 Minimum Scenario Coverage
+## MY-INT-004 Interview Coverage Policy
 
-The scenario set must collectively cover all five resolvable trait groups: `dnaPrimary`, `relationshipMode`, `communicationFormality`, `communicationSentiment`, `dnaSecondary`. Each group must be targeted by at least two scenarios.
+The AI interviewer is guided by a dynamic coverage note that softly steers follow-up questions towards uncovered trait dimensions, but only when natural within the current topic. Hard topic switches for coverage purposes are forbidden.
 
-## MY-INT-005 Scenario Neutrality
+## MY-INT-005 Interview Neutrality
 
-Scenario narratives and choice labels must not reveal which trait they map to. Transparent trait labeling in user-facing text is forbidden.
+The AI interviewer must not ask direct personality meta-questions (e.g. "what kind of personality do you think you have?"). Trait signals are inferred from conversational content, not from self-assessment.
 
 ## MY-INT-006 Interest Tag Pool
 
-The predefined interest tag pool is defined in `tables/scenario-intake.yaml#interest_tag_pool`. Tags are grouped by category for UI presentation. The pool is a static dataset within the mod.
+The predefined interest tag pool is defined in `tables/scenario-intake.yaml#interest_tag_pool`. Tags are grouped by category for UI presentation. The pool is a static dataset within the mod. Interest tags are also used to seed the opening interview topic.

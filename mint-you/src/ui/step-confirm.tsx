@@ -1,7 +1,7 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import { useMintYouStore } from '../state/mint-you-store.js';
-import { useWorldsQuery } from '../hooks/use-worlds-query.js';
+import { useOasisWorldQuery } from '../hooks/use-oasis-world-query.js';
 import { MINTYOU_REASON, MINTYOU_AUDIT } from '../contracts.js';
 import { getMintYouHookClient } from '../runtime-mod.js';
 import { createAgent } from '../pipeline/agent-create.js';
@@ -16,19 +16,30 @@ export function StepConfirm() {
     basicInfo, traitResult, dnaSynthesis, selectedInterests,
     traitOverrides, referenceImageUrl, worldId, error, loading,
   } = store;
-  const { worlds, loading: worldsLoading } = useWorldsQuery();
+  const { world: oasisWorld, loading: oasisLoading, error: oasisError } = useOasisWorldQuery();
 
   if (!basicInfo || !traitResult || !dnaSynthesis) return null;
 
   const effectivePrimary = traitOverrides?.dnaPrimary ?? traitResult.dnaPrimary;
   const effectiveSecondary = traitOverrides?.dnaSecondary ?? traitResult.dnaSecondary;
+  const effectiveRelationshipMode = traitOverrides?.relationshipMode ?? traitResult.relationshipMode;
+  const effectiveFormality = traitOverrides?.formality ?? traitResult.formality;
+  const effectiveSentiment = traitOverrides?.sentiment ?? traitResult.sentiment;
+  const oasisWorldId = oasisWorld?.id ?? '';
+  const oasisWorldName = oasisWorld?.name || 'OASIS';
+
+  useEffect(() => {
+    if (oasisWorldId && worldId !== oasisWorldId) {
+      store.setWorldId(oasisWorldId);
+    }
+  }, [oasisWorldId, store, worldId]);
 
   const handleConfirm = useCallback(async () => {
-    if (!worldId) {
+    if (!oasisWorldId) {
       store.setError({
         reasonCode: MINTYOU_REASON.WORLD_NOT_SELECTED,
-        message: 'Please select a target world before creating the agent.',
-        actionHint: 'Select a target world before creating agent.',
+        message: 'OASIS world is unavailable.',
+        actionHint: 'Retry after runtime world data is ready.',
       });
       return;
     }
@@ -48,7 +59,7 @@ export function StepConfirm() {
       traitResult,
       dnaSynthesis,
       interests: selectedInterests,
-      worldId,
+      worldId: oasisWorldId,
       referenceImageUrl,
       traitOverrides,
       existingAgentId: store.createdAgentId,
@@ -63,7 +74,7 @@ export function StepConfirm() {
       store.setError(result.error);
       emitMintYouLog({ level: 'error', message: MINTYOU_AUDIT.AGENT_CREATE_FAILED, flowId, source: 'StepConfirm', details: { reasonCode: result.error.reasonCode } });
     }
-  }, [worldId, basicInfo, traitResult, dnaSynthesis, selectedInterests, referenceImageUrl, traitOverrides, store]);
+  }, [oasisWorldId, basicInfo, traitResult, dnaSynthesis, selectedInterests, referenceImageUrl, traitOverrides, store]);
 
   return (
     <div className="mx-auto max-w-lg space-y-4 p-4">
@@ -77,30 +88,29 @@ export function StepConfirm() {
         mbti={dnaSynthesis.personality.mbti}
         greeting={dnaSynthesis.greeting}
         personalitySummary={dnaSynthesis.personality.summary}
-        formality={traitResult.formality}
-        sentiment={traitResult.sentiment}
-        relationshipMode={traitResult.relationshipMode}
+        formality={effectiveFormality}
+        sentiment={effectiveSentiment}
+        relationshipMode={effectiveRelationshipMode}
         interests={selectedInterests}
         referenceImageUrl={referenceImageUrl}
         compact
       />
 
-      {/* World selector */}
+      {/* Fixed world target: OASIS */}
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">
           {t('Confirm.worldLabel')}
         </label>
-        <select
-          value={worldId ?? ''}
-          onChange={(e) => store.setWorldId(e.target.value || null)}
-          disabled={worldsLoading}
+        <input
+          value={oasisWorldName}
+          readOnly
+          disabled={oasisLoading}
           className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#4ECCA3] focus:outline-none focus:ring-1 focus:ring-[#4ECCA3]"
-        >
-          <option value="">{t('Confirm.selectWorld')}</option>
-          {worlds.map((world: { id: string; name: string }) => (
-            <option key={world.id} value={world.id}>{world.name}</option>
-          ))}
-        </select>
+        />
+        <p className="mt-1 text-xs text-gray-500">{t('Confirm.worldFixedHint')}</p>
+        {oasisError && (
+          <p className="mt-1 text-xs text-red-600">{oasisError}</p>
+        )}
       </div>
 
       {error && (
@@ -117,7 +127,7 @@ export function StepConfirm() {
         </button>
         <button
           onClick={handleConfirm}
-          disabled={loading || !worldId}
+          disabled={loading || oasisLoading || !oasisWorldId}
           className="flex-1 rounded-lg bg-[#4ECCA3] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#3DBB92] disabled:opacity-50"
         >
           {loading ? t('Confirm.creating') : t('Confirm.createAgent')}

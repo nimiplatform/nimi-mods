@@ -1,4 +1,5 @@
 import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
+import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 import { MINTYOU_REASON } from '../contracts.js';
 import { DnaSynthesisOutputSchema } from '../schemas.js';
 import type {
@@ -8,6 +9,7 @@ import type {
   MintYouResult,
 } from '../types.js';
 import { emitMintYouLog } from '../logging.js';
+import { mintYouMessage } from '../i18n/messages.js';
 
 function buildSystemPrompt(): string {
   return `You are a persona synthesis engine for a social AI platform. Given a user's personality profile (primary archetype, secondary traits, relationship mode, formality, sentiment) along with their basic info and interests, generate a complete social persona.
@@ -89,15 +91,27 @@ export async function synthesizeDna(input: {
   basicInfo: BasicInfo;
   traitResult: TraitExtractionResult;
   interests: string[];
+  routeOverride?: RuntimeRouteBinding | null;
 }): Promise<MintYouResult<DnaSynthesisOutput>> {
-  const { aiClient, basicInfo, traitResult, interests } = input;
+  const {
+    aiClient,
+    basicInfo,
+    traitResult,
+    interests,
+    routeOverride,
+  } = input;
 
   const systemPrompt = buildSystemPrompt();
   const prompt = buildUserPrompt({ basicInfo, traitResult, interests });
+  const actionHint = mintYouMessage(
+    'Errors.dnaActionHint',
+    'Check LLM route availability and retry synthesis.',
+  );
 
   try {
     const result = await aiClient.generateObject({
       routeHint: 'chat/default',
+      routeOverride: routeOverride || undefined,
       systemPrompt,
       prompt,
       maxTokens: 4096,
@@ -121,8 +135,12 @@ export async function synthesizeDna(input: {
         ok: false,
         error: {
           reasonCode: MINTYOU_REASON.DNA_SYNTHESIS_FAILED,
-          message: `LLM output schema validation failed: ${issues}`,
-          actionHint: 'Check LLM route availability and retry synthesis.',
+          message: mintYouMessage(
+            'Errors.dnaSchemaInvalid',
+            'LLM output schema validation failed: {{issues}}',
+            { issues },
+          ),
+          actionHint,
         },
       };
     }
@@ -130,18 +148,36 @@ export async function synthesizeDna(input: {
     return { ok: true, data: validation.data as DnaSynthesisOutput };
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error || '');
+    const normalized = msg.trim() || 'unknown error';
+    const lower = normalized.toLowerCase();
+    const timeoutLike = (
+      lower.includes('timeout')
+      || lower.includes('timed out')
+      || lower.includes('deadline_exceeded')
+      || lower.includes('deadline exceeded')
+      || lower.includes('ai_provider_timeout')
+    );
     emitMintYouLog({
       level: 'error',
       message: 'action:dna-synthesis:error',
       source: 'synthesizeDna',
-      details: { error: msg },
+      details: { error: normalized, timeoutLike },
     });
     return {
       ok: false,
       error: {
         reasonCode: MINTYOU_REASON.DNA_SYNTHESIS_FAILED,
-        message: `DNA synthesis failed: ${msg}`,
-        actionHint: 'Check LLM route availability and retry synthesis.',
+        message: timeoutLike
+          ? mintYouMessage(
+            'Errors.dnaSynthesisTimeout',
+            'DNA synthesis timed out. Please retry or switch model.',
+          )
+          : mintYouMessage(
+            'Errors.dnaSynthesisFailed',
+            'DNA synthesis failed: {{detail}}',
+            { detail: normalized },
+          ),
+        actionHint,
       },
     };
   }

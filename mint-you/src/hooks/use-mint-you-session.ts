@@ -8,7 +8,7 @@ import {
   isSessionExpired,
   buildSessionSnapshot,
 } from '../services/session-manager.js';
-import { MINTYOU_DATA_API_WORLDS_MINE, MINTYOU_REASON } from '../contracts.js';
+import { MINTYOU_DATA_API_WORLD_ACCESS_ME, MINTYOU_REASON } from '../contracts.js';
 import { emitMintYouLog } from '../logging.js';
 import { createUlid } from '../utils/ulid.js';
 import { getMintYouHookClient } from '../runtime-mod.js';
@@ -43,7 +43,7 @@ function extractUserIdFromRecord(record: Record<string, unknown>): string {
   return '';
 }
 
-function extractScopeKeyFromWorldsResponse(response: unknown): string {
+function extractScopeKeyFromAccessResponse(response: unknown): string {
   const root = toRecord(response);
   const topLevel = extractUserIdFromRecord(root);
   if (topLevel) return topLevel;
@@ -77,10 +77,10 @@ export function useMintYouSession() {
     if (!hookClient) return DEFAULT_SCOPE_KEY;
     try {
       const response = await hookClient.data.query({
-        capability: MINTYOU_DATA_API_WORLDS_MINE,
+        capability: MINTYOU_DATA_API_WORLD_ACCESS_ME,
         query: {},
       });
-      const userId = extractScopeKeyFromWorldsResponse(response);
+      const userId = extractScopeKeyFromAccessResponse(response);
       return userId || DEFAULT_SCOPE_KEY;
     } catch {
       return DEFAULT_SCOPE_KEY;
@@ -114,14 +114,36 @@ export function useMintYouSession() {
       } else {
         // Resume existing session
         store.setSessionId(existing.sessionId);
-        store.goToStep(existing.currentStep);
+
+        // Guard: if saved at agent-create without a result, fall back to confirm
+        const resumeStep =
+          existing.currentStep === 'agent-create' && !existing.createdAgentId
+            ? 'user-confirm'
+            : existing.currentStep;
+        store.goToStep(resumeStep);
+
         if (existing.basicInfo) store.setBasicInfo(existing.basicInfo);
         if (existing.selectedInterests.length > 0) store.setSelectedInterests(existing.selectedInterests);
-        if (Object.keys(existing.scenarioChoices).length > 0) {
-          for (const [scenarioId, choiceId] of Object.entries(existing.scenarioChoices)) {
-            store.setScenarioChoice(scenarioId, choiceId);
+
+        // Restore interview state
+        if (existing.interviewMessages.length > 0) {
+          for (const msg of existing.interviewMessages) {
+            store.addInterviewMessage(msg);
           }
         }
+        if (existing.interviewSignals.length > 0) {
+          store.addInterviewSignals(existing.interviewSignals);
+        }
+        if (existing.interviewTurnCount > 0) {
+          store.setInterviewTurnCount(existing.interviewTurnCount);
+        }
+        if (existing.interviewValidTurnCount > 0) {
+          store.setInterviewValidTurnCount(existing.interviewValidTurnCount);
+        }
+        if (existing.memoryDigest) {
+          store.setMemoryDigest(existing.memoryDigest);
+        }
+
         if (existing.traitResult) store.setTraitResult(existing.traitResult);
         if (existing.dnaSynthesis) store.setDnaSynthesis(existing.dnaSynthesis);
         if (existing.traitOverrides) store.setTraitOverrides(existing.traitOverrides);
@@ -149,6 +171,20 @@ export function useMintYouSession() {
   // Auto-save on state changes (debounced)
   const currentStep = useMintYouStore((s) => s.currentStep);
   const sessionId = useMintYouStore((s) => s.sessionId);
+  const basicInfo = useMintYouStore((s) => s.basicInfo);
+  const selectedInterests = useMintYouStore((s) => s.selectedInterests);
+  const interviewMessages = useMintYouStore((s) => s.interviewMessages);
+  const interviewSignals = useMintYouStore((s) => s.interviewSignals);
+  const interviewTurnCount = useMintYouStore((s) => s.interviewTurnCount);
+  const interviewValidTurnCount = useMintYouStore((s) => s.interviewValidTurnCount);
+  const memoryDigest = useMintYouStore((s) => s.memoryDigest);
+  const traitResult = useMintYouStore((s) => s.traitResult);
+  const dnaSynthesis = useMintYouStore((s) => s.dnaSynthesis);
+  const traitOverrides = useMintYouStore((s) => s.traitOverrides);
+  const referenceImageUrl = useMintYouStore((s) => s.referenceImageUrl);
+  const worldId = useMintYouStore((s) => s.worldId);
+  const confirmed = useMintYouStore((s) => s.confirmed);
+  const createdAgentId = useMintYouStore((s) => s.createdAgentId);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -165,7 +201,11 @@ export function useMintYouSession() {
         currentStep: state.currentStep,
         basicInfo: state.basicInfo,
         selectedInterests: state.selectedInterests,
-        scenarioChoices: state.scenarioChoices,
+        interviewMessages: state.interviewMessages,
+        interviewSignals: state.interviewSignals,
+        interviewTurnCount: state.interviewTurnCount,
+        interviewValidTurnCount: state.interviewValidTurnCount,
+        memoryDigest: state.memoryDigest,
         traitResult: state.traitResult,
         dnaSynthesis: state.dnaSynthesis,
         traitOverrides: state.traitOverrides,
@@ -175,7 +215,9 @@ export function useMintYouSession() {
         createdAgentId: state.createdAgentId,
       });
       const hookClient = tryGetHookClient();
-      void saveSession(scopeKeyRef.current, snapshot, { hookClient });
+      void saveSession(scopeKeyRef.current, snapshot, { hookClient }).then((warning) => {
+        useMintYouStore.getState().setSessionPersistWarning(warning);
+      });
     }, 500);
 
     return () => {
@@ -183,7 +225,24 @@ export function useMintYouSession() {
         clearTimeout(saveTimerRef.current);
       }
     };
-  }, [sessionId, currentStep]);
+  }, [
+    sessionId,
+    currentStep,
+    basicInfo,
+    selectedInterests,
+    interviewMessages,
+    interviewSignals,
+    interviewTurnCount,
+    interviewValidTurnCount,
+    memoryDigest,
+    traitResult,
+    dnaSynthesis,
+    traitOverrides,
+    referenceImageUrl,
+    worldId,
+    confirmed,
+    createdAgentId,
+  ]);
 
   return { initSession };
 }

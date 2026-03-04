@@ -5,7 +5,7 @@ import type { MintYouPipelineStep } from '../contracts.js';
 const VISIBLE_STEPS: { key: MintYouPipelineStep; labelKey: string }[] = [
   { key: 'basic-info', labelKey: 'Steps.basicInfo' },
   { key: 'interest-tags', labelKey: 'Steps.interestTags' },
-  { key: 'scenarios', labelKey: 'Steps.scenarios' },
+  { key: 'interview', labelKey: 'Steps.interview' },
   { key: 'trait-extract', labelKey: 'Steps.processing' },
   { key: 'preview-card', labelKey: 'Steps.preview' },
   { key: 'user-confirm', labelKey: 'Steps.confirm' },
@@ -15,7 +15,7 @@ const VISIBLE_STEPS: { key: MintYouPipelineStep; labelKey: string }[] = [
 const STEP_ORDER: MintYouPipelineStep[] = [
   'basic-info',
   'interest-tags',
-  'scenarios',
+  'interview',
   'trait-extract',
   'dna-synthesize',
   'preview-card',

@@ -15,8 +15,9 @@ export async function registerMintYouDataCapabilities(input: {
   });
 
   // mint-you consumes:
-  //   data.query.data-api.creator.agents.create  — provided by host runtime
-  //   data.query.data-api.world.worlds.mine       — provided by host runtime
+  //   data.query.data-api.creator.agents.create   — provided by host runtime
+  //   data.query.data-api.world.access.me         — provided by host runtime
+  //   data.query.data-api.world.oasis.get         — provided by host runtime
   // No custom data handlers needed for these capabilities.
 
   // TODO: hook.agent-profile.read — photo access control interception.

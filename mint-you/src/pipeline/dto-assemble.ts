@@ -1,4 +1,10 @@
-import type { DnaPrimaryType, DnaSecondaryTrait } from '../contracts.js';
+import type {
+  DnaPrimaryType,
+  DnaSecondaryTrait,
+  RelationshipMode,
+  FormalityValue,
+  SentimentValue,
+} from '../contracts.js';
 import type { AgentRules } from '../types.js';
 import {
   HARDCODED_IDENTITY,
@@ -34,6 +40,9 @@ export function assembleCreateAgentDto(input: {
   traitOverrides?: {
     dnaPrimary?: DnaPrimaryType;
     dnaSecondary?: DnaSecondaryTrait[];
+    relationshipMode?: RelationshipMode;
+    formality?: FormalityValue;
+    sentiment?: SentimentValue;
   } | null;
 }): CreateAgentDto {
   const {
@@ -49,6 +58,9 @@ export function assembleCreateAgentDto(input: {
 
   const effectivePrimary = traitOverrides?.dnaPrimary ?? traitResult.dnaPrimary;
   const effectiveSecondary = traitOverrides?.dnaSecondary ?? traitResult.dnaSecondary;
+  const effectiveRelationshipMode = traitOverrides?.relationshipMode ?? traitResult.relationshipMode;
+  const effectiveFormality = traitOverrides?.formality ?? traitResult.formality;
+  const effectiveSentiment = traitOverrides?.sentiment ?? traitResult.sentiment;
 
   const dna: AgentDna = {
     identity: {
@@ -78,13 +90,13 @@ export function assembleCreateAgentDto(input: {
       mbti: dnaSynthesis.personality.mbti,
       interests,
       goals: [basicInfo.socialIntent],
-      relationshipMode: traitResult.relationshipMode,
+      relationshipMode: effectiveRelationshipMode,
     },
     communication: {
       summary: dnaSynthesis.communication.summary,
       responseLength: dnaSynthesis.communication.responseLength,
-      formality: traitResult.formality,
-      sentiment: traitResult.sentiment,
+      formality: effectiveFormality,
+      sentiment: effectiveSentiment,
     },
   };
 

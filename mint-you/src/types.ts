@@ -36,19 +36,35 @@ export type InterestTag = {
   category: InterestCategory;
 };
 
-// ── Scenarios ──
+// ── Interview ──
 
-export type ScenarioChoice = {
+export type InterviewMessage = {
   id: string;
-  label: string;
-  traitWeights: Record<string, number>;
+  role: 'user' | 'ai';
+  content: string;
+  timestamp: number;
 };
 
-export type Scenario = {
-  id: string;
-  narrative: string;
-  choices: ScenarioChoice[];
+export type InterviewTurnSignal = {
+  turnIndex: number;
+  messageId: string;
+  key: string;
+  weight: number;
+  evidence: string;
 };
+
+export type InterviewTurnOutput = {
+  assistantReply: string;
+  traitSignals: Array<{ key: string; weight: number; evidence: string }>;
+  turnControl: {
+    suggestedEnd: boolean;
+    phase: 'opening' | 'exploring' | 'deepening' | 'wrapping';
+    nextQuestionFocus: string;
+  };
+  memoryDigest: string;
+};
+
+export type InterviewStatus = 'idle' | 'ai-thinking' | 'typing' | 'complete' | 'error';
 
 // ── Trait Extraction Result ──
 
@@ -167,17 +183,25 @@ export type CreateAgentDto = {
 // ── Session ──
 
 export type MintYouSession = {
+  sessionVersion: number;
   sessionId: string;
   userId: string;
   currentStep: MintYouPipelineStep;
   basicInfo: BasicInfo | null;
   selectedInterests: string[];
-  scenarioChoices: Record<string, string>;
+  interviewMessages: InterviewMessage[];
+  interviewSignals: InterviewTurnSignal[];
+  interviewTurnCount: number;
+  interviewValidTurnCount: number;
+  memoryDigest: string;
   traitResult: TraitExtractionResult | null;
   dnaSynthesis: DnaSynthesisOutput | null;
   traitOverrides: {
     dnaPrimary?: DnaPrimaryType;
     dnaSecondary?: DnaSecondaryTrait[];
+    relationshipMode?: RelationshipMode;
+    formality?: FormalityValue;
+    sentiment?: SentimentValue;
   } | null;
   referenceImageUrl: string | null;
   worldId: string | null;

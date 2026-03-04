@@ -7,12 +7,12 @@
 version: 1
 cases:
   - id: MY-001-FULL-INTAKE-SUCCESS
-    description: Complete intake flow (basic-info + interests + all scenarios) produces a valid persona card.
+    description: Complete intake flow (basic-info + interests + interview) produces a valid persona card.
     expected_ok: true
     reason_code: null
     source_rule: MY-ACC-002
   - id: MY-002-TRAIT-EXTRACTION-PRODUCES-PRIMARY
-    description: Trait extraction resolves exactly one dnaPrimary from aggregated scenario scores.
+    description: Trait extraction resolves exactly one dnaPrimary from aggregated interview signals.
     expected_ok: true
     reason_code: null
     source_rule: MY-ACC-002
@@ -28,12 +28,12 @@ cases:
     prerequisite: user has not confirmed
     source_rule: MY-ACC-002
   - id: MY-005-AGENT-CREATE-SUCCESS
-    description: After confirmation, agent is created with INCUBATING state, correct worldId binding, and WORLD_OWNED ownership.
+    description: After confirmation, agent is created with INCUBATING state, worldId bound to OASIS, and WORLD_OWNED ownership.
     expected_ok: true
     reason_code: null
     source_rule: MY-ACC-002
   - id: MY-006-WORLD-NOT-SELECTED-FAIL-CLOSE
-    description: Agent creation fails with blocking error when no worldId is selected.
+    description: Agent creation fails with blocking error when OASIS worldId cannot be resolved.
     expected_ok: false
     reason_code: MINTYOU_WORLD_NOT_SELECTED
     source_rule: MY-ACC-002
@@ -47,10 +47,10 @@ cases:
     expected_ok: true
     reason_code: null
     source_rule: MY-ACC-002
-  - id: MY-009-SCENARIO-INCOMPLETE-BLOCKED
-    description: Advancing past scenarios step is blocked when not all scenarios are answered.
+  - id: MY-009-INTERVIEW-INCOMPLETE-BLOCKED
+    description: Advancing past interview step is blocked when fewer than 7 valid turns are completed.
     expected_ok: false
-    reason_code: MINTYOU_SCENARIO_INCOMPLETE
+    reason_code: MINTYOU_INTERVIEW_INCOMPLETE
     source_rule: MY-ACC-002
   - id: MY-010-IDEMPOTENT-CREATE
     description: Re-confirming the same persona card in the same session does not create a duplicate agent.

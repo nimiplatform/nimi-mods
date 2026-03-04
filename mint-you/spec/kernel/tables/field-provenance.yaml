@@ -68,8 +68,8 @@ create_agent_dto:
     required: true
     source_rule: MY-PROF-002
   - field: worldId
-    provenance: user-input
-    source: user selects from worlds.mine list
+    provenance: deterministic
+    source: resolved from data-api.world.oasis.get (main world)
     required: true
     source_rule: MY-PIPE-005
   - field: ownershipType

@@ -89,7 +89,7 @@ export const MOD_SPEC_CONFIG = {
       { input: 'reason-codes.yaml', output: 'reason-codes.md', title: 'Generated Reason Codes' },
       { input: 'acceptance-cases.yaml', output: 'acceptance-cases.md', title: 'Generated Acceptance Cases' },
     ],
-    requiredPipelineChain: ['basic-info', 'interest-tags', 'scenarios', 'trait-extract', 'dna-synthesize', 'preview-card', 'user-confirm', 'agent-create'],
+    requiredPipelineChain: ['basic-info', 'interest-tags', 'interview', 'trait-extract', 'dna-synthesize', 'preview-card', 'user-confirm', 'agent-create'],
     requiredAcceptanceCaseIds: [
       'MY-001-FULL-INTAKE-SUCCESS',
       'MY-002-TRAIT-EXTRACTION-PRODUCES-PRIMARY',
@@ -99,7 +99,7 @@ export const MOD_SPEC_CONFIG = {
       'MY-006-WORLD-NOT-SELECTED-FAIL-CLOSE',
       'MY-007-SYNTHESIS-FAILURE-FAIL-CLOSE',
       'MY-008-TRAIT-OVERRIDE-RESYNTHESIS',
-      'MY-009-SCENARIO-INCOMPLETE-BLOCKED',
+      'MY-009-INTERVIEW-INCOMPLETE-BLOCKED',
       'MY-010-IDEMPOTENT-CREATE',
       'MY-011-AGENT-LIMIT-BLOCKED',
       'MY-012-HANDLE-RETRY-ON-CONFLICT',

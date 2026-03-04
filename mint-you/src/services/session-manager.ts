@@ -1,10 +1,32 @@
 import type { HookClient } from '@nimiplatform/sdk/mod/types';
-import type { MintYouSession, BasicInfo, TraitExtractionResult, DnaSynthesisOutput } from '../types.js';
-import type { MintYouPipelineStep, DnaPrimaryType, DnaSecondaryTrait } from '../contracts.js';
+import type {
+  MintYouSession,
+  BasicInfo,
+  TraitExtractionResult,
+  DnaSynthesisOutput,
+  InterviewMessage,
+  InterviewTurnSignal,
+} from '../types.js';
+import type {
+  MintYouPipelineStep,
+  DnaPrimaryType,
+  DnaSecondaryTrait,
+  RelationshipMode,
+  FormalityValue,
+  SentimentValue,
+} from '../contracts.js';
+import { emitMintYouLog } from '../logging.js';
+
+export const SESSION_VERSION = 2;
 
 const SESSION_KEY_PREFIX = 'mint-you:session:';
 const SESSION_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const MOD_STATE_CAPABILITY = 'data.store.mod-state';
+
+const MAX_PERSISTED_MESSAGES = 8;
+const MAX_MEMORY_DIGEST_LENGTH = 2000;
+const MAX_SIGNALS_PER_TURN = 8;
+const MAX_EVIDENCE_LENGTH = 100;
 
 function normalizeScopeKey(scopeKey: string): string {
   const normalized = String(scopeKey || '').trim();
@@ -15,39 +37,22 @@ function getSessionKey(scopeKey: string): string {
   return `${SESSION_KEY_PREFIX}${normalizeScopeKey(scopeKey)}`;
 }
 
-function readLocalStorage(key: string): string | null {
-  if (typeof localStorage === 'undefined') return null;
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function writeLocalStorage(key: string, value: string): void {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // Silent fail
-  }
-}
-
-function removeLocalStorage(key: string): void {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    localStorage.removeItem(key);
-  } catch {
-    // Silent fail
-  }
-}
-
 function extractStateValue(response: unknown): string | null {
   if (typeof response === 'string') return response;
   if (!response || typeof response !== 'object') return null;
   const record = response as Record<string, unknown>;
+  if ('ok' in record && record.ok === false) return null;
   if (typeof record.value === 'string') return record.value;
   return null;
+}
+
+function extractStateAck(response: unknown): boolean {
+  if (!response || typeof response !== 'object') return true;
+  const record = response as Record<string, unknown>;
+  if (typeof record.ok === 'boolean') {
+    return record.ok;
+  }
+  return true;
 }
 
 async function readFromModStateStore(
@@ -71,11 +76,11 @@ async function writeToModStateStore(
   value: string,
 ): Promise<boolean> {
   try {
-    await hookClient.data.query({
+    const response = await hookClient.data.query({
       capability: MOD_STATE_CAPABILITY,
       query: { op: 'set', key, value },
     });
-    return true;
+    return extractStateAck(response);
   } catch {
     return false;
   }
@@ -86,11 +91,11 @@ async function removeFromModStateStore(
   key: string,
 ): Promise<boolean> {
   try {
-    await hookClient.data.query({
+    const response = await hookClient.data.query({
       capability: MOD_STATE_CAPABILITY,
       query: { op: 'delete', key },
     });
-    return true;
+    return extractStateAck(response);
   } catch {
     return false;
   }
@@ -101,29 +106,78 @@ function parseSession(raw: string | null): MintYouSession | null {
   try {
     const parsed = JSON.parse(raw) as MintYouSession;
     if (!parsed || typeof parsed !== 'object') return null;
+    // Version check: reject sessions from older schema
+    if ((parsed.sessionVersion ?? 0) !== SESSION_VERSION) return null;
     return parsed;
   } catch {
     return null;
   }
 }
 
+/**
+ * Trim session data for persistence to stay within mod-state 512KB limit.
+ * - Exclude data: URL photos (only keep in memory)
+ * - Trim interview messages to most recent N
+ * - Clamp memoryDigest length
+ * - Clamp signal evidence length and per-turn count
+ */
+function trimForPersistence(session: MintYouSession): MintYouSession {
+  // Exclude data: URL photos
+  const referenceImageUrl = session.referenceImageUrl?.startsWith('data:')
+    ? null
+    : session.referenceImageUrl;
+
+  // Keep only the most recent messages
+  const interviewMessages = session.interviewMessages.slice(-MAX_PERSISTED_MESSAGES);
+
+  // Clamp memoryDigest
+  const memoryDigest = session.memoryDigest.slice(0, MAX_MEMORY_DIGEST_LENGTH);
+
+  // Trim signals: cap per-turn and evidence length
+  const turnSignalCounts = new Map<number, number>();
+  const interviewSignals: InterviewTurnSignal[] = [];
+  for (const signal of session.interviewSignals) {
+    const count = turnSignalCounts.get(signal.turnIndex) ?? 0;
+    if (count >= MAX_SIGNALS_PER_TURN) continue;
+    turnSignalCounts.set(signal.turnIndex, count + 1);
+    interviewSignals.push({
+      ...signal,
+      evidence: signal.evidence.slice(0, MAX_EVIDENCE_LENGTH),
+    });
+  }
+
+  return {
+    ...session,
+    referenceImageUrl,
+    interviewMessages,
+    interviewSignals,
+    memoryDigest,
+  };
+}
+
 export async function saveSession(
   scopeKey: string,
   session: MintYouSession,
   options?: { hookClient?: HookClient | null },
-): Promise<void> {
+): Promise<string | null> {
   const key = getSessionKey(scopeKey);
-  const data = JSON.stringify({ ...session, updatedAt: Date.now() });
+  const trimmed = trimForPersistence({ ...session, updatedAt: Date.now() });
+  const data = JSON.stringify(trimmed);
 
   const hookClient = options?.hookClient ?? null;
-  if (hookClient) {
-    const saved = await writeToModStateStore(hookClient, key, data);
-    if (saved) {
-      return;
-    }
-  }
+  if (!hookClient) return null;
 
-  writeLocalStorage(key, data);
+  const ok = await writeToModStateStore(hookClient, key, data);
+  if (!ok) {
+    emitMintYouLog({
+      level: 'warn',
+      message: 'action:session:persist-failed',
+      source: 'saveSession',
+      details: { scopeKey, dataLength: data.length },
+    });
+    return 'Progress may not have been saved. This won\'t affect your current session.';
+  }
+  return null;
 }
 
 export async function loadSession(
@@ -133,15 +187,9 @@ export async function loadSession(
   const key = getSessionKey(scopeKey);
 
   const hookClient = options?.hookClient ?? null;
-  if (hookClient) {
-    const remote = await readFromModStateStore(hookClient, key);
-    const parsedRemote = parseSession(remote);
-    if (parsedRemote) {
-      return parsedRemote;
-    }
-  }
-
-  return parseSession(readLocalStorage(key));
+  if (!hookClient) return null;
+  const remote = await readFromModStateStore(hookClient, key);
+  return parseSession(remote);
 }
 
 export async function clearSession(
@@ -151,14 +199,8 @@ export async function clearSession(
   const key = getSessionKey(scopeKey);
 
   const hookClient = options?.hookClient ?? null;
-  if (hookClient) {
-    const removed = await removeFromModStateStore(hookClient, key);
-    if (removed) {
-      return;
-    }
-  }
-
-  removeLocalStorage(key);
+  if (!hookClient) return;
+  await removeFromModStateStore(hookClient, key);
 }
 
 export function isSessionExpired(session: MintYouSession): boolean {
@@ -172,10 +214,20 @@ export function buildSessionSnapshot(input: {
   currentStep: MintYouPipelineStep;
   basicInfo: BasicInfo | null;
   selectedInterests: string[];
-  scenarioChoices: Record<string, string>;
+  interviewMessages: InterviewMessage[];
+  interviewSignals: InterviewTurnSignal[];
+  interviewTurnCount: number;
+  interviewValidTurnCount: number;
+  memoryDigest: string;
   traitResult: TraitExtractionResult | null;
   dnaSynthesis: DnaSynthesisOutput | null;
-  traitOverrides: { dnaPrimary?: DnaPrimaryType; dnaSecondary?: DnaSecondaryTrait[] } | null;
+  traitOverrides: {
+    dnaPrimary?: DnaPrimaryType;
+    dnaSecondary?: DnaSecondaryTrait[];
+    relationshipMode?: RelationshipMode;
+    formality?: FormalityValue;
+    sentiment?: SentimentValue;
+  } | null;
   referenceImageUrl: string | null;
   worldId: string | null;
   confirmed: boolean;
@@ -183,12 +235,17 @@ export function buildSessionSnapshot(input: {
 }): MintYouSession {
   const now = Date.now();
   return {
+    sessionVersion: SESSION_VERSION,
     sessionId: input.sessionId,
     userId: input.userId,
     currentStep: input.currentStep,
     basicInfo: input.basicInfo,
     selectedInterests: input.selectedInterests,
-    scenarioChoices: input.scenarioChoices,
+    interviewMessages: input.interviewMessages,
+    interviewSignals: input.interviewSignals,
+    interviewTurnCount: input.interviewTurnCount,
+    interviewValidTurnCount: input.interviewValidTurnCount,
+    memoryDigest: input.memoryDigest,
     traitResult: input.traitResult,
     dnaSynthesis: input.dnaSynthesis,
     traitOverrides: input.traitOverrides,

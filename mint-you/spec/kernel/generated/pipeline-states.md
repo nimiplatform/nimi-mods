@@ -16,16 +16,16 @@ execution_chain:
     type: user-input
     description: Multi-select interest tags from predefined pool.
     source_rule: MY-PIPE-001
-  - step: scenarios
+  - step: interview
     order: 3
-    type: user-input
-    description: Present 7-10 situational stories with 3-4 choices each.
+    type: ai-conversation
+    description: Conversational AI interview (7-12 turns). Extracts trait signals from natural dialogue.
     source_rule: MY-PIPE-001
   - step: trait-extract
     order: 4
     type: deterministic
-    description: Aggregate weighted scores from scenario choices. Resolve dnaPrimary, dnaSecondary, relationshipMode, formality, sentiment.
-    precondition: all scenario choices completed
+    description: Aggregate weighted signals from interview turns. Resolve dnaPrimary, dnaSecondary, relationshipMode, formality, sentiment.
+    precondition: interview completed (min 7 valid turns or degraded end at turn 12)
     source_rule: MY-PIPE-002
   - step: dna-synthesize
     order: 5
@@ -41,14 +41,14 @@ execution_chain:
   - step: user-confirm
     order: 7
     type: user-input
-    description: User explicitly approves persona card and selects target world. Confirmation is mandatory gate.
-    precondition: persona card previewed + worldId selected
+    description: User explicitly approves persona card. Target world is fixed to OASIS and displayed read-only.
+    precondition: persona card previewed + OASIS worldId resolved
     source_rule: MY-PIPE-002
   - step: agent-create
     order: 8
     type: api-call
     description: Assemble CreateAgentDto with pre-built dna and call creator.agents.create API.
-    precondition: user confirmed + worldId resolved + agent limit not reached
+    precondition: user confirmed + OASIS worldId resolved + agent limit not reached
     source_rule: MY-PIPE-005
 photo_actions:
   - action: photo-upload

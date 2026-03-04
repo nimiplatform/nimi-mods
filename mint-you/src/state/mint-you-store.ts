@@ -1,11 +1,30 @@
 import { create } from 'zustand';
-import type { MintYouPipelineStep, DnaPrimaryType, DnaSecondaryTrait } from '../contracts.js';
+import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
+import type {
+  MintYouPipelineStep,
+  DnaPrimaryType,
+  DnaSecondaryTrait,
+  RelationshipMode,
+  FormalityValue,
+  SentimentValue,
+} from '../contracts.js';
 import type {
   BasicInfo,
   TraitExtractionResult,
   DnaSynthesisOutput,
+  InterviewMessage,
+  InterviewTurnSignal,
+  InterviewStatus,
   MintYouError,
 } from '../types.js';
+
+type TraitOverrides = {
+  dnaPrimary?: DnaPrimaryType;
+  dnaSecondary?: DnaSecondaryTrait[];
+  relationshipMode?: RelationshipMode;
+  formality?: FormalityValue;
+  sentiment?: SentimentValue;
+} | null;
 
 type MintYouStore = {
   // Session
@@ -15,17 +34,22 @@ type MintYouStore = {
   // Step data
   basicInfo: BasicInfo | null;
   selectedInterests: string[];
-  scenarioChoices: Record<string, string>;
+
+  // Interview state
+  interviewMessages: InterviewMessage[];
+  interviewSignals: InterviewTurnSignal[];
+  interviewTurnCount: number;
+  interviewValidTurnCount: number;
+  interviewStatus: InterviewStatus;
+  memoryDigest: string;
+  currentRequestId: string | null;
 
   // Pipeline results
   traitResult: TraitExtractionResult | null;
   dnaSynthesis: DnaSynthesisOutput | null;
 
   // Preview overrides
-  traitOverrides: {
-    dnaPrimary?: DnaPrimaryType;
-    dnaSecondary?: DnaSecondaryTrait[];
-  } | null;
+  traitOverrides: TraitOverrides;
   referenceImageUrl: string | null;
 
   // Confirmation
@@ -36,6 +60,8 @@ type MintYouStore = {
   // UI state
   loading: boolean;
   error: MintYouError | null;
+  routeOverride: RuntimeRouteBinding | null;
+  sessionPersistWarning: string | null;
 
   // Actions
   setSessionId: (id: string) => void;
@@ -44,16 +70,24 @@ type MintYouStore = {
   goBack: () => void;
   setBasicInfo: (info: BasicInfo) => void;
   setSelectedInterests: (interests: string[]) => void;
-  setScenarioChoice: (scenarioId: string, choiceId: string) => void;
+  addInterviewMessage: (message: InterviewMessage) => void;
+  addInterviewSignals: (signals: InterviewTurnSignal[]) => void;
+  setInterviewTurnCount: (count: number) => void;
+  setInterviewValidTurnCount: (count: number) => void;
+  setInterviewStatus: (status: InterviewStatus) => void;
+  setMemoryDigest: (digest: string) => void;
+  setCurrentRequestId: (id: string | null) => void;
   setTraitResult: (result: TraitExtractionResult) => void;
   setDnaSynthesis: (output: DnaSynthesisOutput) => void;
-  setTraitOverrides: (overrides: { dnaPrimary?: DnaPrimaryType; dnaSecondary?: DnaSecondaryTrait[] } | null) => void;
+  setTraitOverrides: (overrides: TraitOverrides) => void;
   setReferenceImageUrl: (url: string | null) => void;
   setWorldId: (id: string | null) => void;
   setConfirmed: (confirmed: boolean) => void;
   setCreatedAgentId: (id: string | null) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: MintYouError | null) => void;
+  setRouteOverride: (routeOverride: RuntimeRouteBinding | null) => void;
+  setSessionPersistWarning: (warning: string | null) => void;
   reset: () => void;
   startNewSession: (sessionId: string) => void;
 };
@@ -61,7 +95,7 @@ type MintYouStore = {
 const STEP_ORDER: readonly MintYouPipelineStep[] = [
   'basic-info',
   'interest-tags',
-  'scenarios',
+  'interview',
   'trait-extract',
   'dna-synthesize',
   'preview-card',
@@ -78,16 +112,24 @@ const INITIAL_STATE = {
   currentStep: 'basic-info' as MintYouPipelineStep,
   basicInfo: null as BasicInfo | null,
   selectedInterests: [] as string[],
-  scenarioChoices: {} as Record<string, string>,
+  interviewMessages: [] as InterviewMessage[],
+  interviewSignals: [] as InterviewTurnSignal[],
+  interviewTurnCount: 0,
+  interviewValidTurnCount: 0,
+  interviewStatus: 'idle' as InterviewStatus,
+  memoryDigest: '',
+  currentRequestId: null as string | null,
   traitResult: null as TraitExtractionResult | null,
   dnaSynthesis: null as DnaSynthesisOutput | null,
-  traitOverrides: null as { dnaPrimary?: DnaPrimaryType; dnaSecondary?: DnaSecondaryTrait[] } | null,
+  traitOverrides: null as TraitOverrides,
   referenceImageUrl: null as string | null,
   worldId: null as string | null,
   confirmed: false,
   createdAgentId: null as string | null,
   loading: false,
   error: null as MintYouError | null,
+  routeOverride: null as RuntimeRouteBinding | null,
+  sessionPersistWarning: null as string | null,
 };
 
 export const useMintYouStore = create<MintYouStore>((set) => ({
@@ -115,9 +157,17 @@ export const useMintYouStore = create<MintYouStore>((set) => ({
 
   setBasicInfo: (info) => set({ basicInfo: info }),
   setSelectedInterests: (interests) => set({ selectedInterests: interests }),
-  setScenarioChoice: (scenarioId, choiceId) => set((state) => ({
-    scenarioChoices: { ...state.scenarioChoices, [scenarioId]: choiceId },
+  addInterviewMessage: (message) => set((state) => ({
+    interviewMessages: [...state.interviewMessages, message],
   })),
+  addInterviewSignals: (signals) => set((state) => ({
+    interviewSignals: [...state.interviewSignals, ...signals],
+  })),
+  setInterviewTurnCount: (count) => set({ interviewTurnCount: count }),
+  setInterviewValidTurnCount: (count) => set({ interviewValidTurnCount: count }),
+  setInterviewStatus: (status) => set({ interviewStatus: status }),
+  setMemoryDigest: (digest) => set({ memoryDigest: digest }),
+  setCurrentRequestId: (id) => set({ currentRequestId: id }),
   setTraitResult: (result) => set({ traitResult: result }),
   setDnaSynthesis: (output) => set({ dnaSynthesis: output }),
   setTraitOverrides: (overrides) => set({ traitOverrides: overrides }),
@@ -127,6 +177,8 @@ export const useMintYouStore = create<MintYouStore>((set) => ({
   setCreatedAgentId: (id) => set({ createdAgentId: id }),
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error }),
+  setRouteOverride: (routeOverride) => set({ routeOverride }),
+  setSessionPersistWarning: (warning) => set({ sessionPersistWarning: warning }),
 
   reset: () => set({ ...INITIAL_STATE }),
 
