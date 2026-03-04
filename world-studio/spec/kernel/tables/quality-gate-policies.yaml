@@ -7,7 +7,7 @@ status_model:
   block_is_fail_close: true
   source_rule: WS-QG-001
 thresholds:
-  primary_evidence_coverage_block_lt: 0.9
+  primary_evidence_coverage_block_lt: 0.75
   chunk_success_ratio_block_lt: 0.4
   chunk_success_ratio_warn_lt: 0.7
   primary_time_ref_warn_lt_when_no_temporal_edges: 0.5

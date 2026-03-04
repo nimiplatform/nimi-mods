@@ -232,6 +232,7 @@ export function applyPhase1ResultSnapshot(input: WorldStudioCreateActionsInput, 
         selectedCharacters,
         characterCandidateCount: params.result.characterCandidates.length,
         characterCandidateNames: params.result.characterCandidates.map((c) => c.name),
+        existingSelectedCharacters: input.snapshot.selectedCharacters,
         existingAgentSyncSelectedCharacterIds: input.snapshot.agentSync.selectedCharacterIds,
         existingAgentSyncDraftKeys: Object.keys(input.snapshot.agentSync.draftsByCharacter || {}),
       },
@@ -240,7 +241,7 @@ export function applyPhase1ResultSnapshot(input: WorldStudioCreateActionsInput, 
     // Ignore diagnostics sink failures in non-runtime environments (tests, headless execution).
   }
 
-  const selectedStartTimeId = params.result.startTimeOptions[0]?.id || '';
+  const selectedStartTimeId = params.result.startTimeOptions[params.result.startTimeOptions.length - 1]?.id || '';
   const projection = projectEventsForSelectedStartTime({
     selectedStartTimeId,
     startTimeOptions: params.result.startTimeOptions,

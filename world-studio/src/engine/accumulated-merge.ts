@@ -16,6 +16,54 @@ function normalizeId(value: unknown): string {
   return String(value || '').trim().toLowerCase();
 }
 
+const PLACEHOLDER_EVENT_ID_RE = /^(?:evt|event|primary|secondary|main|sub|p|s)[-_:\s]*[a-z]*\d+(?:[-_:\s]*\d+)*$/i;
+const PLACEHOLDER_ENTITY_NAME_RE = /^(?:char(?:acter)?|role|persona?|loc(?:ation)?|evt|event|timeline|segment|item|node|人物|角色|地点|事件|时间线)(?:[-_: ]+[a-z0-9]+|\d+)$/i;
+
+function isPlaceholderEventId(value: unknown): boolean {
+  const normalized = normalizeId(value);
+  if (!normalized) return true;
+  return PLACEHOLDER_ENTITY_NAME_RE.test(normalized) || PLACEHOLDER_EVENT_ID_RE.test(normalized);
+}
+
+function normalizeSortedList(values: string[]): string[] {
+  const seen = new Set<string>();
+  const output: string[] = [];
+  values
+    .map((value) => normalizeId(value))
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b))
+    .forEach((value) => {
+      if (seen.has(value)) return;
+      seen.add(value);
+      output.push(value);
+    });
+  return output;
+}
+
+function buildEventSemanticKey(item: EventNodeDraft, fallbackKey: string): string {
+  const normalizedTitle = normalizeId(item.title || '');
+  const normalizedSummary = normalizeId(item.summary || '');
+  const normalizedTimeRef = normalizeId(item.timeRef || '');
+  const normalizedCharacters = normalizeSortedList(item.characterRefs || []).join(',');
+  const normalizedLocations = normalizeSortedList(item.locationRefs || []).join(',');
+  const key = [
+    normalizedTitle,
+    normalizedSummary,
+    normalizedTimeRef,
+    normalizedCharacters,
+    normalizedLocations,
+  ].filter(Boolean).join('|');
+  return key || fallbackKey;
+}
+
+function resolveEventMergeKey(item: EventNodeDraft, fallbackKey: string): string {
+  const normalizedId = normalizeId(item.id || '');
+  if (normalizedId && !isPlaceholderEventId(normalizedId)) {
+    return `id:${normalizedId}`;
+  }
+  return `semantic:${buildEventSemanticKey(item, fallbackKey)}`;
+}
+
 function makeFreshness(chunkIndex: number): EntityFreshness {
   return { firstSeenChunk: chunkIndex, lastSeenChunk: chunkIndex, mentionCount: 1 };
 }
@@ -96,12 +144,15 @@ function upsertEvents(
   chunkIndex: number,
 ): AccumulatedEvent[] {
   const byKey = new Map<string, AccumulatedEvent>();
-  existing.forEach((item) => {
-    const key = normalizeId(item.id);
+  existing.forEach((item, index) => {
+    const key = resolveEventMergeKey(item, `existing-${index + 1}`);
     if (key) byKey.set(key, item);
   });
-  incoming.forEach((item) => {
-    const key = normalizeId(item.id);
+  incoming.forEach((item, index) => {
+    const key = resolveEventMergeKey(
+      item,
+      `chunk-${chunkIndex + 1}-event-${index + 1}`,
+    );
     if (!key) return;
     const prev = byKey.get(key);
     if (prev) {

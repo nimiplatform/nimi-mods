@@ -10,6 +10,20 @@ import type {
 } from './types.js';
 import { buildRepairPrompt, parseJsonRecord, summarizeModelError } from './json-repair.js';
 import { isSyntheticEntityName } from './errors.js';
+import { emitWorldStudioLog } from '../logging.js';
+
+function diagLog(message: string, details?: Record<string, unknown>) {
+  try {
+    emitWorldStudioLog({
+      level: 'error',
+      message: `[MODS-TEST-DIAG] ${message}`,
+      source: 'DIAG',
+      details,
+    });
+  } catch {
+    // Ignore diagnostics sink failures in non-runtime environments (tests, headless execution).
+  }
+}
 
 function normalizeEntityRefs(value: unknown): string[] {
   return Array.from(new Set(
@@ -256,6 +270,54 @@ function normalizeDraftPatch(raw: Record<string, unknown>, chunkIndex: number): 
   return patch;
 }
 
+function summarizeExtractionCounts(extraction: ChunkExtraction): Record<string, unknown> {
+  return {
+    timeline: extraction.timeline.length,
+    locations: extraction.locations.length,
+    characters: extraction.characters.length,
+    primaryEvents: extraction.events.primary.length,
+    secondaryEvents: extraction.events.secondary.length,
+    characterRelations: extraction.characterRelations.length,
+    timelineLabels: extraction.timeline
+      .map((item) => String(asRecord(item).label || asRecord(item).time || '').trim())
+      .filter(Boolean)
+      .slice(0, 8),
+    locationNames: extraction.locations
+      .map((item) => String(asRecord(item).name || '').trim())
+      .filter(Boolean)
+      .slice(0, 8),
+    characterNames: extraction.characters
+      .map((item) => String(asRecord(item).name || '').trim())
+      .filter(Boolean)
+      .slice(0, 12),
+    primaryEventTitles: extraction.events.primary
+      .map((item) => String(item.title || '').trim())
+      .filter(Boolean)
+      .slice(0, 10),
+    secondaryEventTitles: extraction.events.secondary
+      .map((item) => String(item.title || '').trim())
+      .filter(Boolean)
+      .slice(0, 10),
+  };
+}
+
+function summarizeDraftPatchCounts(patch: DraftPatch): Record<string, unknown> {
+  return {
+    worldKeys: Object.keys(asRecord(patch.world || {})).length,
+    worldviewKeys: Object.keys(asRecord(patch.worldview || {})).length,
+    worldLorebooks: Array.isArray(patch.worldLorebooks) ? patch.worldLorebooks.length : 0,
+    futureHistoricalEvents: Array.isArray(patch.futureHistoricalEvents) ? patch.futureHistoricalEvents.length : 0,
+    agentDrafts: Array.isArray(patch.agentDrafts) ? patch.agentDrafts.length : 0,
+    evidenceRefs: Array.isArray(patch.evidenceRefs) ? patch.evidenceRefs.length : 0,
+    notes: Array.isArray(patch.notes) ? patch.notes.length : 0,
+    worldKeyNames: Object.keys(asRecord(patch.world || {})).slice(0, 12),
+    worldviewKeyNames: Object.keys(asRecord(patch.worldview || {})).slice(0, 12),
+    agentDraftCharacters: Array.isArray(patch.agentDrafts)
+      ? patch.agentDrafts.map((item) => String(item.characterName || '').trim()).filter(Boolean).slice(0, 12)
+      : [],
+  };
+}
+
 function buildFinePrompt(input: {
   chunk: string;
   index: number;
@@ -370,12 +432,36 @@ export async function extractChunkFine(
     mode: 'STORY',
     abortSignal: input.abortSignal,
   });
+  diagLog('Phase1 fine llm response', {
+    chunkIndex: input.index,
+    chunkTotal: input.total,
+    attempt: 1,
+    routeHint: 'chat/fine',
+    promptTraceId: first.promptTraceId,
+    textLength: String(first.text || '').length,
+  });
   try {
+    const parsed = parseFineOutput(parseJsonRecord(first.text), input.index);
+    diagLog('Phase1 fine parse success', {
+      chunkIndex: input.index,
+      chunkTotal: input.total,
+      attempt: 1,
+      promptTraceId: first.promptTraceId,
+      extraction: summarizeExtractionCounts(parsed.extraction),
+      draftPatch: summarizeDraftPatchCounts(parsed.draftPatch),
+    });
     return {
-      ...parseFineOutput(parseJsonRecord(first.text), input.index),
+      ...parsed,
       retryCount: 0,
     };
   } catch (firstError) {
+    diagLog('Phase1 fine parse failed', {
+      chunkIndex: input.index,
+      chunkTotal: input.total,
+      attempt: 1,
+      promptTraceId: first.promptTraceId,
+      error: summarizeModelError(firstError),
+    });
     const repairPrompt = buildRepairPrompt({
       schemaLines: buildFineSchemaLines(),
       chunk: input.chunk,
@@ -390,12 +476,36 @@ export async function extractChunkFine(
       mode: 'STORY',
       abortSignal: input.abortSignal,
     });
+    diagLog('Phase1 fine llm response', {
+      chunkIndex: input.index,
+      chunkTotal: input.total,
+      attempt: 2,
+      routeHint: 'chat/retry-low-temp',
+      promptTraceId: second.promptTraceId,
+      textLength: String(second.text || '').length,
+    });
     try {
+      const parsed = parseFineOutput(parseJsonRecord(second.text), input.index);
+      diagLog('Phase1 fine parse success', {
+        chunkIndex: input.index,
+        chunkTotal: input.total,
+        attempt: 2,
+        promptTraceId: second.promptTraceId,
+        extraction: summarizeExtractionCounts(parsed.extraction),
+        draftPatch: summarizeDraftPatchCounts(parsed.draftPatch),
+      });
       return {
-        ...parseFineOutput(parseJsonRecord(second.text), input.index),
+        ...parsed,
         retryCount: 1,
       };
     } catch (secondError) {
+      diagLog('Phase1 fine parse failed', {
+        chunkIndex: input.index,
+        chunkTotal: input.total,
+        attempt: 2,
+        promptTraceId: second.promptTraceId,
+        error: summarizeModelError(secondError),
+      });
       throw new Error(
         `WORLD_STUDIO_FINE_JSON_PARSE_FAILED: ${summarizeModelError(firstError)} -> ${summarizeModelError(secondError)}`,
       );

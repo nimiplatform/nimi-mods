@@ -127,7 +127,7 @@ export async function runCreatePhase2(
   const startTimeOptions = deriveStartTimeOptions(graphForPhase2);
   const selectedStartTimeId = startTimeOptions.some((item) => item.id === input.snapshot.selectedStartTimeId)
     ? input.snapshot.selectedStartTimeId
-    : (startTimeOptions[0]?.id || '');
+    : (startTimeOptions[startTimeOptions.length - 1]?.id || '');
   const qualityGate = input.phase1?.qualityGate || input.snapshot.phase1Artifact?.qualityGate || null;
 
   diagLog('Phase2 ENTER', {
@@ -136,6 +136,8 @@ export async function runCreatePhase2(
     startTimeOptionCount: startTimeOptions.length,
     selectedCharacters: input.snapshot.selectedCharacters,
     selectedCharactersCount: input.snapshot.selectedCharacters.length,
+    agentSyncSelectedCharacterIds: input.snapshot.agentSync.selectedCharacterIds,
+    agentSyncSelectedCharacterIdsCount: input.snapshot.agentSync.selectedCharacterIds.length,
     phase1QualityStatus: input.phase1?.qualityGate?.status || input.snapshot.phase1Artifact?.qualityGate?.status || null,
     knowledgeGraph: {
       timeline: input.snapshot.knowledgeGraph.timeline.length,

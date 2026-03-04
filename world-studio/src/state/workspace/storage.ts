@@ -13,6 +13,10 @@ import {
 import { emitWorldStudioLog } from '../../logging.js';
 
 const STORAGE_PREFIX_V3 = 'nimi.world-studio.workspace.v3.';
+const lastPersistedSelectionStateByUser = new Map<string, {
+  selectedCharacters: string[];
+  agentSyncSelectedCharacterIds: string[];
+}>();
 
 function diagLog(message: string, details?: Record<string, unknown>) {
   try {
@@ -25,6 +29,19 @@ function diagLog(message: string, details?: Record<string, unknown>) {
   } catch {
     // Ignore diagnostics sink failures in non-runtime environments (tests, headless execution).
   }
+}
+
+function normalizeSelectionArray(value: string[]): string[] {
+  return value.map((item) => String(item || '').trim()).filter(Boolean);
+}
+
+function computeSelectionDelta(before: string[], after: string[]): { added: string[]; removed: string[] } {
+  const beforeSet = new Set(before);
+  const afterSet = new Set(after);
+  return {
+    added: after.filter((item) => !beforeSet.has(item)),
+    removed: before.filter((item) => !afterSet.has(item)),
+  };
 }
 
 function storageKeyForUser(userId: string): string {
@@ -130,10 +147,16 @@ export function readSnapshotFromStorage(userId: string): WorldStudioWorkspaceSna
       taskState: normalizeTaskState(parsed.taskState || {}),
     };
     const synced = syncSnapshot(snapshot);
+    lastPersistedSelectionStateByUser.set(normalizedUserId, {
+      selectedCharacters: normalizeSelectionArray(synced.selectedCharacters),
+      agentSyncSelectedCharacterIds: normalizeSelectionArray(synced.agentSync.selectedCharacterIds),
+    });
     diagLog('storage read: snapshot recovered', {
       userId: normalizedUserId,
       selectedCharactersCount: synced.selectedCharacters.length,
+      selectedCharacters: synced.selectedCharacters,
       agentSyncSelectedCharacterIdsCount: synced.agentSync.selectedCharacterIds.length,
+      agentSyncSelectedCharacterIds: synced.agentSync.selectedCharacterIds,
       agentSyncDraftKeys: Object.keys(synced.agentSync.draftsByCharacter || {}),
       agentSyncDraftCoverage: Object.entries(synced.agentSync.draftsByCharacter || {}).map(([name, draft]) => {
         const record = asRecord(draft);
@@ -190,12 +213,36 @@ export function persistSnapshotToStorage(userId: string, snapshot: WorldStudioWo
     ...persistable
   } = synced;
   saveLocalStorageJson(storageKeyForUser(normalizedUserId), persistable);
+  const normalizedSelectedCharacters = normalizeSelectionArray(synced.selectedCharacters);
+  const normalizedAgentSyncSelectedCharacterIds = normalizeSelectionArray(synced.agentSync.selectedCharacterIds);
+  const previousPersisted = lastPersistedSelectionStateByUser.get(normalizedUserId) || {
+    selectedCharacters: [] as string[],
+    agentSyncSelectedCharacterIds: [] as string[],
+  };
+  const selectedCharactersDelta = computeSelectionDelta(
+    previousPersisted.selectedCharacters,
+    normalizedSelectedCharacters,
+  );
+  const agentSyncSelectedCharacterIdsDelta = computeSelectionDelta(
+    previousPersisted.agentSyncSelectedCharacterIds,
+    normalizedAgentSyncSelectedCharacterIds,
+  );
+  lastPersistedSelectionStateByUser.set(normalizedUserId, {
+    selectedCharacters: normalizedSelectedCharacters,
+    agentSyncSelectedCharacterIds: normalizedAgentSyncSelectedCharacterIds,
+  });
   diagLog('storage persist snapshot', {
     userId: normalizedUserId,
     parsePhase: synced.parseJob.phase,
     createStep: synced.createStep,
     selectedCharactersCount: synced.selectedCharacters.length,
+    selectedCharacters: normalizedSelectedCharacters,
+    selectedCharactersAddedSinceLastPersist: selectedCharactersDelta.added,
+    selectedCharactersRemovedSinceLastPersist: selectedCharactersDelta.removed,
     agentSyncSelectedCharacterIdsCount: synced.agentSync.selectedCharacterIds.length,
+    agentSyncSelectedCharacterIds: normalizedAgentSyncSelectedCharacterIds,
+    agentSyncSelectedCharacterIdsAddedSinceLastPersist: agentSyncSelectedCharacterIdsDelta.added,
+    agentSyncSelectedCharacterIdsRemovedSinceLastPersist: agentSyncSelectedCharacterIdsDelta.removed,
     agentSyncDraftKeys: Object.keys(synced.agentSync.draftsByCharacter || {}),
     agentSyncDraftCoverage: Object.entries(synced.agentSync.draftsByCharacter || {}).map(([name, draft]) => {
       const record = asRecord(draft);

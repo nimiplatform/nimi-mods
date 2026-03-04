@@ -7,6 +7,7 @@ import { projectEventsForSelectedStartTime } from '../../services/start-time-pro
 import { buildPhase1ArtifactFromResult } from '../../services/phase1-artifact.js';
 import type { WorldStudioSnapshotPatch, WorldStudioWorkspaceSnapshot } from '../../contracts.js';
 import type { Phase1Result, Phase2Result } from '../../generation/pipeline.js';
+import { emitWorldStudioLog } from '../../logging.js';
 
 type UseWorldStudioWorkspaceControllerActionsInput = {
   snapshot: WorldStudioWorkspaceSnapshot;
@@ -23,6 +24,19 @@ type UseWorldStudioWorkspaceControllerActionsInput = {
   setError: (value: string | null) => void;
   setNotice: (value: string | null) => void;
 };
+
+function diagLog(message: string, details?: Record<string, unknown>) {
+  try {
+    emitWorldStudioLog({
+      level: 'error',
+      message: `[MODS-TEST-DIAG] ${message}`,
+      source: 'DIAG',
+      details,
+    });
+  } catch {
+    // Ignore diagnostics sink failures in non-runtime environments (tests, headless execution).
+  }
+}
 
 export function useWorldStudioWorkspaceControllerActions(
   input: UseWorldStudioWorkspaceControllerActionsInput,
@@ -55,7 +69,7 @@ export function useWorldStudioWorkspaceControllerActions(
     })();
     const selectedStartTimeId = startTimeOptions.some((item) => item.id === input.snapshot.selectedStartTimeId)
       ? input.snapshot.selectedStartTimeId
-      : (startTimeOptions[0]?.id || '');
+      : (startTimeOptions[startTimeOptions.length - 1]?.id || '');
     const projection = projectEventsForSelectedStartTime({
       selectedStartTimeId,
       startTimeOptions,
@@ -167,12 +181,22 @@ export function useWorldStudioWorkspaceControllerActions(
 
   const onToggleAgentSyncCharacter = useCallback((name: string, checked: boolean) => {
     const current = input.snapshot.agentSync.selectedCharacterIds;
+    const nextAgentSyncSelectedCharacterIds = checked
+      ? toUniqueStringArray([...current, name])
+      : current.filter((item) => item !== name);
+    diagLog('UI phase2 agent-sync character toggle', {
+      trigger: 'phase2.agent-sync.checkbox',
+      characterName: name,
+      checked,
+      createStep: input.snapshot.createStep,
+      selectedCharacters: input.snapshot.selectedCharacters,
+      beforeAgentSyncSelectedCharacterIds: current,
+      afterAgentSyncSelectedCharacterIds: nextAgentSyncSelectedCharacterIds,
+    });
     input.patchSnapshot({
       agentSync: {
         ...input.snapshot.agentSync,
-        selectedCharacterIds: checked
-          ? toUniqueStringArray([...current, name])
-          : current.filter((item) => item !== name),
+        selectedCharacterIds: nextAgentSyncSelectedCharacterIds,
       },
     });
   }, [input]);

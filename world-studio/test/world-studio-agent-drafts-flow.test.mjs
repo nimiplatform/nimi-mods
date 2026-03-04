@@ -262,8 +262,8 @@ test('world-studio agent drafts flow persists phase2 drafts and publishes with d
   assert.equal(wDraft.agentLorebooks.length, 1);
   assert.equal(wDraft.referenceImageUrl, 'https://example.com/wangmiao.png');
   assert.equal(wDraft.wakeStrategy, 'PROACTIVE');
-  assert.equal(wDraft.dnaPrimary, 'RATIONAL');
-  assert.deepEqual(wDraft.dnaSecondary, ['CAUTIOUS', 'ANALYTICAL']);
+  assert.equal(wDraft.dnaPrimary, 'INTELLECTUAL');
+  assert.deepEqual(wDraft.dnaSecondary, ['REALISTIC', 'WISE']);
 
   const publishInput = {
     ...baseInput,
@@ -292,8 +292,8 @@ test('world-studio agent drafts flow persists phase2 drafts and publishes with d
   assert.equal(batchPayloadRef.current.items[0].agentLorebooks.length, 1);
   assert.equal(batchPayloadRef.current.items[0].referenceImageUrl, 'https://example.com/wangmiao.png');
   assert.equal(batchPayloadRef.current.items[0].wakeStrategy, 'PROACTIVE');
-  assert.equal(batchPayloadRef.current.items[0].dnaPrimary, 'RATIONAL');
-  assert.deepEqual(batchPayloadRef.current.items[0].dnaSecondary, ['CAUTIOUS', 'ANALYTICAL']);
+  assert.equal(batchPayloadRef.current.items[0].dnaPrimary, 'INTELLECTUAL');
+  assert.deepEqual(batchPayloadRef.current.items[0].dnaSecondary, ['REALISTIC', 'WISE']);
 });
 
 test('world-studio publish normalizes invalid handle to ASCII fallback', async () => {
@@ -389,4 +389,113 @@ test('world-studio publish normalizes invalid handle to ASCII fallback', async (
   assert.equal(batchPayload.items[0].handle === '~韩立-1', false);
   assert.equal(/^~[a-z0-9_]{4,16}$/.test(batchPayload.items[0].handle), true);
   assert.equal(Object.prototype.hasOwnProperty.call(batchPayload.items[0], 'dna'), false);
+});
+
+test('world-studio publish sanitizes dna traits to backend enums', async () => {
+  const snapshotRef = { current: cloneDefaultSnapshot() };
+  snapshotRef.current.selectedCharacters = ['韩立', '瘦长师兄'];
+  snapshotRef.current.knowledgeGraph = {
+    ...snapshotRef.current.knowledgeGraph,
+    characters: [
+      { id: 'char-1', name: '韩立', summary: '主角' },
+      { id: 'char-2', name: '瘦长师兄', summary: '外门师兄' },
+    ],
+  };
+  snapshotRef.current.worldPatch = { name: '凡人修仙传:七玄门篇' };
+  snapshotRef.current.agentSync = {
+    ...snapshotRef.current.agentSync,
+    selectedCharacterIds: ['韩立', '瘦长师兄'],
+    draftsByCharacter: {
+      韩立: {
+        characterName: '韩立',
+        handle: '~hanli',
+        concept: 'concept',
+        backstory: 'backstory',
+        coreValues: 'core values',
+        relationshipStyle: 'relationship style',
+        dnaPrimary: 'RATIONAL',
+        dnaSecondary: ['CAUTIOUS', 'ANALYTICAL', 'GENTLE'],
+      },
+      瘦长师兄: {
+        characterName: '瘦长师兄',
+        handle: '~senior',
+        concept: 'concept',
+        backstory: 'backstory',
+        coreValues: 'core values',
+        relationshipStyle: 'relationship style',
+        dnaPrimary: '冷酷',
+      },
+    },
+  };
+
+  const taskController = createMockTaskController();
+  let batchPayload = null;
+  const input = {
+    aiClient: null,
+    flowId: 'flow-dna-sanitize',
+    sourceEncoding: 'utf-8',
+    setSourceEncoding: () => {},
+    sourceMode: 'TEXT',
+    setSourceMode: () => {},
+    setFilePreviewText: () => {},
+    sourceChunksRef: { current: [] },
+    sourceRawTextRef: { current: '' },
+    routeOptions: null,
+    snapshot: snapshotRef.current,
+    patchSnapshot: (patch) => {
+      snapshotRef.current = {
+        ...snapshotRef.current,
+        ...patch,
+        agentSync: {
+          ...snapshotRef.current.agentSync,
+          ...(patch.agentSync || {}),
+        },
+      };
+      input.snapshot = snapshotRef.current;
+    },
+    patchPanel: () => {},
+    setCreateStep: () => {},
+    setPhase1: () => {},
+    setPhase2: () => {},
+    phase1: null,
+    retryConcurrency: 1,
+    retryErrorCode: null,
+    retryScope: 'all',
+    retryWithFineRoute: false,
+    resolveEffectiveRouteOverrides: () => ({ coarse: null, fine: null }),
+    resolveRuntimeDefaultRouteBinding: async () => null,
+    routeOverrideMap: { coarse: null, fine: null },
+    runtimeDefaultRouteBinding: null,
+    selectedDraftId: 'draft-1',
+    selectedWorldId: '',
+    setLanding: () => {},
+    mutations: {
+      publishDraftMutation: {
+        mutateAsync: async () => ({ worldId: 'world-1', worldviewVersion: 1 }),
+      },
+      batchCreateCreatorAgentsMutation: {
+        mutateAsync: async (payload) => {
+          batchPayload = payload;
+          return { created: payload.items || [], failed: [] };
+        },
+      },
+    },
+    queries: {
+      maintenanceQuery: {
+        refetch: async () => ({ data: null }),
+      },
+    },
+    setStatusBanner: () => {},
+    setError: () => {},
+    setNotice: () => {},
+    taskController,
+  };
+
+  await publishWorldDraft(input);
+
+  assert.notEqual(batchPayload, null);
+  assert.equal(batchPayload.items.length, 2);
+  assert.equal(batchPayload.items[0].dnaPrimary, 'INTELLECTUAL');
+  assert.deepEqual(batchPayload.items[0].dnaSecondary, ['REALISTIC', 'WISE', 'GENTLE']);
+  assert.equal(Object.prototype.hasOwnProperty.call(batchPayload.items[1], 'dnaPrimary'), false);
 });

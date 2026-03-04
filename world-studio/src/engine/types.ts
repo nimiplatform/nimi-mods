@@ -285,6 +285,8 @@ export type RouteCapabilityLlmInvoker = {
   generateText: (input: {
     routeHint?: string;
     prompt: string;
+    maxTokens?: number;
+    temperature?: number;
     mode?: 'STORY' | 'SCENE_TURN';
     worldId?: string;
     agentId?: string;

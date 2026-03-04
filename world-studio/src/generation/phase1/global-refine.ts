@@ -4,6 +4,7 @@ import {
   normalizeZhCharacterName,
 } from '../../engine/character/normalize-zh.js';
 import { isSyntheticEntityName } from '../../engine/errors.js';
+import { computeTemporalOrder } from '../../services/temporal-order.js';
 import type {
   CharacterPoint,
   CharacterRelationPoint,
@@ -38,6 +39,44 @@ function toCanonicalName(name: string, aliasMap: Record<string, string>): string
   const normalized = normalizeZhCharacterName(name);
   if (!normalized) return String(name || '').trim();
   return aliasMap[normalized] || normalized;
+}
+
+function normalizeNarrativeTitleKey(value: unknown): string {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s,.;:!?，。！？；：“”"'`~\-—_()[\]{}<>《》【】、]/g, '');
+}
+
+function orderPrimaryEventsForNarrative(primaryEvents: EventNodeDraft[]): EventNodeDraft[] {
+  if (primaryEvents.length <= 1) return [...primaryEvents];
+  const byId = new Map<string, EventNodeDraft>();
+  primaryEvents.forEach((event) => {
+    const id = String(event.id || '').trim();
+    if (!id) return;
+    if (!byId.has(id)) byId.set(id, event);
+  });
+  const order = computeTemporalOrder({
+    primary: Array.from(byId.values()),
+    secondary: [],
+  });
+  const ordered = order.orderedPrimaryIds
+    .map((eventId) => byId.get(eventId))
+    .filter((event): event is EventNodeDraft => Boolean(event));
+  if (ordered.length === byId.size) return ordered;
+  return [...byId.values()];
+}
+
+function dedupeNarrativeEventsByTitle(primaryEvents: EventNodeDraft[]): EventNodeDraft[] {
+  const seen = new Set<string>();
+  const output: EventNodeDraft[] = [];
+  primaryEvents.forEach((event) => {
+    const titleKey = normalizeNarrativeTitleKey(event.title || event.summary || event.id);
+    if (titleKey && seen.has(titleKey)) return;
+    if (titleKey) seen.add(titleKey);
+    output.push(event);
+  });
+  return output;
 }
 
 function dedupeRelations(relations: CharacterRelationPoint[]): CharacterRelationPoint[] {
@@ -129,11 +168,36 @@ function normalizeCharacterRelations(
 
 function buildNarrativeArc(primaryEvents: EventNodeDraft[]): WorldStudioNarrativeArc | null {
   if (primaryEvents.length === 0) return null;
-  const sorted = [...primaryEvents];
+  const ordered = orderPrimaryEventsForNarrative(primaryEvents);
+  const sorted = dedupeNarrativeEventsByTitle(ordered);
+  if (sorted.length === 0) return null;
   const openingEvent = sorted[0]!;
-  const climaxEvent = [...sorted].sort((a, b) => (b.confidence || 0) - (a.confidence || 0))[0] || openingEvent;
+  if (sorted.length === 1) {
+    const opening = (openingEvent.cause || openingEvent.summary || openingEvent.title || '').trim();
+    const climax = (openingEvent.result || openingEvent.process || openingEvent.summary || openingEvent.title || '').trim();
+    const resolution = (openingEvent.result || openingEvent.summary || openingEvent.title || '').trim();
+    const summary = String(openingEvent.title || '').trim() || [opening, climax, resolution].filter(Boolean).join('；');
+    const hasContent = Boolean(opening || climax || resolution || summary);
+    if (!hasContent) return null;
+    return {
+      summary,
+      opening,
+      development: '',
+      climax,
+      resolution,
+    };
+  }
   const resolutionEvent = sorted[sorted.length - 1] || openingEvent;
-  const middleEvents = sorted.slice(1, Math.max(2, sorted.length - 1));
+  const climaxPoolStart = Math.min(sorted.length - 1, Math.max(1, Math.floor(sorted.length * 0.55)));
+  const climaxPool = sorted.slice(climaxPoolStart);
+  const fallbackClimax = sorted[Math.max(1, Math.floor((sorted.length - 1) / 2))] || resolutionEvent;
+  const climaxEvent = [...climaxPool]
+    .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
+    .find((event) => event.id !== openingEvent.id)
+    || fallbackClimax
+    || openingEvent;
+  const excludedEventIds = new Set([openingEvent.id, climaxEvent.id, resolutionEvent.id].filter(Boolean));
+  const middleEvents = sorted.filter((event) => !excludedEventIds.has(event.id)).slice(0, 3);
   const opening = (openingEvent.cause || openingEvent.summary || openingEvent.title || '').trim();
   const development = middleEvents
     .map((event) => event.process || event.summary || event.title)
@@ -142,7 +206,12 @@ function buildNarrativeArc(primaryEvents: EventNodeDraft[]): WorldStudioNarrativ
     .join('；');
   const climax = (climaxEvent.result || climaxEvent.process || climaxEvent.summary || climaxEvent.title || '').trim();
   const resolution = (resolutionEvent.result || resolutionEvent.summary || resolutionEvent.title || '').trim();
-  const summary = [openingEvent.title, climaxEvent.title, resolutionEvent.title].filter(Boolean).join(' -> ');
+  const summaryTitleList = uniqueStrings([
+    String(openingEvent.title || '').trim(),
+    String(climaxEvent.title || '').trim(),
+    String(resolutionEvent.title || '').trim(),
+  ].filter(Boolean));
+  const summary = summaryTitleList.join(' -> ');
   const hasContent = Boolean(opening || development || climax || resolution || summary);
   if (!hasContent) return null;
   return {

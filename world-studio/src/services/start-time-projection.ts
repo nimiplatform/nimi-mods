@@ -47,6 +47,40 @@ function normalizeKey(value: unknown): string {
   return String(value || '').trim().toLowerCase();
 }
 
+const PLACEHOLDER_EVENT_ID_RE = /^(?:evt|event|primary|secondary|main|sub|p|s)[-_:\s]*[a-z]*\d+(?:[-_:\s]*\d+)*$/i;
+const PLACEHOLDER_ENTITY_NAME_RE = /^(?:char(?:acter)?|role|persona?|loc(?:ation)?|evt|event|timeline|segment|item|node|人物|角色|地点|事件|时间线)(?:[-_: ]+[a-z0-9]+|\d+)$/i;
+
+function isPlaceholderEventId(value: unknown): boolean {
+  const normalized = normalizeKey(value);
+  if (!normalized) return true;
+  return PLACEHOLDER_ENTITY_NAME_RE.test(normalized) || PLACEHOLDER_EVENT_ID_RE.test(normalized);
+}
+
+function normalizeSortedList(values: string[]): string[] {
+  return values
+    .map((value) => normalizeKey(value))
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function buildEventSemanticKey(event: EventNodeDraft, fallbackKey: string): string {
+  const normalizedTitle = normalizeKey(event.title || '');
+  const normalizedSummary = normalizeKey(event.summary || '');
+  const normalizedTimeRef = normalizeKey(event.timeRef || '');
+  const normalizedCharacters = normalizeSortedList(event.characterRefs || []).join(',');
+  const normalizedLocations = normalizeSortedList(event.locationRefs || []).join(',');
+  const normalizedEvidence = normalizeKey((event.evidenceRefs || [])[0]?.excerpt || '');
+  const key = [
+    normalizedTitle,
+    normalizedSummary,
+    normalizedTimeRef,
+    normalizedCharacters,
+    normalizedLocations,
+    normalizedEvidence,
+  ].filter(Boolean).join('|');
+  return key || fallbackKey;
+}
+
 function safeString(value: unknown): string {
   return String(value || '').trim();
 }
@@ -58,10 +92,28 @@ function safeStringArray(value: unknown): string[] {
     .filter(Boolean);
 }
 
-function eventKey(event: EventNodeDraft): string {
+function eventKey(event: EventNodeDraft, index: number): string {
   const id = normalizeKey(event.id);
-  if (id) return id;
-  return normalizeKey(`${event.level}:${event.title}:${event.timeRef}:${event.parentEventId || ''}`);
+  if (id && !isPlaceholderEventId(id)) return `id:${id}`;
+  return `semantic:${buildEventSemanticKey(
+    event,
+    normalizeKey(`${event.level}:${event.title}:${event.timeRef}:${event.parentEventId || ''}:${index + 1}`),
+  )}`;
+}
+
+function eventSignalScore(event: EventNodeDraft): number {
+  const evidenceCount = Array.isArray(event.evidenceRefs) ? event.evidenceRefs.length : 0;
+  const confidence = Number.isFinite(Number(event.confidence)) ? Number(event.confidence) : 0;
+  const textSignal = [
+    String(event.summary || '').trim(),
+    String(event.process || '').trim(),
+    String(event.result || '').trim(),
+  ].filter(Boolean).join('').length;
+  return (evidenceCount * 10) + confidence + Math.min(5, textSignal / 200);
+}
+
+function pickPreferredEvent(current: EventNodeDraft, candidate: EventNodeDraft): EventNodeDraft {
+  return eventSignalScore(candidate) > eventSignalScore(current) ? candidate : current;
 }
 
 function normalizeEventNode(value: unknown, fallbackLevel: 'PRIMARY' | 'SECONDARY'): EventNodeDraft | null {
@@ -161,8 +213,14 @@ function extractFutureEventNodes(
 
 function dedupeEvents(events: EventNodeDraft[]): EventNodeDraft[] {
   const byId = new Map<string, EventNodeDraft>();
-  events.forEach((event) => {
-    byId.set(eventKey(event), event);
+  events.forEach((event, index) => {
+    const key = eventKey(event, index);
+    const existing = byId.get(key);
+    if (!existing) {
+      byId.set(key, event);
+      return;
+    }
+    byId.set(key, pickPreferredEvent(existing, event));
   });
   return Array.from(byId.values());
 }
@@ -175,7 +233,7 @@ function sortEventsByRank(
   const ranked: RankedEvent[] = events.map((event, index) => ({
     event,
     rank: resolveRank(event),
-    index: sourceOrderMap.get(eventKey(event)) ?? index,
+    index: sourceOrderMap.get(eventKey(event, index)) ?? index,
   }));
   ranked.sort((a, b) => {
     if (a.rank !== b.rank) return a.rank - b.rank;
@@ -256,7 +314,7 @@ function projectWithTemporalOrder(input: {
 
   const sourceOrderMap = new Map<string, number>();
   [...fullPrimary, ...fullSecondary].forEach((event, index) => {
-    sourceOrderMap.set(eventKey(event), index);
+    sourceOrderMap.set(eventKey(event, index), index);
   });
 
   const rankOf = (event: EventNodeDraft): number => (

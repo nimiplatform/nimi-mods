@@ -64,11 +64,15 @@ export function useWorldStudioDraftHydration(input: WorldStudioDraftHydrationInp
         const payloadFinalDraftAccumulator = asRecord(payload.finalDraftAccumulator);
         const payloadAgentSync = asRecord(payload.agentSync);
         const payloadAgentDraftsByCharacter = asRecord(payloadAgentSync.draftsByCharacter);
-        const selectedCharacterIds = Array.isArray(payloadAgentSync.selectedCharacterIds)
+        const payloadAgentSyncSelectedCharacterIds = Array.isArray(payloadAgentSync.selectedCharacterIds)
           ? payloadAgentSync.selectedCharacterIds.map((item) => String(item || '')).filter(Boolean)
-          : (Array.isArray(pipelineState.selectedCharacters)
-            ? pipelineState.selectedCharacters.map((item) => String(item || '')).filter(Boolean)
-            : []);
+          : [];
+        const pipelineSelectedCharacters = Array.isArray(pipelineState.selectedCharacters)
+          ? pipelineState.selectedCharacters.map((item) => String(item || '')).filter(Boolean)
+          : [];
+        const selectedCharacterIds = payloadAgentSyncSelectedCharacterIds.length > 0
+          ? payloadAgentSyncSelectedCharacterIds
+          : pipelineSelectedCharacters;
         const futureHistoricalEvents = Array.isArray(payload.futureHistoricalEvents)
           ? (payload.futureHistoricalEvents as Array<Record<string, unknown>>)
           : [];
@@ -84,6 +88,11 @@ export function useWorldStudioDraftHydration(input: WorldStudioDraftHydrationInp
           payloadKeys: Object.keys(payload),
           pipelineStateKeys: Object.keys(pipelineState),
           selectedCharactersCount: selectedCharacterIds.length,
+          selectedCharacterIds,
+          payloadAgentSyncSelectedCharacterIds,
+          pipelineSelectedCharacters,
+          existingSnapshotSelectedCharacters: input.snapshot.selectedCharacters,
+          existingSnapshotAgentSyncSelectedCharacterIds: input.snapshot.agentSync.selectedCharacterIds,
           primaryEvents: primaryEvents.length,
           secondaryEvents: secondaryEvents.length,
           hasAgentSync: Object.keys(payloadAgentSync).length > 0,

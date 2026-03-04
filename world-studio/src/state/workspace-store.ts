@@ -10,6 +10,7 @@ import type {
 import { cloneDefaultSnapshot } from './workspace/defaults.js';
 import { syncSnapshot } from './workspace/normalize.js';
 import { persistSnapshotToStorage, readSnapshotFromStorage } from './workspace/storage.js';
+import { emitWorldStudioLog } from '../logging.js';
 
 type WorldStudioWorkspaceStore = {
   snapshot: WorldStudioWorkspaceSnapshot;
@@ -21,6 +22,45 @@ type WorldStudioWorkspaceStore = {
   resetSnapshot: () => void;
 };
 
+function diagLog(message: string, details?: Record<string, unknown>) {
+  try {
+    emitWorldStudioLog({
+      level: 'error',
+      message: `[MODS-TEST-DIAG] ${message}`,
+      source: 'DIAG',
+      details,
+    });
+  } catch {
+    // Ignore diagnostics sink failures in non-runtime environments (tests, headless execution).
+  }
+}
+
+function normalizeStringArray(value: unknown[]): string[] {
+  return value.map((item) => String(item || '').trim()).filter(Boolean);
+}
+
+function arraysEqual(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false;
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) return false;
+  }
+  return true;
+}
+
+function computeArrayDiff(before: string[], after: string[]): { added: string[]; removed: string[] } {
+  const beforeSet = new Set(before);
+  const afterSet = new Set(after);
+  return {
+    added: after.filter((item) => !beforeSet.has(item)),
+    removed: before.filter((item) => !afterSet.has(item)),
+  };
+}
+
+function captureCallerStack(maxFrames = 8): string[] {
+  const stack = String(new Error().stack || '').split('\n').map((line) => line.trim()).filter(Boolean);
+  return stack.slice(2, 2 + maxFrames);
+}
+
 export const useWorldStudioWorkspaceStore = create<WorldStudioWorkspaceStore>((set, get) => ({
   snapshot: cloneDefaultSnapshot(),
   setCreateStep: (step) => set((state) => ({
@@ -29,8 +69,22 @@ export const useWorldStudioWorkspaceStore = create<WorldStudioWorkspaceStore>((s
       createStep: step,
     },
   })),
-  patchSnapshot: (patch) => set((state) => ({
-    snapshot: syncSnapshot({
+  patchSnapshot: (patch) => set((state) => {
+    const previousSelectedCharacters = normalizeStringArray(state.snapshot.selectedCharacters);
+    const previousAgentSyncSelectedCharacterIds = normalizeStringArray(state.snapshot.agentSync.selectedCharacterIds);
+    const patchRecord = asRecord(patch);
+    const patchAgentSyncRecord = patch.agentSync && typeof patch.agentSync === 'object'
+      ? asRecord(patch.agentSync)
+      : {};
+    const patchSelectedCharacters = Array.isArray(patch.selectedCharacters)
+      ? normalizeStringArray(patch.selectedCharacters)
+      : null;
+    const patchAgentSyncSelectedCharacterIds = Array.isArray(patchAgentSyncRecord.selectedCharacterIds)
+      ? normalizeStringArray(patchAgentSyncRecord.selectedCharacterIds as unknown[])
+      : null;
+    const stackFrames = captureCallerStack();
+
+    const snapshot = syncSnapshot({
       ...state.snapshot,
       ...patch,
       panel: {
@@ -186,8 +240,51 @@ export const useWorldStudioWorkspaceStore = create<WorldStudioWorkspaceStore>((s
       selectedCharacters: Array.isArray(patch.selectedCharacters)
         ? patch.selectedCharacters.map((item) => String(item || '')).filter((item) => item.length > 0)
         : state.snapshot.selectedCharacters,
-    }),
-  })),
+    });
+
+    const nextSelectedCharacters = normalizeStringArray(snapshot.selectedCharacters);
+    const nextAgentSyncSelectedCharacterIds = normalizeStringArray(snapshot.agentSync.selectedCharacterIds);
+    const selectedCharactersChanged = !arraysEqual(previousSelectedCharacters, nextSelectedCharacters);
+    const agentSyncSelectedChanged = !arraysEqual(previousAgentSyncSelectedCharacterIds, nextAgentSyncSelectedCharacterIds);
+    const shouldLogSelectionPatch = Boolean(
+      patchSelectedCharacters
+      || patchAgentSyncSelectedCharacterIds
+      || selectedCharactersChanged
+      || agentSyncSelectedChanged,
+    );
+
+    if (shouldLogSelectionPatch) {
+      const selectedDiff = computeArrayDiff(previousSelectedCharacters, nextSelectedCharacters);
+      const agentSyncDiff = computeArrayDiff(previousAgentSyncSelectedCharacterIds, nextAgentSyncSelectedCharacterIds);
+      const sourceHint = patchSelectedCharacters && patchAgentSyncSelectedCharacterIds
+        ? 'dual-selection-patch'
+        : patchSelectedCharacters
+          ? 'selected-characters-patch'
+          : patchAgentSyncSelectedCharacterIds
+            ? 'agent-sync-selected-ids-patch'
+            : 'indirect-selection-change';
+      diagLog('patchSnapshot selection mutation', {
+        sourceHint,
+        patchKeys: Object.keys(patchRecord).sort(),
+        patchAgentSyncKeys: Object.keys(patchAgentSyncRecord).sort(),
+        patchSelectedCharacters,
+        patchAgentSyncSelectedCharacterIds,
+        beforeSelectedCharacters: previousSelectedCharacters,
+        afterSelectedCharacters: nextSelectedCharacters,
+        selectedCharactersAdded: selectedDiff.added,
+        selectedCharactersRemoved: selectedDiff.removed,
+        beforeAgentSyncSelectedCharacterIds: previousAgentSyncSelectedCharacterIds,
+        afterAgentSyncSelectedCharacterIds: nextAgentSyncSelectedCharacterIds,
+        agentSyncSelectedCharacterIdsAdded: agentSyncDiff.added,
+        agentSyncSelectedCharacterIdsRemoved: agentSyncDiff.removed,
+        createStepBefore: state.snapshot.createStep,
+        createStepAfter: snapshot.createStep,
+        stackFrames,
+      });
+    }
+
+    return { snapshot };
+  }),
   patchPanel: (patch) => set((state) => ({
     snapshot: {
       ...state.snapshot,

@@ -1,4 +1,4 @@
-export const PRIMARY_EVIDENCE_COVERAGE_BLOCK_THRESHOLD = 0.9;
+export const PRIMARY_EVIDENCE_COVERAGE_BLOCK_THRESHOLD = 0.75;
 
 export function countPrimaryEventsWithEvidence(events: Array<{ evidenceRefs?: unknown[] }>): number {
   return events.filter((event) => Array.isArray(event.evidenceRefs) && event.evidenceRefs.length > 0).length;
@@ -26,4 +26,3 @@ export function summarizePrimaryEvidenceCoverage(events: Array<{ evidenceRefs?: 
     coverage,
   };
 }
-

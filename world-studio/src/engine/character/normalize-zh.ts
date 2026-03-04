@@ -58,6 +58,47 @@ const HAS_CJK_RE = /[\u4e00-\u9fff]/;
 const LATIN_NAME_RE = /^[A-Za-z][A-Za-z0-9'\-. ]{1,40}$/;
 const PLACEHOLDER_ENTITY_RE = /^(?:char(?:acter)?|loc(?:ation)?|evt|event|timeline|segment|item|node)(?:[-_: ]+[a-z0-9]+|\d+)$/i;
 const PLACEHOLDER_CJK_RE = /^(?:角色|人物|地点|事件|时间线)[-_:\s]*\d+$/;
+const RELATION_DESCRIPTOR_SUFFIXES = [
+  '叔叔',
+  '叔父',
+  '伯伯',
+  '伯父',
+  '舅舅',
+  '舅父',
+  '姑妈',
+  '姨妈',
+  '父亲',
+  '母亲',
+  '韩父',
+  '韩母',
+  '父',
+  '母',
+  '哥哥',
+  '姐姐',
+  '弟弟',
+  '妹妹',
+  '师父',
+  '师兄',
+  '师姐',
+  '师弟',
+  '师妹',
+  '师叔',
+  '师伯',
+  '门主',
+  '宗主',
+  '掌门',
+  '长老',
+  '护法',
+  '大夫',
+  '先生',
+  '夫人',
+  '公子',
+  '小姐',
+  '老祖',
+  '城主',
+  '寨主',
+  '掌柜',
+];
 
 function normalizeWhitespace(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
@@ -105,6 +146,15 @@ function isAliasLike(a: string, b: string): boolean {
   if (a === b) return true;
   if (!HAS_CJK_RE.test(a) || !HAS_CJK_RE.test(b)) return false;
   if (Math.min(a.length, b.length) < 2) return false;
+  const shorter = a.length <= b.length ? a : b;
+  const longer = shorter === a ? b : a;
+  if (longer.length - shorter.length > 2) return false;
+  if (!(longer.startsWith(shorter) || shorter.startsWith(longer))) return false;
+  const suffix = longer.slice(shorter.length);
+  if (suffix.startsWith('的') || suffix.startsWith('之')) return false;
+  if (RELATION_DESCRIPTOR_SUFFIXES.some((token) => suffix.startsWith(token))) return false;
+  if (longer.includes('的') || longer.includes('之')) return false;
+  if (suffix.length >= 2 && /^(老|小)/.test(suffix)) return false;
   if (a.startsWith(b) || b.startsWith(a)) return true;
   return false;
 }

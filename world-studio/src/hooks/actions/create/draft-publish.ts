@@ -4,6 +4,10 @@ import {
   toUniqueStringArray,
 } from '../../../services/snapshot-normalize.js';
 import { resolveWorldOwnedAgentHandle } from '../../../services/agent-handle.js';
+import {
+  normalizeDnaPrimaryTrait,
+  normalizeDnaSecondaryTraits,
+} from '../../../services/agent-dna-traits.js';
 import { emitWorldStudioLog } from '../../../logging.js';
 import type { WorldStudioCreateActionsInput } from './types.js';
 
@@ -338,8 +342,8 @@ export async function publishWorldDraft(
           postHistoryInstructions: toNullableTrimmedString(draft.postHistoryInstructions),
           alternateGreetings: normalizeStringArray(draft.alternateGreetings),
         };
-        const normalizedDnaPrimary = toNullableTrimmedString(draft.dnaPrimary);
-        const normalizedDnaSecondary = normalizeStringArray(draft.dnaSecondary).slice(0, 3);
+        const normalizedDnaPrimary = normalizeDnaPrimaryTrait(draft.dnaPrimary);
+        const normalizedDnaSecondary = normalizeDnaSecondaryTraits(draft.dnaSecondary, 3);
         const normalizedWakeStrategy = normalizeWakeStrategy(draft.wakeStrategy);
         const normalizedReferenceImageUrl = toNullableTrimmedString(draft.referenceImageUrl);
         const normalizedAgentLorebooks = Array.isArray(draft.agentLorebooks)
@@ -395,6 +399,8 @@ export async function publishWorldDraft(
           summary: summary.slice(0, 100),
           producedFields,
           normalizedIdentityCard,
+          normalizedDnaPrimary: normalizedDnaPrimary || null,
+          normalizedDnaSecondary,
           agentLorebooksPrepared,
           agentLorebooksSkippedEmptyContent,
         });

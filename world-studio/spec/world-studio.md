@@ -31,6 +31,9 @@
 - `WS-DOM-013`: Reload recovery converts live task to `PAUSED` or `FAILED` by resumable capability.
 - `WS-DOM-014`: Publish path keeps agent sync world-owned and normalizes invalid handles.
 - `WS-DOM-015`: Maintenance diagnostics expose story projection summary (`count/missingContext/latestProjectedAt`) for narrative handoff audit.
+- `WS-DOM-016`: Start-time options must prioritize temporal semantics (`timeRef`, dependency edges) over raw merge order when both are available.
+- `WS-DOM-017`: Phase2 synthesize must auto-retry once with compact budget on timeout or JSON-object parse failure before surfacing an error.
+- `WS-DOM-018`: Publish agent sync must normalize `dnaPrimary/dnaSecondary` into backend enum domain and omit non-enum values.
 
 ## 3. No Over-Design Guard
 

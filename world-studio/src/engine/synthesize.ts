@@ -13,6 +13,10 @@ import type {
 import { parseJsonRecord } from './json-repair.js';
 import { emitWorldStudioLog } from '../logging.js';
 import {
+  normalizeDnaPrimaryTrait,
+  normalizeDnaSecondaryTraits,
+} from '../services/agent-dna-traits.js';
+import {
   applyDraftPatch,
   buildFinalDraftAccumulatorSlice,
   createEmptyFinalDraftAccumulator,
@@ -33,6 +37,72 @@ function diagLog(message: string, details?: Record<string, unknown>) {
   } catch {
     // Ignore diagnostics sink failures in non-runtime environments (tests, headless execution).
   }
+}
+
+type SynthesizePromptBudget = {
+  timeline: number;
+  locations: number;
+  primaryEvents: number;
+  secondaryEvents: number;
+  characterProfiles: number;
+  characterRelations: number;
+  evidenceSnippets: number;
+  worldSettingMaxChars: number;
+  maxTokens: number;
+  accumulatorSlice: {
+    maxLorebooks: number;
+    maxFutureEvents: number;
+    maxAgentDrafts: number;
+    maxRevisions: number;
+  };
+};
+
+const DEFAULT_SYNTHESIZE_PROMPT_BUDGET: SynthesizePromptBudget = {
+  timeline: 18,
+  locations: 16,
+  primaryEvents: 24,
+  secondaryEvents: 32,
+  characterProfiles: 16,
+  characterRelations: 24,
+  evidenceSnippets: 20,
+  worldSettingMaxChars: 800,
+  maxTokens: 2200,
+  accumulatorSlice: {
+    maxLorebooks: 12,
+    maxFutureEvents: 12,
+    maxAgentDrafts: 16,
+    maxRevisions: 12,
+  },
+};
+
+const COMPACT_SYNTHESIZE_PROMPT_BUDGET: SynthesizePromptBudget = {
+  timeline: 12,
+  locations: 12,
+  primaryEvents: 14,
+  secondaryEvents: 20,
+  characterProfiles: 10,
+  characterRelations: 16,
+  evidenceSnippets: 12,
+  worldSettingMaxChars: 500,
+  maxTokens: 1400,
+  accumulatorSlice: {
+    maxLorebooks: 8,
+    maxFutureEvents: 8,
+    maxAgentDrafts: 10,
+    maxRevisions: 8,
+  },
+};
+
+function isTimeoutLikeError(error: unknown): boolean {
+  const message = String(error instanceof Error ? error.message : error || '').toLowerCase();
+  return message.includes('timeout') || message.includes('deadline');
+}
+
+function isJsonParseRetryableError(error: unknown): boolean {
+  const message = String(error instanceof Error ? error.message : error || '').toLowerCase();
+  return message.includes('json')
+    || message.includes('object_required')
+    || message.includes('empty_model_output');
 }
 
 function asEventArray(value: unknown): EventNodeDraft[] {
@@ -308,7 +378,10 @@ function normalizeAgentLorebookDrafts(value: unknown): WorldStudioAgentLorebookD
     .filter((item): item is WorldStudioAgentLorebookDraft => Boolean(item));
 }
 
-function buildEvidenceSnippets(graph: WorldStudioKnowledgeGraphDraft): Array<Record<string, unknown>> {
+function buildEvidenceSnippets(
+  graph: WorldStudioKnowledgeGraphDraft,
+  maxSnippets = 32,
+): Array<Record<string, unknown>> {
   const snippets: Array<Record<string, unknown>> = [];
   graph.events.primary.forEach((event) => {
     (event.evidenceRefs || []).slice(0, 2).forEach((evidence, evidenceIndex) => {
@@ -322,22 +395,22 @@ function buildEvidenceSnippets(graph: WorldStudioKnowledgeGraphDraft): Array<Rec
       });
     });
   });
-  return snippets.slice(0, 32);
+  return snippets.slice(0, maxSnippets);
 }
 
 function buildStructuredGraphForPrompt(input: {
   selectedStartTimeId: string;
   selectedCharacters: string[];
   knowledgeGraph: WorldStudioKnowledgeGraphDraft;
-}): Record<string, unknown> {
+}, budget: SynthesizePromptBudget): Record<string, unknown> {
   const profileMap = new Map(
     (input.knowledgeGraph.characterProfiles || []).map((profile) => [profile.name, profile] as const),
   );
   const selectedCharacterProfiles = input.selectedCharacters
     .map((name) => profileMap.get(name))
     .filter((item) => Boolean(item));
-  const timeline = input.knowledgeGraph.timeline.slice(0, 24);
-  const normalizedPrimaryEvents = input.knowledgeGraph.events.primary.slice(0, 32).map((event) => ({
+  const timeline = input.knowledgeGraph.timeline.slice(0, budget.timeline);
+  const normalizedPrimaryEvents = input.knowledgeGraph.events.primary.slice(0, budget.primaryEvents).map((event) => ({
     id: event.id,
     title: event.title,
     summary: event.summary,
@@ -353,7 +426,7 @@ function buildStructuredGraphForPrompt(input: {
       confidence: evidence.confidence,
     })),
   }));
-  const normalizedSecondaryEvents = input.knowledgeGraph.events.secondary.slice(0, 48).map((event) => ({
+  const normalizedSecondaryEvents = input.knowledgeGraph.events.secondary.slice(0, budget.secondaryEvents).map((event) => ({
     id: event.id,
     parentEventId: event.parentEventId,
     title: event.title,
@@ -366,18 +439,18 @@ function buildStructuredGraphForPrompt(input: {
   return {
     selectedStartTimeId: input.selectedStartTimeId,
     selectedCharacters: input.selectedCharacters,
-    worldSetting: truncate(input.knowledgeGraph.worldSetting, 1000),
+    worldSetting: truncate(input.knowledgeGraph.worldSetting, budget.worldSettingMaxChars),
     narrativeArc: input.knowledgeGraph.narrativeArc || null,
     timeline,
-    locations: input.knowledgeGraph.locations.slice(0, 24),
+    locations: input.knowledgeGraph.locations.slice(0, budget.locations),
     characterProfiles: selectedCharacterProfiles.length > 0
       ? selectedCharacterProfiles
-      : (input.knowledgeGraph.characterProfiles || []).slice(0, 24),
+      : (input.knowledgeGraph.characterProfiles || []).slice(0, budget.characterProfiles),
     characterAliasMap: input.knowledgeGraph.characterAliasMap || {},
-    characterRelations: input.knowledgeGraph.characterRelations.slice(0, 48),
+    characterRelations: input.knowledgeGraph.characterRelations.slice(0, budget.characterRelations),
     primaryEvents: normalizedPrimaryEvents,
     secondaryEvents: normalizedSecondaryEvents,
-    evidenceSnippets: buildEvidenceSnippets(input.knowledgeGraph),
+    evidenceSnippets: buildEvidenceSnippets(input.knowledgeGraph, budget.evidenceSnippets),
   };
 }
 
@@ -386,14 +459,37 @@ function buildSynthesizePrompt(input: {
   selectedCharacters: string[];
   knowledgeGraph: WorldStudioKnowledgeGraphDraft;
   finalDraftAccumulator: FinalDraftAccumulator;
+}, options?: {
+  compact?: boolean;
 }): string {
-  const structuredGraph = buildStructuredGraphForPrompt(input);
-  const accumulatorSlice = buildFinalDraftAccumulatorSlice(input.finalDraftAccumulator, {
-    maxLorebooks: 20,
-    maxFutureEvents: 20,
-    maxAgentDrafts: 24,
-    maxRevisions: 20,
-  });
+  const promptBudget = options?.compact
+    ? COMPACT_SYNTHESIZE_PROMPT_BUDGET
+    : DEFAULT_SYNTHESIZE_PROMPT_BUDGET;
+  const structuredGraph = buildStructuredGraphForPrompt(input, promptBudget);
+  const accumulatorSlice = buildFinalDraftAccumulatorSlice(
+    input.finalDraftAccumulator,
+    promptBudget.accumulatorSlice,
+  );
+  const worldviewModuleLines = options?.compact
+    ? [
+      '## Worldview Module Descriptions',
+      '- Required: timeModel, spaceTopology, causality, coreSystem.',
+      '- Also include: existences, resources, structures, visualGuide, narrativeHooks (concise but complete).',
+      'Note: Do NOT include a "knowledge" module — it is deprecated.',
+    ]
+    : [
+      '## Worldview Module Descriptions',
+      '- timeModel (REQUIRED): The world\'s temporal structure. Infer the appropriate time model type from the source material — it may be absolute (calendar dates), relative (narrative progression), cyclical, or mixed.',
+      '- spaceTopology (REQUIRED): Geographic/spatial structure — realms, regions, dimensions, boundaries.',
+      '- causality (REQUIRED): How cause-and-effect works — power systems, natural laws, fate mechanisms.',
+      '- coreSystem (REQUIRED): The fundamental system that drives the world — cultivation ranks, magic system, technology tiers, etc.',
+      '- existences: Types of beings and their classifications.',
+      '- resources: Important materials, currencies, energy sources.',
+      '- structures: Social hierarchies, organizations, factions.',
+      '- visualGuide: Art style, color palette, atmosphere descriptions.',
+      '- narrativeHooks: Unresolved tensions, prophecies, mysteries.',
+      'Note: Do NOT include a "knowledge" module — it is deprecated.',
+    ];
   return [
     'You are an event-driven world generation closure engine.',
     'Use the accumulator as the primary draft source and perform global consistency closure.',
@@ -418,17 +514,7 @@ function buildSynthesizePrompt(input: {
     '- themes: Array of 2-5 core thematic elements.',
     '- era: The narrative era or time period setting.',
     '',
-    '## Worldview Module Descriptions',
-    '- timeModel (REQUIRED): The world\'s temporal structure. Infer the appropriate time model type from the source material — it may be absolute (calendar dates), relative (narrative progression), cyclical, or mixed.',
-    '- spaceTopology (REQUIRED): Geographic/spatial structure — realms, regions, dimensions, boundaries.',
-    '- causality (REQUIRED): How cause-and-effect works — power systems, natural laws, fate mechanisms.',
-    '- coreSystem (REQUIRED): The fundamental system that drives the world — cultivation ranks, magic system, technology tiers, etc.',
-    '- existences: Types of beings and their classifications.',
-    '- resources: Important materials, currencies, energy sources.',
-    '- structures: Social hierarchies, organizations, factions.',
-    '- visualGuide: Art style, color palette, atmosphere descriptions.',
-    '- narrativeHooks: Unresolved tensions, prophecies, mysteries.',
-    'Note: Do NOT include a "knowledge" module — it is deprecated.',
+    ...worldviewModuleLines,
     '',
     '## Agent Draft Rules',
     '- agentDrafts must cover all selectedCharacters and keep canonical character names.',
@@ -609,6 +695,8 @@ function normalizeAgentDraft(value: unknown, fallbackName: string, index: number
   const characterName = String(record.characterName || fallbackName || '').trim() || fallbackName;
   const normalizedRules = normalizeAgentRules(record.rules);
   const normalizedWakeStrategy = normalizeWakeStrategy(record.wakeStrategy);
+  const normalizedDnaPrimary = normalizeDnaPrimaryTrait(record.dnaPrimary);
+  const normalizedDnaSecondary = normalizeDnaSecondaryTraits(record.dnaSecondary, 3);
   const dnaValidation = validateAgentDna(record.dna);
   const dna = dnaValidation.dna;
   // Enforce: dna.identity.name must match characterName
@@ -655,10 +743,8 @@ function normalizeAgentDraft(value: unknown, fallbackName: string, index: number
     ...(Array.isArray(record.agentLorebooks)
       ? { agentLorebooks: normalizeAgentLorebookDrafts(record.agentLorebooks) }
       : {}),
-    ...(typeof record.dnaPrimary === 'string' ? { dnaPrimary: record.dnaPrimary } : {}),
-    ...(Array.isArray(record.dnaSecondary)
-      ? { dnaSecondary: record.dnaSecondary.map((item) => String(item || '')).filter(Boolean) }
-      : {}),
+    ...(normalizedDnaPrimary ? { dnaPrimary: normalizedDnaPrimary } : {}),
+    ...(normalizedDnaSecondary.length > 0 ? { dnaSecondary: normalizedDnaSecondary } : {}),
     ...(dna ? { dna } : {}),
   };
 }
@@ -672,6 +758,7 @@ function buildFallbackAgentDrafts(input: {
   );
   return input.selectedCharacters.map((name, index) => {
     const profile = profileByName.get(name);
+    const fallbackDnaPrimary = normalizeDnaPrimaryTrait(profile?.motivation || '');
     const concept = profile?.summary
       ? `${name}: ${profile.summary}`
       : `${name} is a key character in the world narrative.`;
@@ -697,7 +784,7 @@ function buildFallbackAgentDrafts(input: {
       postHistoryInstructions: null,
       alternateGreetings: [],
       agentLorebooks: [],
-      ...(profile?.motivation ? { dnaPrimary: profile.motivation } : {}),
+      ...(fallbackDnaPrimary ? { dnaPrimary: fallbackDnaPrimary } : {}),
     };
   });
 }
@@ -926,17 +1013,74 @@ export async function runSynthesizeDraft(
 ): Promise<Phase2Result> {
   validateEventGraph(input.knowledgeGraph);
   const finalDraftAccumulator = input.finalDraftAccumulator || createEmptyFinalDraftAccumulator();
-  const prompt = buildSynthesizePrompt({
-    ...input,
-    finalDraftAccumulator,
-  });
-  const response = await llm.generateText({
-    routeHint: 'chat/fine',
-    prompt,
-    mode: 'STORY',
-    abortSignal: input.abortSignal,
-  });
-  const payload = parseJsonRecord(response.text);
+  const attempts = [
+    { attempt: 1, compact: false, maxTokens: DEFAULT_SYNTHESIZE_PROMPT_BUDGET.maxTokens },
+    { attempt: 2, compact: true, maxTokens: COMPACT_SYNTHESIZE_PROMPT_BUDGET.maxTokens },
+  ] as const;
+  let response: { text: string; promptTraceId: string } | null = null;
+  let payload: Record<string, unknown> | null = null;
+  let lastError: unknown = null;
+  for (const attempt of attempts) {
+    try {
+      response = await llm.generateText({
+        routeHint: 'chat/fine',
+        prompt: buildSynthesizePrompt({
+          ...input,
+          finalDraftAccumulator,
+        }, {
+          compact: attempt.compact,
+        }),
+        maxTokens: attempt.maxTokens,
+        mode: 'STORY',
+        abortSignal: input.abortSignal,
+      });
+      diagLog('Phase2 synthesize llm response', {
+        attempt: attempt.attempt,
+        promptTraceId: response.promptTraceId,
+        textLength: String(response.text || '').length,
+        maxTokens: attempt.maxTokens,
+        compact: attempt.compact,
+      });
+    } catch (error) {
+      lastError = error;
+      if (input.abortSignal?.aborted) throw error;
+      if (!isTimeoutLikeError(error) || attempt.attempt === attempts.length) {
+        throw error;
+      }
+      diagLog('Phase2 synthesize timeout; retry with compact prompt budget', {
+        maxTokens: COMPACT_SYNTHESIZE_PROMPT_BUDGET.maxTokens,
+        selectedCharacters: input.selectedCharacters,
+        timeline: input.knowledgeGraph.timeline.length,
+        primaryEvents: input.knowledgeGraph.events.primary.length,
+        secondaryEvents: input.knowledgeGraph.events.secondary.length,
+        characterProfiles: (input.knowledgeGraph.characterProfiles || []).length,
+        error: error instanceof Error ? error.message : String(error || ''),
+      });
+      continue;
+    }
+
+    try {
+      payload = parseJsonRecord(response.text);
+      break;
+    } catch (parseError) {
+      lastError = parseError;
+      if (input.abortSignal?.aborted) throw parseError;
+      const retryable = isJsonParseRetryableError(parseError);
+      diagLog('Phase2 synthesize parse failed', {
+        attempt: attempt.attempt,
+        promptTraceId: response.promptTraceId,
+        compact: attempt.compact,
+        error: parseError instanceof Error ? parseError.message : String(parseError || ''),
+        retryable,
+      });
+      if (!retryable || attempt.attempt === attempts.length) {
+        throw parseError;
+      }
+    }
+  }
+  if (!response || !payload) {
+    throw (lastError instanceof Error ? lastError : new Error('WORLD_STUDIO_JSON_OBJECT_REQUIRED'));
+  }
   const world = {
     ...asRecord(finalDraftAccumulator.world || {}),
     ...asRecord(payload.world),
@@ -964,6 +1108,16 @@ export async function runSynthesizeDraft(
   const futureHistoricalEvents = Array.isArray(payload.futureHistoricalEvents)
     ? (payload.futureHistoricalEvents as Array<Record<string, unknown>>)
     : (finalDraftAccumulator.futureHistoricalEvents || []);
+
+  diagLog('Phase2 synthesize parsed payload', {
+    promptTraceId: response.promptTraceId,
+    worldKeys: Object.keys(asRecord(payload.world || {})),
+    worldviewKeys: Object.keys(asRecord(payload.worldview || {})),
+    worldEvents: modelEvents.length,
+    worldLorebooks: lorebookPayload.length,
+    futureHistoricalEvents: futureHistoricalEvents.length,
+    agentDrafts: Array.isArray(payload.agentDrafts) ? payload.agentDrafts.length : 0,
+  });
 
   const agentDrafts = resolveAgentDrafts(payload, {
     selectedCharacters: input.selectedCharacters,

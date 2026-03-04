@@ -7,6 +7,7 @@ import type {
 } from './types.js';
 import { buildRepairPrompt, parseJsonRecord, summarizeModelError } from './json-repair.js';
 import { isSyntheticEntityName } from './errors.js';
+import { emitWorldStudioLog } from '../logging.js';
 
 const CHUNK_TIMELINE_MAX = 8;
 const CHUNK_LOCATIONS_MAX = 10;
@@ -16,6 +17,19 @@ const CHUNK_SECONDARY_EVENTS_MAX = 12;
 const CHUNK_RELATIONS_MAX = 14;
 const STRICT_REPAIR_OUTPUT_LIMIT = 1400;
 const STRICT_REPAIR_SOURCE_LIMIT = 2200;
+
+function diagLog(message: string, details?: Record<string, unknown>) {
+  try {
+    emitWorldStudioLog({
+      level: 'error',
+      message: `[MODS-TEST-DIAG] ${message}`,
+      source: 'DIAG',
+      details,
+    });
+  } catch {
+    // Ignore diagnostics sink failures in non-runtime environments (tests, headless execution).
+  }
+}
 
 function normalizeEntityRefs(value: unknown): string[] {
   return Array.from(new Set(
@@ -124,6 +138,37 @@ function normalizeChunkExtraction(raw: Record<string, unknown>): ChunkExtraction
       ...(item as Record<string, unknown>),
       strength: clamp01(asRecord(item).strength, 0.5),
     })),
+  };
+}
+
+function summarizeExtractionCounts(extraction: ChunkExtraction): Record<string, unknown> {
+  return {
+    timeline: extraction.timeline.length,
+    locations: extraction.locations.length,
+    characters: extraction.characters.length,
+    primaryEvents: extraction.events.primary.length,
+    secondaryEvents: extraction.events.secondary.length,
+    characterRelations: extraction.characterRelations.length,
+    timelineLabels: extraction.timeline
+      .map((item) => String(asRecord(item).label || asRecord(item).time || '').trim())
+      .filter(Boolean)
+      .slice(0, 8),
+    locationNames: extraction.locations
+      .map((item) => String(asRecord(item).name || '').trim())
+      .filter(Boolean)
+      .slice(0, 8),
+    characterNames: extraction.characters
+      .map((item) => String(asRecord(item).name || '').trim())
+      .filter(Boolean)
+      .slice(0, 12),
+    primaryEventTitles: extraction.events.primary
+      .map((item) => String(item.title || '').trim())
+      .filter(Boolean)
+      .slice(0, 10),
+    secondaryEventTitles: extraction.events.secondary
+      .map((item) => String(item.title || '').trim())
+      .filter(Boolean)
+      .slice(0, 10),
   };
 }
 
@@ -256,12 +301,35 @@ export async function extractChunkCoarse(
     mode: 'STORY',
     abortSignal: input.abortSignal,
   });
+  diagLog('Phase1 coarse llm response', {
+    chunkIndex: input.index,
+    chunkTotal: input.total,
+    attempt: 1,
+    routeHint: 'chat/coarse',
+    promptTraceId: first.promptTraceId,
+    textLength: String(first.text || '').length,
+  });
   try {
+    const parsed = normalizeChunkExtraction(parseJsonRecord(first.text));
+    diagLog('Phase1 coarse parse success', {
+      chunkIndex: input.index,
+      chunkTotal: input.total,
+      attempt: 1,
+      promptTraceId: first.promptTraceId,
+      extraction: summarizeExtractionCounts(parsed),
+    });
     return {
-      extraction: normalizeChunkExtraction(parseJsonRecord(first.text)),
+      extraction: parsed,
       retryCount: 0,
     };
   } catch (firstError) {
+    diagLog('Phase1 coarse parse failed', {
+      chunkIndex: input.index,
+      chunkTotal: input.total,
+      attempt: 1,
+      promptTraceId: first.promptTraceId,
+      error: summarizeModelError(firstError),
+    });
     const repairPrompt = buildRepairPrompt({
       schemaLines: buildCoarseSchemaLines(),
       chunk: input.chunk,
@@ -276,12 +344,35 @@ export async function extractChunkCoarse(
       mode: 'STORY',
       abortSignal: input.abortSignal,
     });
+    diagLog('Phase1 coarse llm response', {
+      chunkIndex: input.index,
+      chunkTotal: input.total,
+      attempt: 2,
+      routeHint: 'chat/retry-low-temp',
+      promptTraceId: second.promptTraceId,
+      textLength: String(second.text || '').length,
+    });
     try {
+      const parsed = normalizeChunkExtraction(parseJsonRecord(second.text));
+      diagLog('Phase1 coarse parse success', {
+        chunkIndex: input.index,
+        chunkTotal: input.total,
+        attempt: 2,
+        promptTraceId: second.promptTraceId,
+        extraction: summarizeExtractionCounts(parsed),
+      });
       return {
-        extraction: normalizeChunkExtraction(parseJsonRecord(second.text)),
+        extraction: parsed,
         retryCount: 1,
       };
     } catch (secondError) {
+      diagLog('Phase1 coarse parse failed', {
+        chunkIndex: input.index,
+        chunkTotal: input.total,
+        attempt: 2,
+        promptTraceId: second.promptTraceId,
+        error: summarizeModelError(secondError),
+      });
       const strictRepairPrompt = buildStrictCoarseRepairPrompt({
         schemaLines: buildCoarseSchemaLines(),
         chunk: input.chunk,
@@ -298,12 +389,35 @@ export async function extractChunkCoarse(
         mode: 'STORY',
         abortSignal: input.abortSignal,
       });
+      diagLog('Phase1 coarse llm response', {
+        chunkIndex: input.index,
+        chunkTotal: input.total,
+        attempt: 3,
+        routeHint: 'chat/retry-low-temp',
+        promptTraceId: third.promptTraceId,
+        textLength: String(third.text || '').length,
+      });
       try {
+        const parsed = normalizeChunkExtraction(parseJsonRecord(third.text));
+        diagLog('Phase1 coarse parse success', {
+          chunkIndex: input.index,
+          chunkTotal: input.total,
+          attempt: 3,
+          promptTraceId: third.promptTraceId,
+          extraction: summarizeExtractionCounts(parsed),
+        });
         return {
-          extraction: normalizeChunkExtraction(parseJsonRecord(third.text)),
+          extraction: parsed,
           retryCount: 2,
         };
       } catch (thirdError) {
+        diagLog('Phase1 coarse parse failed', {
+          chunkIndex: input.index,
+          chunkTotal: input.total,
+          attempt: 3,
+          promptTraceId: third.promptTraceId,
+          error: summarizeModelError(thirdError),
+        });
         throw new Error(
           `WORLD_STUDIO_COARSE_JSON_PARSE_FAILED: ${summarizeModelError(firstError)} -> ${summarizeModelError(secondError)} -> ${summarizeModelError(thirdError)}`,
         );

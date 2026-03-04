@@ -15,12 +15,70 @@ function normalizeId(value: unknown): string {
   return String(value || '').trim().toLowerCase();
 }
 
+const PLACEHOLDER_EVENT_ID_RE = /^(?:evt|event|primary|secondary|main|sub|p|s)[-_:\s]*[a-z]*\d+(?:[-_:\s]*\d+)*$/i;
+
 const PLACEHOLDER_ENTITY_NAME_RE = /^(?:char(?:acter)?|role|persona?|loc(?:ation)?|evt|event|timeline|segment|item|node|人物|角色|地点|事件|时间线)(?:[-_: ]+[a-z0-9]+|\d+)$/i;
 
 function isPlaceholderEntityName(value: string): boolean {
   const name = String(value || '').trim();
   if (!name) return true;
   return PLACEHOLDER_ENTITY_NAME_RE.test(name);
+}
+
+function isPlaceholderEventId(value: unknown): boolean {
+  const normalized = normalizeId(value);
+  if (!normalized) return true;
+  return PLACEHOLDER_ENTITY_NAME_RE.test(normalized) || PLACEHOLDER_EVENT_ID_RE.test(normalized);
+}
+
+function normalizeSortedList(values: string[]): string[] {
+  const seen = new Set<string>();
+  const output: string[] = [];
+  values
+    .map((value) => normalizeId(value))
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b))
+    .forEach((value) => {
+      if (seen.has(value)) return;
+      seen.add(value);
+      output.push(value);
+    });
+  return output;
+}
+
+function buildEventSemanticKey(item: EventNodeDraft, fallbackKey: string): string {
+  const normalizedTitle = normalizeId(item.title || '');
+  const normalizedSummary = normalizeId(item.summary || '');
+  const normalizedTimeRef = normalizeId(item.timeRef || '');
+  const normalizedCharacters = normalizeSortedList(item.characterRefs || []).join(',');
+  const normalizedLocations = normalizeSortedList(item.locationRefs || []).join(',');
+  const key = [
+    normalizedTitle,
+    normalizedSummary,
+    normalizedTimeRef,
+    normalizedCharacters,
+    normalizedLocations,
+  ].filter(Boolean).join('|');
+  return key || fallbackKey;
+}
+
+function primaryMergeKey(item: EventNodeDraft, index: number): string {
+  const id = normalizeId(item.id || '');
+  if (id && !isPlaceholderEventId(id)) {
+    return `id:${id}`;
+  }
+  return `semantic:${buildEventSemanticKey(item, `primary-${index + 1}`)}`;
+}
+
+function secondaryMergeKey(item: EventNodeDraft, index: number): string {
+  const id = normalizeId(item.id || '');
+  if (id && !isPlaceholderEventId(id)) {
+    return `id:${id}`;
+  }
+  const parentEventId = isPlaceholderEventId(item.parentEventId)
+    ? ''
+    : normalizeId(item.parentEventId || '');
+  return `semantic:${parentEventId}|${buildEventSemanticKey(item, `secondary-${index + 1}`)}`;
 }
 
 function uniqueBy<T>(items: T[], keyOf: (item: T, index: number) => string): T[] {
@@ -80,22 +138,19 @@ function mergeEvents(extractions: ChunkExtraction[]): { primary: EventNodeDraft[
   const primaryRaw = extractions.flatMap((item) => item.events.primary || []).map((item) => normalizeEvent(item, 'PRIMARY'));
   const secondaryRaw = extractions.flatMap((item) => item.events.secondary || []).map((item) => normalizeEvent(item, 'SECONDARY'));
 
-  const primary = uniqueBy(primaryRaw, (item, index) => (
-    normalizeId(item.id || item.title || `primary-${index + 1}`)
-  ));
+  const primary = uniqueBy(primaryRaw, (item, index) => primaryMergeKey(item, index));
 
   const primaryIdSet = new Set(primary.map((item) => item.id));
-  const secondary = uniqueBy(secondaryRaw, (item, index) => (
-    normalizeId(item.id || `${item.parentEventId || ''}-${item.title || ''}-${index + 1}`)
-  )).map((item) => {
-    if (item.parentEventId && primaryIdSet.has(item.parentEventId)) {
-      return item;
-    }
-    return {
-      ...item,
-      parentEventId: item.parentEventId || null,
-    };
-  });
+  const secondary = uniqueBy(secondaryRaw, (item, index) => secondaryMergeKey(item, index))
+    .map((item) => {
+      if (item.parentEventId && primaryIdSet.has(item.parentEventId)) {
+        return item;
+      }
+      return {
+        ...item,
+        parentEventId: item.parentEventId || null,
+      };
+    });
 
   return { primary, secondary };
 }

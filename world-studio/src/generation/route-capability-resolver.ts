@@ -13,6 +13,8 @@ export function withRouteOverride(
   return {
     generateText: (input) => ai.generateText({
       prompt: input.prompt,
+      maxTokens: input.maxTokens,
+      temperature: input.temperature,
       mode: input.mode,
       worldId: input.worldId,
       agentId: input.agentId,

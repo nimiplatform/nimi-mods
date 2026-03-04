@@ -4,6 +4,7 @@ import { MaintainWorkbench } from '../ui/maintain/maintain-workbench.js';
 import { deriveCharacterCandidates, deriveStartTimeOptions } from '../generation/phase1/derived-options.js';
 import { toUniqueStringArray } from '../services/snapshot-normalize.js';
 import { projectEventsForSelectedStartTime } from '../services/start-time-projection.js';
+import { emitWorldStudioLog } from '../logging.js';
 import type {
   EventNodeDraft,
   WorldStudioCreateStep,
@@ -66,6 +67,19 @@ type BuildWorldStudioMainPanelInput = {
   onDeleteFirstLorebook: () => Promise<void>;
 };
 
+function diagLog(message: string, details?: Record<string, unknown>) {
+  try {
+    emitWorldStudioLog({
+      level: 'error',
+      message: `[MODS-TEST-DIAG] ${message}`,
+      source: 'DIAG',
+      details,
+    });
+  } catch {
+    // Ignore diagnostics sink failures in non-runtime environments (tests, headless execution).
+  }
+}
+
 export function buildWorldStudioMainPanel(input: BuildWorldStudioMainPanelInput): ReactNode {
   if (input.landingTarget === 'CREATE') {
     const graphForCheckpoints = {
@@ -98,7 +112,7 @@ export function buildWorldStudioMainPanel(input: BuildWorldStudioMainPanelInput)
     const startTimeOptions = phase1ForWorkbench?.startTimeOptions || [];
     const effectiveSelectedStartTimeId = startTimeOptions.some((item) => item.id === input.snapshot.selectedStartTimeId)
       ? input.snapshot.selectedStartTimeId
-      : (startTimeOptions[0]?.id || '');
+      : (startTimeOptions[startTimeOptions.length - 1]?.id || '');
     const buildStartTimeProjectionPatch = (
       selectedStartTimeId: string,
       events: { primary: EventNodeDraft[]; secondary: EventNodeDraft[] },
@@ -174,15 +188,27 @@ export function buildWorldStudioMainPanel(input: BuildWorldStudioMainPanelInput)
         onToggleCharacter={(name, checked) => {
           const current = input.snapshot.selectedCharacters;
           const currentSync = input.snapshot.agentSync.selectedCharacterIds;
+          const nextSelectedCharacters = checked
+            ? toUniqueStringArray([...current, name])
+            : current.filter((item) => item !== name);
+          const nextAgentSyncSelectedCharacterIds = checked
+            ? toUniqueStringArray([...currentSync, name])
+            : currentSync.filter((item) => item !== name);
+          diagLog('UI checkpoint character toggle', {
+            trigger: 'checkpoints.character-selection.checkbox',
+            characterName: name,
+            checked,
+            createStep: input.snapshot.createStep,
+            beforeSelectedCharacters: current,
+            afterSelectedCharacters: nextSelectedCharacters,
+            beforeAgentSyncSelectedCharacterIds: currentSync,
+            afterAgentSyncSelectedCharacterIds: nextAgentSyncSelectedCharacterIds,
+          });
           input.patchSnapshot({
-            selectedCharacters: checked
-              ? toUniqueStringArray([...current, name])
-              : current.filter((item) => item !== name),
+            selectedCharacters: nextSelectedCharacters,
             agentSync: {
               ...input.snapshot.agentSync,
-              selectedCharacterIds: checked
-                ? toUniqueStringArray([...currentSync, name])
-                : currentSync.filter((item) => item !== name),
+              selectedCharacterIds: nextAgentSyncSelectedCharacterIds,
             },
           });
         }}
