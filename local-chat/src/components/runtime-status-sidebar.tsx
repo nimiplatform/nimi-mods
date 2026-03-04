@@ -23,6 +23,23 @@ const ICON_SHIELD = (
   </svg>
 );
 
+type RuntimeSpeechVoice = RuntimeStatusSidebarProps['speechVoices'][number];
+
+export function resolveVisibleSpeechVoices(input: {
+  ttsRouteSource: RuntimeStatusSidebarProps['ttsRouteSource'];
+  selectedSpeechProviderId: string;
+  speechVoices: RuntimeSpeechVoice[];
+}): RuntimeSpeechVoice[] {
+  if (input.ttsRouteSource === 'token-api') {
+    return input.speechVoices;
+  }
+  const providerId = String(input.selectedSpeechProviderId || '').trim();
+  if (!providerId) {
+    return input.speechVoices;
+  }
+  return input.speechVoices.filter((voice) => voice.providerId === providerId);
+}
+
 export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
   const { t } = useModTranslation('local-chat');
   const {
@@ -102,9 +119,11 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     [chatModelOptions, chatModelQuery],
   );
   const visibleSpeechVoices = useMemo(
-    () => ttsRouteSource === 'token-api'
-      ? speechVoices
-      : speechVoices.filter((voice) => !selectedSpeechProviderId || voice.providerId === selectedSpeechProviderId),
+    () => resolveVisibleSpeechVoices({
+      ttsRouteSource,
+      selectedSpeechProviderId,
+      speechVoices,
+    }),
     [selectedSpeechProviderId, speechVoices, ttsRouteSource],
   );
 

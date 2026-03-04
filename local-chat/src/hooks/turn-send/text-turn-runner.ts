@@ -30,6 +30,9 @@ export type TextTurnResult = {
   retryAttempted: boolean;
   retryImproved: boolean;
   firstReply: string;
+  traceId?: string;
+  plannerErrorReasonCode?: string;
+  plannerErrorTraceId?: string;
 };
 
 type RunTextTurnInput = {
@@ -135,6 +138,44 @@ function normalizeIntent(value: unknown): AssistantPlanIntent {
   return 'answer';
 }
 
+function extractErrorReasonCode(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object') {
+    return undefined;
+  }
+  const record = error as Record<string, unknown>;
+  const direct = String(record.reasonCode || '').trim();
+  if (direct) {
+    return direct;
+  }
+  const message = String(record.message || '').trim();
+  if (!message) {
+    return undefined;
+  }
+  const matched = message.match(/\"reasonCode\"\\s*:\\s*\"([A-Z0-9_]+)\"/);
+  if (matched?.[1]) {
+    return matched[1];
+  }
+  const upper = message.match(/\\b[A-Z][A-Z0-9_]{2,}\\b/);
+  return upper?.[0];
+}
+
+function extractErrorTraceId(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object') {
+    return undefined;
+  }
+  const record = error as Record<string, unknown>;
+  const direct = String(record.traceId || '').trim();
+  if (direct) {
+    return direct;
+  }
+  const message = String(record.message || '').trim();
+  if (!message) {
+    return undefined;
+  }
+  const matched = message.match(/\"traceId\"\\s*:\\s*\"([^\"\\s]+)\"/i);
+  return matched?.[1] ? String(matched[1]).trim() : undefined;
+}
+
 function toAssistantPlanSegment(input: {
   raw: Record<string, unknown>;
   index: number;
@@ -220,8 +261,10 @@ async function buildSegmentsFromFallbackText(input: RunTextTurnInput): Promise<{
   retryAttempted: boolean;
   retryImproved: boolean;
   firstReply: string;
+  traceId?: string;
 }> {
   const result = await input.aiClient.generateText(input.invokeInput);
+  let latestTraceId = String(result.traceId || result.promptTraceId || '').trim() || undefined;
   const firstReply = String(result.text || '').trim();
   let assistantText = normalizeAssistantReplyTail(sanitizeAssistantReply(firstReply));
   let retryAttempted = false;
@@ -257,6 +300,7 @@ ASSISTANT QUALITY RULES:
         ...input.invokeInput,
         prompt: retryPrompt,
       });
+      latestTraceId = String(retry.traceId || retry.promptTraceId || '').trim() || latestTraceId;
       const retryReply = normalizeAssistantReplyTail(
         sanitizeAssistantReply(String(retry.text || '').trim()),
       );
@@ -295,6 +339,7 @@ ASSISTANT QUALITY RULES:
         ...input.invokeInput,
         prompt: directPrompt,
       });
+      latestTraceId = String(direct.traceId || direct.promptTraceId || '').trim() || latestTraceId;
       const directReply = normalizeAssistantReplyTail(
         sanitizeAssistantReply(String(direct.text || '').trim()),
       );
@@ -339,6 +384,7 @@ ASSISTANT QUALITY RULES:
           ...input.invokeInput,
           prompt: rewritePrompt,
         });
+        latestTraceId = String(rewrite.traceId || rewrite.promptTraceId || '').trim() || latestTraceId;
         const rewriteReply = normalizeAssistantReplyTail(
           sanitizeAssistantReply(String(rewrite.text || '').trim()),
         );
@@ -389,6 +435,7 @@ ASSISTANT QUALITY RULES:
           ...input.invokeInput,
           prompt: completionPrompt,
         });
+        latestTraceId = String(completion.traceId || completion.promptTraceId || '').trim() || latestTraceId;
         const completionReply = normalizeAssistantReplyTail(
           sanitizeAssistantReply(String(completion.text || '').trim()),
         );
@@ -447,6 +494,7 @@ ${assistantText}
         ...input.invokeInput,
         prompt: followupPrompt,
       });
+      latestTraceId = String(followup.traceId || followup.promptTraceId || '').trim() || latestTraceId;
       const normalized = sanitizeAssistantReply(String(followup.text || '').trim());
       if (
         normalized
@@ -493,6 +541,7 @@ ${assistantText}
     retryAttempted,
     retryImproved,
     firstReply,
+    traceId: latestTraceId,
   };
 }
 
@@ -543,10 +592,13 @@ JSON 格式如下：
         retryAttempted: false,
         retryImproved: false,
         firstReply: segments[0]?.content || '',
+        traceId: String(planned.traceId || planned.promptTraceId || '').trim() || undefined,
       };
     }
     throw new Error(PLAN_INVALID_ERROR);
   } catch (plannerError) {
+    const plannerErrorReasonCode = extractErrorReasonCode(plannerError);
+    const plannerErrorTraceId = extractErrorTraceId(plannerError);
     logRendererEvent({
       level: 'warn',
       area: 'local-chat',
@@ -554,17 +606,21 @@ JSON 格式如下：
       flowId: input.flowId,
       details: {
         error: plannerError instanceof Error ? plannerError.message : String(plannerError || ''),
+        reasonCode: plannerErrorReasonCode || null,
+        traceId: plannerErrorTraceId || null,
       },
     });
+    const fallback = await buildSegmentsFromFallbackText(input);
+
+    return {
+      planner: 'fallback',
+      segments: fallback.segments,
+      retryAttempted: fallback.retryAttempted,
+      retryImproved: fallback.retryImproved,
+      firstReply: fallback.firstReply,
+      traceId: fallback.traceId,
+      plannerErrorReasonCode,
+      plannerErrorTraceId,
+    };
   }
-
-  const fallback = await buildSegmentsFromFallbackText(input);
-
-  return {
-    planner: 'fallback',
-    segments: fallback.segments,
-    retryAttempted: fallback.retryAttempted,
-    retryImproved: fallback.retryImproved,
-    firstReply: fallback.firstReply,
-  };
 }

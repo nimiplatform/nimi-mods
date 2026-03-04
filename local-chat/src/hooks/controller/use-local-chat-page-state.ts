@@ -177,6 +177,9 @@ export function useLocalChatPageState() {
 
   const effectiveTtsModel = useMemo(() => {
     const configuredModel = String(speechSettingsState.defaultSettings.ttsModel || '').trim();
+    if (configuredModel) {
+      return configuredModel;
+    }
     const connectorId = String(effectiveTtsConnectorId || '').trim();
     if (!connectorId) {
       return configuredModel;
@@ -187,9 +190,6 @@ export function useLocalChatPageState() {
     }
     const candidateModels = candidate.models;
     if (candidateModels.length === 0) {
-      return configuredModel;
-    }
-    if (configuredModel && candidateModels.includes(configuredModel)) {
       return configuredModel;
     }
     return candidateModels[0] || configuredModel;
@@ -259,6 +259,35 @@ export function useLocalChatPageState() {
     speechSettingsState.defaultSettings.ttsRouteSource,
     speechSettingsState.defaultSettings.ttsModel,
     speechSettingsState.handleTtsModelChange,
+  ]);
+
+  useEffect(() => {
+    const ttsRouteSource = speechSettingsState.defaultSettings.ttsRouteSource;
+    const resolvedRouteSource = ttsRouteOptions?.selected?.source;
+    const shouldUseTokenRoute = ttsRouteSource === 'token-api'
+      || (ttsRouteSource === 'auto' && resolvedRouteSource === 'token-api');
+    if (shouldUseTokenRoute) {
+      const connectorId = String(effectiveTtsConnectorId || '').trim();
+      const model = String(effectiveTtsModel || '').trim();
+      if (!connectorId || !model) {
+        return;
+      }
+      void speechSettingsState.loadSpeechVoices({
+        routeSource: 'token-api',
+        connectorId,
+        model,
+      });
+      return;
+    }
+    const providerId = String(speechSettingsState.selectedSpeechProviderId || '').trim();
+    void speechSettingsState.loadSpeechVoices(providerId ? { providerId } : undefined);
+  }, [
+    effectiveTtsConnectorId,
+    effectiveTtsModel,
+    ttsRouteOptions?.selected?.source,
+    speechSettingsState.defaultSettings.ttsRouteSource,
+    speechSettingsState.selectedSpeechProviderId,
+    speechSettingsState.loadSpeechVoices,
   ]);
 
   const effectiveRouteSource = (

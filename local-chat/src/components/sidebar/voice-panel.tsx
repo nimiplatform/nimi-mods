@@ -32,6 +32,24 @@ type Props = {
   onSttModelChange: (model: string) => void;
 };
 
+export type VoicePanelVoiceOption = {
+  id: string;
+  providerId: string;
+  name: string;
+};
+
+export function buildVoiceOptionItems(voices: VoicePanelVoiceOption[]): Array<{
+  key: string;
+  value: string;
+  label: string;
+}> {
+  return voices.map((voice) => ({
+    key: `voice-option-${voice.providerId}-${voice.id}`,
+    value: voice.id,
+    label: voice.name,
+  }));
+}
+
 const selectClassName = 'h-8 w-full rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-900 disabled:bg-gray-100 disabled:text-gray-400';
 const inputClassName = 'h-8 w-full rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-900 outline-none transition-colors focus:border-green-500 focus:ring-1 focus:ring-green-500 disabled:bg-gray-100 disabled:text-gray-400';
 
@@ -101,6 +119,11 @@ export function VoicePanel(props: Props) {
     [sttConnectorModels, sttModelQuery],
   );
 
+  const voiceOptions = useMemo(
+    () => buildVoiceOptionItems(visibleSpeechVoices),
+    [visibleSpeechVoices],
+  );
+
   return (
     <div className="rounded-[10px] border border-gray-200 bg-gray-50 p-3 text-xs">
       <button
@@ -163,13 +186,11 @@ export function VoicePanel(props: Props) {
                   <input
                     list="voice-panel-tts-model-list"
                     value={ttsModelQuery}
-                    disabled={!enableVoice || !ttsConnectorId}
+                    disabled={!enableVoice}
                     onChange={(event) => {
                       const nextValue = event.target.value;
                       setTtsModelQuery(nextValue);
-                      if (ttsConnectorModels.includes(nextValue)) {
-                        onTtsModelChange(nextValue);
-                      }
+                      onTtsModelChange(nextValue.trim());
                     }}
                     placeholder={t('VoicePanel.modelPlaceholder')}
                     className={inputClassName}
@@ -289,9 +310,9 @@ export function VoicePanel(props: Props) {
                 onChange={(event) => onVoiceIdChange(event.target.value)}
                 className={selectClassName}
               >
-                {visibleSpeechVoices.map((voice) => (
-                  <option key={`voice-option-${voice.providerId}-${voice.id}`} value={voice.id}>
-                    {voice.name}
+                {voiceOptions.map((voice) => (
+                  <option key={voice.key} value={voice.value}>
+                    {voice.label}
                   </option>
                 ))}
               </select>
