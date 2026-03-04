@@ -1,0 +1,141 @@
+version: 1
+description: Meeting Scribe core entity definitions
+source_contract: entity-contract.md
+
+entities:
+  - name: Meeting
+    rule_id: MS-ENT-001
+    fields:
+      - name: id
+        type: string
+        format: ULID
+        required: true
+        description: Unique meeting identifier
+      - name: title
+        type: string
+        required: true
+        description: Meeting title (user-defined or auto-generated from summary)
+      - name: status
+        type: enum
+        ref: meeting-states.yaml
+        required: true
+        description: Current pipeline stage
+      - name: audioFileName
+        type: string
+        required: true
+        description: Original uploaded file name
+      - name: audioMimeType
+        type: string
+        required: true
+        description: "MIME type of uploaded audio (audio/wav, audio/mpeg, audio/mp4, audio/webm, audio/ogg)"
+      - name: audioSizeBytes
+        type: integer
+        required: true
+        description: File size in bytes
+      - name: audioDurationMs
+        type: integer
+        required: false
+        description: Audio duration in milliseconds (populated after STT)
+      - name: language
+        type: string
+        required: false
+        description: Detected language code (e.g. zh, en, ja) from STT
+      - name: localOnly
+        type: boolean
+        default: false
+        description: Whether to force local-only routing
+      - name: transcript
+        type: TranscriptSegment[]
+        required: false
+        description: Ordered transcript segments (populated after STT)
+      - name: summary
+        type: MeetingSummary
+        required: false
+        description: Structured summary (populated after analysis)
+      - name: error
+        type: string
+        required: false
+        description: Error message if pipeline failed
+      - name: createdAt
+        type: timestamp
+        required: true
+      - name: updatedAt
+        type: timestamp
+        required: true
+
+  - name: TranscriptSegment
+    rule_id: MS-ENT-002
+    fields:
+      - name: id
+        type: string
+        format: ULID
+        required: true
+      - name: index
+        type: integer
+        required: true
+        description: Zero-based order in full transcript
+      - name: startMs
+        type: integer
+        required: true
+        description: Start time in milliseconds from audio beginning
+      - name: endMs
+        type: integer
+        required: true
+        description: End time in milliseconds from audio beginning
+      - name: speaker
+        type: string
+        required: true
+        description: "Speaker label (Gemini: auto-detected e.g. 'Speaker 1'; Local: 'Unknown')"
+      - name: text
+        type: string
+        required: true
+        description: Transcribed text content
+      - name: confidence
+        type: float
+        required: false
+        description: STT confidence score (0.0 ~ 1.0)
+
+  - name: MeetingSummary
+    rule_id: MS-ENT-003
+    fields:
+      - name: keyPoints
+        type: string[]
+        required: true
+        description: Core meeting points (3-10 items)
+      - name: decisions
+        type: string[]
+        required: true
+        description: Explicit decisions made during the meeting
+      - name: actionItems
+        type: ActionItem[]
+        required: true
+        description: Extracted action items / todos
+      - name: language
+        type: string
+        required: true
+        description: Output language (inherited from Meeting.language)
+
+  - name: ActionItem
+    rule_id: MS-ENT-004
+    fields:
+      - name: id
+        type: string
+        format: ULID
+        required: true
+      - name: description
+        type: string
+        required: true
+        description: What needs to be done
+      - name: assignee
+        type: string
+        required: false
+        description: "Responsible person (references TranscriptSegment.speaker label; null if unidentifiable)"
+      - name: dueDate
+        type: string
+        required: false
+        description: "Deadline extracted from meeting content (ISO 8601 date string; null if not mentioned)"
+      - name: priority
+        type: enum
+        values: [high, medium, low]
+        required: true
+        description: Priority inferred by LLM from context

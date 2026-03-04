@@ -1,0 +1,111 @@
+version: 1
+description: Meeting state machine
+source_rule: MS-PIPE-001
+
+states:
+  - id: idle
+    label: Idle
+    label_zh: 空闲
+    description: Initial state, no audio uploaded yet
+
+  - id: uploading
+    label: Uploading
+    label_zh: 上传中
+    description: Audio file is being read and validated
+
+  - id: transcribing
+    label: Transcribing
+    label_zh: 转录中
+    description: STT is processing the audio (transient state)
+
+  - id: transcribed
+    label: Transcribed
+    label_zh: 已转录
+    description: Transcript segments generated, awaiting analysis
+
+  - id: analyzing
+    label: Analyzing
+    label_zh: 分析中
+    description: LLM is generating structured summary (transient state)
+
+  - id: done
+    label: Complete
+    label_zh: 已完成
+    description: Summary and action items generated successfully
+
+  - id: error
+    label: Error
+    label_zh: 错误
+    description: Pipeline failed at transcription or analysis step
+
+transitions:
+  - from: idle
+    to: uploading
+    trigger: file_selected
+    description: User selects or drops an audio file
+
+  - from: uploading
+    to: transcribing
+    trigger: upload_complete
+    description: Audio validated, STT auto-starts
+
+  - from: transcribing
+    to: transcribed
+    trigger: transcription_complete
+    description: STT finished, transcript segments available
+
+  - from: transcribed
+    to: analyzing
+    trigger: analysis_start
+    description: Analysis auto-starts after transcription
+
+  - from: analyzing
+    to: done
+    trigger: analysis_complete
+    description: Structured summary generated successfully
+
+  # Error transitions
+  - from: uploading
+    to: error
+    trigger: upload_failed
+    description: File validation failed (unsupported format, too large)
+
+  - from: transcribing
+    to: error
+    trigger: transcription_failed
+    description: STT provider returned an error
+
+  - from: analyzing
+    to: error
+    trigger: analysis_failed
+    description: LLM analysis returned an error
+
+  # Recovery transitions
+  - from: error
+    to: idle
+    trigger: retry_upload
+    description: User retries with a new file (clear all state)
+    side_effects:
+      - clear_transcript
+      - clear_summary
+      - clear_audio
+
+  - from: error
+    to: transcribing
+    trigger: retry_transcription
+    description: User retries STT on same audio (only if audio data still in memory)
+
+  - from: error
+    to: analyzing
+    trigger: retry_analysis
+    description: User retries analysis on existing transcript
+
+  # Re-upload from done
+  - from: done
+    to: uploading
+    trigger: new_meeting
+    description: User uploads a new audio file
+    side_effects:
+      - clear_transcript
+      - clear_summary
+      - clear_audio

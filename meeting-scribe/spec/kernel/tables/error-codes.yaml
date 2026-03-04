@@ -1,0 +1,87 @@
+version: 1
+description: Meeting Scribe error codes
+source_contract: pipeline-contract.md
+
+error_codes:
+  # Upload errors
+  - code: MS_UPLOAD_TOO_LARGE
+    category: upload
+    severity: error
+    message: Audio file exceeds 100MB size limit
+    message_zh: 音频文件超过 100MB 大小限制
+    recoverable: true
+    recovery: Upload a smaller file
+
+  - code: MS_UPLOAD_UNSUPPORTED_FORMAT
+    category: upload
+    severity: error
+    message: Audio format not supported
+    message_zh: 不支持的音频格式
+    recoverable: true
+    recovery: "Upload a file in one of: WAV, MP3, M4A, WebM, OGG"
+
+  - code: MS_UPLOAD_FILE_READ_ERROR
+    category: upload
+    severity: error
+    message: Failed to read uploaded file
+    message_zh: 读取上传文件失败
+    recoverable: true
+    recovery: Re-select the file and try again
+
+  # Transcription errors
+  - code: MS_STT_PROVIDER_UNAVAILABLE
+    category: transcription
+    severity: error
+    message: STT provider is not available
+    message_zh: 语音转文字服务不可用
+    recoverable: true
+    recovery: Check route configuration or switch routing mode
+
+  - code: MS_STT_TIMEOUT
+    category: transcription
+    severity: error
+    message: STT request timed out
+    message_zh: 语音转文字请求超时
+    recoverable: true
+    recovery: Retry the transcription
+
+  - code: MS_STT_EMPTY_RESULT
+    category: transcription
+    severity: error
+    message: STT returned empty transcript
+    message_zh: 转录结果为空
+    recoverable: false
+    recovery: Audio may contain no speech; try a different file
+
+  - code: MS_STT_LOCAL_MODEL_NOT_INSTALLED
+    category: transcription
+    severity: error
+    message: Local STT model not installed
+    message_zh: 本地语音模型未安装
+    recoverable: true
+    recovery: Install Whisper model or switch to cloud mode
+
+  # Analysis errors
+  - code: MS_ANALYSIS_PROVIDER_UNAVAILABLE
+    category: analysis
+    severity: error
+    message: Text analysis provider is not available
+    message_zh: 文本分析服务不可用
+    recoverable: true
+    recovery: Check route configuration or switch routing mode
+
+  - code: MS_ANALYSIS_CONTEXT_TOO_LONG
+    category: analysis
+    severity: error
+    message: Transcript exceeds model context window
+    message_zh: 转录文本超出模型上下文窗口限制
+    recoverable: false
+    recovery: Audio recording may be too long for single-pass analysis
+
+  - code: MS_ANALYSIS_PARSE_ERROR
+    category: analysis
+    severity: error
+    message: Failed to parse LLM structured output
+    message_zh: 结构化输出解析失败
+    recoverable: true
+    recovery: Retry the analysis

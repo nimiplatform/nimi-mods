@@ -1,0 +1,38 @@
+id: world.nimi.meeting-scribe
+name: Meeting Scribe
+version: 0.1.0
+kind: capability-mod
+entry: ./dist/mods/meeting-scribe/index.js
+description: >
+  AI 会议助手。上传录音，自动转录（含说话人分离）、生成摘要与待办事项。
+capabilities:
+  - llm.text.generate
+  - llm.text.stream
+  - llm.speech.transcribe
+  - ui.register.ui-extension.app.sidebar.mods
+  - ui.register.ui-extension.app.content.routes
+  - event.publish.ms:transcription:progress
+  - event.subscribe.ms:transcription:progress
+  - event.publish.ms:analysis:progress
+  - event.subscribe.ms:analysis:progress
+ai:
+  consume:
+    - chat
+    - speech
+  dependencies:
+    required:
+      - dependencyId: meeting-scribe/stt-gemini
+        kind: node
+        capability: speech
+        nodeId: speech.transcribe.token-api
+        title: Gemini STT (transcription + diarization)
+    optional:
+      - dependencyId: meeting-scribe/stt-whisper-local
+        kind: model
+        capability: speech
+        modelId: local/whisper-large-v3
+        repo: ggerganov/whisper.cpp
+        engine: openai-compatible
+        title: Whisper Large V3 (local STT, no diarization)
+    preferred:
+      speech: meeting-scribe/stt-gemini

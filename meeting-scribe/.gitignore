@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.log
+
+# Audio test fixtures (too large for git)
+test/test-audio/
+test/fixtures/
