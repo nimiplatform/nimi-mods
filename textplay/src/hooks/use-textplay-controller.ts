@@ -502,12 +502,16 @@ function deriveStoryPlaceholder(input: {
   story: TextplayStoryDetail | null;
   startupReady: boolean;
   started: boolean;
+  paused: boolean;
 }): string {
   if (!input.story) {
     return 'Select a world and story first...';
   }
   if (!input.started) {
     return 'Fill Player Name, then click Start to load background and opening narration...';
+  }
+  if (input.paused) {
+    return 'Session paused. Click Resume in Current Session before sending.';
   }
   if (!input.startupReady) {
     return 'Startup package is loading...';
@@ -704,6 +708,7 @@ export function useTextplayController(): TextplayShellProps {
   const [failure, setFailure] = useState<TextplayShellProps['failure']>(null);
   const [pendingUserTurn, setPendingUserTurn] = useState<TextplayShellProps['pendingUserTurn']>(null);
   const [storyBrief, setStoryBrief] = useState<TextplayStoryBrief | null>(null);
+  const [sessionPaused, setSessionPaused] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
   const storyHydrationSeqRef = useRef(0);
@@ -747,6 +752,7 @@ export function useTextplayController(): TextplayShellProps {
     setSelectedRecordRunId(null);
     setLastRenderedText('');
     setStoryBrief(null);
+    setSessionPaused(false);
     setPendingUserTurn(null);
     setRunEvents([]);
     setWarnings([]);
@@ -1673,6 +1679,7 @@ export function useTextplayController(): TextplayShellProps {
         preferredRunId: target.runId,
         forceWorldId: target.worldId,
       });
+      setSessionPaused(false);
 
       if (typeof setStatusBanner === 'function') {
         setStatusBanner({
@@ -1785,6 +1792,15 @@ export function useTextplayController(): TextplayShellProps {
   const onSend = useCallback(() => {
     void (async () => {
       if (isRunning) {
+        return;
+      }
+      if (sessionPaused) {
+        if (typeof setStatusBanner === 'function') {
+          setStatusBanner({
+            kind: 'info',
+            message: 'Session is paused. Click Resume in Current Session before sending.',
+          });
+        }
         return;
       }
 
@@ -2094,9 +2110,41 @@ export function useTextplayController(): TextplayShellProps {
     routeOverride,
     selectedStory,
     selectedWorldId,
+    sessionPaused,
     setStatusBanner,
     syncPresenceView,
     worldIdRuntime,
+  ]);
+
+  const onToggleSessionPause = useCallback(() => {
+    if (isRunning || records.length === 0) {
+      return;
+    }
+    const nextPaused = !sessionPaused;
+    setSessionPaused(nextPaused);
+    if (nextPaused) {
+      presenceMachine.dispatch('onUserPaused');
+    } else {
+      lastUserActivityMsRef.current = Date.now();
+      consecutiveInitiativeRef.current = 0;
+      presenceMachine.dispatch('onUserActive');
+    }
+    syncPresenceView();
+    if (typeof setStatusBanner === 'function') {
+      setStatusBanner({
+        kind: 'info',
+        message: nextPaused
+          ? 'Session paused. Initiative auto progression is suspended.'
+          : 'Session resumed. Initiative auto progression is enabled.',
+      });
+    }
+  }, [
+    isRunning,
+    presenceMachine,
+    records.length,
+    sessionPaused,
+    setStatusBanner,
+    syncPresenceView,
   ]);
 
   const triggerInitiativeRender = useCallback((inactiveMs: number) => {
@@ -3092,8 +3140,17 @@ export function useTextplayController(): TextplayShellProps {
   }, [hydrateStorySelection, selectedStoryId, selectedWorldId, stories.length]);
 
   useEffect(() => {
+    if (records.length === 0 && sessionPaused) {
+      setSessionPaused(false);
+    }
+  }, [records.length, sessionPaused]);
+
+  useEffect(() => {
     const timer = setInterval(() => {
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return;
+      }
+      if (sessionPaused) {
         return;
       }
       const startup = startupPackage;
@@ -3139,6 +3196,7 @@ export function useTextplayController(): TextplayShellProps {
     isRunning,
     presenceState,
     records.length,
+    sessionPaused,
     selectedStory,
     startupPackage,
     triggerInitiativeRender,
@@ -3166,10 +3224,12 @@ export function useTextplayController(): TextplayShellProps {
   const canSend = !isRunning
     && !!selectedStory
     && storyStarted
+    && !sessionPaused
     && hasRouteConfig
     && hasStoryRuntimeBinding
     && hasPlayerName
     && inputText.trim().length > 0;
+  const canTogglePause = !isRunning && storyStarted;
   const canContinueHistory = !isRunning
     && historySessions.length > 0
     && Boolean(selectedHistoryRunId);
@@ -3205,11 +3265,14 @@ export function useTextplayController(): TextplayShellProps {
       story: selectedStory,
       startupReady: Boolean(startupPackage) && !startupLoading,
       started: storyStarted,
+      paused: sessionPaused,
     }),
     storyStarted,
+    sessionPaused,
     isRunning,
     canStartStory,
     canSend,
+    canTogglePause,
     canContinueHistory,
     canSelectStory: !isRunning,
     routeSource,
@@ -3235,6 +3298,7 @@ export function useTextplayController(): TextplayShellProps {
     onInputFocus,
     onInputBlur,
     onStartStory,
+    onToggleSessionPause,
     onSend,
     onCancel,
     onRefresh,

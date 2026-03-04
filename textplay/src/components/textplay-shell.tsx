@@ -46,9 +46,11 @@ export type TextplayShellProps = {
   inputText: string;
   inputPlaceholder: string;
   storyStarted: boolean;
+  sessionPaused: boolean;
   isRunning: boolean;
   canStartStory: boolean;
   canSend: boolean;
+  canTogglePause: boolean;
   canContinueHistory: boolean;
   canSelectStory: boolean;
   routeSource: RuntimeRouteSource;
@@ -87,6 +89,7 @@ export type TextplayShellProps = {
   onInputFocus: () => void;
   onInputBlur: () => void;
   onStartStory: () => void;
+  onToggleSessionPause: () => void;
   onSend: () => void;
   onCancel: () => void;
   onRefresh: () => void;
@@ -104,6 +107,26 @@ export type TextplayShellProps = {
   onRouteModelChange: (model: string) => void;
   onClearRouteOverride: () => void;
 };
+
+type TextplayRightPanelSection = 'health' | 'route' | 'debug' | null;
+
+function rightPanelSectionHeader(input: {
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+}): React.ReactElement {
+  return (
+    <button
+      type="button"
+      onClick={input.onToggle}
+      aria-expanded={input.open}
+      className="flex w-full items-center justify-between text-left text-gray-700"
+    >
+      <span className="text-sm font-semibold">{input.title}</span>
+      <span className="text-sm font-semibold">{input.open ? '-' : '+'}</span>
+    </button>
+  );
+}
 
 function formatRunEvent(event: TextplayRunEvent): string {
   const parts = [
@@ -158,7 +181,8 @@ function formatRouteLabelFromRecord(record: TextplayPersistRecord): string {
 
 function formatHistorySessionTitle(session: TextplayHistorySession): string {
   const storyLabel = session.storyTitle.trim() || session.storyId;
-  return `${storyLabel} · ${session.runId}`;
+  const runLabel = session.runId.length > 12 ? `...${session.runId.slice(-12)}` : session.runId;
+  return `${storyLabel} · ${runLabel}`;
 }
 
 function formatHistorySessionUpdatedAt(updatedAt: string): string {
@@ -445,8 +469,8 @@ function renderOpeningCard(props: TextplayShellProps): React.ReactNode {
         </div>
         <div className="mt-1 whitespace-pre-line text-sm leading-6 text-emerald-900">
           {briefText || (briefMode === 'recap'
-            ? 'Click Start to generate story recap.'
-            : 'Click Start to generate opening narration.')}
+            ? 'Click Recap in Current Session to generate story recap.'
+            : 'Click Start in Session Entry to generate opening narration.')}
         </div>
       </div>
     </section>
@@ -507,6 +531,7 @@ export function TextplayShell(props: TextplayShellProps) {
   const [sessionEntryTab, setSessionEntryTab] = useState<'continue' | 'new'>(() => (
     props.storyStarted ? 'continue' : 'new'
   ));
+  const [openRightPanelSection, setOpenRightPanelSection] = useState<TextplayRightPanelSection>('health');
 
   useEffect(() => {
     if (props.storyStarted) {
@@ -555,6 +580,7 @@ export function TextplayShell(props: TextplayShellProps) {
               </div>
               <div>Story: {props.selectedStory?.title || props.storyId || '(unknown)'}</div>
               <div>Player: {props.playerName || '(missing)'} · {props.playerIdentity || 'default'}</div>
+              <div>Status: {props.sessionPaused ? 'Paused' : 'Active'}</div>
               <div>Run: {props.selectedRecordRunId || props.runId || '(none)'}</div>
               <div>
                 Updated: {selectedRecord?.updatedAt ? formatHistorySessionUpdatedAt(selectedRecord.updatedAt) : '-'}
@@ -565,6 +591,26 @@ export function TextplayShell(props: TextplayShellProps) {
               No active session.
             </div>
           )}
+          {props.storyStarted ? (
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={props.onStartStory}
+                disabled={!props.canStartStory}
+              >
+                {props.isRunning ? 'Recapping...' : 'Recap'}
+              </button>
+              <button
+                type="button"
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={props.onToggleSessionPause}
+                disabled={!props.canTogglePause}
+              >
+                {props.sessionPaused ? 'Resume' : 'Pause'}
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <button
@@ -613,7 +659,7 @@ export function TextplayShell(props: TextplayShellProps) {
                   </span>
                 </div>
                 <select
-                  className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm"
+                  className="mt-1.5 w-full max-w-full truncate rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm"
                   value={props.selectedHistoryRunId || ''}
                   onChange={(event) => props.onSelectHistorySession(event.target.value)}
                   disabled={props.isRunning || props.historyLoading || props.historySessions.length === 0}
@@ -637,12 +683,16 @@ export function TextplayShell(props: TextplayShellProps) {
                 ) : null}
 
                 {selectedHistorySession ? (
-                  <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
-                    <div className="text-xs font-medium text-slate-800">{selectedHistorySession.storyTitle}</div>
+                  <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                    <div className="break-all text-xs font-medium leading-5 text-slate-800">
+                      {selectedHistorySession.storyTitle}
+                    </div>
                     <div className="mt-1 text-[11px] text-slate-500">
                       updated: {formatHistorySessionUpdatedAt(selectedHistorySession.updatedAt)}
                     </div>
-                    <div className="mt-2 text-xs leading-5 text-slate-700">{selectedHistorySession.preview}</div>
+                    <div className="mt-2 break-words text-xs leading-5 text-slate-700">
+                      {selectedHistorySession.preview}
+                    </div>
                     <div className="mt-2 break-all text-[10px] text-slate-500">
                       world: {selectedHistorySession.worldId} · story: {selectedHistorySession.storyId}
                     </div>
@@ -718,11 +768,12 @@ export function TextplayShell(props: TextplayShellProps) {
                   {renderStorySummary(props.selectedStory)}
                 </div>
 
-                <div className="mt-3 block text-xs text-gray-600">
+                <div className="mt-3 text-xs text-gray-600">
                   Player ID
-                  <div className="mt-1.5 break-all rounded-lg border border-slate-300 bg-slate-50 px-2.5 py-2 text-sm text-slate-700">
+                  <div className="mt-1.5 break-all font-mono text-[11px] leading-5 text-slate-600">
                     {props.playerId || '(missing)'}
                   </div>
+                  <div className="mt-0.5 text-[11px] text-slate-500">Auto-generated and read-only.</div>
                 </div>
 
                 <label className="mt-2 block text-xs text-gray-600">
@@ -754,6 +805,17 @@ export function TextplayShell(props: TextplayShellProps) {
                   />
                   <div className="mt-1 text-[11px] text-gray-500">用于叙事身份绑定；留空将使用剧情上下文默认身份。</div>
                 </label>
+
+                {!props.storyStarted ? (
+                  <button
+                    type="button"
+                    className="mt-3 w-full rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={props.onStartStory}
+                    disabled={!props.canStartStory}
+                  >
+                    {props.isRunning ? 'Starting...' : 'Start'}
+                  </button>
+                ) : null}
 
                 <button
                   type="button"
@@ -835,7 +897,7 @@ export function TextplayShell(props: TextplayShellProps) {
                   ? 'Select a playable story to load timeline.'
                   : (props.storyStarted
                     ? 'No persisted timeline records yet.'
-                    : 'Click Start to generate opening narration and begin timeline.')}
+                    : 'Click Start in Session Entry to generate opening narration and begin timeline.')}
               </section>
             ) : (
               <section className="space-y-2">
@@ -932,14 +994,6 @@ export function TextplayShell(props: TextplayShellProps) {
               </button>
               <button
                 type="button"
-                className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
-                onClick={props.onStartStory}
-                disabled={!props.canStartStory}
-              >
-                {props.storyStarted ? (props.isRunning ? 'Recapping...' : 'Recap') : props.isRunning ? 'Starting...' : 'Start'}
-              </button>
-              <button
-                type="button"
                 className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={props.onSend}
                 disabled={!props.canSend}
@@ -955,13 +1009,18 @@ export function TextplayShell(props: TextplayShellProps) {
           {props.selectedStoryId && !props.storyStarted ? (
             <div className="mt-2 text-xs text-amber-700">
               {props.playerName.trim()
-                ? 'Click Start to load background and generate opening narration before sending.'
-                : 'Player Name is required. Fill Player Name first, then click Start.'}
+                ? 'Click Start in Session Entry to load background and opening narration before sending.'
+                : 'Player Name is required. Fill Player Name first, then click Start in Session Entry.'}
             </div>
           ) : null}
-          {props.selectedStoryId && props.storyStarted ? (
+          {props.storyStarted && props.sessionPaused ? (
+            <div className="mt-2 text-xs text-amber-700">
+              Session is paused. Click Resume in Current Session to re-enable Send and auto progression.
+            </div>
+          ) : null}
+          {props.selectedStoryId && props.storyStarted && !props.sessionPaused ? (
             <div className="mt-2 text-xs text-gray-500">
-              Click Recap to refresh a concise "previously on" summary before your next move.
+              Click Recap in Current Session to refresh a concise "previously on" summary before your next move.
             </div>
           ) : null}
 
@@ -974,172 +1033,210 @@ export function TextplayShell(props: TextplayShellProps) {
       </main>
 
       <aside className="w-full min-h-0 overflow-y-auto bg-slate-50 p-3 lg:w-80">
-        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Route Config</div>
-        <div className="rounded-lg border border-gray-200 bg-white p-2 text-xs text-gray-600">
-          <label className="block">
-            <div className="mb-1 text-gray-500">Source</div>
-            <select
-              className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-xs"
-              value={props.routeSource}
-              onChange={(event) => props.onRouteSourceChange(event.target.value === 'token-api' ? 'token-api' : 'local-runtime')}
-            >
-              <option value="local-runtime">local-runtime</option>
-              <option value="token-api">token-api</option>
-            </select>
-          </label>
-
-          {props.routeSource === 'token-api' ? (
-            <label className="mt-2 block">
-              <div className="mb-1 text-gray-500">Connector</div>
-              <select
-                className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-xs"
-                value={props.routeConnectorId}
-                onChange={(event) => props.onRouteConnectorChange(event.target.value)}
-              >
-                {props.routeConnectors.length === 0 ? (
-                  <option value="">No connector</option>
-                ) : null}
-                {props.routeConnectors.map((connector) => (
-                  <option key={connector.id} value={connector.id}>
-                    {connector.label || connector.id}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-
-          <label className="mt-2 block">
-            <div className="mb-1 text-gray-500">Model</div>
-            <input
-              className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-xs"
-              list={routeModelListId}
-              value={props.routeModel}
-              onChange={(event) => props.onRouteModelChange(event.target.value)}
-              placeholder={props.routeSource === 'token-api' && !activeConnector ? 'Select connector first' : 'model id'}
-            />
-            <datalist id={routeModelListId}>
-              {props.routeModelOptions.map((model) => (
-                <option key={`textplay-route-model-${model}`} value={model} />
-              ))}
-            </datalist>
-          </label>
-
-          <div className="mt-2 flex items-center justify-between">
-            <div className="text-[11px] text-gray-500">
-              override: {props.routeOverrideActive ? 'on' : 'off'}
-            </div>
-            <button
-              type="button"
-              className="rounded border border-gray-300 bg-white px-2 py-1 text-[11px] hover:bg-gray-50"
-              onClick={props.onClearRouteOverride}
-            >
-              Use Runtime Default
-            </button>
-          </div>
-        </div>
-
-        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Story Snapshot</div>
-        <div className="rounded-lg border border-gray-200 bg-white p-2 text-xs text-gray-600">
-          {props.storySnapshot ? (
-            <div className="space-y-1">
-              <div>storyId: {props.storySnapshot.storyId}</div>
-              <div>entryEventId: {props.storySnapshot.entryEventId}</div>
-              <div>primaryAgentId: {props.storySnapshot.primaryAgentId || '(missing)'}</div>
-              <div>version: {props.storySnapshot.version}</div>
-              <div>source: {props.storySnapshot.source}</div>
-              <div>loadedAt: {props.storySnapshot.loadedAt}</div>
-              {props.startupPackage ? (
-                <div>
-                  initiative: tick={props.startupPackage.startupPolicy.initiative.tickSeconds}s
-                  {' '}cooldown={props.startupPackage.startupPolicy.initiative.cooldownSeconds}s
-                  {' '}max={props.startupPackage.startupPolicy.initiative.maxConsecutive}
+        <div className="min-h-0 rounded-[10px] border border-gray-200 bg-white">
+          <section className="px-3 py-3 text-xs">
+            {rightPanelSectionHeader({
+              title: 'Session Health',
+              open: openRightPanelSection === 'health',
+              onToggle: () => setOpenRightPanelSection((prev) => (prev === 'health' ? null : 'health')),
+            })}
+            {openRightPanelSection === 'health' ? (
+              <div className="mt-3 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[11px] text-gray-500">Run status and warning overview.</div>
+                  <button
+                    type="button"
+                    className="rounded border border-gray-300 bg-white px-2 py-1 text-[11px] hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={props.onLoadRecoveryDelta}
+                    disabled={!props.selectedRecordRunId && !props.runId}
+                  >
+                    Load Delta
+                  </button>
                 </div>
-              ) : null}
-              <div>
-                coverage: canon={String(props.storySnapshot.contextCoverage.canon)}
-                {' '}story={String(props.storySnapshot.contextCoverage.story)}
-                {' '}subject={String(props.storySnapshot.contextCoverage.subject)}
-                {' '}relation={String(props.storySnapshot.contextCoverage.relation)}
-                {' '}scene={String(props.storySnapshot.contextCoverage.scene)}
+
+                <div className="rounded-lg border border-gray-200 bg-white p-2 text-xs text-gray-600">
+                  <div>gapRefillApplied: {String(props.gapRefillApplied)}</div>
+                  {props.runSnapshot ? (
+                    <div className="mt-1">
+                      status={props.runSnapshot.status} · lastSeq={props.runSnapshot.lastSeq}
+                    </div>
+                  ) : null}
+                  {props.deltaStatus ? (
+                    <div className={`mt-2 rounded px-2 py-1 text-[11px] ${
+                      props.deltaStatus.kind === 'success'
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : props.deltaStatus.kind === 'warn'
+                          ? 'bg-amber-50 text-amber-700'
+                          : props.deltaStatus.kind === 'error'
+                            ? 'bg-rose-50 text-rose-700'
+                            : 'bg-slate-100 text-slate-700'
+                    }`}
+                    >
+                      delta: {props.deltaStatus.message}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-2">
+                  <div className="text-xs font-medium text-amber-900">Warnings ({props.warnings.length})</div>
+                  <div className="mt-1 max-h-24 overflow-auto text-[11px] text-amber-800">
+                    {props.warnings.length === 0 ? 'none' : props.warnings.map((warning, index) => (
+                      <div key={`${warning.code}-${index}`}>{warning.code} · {warning.actionHint}</div>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div>gapWarnings: {props.storySnapshot.gapWarnings.length}</div>
-            </div>
-          ) : (
-            <div>none</div>
-          )}
-        </div>
+            ) : null}
+          </section>
 
-        <div className="mb-2 mt-3 flex items-center justify-between">
-          <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Run Diagnostics</div>
-          <button
-            type="button"
-            className="rounded border border-gray-300 bg-white px-2 py-1 text-[11px] hover:bg-gray-50"
-            onClick={props.onLoadRecoveryDelta}
-            disabled={!props.selectedRecordRunId && !props.runId}
-          >
-            Load Delta
-          </button>
-        </div>
+          <section className="border-t border-gray-200 px-3 py-3 text-xs">
+            {rightPanelSectionHeader({
+              title: 'Route Config',
+              open: openRightPanelSection === 'route',
+              onToggle: () => setOpenRightPanelSection((prev) => (prev === 'route' ? null : 'route')),
+            })}
+            {openRightPanelSection === 'route' ? (
+              <div className="mt-3 rounded-lg border border-gray-200 bg-white p-2 text-xs text-gray-600">
+                <label className="block">
+                  <div className="mb-1 text-gray-500">Source</div>
+                  <select
+                    className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-xs"
+                    value={props.routeSource}
+                    onChange={(event) => props.onRouteSourceChange(event.target.value === 'token-api' ? 'token-api' : 'local-runtime')}
+                  >
+                    <option value="local-runtime">local-runtime</option>
+                    <option value="token-api">token-api</option>
+                  </select>
+                </label>
 
-        <div className="rounded-lg border border-gray-200 bg-white p-2 text-xs text-gray-600">
-          <div>gapRefillApplied: {String(props.gapRefillApplied)}</div>
-          {props.runSnapshot ? (
-            <div className="mt-1">
-              status={props.runSnapshot.status} · lastSeq={props.runSnapshot.lastSeq}
-            </div>
-          ) : null}
-          {selectedRecord ? (
-            <div className="mt-2 space-y-1 border-t border-gray-100 pt-2 text-[11px]">
-              <div>selectedRun: {selectedRecord.runId}</div>
-              <div>selectedTurn: {selectedRecord.turnId}</div>
-              <div>trigger: {selectedRecord.triggerSource}</div>
-              <div>route: {formatRouteLabelFromRecord(selectedRecord)}</div>
-              <div>traceId: {selectedRecord.traceId}</div>
-              <div>promptTraceId: {selectedRecord.meta.promptTraceId || '(none)'}</div>
-            </div>
-          ) : null}
-          {(diagnosticReasonCode || diagnosticTraceId || diagnosticStep) ? (
-            <div className="mt-2 space-y-1 border-t border-gray-100 pt-2 text-[11px] text-rose-700">
-              {diagnosticReasonCode ? <div>reasonCode: {diagnosticReasonCode}</div> : null}
-              {diagnosticTraceId ? <div>traceId: {diagnosticTraceId}</div> : null}
-              {diagnosticStep ? <div>step: {diagnosticStep}</div> : null}
-            </div>
-          ) : null}
-          {props.deltaStatus ? (
-            <div className={`mt-2 rounded px-2 py-1 text-[11px] ${
-              props.deltaStatus.kind === 'success'
-                ? 'bg-emerald-50 text-emerald-700'
-                : props.deltaStatus.kind === 'warn'
-                  ? 'bg-amber-50 text-amber-700'
-                  : props.deltaStatus.kind === 'error'
-                    ? 'bg-rose-50 text-rose-700'
-                    : 'bg-slate-100 text-slate-700'
-            }`}
-            >
-              delta: {props.deltaStatus.message}
-            </div>
-          ) : null}
-        </div>
+                {props.routeSource === 'token-api' ? (
+                  <label className="mt-2 block">
+                    <div className="mb-1 text-gray-500">Connector</div>
+                    <select
+                      className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-xs"
+                      value={props.routeConnectorId}
+                      onChange={(event) => props.onRouteConnectorChange(event.target.value)}
+                    >
+                      {props.routeConnectors.length === 0 ? (
+                        <option value="">No connector</option>
+                      ) : null}
+                      {props.routeConnectors.map((connector) => (
+                        <option key={connector.id} value={connector.id}>
+                          {connector.label || connector.id}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
 
-        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2">
-          <div className="text-xs font-medium text-amber-900">Warnings ({props.warnings.length})</div>
-          <div className="mt-1 max-h-24 overflow-auto text-[11px] text-amber-800">
-            {props.warnings.length === 0 ? 'none' : props.warnings.map((warning, index) => (
-              <div key={`${warning.code}-${index}`}>{warning.code} · {warning.actionHint}</div>
-            ))}
-          </div>
-        </div>
+                <label className="mt-2 block">
+                  <div className="mb-1 text-gray-500">Model</div>
+                  <input
+                    className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-xs"
+                    list={routeModelListId}
+                    value={props.routeModel}
+                    onChange={(event) => props.onRouteModelChange(event.target.value)}
+                    placeholder={props.routeSource === 'token-api' && !activeConnector ? 'Select connector first' : 'model id'}
+                  />
+                  <datalist id={routeModelListId}>
+                    {props.routeModelOptions.map((model) => (
+                      <option key={`textplay-route-model-${model}`} value={model} />
+                    ))}
+                  </datalist>
+                </label>
 
-        <div className="mt-3 rounded-lg border border-gray-200 bg-white p-2">
-          <div className="text-xs font-medium text-gray-800">Run Steps ({props.runEvents.length})</div>
-          <div className="mt-1 text-[11px] text-gray-500">System pipeline events (not narrative cards).</div>
-          <div className="mt-1 max-h-[40vh] overflow-auto text-[11px] text-gray-600">
-            {props.runEvents.length === 0 ? 'none' : props.runEvents.map((event) => (
-              <div key={`${event.runId}-${event.seq}`} className="mb-1 rounded border border-gray-100 bg-gray-50 px-2 py-1">
-                {formatRunEvent(event)}
+                <div className="mt-2 flex items-center justify-between">
+                  <div className="text-[11px] text-gray-500">
+                    override: {props.routeOverrideActive ? 'on' : 'off'}
+                  </div>
+                  <button
+                    type="button"
+                    className="rounded border border-gray-300 bg-white px-2 py-1 text-[11px] hover:bg-gray-50"
+                    onClick={props.onClearRouteOverride}
+                  >
+                    Use Runtime Default
+                  </button>
+                </div>
               </div>
-            ))}
-          </div>
+            ) : null}
+          </section>
+
+          <section className="border-t border-gray-200 px-3 py-3 text-xs">
+            {rightPanelSectionHeader({
+              title: 'Debug Trace',
+              open: openRightPanelSection === 'debug',
+              onToggle: () => setOpenRightPanelSection((prev) => (prev === 'debug' ? null : 'debug')),
+            })}
+            {openRightPanelSection === 'debug' ? (
+              <div className="mt-3 space-y-3">
+                <div className="rounded-lg border border-gray-200 bg-white p-2 text-xs text-gray-600">
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-gray-700">Story Snapshot</div>
+                  {props.storySnapshot ? (
+                    <div className="mt-2 space-y-1">
+                      <div>storyId: {props.storySnapshot.storyId}</div>
+                      <div>entryEventId: {props.storySnapshot.entryEventId}</div>
+                      <div>primaryAgentId: {props.storySnapshot.primaryAgentId || '(missing)'}</div>
+                      <div>version: {props.storySnapshot.version}</div>
+                      <div>source: {props.storySnapshot.source}</div>
+                      <div>loadedAt: {props.storySnapshot.loadedAt}</div>
+                      {props.startupPackage ? (
+                        <div>
+                          initiative: tick={props.startupPackage.startupPolicy.initiative.tickSeconds}s
+                          {' '}cooldown={props.startupPackage.startupPolicy.initiative.cooldownSeconds}s
+                          {' '}max={props.startupPackage.startupPolicy.initiative.maxConsecutive}
+                        </div>
+                      ) : null}
+                      <div>
+                        coverage: canon={String(props.storySnapshot.contextCoverage.canon)}
+                        {' '}story={String(props.storySnapshot.contextCoverage.story)}
+                        {' '}subject={String(props.storySnapshot.contextCoverage.subject)}
+                        {' '}relation={String(props.storySnapshot.contextCoverage.relation)}
+                        {' '}scene={String(props.storySnapshot.contextCoverage.scene)}
+                      </div>
+                      <div>gapWarnings: {props.storySnapshot.gapWarnings.length}</div>
+                    </div>
+                  ) : (
+                    <div className="mt-2">none</div>
+                  )}
+                </div>
+
+                <div className="rounded-lg border border-gray-200 bg-white p-2 text-xs text-gray-600">
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-gray-700">Selected Turn Debug</div>
+                  {selectedRecord ? (
+                    <div className="mt-2 space-y-1 text-[11px]">
+                      <div>selectedRun: {selectedRecord.runId}</div>
+                      <div>selectedTurn: {selectedRecord.turnId}</div>
+                      <div>trigger: {selectedRecord.triggerSource}</div>
+                      <div>route: {formatRouteLabelFromRecord(selectedRecord)}</div>
+                      <div>traceId: {selectedRecord.traceId}</div>
+                      <div>promptTraceId: {selectedRecord.meta.promptTraceId || '(none)'}</div>
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-[11px] text-gray-500">none</div>
+                  )}
+                  {(diagnosticReasonCode || diagnosticTraceId || diagnosticStep) ? (
+                    <div className="mt-2 space-y-1 border-t border-gray-100 pt-2 text-[11px] text-rose-700">
+                      {diagnosticReasonCode ? <div>reasonCode: {diagnosticReasonCode}</div> : null}
+                      {diagnosticTraceId ? <div>traceId: {diagnosticTraceId}</div> : null}
+                      {diagnosticStep ? <div>step: {diagnosticStep}</div> : null}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="rounded-lg border border-gray-200 bg-white p-2">
+                  <div className="text-xs font-medium text-gray-800">Run Steps ({props.runEvents.length})</div>
+                  <div className="mt-1 text-[11px] text-gray-500">System pipeline events (not narrative cards).</div>
+                  <div className="mt-1 max-h-[40vh] overflow-auto text-[11px] text-gray-600">
+                    {props.runEvents.length === 0 ? 'none' : props.runEvents.map((event) => (
+                      <div key={`${event.runId}-${event.seq}`} className="mb-1 rounded border border-gray-100 bg-gray-50 px-2 py-1">
+                        {formatRunEvent(event)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </section>
         </div>
       </aside>
     </div>
