@@ -9,11 +9,18 @@
 - `kernel/generated/*.md`: generated views from YAML.
 - `mint-you.md`: domain increments only.
 
+## Key Fact Tables
+
+- `field-provenance.yaml`: **Start here.** Maps every AgentDna/CreateAgentDto field to its data source.
+- `scenario-intake.yaml`: Intake phases, interest tag pool, trait weight key format, scenario bank.
+- `trait-dimensions.yaml`: Primary archetypes, secondary traits, relationship modes, resolvable groups.
+
 ## Editing Rules
 
 - Do not manually edit `kernel/generated/*.md`.
 - Update `kernel/tables/*.yaml` first, then align kernel/domain docs in the same change.
 - Keep no-legacy mode and no compatibility shim.
+- When adding a new field to CreateAgentDto or AgentDna, add its provenance entry to `field-provenance.yaml` in the same change.
 
 ## Mandatory Verification
 

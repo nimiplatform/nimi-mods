@@ -1,0 +1,148 @@
+import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
+import { MINTYOU_REASON } from '../contracts.js';
+import { DnaSynthesisOutputSchema } from '../schemas.js';
+import type {
+  BasicInfo,
+  TraitExtractionResult,
+  DnaSynthesisOutput,
+  MintYouResult,
+} from '../types.js';
+import { emitMintYouLog } from '../logging.js';
+
+function buildSystemPrompt(): string {
+  return `You are a persona synthesis engine for a social AI platform. Given a user's personality profile (primary archetype, secondary traits, relationship mode, formality, sentiment) along with their basic info and interests, generate a complete social persona.
+
+Output a single JSON object with exactly these fields:
+
+{
+  "concept": "A one-paragraph persona summary capturing the character's essence",
+  "description": "A bio paragraph describing who this persona is and how they interact",
+  "greeting": "An opening message this persona would send when meeting someone new (in character)",
+  "exampleDialogue": "A sample conversation exchange showing this persona's communication style (3-4 turns)",
+  "systemPromptBase": "Core system prompt that defines this persona's identity and behavioral rules",
+  "rules": ["Rule line 1", "Rule line 2", "..."],
+  "scenario": "The default interaction context for this persona",
+  "identity": {
+    "role": "A short role description (e.g. 'gentle listener', 'witty challenger')",
+    "worldview": "How this persona sees the world in 1-2 sentences",
+    "summary": "A natural-language personality summary paragraph"
+  },
+  "personality": {
+    "summary": "A natural-language description of the persona's personality",
+    "mbti": "A 4-letter MBTI type (e.g. 'ENFP', 'ISTJ') inferred from the trait profile"
+  },
+  "communication": {
+    "summary": "A description of how this persona communicates",
+    "responseLength": "short|medium|long based on personality"
+  }
+}
+
+Rules:
+- All text fields must be non-empty strings.
+- The greeting must reflect the persona's communication style (formality + sentiment).
+- The MBTI must be a valid 4-letter code: [E|I][N|S][T|F][J|P].
+- The "rules" field must be an array of rule line strings.
+- Output ONLY the JSON object. No markdown, no explanation.`;
+}
+
+function buildUserPrompt(input: {
+  basicInfo: BasicInfo;
+  traitResult: TraitExtractionResult;
+  interests: string[];
+}): string {
+  const { basicInfo, traitResult, interests } = input;
+  return `Generate a social persona with the following profile:
+
+Display Name: ${basicInfo.displayName}
+Gender: ${basicInfo.gender}
+Age Range: ${basicInfo.ageRange}
+Social Intent: ${basicInfo.socialIntent}
+
+Primary Archetype: ${traitResult.dnaPrimary}
+Secondary Traits: ${traitResult.dnaSecondary.join(', ')}
+Relationship Mode: ${traitResult.relationshipMode}
+Formality: ${traitResult.formality}
+Sentiment: ${traitResult.sentiment}
+
+Interests: ${interests.join(', ')}
+
+Generate the complete persona JSON now.`;
+}
+
+function parseJsonFromText(text: string): Record<string, unknown> {
+  const trimmed = String(text || '').trim();
+  if (!trimmed) throw new Error('Empty text');
+
+  // Try markdown code block
+  const codeBlockMatch = trimmed.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+  const jsonText = codeBlockMatch ? codeBlockMatch[1]!.trim() : trimmed;
+
+  const parsed = JSON.parse(jsonText);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Parsed value is not an object');
+  }
+  return parsed as Record<string, unknown>;
+}
+
+export async function synthesizeDna(input: {
+  aiClient: ModAiClient;
+  basicInfo: BasicInfo;
+  traitResult: TraitExtractionResult;
+  interests: string[];
+}): Promise<MintYouResult<DnaSynthesisOutput>> {
+  const { aiClient, basicInfo, traitResult, interests } = input;
+
+  const systemPrompt = buildSystemPrompt();
+  const prompt = buildUserPrompt({ basicInfo, traitResult, interests });
+
+  try {
+    const result = await aiClient.generateObject({
+      routeHint: 'chat/default',
+      systemPrompt,
+      prompt,
+      maxTokens: 4096,
+      temperature: 0.7,
+      parse: parseJsonFromText,
+    });
+
+    const raw = result.object;
+
+    // Normalize rules: LLM returns string[], we need to validate that
+    const validation = DnaSynthesisOutputSchema.safeParse(raw);
+    if (!validation.success) {
+      const issues = validation.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ');
+      emitMintYouLog({
+        level: 'warn',
+        message: 'action:dna-synthesis:validate-failed',
+        source: 'synthesizeDna',
+        details: { issues },
+      });
+      return {
+        ok: false,
+        error: {
+          reasonCode: MINTYOU_REASON.DNA_SYNTHESIS_FAILED,
+          message: `LLM output schema validation failed: ${issues}`,
+          actionHint: 'Check LLM route availability and retry synthesis.',
+        },
+      };
+    }
+
+    return { ok: true, data: validation.data as DnaSynthesisOutput };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error || '');
+    emitMintYouLog({
+      level: 'error',
+      message: 'action:dna-synthesis:error',
+      source: 'synthesizeDna',
+      details: { error: msg },
+    });
+    return {
+      ok: false,
+      error: {
+        reasonCode: MINTYOU_REASON.DNA_SYNTHESIS_FAILED,
+        message: `DNA synthesis failed: ${msg}`,
+        actionHint: 'Check LLM route availability and retry synthesis.',
+      },
+    };
+  }
+}

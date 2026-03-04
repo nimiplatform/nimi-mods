@@ -12,8 +12,8 @@ mod_identity:
   entry: ./dist/mods/mint-you/index.js
   source_rule: MY-CAP-001
 required_capabilities:
-  - key: llm.object.generate
-    purpose: Structured DNA synthesis from trait scores
+  - key: llm.text.generate
+    purpose: Structured DNA synthesis and Identity Card generation from trait scores
     source_rule: MY-CAP-003
   - key: data.query.data-api.creator.agents.create
     purpose: Create agent with pre-built DNA payload
@@ -21,11 +21,17 @@ required_capabilities:
   - key: data.query.data-api.world.worlds.mine
     purpose: List user worlds for world selection gate
     source_rule: MY-CAP-002
+  - key: hook.agent-profile.read
+    purpose: Intercept agent profile reads to filter referenceImageUrl based on photo authorization state
+    source_rule: MY-CAP-005
+  - key: data.store.mod-state
+    purpose: Persist intake session progress and photo authorization state
+    source_rule: MY-CAP-002
   - key: ui.register.ui-extension.app.sidebar.mods
     purpose: Sidebar navigation entry
     source_rule: MY-CAP-001
   - key: ui.register.ui-extension.app.content.routes
-    purpose: Content route for intake flow UI
+    purpose: Content routes for intake flow and photo management UI
     source_rule: MY-CAP-001
 minimal_permission_policy:
   wildcard_forbidden: true

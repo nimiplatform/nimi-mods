@@ -8,5 +8,6 @@
 | `pipeline-states.md` | `tables/pipeline-states.yaml` |
 | `scenario-intake.md` | `tables/scenario-intake.yaml` |
 | `trait-dimensions.md` | `tables/trait-dimensions.yaml` |
+| `field-provenance.md` | `tables/field-provenance.yaml` |
 | `reason-codes.md` | `tables/reason-codes.yaml` |
 | `acceptance-cases.md` | `tables/acceptance-cases.yaml` |

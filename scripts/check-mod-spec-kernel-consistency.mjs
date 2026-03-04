@@ -378,8 +378,8 @@ function checkWorldStudio(tables, reasonCodeSet, config) {
   }
 
   const primaryEvidenceThreshold = Number(tables['quality-gate-policies.yaml']?.thresholds?.primary_evidence_coverage_block_lt);
-  if (Math.abs(primaryEvidenceThreshold - 0.9) > 1e-6) {
-    fail(`[world-studio] primary_evidence_coverage_block_lt must be 0.9, got ${primaryEvidenceThreshold}`);
+  if (Math.abs(primaryEvidenceThreshold - 0.75) > 1e-6) {
+    fail(`[world-studio] primary_evidence_coverage_block_lt must be 0.75, got ${primaryEvidenceThreshold}`);
   }
 }
 

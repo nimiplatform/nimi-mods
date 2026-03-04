@@ -1,7 +1,7 @@
 # Mint-You Spec Index
 
 > Status: Draft
-> Date: 2026-03-03
+> Date: 2026-03-04
 
 ## Structure
 
@@ -31,11 +31,20 @@
 3. `spec/kernel/tables/trait-dimensions.yaml`
 4. `spec/mint-you.md`
 
-### Change profile synthesis
+### Change profile synthesis or field provenance
 
 1. `spec/kernel/profile-contract.md`
-2. `spec/kernel/tables/trait-dimensions.yaml`
-3. `spec/mint-you.md`
+2. `spec/kernel/tables/field-provenance.yaml`
+3. `spec/kernel/tables/trait-dimensions.yaml`
+4. `spec/mint-you.md`
+
+### Change photo trust mechanism
+
+1. `spec/kernel/photo-contract.md`
+2. `spec/kernel/tables/pipeline-states.yaml` (photo_actions section)
+3. `spec/kernel/tables/reason-codes.yaml` (photo codes)
+4. `spec/kernel/tables/acceptance-cases.yaml` (MY-020+)
+5. `spec/mint-you.md`
 
 ### Change reason codes / acceptance
 

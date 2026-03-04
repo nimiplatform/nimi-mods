@@ -31,12 +31,13 @@ intake_phases:
           - 40+
         required: true
         maps_to: biological.visualAge
-      - field: relationshipIntent
+      - field: socialIntent
         type: enum
         values:
-          - serious
-          - casual
+          - dating
           - friendship
+          - social-explore
+          - professional
         required: true
         maps_to: personality.goals[0]
     source_rule: MY-INT-001
@@ -54,15 +55,125 @@ intake_phases:
       - 3
       - 4
     source_rule: MY-INT-002
+interest_tag_pool:
+  source_rule: MY-INT-006
+  categories:
+    - category: lifestyle
+      tags:
+        - travel
+        - fitness
+        - cooking
+        - photography
+        - fashion
+        - gardening
+        - pets
+        - outdoors
+    - category: entertainment
+      tags:
+        - movies
+        - anime
+        - music
+        - gaming
+        - reading
+        - podcasts
+        - concerts
+        - theater
+    - category: intellectual
+      tags:
+        - technology
+        - science
+        - philosophy
+        - history
+        - politics
+        - economics
+        - psychology
+        - languages
+    - category: creative
+      tags:
+        - writing
+        - painting
+        - design
+        - filmmaking
+        - crafts
+        - music-production
+    - category: social
+      tags:
+        - volunteering
+        - mentoring
+        - community
+        - networking
+        - debate
+        - public-speaking
+    - category: wellness
+      tags:
+        - meditation
+        - yoga
+        - mental-health
+        - nutrition
+        - skincare
+        - self-improvement
+trait_weight_key_format:
+  source_rule: MY-INT-003
+  description: |
+    Dot-notation namespaces for trait weight keys. The first segment identifies the resolvable trait group. The remaining segments identify the specific dimension value.
+  namespaces:
+    - prefix: primary
+      group: dnaPrimary
+      valid_values:
+        - CARING
+        - PLAYFUL
+        - INTELLECTUAL
+        - CONFIDENT
+        - MYSTERIOUS
+        - ROMANTIC
+      example: primary.CARING
+    - prefix: relationship
+      group: relationshipMode
+      valid_values:
+        - SECURE
+        - PASSIONATE
+        - INDEPENDENT
+      example: relationship.SECURE
+    - prefix: communication.formality
+      group: communicationFormality
+      valid_values:
+        - casual
+        - formal
+        - slang
+      example: communication.formality.casual
+    - prefix: communication.sentiment
+      group: communicationSentiment
+      valid_values:
+        - positive
+        - neutral
+        - cynical
+      example: communication.sentiment.positive
+    - prefix: secondary
+      group: dnaSecondary
+      valid_values:
+        - HUMOROUS
+        - SARCASTIC
+        - GENTLE
+        - DIRECT
+        - OPTIMISTIC
+        - REALISTIC
+        - DRAMATIC
+        - PASSIONATE
+        - REBELLIOUS
+        - INNOCENT
+        - WISE
+        - ECCENTRIC
+      example: secondary.HUMOROUS
 scenario_structure:
   required_fields:
     - id
     - narrative
     - choices
   choice_required_fields:
+    - id
     - label
     - trait_weights
-  trait_weights_schema: Record<string, number>
+  trait_weights_schema: Record<TraitWeightKey, number>
   source_rule: MY-INT-003
 scenario_coverage_policy:
   each_trait_group_min_scenarios: 2
@@ -78,27 +189,25 @@ neutrality_policy:
   source_rule: MY-INT-005
 scenario_bank:
   - id: MY-S01
-    narrative: You arrive a bit early at a cafe. Your match messages that they will be 20 minutes late.
+    narrative: You arrive early at a cafe to meet someone new. They message that they will be 20 minutes late.
     source_rule: MY-INT-002
     choices:
       - id: MY-S01-A
-        label: No worries, take your time. I can order us something warm.
+        label: No worries, take your time. I will order us something warm.
         trait_weights:
           primary.CARING: 2
           relationship.SECURE: 2
           communication.formality.casual: 1
           communication.sentiment.positive: 2
           secondary.GENTLE: 2
-        source_rule: MY-INT-003
       - id: MY-S01-B
-        label: "I will charge one dramatic entrance fee: one great story."
+        label: "Fine, but I am charging one dramatic entrance fee: a great story."
         trait_weights:
           primary.PLAYFUL: 2
           relationship.PASSIONATE: 1
           communication.formality.casual: 2
           communication.sentiment.positive: 1
           secondary.HUMOROUS: 2
-        source_rule: MY-INT-003
       - id: MY-S01-C
         label: Understood. Let us keep this short and efficient when you arrive.
         trait_weights:
@@ -107,9 +216,8 @@ scenario_bank:
           communication.formality.formal: 1
           communication.sentiment.neutral: 2
           secondary.REALISTIC: 1
-        source_rule: MY-INT-003
   - id: MY-S02
-    narrative: You and your match both want to plan the weekend, but your priorities conflict.
+    narrative: You and someone you have been getting to know both want to plan the weekend, but your priorities clash.
     source_rule: MY-INT-002
     choices:
       - id: MY-S02-A
@@ -120,7 +228,6 @@ scenario_bank:
           communication.formality.formal: 1
           communication.sentiment.neutral: 1
           secondary.WISE: 1
-        source_rule: MY-INT-003
       - id: MY-S02-B
         label: Forget the spreadsheet, let us pick the most exciting option and go.
         trait_weights:
@@ -129,7 +236,6 @@ scenario_bank:
           communication.formality.casual: 2
           communication.sentiment.positive: 1
           secondary.REBELLIOUS: 1
-        source_rule: MY-INT-003
       - id: MY-S02-C
         label: I can be flexible, but this boundary is non-negotiable.
         trait_weights:
@@ -138,9 +244,8 @@ scenario_bank:
           communication.formality.formal: 1
           communication.sentiment.neutral: 1
           secondary.DIRECT: 2
-        source_rule: MY-INT-003
   - id: MY-S03
-    narrative: Your match shares a fear of being abandoned after a bad past relationship.
+    narrative: Someone you are close to shares a fear of being abandoned after a bad past experience.
     source_rule: MY-INT-002
     choices:
       - id: MY-S03-A
@@ -151,7 +256,6 @@ scenario_bank:
           communication.formality.casual: 1
           communication.sentiment.positive: 2
           secondary.GENTLE: 2
-        source_rule: MY-INT-003
       - id: MY-S03-B
         label: I care, but I also need us to build trust through actions, not fear.
         trait_weights:
@@ -160,7 +264,6 @@ scenario_bank:
           communication.formality.formal: 1
           communication.sentiment.neutral: 1
           secondary.DIRECT: 2
-        source_rule: MY-INT-003
       - id: MY-S03-C
         label: I am not going anywhere, unless your playlist has no good songs.
         trait_weights:
@@ -169,9 +272,8 @@ scenario_bank:
           communication.formality.slang: 2
           communication.sentiment.neutral: 1
           secondary.SARCASTIC: 2
-        source_rule: MY-INT-003
   - id: MY-S04
-    narrative: "A conversation turns to future plans: city, family rhythm, and career intensity."
+    narrative: "A conversation turns to future plans: where to live, lifestyle rhythm, and career intensity."
     source_rule: MY-INT-002
     choices:
       - id: MY-S04-A
@@ -182,7 +284,6 @@ scenario_bank:
           communication.formality.formal: 2
           communication.sentiment.neutral: 1
           secondary.REALISTIC: 2
-        source_rule: MY-INT-003
       - id: MY-S04-B
         label: If the feeling is real, we can write the future as we live it.
         trait_weights:
@@ -191,7 +292,6 @@ scenario_bank:
           communication.formality.casual: 1
           communication.sentiment.positive: 2
           secondary.PASSIONATE: 2
-        source_rule: MY-INT-003
       - id: MY-S04-C
         label: I prefer keeping long-term options open until patterns are clear.
         trait_weights:
@@ -200,9 +300,8 @@ scenario_bank:
           communication.formality.formal: 1
           communication.sentiment.neutral: 2
           secondary.ECCENTRIC: 1
-        source_rule: MY-INT-003
   - id: MY-S05
-    narrative: At a crowded gathering, your match introduces you to many new people.
+    narrative: At a crowded gathering, someone introduces you to many new people at once.
     source_rule: MY-INT-002
     choices:
       - id: MY-S05-A
@@ -214,7 +313,6 @@ scenario_bank:
           communication.formality.casual: 2
           communication.sentiment.positive: 2
           secondary.OPTIMISTIC: 2
-        source_rule: MY-INT-003
       - id: MY-S05-B
         label: I observe first, then join when I understand the room dynamic.
         trait_weights:
@@ -223,7 +321,6 @@ scenario_bank:
           communication.formality.formal: 1
           communication.sentiment.neutral: 2
           secondary.WISE: 1
-        source_rule: MY-INT-003
       - id: MY-S05-C
         label: I break the ice with an edgy joke and test who can keep up.
         trait_weights:
@@ -232,20 +329,18 @@ scenario_bank:
           communication.formality.slang: 2
           communication.sentiment.cynical: 1
           secondary.SARCASTIC: 2
-        source_rule: MY-INT-003
   - id: MY-S06
-    narrative: A misunderstanding appears in a public group chat and tension rises quickly.
+    narrative: A misunderstanding appears in a group chat and tension rises quickly.
     source_rule: MY-INT-002
     choices:
       - id: MY-S06-A
-        label: I move it to private chat and clarify with precise wording.
+        label: I move it to a private message and clarify with precise wording.
         trait_weights:
           primary.INTELLECTUAL: 1
           relationship.SECURE: 1
           communication.formality.formal: 2
           communication.sentiment.neutral: 2
           secondary.DIRECT: 1
-        source_rule: MY-INT-003
       - id: MY-S06-B
         label: I soften the tone with playful language and positive energy.
         trait_weights:
@@ -255,7 +350,6 @@ scenario_bank:
           communication.formality.casual: 2
           communication.sentiment.positive: 2
           secondary.HUMOROUS: 1
-        source_rule: MY-INT-003
       - id: MY-S06-C
         label: I address the issue directly and close the thread fast.
         trait_weights:
@@ -264,13 +358,12 @@ scenario_bank:
           communication.formality.formal: 1
           communication.sentiment.cynical: 2
           secondary.DIRECT: 2
-        source_rule: MY-INT-003
   - id: MY-S07
-    narrative: Your match forgets an important date that mattered to you.
+    narrative: Someone you care about forgets an occasion that mattered to you.
     source_rule: MY-INT-002
     choices:
       - id: MY-S07-A
-        label: I tell them honestly I am hurt and ask for a meaningful repair.
+        label: I tell them honestly I am hurt and ask for a meaningful gesture.
         trait_weights:
           primary.CARING: 1
           primary.ROMANTIC: 1
@@ -278,16 +371,14 @@ scenario_bank:
           communication.formality.casual: 1
           communication.sentiment.neutral: 1
           secondary.PASSIONATE: 1
-        source_rule: MY-INT-003
       - id: MY-S07-B
-        label: I turn it into a playful challenge for our next date.
+        label: I turn it into a playful challenge for next time.
         trait_weights:
           primary.PLAYFUL: 2
           relationship.PASSIONATE: 1
           communication.formality.slang: 1
           communication.sentiment.positive: 2
           secondary.INNOCENT: 2
-        source_rule: MY-INT-003
       - id: MY-S07-C
         label: I stay calm, lower expectations, and watch future consistency.
         trait_weights:
@@ -296,5 +387,104 @@ scenario_bank:
           communication.formality.formal: 1
           communication.sentiment.cynical: 1
           secondary.REALISTIC: 2
-        source_rule: MY-INT-003
+  - id: MY-S08
+    narrative: You are working on a creative project and someone offers blunt, unsolicited feedback.
+    source_rule: MY-INT-002
+    choices:
+      - id: MY-S08-A
+        label: I appreciate the honesty and dissect their points one by one.
+        trait_weights:
+          primary.INTELLECTUAL: 2
+          relationship.SECURE: 1
+          communication.formality.formal: 2
+          communication.sentiment.neutral: 1
+          secondary.WISE: 2
+      - id: MY-S08-B
+        label: I dramatically clutch my heart, then laugh and ask for specifics.
+        trait_weights:
+          primary.PLAYFUL: 1
+          primary.ROMANTIC: 1
+          relationship.PASSIONATE: 1
+          communication.formality.casual: 2
+          communication.sentiment.positive: 1
+          secondary.DRAMATIC: 2
+      - id: MY-S08-C
+        label: I thank them briefly and decide privately whether the advice has merit.
+        trait_weights:
+          primary.CONFIDENT: 1
+          primary.MYSTERIOUS: 1
+          relationship.INDEPENDENT: 2
+          communication.formality.formal: 1
+          communication.sentiment.neutral: 2
+          secondary.REALISTIC: 1
+      - id: MY-S08-D
+        label: I share how the project makes me feel and invite them into the vision.
+        trait_weights:
+          primary.ROMANTIC: 2
+          relationship.PASSIONATE: 2
+          communication.formality.casual: 1
+          communication.sentiment.positive: 2
+          secondary.PASSIONATE: 1
+  - id: MY-S09
+    narrative: A friend cancels plans at the last minute for the third time this month.
+    source_rule: MY-INT-002
+    choices:
+      - id: MY-S09-A
+        label: I check if they are okay first, then share how it makes me feel.
+        trait_weights:
+          primary.CARING: 2
+          relationship.SECURE: 2
+          communication.formality.casual: 1
+          communication.sentiment.positive: 1
+          secondary.GENTLE: 1
+          secondary.OPTIMISTIC: 1
+      - id: MY-S09-B
+        label: I set a clear boundary and tell them the pattern needs to change.
+        trait_weights:
+          primary.CONFIDENT: 2
+          relationship.INDEPENDENT: 2
+          communication.formality.formal: 1
+          communication.sentiment.cynical: 1
+          secondary.DIRECT: 2
+      - id: MY-S09-C
+        label: I say nothing, quietly deprioritize them, and make other plans.
+        trait_weights:
+          primary.MYSTERIOUS: 2
+          relationship.INDEPENDENT: 2
+          communication.formality.formal: 1
+          communication.sentiment.neutral: 2
+          secondary.ECCENTRIC: 2
+  - id: MY-S10
+    narrative: At a dinner party, the host asks you to give a toast to the group.
+    source_rule: MY-INT-002
+    choices:
+      - id: MY-S10-A
+        label: I deliver a heartfelt, sincere message about the people in the room.
+        trait_weights:
+          primary.CARING: 1
+          primary.ROMANTIC: 1
+          relationship.SECURE: 1
+          communication.formality.casual: 1
+          communication.sentiment.positive: 2
+          secondary.GENTLE: 1
+          secondary.OPTIMISTIC: 1
+      - id: MY-S10-B
+        label: I craft a witty, slightly provocative toast that gets everyone laughing.
+        trait_weights:
+          primary.PLAYFUL: 2
+          primary.CONFIDENT: 1
+          relationship.PASSIONATE: 1
+          communication.formality.slang: 2
+          communication.sentiment.positive: 1
+          secondary.DRAMATIC: 2
+          secondary.HUMOROUS: 1
+      - id: MY-S10-C
+        label: I keep it short, raise my glass, and let the moment speak for itself.
+        trait_weights:
+          primary.MYSTERIOUS: 1
+          primary.CONFIDENT: 1
+          relationship.INDEPENDENT: 1
+          communication.formality.formal: 2
+          communication.sentiment.neutral: 2
+          secondary.WISE: 1
 ```

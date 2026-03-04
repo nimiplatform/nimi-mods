@@ -1,7 +1,7 @@
 # Mint-You Kernel Contracts
 
 > Status: Draft
-> Date: 2026-03-03
+> Date: 2026-03-04
 
 ## 1. Goals
 
@@ -11,7 +11,7 @@ Domain docs reference kernel rule IDs and cannot duplicate kernel prose.
 ## 2. Rule ID Format
 
 - Format: `MY-<DOMAIN>-NNN`
-- Domain enum: `CAP`, `INT`, `PROF`, `PIPE`, `ERR`, `ACC`
+- Domain enum: `CAP`, `INT`, `PROF`, `PIPE`, `PHOTO`, `ERR`, `ACC`
 
 ## 3. Ownership
 
@@ -19,6 +19,7 @@ Domain docs reference kernel rule IDs and cannot duplicate kernel prose.
 - `intake-contract.md` -> `MY-INT-*`
 - `profile-contract.md` -> `MY-PROF-*`
 - `pipeline-contract.md` -> `MY-PIPE-*`
+- `photo-contract.md` -> `MY-PHOTO-*`
 - `error-model.md` -> `MY-ERR-*`
 - `acceptance-contract.md` -> `MY-ACC-*`
 
@@ -28,6 +29,7 @@ Domain docs reference kernel rule IDs and cannot duplicate kernel prose.
 - `pipeline-states.yaml`
 - `scenario-intake.yaml`
 - `trait-dimensions.yaml`
+- `field-provenance.yaml`
 - `reason-codes.yaml`
 - `acceptance-cases.yaml`
 

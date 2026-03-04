@@ -1,6 +1,7 @@
 packages:
   - 'kismet'
   - 'local-chat'
+  - 'mint-you'
   - 'narrative-engine'
   - 'textplay'
   - 'test-chat-tts'

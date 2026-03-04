@@ -12,4 +12,4 @@ Blocking reason codes must carry actionable `actionHint`.
 
 ## MY-ERR-003 Non-Blocking Warning Requirements
 
-Non-blocking warnings cannot change the persona card output shape.
+Non-blocking warnings cannot change the persona card output shape or block the creation pipeline.

@@ -8,7 +8,7 @@ Acceptance behavior is authoritative in `tables/acceptance-cases.yaml`.
 
 ## MY-ACC-002 Minimum Coverage
 
-Coverage includes: full intake completion path, trait extraction correctness, DNA schema conformance, user confirmation gate, agent creation success, and error paths for missing world and synthesis failure.
+Coverage includes: full intake completion path, trait extraction correctness, DNA schema conformance, user confirmation gate, agent creation success, error paths for missing world and synthesis failure, photo upload and mutual authorization flows, and photo revocation.
 
 ## MY-ACC-003 Verification Commands
 

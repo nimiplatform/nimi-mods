@@ -1,5 +1,6 @@
 version: 1
 codes:
+  # ─── Creation flow ───
   - code: MINTYOU_INPUT_INVALID
     stage: basic-info
     blocking: true
@@ -38,10 +39,32 @@ codes:
   - code: MINTYOU_HANDLE_UNAVAILABLE
     stage: agent-create
     blocking: true
-    action_hint: Choose a different handle for the agent.
+    action_hint: Choose a different handle for the agent. Auto-retry up to 3 times.
+    source_rule: MY-ERR-001
+  - code: MINTYOU_AGENT_LIMIT_REACHED
+    stage: agent-create
+    blocking: true
+    action_hint: You have reached the maximum number of agents (5). Remove an existing agent before creating a new one.
     source_rule: MY-ERR-001
   - code: MINTYOU_SESSION_EXPIRED_WARN
     stage: resume
     blocking: false
-    action_hint: Session data expired. Restart intake flow.
+    action_hint: Session data expired after 7 days of inactivity. Restart intake flow.
     source_rule: MY-ERR-003
+
+  # ─── Photo trust ───
+  - code: MINTYOU_PHOTO_NO_PHOTO
+    stage: photo-reveal
+    blocking: false
+    action_hint: The other user has not uploaded a photo yet.
+    source_rule: MY-ERR-003
+  - code: MINTYOU_PHOTO_REQUEST_DECLINED
+    stage: photo-reveal
+    blocking: false
+    action_hint: The other user declined your photo reveal request. You may request again after the cooldown period.
+    source_rule: MY-ERR-003
+  - code: MINTYOU_PHOTO_COOLDOWN_ACTIVE
+    stage: photo-reveal
+    blocking: true
+    action_hint: A previous request was declined. Wait for the cooldown period (24h) before requesting again.
+    source_rule: MY-ERR-001

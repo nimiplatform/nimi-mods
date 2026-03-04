@@ -1,5 +1,6 @@
 version: 1
 cases:
+  # ─── Creation flow ───
   - id: MY-001-FULL-INTAKE-SUCCESS
     description: Complete intake flow (basic-info + interests + all scenarios) produces a valid persona card.
     expected_ok: true
@@ -11,7 +12,7 @@ cases:
     reason_code: null
     source_rule: MY-ACC-002
   - id: MY-003-DNA-SCHEMA-CONFORMANCE
-    description: Synthesized DNA object passes AgentDna 5-dimensional schema validation.
+    description: Synthesized DNA object passes AgentDna 5-dimensional schema validation. All required fields have values per field-provenance.yaml.
     expected_ok: true
     reason_code: null
     source_rule: MY-ACC-002
@@ -22,7 +23,7 @@ cases:
     prerequisite: user has not confirmed
     source_rule: MY-ACC-002
   - id: MY-005-AGENT-CREATE-SUCCESS
-    description: After confirmation, agent is created with INCUBATING state and correct worldId binding.
+    description: After confirmation, agent is created with INCUBATING state, correct worldId binding, and WORLD_OWNED ownership.
     expected_ok: true
     reason_code: null
     source_rule: MY-ACC-002
@@ -37,7 +38,7 @@ cases:
     reason_code: MINTYOU_DNA_SYNTHESIS_FAILED
     source_rule: MY-ACC-002
   - id: MY-008-TRAIT-OVERRIDE-RESYNTHESIS
-    description: User modifying a trait in preview triggers re-synthesis of dependent fields only. Unaffected fields remain stable.
+    description: User modifying a trait in preview triggers re-synthesis of dependent LLM fields only. Deterministic and hard-coded fields remain stable.
     expected_ok: true
     reason_code: null
     source_rule: MY-ACC-002
@@ -51,6 +52,89 @@ cases:
     expected_ok: true
     reason_code: null
     source_rule: MY-ACC-002
+  - id: MY-011-AGENT-LIMIT-BLOCKED
+    description: Agent creation fails when user already has 5 agents.
+    expected_ok: false
+    reason_code: MINTYOU_AGENT_LIMIT_REACHED
+    source_rule: MY-ACC-002
+  - id: MY-012-HANDLE-RETRY-ON-CONFLICT
+    description: When auto-generated handle is taken, system retries with new suffix up to 3 times before failing.
+    expected_ok: true
+    reason_code: null
+    source_rule: MY-ACC-002
+  - id: MY-013-SESSION-RESUME
+    description: User can resume an interrupted intake from the last completed step within 7 days.
+    expected_ok: true
+    reason_code: null
+    source_rule: MY-ACC-002
+  - id: MY-014-INPUT-INVALID-BLOCKED
+    description: Submitting basic-info with missing required fields returns blocking error.
+    expected_ok: false
+    reason_code: MINTYOU_INPUT_INVALID
+    source_rule: MY-ACC-002
+  - id: MY-015-TRAIT-EXTRACTION-FAILED
+    description: Corrupted or inconsistent scenario data causes trait extraction to fail with blocking error.
+    expected_ok: false
+    reason_code: MINTYOU_TRAIT_EXTRACTION_FAILED
+    source_rule: MY-ACC-002
+  - id: MY-016-AGENT-CREATE-BACKEND-FAIL
+    description: Backend agent creation API failure returns blocking error with actionable hint.
+    expected_ok: false
+    reason_code: MINTYOU_AGENT_CREATE_FAILED
+    source_rule: MY-ACC-002
+  - id: MY-017-HANDLE-EXHAUSTED-FAIL
+    description: When all 3 handle generation retries fail due to unavailability, creation fails with blocking error.
+    expected_ok: false
+    reason_code: MINTYOU_HANDLE_UNAVAILABLE
+    source_rule: MY-ACC-002
+  - id: MY-018-SESSION-EXPIRED-WARN
+    description: Resuming a session after 7 days of inactivity returns non-blocking warning and restarts intake.
+    expected_ok: true
+    reason_code: MINTYOU_SESSION_EXPIRED_WARN
+    source_rule: MY-ACC-002
+  - id: MY-019-PHOTO-DECLINE-REREQUEST
+    description: After cooldown expires following a decline, requester can send a new photo reveal request.
+    expected_ok: true
+    reason_code: null
+    source_rule: MY-ACC-002
+  - id: MY-026-PHOTO-REQUEST-DECLINED
+    description: When User B declines a photo reveal request, requester receives non-blocking declined status.
+    expected_ok: true
+    reason_code: MINTYOU_PHOTO_REQUEST_DECLINED
+    source_rule: MY-ACC-002
+
+  # ─── Photo trust ───
+  - id: MY-020-PHOTO-UPLOAD-OPTIONAL
+    description: Agent creation succeeds with and without referenceImageUrl. Photo absence does not block creation.
+    expected_ok: true
+    reason_code: null
+    source_rule: MY-ACC-002
+  - id: MY-021-PHOTO-PRIVATE-BY-DEFAULT
+    description: After creation, referenceImageUrl is not visible to other users without mutual authorization.
+    expected_ok: true
+    reason_code: null
+    source_rule: MY-ACC-002
+  - id: MY-022-PHOTO-MUTUAL-UNLOCK
+    description: When both users authorize, each can see the other's referenceImageUrl.
+    expected_ok: true
+    reason_code: null
+    source_rule: MY-ACC-002
+  - id: MY-023-PHOTO-UNILATERAL-REVOKE
+    description: Either user revoking access immediately hides their photo from the other party.
+    expected_ok: true
+    reason_code: null
+    source_rule: MY-ACC-002
+  - id: MY-024-PHOTO-REQUEST-NO-PHOTO
+    description: Requesting photo reveal from a user without uploaded photo returns non-blocking status.
+    expected_ok: true
+    reason_code: MINTYOU_PHOTO_NO_PHOTO
+    source_rule: MY-ACC-002
+  - id: MY-025-PHOTO-DECLINE-COOLDOWN
+    description: After decline, requester cannot re-request until cooldown (24h) expires.
+    expected_ok: false
+    reason_code: MINTYOU_PHOTO_COOLDOWN_ACTIVE
+    source_rule: MY-ACC-002
+
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:mint-you-kernel-docs
     source_rule: MY-ACC-003

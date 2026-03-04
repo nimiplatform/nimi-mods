@@ -9,7 +9,7 @@ execution_chain:
   - step: basic-info
     order: 1
     type: user-input
-    description: Collect display name, gender, age range, relationship intent.
+    description: Collect display name, gender, age range, social intent.
     source_rule: MY-PIPE-001
   - step: interest-tags
     order: 2
@@ -24,30 +24,47 @@ execution_chain:
   - step: trait-extract
     order: 4
     type: deterministic
-    description: Aggregate weighted scores from scenario choices. Resolve dnaPrimary and dnaSecondary.
+    description: Aggregate weighted scores from scenario choices. Resolve dnaPrimary, dnaSecondary, relationshipMode, formality, sentiment.
     precondition: all scenario choices completed
     source_rule: MY-PIPE-002
   - step: dna-synthesize
     order: 5
     type: llm
-    description: Generate natural-language summaries and Identity Card fields from structured scores.
+    description: Generate all llm-synthesis fields per field-provenance.yaml (summaries, Identity Card, concept, mbti). Handle is auto-generated separately.
     precondition: trait extraction output available
     source_rule: MY-PIPE-002
   - step: preview-card
     order: 6
     type: user-review
-    description: Display persona card for user review. User may modify traits.
+    description: Display persona card for user review. User may modify traits and optionally upload photo.
     source_rule: MY-PIPE-002
   - step: user-confirm
     order: 7
     type: user-input
-    description: User explicitly approves persona card. Confirmation is mandatory gate.
-    precondition: persona card previewed
+    description: User explicitly approves persona card and selects target world. Confirmation is mandatory gate.
+    precondition: persona card previewed + worldId selected
     source_rule: MY-PIPE-002
   - step: agent-create
     order: 8
     type: api-call
-    description: Assemble CreateAgentDto and call creator.agents.create API.
-    precondition: user confirmed + worldId resolved
+    description: Assemble CreateAgentDto with pre-built dna and call creator.agents.create API.
+    precondition: user confirmed + worldId resolved + agent limit not reached
     source_rule: MY-PIPE-005
+photo_actions:
+  - action: photo-upload
+    type: user-input
+    description: User uploads photo. Stored as referenceImageUrl on agent profile. Available during preview-card step or post-creation.
+    source_rule: MY-PIPE-006
+  - action: photo-request
+    type: user-input
+    description: User A requests to see User B's photo. Creates REQUESTED state in authorization store.
+    source_rule: MY-PHOTO-003
+  - action: photo-respond
+    type: user-input
+    description: User B accepts or declines photo request. Acceptance checks if reverse authorization also exists for mutual unlock.
+    source_rule: MY-PHOTO-003
+  - action: photo-revoke
+    type: user-input
+    description: Either user revokes their photo authorization. Immediate effect.
+    source_rule: MY-PHOTO-005
 ```

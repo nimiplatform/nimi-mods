@@ -32,52 +32,81 @@ primary_archetypes:
     source_rule: MY-PROF-001
 secondary_traits:
   - key: HUMOROUS
+    label: 幽默
     source_rule: MY-PROF-002
   - key: SARCASTIC
+    label: 毒舌
     source_rule: MY-PROF-002
   - key: GENTLE
+    label: 温柔
     source_rule: MY-PROF-002
   - key: DIRECT
+    label: 直接
     source_rule: MY-PROF-002
   - key: OPTIMISTIC
+    label: 乐观
     source_rule: MY-PROF-002
   - key: REALISTIC
+    label: 现实
     source_rule: MY-PROF-002
   - key: DRAMATIC
+    label: 戏剧化
     source_rule: MY-PROF-002
   - key: PASSIONATE
+    label: 热情
     source_rule: MY-PROF-002
   - key: REBELLIOUS
+    label: 叛逆
     source_rule: MY-PROF-002
   - key: INNOCENT
+    label: 纯真
     source_rule: MY-PROF-002
   - key: WISE
+    label: 睿智
     source_rule: MY-PROF-002
   - key: ECCENTRIC
+    label: 古怪
     source_rule: MY-PROF-002
+relationship_modes:
+  - key: SECURE
+    label: 安全型
+    description: Values stability, open communication, and mutual trust.
+    source_rule: MY-PROF-001
+  - key: PASSIONATE
+    label: 热烈型
+    description: Values intensity, emotional depth, and spontaneous connection.
+    source_rule: MY-PROF-001
+  - key: INDEPENDENT
+    label: 独立型
+    description: Values autonomy, personal space, and selective engagement.
+    source_rule: MY-PROF-001
 resolvable_trait_groups:
   - group: dnaPrimary
-    target_field: CreateAgentDto.dnaPrimary
+    target_field: CreateAgentDto.dnaPrimary (DnaPrimaryType enum, top-level)
     resolution: highest aggregated score across primary archetypes
+    tie_breaker: scenario presentation order (earlier wins)
     min_scenarios: 2
     source_rule: MY-INT-004
   - group: relationshipMode
-    target_field: CreateAgentDto.dna.personality.relationshipMode
-    resolution: LLM synthesis from scenario scores
+    target_field: AgentDna.personality.relationshipMode
+    resolution: highest aggregated score among SECURE/PASSIONATE/INDEPENDENT
+    tie_breaker: scenario presentation order (earlier wins)
     min_scenarios: 2
     source_rule: MY-INT-004
   - group: communicationFormality
-    target_field: CreateAgentDto.dna.communication.formality
+    target_field: AgentDna.communication.formality
     resolution: highest score among casual/formal/slang
+    tie_breaker: defaults to casual
     min_scenarios: 2
     source_rule: MY-INT-004
   - group: communicationSentiment
-    target_field: CreateAgentDto.dna.communication.sentiment
+    target_field: AgentDna.communication.sentiment
     resolution: highest score among positive/neutral/cynical
+    tie_breaker: defaults to neutral
     min_scenarios: 2
     source_rule: MY-INT-004
   - group: dnaSecondary
-    target_field: CreateAgentDto.dnaSecondary
+    target_field: CreateAgentDto.dnaSecondary (DnaSecondaryTrait[] enum, top-level, max 3)
     resolution: top 2-3 secondary traits by score
     min_scenarios: 2
     source_rule: MY-INT-004

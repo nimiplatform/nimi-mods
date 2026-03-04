@@ -1,0 +1,12 @@
+{
+  "name": "@nimiplatform/mod-mint-you",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node ../scripts/build-mod.mjs --mod mint-you",
+    "watch": "node ../scripts/build-mod.mjs --mod mint-you --watch",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "clean": "rm -rf dist"
+  }
+}
