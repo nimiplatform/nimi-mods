@@ -67,12 +67,14 @@ function createProvider(callerId: string) {
       callerKind: 'desktop-core',
       callerId,
     },
+    subjectContext: {
+      subjectUserId: SUBJECT_USER_ID,
+    },
   });
 
   return createNimiAiProvider({
     runtime,
     appId: APP_ID,
-    subjectUserId: SUBJECT_USER_ID,
     routePolicy: 'token-api',
     fallback: 'deny',
     timeoutMs: 300_000,

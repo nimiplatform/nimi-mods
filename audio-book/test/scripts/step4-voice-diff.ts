@@ -79,6 +79,9 @@ function createRuntime(): Runtime {
     appId: APP_ID,
     transport: { type: 'node-grpc', endpoint: RUNTIME_ENDPOINT },
     defaults: { callerKind: 'desktop-core', callerId: 'voice-diff-test' },
+    subjectContext: {
+      subjectUserId: SUBJECT_USER_ID,
+    },
   });
 }
 
@@ -97,7 +100,6 @@ async function synthesizeOne(
     speed: 1.0,
     pitch: 0,
     emotion: '',
-    subjectUserId: SUBJECT_USER_ID,
     route: 'token-api',
     fallback: 'deny',
     timeoutMs: 60_000,

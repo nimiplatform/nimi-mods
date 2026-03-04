@@ -94,12 +94,14 @@ function createRuntimeLlmClient(endpoint: string, modelId: string): LlmClient {
       callerKind: 'desktop-core',
       callerId: 'audio-book-step3',
     },
+    subjectContext: {
+      subjectUserId: SUBJECT_USER_ID,
+    },
   });
 
   const provider = createNimiAiProvider({
     runtime,
     appId: APP_ID,
-    subjectUserId: SUBJECT_USER_ID,
     routePolicy: 'token-api',
     fallback: 'deny',
     timeoutMs: 300_000,

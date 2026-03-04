@@ -107,6 +107,9 @@ function createRuntimeTtsClient(endpoint: string, modelId: string): TtsClient {
       callerKind: 'desktop-core',
       callerId: 'audio-book-step4',
     },
+    subjectContext: {
+      subjectUserId: SUBJECT_USER_ID,
+    },
   });
 
   const metadata = buildMetadata();
@@ -115,7 +118,6 @@ function createRuntimeTtsClient(endpoint: string, modelId: string): TtsClient {
     async listVoices() {
       const result = await runtime.media.tts.listVoices({
         model: modelId,
-        subjectUserId: SUBJECT_USER_ID,
         route: 'token-api',
         fallback: 'deny',
         metadata,
@@ -140,7 +142,6 @@ function createRuntimeTtsClient(endpoint: string, modelId: string): TtsClient {
         speed: input.speakingRate ?? 1.0,
         pitch: input.pitch ?? 0,
         emotion: input.emotion ?? '',
-        subjectUserId: SUBJECT_USER_ID,
         route: 'token-api',
         fallback: 'deny',
         timeoutMs: 60_000,
