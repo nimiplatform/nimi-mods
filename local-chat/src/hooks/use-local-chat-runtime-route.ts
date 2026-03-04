@@ -14,24 +14,36 @@ import { buildRouteOverrideForConnector, buildRouteOverrideForModel, buildRouteO
 import { loadRouteOptions, resolveRouteSnapshot, runRouteHealthCheck } from './runtime-route/queries.js';
 import type { ChatRouteSnapshot, UseLocalChatRuntimeRouteInput } from './runtime-route/types.js';
 
+type RouteCapability = 'chat' | 'tts' | 'stt';
+
 export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
   const [healthStatus, setHealthStatus] = useState<HealthStatus>('idle');
   const [checkingHealth, setCheckingHealth] = useState(false);
   const [routeSnapshot, setRouteSnapshot] = useState<ChatRouteSnapshot | null>(null);
   const [chatRouteOptions, setChatRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
+  const [ttsRouteOptions, setTtsRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
+  const [sttRouteOptions, setSttRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
   const [routeOverride, setRouteOverride] = useState<RuntimeRouteBinding | null>(() => loadLocalChatRouteOverride());
-  const routeOptionsLoadInFlightRef = useRef<Promise<RuntimeRouteOptionsSnapshot | null> | null>(null);
+  const routeOptionsLoadInFlightRef = useRef<Partial<Record<RouteCapability, Promise<RuntimeRouteOptionsSnapshot | null>>>>({});
 
-  const setChatRouteOptionsSafely = useCallback((next: RuntimeRouteOptionsSnapshot | null) => {
-    setChatRouteOptions((previous) => {
-      if (!next) {
-        return previous;
-      }
-      if (next.connectors.length === 0 && (previous?.connectors.length || 0) > 0) {
-        return previous;
-      }
-      return next;
-    });
+  const setRouteOptionsSafely = useCallback((capability: RouteCapability, next: RuntimeRouteOptionsSnapshot | null) => {
+    if (capability === 'chat') {
+      setChatRouteOptions((previous) => {
+        if (!next) {
+          return previous;
+        }
+        if (next.connectors.length === 0 && (previous?.connectors.length || 0) > 0) {
+          return previous;
+        }
+        return next;
+      });
+      return;
+    }
+    if (capability === 'tts') {
+      setTtsRouteOptions(next);
+      return;
+    }
+    setSttRouteOptions(next);
   }, []);
 
   const refreshRouteSnapshot = useCallback(async () => {
@@ -43,12 +55,12 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
     });
   }, [input.aiClient, input.setStatusBanner, routeOverride]);
 
-  const loadChatRuntimeRouteOptions = useCallback(async () => {
-    const inFlight = routeOptionsLoadInFlightRef.current;
+  const loadRuntimeRouteOptions = useCallback(async (capability: RouteCapability) => {
+    const inFlight = routeOptionsLoadInFlightRef.current[capability];
     if (inFlight) {
       emitLocalChatLog({
         level: 'debug',
-        message: 'action:local-chat:route-options:load:reuse-inflight',
+        message: `action:local-chat:route-options:${capability}:load:reuse-inflight`,
         source: 'useLocalChatRuntimeRoute',
       });
       return inFlight;
@@ -56,18 +68,20 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
     const task = (async () => {
       emitLocalChatLog({
         level: 'debug',
-        message: 'action:local-chat:route-options:load:start',
+        message: `action:local-chat:route-options:${capability}:load:start`,
         source: 'useLocalChatRuntimeRoute',
       });
       const loaded = await loadRouteOptions({
+        capability,
         hookClient: input.hookClient,
-        setChatRouteOptions: setChatRouteOptionsSafely,
+        setRouteOptions: (value) => setRouteOptionsSafely(capability, value),
       });
       emitLocalChatLog({
         level: 'debug',
-        message: 'action:local-chat:route-options:load:done',
+        message: `action:local-chat:route-options:${capability}:load:done`,
         source: 'useLocalChatRuntimeRoute',
         details: {
+          capability,
           loaded: Boolean(loaded),
           connectorsCount: loaded?.connectors.length ?? 0,
           selectedSource: loaded?.selected.source ?? null,
@@ -76,14 +90,36 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
       });
       return loaded;
     })();
-    routeOptionsLoadInFlightRef.current = task;
+    routeOptionsLoadInFlightRef.current[capability] = task;
     void task.finally(() => {
-      if (routeOptionsLoadInFlightRef.current === task) {
-        routeOptionsLoadInFlightRef.current = null;
+      if (routeOptionsLoadInFlightRef.current[capability] === task) {
+        delete routeOptionsLoadInFlightRef.current[capability];
       }
     });
     return task;
-  }, [input.hookClient, setChatRouteOptionsSafely]);
+  }, [input.hookClient, setRouteOptionsSafely]);
+
+  const loadChatRuntimeRouteOptions = useCallback(
+    () => loadRuntimeRouteOptions('chat'),
+    [loadRuntimeRouteOptions],
+  );
+  const loadTtsRuntimeRouteOptions = useCallback(
+    () => loadRuntimeRouteOptions('tts'),
+    [loadRuntimeRouteOptions],
+  );
+  const loadSttRuntimeRouteOptions = useCallback(
+    () => loadRuntimeRouteOptions('stt'),
+    [loadRuntimeRouteOptions],
+  );
+
+  const loadAllRuntimeRouteOptions = useCallback(async () => {
+    const [chat, tts, stt] = await Promise.all([
+      loadChatRuntimeRouteOptions(),
+      loadTtsRuntimeRouteOptions(),
+      loadSttRuntimeRouteOptions(),
+    ]);
+    return { chat, tts, stt };
+  }, [loadChatRuntimeRouteOptions, loadTtsRuntimeRouteOptions, loadSttRuntimeRouteOptions]);
 
   const handleHealthCheck = useCallback(async () => {
     await runRouteHealthCheck({
@@ -234,7 +270,8 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
         }
         let loaded: RuntimeRouteOptionsSnapshot | null = null;
         try {
-          loaded = await loadChatRuntimeRouteOptions();
+          const loadedSnapshot = await loadAllRuntimeRouteOptions();
+          loaded = loadedSnapshot.chat || loadedSnapshot.tts || loadedSnapshot.stt || null;
         } catch {
           loaded = null;
         }
@@ -247,26 +284,45 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
     return () => {
       cancelled = true;
     };
-  }, [loadChatRuntimeRouteOptions]);
+  }, [loadAllRuntimeRouteOptions]);
 
   useEffect(() => {
-    const connectorCount = chatRouteOptions?.connectors.length || 0;
+    const connectorCount = Math.max(
+      chatRouteOptions?.connectors.length || 0,
+      ttsRouteOptions?.connectors.length || 0,
+      sttRouteOptions?.connectors.length || 0,
+    );
     const pollIntervalMs = connectorCount > 0 ? 10_000 : 30_000;
     const timer = setInterval(() => {
-      void loadChatRuntimeRouteOptions();
+      void loadAllRuntimeRouteOptions();
     }, pollIntervalMs);
     return () => {
       clearInterval(timer);
     };
-  }, [chatRouteOptions?.connectors.length, loadChatRuntimeRouteOptions]);
+  }, [
+    chatRouteOptions?.connectors.length,
+    ttsRouteOptions?.connectors.length,
+    sttRouteOptions?.connectors.length,
+    loadAllRuntimeRouteOptions,
+  ]);
 
   return {
     healthStatus,
     checkingHealth,
     routeSnapshot,
     chatRouteOptions,
+    ttsRouteOptions,
+    sttRouteOptions,
+    routeOptionsByCapability: {
+      chat: chatRouteOptions,
+      tts: ttsRouteOptions,
+      stt: sttRouteOptions,
+    },
     routeOverride,
     loadChatRuntimeRouteOptions,
+    loadTtsRuntimeRouteOptions,
+    loadSttRuntimeRouteOptions,
+    loadAllRuntimeRouteOptions,
     refreshRouteSnapshot,
     handleHealthCheck,
     handleRouteSourceChange,

@@ -6,6 +6,7 @@ import { emitLocalChatLog } from '../../logging.js';
 import type { ChatRouteSnapshot, UseLocalChatRuntimeRouteInput } from './types.js';
 
 const ROUTE_OPTIONS_QUERY_TIMEOUT_MS = 6000;
+type RouteCapability = 'chat' | 'tts' | 'stt';
 
 function safeLogRendererEvent(payload: Parameters<typeof logRendererEvent>[0]): void {
   emitLocalChatLog({
@@ -101,14 +102,15 @@ export async function resolveRouteSnapshot(input: {
 }
 
 export async function loadRouteOptions(input: {
+  capability: RouteCapability;
   hookClient: UseLocalChatRuntimeRouteInput['hookClient'];
-  setChatRouteOptions: (value: ReturnType<typeof parseRuntimeRouteOptions>) => void;
+  setRouteOptions: (value: ReturnType<typeof parseRuntimeRouteOptions>) => void;
 }): Promise<ReturnType<typeof parseRuntimeRouteOptions>> {
   try {
     safeLogRendererEvent({
       level: 'debug',
       area: 'local-chat',
-      message: 'local-chat:chat-route-options:query:start',
+      message: `local-chat:${input.capability}-route-options:query:start`,
       details: {
         timeoutMs: ROUTE_OPTIONS_QUERY_TIMEOUT_MS,
       },
@@ -118,7 +120,7 @@ export async function loadRouteOptions(input: {
       input.hookClient.data.query({
         capability: LOCAL_CHAT_DATA_API_RUNTIME_ROUTE_OPTIONS,
         query: {
-          capability: 'chat',
+          capability: input.capability,
           modId: LOCAL_CHAT_MOD_ID,
         },
       }),
@@ -138,7 +140,7 @@ export async function loadRouteOptions(input: {
       safeLogRendererEvent({
         level: 'warn',
         area: 'local-chat',
-        message: 'local-chat:chat-route-options:parsed-null',
+        message: `local-chat:${input.capability}-route-options:parsed-null`,
         details: {
           payloadKeys: Object.keys(record),
           hasSelected: typeof record.selected === 'object' && record.selected !== null,
@@ -146,14 +148,14 @@ export async function loadRouteOptions(input: {
           connectorsCount: Array.isArray(record.connectors) ? record.connectors.length : -1,
         },
       });
-      input.setChatRouteOptions(null);
+      input.setRouteOptions(null);
       return null;
     }
     const resolved = normalizeRouteOptionsSnapshot(parsed);
     safeLogRendererEvent({
       level: 'debug',
       area: 'local-chat',
-      message: 'local-chat:chat-route-options:loaded',
+      message: `local-chat:${input.capability}-route-options:loaded`,
       details: {
         selectedSource: resolved?.selected.source || null,
         selectedConnectorId: resolved?.selected.connectorId || null,
@@ -162,14 +164,14 @@ export async function loadRouteOptions(input: {
         connectorIds: resolved?.connectors.map((item) => item.id) || [],
       },
     });
-    input.setChatRouteOptions(resolved);
+    input.setRouteOptions(resolved);
     return resolved;
   } catch (error) {
-    input.setChatRouteOptions(null);
+    input.setRouteOptions(null);
     safeLogRendererEvent({
       level: 'warn',
       area: 'local-chat',
-      message: 'local-chat:chat-route-options:failed',
+      message: `local-chat:${input.capability}-route-options:failed`,
       details: {
         error: error instanceof Error ? error.message : String(error || ''),
       },

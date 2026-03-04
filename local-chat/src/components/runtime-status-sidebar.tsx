@@ -247,7 +247,8 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
           sttRouteSource={sttRouteSource}
           sttConnectorId={props.sttConnectorId}
           sttModel={props.sttModel}
-          connectors={props.connectors}
+          ttsConnectors={props.ttsConnectors}
+          sttConnectors={props.sttConnectors}
           localTtsRouteAvailable={localTtsRouteAvailable}
           localSttRouteAvailable={localSttRouteAvailable}
           speechProviders={speechProviders}

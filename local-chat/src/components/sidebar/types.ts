@@ -45,7 +45,8 @@ export type RuntimeStatusSidebarProps = {
   ttsModel: string;
   sttConnectorId: string;
   sttModel: string;
-  connectors: Array<{ id: string; label: string; models: string[]; modelCapabilities?: Record<string, string[]> }>;
+  ttsConnectors: Array<{ id: string; label: string; models: string[]; modelCapabilities?: Record<string, string[]> }>;
+  sttConnectors: Array<{ id: string; label: string; models: string[]; modelCapabilities?: Record<string, string[]> }>;
   onTtsRouteSourceChange: (source: 'auto' | 'local-runtime' | 'token-api') => void;
   onTtsConnectorChange: (connectorId: string) => void;
   onTtsModelChange: (model: string) => void;

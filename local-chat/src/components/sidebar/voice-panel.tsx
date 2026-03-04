@@ -16,7 +16,8 @@ type Props = {
   sttRouteSource: 'auto' | 'local-runtime' | 'token-api';
   sttConnectorId: string;
   sttModel: string;
-  connectors: Array<{ id: string; label: string; models: string[]; modelCapabilities?: Record<string, string[]> }>;
+  ttsConnectors: Array<{ id: string; label: string; models: string[]; modelCapabilities?: Record<string, string[]> }>;
+  sttConnectors: Array<{ id: string; label: string; models: string[]; modelCapabilities?: Record<string, string[]> }>;
   localTtsRouteAvailable: boolean;
   localSttRouteAvailable: boolean;
   speechProviders: Array<{ id: string; name: string; status: 'available' | 'unavailable' }>;
@@ -49,7 +50,8 @@ export function VoicePanel(props: Props) {
     sttRouteSource,
     sttConnectorId,
     sttModel,
-    connectors,
+    ttsConnectors,
+    sttConnectors,
     localTtsRouteAvailable,
     localSttRouteAvailable,
     speechProviders,
@@ -69,25 +71,25 @@ export function VoicePanel(props: Props) {
 
   const ttsConnectorModels = useMemo(() => {
     if (!ttsConnectorId) return [];
-    const connector = connectors.find((c) => c.id === ttsConnectorId);
+    const connector = ttsConnectors.find((c) => c.id === ttsConnectorId);
     if (!connector) return [];
     return resolveModelsForScenario({
       models: connector.models || [],
       modelCapabilities: connector.modelCapabilities,
       scenario: 'tts',
     });
-  }, [connectors, ttsConnectorId]);
+  }, [ttsConnectors, ttsConnectorId]);
 
   const sttConnectorModels = useMemo(() => {
     if (!sttConnectorId) return [];
-    const connector = connectors.find((c) => c.id === sttConnectorId);
+    const connector = sttConnectors.find((c) => c.id === sttConnectorId);
     if (!connector) return [];
     return resolveModelsForScenario({
       models: connector.models || [],
       modelCapabilities: connector.modelCapabilities,
       scenario: 'stt',
     });
-  }, [connectors, sttConnectorId]);
+  }, [sttConnectors, sttConnectorId]);
 
   const filteredTtsModels = useMemo(
     () => filterModelOptions(ttsConnectorModels, ttsModelQuery),
@@ -148,7 +150,7 @@ export function VoicePanel(props: Props) {
                     className={selectClassName}
                   >
                     <option value="">{t('VoicePanel.auto')}</option>
-                    {connectors.map((connector) => (
+                    {ttsConnectors.map((connector) => (
                       <option key={`tts-connector-${connector.id}`} value={connector.id}>
                         {connector.label || connector.id}
                       </option>
@@ -219,7 +221,7 @@ export function VoicePanel(props: Props) {
                     className={selectClassName}
                   >
                     <option value="">{t('VoicePanel.auto')}</option>
-                    {connectors.map((connector) => (
+                    {sttConnectors.map((connector) => (
                       <option key={`stt-connector-${connector.id}`} value={connector.id}>
                         {connector.label || connector.id}
                       </option>

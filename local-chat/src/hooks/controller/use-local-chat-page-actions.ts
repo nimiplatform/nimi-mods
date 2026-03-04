@@ -5,6 +5,7 @@ import type { ChatMessage } from '../../types.js';
 import type { useLocalChatPageState } from './use-local-chat-page-state.js';
 import type { RuntimeStatusSidebarProps } from '../../components/sidebar/types.js';
 import { ReasonCode } from '@nimiplatform/sdk/types';
+import { resolveModelsForScenario } from '../../services/route/connector-model-capabilities.js';
 
 type LocalChatPageState = ReturnType<typeof useLocalChatPageState>;
 
@@ -97,12 +98,14 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         ? resolvedDefaultSource
         : 'unknown';
 
-      const localRuntimeModels = state.runtimeRouteState.chatRouteOptions?.localRuntime.models || [];
-      const localTtsRouteAvailable = localRuntimeModels.some((model) => {
+      const localChatRuntimeModels = state.runtimeRouteState.chatRouteOptions?.localRuntime.models || [];
+      const localTtsRuntimeModels = state.runtimeRouteState.ttsRouteOptions?.localRuntime.models || localChatRuntimeModels;
+      const localSttRuntimeModels = state.runtimeRouteState.sttRouteOptions?.localRuntime.models || localChatRuntimeModels;
+      const localTtsRouteAvailable = localTtsRuntimeModels.some((model) => {
         const capabilities = Array.isArray(model.capabilities) ? model.capabilities : [];
         return capabilities.includes('tts');
       });
-      const localSttRouteAvailable = localRuntimeModels.some((model) => {
+      const localSttRouteAvailable = localSttRuntimeModels.some((model) => {
         const capabilities = Array.isArray(model.capabilities) ? model.capabilities : [];
         return capabilities.includes('stt');
       });
@@ -115,7 +118,7 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         }
         const selected = state.runtimeRouteState.routeOverride || state.runtimeRouteState.chatRouteOptions?.selected || null;
         if (!selected || selected.source !== 'local-runtime') return true;
-        const localModel = localRuntimeModels.find((model) => {
+        const localModel = localChatRuntimeModels.find((model) => {
           const byId = String(model.localModelId || '').trim() === String(selected.localModelId || '').trim();
           const byModel = String(model.model || '').trim() === String(selected.model || '').trim();
           return byId || byModel;
@@ -134,9 +137,21 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
           if (capability === 'chat') return chatCapabilityMatched;
           if (capability === 'tts') {
             if (state.speechSettingsState.defaultSettings.ttsRouteSource === 'token-api') return true;
+            if (
+              state.speechSettingsState.defaultSettings.ttsRouteSource === 'auto'
+              && state.runtimeRouteState.ttsRouteOptions?.selected?.source === 'token-api'
+            ) {
+              return true;
+            }
             return localTtsRouteAvailable;
           }
           if (state.speechSettingsState.defaultSettings.sttRouteSource === 'token-api') return true;
+          if (
+            state.speechSettingsState.defaultSettings.sttRouteSource === 'auto'
+            && state.runtimeRouteState.sttRouteOptions?.selected?.source === 'token-api'
+          ) {
+            return true;
+          }
           return localSttRouteAvailable;
         }
         return rows.some((item) => item.selected);
@@ -237,11 +252,31 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         onClearRouteOverride: state.runtimeRouteState.clearRouteOverride,
         onSpeechProviderChange: handleSpeechProviderChange,
         onVoiceIdChange: handleVoiceIdChange,
-        ttsConnectorId: state.speechSettingsState.defaultSettings.ttsConnectorId,
-        ttsModel: state.speechSettingsState.defaultSettings.ttsModel,
+        ttsConnectorId: state.effectiveTtsConnectorId,
+        ttsModel: state.effectiveTtsModel,
         sttConnectorId: state.speechSettingsState.defaultSettings.sttConnectorId,
         sttModel: state.speechSettingsState.defaultSettings.sttModel,
-        connectors: (state.runtimeRouteState.chatRouteOptions?.connectors || []).map((c) => ({
+        ttsConnectors: (state.runtimeRouteState.ttsRouteOptions?.connectors || []).filter((c) => {
+          const models = resolveModelsForScenario({
+            models: c.models || [],
+            modelCapabilities: c.modelCapabilities,
+            scenario: 'tts',
+          });
+          return models.length > 0;
+        }).map((c) => ({
+          id: c.id,
+          label: c.label || c.id,
+          models: c.models || [],
+          modelCapabilities: c.modelCapabilities,
+        })),
+        sttConnectors: (state.runtimeRouteState.sttRouteOptions?.connectors || []).filter((c) => {
+          const models = resolveModelsForScenario({
+            models: c.models || [],
+            modelCapabilities: c.modelCapabilities,
+            scenario: 'stt',
+          });
+          return models.length > 0;
+        }).map((c) => ({
           id: c.id,
           label: c.label || c.id,
           models: c.models || [],

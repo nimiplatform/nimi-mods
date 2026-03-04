@@ -1,25 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { HookClient } from '@nimiplatform/sdk/mod/types';
 import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import type { ChatMessage } from '../types.js';
 import type { LocalChatTarget } from '../data/index.js';
-import { buildAgentVoiceStylePrompt } from '../services/voice/agent-voice-style.js';
 
 const TTS_PLAYBACK_ERROR_CODE = 'LOCAL_CHAT_TTS_PLAYBACK_FAILED';
 
 export function useSpeechPlayback(input: {
-  hookClient: HookClient;
   enableVoice: boolean;
   defaultVoiceName: string;
   defaultVoiceId: string;
-  defaultAudioFormat: 'mp3' | 'wav' | 'opus' | 'pcm';
   ttsRouteSource: 'auto' | 'local-runtime' | 'token-api';
-  ttsConnectorId: string;
-  ttsModel: string;
   selectedSpeechProviderId: string;
   selectedTargetId: string;
   selectedTarget: LocalChatTarget | null;
-  selectedSessionId: string;
+  synthesizeVoice: (text: string) => Promise<{ audioUri: string }>;
   setStatusBanner: (payload: { kind: 'warn' | 'error' | 'info' | 'success'; message: string }) => void;
 }) {
   const [playingVoiceMessageId, setPlayingVoiceMessageId] = useState<string | null>(null);
@@ -113,23 +107,7 @@ export function useSpeechPlayback(input: {
         objectUrl = cachedAudioUri;
       } else {
         // Fallback to on-demand synthesis (old messages / pre-synthesis failed / URL expired)
-        const voiceStyle = buildAgentVoiceStylePrompt({
-          target: input.selectedTarget,
-          messageText: text,
-        });
-        const response = await input.hookClient.llm.speech.synthesize({
-          text,
-          providerId: input.selectedSpeechProviderId || undefined,
-          routeSource: input.ttsRouteSource,
-          connectorId: input.ttsConnectorId || undefined,
-          model: input.ttsModel || undefined,
-          voiceId: input.defaultVoiceName || input.defaultVoiceId,
-          format: input.defaultAudioFormat,
-          language: voiceStyle.language,
-          stylePrompt: voiceStyle.stylePrompt,
-          targetId: input.selectedTargetId,
-          sessionId: input.selectedSessionId || undefined,
-        });
+        const response = await input.synthesizeVoice(text);
         if (voicePlaybackTokenRef.current !== playbackToken) {
           return;
         }
@@ -210,15 +188,11 @@ export function useSpeechPlayback(input: {
     }
   }, [
     clearVoiceAudio,
-    input.defaultAudioFormat,
     input.defaultVoiceId,
     input.defaultVoiceName,
     input.enableVoice,
-    input.hookClient.llm.speech,
-    input.ttsConnectorId,
-    input.ttsModel,
+    input.synthesizeVoice,
     input.ttsRouteSource,
-    input.selectedSessionId,
     input.selectedSpeechProviderId,
     input.selectedTarget,
     input.selectedTargetId,

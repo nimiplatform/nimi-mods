@@ -19,7 +19,7 @@ export function useLocalChatPageController(): LocalChatShellProps {
     onRefresh: () => {
       void state.targetsState.loadTargets();
       void state.runtimeRouteState.refreshRouteSnapshot();
-      void state.runtimeRouteState.loadChatRuntimeRouteOptions();
+      void state.runtimeRouteState.loadAllRuntimeRouteOptions();
       void state.speechSettingsState.loadSpeechCatalog();
     },
     selectedTarget: state.targetsState.selectedTarget,
