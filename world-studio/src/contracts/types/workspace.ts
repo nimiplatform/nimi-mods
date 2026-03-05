@@ -15,7 +15,7 @@ import type {
 
 export type WorldStudioLandingMode = 'NO_ACCESS' | 'CREATE' | 'MAINTAIN';
 export type WorldStudioViewMode = WorldStudioLandingMode;
-export type WorldStudioDraftStatus = 'DRAFT' | 'READY' | 'PUBLISHED' | 'ARCHIVED';
+export type WorldStudioDraftStatus = 'DRAFT' | 'SYNTHESIZE' | 'REVIEW' | 'PUBLISH' | 'FAILED';
 export type WorldStudioGenerationCheckpoint = 'SOURCE_PARSED' | 'STRUCTURED' | 'REVIEWED';
 export type WorldStudioCreateStep =
   | 'SOURCE'

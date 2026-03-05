@@ -16,7 +16,7 @@ type SaveDraftInput = {
   draftId?: string;
   sourceType: 'TEXT' | 'FILE';
   sourceRef: string;
-  status: 'DRAFT' | 'READY' | 'ARCHIVED';
+  status: 'DRAFT' | 'SYNTHESIZE' | 'REVIEW' | 'PUBLISH' | 'FAILED';
   pipelineState: Record<string, unknown>;
   draftPayload: Record<string, unknown>;
   targetWorldId?: string;

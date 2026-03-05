@@ -10,7 +10,7 @@ export type LandingState = {
 export type WorldDraftSummary = {
   id: string;
   targetWorldId: string | null;
-  status: 'DRAFT' | 'READY' | 'PUBLISHED' | 'ARCHIVED';
+  status: 'DRAFT' | 'SYNTHESIZE' | 'REVIEW' | 'PUBLISH' | 'FAILED';
   sourceType: 'TEXT' | 'FILE';
   sourceRef: string | null;
   updatedAt: string;

@@ -158,7 +158,7 @@ export async function saveWorldDraft(
       draftId: input.selectedDraftId || undefined,
       sourceType: input.sourceMode === 'FILE' ? 'FILE' : 'TEXT',
       sourceRef: input.snapshot.sourceRef || 'inline:text',
-      status: 'READY',
+      status: 'REVIEW',
       pipelineState,
       draftPayload,
       targetWorldId: input.selectedWorldId || undefined,
