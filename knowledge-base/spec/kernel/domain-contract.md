@@ -11,8 +11,8 @@
 
 - 每个文档具有唯一 ULID 标识。
 - `sourceKind` 区分三种导入来源：`file`（文件上传）、`paste`（文本粘贴）、`url`（URL 抓取）。
-- `status` 遵循 `tables/document-states.yaml` 定义的状态机。
-- `errorReason` 仅在 `error` 状态时有值，取值遵循 `tables/error-codes.yaml`。
+- `status` 遵循 `tables/pipeline-states.yaml` 定义的状态机。
+- `errorReason` 仅在 `error` 状态时有值，取值遵循 `tables/reason-codes.yaml`。
 - 删除文档时级联清理所有关联 KBChunk 和 KBVector 记录。
 - 当前支持的 MIME 类型：`text/plain`、`text/markdown`、`text/csv`、`application/json`、`text/html`。
 

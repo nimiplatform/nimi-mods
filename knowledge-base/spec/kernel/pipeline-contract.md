@@ -1,7 +1,7 @@
 # Knowledge Base Pipeline Contract
 
 > Owner Domain: `KB-PIPE-*`
-> Authoritative source: `tables/document-states.yaml`, `tables/error-codes.yaml`
+> Authoritative source: `tables/pipeline-states.yaml`, `tables/reason-codes.yaml`
 
 ---
 
@@ -17,8 +17,8 @@
 | 3 | embedding | 分块成功 | KBVector[] |
 | 4 | ready | 全部向量化完成 | 可检索文档 |
 
-- 状态机遵循 `tables/document-states.yaml` 定义的转换规则。
-- 任一阶段失败转入 `error` 状态，记录 `errorReason`（参考 `tables/error-codes.yaml`）。
+- 状态机遵循 `tables/pipeline-states.yaml` 定义的转换规则。
+- 任一阶段失败转入 `error` 状态，记录 `errorReason`（参考 `tables/reason-codes.yaml`）。
 - 用户可从 `error` 触发重试，当前实现为重新导入。
 
 ## KB-PIPE-002 — 格式解析

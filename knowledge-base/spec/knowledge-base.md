@@ -49,13 +49,23 @@ knowledge-base/
 └── package.json
 ```
 
+## Normative Imports
+
+- Capability boundary: `kernel/capability-contract.md` (`KB-CAP-*`)
+- Core entities: `kernel/domain-contract.md` (`KB-DOM-*`)
+- Document pipeline: `kernel/pipeline-contract.md` (`KB-PIPE-*`)
+- RAG pipeline: `kernel/rag-contract.md` (`KB-RAG-*`)
+- Error semantics: `kernel/error-model.md` (`KB-ERR-*`)
+- Acceptance gates: `kernel/acceptance-contract.md` (`KB-ACC-*`)
+
 ## Kernel Reading Paths
 
 - **实体定义**：`kernel/domain-contract.md`（KB-DOM-001~007）+ `kernel/tables/entities.yaml`
-- **文档处理**：`kernel/pipeline-contract.md`（KB-PIPE-001~005）+ `kernel/tables/document-states.yaml`
+- **文档处理**：`kernel/pipeline-contract.md`（KB-PIPE-001~005）+ `kernel/tables/pipeline-states.yaml`
 - **RAG 管线**：`kernel/rag-contract.md`（KB-RAG-001~005）
 - **能力与集成**：`kernel/capability-contract.md`（KB-CAP-001~008）+ `kernel/tables/capabilities.yaml`
-- **错误码**：`kernel/tables/error-codes.yaml`
+- **错误语义**：`kernel/error-model.md`（KB-ERR-001~004）+ `kernel/tables/reason-codes.yaml`
+- **验收门**：`kernel/acceptance-contract.md`（KB-ACC-001~002）+ `kernel/tables/acceptance-cases.yaml`
 
 ## Non-Goals (V1)
 

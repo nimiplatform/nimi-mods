@@ -50,11 +50,9 @@ const OUTPUT_DIR = resolve(__dirname, '../output/voice-diff');
 const TEST_TEXT = process.env.NIMI_VOICE_DIFF_TEXT
   ?? '在那遥远的群星之间，人类第一次听到了来自宇宙深处的回声。那声音古老而陌生，却又带着某种令人心安的温暖。';
 
-// Voices to compare — 3 distinct timbres: male narrator, female, gruff male
+// Single voice to test
 const VOICES_TO_TEST: Array<{ voiceId: string; voiceName: string; description: string }> = [
-  { voiceId: 'Neil',    voiceName: '阿闻',  description: '字正腔圆、专业新闻主持人' },
-  { voiceId: 'Cherry',  voiceName: '芊悦',  description: '阳光积极亲切自然（女声）' },
-  { voiceId: 'Vincent', voiceName: '田叔',  description: '沙哑烟嗓、千军万马江湖豪情' },
+  { voiceId: 'Vincent', voiceName: '田叔', description: '沙哑烟嗓、千军万马江湖豪情' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -110,6 +108,10 @@ async function synthesizeOne(
   if (!artifact || artifact.bytes.length === 0) {
     throw new Error(`TTS returned empty audio for voice: ${voiceId}`);
   }
+
+  // Log artifact providerRaw to verify voice was actually used by provider
+  const raw = artifact.providerRaw ?? {};
+  console.log(`    [debug] requested voice=${voiceId}, providerRaw=${JSON.stringify(raw)}`);
 
   const estimatedDurationMs = Math.round(artifact.bytes.length * 8 / 128000 * 1000);
   return {

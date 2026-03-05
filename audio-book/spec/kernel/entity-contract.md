@@ -14,8 +14,8 @@
 - 每个项目拥有唯一 ULID 标识。
 - 项目名称由用户命名，不可为空。
 - 项目状态遵循 `tables/project-states.yaml` 定义的状态机。
-- 一个项目恰好关联一份 SourceText（按章节组织的原始文本）。
-- 项目数据持久化于 IndexedDB，key 前缀为 `vs:project:{id}`。
+- 一个项目包含 `sourceChapters`（按章节组织的原始文本）、`script`（分析产物）、`characters`（角色档案数组）、`voiceCastings`（声线分配数组）、`synthesisJob`（合成任务）和 `audioOutputs`（章节级音频输出元数据）。
+- 项目数据持久化于 IndexedDB，key 前缀为 `ab:project:{id}`。
 
 ## VS-ENT-002 — SourceChapter
 
@@ -30,8 +30,9 @@
 
 结构化脚本是 LLM 分析的产物，将原始文本转换为有序的语音段落序列。
 
-- 一个项目恰好生成一份 Script。
+- 一个项目恰好生成一份 Script，存储于 `VoiceProject.script`。
 - Script 由 `ScriptSegment[]` 组成，全局有序（跨章节连续编号）。
+- `lastProcessedChapter` 记录最后一个成功分析的章节索引，用于断点续传。
 - Script 可被用户手动修改（调整说话人标注、合并/拆分段落）。
 
 ## VS-ENT-004 — ScriptSegment
@@ -72,14 +73,11 @@
 
 声线分配记录角色与 TTS voice 的映射关系。
 
+- VoiceCasting 作为独立数组存储于 `VoiceProject.voiceCastings`，通过 `characterName` 关联 CharacterProfile。
 - 每个 CharacterProfile 关联至多一个 VoiceCasting。
 - `voiceSource`: `preset`（从预设列表选取）或 `designed`（Voice Design 生成，预留）。
-- 当 `voiceSource = 'preset'`:
-  - `providerId` + `voiceId` 指向具体的 TTS provider voice。
-  - `voiceName` 为人类可读名称（如 "Ethan"）。
-- 当 `voiceSource = 'designed'`（预留，第一版不实现）:
-  - `designPrompt` 存储生成该音色的描述文本。
-  - `designedVoiceId` 存储 provider 返回的音色 ID。
+- `providerId` + `voiceId` 指向具体的 TTS provider voice。
+- `voiceName` 为人类可读名称（如 "Ethan"）。
 - `speakingRate`, `pitch`, `emotion` 为该角色的默认合成参数。
 - `previewAudioUri` 存储试听音频的 base64 data URI。
 

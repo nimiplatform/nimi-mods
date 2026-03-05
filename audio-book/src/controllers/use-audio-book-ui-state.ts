@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { useState, useCallback } from 'react';
+import type { SynthesisJob } from '../types.js';
 
 export type AudioBookStep = 'import' | 'analyze' | 'cast' | 'synth' | 'play';
 
@@ -46,6 +47,17 @@ export function useAudioBookUiState() {
     onConfirm: () => void;
   } | null>(null);
 
+  // Test synthesis mode (ephemeral — not persisted to IndexedDB)
+  const [testMode, setTestMode] = useState(false);
+  const [testSegmentIds, setTestSegmentIds] = useState<string[]>([]);
+  const [testSynthesisJob, setTestSynthesisJob] = useState<SynthesisJob | null>(null);
+
+  // Playback speed
+  const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
+
+  // Playback chapter selection
+  const [playbackChapter, setPlaybackChapter] = useState(0);
+
   const clearError = useCallback(() => setError(null), []);
 
   return {
@@ -61,6 +73,13 @@ export function useAudioBookUiState() {
     playbackState, setPlaybackState,
     error, setError, clearError,
     confirmDialog, setConfirmDialog,
+    // Test mode
+    testMode, setTestMode,
+    testSegmentIds, setTestSegmentIds,
+    testSynthesisJob, setTestSynthesisJob,
+    // Playback
+    playbackSpeed, setPlaybackSpeed,
+    playbackChapter, setPlaybackChapter,
   };
 }
 

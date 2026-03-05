@@ -1,10 +1,13 @@
 // ---------------------------------------------------------------------------
-// Cast step — connector selector + character list + voice selector + preview
+// Cast step — connector selector + character list + voice selector + preview (matches Pencil)
 // ---------------------------------------------------------------------------
 
 import React, { useEffect, useState } from 'react';
 import type { CharacterProfile, VoiceCasting, TtsClient } from '../../types.js';
 import type { TtsRouteState } from '../../controllers/use-tts-route.js';
+import { Select } from '../ui/select.js';
+import { Slider } from '../ui/slider.js';
+import { TierBadge } from '../ui/badge.js';
 
 type CastStepProps = {
   characters: CharacterProfile[];
@@ -36,10 +39,10 @@ export function CastStep(props: CastStepProps) {
   const [availableVoices, setAvailableVoices] = useState<VoiceOption[]>([]);
   const [loadingVoices, setLoadingVoices] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [autoLoading, setAutoLoading] = useState(false);
 
   // Reload voices when connector changes
   useEffect(() => {
-    // Skip if route is still loading
     if (ttsRoute.loading) return;
 
     let cancelled = false;
@@ -86,52 +89,67 @@ export function CastStep(props: CastStepProps) {
   const selected = selectedCharacter ?? characters[0]?.name ?? null;
   const selectedCasting = selected ? castingMap.get(selected) : null;
 
+  const handleAutoRecommend = async () => {
+    setAutoLoading(true);
+    try {
+      await onAutoRecommend();
+    } finally {
+      setAutoLoading(false);
+    }
+  };
+
   return (
-    <div className="mx-auto max-w-3xl p-6">
-      {/* TTS Connector selector */}
-      <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
-        <label className="mb-1 block text-xs font-medium text-gray-600">TTS Provider</label>
-        {ttsRoute.loading ? (
-          <p className="text-xs text-gray-400">Loading providers...</p>
-        ) : ttsRoute.error ? (
-          <p className="text-xs text-red-500">{ttsRoute.error}</p>
-        ) : ttsRoute.ttsConnectors.length === 0 ? (
-          <p className="text-xs text-gray-500">No TTS connectors available. Using default route.</p>
-        ) : (
-          <select
-            value={ttsRoute.ttsSelection.connectorId}
-            onChange={(e) => ttsRoute.selectTtsConnector(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-blue-500"
-          >
-            {ttsRoute.ttsConnectors.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.label || c.id}
-                {c.vendor ? ` (${c.vendor})` : ''}
-              </option>
-            ))}
-          </select>
-        )}
+    <div className="flex h-full flex-col overflow-hidden">
+      {/* TTS Connector selector — top bar */}
+      <div className="shrink-0 border-b border-gray-100 bg-gray-50 px-6 py-3">
+        <div className="flex items-center gap-3">
+          <label className="shrink-0 text-xs font-medium text-gray-600">TTS Provider</label>
+          <div className="min-w-0 flex-1">
+            {ttsRoute.loading ? (
+              <p className="text-xs text-gray-400">Loading providers...</p>
+            ) : ttsRoute.error ? (
+              <p className="text-xs text-red-500">{ttsRoute.error}</p>
+            ) : ttsRoute.ttsConnectors.length === 0 ? (
+              <p className="text-xs text-gray-500">No TTS connectors available. Using default route.</p>
+            ) : (
+              <Select
+                value={ttsRoute.ttsSelection.connectorId}
+                onValueChange={(v) => ttsRoute.selectTtsConnector(v)}
+                options={ttsRoute.ttsConnectors.map((c) => ({
+                  value: c.id,
+                  label: c.label || c.id,
+                  description: c.vendor ? `(${c.vendor})` : undefined,
+                }))}
+                placeholder="Select TTS provider..."
+              />
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Voice loading error banner */}
       {voiceError && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+        <div className="shrink-0 border-b border-red-200 bg-red-50 px-6 py-2 text-xs text-red-700">
           {voiceError}
         </div>
       )}
 
-      <div className="flex gap-4">
+      {/* Main content: character list + voice config */}
+      <div className="flex min-h-0 flex-1">
         {/* Left: character list */}
-        <div className="w-48 shrink-0">
+        <div className="w-56 shrink-0 overflow-y-auto border-r border-gray-100 px-4 py-4">
           <div className="mb-3 flex items-center justify-between">
-            <h4 className="text-sm font-medium text-gray-700">Characters</h4>
+            <h4 className="text-xs font-semibold text-gray-700">Characters</h4>
             <button
               type="button"
-              onClick={onAutoRecommend}
-              className="text-[10px] font-medium text-blue-600 hover:underline"
-              title="Auto-assign voices via LLM"
+              onClick={handleAutoRecommend}
+              disabled={autoLoading}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-indigo-600 transition-colors hover:bg-indigo-50 disabled:opacity-50"
             >
-              Auto
+              {autoLoading && (
+                <span className="inline-block h-3 w-3 animate-spin rounded-full border border-indigo-400 border-t-transparent" />
+              )}
+              {autoLoading ? 'Auto...' : 'Auto'}
             </button>
           </div>
           <div className="space-y-1">
@@ -143,12 +161,16 @@ export function CastStep(props: CastStepProps) {
                   key={ch.name}
                   type="button"
                   onClick={() => onSelectCharacter(ch.name)}
-                  className={`block w-full rounded-lg px-3 py-2 text-left text-xs transition-colors ${
-                    isSelected ? 'bg-blue-50 text-blue-800' : 'hover:bg-gray-50 text-gray-700'
+                  className={`block w-full rounded-lg px-3 py-2.5 text-left text-xs transition-colors ${
+                    isSelected
+                      ? 'border border-indigo-200 bg-indigo-50 text-indigo-800'
+                      : 'hover:bg-gray-50 text-gray-700'
                   }`}
                 >
-                  <span className="font-medium">{ch.name}</span>
-                  <span className="ml-1 text-[10px] opacity-60">({ch.tier})</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-medium">{ch.name}</span>
+                    <TierBadge tier={ch.tier} />
+                  </div>
                   {casting && (
                     <p className="mt-0.5 truncate text-[10px] opacity-60">{casting.voiceName}</p>
                   )}
@@ -159,25 +181,28 @@ export function CastStep(props: CastStepProps) {
         </div>
 
         {/* Right: voice config for selected character */}
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 overflow-y-auto px-6 py-6">
           {selected && selectedCasting ? (
-            <div className="rounded-xl border border-gray-200 bg-white p-4">
-              <h4 className="mb-3 text-sm font-semibold text-gray-900">
+            <div className="mx-auto max-w-md">
+              <h3 className="mb-5 text-base font-semibold text-gray-900">
                 Voice for {selected}
-              </h4>
+              </h3>
 
               {/* Voice selector */}
-              <div className="mb-3">
-                <label className="mb-1 block text-xs font-medium text-gray-600">Voice</label>
+              <div className="mb-4">
+                <label className="mb-1.5 block text-xs font-medium text-gray-600">Voice</label>
                 {loadingVoices ? (
-                  <p className="text-xs text-gray-400">Loading voices...</p>
+                  <div className="flex items-center gap-2 py-2">
+                    <div className="h-3 w-3 animate-spin rounded-full border border-gray-400 border-t-transparent" />
+                    <span className="text-xs text-gray-400">Loading voices...</span>
+                  </div>
                 ) : availableVoices.length === 0 ? (
                   <p className="text-xs text-gray-500">No voices available for this provider.</p>
                 ) : (
-                  <select
+                  <Select
                     value={selectedCasting.voiceId}
-                    onChange={(e) => {
-                      const voice = availableVoices.find((v) => v.voiceId === e.target.value);
+                    onValueChange={(v) => {
+                      const voice = availableVoices.find((opt) => opt.voiceId === v);
                       if (voice) {
                         onUpdateCasting(selected, {
                           voiceId: voice.voiceId,
@@ -186,60 +211,49 @@ export function CastStep(props: CastStepProps) {
                         });
                       }
                     }}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
-                  >
-                    {availableVoices.map((v) => (
-                      <option key={`${v.providerId}:${v.voiceId}`} value={v.voiceId}>
-                        {v.voiceName} ({v.voiceId})
-                      </option>
-                    ))}
-                  </select>
+                    options={availableVoices.map((v) => ({
+                      value: v.voiceId,
+                      label: v.voiceName,
+                      description: v.voiceId,
+                    }))}
+                    placeholder="Select voice..."
+                  />
                 )}
               </div>
 
               {/* Speaking rate */}
-              <div className="mb-3">
-                <label className="mb-1 flex items-center justify-between text-xs font-medium text-gray-600">
-                  <span>Speaking Rate</span>
-                  <span className="text-[10px] text-gray-400">{selectedCasting.speakingRate.toFixed(1)}x</span>
-                </label>
-                <input
-                  type="range"
-                  min={0.5}
-                  max={2.0}
-                  step={0.1}
-                  value={selectedCasting.speakingRate}
-                  onChange={(e) => onUpdateCasting(selected, { speakingRate: Number(e.target.value) })}
-                  className="w-full"
-                />
-              </div>
+              <Slider
+                className="mb-4"
+                label="Speaking Rate"
+                value={selectedCasting.speakingRate}
+                onValueChange={(v) => onUpdateCasting(selected, { speakingRate: v })}
+                min={0.5}
+                max={2.0}
+                step={0.1}
+                formatValue={(v) => `${v.toFixed(1)}x`}
+              />
 
               {/* Pitch */}
-              <div className="mb-3">
-                <label className="mb-1 flex items-center justify-between text-xs font-medium text-gray-600">
-                  <span>Pitch</span>
-                  <span className="text-[10px] text-gray-400">{selectedCasting.pitch}</span>
-                </label>
-                <input
-                  type="range"
-                  min={-10}
-                  max={10}
-                  step={1}
-                  value={selectedCasting.pitch}
-                  onChange={(e) => onUpdateCasting(selected, { pitch: Number(e.target.value) })}
-                  className="w-full"
-                />
-              </div>
+              <Slider
+                className="mb-4"
+                label="Pitch"
+                value={selectedCasting.pitch}
+                onValueChange={(v) => onUpdateCasting(selected, { pitch: v })}
+                min={-10}
+                max={10}
+                step={1}
+                formatValue={(v) => String(v)}
+              />
 
               {/* Emotion */}
-              <div className="mb-4">
-                <label className="mb-1 block text-xs font-medium text-gray-600">Emotion / Style</label>
+              <div className="mb-5">
+                <label className="mb-1.5 block text-xs font-medium text-gray-600">Emotion / Style</label>
                 <input
                   type="text"
                   value={selectedCasting.emotion ?? ''}
                   onChange={(e) => onUpdateCasting(selected, { emotion: e.target.value || undefined })}
                   placeholder="e.g., calm, excited, sad..."
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  className="w-full rounded-md border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                 />
               </div>
 
@@ -248,26 +262,32 @@ export function CastStep(props: CastStepProps) {
                 type="button"
                 onClick={() => onPreviewVoice(selectedCasting)}
                 disabled={previewPlaying !== null || loadingVoices}
-                className={`w-full rounded-lg px-4 py-2 text-sm font-medium ${
-                  previewPlaying === selectedCasting.voiceId
-                    ? 'bg-blue-100 text-blue-700'
-                    : previewPlaying || loadingVoices
-                      ? 'bg-gray-100 text-gray-400 cursor-default'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                className="flex w-full items-center justify-center gap-2 rounded-md border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50"
               >
-                {previewPlaying === selectedCasting.voiceId ? 'Playing...' : 'Preview Voice'}
+                {previewPlaying === selectedCasting.voiceId ? (
+                  <>
+                    <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+                    Playing...
+                  </>
+                ) : (
+                  <>
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="5 3 19 12 5 21 5 3" />
+                    </svg>
+                    Preview Voice
+                  </>
+                )}
               </button>
             </div>
           ) : selected ? (
-            <div className="rounded-xl border border-gray-200 bg-white p-4">
-              <p className="text-sm text-gray-500">
+            <div className="flex h-full items-center justify-center">
+              <p className="text-sm text-gray-400">
                 No voice assigned for {selected}. Click &ldquo;Auto&rdquo; to auto-assign.
               </p>
             </div>
           ) : (
-            <div className="rounded-xl border border-gray-200 bg-white p-4">
-              <p className="text-sm text-gray-500">Select a character to configure voice.</p>
+            <div className="flex h-full items-center justify-center">
+              <p className="text-sm text-gray-400">Select a character to configure voice.</p>
             </div>
           )}
         </div>

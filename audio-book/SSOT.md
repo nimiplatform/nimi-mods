@@ -29,6 +29,7 @@
 | CharacterProfile | 角色档案（性别、年龄、性格特征） |
 | VoiceCasting | 角色 ↔ TTS 声线映射 |
 | SynthesisJob / SegmentJob | 批量合成任务管理 |
+| AudioOutput | 章节级音频输出元数据 |
 
 ## Tech Stack
 
@@ -45,5 +46,6 @@
 
 - 文本导入: .txt 文件 + 粘贴
 - 声线: 预设列表选取（DashScope / Volcengine / OpenAI）
-- 播放: Segment 队列 + 文本跟读
-- 不含: epub、Voice Design、背景音乐、全书导出
+- 合成: 批量合成 + 测试合成（选取 2-3 段验证声线效果）
+- 播放: Segment 队列 + 文本跟读 + 播放速率调整 (0.5x-2.0x)
+- 不含: epub、Voice Design、背景音乐、全书导出、书签

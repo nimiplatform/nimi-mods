@@ -15,7 +15,7 @@ entities:
         type: string
         required: true
         description: User-defined project name
-      - name: status
+      - name: state
         type: enum
         ref: project-states.yaml
         required: true
@@ -24,6 +24,29 @@ entities:
         type: SourceChapter[]
         required: true
         description: Imported text organized by chapters
+      - name: script
+        type: Script
+        required: false
+        description: Structured script (populated after Step 2 analysis)
+      - name: characters
+        type: CharacterProfile[]
+        required: true
+        default: "[]"
+        description: Character profiles extracted from text
+      - name: voiceCastings
+        type: VoiceCasting[]
+        required: true
+        default: "[]"
+        description: Voice assignments for characters
+      - name: synthesisJob
+        type: SynthesisJob
+        required: false
+        description: Active or completed synthesis job
+      - name: audioOutputs
+        type: AudioOutput[]
+        required: true
+        default: "[]"
+        description: Chapter-level audio output metadata
       - name: createdAt
         type: timestamp
         required: true
@@ -58,6 +81,10 @@ entities:
         type: ScriptSegment[]
         required: true
         description: Ordered list of all speech segments across chapters
+      - name: lastProcessedChapter
+        type: integer
+        required: true
+        description: Index of the last successfully analyzed chapter (for resume)
 
   - name: ScriptSegment
     rule_id: VS-ENT-004
@@ -127,14 +154,17 @@ entities:
         ref: character-tiers.yaml
         derived: true
         description: Computed character tier based on segmentCount thresholds
-      - name: voiceCasting
-        type: VoiceCasting
-        required: false
-        description: Assigned voice (null until Step 3)
 
   - name: VoiceCasting
     rule_id: VS-ENT-006
+    description: >
+      Stored as a top-level array on VoiceProject.voiceCastings (not nested
+      inside CharacterProfile). Linked to characters via characterName.
     fields:
+      - name: characterName
+        type: string
+        required: true
+        description: References CharacterProfile.name
       - name: voiceSource
         type: enum
         values: [preset, designed]
@@ -142,27 +172,16 @@ entities:
         description: "'preset' for v1; 'designed' reserved for Voice Design"
       - name: providerId
         type: string
-        required: false
-        required_when: "voiceSource = 'preset'"
+        required: true
         description: TTS provider identifier
       - name: voiceId
         type: string
-        required: false
-        required_when: "voiceSource = 'preset'"
+        required: true
         description: Voice identifier within the provider
       - name: voiceName
         type: string
-        required: false
-        required_when: "voiceSource = 'preset'"
+        required: true
         description: Human-readable voice name
-      - name: designPrompt
-        type: string
-        required: false
-        description: "Voice design text prompt (reserved, voiceSource='designed' only)"
-      - name: designedVoiceId
-        type: string
-        required: false
-        description: "Provider-returned designed voice ID (reserved)"
       - name: speakingRate
         type: float
         default: 1.0
@@ -194,10 +213,6 @@ entities:
       - name: segmentJobs
         type: SegmentJob[]
         required: true
-      - name: concurrency
-        type: integer
-        default: 3
-        description: Max parallel synthesis requests
       - name: startedAt
         type: timestamp
         required: false

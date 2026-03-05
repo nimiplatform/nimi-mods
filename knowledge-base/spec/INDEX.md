@@ -57,19 +57,33 @@ version: 1.0.0
 
 | Document | Rule IDs | Description |
 |----------|----------|-------------|
+| `kernel/index.md` | — | Rule ID format, ownership, fact sources |
 | `kernel/domain-contract.md` | KB-DOM-001 ~ 007 | 7 核心实体（Document, Chunk, Vector, Conversation, Turn, Citation, Settings） |
 | `kernel/pipeline-contract.md` | KB-PIPE-001 ~ 005 | 文档处理管线（解析→分块→向量化→存储） |
 | `kernel/rag-contract.md` | KB-RAG-001 ~ 005 | RAG 管线（query rewriting→检索→prompt→生成→引用解析） |
 | `kernel/capability-contract.md` | KB-CAP-001 ~ 008 | 能力注册、AI 消费、数据 API、跨 mod 集成、隐私约束 |
+| `kernel/error-model.md` | KB-ERR-001 ~ 004 | 错误语义（reason code 注册、结构化信封、fail-close、降级） |
+| `kernel/acceptance-contract.md` | KB-ACC-001 ~ 002 | 验收门（table-driven、覆盖要求） |
 
 ### Kernel Tables
 
 | Table | Content |
 |-------|---------|
 | `kernel/tables/entities.yaml` | 7 实体定义（字段、类型、默认值、引用关系） |
-| `kernel/tables/document-states.yaml` | 文档状态机（6 states, 9 transitions, constraints） |
-| `kernel/tables/error-codes.yaml` | 12 个 reasonCode（分 phase: parsing/chunking/embedding/search/rag/storage/query） |
+| `kernel/tables/pipeline-states.yaml` | 双管线状态机（document 5 步 + RAG 6 步 + transitions） |
+| `kernel/tables/reason-codes.yaml` | 12 个 reasonCode（blocking/non-blocking + action hint） |
 | `kernel/tables/capabilities.yaml` | 22 个 capability 键（3 AI + 16 data + 1 route + 2 UI） |
+| `kernel/tables/acceptance-cases.yaml` | 7 个验收用例 + 4 个 verification commands |
+
+### Generated Views
+
+| File | Source |
+|------|--------|
+| `kernel/generated/capabilities.md` | `kernel/tables/capabilities.yaml` |
+| `kernel/generated/entities.md` | `kernel/tables/entities.yaml` |
+| `kernel/generated/pipeline-states.md` | `kernel/tables/pipeline-states.yaml` |
+| `kernel/generated/reason-codes.md` | `kernel/tables/reason-codes.yaml` |
+| `kernel/generated/acceptance-cases.md` | `kernel/tables/acceptance-cases.yaml` |
 
 ### Domain Documents
 
@@ -88,7 +102,7 @@ version: 1.0.0
 
 ### "修改文档解析逻辑"
 1. `kernel/pipeline-contract.md` § KB-PIPE-002（格式解析）
-2. `kernel/tables/error-codes.yaml`（KB_FORMAT_UNSUPPORTED, KB_PARSING_FAILED）
+2. `kernel/tables/reason-codes.yaml`（KB_FORMAT_UNSUPPORTED, KB_PARSING_FAILED）
 3. 源码：`src/services/document-parser.ts`
 
 ### "修改 RAG 检索策略"
@@ -101,10 +115,25 @@ version: 1.0.0
 2. `kernel/tables/capabilities.yaml`（添加新行）
 3. 源码：`src/contracts.ts`, `src/registrars/data.ts`, `mod.manifest.yaml`
 
+### "修改错误语义"
+1. `kernel/error-model.md`（KB-ERR-001~004）
+2. `kernel/tables/reason-codes.yaml`
+3. `knowledge-base.md`
+
+### "修改验收门"
+1. `kernel/acceptance-contract.md`（KB-ACC-001~002）
+2. `kernel/tables/acceptance-cases.yaml`
+
 ### "修改 UI 组件"
 1. `frontend.md`（组件树 + 文件结构）
 2. `kernel/domain-contract.md`（引用的实体）
 3. 源码：`src/components/**`
+
+## Verification
+
+1. `pnpm -C nimi-mods run generate:spec:knowledge-base-kernel-docs`
+2. `pnpm -C nimi-mods run check:spec:knowledge-base-kernel-docs-drift`
+3. `pnpm -C nimi-mods run check:spec:knowledge-base-kernel-consistency`
 
 ## Design Decisions
 

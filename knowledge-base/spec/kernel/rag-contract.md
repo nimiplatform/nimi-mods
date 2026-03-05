@@ -1,7 +1,7 @@
 # Knowledge Base RAG Contract
 
 > Owner Domain: `KB-RAG-*`
-> Authoritative source: `tables/error-codes.yaml`
+> Authoritative source: `tables/reason-codes.yaml`
 
 ---
 

@@ -23,11 +23,12 @@ import {
   buildAccumulatedContext,
 } from './analysis-prompts.js';
 import { rebaseChapterSegmentsToSource } from './text-fidelity.js';
+import { splitLongSegments } from './segment-post-processor.js';
 
 const VALID_SEGMENT_TYPES = new Set<SegmentType>(['dialogue', 'narration', 'inner_thought', 'sound_effect']);
 const RECENT_SEGMENTS_WINDOW = 3;
-const MAX_CHUNK_CHARS = 3000;
-const CHUNK_RETRY_SIZES = [MAX_CHUNK_CHARS, 2000, 1200, 800, 500] as const;
+const MAX_CHUNK_CHARS = 1500;
+const CHUNK_RETRY_SIZES = [MAX_CHUNK_CHARS, 1000, 800, 500] as const;
 
 /**
  * Estimate output tokens needed for a chapter's analysis JSON.
@@ -534,7 +535,7 @@ export async function analyzeAllChapters(
       });
 
       // Convert raw segments to ScriptSegments with IDs
-      const chapterSegments: ScriptSegment[] = rebased.segments.map((seg, segIdx) => ({
+      const rawChapterSegments: ScriptSegment[] = rebased.segments.map((seg, segIdx) => ({
         id: `seg-${i}-${segIdx}`,
         chapterIndex: i,
         index: globalSegmentIndex + segIdx,
@@ -545,6 +546,13 @@ export async function analyzeAllChapters(
         endOffset: seg.endOffset,
         ...(seg.emotion ? { emotion: seg.emotion } : {}),
       }));
+
+      // Post-process: split overly long segments at dialogue boundaries
+      const chapterSegments = splitLongSegments(rawChapterSegments);
+      // Re-number indices for this chapter
+      for (let si = 0; si < chapterSegments.length; si++) {
+        chapterSegments[si]!.index = globalSegmentIndex + si;
+      }
 
       allSegments.push(...chapterSegments);
       globalSegmentIndex += chapterSegments.length;

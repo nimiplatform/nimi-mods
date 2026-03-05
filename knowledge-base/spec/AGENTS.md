@@ -10,6 +10,8 @@
 | KB-PIPE-* | Document processing pipeline | `kernel/pipeline-contract.md` |
 | KB-RAG-* | RAG retrieval & generation | `kernel/rag-contract.md` |
 | KB-CAP-* | Capabilities & integration | `kernel/capability-contract.md` |
+| KB-ERR-* | Error semantics | `kernel/error-model.md` |
+| KB-ACC-* | Acceptance gates | `kernel/acceptance-contract.md` |
 
 ## Authoritative Hierarchy
 
@@ -20,8 +22,9 @@
 ## Editing Rules
 
 - When entity fields change: edit `tables/entities.yaml` first, then align `kernel/domain-contract.md`.
-- When states change: edit `tables/document-states.yaml` first, then align `kernel/pipeline-contract.md`.
-- When error codes change: edit `tables/error-codes.yaml` first, then align referencing contracts.
+- When states change: edit `tables/pipeline-states.yaml` first, then align `kernel/pipeline-contract.md`.
+- When error codes change: edit `tables/reason-codes.yaml` first, then align `kernel/error-model.md` and referencing contracts.
+- When acceptance cases change: edit `tables/acceptance-cases.yaml` first, then align `kernel/acceptance-contract.md`.
 - When capabilities change: edit `tables/capabilities.yaml` first, then align `kernel/capability-contract.md` and `mod.manifest.yaml`.
 - Domain docs must NOT define new Rule ID systems or contract-style sections.
 

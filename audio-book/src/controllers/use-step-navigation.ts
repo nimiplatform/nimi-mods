@@ -23,6 +23,8 @@ export function useStepNavigation(input: {
   projectState: ProjectState | null;
   segmentsCount?: number;
   castingsCount?: number;
+  /** When true, allow entering the play step even from cast_complete (test mode). */
+  hasTestAudio?: boolean;
   onConfirmBacktrack?: (targetStep: AudioBookStep, callback: () => void) => void;
 }) {
   const {
@@ -31,6 +33,7 @@ export function useStepNavigation(input: {
     projectState,
     segmentsCount = 0,
     castingsCount = 0,
+    hasTestAudio = false,
     onConfirmBacktrack,
   } = input;
 
@@ -39,9 +42,13 @@ export function useStepNavigation(input: {
   const canEnterStep = useCallback(
     (step: AudioBookStep): boolean => {
       if (!projectState) return step === 'import';
+      // Allow play step from cast_complete when test audio exists
+      if (step === 'play' && hasTestAudio && STEP_MIN_STATE.synth.includes(projectState)) {
+        return true;
+      }
       return STEP_MIN_STATE[step].includes(projectState);
     },
-    [projectState],
+    [projectState, hasTestAudio],
   );
 
   const canAdvance = useMemo(() => {

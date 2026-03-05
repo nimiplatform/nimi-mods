@@ -14,6 +14,7 @@
 - 每个 segment 的合成参数由其 speaker 关联的 VoiceCasting 决定：
   - `voiceId` / `providerId` / `speakingRate` / `pitch` / `emotion`
   - segment 自身的 `emotion` 字段（如有）覆盖角色默认 emotion。
+- 长文本自动分块：segment 文本超过 `MAX_TTS_TEXT_CHARS`（默认 300 字符）时，在句末标点处拆分为多个 chunk 逐一合成，最终拼接为单个音频 Blob。此限制是为了兼容 DashScope CosyVoice ~500 字符输入限制。
 
 ## VS-SYNTH-002 — 并发控制
 

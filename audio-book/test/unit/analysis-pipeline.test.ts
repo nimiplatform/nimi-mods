@@ -78,7 +78,7 @@ describe('analysis-pipeline chunking', () => {
         const chunkText = extractChapterContentFromPrompt(input.userPrompt);
         callChunkSizes.push(chunkText.length);
 
-        if (chunkText.length > 1500) {
+        if (chunkText.length > 1000) {
           return { text: '```json\n{ "segments": [ { "type": "narration"' };
         }
 
@@ -100,8 +100,8 @@ describe('analysis-pipeline chunking', () => {
 
     const result = await analyzeAllChapters(llm, chapters);
 
-    expect(callChunkSizes.some((size) => size > 1500)).toBe(true);
-    expect(callChunkSizes.some((size) => size <= 1500)).toBe(true);
+    expect(callChunkSizes.some((size) => size > 1000)).toBe(true);
+    expect(callChunkSizes.some((size) => size <= 1000)).toBe(true);
     expect(result.chapterResults[0]?.error).toBeUndefined();
   });
 });

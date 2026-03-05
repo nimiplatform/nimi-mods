@@ -31,7 +31,7 @@ audio-book (nimi-mod)
 | Document | Rule IDs | Content |
 |----------|----------|---------|
 | [`kernel/entity-contract.md`](kernel/entity-contract.md) | VS-ENT-001 ~ 009 | 9 个核心实体定义 |
-| [`kernel/pipeline-contract.md`](kernel/pipeline-contract.md) | VS-PIPE-001 ~ 007 | 五步流水线 + 状态转换 |
+| [`kernel/pipeline-contract.md`](kernel/pipeline-contract.md) | VS-PIPE-001 ~ 008 | 五步流水线 + 测试合成 + 状态转换 |
 | [`kernel/synthesis-contract.md`](kernel/synthesis-contract.md) | VS-SYNTH-001 ~ 007 | 批量合成执行策略 |
 
 ### Kernel Tables (Structured Facts)
@@ -78,7 +78,7 @@ audio-book (nimi-mod)
 3. `voice-casting.md` § 2
 
 ### "修改播放器行为"
-1. `kernel/pipeline-contract.md` § VS-PIPE-007
+1. `kernel/pipeline-contract.md` § VS-PIPE-008
 2. `playback.md`
 
 ### "添加新的段落类型"
@@ -111,11 +111,12 @@ audio-book (nimi-mod)
 | 声线云端同步 | | ✓ |
 | 批量合成 | ✓ | |
 | 文本跟读播放 | ✓ | |
+| 测试合成 (Test Synthesis) | ✓ | |
 | 章节音频导出 | ✓ (可选) | |
 | 全书导出 | | ✓ |
 | 背景音乐 | | ✓ |
 | 段间停顿控制 | | ✓ |
-| 播放速率调整 | | ✓ |
+| 播放速率调整 | ✓ | |
 | 书签功能 | | ✓ |
 
 ## Dependencies
@@ -132,8 +133,8 @@ audio-book (nimi-mod)
 - data.query.data-api.audio-book.*
 - ui.register.ui-extension.app.sidebar.mods
 - ui.register.ui-extension.app.content.routes
-- event.publish.vs:*
-- event.subscribe.vs:*
+- event.publish.ab:*
+- event.subscribe.ab:*
 ```
 
 ### External Dependencies

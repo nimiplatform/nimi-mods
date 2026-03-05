@@ -25,6 +25,7 @@ export function StepContent({ controller }: StepContentProps) {
           importLoading={ui.importLoading}
           projectName={store.project?.name ?? ''}
           onImport={actions.importText}
+          onNameChange={actions.updateProjectName}
         />
       );
 
@@ -63,11 +64,17 @@ export function StepContent({ controller }: StepContentProps) {
         <SynthesisStep
           synthRunning={ui.synthRunning}
           progress={ui.synthProgress}
-          synthesisJob={store.synthesisJob}
+          synthesisJob={ui.testMode ? (ui.testSynthesisJob ?? null) : (store.synthesisJob ?? null)}
+          segments={store.script?.segments ?? []}
+          testMode={ui.testMode}
+          testSegmentIds={ui.testSegmentIds}
           onStart={actions.startSynthesis}
+          onStartTest={actions.startTestSynthesis}
           onPause={actions.pauseSynthesis}
           onResume={actions.resumeSynthesis}
           onCancel={actions.cancelSynthesis}
+          onPlaySegment={actions.playSegmentAudio}
+          onGoToPlayer={() => ui.setCurrentStep('play')}
         />
       );
 
@@ -76,11 +83,16 @@ export function StepContent({ controller }: StepContentProps) {
         <PlaybackStep
           chapters={store.project?.sourceChapters ?? []}
           segments={store.script?.segments ?? []}
-          synthesisJob={store.synthesisJob}
+          synthesisJob={ui.testSynthesisJob ?? store.synthesisJob ?? null}
           playbackState={ui.playbackState}
+          playbackSpeed={ui.playbackSpeed}
+          playbackChapter={ui.playbackChapter}
           synthRunning={ui.synthRunning}
           onPlaySegment={actions.playSegmentAudio}
+          onStopPlayback={actions.stopPlayback}
           onRetryFailed={actions.retryFailedSynthesis}
+          onSetSpeed={ui.setPlaybackSpeed}
+          onSetChapter={ui.setPlaybackChapter}
         />
       );
 

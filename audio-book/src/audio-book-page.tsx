@@ -9,12 +9,13 @@ import { StepFooter } from './components/shell/step-footer.js';
 import { ProjectListView } from './components/project/project-list-view.js';
 import { ProjectHeader } from './components/project/project-header.js';
 import { StepContent } from './components/step-content.js';
+import { TooltipProvider } from './components/ui/tooltip.js';
 
 export function AudioBookPage() {
   const controller = useAudioBookPageController();
   const { store, ui, navigation } = controller;
 
-  // No active project → show project list
+  // No active project -> show project list
   if (!store.activeProjectId) {
     return (
       <div className="flex h-full min-h-0 flex-col bg-gray-50">
@@ -33,33 +34,44 @@ export function AudioBookPage() {
     );
   }
 
-  // Active project → step-based workflow
+  const prevStep = navigation.currentIndex > 0
+    ? navigation.steps[navigation.currentIndex - 1]
+    : undefined;
+  const nextStep = navigation.currentIndex < navigation.steps.length - 1
+    ? navigation.steps[navigation.currentIndex + 1]
+    : undefined;
+
+  // Active project -> step-based workflow
   return (
-    <AudioBookShell
-      header={
-        <ProjectHeader
-          projectName={store.project?.name ?? ''}
-          onBack={() => store.closeProject()}
-          steps={navigation.steps}
-          currentStep={navigation.currentStep}
-          currentIndex={navigation.currentIndex}
-          canEnterStep={navigation.canEnterStep}
-          onStepClick={navigation.goToStep}
-        />
-      }
-      content={<StepContent controller={controller} />}
-      footer={
-        <StepFooter
-          canRetreat={navigation.canRetreat}
-          canAdvance={navigation.canAdvance}
-          onPrev={navigation.goPrev}
-          onNext={navigation.goNext}
-        />
-      }
-      error={ui.error}
-      onDismissError={ui.clearError}
-      confirmDialog={ui.confirmDialog}
-      onDismissConfirm={() => ui.setConfirmDialog(null)}
-    />
+    <TooltipProvider>
+      <AudioBookShell
+        header={
+          <ProjectHeader
+            projectName={store.project?.name ?? ''}
+            onBack={() => store.closeProject()}
+            steps={navigation.steps}
+            currentStep={navigation.currentStep}
+            currentIndex={navigation.currentIndex}
+            canEnterStep={navigation.canEnterStep}
+            onStepClick={navigation.goToStep}
+          />
+        }
+        content={<StepContent controller={controller} />}
+        footer={
+          <StepFooter
+            canRetreat={navigation.canRetreat}
+            canAdvance={navigation.canAdvance}
+            onPrev={navigation.goPrev}
+            onNext={navigation.goNext}
+            prevStep={prevStep}
+            nextStep={nextStep}
+          />
+        }
+        error={ui.error}
+        onDismissError={ui.clearError}
+        confirmDialog={ui.confirmDialog}
+        onDismissConfirm={() => ui.setConfirmDialog(null)}
+      />
+    </TooltipProvider>
   );
 }

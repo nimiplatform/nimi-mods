@@ -1,10 +1,9 @@
 version: 1
 description: Knowledge Base core entity definitions
-source_rule: KB-DOM-001 ~ KB-DOM-007
 
 entities:
   - name: KBDocument
-    rule_id: KB-DOM-001
+    source_rule: KB-DOM-001
     fields:
       - { name: id,           type: string,   format: ULID,  required: true,  description: "文档唯一标识" }
       - { name: title,        type: string,                  required: true,  description: "文档标题（文件名推导或用户编辑）" }
@@ -12,15 +11,15 @@ entities:
       - { name: sourceKind,   type: string,   ref: source-kinds, required: true, description: "'file' | 'paste' | 'url'" }
       - { name: mimeType,     type: string,                  required: true,  description: "MIME 类型" }
       - { name: fileSize,     type: number,                  required: true,  description: "原始文件大小（字节）" }
-      - { name: status,       type: string,   ref: document-states.yaml, required: true, description: "文档处理状态" }
+      - { name: status,       type: string,   ref: pipeline-states.yaml, required: true, description: "文档处理状态" }
       - { name: chunkCount,   type: number,                  required: true,  default: 0, description: "分块数量（ready 后固定）" }
       - { name: tags,         type: "string[]",              required: true,  default: "[]", description: "用户标签" }
-      - { name: errorReason,  type: string,   ref: error-codes.yaml, required: false, description: "失败 reasonCode（仅 error 状态）" }
+      - { name: errorReason,  type: string,   ref: reason-codes.yaml, required: false, description: "失败 reasonCode（仅 error 状态）" }
       - { name: createdAt,    type: string,   format: ISO8601, required: true, description: "创建时间" }
       - { name: updatedAt,    type: string,   format: ISO8601, required: true, description: "最后更新时间" }
 
   - name: KBChunk
-    rule_id: KB-DOM-002
+    source_rule: KB-DOM-002
     fields:
       - { name: id,           type: string,   format: ULID,  required: true,  description: "分块唯一标识" }
       - { name: documentId,   type: string,   ref: KBDocument, required: true, description: "所属文档 ID" }
@@ -34,7 +33,7 @@ entities:
       - { name: rowRange,     type: "[number, number]", required: false, description: "CSV 行范围" }
 
   - name: KBVector
-    rule_id: KB-DOM-003
+    source_rule: KB-DOM-003
     fields:
       - { name: id,           type: string,   format: ULID,  required: true,  description: "向量记录唯一标识" }
       - { name: chunkId,      type: string,   ref: KBChunk,  required: true,  description: "关联的 chunk ID" }
@@ -44,7 +43,7 @@ entities:
       - { name: dimensions,   type: number,                  required: true,  description: "向量维度" }
 
   - name: KBConversation
-    rule_id: KB-DOM-004
+    source_rule: KB-DOM-004
     fields:
       - { name: id,           type: string,   format: ULID,  required: true,  description: "对话唯一标识" }
       - { name: title,        type: string,                  required: true,  description: "对话标题（自动生成或用户编辑）" }
@@ -54,7 +53,7 @@ entities:
       - { name: updatedAt,    type: string,   format: ISO8601, required: true, description: "最后更新时间" }
 
   - name: KBTurn
-    rule_id: KB-DOM-005
+    source_rule: KB-DOM-005
     fields:
       - { name: id,           type: string,   format: ULID,  required: true,  description: "回合唯一标识" }
       - { name: role,         type: string,                  required: true,  description: "'user' | 'assistant'" }
@@ -65,7 +64,7 @@ entities:
       - { name: timestamp,    type: string,   format: ISO8601, required: true, description: "回合时间" }
 
   - name: KBCitation
-    rule_id: KB-DOM-006
+    source_rule: KB-DOM-006
     fields:
       - { name: chunkId,      type: string,   ref: KBChunk,  required: true,  description: "引用的 chunk ID" }
       - { name: documentId,   type: string,   ref: KBDocument, required: true, description: "引用的文档 ID" }
@@ -75,7 +74,7 @@ entities:
       - { name: refIndex,     type: number,                  required: true,  description: "引用序号（从 1 开始）" }
 
   - name: KBSettings
-    rule_id: KB-DOM-007
+    source_rule: KB-DOM-007
     fields:
       - { name: chunkSize,          type: number,  required: true, default: 512,  description: "分块目标大小（tokens）" }
       - { name: chunkOverlap,       type: number,  required: true, default: 64,   description: "分块重叠（tokens）" }

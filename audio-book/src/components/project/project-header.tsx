@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Project header — project name + back button + step indicator
+// Project header — logo + step indicator (matches Pencil design)
 // ---------------------------------------------------------------------------
 
 import React from 'react';
@@ -18,27 +18,29 @@ type ProjectHeaderProps = {
 
 export function ProjectHeader(props: ProjectHeaderProps) {
   return (
-    <div className="flex w-full items-center gap-3">
+    <div className="flex w-full items-center justify-between">
+      {/* Logo + Back */}
       <button
         type="button"
         onClick={props.onBack}
-        className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+        className="flex items-center gap-2 rounded-lg px-1 py-1 text-gray-700 transition-colors hover:bg-gray-50"
         title="Back to projects"
       >
-        <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z" clipRule="evenodd" />
+        <svg className="h-5 w-5 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
         </svg>
+        <span className="text-sm font-semibold text-gray-900">AudioBook Studio</span>
       </button>
-      <span className="truncate text-sm font-semibold text-gray-900">{props.projectName}</span>
-      <div className="ml-auto">
-        <StepIndicator
-          steps={props.steps}
-          currentStep={props.currentStep}
-          currentIndex={props.currentIndex}
-          canEnterStep={props.canEnterStep}
-          onStepClick={props.onStepClick}
-        />
-      </div>
+
+      {/* Step indicator */}
+      <StepIndicator
+        steps={props.steps}
+        currentStep={props.currentStep}
+        currentIndex={props.currentIndex}
+        canEnterStep={props.canEnterStep}
+        onStepClick={props.onStepClick}
+      />
     </div>
   );
 }

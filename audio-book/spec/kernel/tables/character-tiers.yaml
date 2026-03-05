@@ -51,4 +51,4 @@ default_voices:
     Actual voice IDs depend on available provider at runtime.
   male: "Ethan"
   female: "Cherry"
-  neutral: "Alloy"
+  neutral: "Neil"

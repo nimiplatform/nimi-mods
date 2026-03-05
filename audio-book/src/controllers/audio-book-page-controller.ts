@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useHookClient, useAiClient, useAudioBookClients } from './use-audio-book-clients.js';
 import { useAudioBookUiState } from './use-audio-book-ui-state.js';
+import type { AudioBookStep } from './use-audio-book-ui-state.js';
 import { useStepNavigation } from './use-step-navigation.js';
 import { useTtsRoute } from './use-tts-route.js';
 import { useAudioBookStore } from '../state/audio-book-store.js';
@@ -15,8 +16,9 @@ import { classifyAllCharacters } from '../services/character-tier.js';
 import { recommendAllVoices } from '../services/voice-recommender.js';
 import { runSynthesisJob } from '../services/synthesis-scheduler.js';
 import type { SynthesisJobController } from '../services/synthesis-scheduler.js';
+import { pickTestSegments } from '../services/test-segment-picker.js';
 import { dbPutAudio, dbGetAudio } from '../state/indexed-db.js';
-import type { SegmentJob, VoiceCasting } from '../types.js';
+import type { ScriptSegment, SegmentJob, VoiceCasting } from '../types.js';
 import { createLlmClientAdapter } from '../adapters/llm-adapter.js';
 
 const FLOW_LOG_PREFIX = '[audio-book:flow]';
@@ -70,6 +72,12 @@ export function useAudioBookPageController() {
   const playbackAudioRef = useRef<HTMLAudioElement | null>(null);
   const playbackAudioUrlRef = useRef<string | null>(null);
 
+  // Use stable setter refs — ui.setX are stable (from useState), but extracting
+  // them prevents the callbacks from depending on the whole `ui` object which is
+  // a new reference each render. Without this, the cleanup effect re-runs every
+  // render and kills any active Audio element.
+  const { setPreviewPlaying, setPlaybackState, setCurrentStep, setTestSynthesisJob } = ui;
+
   const stopPreviewAudio = useCallback(() => {
     const audio = previewAudioRef.current;
     if (audio) {
@@ -83,8 +91,8 @@ export function useAudioBookPageController() {
     }
     previewAudioRef.current = null;
     previewAudioUrlRef.current = null;
-    ui.setPreviewPlaying(null);
-  }, [ui]);
+    setPreviewPlaying(null);
+  }, [setPreviewPlaying]);
 
   const stopPlaybackAudio = useCallback(() => {
     const audio = playbackAudioRef.current;
@@ -99,8 +107,8 @@ export function useAudioBookPageController() {
     }
     playbackAudioRef.current = null;
     playbackAudioUrlRef.current = null;
-    ui.setPlaybackState(null);
-  }, [ui]);
+    setPlaybackState(null);
+  }, [setPlaybackState]);
 
   useEffect(() => {
     console.info(FLOW_LOG_PREFIX, 'controller:mounted');
@@ -155,12 +163,47 @@ export function useAudioBookPageController() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Step restoration: when a project is opened, auto-navigate to the most
+  // advanced step that the persisted project state allows.
+  const prevActiveProjectIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const projectId = store.activeProjectId;
+    const state = store.project?.state;
+    // Only run when activeProjectId changes (i.e. a project was just opened)
+    if (projectId && projectId !== prevActiveProjectIdRef.current && state) {
+      const STATE_TO_STEP: Record<string, AudioBookStep> = {
+        draft: 'import',
+        imported: 'analyze',
+        analyzing: 'analyze',
+        analyzed: 'cast',
+        casting: 'cast',
+        cast_complete: 'synth',
+        synthesizing: 'synth',
+        done: 'play',
+        done_with_errors: 'play',
+        cancelled: 'synth',
+        paused: 'synth',
+      };
+      const targetStep = STATE_TO_STEP[state] ?? 'import';
+      console.info(FLOW_LOG_PREFIX, 'step:restore', {
+        projectId,
+        projectState: state,
+        targetStep,
+      });
+      setCurrentStep(targetStep);
+    }
+    prevActiveProjectIdRef.current = projectId;
+  }, [store.activeProjectId, store.project?.state, setCurrentStep]);
+
+  const hasTestAudio = ui.testMode && (ui.testSynthesisJob?.segmentJobs.some((sj) => sj.status === 'done') ?? false);
+
   const navigation = useStepNavigation({
     currentStep: ui.currentStep,
     setCurrentStep: ui.setCurrentStep,
     projectState: store.project?.state ?? null,
     segmentsCount: store.script?.segments.length || 0,
     castingsCount: store.voiceCastings.length,
+    hasTestAudio,
     onConfirmBacktrack: (target, callback) => {
       ui.setConfirmDialog({
         message: `Going back to "${target}" may discard downstream progress. Continue?`,
@@ -199,6 +242,8 @@ export function useAudioBookPageController() {
         let project = store.project;
         if (!project) {
           project = await store.createProject(projectName || 'Untitled');
+        } else if (projectName && projectName !== project.name) {
+          store.updateProject({ name: projectName });
         }
 
         store.updateProject({
@@ -286,6 +331,42 @@ export function useAudioBookPageController() {
 
       const classified = classifyAllCharacters(chosen.result.characters);
 
+      // --- Patch orphan speakers: speakers in segments but not in characters ---
+      const speakerCounts = new Map<string, number>();
+      for (const seg of chosen.result.segments) {
+        speakerCounts.set(seg.speaker, (speakerCounts.get(seg.speaker) ?? 0) + 1);
+      }
+      const characterNames = new Set(classified.map((c) => c.name));
+      const orphanSpeakers = [...speakerCounts.keys()].filter((s) => !characterNames.has(s));
+      if (orphanSpeakers.length > 0) {
+        for (const speaker of orphanSpeakers) {
+          classified.push({
+            name: speaker,
+            gender: 'neutral',
+            ageGroup: 'adult',
+            traits: [],
+            segmentCount: speakerCounts.get(speaker) ?? 0,
+            tier: 'minor',
+          });
+        }
+        console.warn(FLOW_LOG_PREFIX, 'analyze:orphan-speakers:patched', {
+          speakers: orphanSpeakers,
+          note: 'Added as minor characters so they get voice casting',
+        });
+      }
+
+      // --- Detailed analysis dump for debugging ---
+      console.info(FLOW_LOG_PREFIX, 'analyze:characters', classified.map((c) => ({
+        name: c.name,
+        tier: c.tier,
+        gender: c.gender,
+        segmentCount: speakerCounts.get(c.name) ?? 0,
+      })));
+      console.info(FLOW_LOG_PREFIX, 'analyze:speakers-in-segments',
+        Object.fromEntries(speakerCounts.entries()),
+      );
+      // --- End analysis dump ---
+
       store.updateProject({ state: 'analyzed' });
       store.setScript({
         projectId: store.project!.id,
@@ -350,6 +431,24 @@ export function useAudioBookPageController() {
       console.info(FLOW_LOG_PREFIX, 'cast:auto:ok', {
         castingsCount: castings.length,
       });
+      // --- Detailed cast dump for debugging ---
+      console.info(FLOW_LOG_PREFIX, 'cast:auto:detail', castings.map((c) => ({
+        character: c.characterName,
+        voiceId: c.voiceId,
+        voiceName: c.voiceName,
+        providerId: c.providerId,
+      })));
+      // Check for characters without castings
+      const castNames = new Set(castings.map((c) => c.characterName));
+      const allSegmentSpeakers = new Set((store.script?.segments ?? []).map((s) => s.speaker));
+      const uncastSpeakers = [...allSegmentSpeakers].filter((s) => !castNames.has(s));
+      if (uncastSpeakers.length > 0) {
+        console.warn(FLOW_LOG_PREFIX, 'cast:auto:uncast-speakers', {
+          speakers: uncastSpeakers,
+          note: 'These speakers have segments but no voice casting — their segments will fail during synthesis',
+        });
+      }
+      // --- End cast dump ---
     } catch (err) {
       console.warn(FLOW_LOG_PREFIX, 'cast:auto:failed', {
         error: err instanceof Error ? err.message : String(err),
@@ -454,8 +553,12 @@ export function useAudioBookPageController() {
   // Actions: Synthesize
   // ---------------------------------------------------------------------------
 
-  const runSynthesis = useCallback(async (existingJobs?: SegmentJob[], reason: 'start' | 'retry-failed' = 'start') => {
-    const segments = store.script?.segments ?? [];
+  const runSynthesis = useCallback(async (
+    existingJobs?: SegmentJob[],
+    reason: 'start' | 'retry-failed' | 'test' = 'start',
+    segmentSubset?: ScriptSegment[],
+  ) => {
+    const segments = segmentSubset ?? store.script?.segments ?? [];
     const castingsCount = store.voiceCastings.length;
 
     if (ui.synthRunning) {
@@ -493,7 +596,10 @@ export function useAudioBookPageController() {
 
     ui.setSynthRunning(true);
     ui.setError(null);
-    store.updateProject({ state: 'synthesizing' });
+    // Test mode: don't mutate project state — it stays at cast_complete
+    if (reason !== 'test') {
+      store.updateProject({ state: 'synthesizing' });
+    }
     console.info(FLOW_LOG_PREFIX, 'synth:start', {
       reason,
       projectId: store.project?.id || '(none)',
@@ -546,8 +652,8 @@ export function useAudioBookPageController() {
 
     try {
       const job = await promise;
-      store.setSynthesisJob(job);
       console.info(FLOW_LOG_PREFIX, 'synth:done', {
+        reason,
         status: job.status,
         total: job.segmentJobs.length,
         completed: job.segmentJobs.filter((item) => item.status === 'done').length,
@@ -572,14 +678,24 @@ export function useAudioBookPageController() {
         }
       }
 
-      if (job.status === 'done') {
-        store.updateProject({ state: 'done' });
-        ui.setCurrentStep('play');
-      } else if (job.status === 'done_with_errors') {
-        store.updateProject({ state: 'done_with_errors' });
-        ui.setCurrentStep('play');
-      } else if (job.status === 'cancelled') {
-        store.updateProject({ state: 'cancelled' });
+      if (reason === 'test') {
+        // Test mode: keep results ephemeral — do NOT persist to store
+        ui.setTestMode(true);
+        ui.setTestSegmentIds(segments.map((s) => s.id));
+        setTestSynthesisJob(job);
+        // Project state was never changed, no need to restore
+      } else {
+        // Full synthesis: persist job to store
+        store.setSynthesisJob(job);
+        if (job.status === 'done') {
+          store.updateProject({ state: 'done' });
+          ui.setCurrentStep('play');
+        } else if (job.status === 'done_with_errors') {
+          store.updateProject({ state: 'done_with_errors' });
+          ui.setCurrentStep('play');
+        } else if (job.status === 'cancelled') {
+          store.updateProject({ state: 'cancelled' });
+        }
       }
     } catch (err) {
       console.warn(FLOW_LOG_PREFIX, 'synth:failed', {
@@ -589,7 +705,10 @@ export function useAudioBookPageController() {
         model: ttsRoute.ttsSelection.model || '(none)',
       });
       ui.setError(err instanceof Error ? err.message : 'Synthesis failed');
-      store.updateProject({ state: 'cast_complete' });
+      // Only restore project state for full synthesis (test mode never changed it)
+      if (reason !== 'test') {
+        store.updateProject({ state: 'cast_complete' });
+      }
     } finally {
       ui.setSynthRunning(false);
       ui.setSynthProgress(null);
@@ -599,14 +718,37 @@ export function useAudioBookPageController() {
     store,
     clients.ttsClient,
     ui,
+    setTestSynthesisJob,
     ttsRoute.ttsSelection.connectorId,
     ttsRoute.ttsSelection.model,
     ttsRoute.ttsSelection.routeSource,
   ]);
 
   const startSynthesis = useCallback(async () => {
+    ui.setTestMode(false);
+    ui.setTestSegmentIds([]);
+    setTestSynthesisJob(null);
     await runSynthesis(undefined, 'start');
-  }, [runSynthesis]);
+  }, [runSynthesis, ui, setTestSynthesisJob]);
+
+  const startTestSynthesis = useCallback(async () => {
+    const allSegments = store.script?.segments ?? [];
+    const castingMap = new Map<string, VoiceCasting>();
+    for (const c of store.voiceCastings) {
+      castingMap.set(c.characterName, c);
+    }
+    const testSegments = pickTestSegments(allSegments, castingMap, 3);
+    if (testSegments.length === 0) {
+      ui.setError('No segments available for test synthesis.');
+      return;
+    }
+    console.info(FLOW_LOG_PREFIX, 'synth:test:start', {
+      testSegmentCount: testSegments.length,
+      segmentIds: testSegments.map((s) => s.id),
+      speakers: testSegments.map((s) => s.speaker),
+    });
+    await runSynthesis(undefined, 'test', testSegments);
+  }, [runSynthesis, store.script?.segments, store.voiceCastings, ui]);
 
   const retryFailedSynthesis = useCallback(async () => {
     const failed = store.synthesisJob?.segmentJobs.filter((item) => item.status === 'failed') ?? [];
@@ -626,8 +768,9 @@ export function useAudioBookPageController() {
   // Actions: Playback
   // ---------------------------------------------------------------------------
 
+  // Continuous playback: auto-advance to next segment when current ends
   const playSegmentAudio = useCallback(
-    async (segmentId: string) => {
+    async (segmentId: string, continuous = false) => {
       if (!store.project) return;
       stopPreviewAudio();
       stopPlaybackAudio();
@@ -639,12 +782,38 @@ export function useAudioBookPageController() {
 
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
+      audio.playbackRate = ui.playbackSpeed;
       playbackAudioRef.current = audio;
       playbackAudioUrlRef.current = url;
+
+      const allSegments = store.script?.segments ?? [];
+      const currentIdx = allSegments.findIndex((s) => s.id === segmentId);
+
       audio.onended = () => {
-        if (playbackAudioRef.current === audio) {
-          stopPlaybackAudio();
+        if (playbackAudioRef.current !== audio) return;
+
+        if (continuous) {
+          // Find next playable segment in the same chapter
+          const chapterIndex = allSegments[currentIdx]?.chapterIndex;
+          const doneSet = new Set(
+            store.synthesisJob?.segmentJobs
+              .filter((sj) => sj.status === 'done')
+              .map((sj) => sj.segmentId) ?? [],
+          );
+          let nextIdx = currentIdx + 1;
+          while (nextIdx < allSegments.length) {
+            const nextSeg = allSegments[nextIdx]!;
+            if (nextSeg.chapterIndex !== chapterIndex) break;
+            if (doneSet.has(nextSeg.id)) {
+              // Auto-advance
+              playSegmentAudio(nextSeg.id, true);
+              return;
+            }
+            nextIdx++;
+          }
         }
+        // No more segments or not continuous
+        stopPlaybackAudio();
       };
       audio.onerror = () => {
         if (playbackAudioRef.current === audio) {
@@ -653,11 +822,9 @@ export function useAudioBookPageController() {
       };
       audio.ontimeupdate = () => {
         if (playbackAudioRef.current !== audio) return;
-        const segments = store.script?.segments ?? [];
-        const idx = segments.findIndex((s) => s.id === segmentId);
         ui.setPlaybackState({
           playing: true,
-          currentSegmentIndex: idx,
+          currentSegmentIndex: currentIdx,
           currentSegmentId: segmentId,
           currentTime: audio.currentTime * 1000,
           duration: (audio.duration || 0) * 1000,
@@ -667,6 +834,16 @@ export function useAudioBookPageController() {
     },
     [store, stopPlaybackAudio, stopPreviewAudio, ui],
   );
+
+  const stopPlayback = useCallback(() => {
+    stopPlaybackAudio();
+  }, [stopPlaybackAudio]);
+
+  const updateProjectName = useCallback((name: string) => {
+    if (store.project && name.trim()) {
+      store.updateProject({ name: name.trim() });
+    }
+  }, [store]);
 
   // ---------------------------------------------------------------------------
   // Composed return
@@ -686,17 +863,20 @@ export function useAudioBookPageController() {
     // Actions
     actions: {
       importText,
+      updateProjectName,
       startAnalysis,
       cancelAnalysis,
       startAutoCast,
       updateCasting,
       previewVoice,
       startSynthesis,
+      startTestSynthesis,
       pauseSynthesis,
       resumeSynthesis,
       cancelSynthesis,
       retryFailedSynthesis,
       playSegmentAudio,
+      stopPlayback,
     },
   };
 }

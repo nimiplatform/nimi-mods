@@ -21,8 +21,9 @@ const DEFAULT_MAX_CONCURRENCY = 3;
 const MAX_RETRIES = 2; // 3 total attempts
 const BACKOFF_MS = [1000, 3000];
 const RATE_LIMIT_BACKOFF_MS = [5000, 15000];
-// Keep chunk size conservative for Qwen TTS input limits to avoid AI_INPUT_INVALID.
-const MAX_TTS_TEXT_CHARS = 550;
+// Keep chunk size conservative for Qwen/CosyVoice TTS input limits to avoid AI_INPUT_INVALID.
+// DashScope CosyVoice models have ~500 char limit; use 300 for safety with multi-byte Chinese text.
+const MAX_TTS_TEXT_CHARS = 300;
 
 // ---------------------------------------------------------------------------
 // Error classification
@@ -39,6 +40,8 @@ function classifyError(error: unknown): ErrorClassification {
     lower.includes('text too long') ||
     lower.includes('unsupported') ||
     lower.includes('invalid_request') ||
+    lower.includes('invalidargument') ||
+    lower.includes('ai_input_invalid') ||
     lower.includes('400')
   ) {
     return 'permanent';

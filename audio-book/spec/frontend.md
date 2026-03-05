@@ -8,14 +8,14 @@
 | Kernel Location | Rule IDs |
 |---|---|
 | `kernel/entity-contract.md` | VS-ENT-001 ~ 009 |
-| `kernel/pipeline-contract.md` | VS-PIPE-001 ~ 007 |
+| `kernel/pipeline-contract.md` | VS-PIPE-001 ~ 008 |
 | `kernel/synthesis-contract.md` | VS-SYNTH-006 |
 
 ## 1. Scope
 
 本文档定义 Audio Book 在 desktop 中的前端架构：组件树、状态管理、Step 间导航、每个 Step 的 UI 结构。
 
-遵循 nimi-mod 前端惯例：Controller Hook 编排 + Zustand 持久状态 + React Hooks 临时状态 + Panel Builder 条件渲染。
+遵循 nimi-mod 前端惯例：Controller Hook 编排 + Zustand 持久状态 + React Hooks 临时状态。
 
 ## 2. Mod 注册
 
@@ -27,7 +27,8 @@ audio-book/
 └── src/
     ├── index.ts              # validate manifest, export factory
     ├── runtime-mod.ts        # createAudioBookRuntimeMod()
-    └── contracts.ts          # MOD_ID, capabilities, slots, tab IDs
+    ├── contracts.ts          # MOD_ID, capabilities, slots, tab IDs, error codes
+    └── manifest.ts           # MANIFEST object (ai.dependencies, hooks)
 ```
 
 ### 2.2 注册 (runtime-mod.ts setup)
@@ -40,54 +41,39 @@ const aiClient = createAiClient(MOD_ID, sdkRuntimeContext);
 // 2. 注册 sidebar nav
 await hookClient.ui.register({
   slot: 'ui-extension.app.sidebar.mods',
-  priority: 150,
-  extension: {
-    type: 'nav-item',
-    tabId: 'audio-book',
-    label: t('page.title', 'Audio Book'),
-    icon: 'microphone',
-    strategy: 'append',
-  },
+  extension: { type: 'nav-item', tabId: 'audio-book', label: 'Audio Book', icon: 'microphone' },
 });
 
 // 3. 注册 content route (lazy load)
 const LazyPage = React.lazy(() => import('./audio-book-page.js'));
 await hookClient.ui.register({
   slot: 'ui-extension.app.content.routes',
-  priority: 150,
-  extension: {
-    type: 'tab-page',
-    tabId: 'audio-book',
-    component: () => React.createElement(
-      Suspense,
-      { fallback: loadingUI },
-      React.createElement(LazyPage),
-    ),
-  },
+  extension: { type: 'tab-page', tabId: 'audio-book', component: () => <Suspense><LazyPage /></Suspense> },
 });
-
-// 4. 注册 data capabilities (项目 CRUD)
-await registerAudioBookDataCapabilities({ hookClient });
 ```
 
 ## 3. 组件树
 
 ```
 <AudioBookPage>                          ← 顶层页面入口
-  └─ useAudioBookPageController()        ← Controller Hook（编排全部逻辑）
-      ├─ useAudioBookStore()             ← Zustand 持久状态
-      ├─ useAudioBookUiState()           ← React 临时 UI 状态
-      ├─ useAudioBookClients()           ← hookClient + aiClient
-      └─ renders:
-          <AudioBookShell>               ← 外壳布局
-            ├─ <ProjectHeader />           ← 项目名 + 步骤导航条
-            ├─ <StepContent />             ← 按当前 step 条件渲染：
-            │   ├─ step=import   → <ImportStep />
-            │   ├─ step=analyze  → <AnalyzeStep />
-            │   ├─ step=cast     → <CastStep />
-            │   ├─ step=synth    → <SynthesisStep />
-            │   └─ step=play     → <PlaybackStep />
-            └─ <StepFooter />              ← 上一步/下一步按钮
+  ├─ 无活跃项目时 → <ProjectListView />  ← 项目列表（含 create/delete 确认弹窗）
+  └─ 有活跃项目时 →
+      useAudioBookPageController()       ← 单一 Controller Hook（编排全部逻辑）
+        ├─ useAudioBookStore()           ← Zustand 持久状态
+        ├─ useAudioBookUiState()         ← React 临时 UI 状态
+        ├─ useAudioBookClients()         ← hookClient + aiClient + llmClient + ttsClient
+        ├─ useStepNavigation()           ← Step 导航逻辑
+        ├─ useTtsRoute()                 ← TTS/Chat connector 发现与 model 选择
+        └─ renders:
+            <AudioBookShell>             ← 外壳布局（error toast + confirm dialog）
+              ├─ <ProjectHeader />       ← 书本图标 + "AudioBook Studio" + <StepIndicator />
+              ├─ <StepContent />         ← 按当前 step 条件渲染：
+              │   ├─ step=import   → <ImportStep />
+              │   ├─ step=analyze  → <AnalyzeStep />
+              │   ├─ step=cast     → <CastStep />
+              │   ├─ step=synth    → <SynthesisStep />
+              │   └─ step=play     → <PlaybackStep />
+              └─ <StepFooter />          ← 箭头图标 prev/next 按钮
 ```
 
 ## 4. 状态管理
@@ -96,553 +82,276 @@ await registerAudioBookDataCapabilities({ hookClient });
 
 | 层 | 工具 | 内容 | 生命周期 |
 |---|---|---|---|
-| **持久状态** | Zustand + IndexedDB | 项目列表、Script、CharacterProfile、VoiceCasting、SynthesisJob 元数据 | 跨会话持久 |
-| **临时 UI 状态** | React useState/useReducer | 当前 step、loading 状态、modal 开关、选中角色、播放位置 | 页面级 |
-| **全局 App 状态** | useAppStore | 当前用户、activeTab、导航 | desktop 全局 |
+| **持久状态** | Zustand + IndexedDB | 项目列表、Script、CharacterProfile[]、VoiceCasting[]、SynthesisJob | 跨会话持久 |
+| **临时 UI 状态** | `useAudioBookUiState()` | 当前 step、loading、进度、选中角色、播放状态、testMode | 页面级 |
+| **路由状态** | `useTtsRoute()` | connector 列表、chat/tts selection、model | 页面级，localStorage 持久化选择 |
 
-### 4.2 Zustand Store 设计
+### 4.2 临时 UI 状态 (`useAudioBookUiState`)
 
 ```typescript
-interface AudioBookStore {
-  // ---- 项目列表 ----
-  projects: VoiceProjectMeta[];          // 轻量元数据列表（不含 chapters 原文）
-  activeProjectId: string | null;
+type AudioBookStep = 'import' | 'analyze' | 'cast' | 'synth' | 'play';
 
-  // ---- 当前活跃项目的完整数据 ----
-  project: VoiceProject | null;          // 包含 sourceChapters
-  script: Script | null;
-  characters: CharacterProfile[];
-  synthesisJob: SynthesisJob | null;
-
-  // ---- Actions ----
-  loadProjectList: () => Promise<void>;
-  openProject: (id: string) => Promise<void>;
-  createProject: (name: string) => Promise<string>;
-  deleteProject: (id: string) => Promise<void>;
-
-  updateProject: (patch: Partial<VoiceProject>) => void;
-  setScript: (script: Script) => void;
-  setCharacters: (characters: CharacterProfile[]) => void;
-  updateCharacter: (name: string, patch: Partial<CharacterProfile>) => void;
-  mergeCharacters: (keepName: string, mergeName: string) => void;
-  setSynthesisJob: (job: SynthesisJob) => void;
-  updateSegmentJob: (segmentId: string, patch: Partial<SegmentJob>) => void;
+// 返回的状态字段：
+{
+  currentStep / setCurrentStep         // AudioBookStep
+  importText / setImportText           // string
+  importLoading / setImportLoading     // boolean
+  analysisProgress / setAnalysisProgress // AnalysisProgress | null
+  analysisRunning / setAnalysisRunning // boolean
+  selectedCharacter / setSelectedCharacter // string | null
+  previewPlaying / setPreviewPlaying   // string | null
+  synthProgress / setSynthProgress     // SynthProgress | null
+  synthRunning / setSynthRunning       // boolean
+  playbackState / setPlaybackState     // PlaybackState | null
+  playbackSpeed / setPlaybackSpeed     // number (default 1.0)
+  playbackChapter / setPlaybackChapter // number (default 0)
+  error / setError / clearError        // string | null
+  confirmDialog / setConfirmDialog     // { message, onConfirm } | null
+  testMode / setTestMode               // boolean
+  testSegmentIds / setTestSegmentIds   // string[]
+  testSynthesisJob / setTestSynthesisJob // SynthesisJob | null
 }
 ```
 
-### 4.3 IndexedDB 层
-
-Store actions 内部调用 IndexedDB wrapper：
+### 4.3 TTS Route 状态 (`useTtsRoute`)
 
 ```typescript
-// DB: 'audio-book', version: 1
-// Object Stores:
-//   'projects'     → key: projectId, value: VoiceProject JSON
-//   'scripts'      → key: projectId, value: Script JSON
-//   'characters'   → key: projectId, value: CharacterProfile[] JSON
-//   'jobs'         → key: projectId, value: SynthesisJob JSON
-//   'audio'        → key: '{projectId}:{segmentId}', value: Blob (mp3)
+type TtsRouteState = {
+  chatConnectors: RuntimeRouteConnectorOption[];
+  ttsConnectors: RuntimeRouteConnectorOption[];
+  chatSelection: RouteSelection;    // { connectorId, routeSource, model? }
+  ttsSelection: RouteSelection;
+  loading: boolean;
+  error: string | null;
+  selectChatConnector: (connectorId: string) => void;
+  selectTtsConnector: (connectorId: string) => void;
+};
 ```
 
-Zustand store 在 `openProject()` 时从 IndexedDB 加载，在每次 mutation 后自动写回。音频 Blob 不进 Zustand store（太大），播放时直接从 IndexedDB 按需读取。
+- Connector 发现：调 `hookClient.data.query({ capability: 'data-api.runtime.route.options' })`，4 次重试，15/30s 轮询。
+- Model 选择：按 vendor 字符串匹配（DashScope/OpenAI）+ 硬编码偏好列表。见 `TODO.md` 改进计划。
+- 选择持久化于 `localStorage`（`audio-book:chat-connector`、`audio-book:tts-connector`）。
 
-### 4.4 临时 UI 状态
+## 5. Adapter 层
 
-```typescript
-function useAudioBookUiState() {
-  // 步骤导航
-  const [currentStep, setCurrentStep] = useState<Step>('import');
+Controller 通过 adapter 层将 SDK client 转换为 service 层可用的抽象接口：
 
-  // Import step
-  const [importText, setImportText] = useState('');
-  const [importLoading, setImportLoading] = useState(false);
+| Adapter | 输入 | 输出 | 文件 |
+|---------|------|------|------|
+| `createLlmClientAdapter` | `ModAiClient` | `LlmClient` | `adapters/llm-adapter.ts` |
+| `createTtsClientAdapter` | `HookLlmClient.speech` | `TtsClient` | `adapters/tts-adapter.ts` |
 
-  // Analyze step
-  const [analysisProgress, setAnalysisProgress] = useState<AnalysisProgress | null>(null);
+`LlmClient` 和 `TtsClient` 是 `types.ts` 中定义的纯接口，service 层只依赖接口不依赖 SDK，便于单元测试。
 
-  // Cast step
-  const [selectedCharacter, setSelectedCharacter] = useState<string | null>(null);
-  const [previewPlaying, setPreviewPlaying] = useState(false);
-
-  // Synthesis step
-  const [synthProgress, setSynthProgress] = useState<SynthProgress | null>(null);
-
-  // Playback step
-  const [playbackState, setPlaybackState] = useState<PlaybackState>({
-    isPlaying: false,
-    currentChapterIndex: 0,
-    currentSegmentIndex: 0,
-    positionMs: 0,
-  });
-
-  // 通用
-  const [error, setError] = useState<string | null>(null);
-  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog | null>(null);
-
-  return { currentStep, setCurrentStep, /* ...all above */ };
-}
-```
-
-## 5. Controller Hook
+## 6. Controller Hook
 
 ```typescript
 function useAudioBookPageController() {
-  // 1. Clients
-  const { hookClient, aiClient } = useAudioBookClients();
-
-  // 2. App state
-  const currentUser = useAppStore((s) => s.auth?.user || null);
-
-  // 3. Persistent state
+  const hookClient = useHookClient();
+  const aiClient = useAiClient();
+  const ttsRoute = useTtsRoute(hookClient, aiClient);
+  const clients = useAudioBookClients(hookClient, aiClient, ttsRoute.chatSelection);
   const store = useAudioBookStore();
-
-  // 4. UI state
   const ui = useAudioBookUiState();
+  const navigation = useStepNavigation({ currentStep, setCurrentStep, projectState, ... });
 
-  // 5. 派生状态
-  const derived = useMemo(() => ({
-    canAdvance: computeCanAdvance(ui.currentStep, store),
-    canRetreat: computeCanRetreat(ui.currentStep),
-    stepProgress: computeStepProgress(store),
-  }), [ui.currentStep, store]);
-
-  // 6. Actions (step-specific)
-  const importActions = useImportActions(store, ui, hookClient);
-  const analyzeActions = useAnalyzeActions(store, ui, aiClient);
-  const castActions = useCastActions(store, ui, hookClient, aiClient);
-  const synthActions = useSynthActions(store, ui, hookClient);
-  const playbackActions = usePlaybackActions(store, ui);
-
-  // 7. Step 导航
-  const navigation = useStepNavigation(store, ui);
-
-  return {
-    store, ui, derived,
-    importActions, analyzeActions, castActions, synthActions, playbackActions,
-    navigation,
+  // 15 个 action 方法直接定义在 controller 中：
+  const actions = {
+    importText, updateProjectName,
+    startAnalysis, cancelAnalysis,
+    startAutoCast, updateCasting, previewVoice,
+    startSynthesis, startTestSynthesis, pauseSynthesis, resumeSynthesis, cancelSynthesis, retryFailedSynthesis,
+    playSegmentAudio, stopPlayback,
   };
+
+  return { clients, store, ui, navigation, ttsRoute, actions };
 }
 ```
 
-## 6. 各 Step UI 设计
+## 7. Service 层
 
-### 6.1 项目列表（首页）
+纯逻辑模块，不依赖 React，通过 `LlmClient` / `TtsClient` 接口注入依赖：
 
-当 `activeProjectId = null` 时显示项目列表而非 step 内容：
+| Service | 文件 | 功能 |
+|---------|------|------|
+| `analyzeAllChapters` | `services/analysis-pipeline.ts` | 逐章 LLM 分析 + 分块重试 + fidelity gate |
+| `splitLongSegments` | `services/segment-post-processor.ts` | 长 segment 在对话引号/句末处拆分 |
+| `recommendAllVoices` | `services/voice-recommender.ts` | LLM 声线推荐 + hash 分配兜底 |
+| `runSynthesisJob` | `services/synthesis-scheduler.ts` | 滑动窗口并发合成 + 暂停/恢复/取消 |
+| `pickTestSegments` | `services/test-segment-picker.ts` | 选取代表性 segment 用于测试合成 |
+| `getQwenSystemVoices` | `services/qwen-voice-catalog.ts` | DashScope 声音目录兜底 |
 
-```
-┌─────────────────────────────────────────┐
-│ Audio Book                   [+ 新建]  │
-│                                         │
-│  项目列表:                               │
-│  ┌─────────────────────────────────┐    │
-│  │ 📖 《三体》    ● 合成中 60%     │    │
-│  │ 📖 《围城》    ✓ 已完成         │    │
-│  │ 📖 《活着》    ○ 待分配声线     │    │
-│  └─────────────────────────────────┘    │
-└─────────────────────────────────────────┘
-```
+### 关键常量
 
-**组件**: `<ProjectListView />`
-- 每个项目卡片显示：名称、状态、章节数、角色数、创建时间
-- 点击项目 → `store.openProject(id)` → 进入对应 step
-- 右键/长按 → 删除确认
+| 常量 | 值 | 位置 |
+|------|-----|------|
+| `MAX_CHUNK_CHARS` | 1500 | analysis-pipeline.ts |
+| `CHUNK_RETRY_SIZES` | [1500, 1000, 800, 500] | analysis-pipeline.ts |
+| `MAX_SEGMENT_CHARS` | 600 | segment-post-processor.ts |
+| `MAX_NARRATION_CHARS` | 800 | segment-post-processor.ts |
+| `DEFAULT_MAX_CONCURRENCY` | 3 | synthesis-scheduler.ts |
+| `MAX_RETRIES` | 2 | synthesis-scheduler.ts |
+| `BACKOFF_MS` | [1000, 3000] | synthesis-scheduler.ts |
+| `MAX_TTS_TEXT_CHARS` | 300 | synthesis-scheduler.ts |
+| `MAX_TEST_TEXT_LENGTH` | 500 | test-segment-picker.ts |
 
-### 6.2 Step 1 — ImportStep
+## 8. Step 导航
 
-```
-┌─────────────────────────────────────────────────┐
-│  [1·导入] → 2·分析 → 3·声线 → 4·合成 → 5·播放  │
-├─────────────────────────────────────────────────┤
-│                                                 │
-│  项目名称: [《三体》________________]            │
-│                                                 │
-│  ┌───────────────────────────────────────┐      │
-│  │   拖拽 .txt 文件到此处                 │      │
-│  │   或 点击上传                          │      │
-│  └───────────────────────────────────────┘      │
-│                                                 │
-│  ┌───────────────────────────────────────┐      │
-│  │ (文本预览 / 粘贴区)                    │      │
-│  │ 第一章 科学边界                        │      │
-│  │ 汪淼骑着自行车来到...                  │      │
-│  └───────────────────────────────────────┘      │
-│                                                 │
-│  ✓ 检测到 24 个章节，共 18.6 万字                │
-│                                                 │
-├─────────────────────────────────────────────────┤
-│                              [下一步：分析 →]    │
-└─────────────────────────────────────────────────┘
-```
+### 8.1 步骤条 (StepIndicator)
 
-**组件分解**:
-```
-<ImportStep>
-  ├─ <ProjectNameInput />
-  ├─ <FileDropZone />            ← <input type="file"> + drag & drop
-  ├─ <TextPreview />             ← 显示已导入文本（按章节折叠）
-  └─ <ImportStats />             ← 章节数、字数统计
-```
-
-### 6.3 Step 2 — AnalyzeStep
-
-```
-┌─────────────────────────────────────────────────┐
-│  1·导入 → [2·分析] → 3·声线 → 4·合成 → 5·播放  │
-├─────────────────────────────────────────────────┤
-│                                                 │
-│  ⏳ 正在分析第 3 / 24 章...                      │
-│  ████████░░░░░░░░  33%                          │
-│                                                 │
-│  已识别角色:                                     │
-│  ┌───────────────────────────────────────┐      │
-│  │ 叶文洁 (42段) · 汪淼 (67段) · 史强    │      │
-│  │ (55段) · 杨冬 (12段) · +3 more        │      │
-│  └───────────────────────────────────────┘      │
-│                                                 │
-│  实时预览:                                       │
-│  ┌───────────────────────────────────────┐      │
-│  │ [旁白] 汪淼骑着自行车来到射击场...     │      │
-│  │ [史强] "汪教授，我姓史，大史。"        │      │
-│  │ [汪淼] "史队长，你找我什么事？"        │      │
-│  └───────────────────────────────────────┘      │
-│                                                 │
-├─────────────────────────────────────────────────┤
-│  [取消]                       [下一步：声线 →]   │
-└─────────────────────────────────────────────────┘
-```
-
-**组件分解**:
-```
-<AnalyzeStep>
-  ├─ <AnalysisProgressBar />     ← 总进度 + 当前章节
-  ├─ <CharacterChipList />       ← 已识别角色的 chip 列表
-  ├─ <SegmentPreviewList />      ← 最近生成的 segments 实时滚动
-  └─ <AnalysisControls />        ← 取消/暂停按钮
-```
-
-**状态流**:
-- `analyzeActions.startAnalysis()` → 逐章调用 `aiClient.generateObject()`
-- 每章完成 → 更新 `store.script` + `store.characters` + `ui.analysisProgress`
-- 分析完成 → `store.updateProject({ status: 'analyzed' })`
-
-### 6.4 Step 3 — CastStep
-
-```
-┌──────────────────────────────────────────────────────────┐
-│  1·导入 → 2·分析 → [3·声线] → 4·合成 → 5·播放           │
-├──────────────────────────────────────────────────────────┤
-│                                                          │
-│  角色列表               │  选中角色详情                    │
-│  ┌─────────────────┐   │  ┌───────────────────────────┐  │
-│  │ ✓ 旁白     380段│   │  │ 角色：史强                 │  │
-│  │ ✓ 叶文洁    42段│   │  │ 性别：男 / 年龄：中年      │  │
-│  │ ● 史强      55段│   │  │ 特征：粗犷、直爽、豪放     │  │
-│  │ ○ 汪淼      67段│   │  │                           │  │
-│  │ ○ 杨冬      12段│   │  │ 声线:                     │  │
-│  │ ◌ 路人甲     2段│   │  │ Provider: [DashScope ▼]   │  │
-│  └─────────────────┘   │  │ Voice:    [Ethan    ▼]    │  │
-│                        │  │ 语速: ──●────── 1.0x      │  │
-│  [一键推荐全部声线]      │  │ 音调: ────●──── 0         │  │
-│  [低频角色用默认]        │  │ 情绪: [沉稳 ▼]           │  │
-│                        │  │                           │  │
-│                        │  │ 试听: "有人要杀你。"       │  │
-│                        │  │ [▶ 播放] [🔄 换一句]      │  │
-│                        │  └───────────────────────────┘  │
-│                                                          │
-├──────────────────────────────────────────────────────────┤
-│  [← 重新分析]                     [下一步：合成 →]        │
-└──────────────────────────────────────────────────────────┘
-```
-
-**组件分解**:
-```
-<CastStep>
-  ├─ <CharacterList>                 ← 左侧角色列表
-  │   ├─ <CharacterListItem />       ← 单个角色行（名称、段数、状态）
-  │   └─ <CharacterBatchActions />   ← 一键推荐、低频默认按钮
-  └─ <CharacterDetail>               ← 右侧详情面板
-      ├─ <CharacterInfo />           ← 性别、年龄、traits 展示/编辑
-      ├─ <VoiceSelector />           ← Provider + Voice 下拉 + 参数滑条
-      └─ <VoicePreview />            ← 试听台词 + 播放按钮
-```
-
-**关键交互**:
-- 选择角色 → `ui.setSelectedCharacter(name)`
-- 切换 voice → `store.updateCharacter(name, { voiceCasting: { ... } })`
-- 试听 → `castActions.preview(characterName)` → 调 `hookClient.llm.speech.synthesize()`
-- 一键推荐 → `castActions.autoRecommendAll()` → 调 `aiClient.generateObject()` 返回推荐映射
-
-### 6.5 Step 4 — SynthesisStep
-
-```
-┌──────────────────────────────────────────────────────────┐
-│  1·导入 → 2·分析 → 3·声线 → [4·合成] → 5·播放           │
-├──────────────────────────────────────────────────────────┤
-│                                                          │
-│  总进度: ████████████░░░░░░░░  58%  1,247 / 2,148 段    │
-│  预计剩余: ~23 分钟                                       │
-│                                                          │
-│  章节进度:                                                │
-│  ┌─────────────────────────────────────────────────┐     │
-│  │ ✓ 第 1 章 - 科学边界                    100%    │     │
-│  │ ✓ 第 2 章 - 台球                        100%    │     │
-│  │ ...                                              │     │
-│  │ ● 第 14 章 - 红岸基地       ██████░░░   62%     │     │
-│  │ ○ 第 15 章 - 三体问题                   0%      │     │
-│  └─────────────────────────────────────────────────┘     │
-│                                                          │
-│  ⚠ 3 个段落合成失败 [查看详情] [重试失败项]               │
-│                                                          │
-├──────────────────────────────────────────────────────────┤
-│  [← 修改声线]  [暂停]          [去播放已完成章节 →]       │
-└──────────────────────────────────────────────────────────┘
-```
-
-**组件分解**:
-```
-<SynthesisStep>
-  ├─ <SynthProgressSummary />        ← 总进度条 + 统计
-  ├─ <ChapterProgressList>           ← 章节级进度列表
-  │   └─ <ChapterProgressItem />     ← 单章进度条
-  ├─ <FailedSegmentsBanner />        ← 失败段落提示 + 操作
-  └─ <SynthControls />               ← 暂停/恢复/取消
-```
-
-**状态流**:
-- `synthActions.start()` → 创建 SynthesisJob → 启动调度循环
-- 调度循环在 `useEffect` 中运行，用 `useRef` 持有 queue state
-- 每完成一个 segment → `store.updateSegmentJob()` + `ui.setSynthProgress()`
-- 音频 Blob 直接写 IndexedDB，不经过 Zustand
-
-### 6.6 Step 5 — PlaybackStep
-
-```
-┌──────────────────────────────────────────────────────────┐
-│  1·导入 → 2·分析 → 3·声线 → 4·合成 → [5·播放]           │
-├──────────────────────────────────────────────────────────┤
-│                                                          │
-│  第 1 章 - 科学边界                    [章节列表 ▼]       │
-│                                                          │
-│  ┌─ 文本跟读区 ──────────────────────────────────┐       │
-│  │                                                │       │
-│  │  汪淼骑着自行车来到射击场，远远看见一群人       │       │
-│  │  站在靶场边上。                                 │       │
-│  │                                                │       │
-│  │  ┌─ 史强 ──────────────────────────────┐      │       │
-│  │  │ "汪教授，我姓史，大史。"             │ ← now │       │
-│  │  └─────────────────────────────────────┘      │       │
-│  │                                                │       │
-│  │  汪淼打量了一下眼前这个壮实的男人。            │       │
-│  │                                                │       │
-│  └────────────────────────────────────────────────┘       │
-│                                                          │
-│  ◁◁   ▶   ▷▷       ──────●──────── 03:24 / 38:12       │
-│  ■ 旁白  ■ 史强  ■ 汪淼                                  │
-│                                                          │
-├──────────────────────────────────────────────────────────┤
-│  [← 修改声线]         [导出本章音频 ↓]                    │
-└──────────────────────────────────────────────────────────┘
-```
-
-**组件分解**:
-```
-<PlaybackStep>
-  ├─ <ChapterSelector />             ← 章节切换下拉
-  ├─ <TextFollowPanel>               ← 文本跟读主区域
-  │   └─ <SegmentTextBlock />        ← 单个段落（角色标签 + 文本 + 高亮）
-  ├─ <PlaybackControls />            ← 播放/暂停/前进/后退 + 进度条
-  ├─ <CharacterColorLegend />        ← 角色颜色图例
-  └─ <ExportButton />                ← 可选导出
-```
-
-**播放引擎 hook**:
-```typescript
-function usePlaybackEngine(store: AudioBookStore) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const nextBlobUrlRef = useRef<string | null>(null);  // 预加载
-
-  const play = useCallback(async (chapterIndex: number, segmentIndex: number) => {
-    const segment = getSegment(store.script, chapterIndex, segmentIndex);
-    const blob = await readAudioBlob(store.project.id, segment.id);
-    const url = URL.createObjectURL(blob);
-    audioRef.current = new Audio(url);
-    audioRef.current.onended = () => {
-      URL.revokeObjectURL(url);
-      advanceToNext();  // 播放下一段
-    };
-    audioRef.current.play();
-    preloadNext(chapterIndex, segmentIndex + 1);  // 预加载
-  }, [store]);
-
-  return { play, pause, resume, seekTo, playbackState };
-}
-```
-
-## 7. Step 导航
-
-### 7.1 步骤条 (StepIndicator)
-
-页面顶部常驻 5 步导航条，显示：
-- 当前步骤高亮
-- 已完成步骤带 ✓
-- 可点击已完成的步骤直接跳转（触发回退逻辑）
+页面顶部常驻 5 步导航条（pill 样式），显示：
+- 当前步骤高亮（indigo 底色）
+- 可点击已到达的步骤直接跳转
 - 未到达的步骤灰色不可点击
 
-### 7.2 前进/后退规则
+### 8.2 STEP_MIN_STATE 映射
 
-```typescript
-type Step = 'import' | 'analyze' | 'cast' | 'synth' | 'play';
+每个 step 允许进入的最小 ProjectState 集合：
 
-function computeCanAdvance(step: Step, store: AudioBookStore): boolean {
-  switch (step) {
-    case 'import':  return store.project?.sourceChapters.length > 0;
-    case 'analyze': return store.project?.status === 'analyzed';
-    case 'cast':    return allRequiredVoicesAssigned(store.characters);
-    case 'synth':   return hasAtLeastOneChapterDone(store.synthesisJob);
-    case 'play':    return false; // 最后一步
-  }
-}
+| Step | 允许的 ProjectState |
+|------|-------------------|
+| `import` | 全部 11 种状态（始终可访问） |
+| `analyze` | `imported`, `analyzing`, `analyzed`, `casting`, `cast_complete`, `synthesizing`, `done`, `done_with_errors`, `cancelled`, `paused` |
+| `cast` | `analyzed`, `casting`, `cast_complete`, `synthesizing`, `done`, `done_with_errors`, `cancelled`, `paused` |
+| `synth` | `cast_complete`, `synthesizing`, `done`, `done_with_errors`, `cancelled`, `paused` |
+| `play` | `done`, `done_with_errors`（另外 `cast_complete`+ 时若 `hasTestAudio=true` 也可进入） |
 
-function computeCanRetreat(step: Step): boolean {
-  return step !== 'import'; // 第一步不能后退
-}
-```
+### 8.3 回退确认
 
-### 7.3 回退确认
+从 Step 3/4/5 回退到 Step 2（重新分析）时，弹出确认对话框。回退操作对应 `project-states.yaml` 中定义的 `side_effects`。
 
-从 Step 3/4/5 回退到 Step 2（重新分析）时，弹出确认对话框：
+## 9. 各 Step UI 概述
 
-> "重新分析将清空当前的脚本、角色和声线分配。已合成的音频也将被删除。确认继续？"
+### 9.1 项目列表（首页）
 
-回退操作对应 `project-states.yaml` 中定义的 `side_effects`。
+当 `activeProjectId = null` 时显示。
 
-## 8. 文件结构
+**组件**: `<ProjectListView />`
+- 顶部：书本图标 + "AudioBook Studio" 标题
+- 创建栏：+ 图标 input + Create 按钮（indigo）
+- 项目卡片网格：名称（hover 变 indigo）+ 状态 badge（彩色 pill）+ 日期
+- 删除：trash 图标按钮 → 确认弹窗（modal overlay）
+- 空状态：大书本图标 + "No projects yet"
+
+### 9.2 Step 1 — ImportStep
+
+居中布局（max-w-lg），标题 "Import Your Text" + 副标题。
+
+- 拖拽上传区（虚线边框 + upload SVG 图标）
+- 文本粘贴 textarea
+- 导入按钮（indigo + 箭头图标）
+- 导入统计信息
+
+### 9.3 Step 2 — AnalyzeStep
+
+左右分栏布局：
+
+- **左侧面板**（w-80）：标题 + LLM provider 选择器 + 章节统计 + Start Analysis 按钮 + 进度条 + 角色 chips + Re-analyze 按钮
+- **右侧面板**：segment 预览列表（type badge + speaker + text），空状态提示
+
+### 9.4 Step 3 — CastStep
+
+三段布局：
+
+- **顶栏**：TTS Provider 选择器
+- **左侧边栏**（w-56）：角色列表（indigo 选中态）+ Auto 按钮
+- **右侧面板**：Voice selector + Speaking Rate slider + Pitch slider + Emotion input + Preview Voice 按钮
+
+### 9.5 Step 4 — SynthesisStep
+
+居中布局（max-w-lg），标题 "Audio Synthesis"。
+
+- 操作按钮：Start Synthesis（indigo）+ Test Synthesis（amber outline）
+- 进度卡片：segment 计数 + 进度条 + 剩余时间 + Pause/Cancel
+- 测试模式结果：amber 卡片 + 逐段试听 + Start Full Synthesis / Re-test
+- 完成状态：success/warning 图标 + 统计 + 失败 segment 详情
+
+### 9.6 Step 5 — PlaybackStep
+
+全高度布局 + 底部固定播放器栏。
+
+- **章节标签页**：indigo 活跃态
+- **文本跟读区**：当前 segment 左侧 indigo 竖条标记，speaker 标签
+- **底部播放器栏**：seek bar + 居中控制区（prev / play-pause / next）+ 倍速按钮（0.5x~2.0x 循环）
+
+## 10. 文件结构
 
 ```
 audio-book/src/
 ├── index.ts
 ├── runtime-mod.ts
-├── contracts.ts                          # MOD_ID, capabilities, slots
+├── contracts.ts                          # MOD_ID, capabilities, slots, error codes
 ├── manifest.ts                           # MANIFEST object
-├── audio-book-page.tsx                 # 顶层页面入口
+├── types.ts                              # 全部实体类型 + LlmClient/TtsClient 接口
+├── audio-book-page.tsx                   # 顶层页面入口（项目列表 / step 内容切换）
+│
+├── adapters/
+│   ├── llm-adapter.ts                    # ModAiClient → LlmClient
+│   └── tts-adapter.ts                    # HookLlmClient.speech → TtsClient
 │
 ├── controllers/
-│   ├── audio-book-page-controller.ts   # 主 Controller Hook
-│   └── use-audio-book-ui-state.ts      # 临时 UI 状态
-│
-├── state/
-│   ├── audio-book-store.ts             # Zustand store
-│   └── indexed-db.ts                     # IndexedDB wrapper
-│
-├── hooks/
-│   ├── use-import-actions.ts             # Step 1 业务逻辑
-│   ├── use-analyze-actions.ts            # Step 2 业务逻辑
-│   ├── use-cast-actions.ts               # Step 3 业务逻辑
-│   ├── use-synth-actions.ts              # Step 4 业务逻辑（含调度引擎）
-│   ├── use-playback-actions.ts           # Step 5 业务逻辑
-│   ├── use-playback-engine.ts            # 播放引擎 (Audio API)
-│   └── use-step-navigation.ts            # Step 间导航逻辑
-│
-├── components/
-│   ├── shell/
-│   │   ├── audio-book-shell.tsx        # 外壳布局
-│   │   ├── step-indicator.tsx            # 步骤导航条
-│   │   └── step-footer.tsx              # 上/下一步按钮
-│   ├── project/
-│   │   └── project-list-view.tsx         # 项目列表首页
-│   ├── import/
-│   │   ├── import-step.tsx
-│   │   ├── file-drop-zone.tsx
-│   │   └── text-preview.tsx
-│   ├── analyze/
-│   │   ├── analyze-step.tsx
-│   │   ├── analysis-progress-bar.tsx
-│   │   ├── character-chip-list.tsx
-│   │   └── segment-preview-list.tsx
-│   ├── cast/
-│   │   ├── cast-step.tsx
-│   │   ├── character-list.tsx
-│   │   ├── character-detail.tsx
-│   │   ├── voice-selector.tsx
-│   │   └── voice-preview.tsx
-│   ├── synth/
-│   │   ├── synthesis-step.tsx
-│   │   ├── synth-progress-summary.tsx
-│   │   └── chapter-progress-list.tsx
-│   └── playback/
-│       ├── playback-step.tsx
-│       ├── text-follow-panel.tsx
-│       ├── segment-text-block.tsx
-│       ├── playback-controls.tsx
-│       └── character-color-legend.tsx
+│   ├── audio-book-page-controller.ts     # 主 Controller Hook（编排全部逻辑 + 15 action）
+│   ├── use-audio-book-ui-state.ts        # 临时 UI 状态
+│   ├── use-audio-book-clients.ts         # hookClient/aiClient/llmClient/ttsClient 创建
+│   ├── use-step-navigation.ts            # Step 导航逻辑 + STEP_MIN_STATE 映射
+│   └── use-tts-route.ts                  # TTS/Chat connector 发现 + model 选择
 │
 ├── services/
-│   ├── chapter-splitter.ts               # 章节拆分纯逻辑
-│   ├── analysis-pipeline.ts              # LLM 分析编排
-│   ├── voice-recommender.ts              # 声线推荐逻辑
-│   ├── synthesis-scheduler.ts            # 合成队列调度器
-│   └── audio-exporter.ts                 # Web Audio 导出（可选）
+│   ├── analysis-pipeline.ts              # LLM 逐章分析编排（含分块重试 + fidelity gate）
+│   ├── segment-post-processor.ts         # 长 segment 拆分（对话引号/句末边界）
+│   ├── voice-recommender.ts              # 声线推荐（LLM + hash 分配 + 默认兜底）
+│   ├── voice-recommender-prompts.ts      # 声线推荐的 system/user prompt 模板
+│   ├── synthesis-scheduler.ts            # 批量合成调度（滑动窗口并发 + 暂停/恢复/取消）
+│   ├── test-segment-picker.ts            # 测试合成 segment 选取
+│   └── qwen-voice-catalog.ts             # DashScope Qwen 声音目录兜底
 │
-├── data/
-│   └── audio-book-data-registrar.ts    # Data capability 注册
+├── components/
+│   ├── ui/                               # 共享 UI 原语（indigo 主题）
+│   │   ├── button.tsx                    # Button (primary/secondary/destructive/ghost)
+│   │   ├── select.tsx                    # Select (Radix UI)
+│   │   ├── progress.tsx                  # Progress bar (Radix UI)
+│   │   ├── slider.tsx                    # Slider (Radix UI)
+│   │   ├── badge.tsx                     # Badge / TierBadge / SegmentTypeBadge
+│   │   ├── dialog.tsx                    # ConfirmDialog
+│   │   └── tooltip.tsx                   # Tooltip (Radix UI)
+│   ├── shell/
+│   │   ├── audio-book-shell.tsx          # 外壳布局（header/content/footer + toast + confirm）
+│   │   ├── step-indicator.tsx            # 步骤导航条（pill 样式）
+│   │   └── step-footer.tsx              # 上/下一步按钮（箭头图标）
+│   ├── project/
+│   │   ├── project-header.tsx            # 书本图标 + "AudioBook Studio" + StepIndicator
+│   │   └── project-list-view.tsx         # 项目列表 + 创建 + 删除确认弹窗
+│   ├── import/
+│   │   └── import-step.tsx               # 居中布局：上传区 + 粘贴区
+│   ├── analyze/
+│   │   └── analyze-step.tsx              # 左右分栏：控制面板 + segment 预览
+│   ├── cast/
+│   │   └── cast-step.tsx                 # 三段：provider 选择 + 角色列表 + 声线配置
+│   ├── synth/
+│   │   └── synthesis-step.tsx            # 居中：操作按钮 + 进度 + 测试模式 + 完成状态
+│   └── playback/
+│       └── playback-step.tsx             # 章节标签 + 文本跟读 + 底部播放器栏
 │
-├── locales/
-│   ├── en.ts
-│   └── zh.ts
-│
-└── types.ts                              # 内部类型定义
+└── step-content.tsx                      # Step 路由（按 currentStep 渲染对应组件）
 ```
 
-## 9. 测试适配策略
+## 11. 测试适配策略
 
-### 9.1 Layer 2 (脱离 desktop 的集成测试)
+### 11.1 Layer 2 (脱离 desktop 的单元/集成测试)
 
-`services/` 目录下的纯逻辑模块是 Layer 2 测试的主要对象：
+`services/` 目录下的纯逻辑模块通过注入 mock `LlmClient` / `TtsClient` 接口进行测试：
 
-| Service | 测试方式 | 依赖 |
-|---------|---------|------|
-| `chapter-splitter.ts` | 纯函数，直接 vitest | 无 |
-| `analysis-pipeline.ts` | 调用真实 LLM API | runtime gRPC / HTTP |
-| `voice-recommender.ts` | 调用 LLM + listVoices | runtime gRPC / HTTP |
-| `synthesis-scheduler.ts` | 调用真实 TTS API | runtime gRPC / HTTP |
+| Service | 测试文件 | 测试方式 |
+|---------|---------|---------|
+| `analysis-pipeline.ts` | `test/unit/analysis-pipeline.test.ts` | Mock LlmClient，验证分块重试 + fallback |
+| `synthesis-scheduler.ts` | `test/unit/synthesis-queue.test.ts` | Mock TtsClient，验证并发 + 重试 + 暂停 |
+| `segment-post-processor.ts` | `test/unit/segment-post-processor.test.ts` | 纯函数测试，验证拆分逻辑 |
+| `test-segment-picker.ts` | `test/unit/test-segment-picker.test.ts` | 纯函数测试 |
+| `voice-recommender.ts` | — | 依赖 LLM，适合 integration test |
+| chapter splitting | `test/unit/chapter-split.test.ts` | 纯函数测试 |
+| TTS adapter | `test/unit/tts-adapter.test.ts` | Mock speech API |
+| character tier | `test/unit/character-tier.test.ts` | 纯函数测试 |
+| JSON repair | `test/unit/json-repair.test.ts` | 纯函数测试 |
+| text fidelity | `test/unit/text-fidelity.test.ts` | 纯函数测试 |
 
-测试脚本直接 import 这些 service 模块，用 runtime API client 替代 hookClient：
-
-```typescript
-// test/scripts/step2-analyze.ts
-import { AnalysisPipeline } from '../../src/services/analysis-pipeline.js';
-
-// 测试时注入 runtime client（非 hookClient）
-const pipeline = new AnalysisPipeline({ llmClient: runtimeDirectClient });
-const result = await pipeline.analyzeChapter(chapterText, existingCharacters);
-```
-
-### 9.2 Hook 适配层
-
-`services/` 模块接受一个抽象的 client 接口，不直接依赖 hookClient：
-
-```typescript
-// services/analysis-pipeline.ts
-interface LlmClient {
-  generateObject<T>(params: GenerateObjectParams<T>): Promise<T>;
-}
-
-// 在 desktop 中: hookClient adapter
-// 在测试中:     runtime direct client
-```
-
-这样同一套 service 代码在两个环境都能跑，集成到 desktop 时只需要写一个薄的 adapter 层。
-
-## 10. Desktop 集成清单
-
-最终集成到 desktop 时需要做的事：
-
-| # | 工作 | 说明 |
-|---|------|------|
-| 1 | hookClient adapter | 将 `LlmClient` / `TtsClient` 接口适配到 `hookClient.llm.*` |
-| 2 | UI 注册 | `runtime-mod.ts` 中的 sidebar + route 注册 |
-| 3 | Data capabilities | 注册 `data-api.audio-book.*` 供其他 mod 查询 |
-| 4 | i18n | 注册翻译文件 |
-| 5 | 权限声明 | `mod.manifest.yaml` capabilities 列表 |
-| 6 | 构建配置 | `tsconfig.build.json` + 打包到 `dist/mods/audio-book/index.js` |
+当前共 9 个测试文件，63 个测试用例。

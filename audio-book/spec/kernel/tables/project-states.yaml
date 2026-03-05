@@ -48,6 +48,16 @@ states:
     label_zh: 完成（部分失败）
     description: Synthesis finished but some segments failed
 
+  - id: cancelled
+    label: Cancelled
+    label_zh: 已取消
+    description: Synthesis was cancelled by user; completed segments preserved
+
+  - id: paused
+    label: Paused
+    label_zh: 已暂停
+    description: Synthesis was paused by user; can be resumed
+
 transitions:
   - from: draft
     to: imported
@@ -95,9 +105,43 @@ transitions:
     description: Synthesis finished with some failed segments
 
   - from: synthesizing
-    to: cast_complete
+    to: cancelled
     trigger: synthesis_cancelled
-    description: User cancels synthesis
+    description: User cancels synthesis; completed segments preserved
+
+  - from: synthesizing
+    to: paused
+    trigger: synthesis_paused
+    description: User pauses synthesis; in-flight segments finish first
+
+  - from: paused
+    to: synthesizing
+    trigger: synthesis_resumed
+    description: User resumes paused synthesis
+
+  - from: paused
+    to: cancelled
+    trigger: synthesis_cancelled
+    description: User cancels from paused state
+
+  - from: cancelled
+    to: synthesizing
+    trigger: synthesis_resumed
+    description: User resumes from cancelled state (pending/failed segments)
+
+  - from: cancelled
+    to: casting
+    trigger: modify_voices
+    description: User modifies voice assignments from cancelled state
+    side_effects:
+      - invalidate_affected_segment_jobs
+
+  - from: paused
+    to: casting
+    trigger: modify_voices
+    description: User modifies voice assignments from paused state
+    side_effects:
+      - invalidate_affected_segment_jobs
 
   # Backward transitions
   - from: analyzed
