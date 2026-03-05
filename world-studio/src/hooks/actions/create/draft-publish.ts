@@ -284,6 +284,7 @@ export async function publishWorldDraft(
     });
 
     let syncNotice = '';
+    const createdAgentIdByCharacter = new Map<string, string>();
     if (syncCharacters.length > 0) {
       const characterByName = new Map(
         input.snapshot.knowledgeGraph.characters
@@ -443,7 +444,7 @@ export async function publishWorldDraft(
 
       diagLog('batchCreate calling...', {
         payloadMode,
-        payloadPolicy: 'Send full canonical agent profile payload aligned with backend CreateAgentDto and SSOT.',
+        payloadPolicy: 'Send full canonical agent profile payload aligned with backend CreateAgentDto and spec-first contracts.',
         itemCount: items.length,
         itemHandles: items.map((i) => i.handle),
         itemDisplayNames: items.map((i) => i.displayName),
@@ -468,6 +469,19 @@ export async function publishWorldDraft(
         continueOnError: true,
       }));
 
+      const createdItems = Array.isArray(syncResult.created)
+        ? (syncResult.created as unknown[]).map((item) => asRecord(item))
+        : [];
+      for (const createdItem of createdItems) {
+        const index = Number(createdItem.index);
+        const agentId = String(createdItem.agentId || '').trim();
+        if (!Number.isFinite(index) || !agentId) continue;
+        const characterName = syncCharacters[Math.floor(index)];
+        if (characterName) {
+          createdAgentIdByCharacter.set(characterName, agentId);
+        }
+      }
+
       diagLog('batchCreate returned', {
         created: syncResult.created,
         failed: syncResult.failed,
@@ -480,6 +494,80 @@ export async function publishWorldDraft(
       syncNotice = ` Agent sync: ${createdCount}/${items.length} created${failedCount > 0 ? `, ${failedCount} failed` : ''}.`;
     } else {
       diagLog('agent sync SKIPPED: syncCharacters is empty');
+    }
+
+    const visualBindingUpserts: Array<Record<string, unknown>> = [];
+    const worldCoverUrl = toNullableTrimmedString(input.snapshot.assets.worldCover.imageUrl);
+    if (worldCoverUrl) {
+      visualBindingUpserts.push({
+        targetType: 'WORLD',
+        targetId: worldId,
+        slot: 'WORLD_BANNER',
+        priority: 0,
+        asset: {
+          mediaType: 'IMAGE',
+          storageRef: worldCoverUrl,
+          provenance: 'GENERATED',
+          sourceRef: 'world-studio:world-cover',
+          label: 'world_cover',
+          tags: ['world-studio', 'world-cover'],
+        },
+      });
+    }
+
+    const locationImages = input.snapshot.assets.locationImages || {};
+    let locationPriority = 0;
+    for (const [locationName, draft] of Object.entries(locationImages)) {
+      const imageUrl = toNullableTrimmedString(asRecord(draft).imageUrl);
+      if (!imageUrl) continue;
+      visualBindingUpserts.push({
+        targetType: 'WORLD',
+        targetId: worldId,
+        slot: 'WORLD_GALLERY',
+        priority: locationPriority,
+        conditions: { location: locationName },
+        tags: ['world-studio', 'location'],
+        asset: {
+          mediaType: 'IMAGE',
+          storageRef: imageUrl,
+          provenance: 'GENERATED',
+          sourceRef: `world-studio:location:${locationName}`,
+          label: locationName,
+          tags: ['world-studio', 'location'],
+        },
+      });
+      locationPriority += 1;
+    }
+
+    const portraits = input.snapshot.assets.characterPortraits || {};
+    for (const [characterName, draft] of Object.entries(portraits)) {
+      const imageUrl = toNullableTrimmedString(asRecord(draft).imageUrl);
+      const agentId = createdAgentIdByCharacter.get(characterName);
+      if (!imageUrl || !agentId) continue;
+      visualBindingUpserts.push({
+        targetType: 'AGENT',
+        targetId: agentId,
+        slot: 'AGENT_PORTRAIT',
+        priority: 0,
+        conditions: { characterName },
+        tags: ['world-studio', 'character-portrait'],
+        asset: {
+          mediaType: 'IMAGE',
+          storageRef: imageUrl,
+          provenance: 'GENERATED',
+          sourceRef: `world-studio:portrait:${characterName}`,
+          label: characterName,
+          tags: ['world-studio', 'character-portrait'],
+        },
+      });
+    }
+
+    if (visualBindingUpserts.length > 0) {
+      await input.mutations.syncVisualBindingsMutation.mutateAsync({
+        worldId,
+        bindingUpserts: visualBindingUpserts,
+        reason: 'Publish world visual assets from world-studio draft',
+      });
     }
 
     input.patchSnapshot({

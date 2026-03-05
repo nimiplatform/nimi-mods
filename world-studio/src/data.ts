@@ -31,3 +31,9 @@ export {
   createCreatorAgent,
   batchCreateCreatorAgents,
 } from './data/queries/creator-agents.js';
+
+export {
+  listWorldVisualBindings,
+  batchUpsertWorldVisualBindings,
+  deleteWorldVisualBinding,
+} from './data/queries/visual-bindings.js';

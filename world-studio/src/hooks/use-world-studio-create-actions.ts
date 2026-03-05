@@ -1,5 +1,9 @@
 import { useCallback } from 'react';
-import { generateCharacterPortraitAsset, generateWorldCoverAsset } from './actions/create/assets-generation.js';
+import {
+  generateCharacterPortraitAsset,
+  generateLocationImageAsset,
+  generateWorldCoverAsset,
+} from './actions/create/assets-generation.js';
 import { publishWorldDraft, saveWorldDraft } from './actions/create/draft-publish.js';
 import { runCreatePhase1 } from './actions/create/run-phase1.js';
 import { runCreatePhase2, runRebuildEmbeddingIndex } from './actions/create/run-phase2.js';
@@ -35,6 +39,10 @@ export function useWorldStudioCreateActions(input: WorldStudioCreateActionsInput
     await generateCharacterPortraitAsset(input, name, options);
   }, [input]);
 
+  const onGenerateLocationImage = useCallback(async (name: string, options?: { taskId?: string }) => {
+    await generateLocationImageAsset(input, name, options);
+  }, [input]);
+
   const onSaveDraft = useCallback(async (options?: { taskId?: string }) => {
     await saveWorldDraft(input, options);
   }, [input]);
@@ -50,6 +58,7 @@ export function useWorldStudioCreateActions(input: WorldStudioCreateActionsInput
     onRebuildEmbeddingIndex,
     onGenerateWorldCover,
     onGenerateCharacterPortrait,
+    onGenerateLocationImage,
     onSaveDraft,
     onPublishDraft,
   };

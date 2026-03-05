@@ -6,6 +6,7 @@ import {
   listWorldEvents,
   getWorldMaintenance,
   listWorldLorebooks,
+  listWorldVisualBindings,
   listWorldMutations,
 } from '../data.js';
 import type {
@@ -160,6 +161,13 @@ export function useWorldStudioResourceQueries(
     queryFn: async () => toMutationSummaryList(await listWorldMutations(hookClient, input.worldId)),
   });
 
+  const visualBindingsQuery = useQuery({
+    queryKey: ['world-studio', 'visual-bindings', input.worldId],
+    enabled: input.enabled && Boolean(input.worldId),
+    retry: false,
+    queryFn: async () => await listWorldVisualBindings(hookClient, input.worldId),
+  });
+
   return {
     draftsQuery,
     worldsQuery,
@@ -167,5 +175,6 @@ export function useWorldStudioResourceQueries(
     eventsQuery,
     lorebooksQuery,
     mutationsQuery,
+    visualBindingsQuery,
   };
 }

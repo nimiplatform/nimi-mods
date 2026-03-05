@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import type { HookClient } from '@nimiplatform/sdk/mod/types';
 import {
+  batchUpsertWorldVisualBindings,
   batchCreateCreatorAgents,
   batchUpsertWorldEvents,
   batchUpsertWorldLorebooks,
@@ -95,6 +96,19 @@ export function useWorldStudioMutations(hookClient: HookClient) {
     ),
   });
 
+  const syncVisualBindingsMutation = useMutation({
+    mutationFn: async (input: {
+      worldId: string;
+      bindingUpserts: Array<Record<string, unknown>>;
+      reason: string;
+    }) => (
+      await batchUpsertWorldVisualBindings(hookClient, input.worldId, {
+        bindingUpserts: input.bindingUpserts,
+        reason: input.reason,
+      })
+    ),
+  });
+
   const deleteLorebookMutation = useMutation({
     mutationFn: async (input: { worldId: string; lorebookId: string }) => (
       await deleteWorldLorebook(hookClient, input.worldId, input.lorebookId)
@@ -125,6 +139,7 @@ export function useWorldStudioMutations(hookClient: HookClient) {
     saveMaintenanceMutation,
     syncLorebooksMutation,
     syncEventsMutation,
+    syncVisualBindingsMutation,
     deleteLorebookMutation,
     deleteEventMutation,
     batchCreateCreatorAgentsMutation,
