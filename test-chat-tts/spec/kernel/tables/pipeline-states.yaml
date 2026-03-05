@@ -22,3 +22,13 @@ tts_diagnostics_chain:
   - step: render-audio-uri
     order: 4
     source_rule: TCT-PIPE-002
+image_diagnostics_chain:
+  - step: image-input-normalize
+    order: 1
+    source_rule: TCT-PIPE-003
+  - step: image-generate
+    order: 2
+    source_rule: TCT-PIPE-003
+  - step: render-image-preview
+    order: 3
+    source_rule: TCT-PIPE-003

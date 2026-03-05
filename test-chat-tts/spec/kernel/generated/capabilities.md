@@ -7,11 +7,13 @@
 version: 1
 mod_identity:
   mod_id: world.nimi.test-chat-tts
-  name: Test Chat + TTS
+  name: Test Chat + TTS + Image
   entry: ./dist/mods/test-chat-tts/index.js
   source_rule: TCT-CAP-001
 required_capabilities:
   - key: llm.text.generate
+    source_rule: TCT-CAP-001
+  - key: llm.image.generate
     source_rule: TCT-CAP-001
   - key: llm.speech.providers.list
     source_rule: TCT-CAP-001

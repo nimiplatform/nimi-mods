@@ -26,6 +26,16 @@ cases:
     expected_ok: false
     reason_code: TEST_CHAT_TTS_ROUTE_OPTIONS_UNAVAILABLE
     source_rule: TCT-ACC-002
+  - id: TCT-005-IMAGE-T2I-PASS
+    description: Image text-to-image diagnostics path succeeds.
+    expected_ok: true
+    reason_code: null
+    source_rule: TCT-ACC-002
+  - id: TCT-006-IMAGE-I2I-PASS
+    description: Image image-to-image diagnostics path succeeds.
+    expected_ok: true
+    reason_code: null
+    source_rule: TCT-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:test-chat-tts-kernel-docs
     source_rule: TCT-ACC-001

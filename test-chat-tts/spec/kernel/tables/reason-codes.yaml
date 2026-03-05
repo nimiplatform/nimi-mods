@@ -15,6 +15,11 @@ codes:
     blocking: true
     action_hint: Verify speech provider capability and retry.
     source_rule: TCT-ERR-001
+  - code: TEST_CHAT_TTS_IMAGE_GENERATE_FAILED
+    stage: image-generate
+    blocking: true
+    action_hint: Verify image route or provider parameters and retry.
+    source_rule: TCT-ERR-001
   - code: TEST_CHAT_TTS_SPEECH_SYNTHESIZE_FAILED
     stage: speech-synthesize
     blocking: true

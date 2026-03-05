@@ -22,7 +22,7 @@ export async function registerTestChatTtsUiExtensions(input: {
     extension: {
       type: 'nav-item',
       tabId: TEST_CHAT_TTS_TAB_ID,
-      label: 'Test Chat+TTS',
+      label: 'Test Chat+Image+TTS',
       badge: 'TEST',
       icon: 'local-chat',
       strategy: 'append',
@@ -42,7 +42,7 @@ export async function registerTestChatTtsUiExtensions(input: {
           fallback: React.createElement(
             'div',
             { className: 'm-4 rounded-xl border border-gray-200 bg-white p-3 text-xs text-gray-600' },
-            'Test Chat+TTS loading...',
+            'Test Chat+Image+TTS loading...',
           ),
         },
         React.createElement(LazyTestChatTtsPage),

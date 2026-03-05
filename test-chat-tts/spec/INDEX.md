@@ -18,7 +18,7 @@
 2. `spec/kernel/tables/capabilities.yaml`
 3. `spec/test-chat-tts.md`
 
-### Change minimal chat/tts flow
+### Change minimal chat/image/tts flow
 
 1. `spec/kernel/pipeline-contract.md`
 2. `spec/kernel/tables/pipeline-states.yaml`

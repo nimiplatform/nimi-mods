@@ -7,6 +7,7 @@ export const TEST_CHAT_TTS_ROUTE_SLOT = 'ui-extension.app.content.routes';
 
 export const TEST_CHAT_TTS_CAPABILITIES = [
   'llm.text.generate',
+  'llm.image.generate',
   'llm.speech.providers.list',
   'llm.speech.voices.list',
   'llm.speech.synthesize',

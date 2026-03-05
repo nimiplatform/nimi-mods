@@ -8,4 +8,4 @@ Capability registry in `tables/capabilities.yaml` is authoritative and intention
 
 ## TCT-CAP-002 Diagnostics Surface
 
-Mod scope is diagnostics and smoke validation for chat and TTS only.
+Mod scope is diagnostics and smoke validation for chat, image, and TTS only.
