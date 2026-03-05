@@ -8,6 +8,9 @@ type Props = {
   onToggle: () => void;
   latestPromptTrace: LocalChatPromptTrace | null;
   latestTurnAudit: LocalChatTurnAudit | null;
+  voiceCatalogSource?: string;
+  voiceCatalogModelResolved?: string;
+  voiceCatalogVersion?: string;
   healthStatus: HealthStatus;
   checkingHealth: boolean;
   onHealthCheck: () => void;
@@ -26,6 +29,9 @@ export function DiagnosticsPanel(props: Props) {
     onToggle,
     latestPromptTrace,
     latestTurnAudit,
+    voiceCatalogSource,
+    voiceCatalogModelResolved,
+    voiceCatalogVersion,
     healthStatus,
     checkingHealth,
     onHealthCheck,
@@ -92,6 +98,11 @@ export function DiagnosticsPanel(props: Props) {
             <p className="text-[11px] font-semibold text-gray-700">{t('Diagnostics.detailTitle')}</p>
             <div className="mt-1.5 space-y-1 text-[11px] text-gray-600">
               <p>
+                <span className="font-medium">Voice catalog:</span>{' '}
+                {voiceCatalogSource || '-'} / {voiceCatalogModelResolved || '-'}
+                {voiceCatalogVersion ? ` (v ${voiceCatalogVersion})` : ''}
+              </p>
+              <p>
                 <span className="font-medium">{t('Diagnostics.detailCompiler')}:</span>{' '}
                 {latestPromptTrace?.compilerVersion || '-'}
               </p>
@@ -118,8 +129,23 @@ export function DiagnosticsPanel(props: Props) {
                   : '-'}
               </p>
               <p>
+                <span className="font-medium">Retry:</span>{' '}
+                {latestPromptTrace ? `${latestPromptTrace.retryAttempted ? 'yes' : 'no'}${latestPromptTrace.retryImproved ? ' (improved)' : ''}` : '-'}
+              </p>
+              <p>
+                <span className="font-medium">Planner:</span>{' '}
+                {latestPromptTrace?.planner || '-'}
+              </p>
+              <p>
                 <span className="font-medium">{t('Diagnostics.detailSegmentParse')}:</span>{' '}
                 {latestPromptTrace?.segmentParseMode || '-'}
+                {typeof latestPromptTrace?.textSegments === 'number' || typeof latestPromptTrace?.voiceSegments === 'number'
+                  ? ` (text ${latestPromptTrace?.textSegments ?? 0} / voice ${latestPromptTrace?.voiceSegments ?? 0})`
+                  : ''}
+              </p>
+              <p>
+                <span className="font-medium">Scheduler delay:</span>{' '}
+                {typeof latestPromptTrace?.schedulerTotalDelayMs === 'number' ? `${latestPromptTrace.schedulerTotalDelayMs}ms` : '-'}
               </p>
               <p>
                 <span className="font-medium">{t('Diagnostics.detailNsfwPolicy')}:</span>{' '}

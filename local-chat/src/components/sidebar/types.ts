@@ -11,6 +11,9 @@ export type RuntimeStatusSidebarProps = {
   routeOverride: RuntimeRouteBinding | null;
   speechProviders: Array<{ id: string; name: string; status: 'available' | 'unavailable' }>;
   speechVoices: Array<{ id: string; providerId: string; name: string }>;
+  voiceCatalogSource?: string;
+  voiceCatalogModelResolved?: string;
+  voiceCatalogVersion?: string;
   selectedSpeechProviderId: string;
   selectedVoiceId: string;
   ttsRouteSource: 'auto' | 'local-runtime' | 'token-api';

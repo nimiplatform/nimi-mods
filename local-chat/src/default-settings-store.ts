@@ -1,22 +1,6 @@
 import { readRuntimeModSettings, writeRuntimeModSettings } from '@nimiplatform/sdk/mod/settings';
 import { LOCAL_CHAT_MOD_ID } from './contracts.js';
 
-export const LOCAL_CHAT_TTS_VOICE_OPTIONS = [
-  'Cherry',
-  'Serena',
-  'Ethan',
-  'Chelsie',
-  'Momo',
-  'Vivian',
-  'Moon',
-  'Maia',
-  'Kai',
-  'Nofish',
-  'alloy',
-  'nova',
-  'shimmer',
-] as const;
-
 export type LocalChatTtsVoice = string;
 export type LocalChatBooleanSettingKey =
   | 'enableVoice'
@@ -56,7 +40,7 @@ export const DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS: LocalChatDefaultSettings = {
   allowNsfwMedia: false,
   mediaTriggerMode: 'marker_only',
   segmentationMode: 'adaptive',
-  voiceName: 'Cherry',
+  voiceName: '',
   ttsRouteSource: 'auto',
   ttsConnectorId: '',
   ttsModel: '',

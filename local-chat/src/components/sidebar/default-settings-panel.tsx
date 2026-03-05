@@ -1,6 +1,5 @@
 import React from 'react';
 import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
-import { LOCAL_CHAT_TTS_VOICE_OPTIONS } from '../../state/index.js';
 import type { RuntimeStatusSidebarProps } from './types.js';
 
 type Props = {
@@ -28,6 +27,10 @@ export function DefaultSettingsPanel(props: Props) {
     onDefaultSettingChange,
     onDefaultVoiceNameChange,
   } = props;
+  const voiceOptions = Array.from(new Set([
+    ...speechVoices.map((voice) => voice.id),
+    defaultSettings.voiceName,
+  ].filter(Boolean)));
 
   return (
     <div className="lc-card rounded-2xl p-3 text-xs">
@@ -95,11 +98,8 @@ export function DefaultSettingsPanel(props: Props) {
               onChange={(event) => onDefaultVoiceNameChange(event.target.value)}
               className="h-8 w-full rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-900 disabled:bg-gray-100 disabled:text-gray-400"
             >
-              {Array.from(new Set([
-                ...(LOCAL_CHAT_TTS_VOICE_OPTIONS as readonly string[]),
-                ...speechVoices.map((voice) => voice.id),
-                defaultSettings.voiceName,
-              ].filter(Boolean))).map((voice) => (
+              <option value="">Auto</option>
+              {voiceOptions.map((voice) => (
                 <option key={`voice-name-${voice}`} value={voice}>{voice}</option>
               ))}
             </select>

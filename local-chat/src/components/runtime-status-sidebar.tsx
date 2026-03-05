@@ -79,6 +79,9 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     dependencyRepairActions,
     latestPromptTrace,
     latestTurnAudit,
+    voiceCatalogSource,
+    voiceCatalogModelResolved,
+    voiceCatalogVersion,
     onRouteSourceChange,
     onRouteConnectorChange,
     onRouteModelChange,
@@ -352,6 +355,9 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
           onToggle={() => setOpenPanel((prev) => (prev === 'diagnostics' ? null : 'diagnostics'))}
           latestPromptTrace={latestPromptTrace}
           latestTurnAudit={latestTurnAudit}
+          voiceCatalogSource={voiceCatalogSource}
+          voiceCatalogModelResolved={voiceCatalogModelResolved}
+          voiceCatalogVersion={voiceCatalogVersion}
           healthStatus={healthStatus}
           checkingHealth={checkingHealth}
           onHealthCheck={onHealthCheck}
