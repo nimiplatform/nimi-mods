@@ -6,7 +6,10 @@
     "roleAgentVoice": "Agent Voice",
     "roleAgent": "Agent",
     "generating": "生成中...",
-    "agentPending": "Agent · 处理中"
+    "generatingImage": "正在生成图片...",
+    "generatingVideo": "正在生成视频...",
+    "agentPending": "Agent · 处理中",
+    "imagePreviewDialogLabel": "图片预览"
   },
   "DefaultSettings": {
     "title": "默认配置",
@@ -26,6 +29,17 @@
     "noModels": "当前来源无可用模型。",
     "noMatchingModels": "无匹配模型。",
     "useRuntimeDefault": "使用 Runtime 默认值"
+  },
+  "MediaRoute": {
+    "title": "媒体路由配置",
+    "imageTitle": "图片生成",
+    "videoTitle": "视频生成",
+    "auto": "自动",
+    "localRuntime": "本地运行时",
+    "tokenApi": "Token API",
+    "modelPlaceholder": "可选模型覆盖...",
+    "connectorRequiredHint": "当前已选择 Token API，但还没有配置连接器，媒体生成会失败。",
+    "autoRouteHint": "当前为自动模式且未设置覆盖参数。若媒体生成失败，请手动指定连接器/模型。"
   },
   "VoicePanel": {
     "title": "Voice Model 配置",

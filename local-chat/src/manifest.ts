@@ -78,7 +78,7 @@ export const LOCAL_CHAT_MANIFEST = {
     ],
   },
   ai: {
-    consume: ['chat', 'tts', 'stt'],
+    consume: ['chat', 'image', 'video', 'tts', 'stt'],
     dependencies: {
       required: [
         {
@@ -90,8 +90,24 @@ export const LOCAL_CHAT_MANIFEST = {
           engine: 'openai-compatible',
           title: 'Qwen2.5 7B Instruct (default)',
         },
+        {
+          dependencyId: 'local-chat/image-z-image-turbo',
+          kind: 'model',
+          capability: 'image',
+          modelId: 'z-image-turbo',
+          repo: 'nimeka/z-image-turbo',
+          engine: 'openai-compatible',
+          title: 'Z-Image Turbo (default)',
+        },
       ],
       optional: [
+        {
+          dependencyId: 'local-chat/video-generate-token-node',
+          kind: 'node',
+          capability: 'video',
+          nodeId: 'video.generate.token-api',
+          title: 'Optional video generation node',
+        },
         {
           dependencyId: 'local-chat/stt-local-node',
           kind: 'node',
@@ -130,6 +146,7 @@ export const LOCAL_CHAT_MANIFEST = {
       ],
       preferred: {
         chat: 'local-chat/chat-qwen2.5-7b',
+        image: 'local-chat/image-z-image-turbo',
         tts: 'local-chat/tts-qwen3-1.7b',
       },
     },

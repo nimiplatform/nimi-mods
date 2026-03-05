@@ -2,6 +2,7 @@ import type { LocalChatHistoryMessage, LocalChatTarget } from '../data/types.js'
 
 export type PromptLayerId =
   | 'platformSafety'
+  | 'conversationSummary'
   | 'worldHardRules'
   | 'identityRules'
   | 'identityBase'
@@ -41,7 +42,7 @@ export type LocalChatCompiledPrompt = {
   layers: PromptLayerTrace[];
   budget: PromptBudgetTrace;
   retrieval: PromptRetrievalTrace;
-  compilerVersion: 'v1' | 'v2';
+  compilerVersion: 'v1' | 'v2' | 'v3';
 };
 
 export type LocalChatPromptCompileInput = {

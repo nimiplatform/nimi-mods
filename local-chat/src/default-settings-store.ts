@@ -31,6 +31,8 @@ export type LocalChatDefaultSettings = {
   allowProactiveContact: boolean;
   autoPlayVoiceReplies: boolean;
   allowNsfwMedia: boolean;
+  mediaTriggerMode: 'marker_only' | 'marker_plus_heuristic';
+  segmentationMode: 'adaptive' | 'single';
   voiceName: LocalChatTtsVoice;
   ttsRouteSource: 'auto' | 'local-runtime' | 'token-api';
   ttsConnectorId: string;
@@ -38,6 +40,12 @@ export type LocalChatDefaultSettings = {
   sttRouteSource: 'auto' | 'local-runtime' | 'token-api';
   sttConnectorId: string;
   sttModel: string;
+  imageRouteSource: 'auto' | 'local-runtime' | 'token-api';
+  imageConnectorId: string;
+  imageModel: string;
+  videoRouteSource: 'auto' | 'local-runtime' | 'token-api';
+  videoConnectorId: string;
+  videoModel: string;
 };
 
 export const DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS: LocalChatDefaultSettings = {
@@ -46,6 +54,8 @@ export const DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS: LocalChatDefaultSettings = {
   allowProactiveContact: false,
   autoPlayVoiceReplies: false,
   allowNsfwMedia: false,
+  mediaTriggerMode: 'marker_only',
+  segmentationMode: 'adaptive',
   voiceName: 'Cherry',
   ttsRouteSource: 'auto',
   ttsConnectorId: '',
@@ -53,6 +63,12 @@ export const DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS: LocalChatDefaultSettings = {
   sttRouteSource: 'auto',
   sttConnectorId: '',
   sttModel: '',
+  imageRouteSource: 'auto',
+  imageConnectorId: '',
+  imageModel: '',
+  videoRouteSource: 'auto',
+  videoConnectorId: '',
+  videoModel: '',
 };
 
 export function normalizeLocalChatDefaultSettings(value: unknown): LocalChatDefaultSettings {
@@ -64,22 +80,44 @@ export function normalizeLocalChatDefaultSettings(value: unknown): LocalChatDefa
   const voiceName = normalizedVoiceName || DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS.voiceName;
   const normalizedTtsRouteSource = String(record.ttsRouteSource || '').trim();
   const normalizedSttRouteSource = String(record.sttRouteSource || '').trim();
+  const normalizedImageRouteSource = String(record.imageRouteSource || '').trim();
+  const normalizedVideoRouteSource = String(record.videoRouteSource || '').trim();
+  const normalizedMediaTriggerMode = String(record.mediaTriggerMode || '').trim();
+  const normalizedSegmentationMode = String(record.segmentationMode || '').trim();
   const ttsRouteSource = normalizedTtsRouteSource === 'local-runtime' || normalizedTtsRouteSource === 'token-api'
     ? normalizedTtsRouteSource
     : 'auto';
   const sttRouteSource = normalizedSttRouteSource === 'local-runtime' || normalizedSttRouteSource === 'token-api'
     ? normalizedSttRouteSource
     : 'auto';
+  const imageRouteSource = normalizedImageRouteSource === 'local-runtime' || normalizedImageRouteSource === 'token-api'
+    ? normalizedImageRouteSource
+    : 'auto';
+  const videoRouteSource = normalizedVideoRouteSource === 'local-runtime' || normalizedVideoRouteSource === 'token-api'
+    ? normalizedVideoRouteSource
+    : 'auto';
+  const mediaTriggerMode = normalizedMediaTriggerMode === 'marker_plus_heuristic'
+    ? 'marker_plus_heuristic'
+    : 'marker_only';
+  const segmentationMode = normalizedSegmentationMode === 'single'
+    ? 'single'
+    : 'adaptive';
   const ttsConnectorId = String(record.ttsConnectorId || '').trim();
   const ttsModel = String(record.ttsModel || '').trim();
   const sttConnectorId = String(record.sttConnectorId || '').trim();
   const sttModel = String(record.sttModel || '').trim();
+  const imageConnectorId = String(record.imageConnectorId || '').trim();
+  const imageModel = String(record.imageModel || '').trim();
+  const videoConnectorId = String(record.videoConnectorId || '').trim();
+  const videoModel = String(record.videoModel || '').trim();
   return {
     enableVoice: Boolean(record.enableVoice),
     allowMultiReply: Boolean(record.allowMultiReply),
     allowProactiveContact: Boolean(record.allowProactiveContact),
     autoPlayVoiceReplies: Boolean(record.autoPlayVoiceReplies),
     allowNsfwMedia: Boolean(record.allowNsfwMedia),
+    mediaTriggerMode,
+    segmentationMode,
     voiceName,
     ttsRouteSource,
     ttsConnectorId,
@@ -87,6 +125,12 @@ export function normalizeLocalChatDefaultSettings(value: unknown): LocalChatDefa
     sttRouteSource,
     sttConnectorId,
     sttModel,
+    imageRouteSource,
+    imageConnectorId,
+    imageModel,
+    videoRouteSource,
+    videoConnectorId,
+    videoModel,
   };
 }
 

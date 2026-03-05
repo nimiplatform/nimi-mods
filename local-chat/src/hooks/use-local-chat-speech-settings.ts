@@ -236,6 +236,48 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
     }));
   }, [updateSettings]);
 
+  const handleImageRouteSourceChange = useCallback((value: 'auto' | 'local-runtime' | 'token-api') => {
+    updateSettings((previous) => ({
+      ...previous,
+      imageRouteSource: value,
+    }));
+  }, [updateSettings]);
+
+  const handleImageConnectorChange = useCallback((value: string) => {
+    updateSettings((previous) => ({
+      ...previous,
+      imageConnectorId: value,
+    }));
+  }, [updateSettings]);
+
+  const handleImageModelChange = useCallback((value: string) => {
+    updateSettings((previous) => ({
+      ...previous,
+      imageModel: value,
+    }));
+  }, [updateSettings]);
+
+  const handleVideoRouteSourceChange = useCallback((value: 'auto' | 'local-runtime' | 'token-api') => {
+    updateSettings((previous) => ({
+      ...previous,
+      videoRouteSource: value,
+    }));
+  }, [updateSettings]);
+
+  const handleVideoConnectorChange = useCallback((value: string) => {
+    updateSettings((previous) => ({
+      ...previous,
+      videoConnectorId: value,
+    }));
+  }, [updateSettings]);
+
+  const handleVideoModelChange = useCallback((value: string) => {
+    updateSettings((previous) => ({
+      ...previous,
+      videoModel: value,
+    }));
+  }, [updateSettings]);
+
   return {
     speechProviders,
     speechVoices,
@@ -253,5 +295,11 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
     handleSttRouteSourceChange,
     handleSttConnectorChange,
     handleSttModelChange,
+    handleImageRouteSourceChange,
+    handleImageConnectorChange,
+    handleImageModelChange,
+    handleVideoRouteSourceChange,
+    handleVideoConnectorChange,
+    handleVideoModelChange,
   };
 }

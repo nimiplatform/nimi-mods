@@ -6,7 +6,7 @@ import { emitLocalChatLog } from '../../logging.js';
 import type { ChatRouteSnapshot, UseLocalChatRuntimeRouteInput } from './types.js';
 
 const ROUTE_OPTIONS_QUERY_TIMEOUT_MS = 6000;
-type RouteCapability = 'chat' | 'tts' | 'stt';
+type RouteCapability = 'chat' | 'image' | 'video' | 'tts' | 'stt';
 
 function safeLogRendererEvent(payload: Parameters<typeof logRendererEvent>[0]): void {
   emitLocalChatLog({

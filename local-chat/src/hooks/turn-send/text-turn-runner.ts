@@ -7,12 +7,13 @@ import {
 import type { TurnInvokeInput } from './request-builder.js';
 import type {
   AssistantPlanSegment,
-  LocalChatTextAiClient,
+  LocalChatTurnAiClient,
   SegmentParseMode,
 } from './types.js';
 
 const MAX_PLANNED_SEGMENTS = 4;
 const MAX_SEGMENT_CHARS = 420;
+const SHORT_REPLY_MERGE_THRESHOLD = 50;
 const EXPLICIT_SEGMENT_RE = /\n{2,}\[\[SEG\]\]\n{2,}/;
 const DOUBLE_NEWLINE_RE = /\n{2,}/;
 
@@ -26,12 +27,15 @@ export type TextTurnResult = {
   segmentParseMode: SegmentParseMode;
 };
 
+export type ReplySegmentationMode = 'adaptive' | 'single';
+
 type RunTextTurnInput = {
   flowId: string;
-  aiClient: LocalChatTextAiClient;
+  aiClient: LocalChatTurnAiClient;
   invokeInput: TurnInvokeInput;
   prompt: string;
   allowMultiReply: boolean;
+  segmentationMode?: ReplySegmentationMode;
   onStreamDelta?: (delta: string, chunkCount: number) => void;
 };
 
@@ -56,7 +60,11 @@ function normalizeCandidateSegments(candidates: string[]): string[] {
     .map((item) => item.slice(0, MAX_SEGMENT_CHARS));
 }
 
-function splitIntoSegments(text: string, allowMultiReply: boolean): SplitSegmentsResult {
+function splitIntoSegments(
+  text: string,
+  allowMultiReply: boolean,
+  segmentationMode: ReplySegmentationMode,
+): SplitSegmentsResult {
   const normalizedText = normalizeSegmentText(text);
   if (!normalizedText) {
     return {
@@ -73,7 +81,7 @@ function splitIntoSegments(text: string, allowMultiReply: boolean): SplitSegment
     rawSegments = normalizedText.split(EXPLICIT_SEGMENT_RE);
   } else if (DOUBLE_NEWLINE_RE.test(normalizedText)) {
     parseMode = 'double-newline';
-    rawSegments = normalizedText.split(DOUBLE_NEWLINE_RE);
+    rawSegments = splitByDoubleNewlineOutsideCodeBlocks(normalizedText);
   }
 
   let segments = normalizeCandidateSegments(rawSegments);
@@ -89,6 +97,23 @@ function splitIntoSegments(text: string, allowMultiReply: boolean): SplitSegment
       parseMode: 'single-message',
     };
   }
+  if (segmentationMode === 'single' && segments.length > 1) {
+    return {
+      segments: [segments.join(' ').slice(0, MAX_SEGMENT_CHARS)],
+      parseMode: 'single-message',
+    };
+  }
+
+  // Guard against over-segmentation for short replies (e.g. "好的\n\n没问题").
+  if (parseMode === 'double-newline' && segments.length > 1) {
+    const combinedLength = countChars(segments.join(''));
+    if (combinedLength < SHORT_REPLY_MERGE_THRESHOLD) {
+      return {
+        segments: [segments.join(' ').slice(0, MAX_SEGMENT_CHARS)],
+        parseMode: 'single-message',
+      };
+    }
+  }
 
   return {
     segments: segments.slice(0, MAX_PLANNED_SEGMENTS),
@@ -96,8 +121,40 @@ function splitIntoSegments(text: string, allowMultiReply: boolean): SplitSegment
   };
 }
 
-export function splitStreamReplyIntoSegments(text: string, allowMultiReply: boolean): SplitSegmentsResult {
-  return splitIntoSegments(text, allowMultiReply);
+export function splitStreamReplyIntoSegments(
+  text: string,
+  allowMultiReply: boolean,
+  segmentationMode: ReplySegmentationMode = 'adaptive',
+): SplitSegmentsResult {
+  return splitIntoSegments(text, allowMultiReply, segmentationMode);
+}
+
+function splitByDoubleNewlineOutsideCodeBlocks(text: string): string[] {
+  const segments: string[] = [];
+  let cursor = 0;
+  let buffer = '';
+  let insideCodeFence = false;
+
+  while (cursor < text.length) {
+    if (text.startsWith('```', cursor)) {
+      insideCodeFence = !insideCodeFence;
+      buffer += '```';
+      cursor += 3;
+      continue;
+    }
+    if (!insideCodeFence && text[cursor] === '\n' && text[cursor + 1] === '\n') {
+      segments.push(buffer);
+      buffer = '';
+      while (text[cursor] === '\n') {
+        cursor += 1;
+      }
+      continue;
+    }
+    buffer += text[cursor];
+    cursor += 1;
+  }
+  segments.push(buffer);
+  return segments;
 }
 
 function countChars(input: string): number {
@@ -109,6 +166,8 @@ function computeDelayMs(content: string, index: number): number {
   const length = countChars(content);
   const endsWithStrongPunctuation = /[!?！？]$/.test(content);
   const endsWithTerminalPunctuation = /[。.!?！？…]$/.test(content);
+  const hasEllipsisTail = /(\.\.\.|……|…)\s*$/.test(content);
+  const endsWithEmoji = /[\u{1F300}-\u{1FAFF}]$/u.test(content.trim());
 
   let delayMs = 0;
   if (length <= 15) {
@@ -120,12 +179,18 @@ function computeDelayMs(content: string, index: number): number {
   }
 
   if (endsWithStrongPunctuation) {
-    delayMs += 120;
+    delayMs += 220;
   } else if (endsWithTerminalPunctuation) {
-    delayMs += 80;
+    delayMs += 100;
+  }
+  if (hasEllipsisTail) {
+    delayMs += 120;
+  }
+  if (endsWithEmoji) {
+    delayMs -= 100;
   }
 
-  return Math.min(3000, delayMs);
+  return Math.max(100, Math.min(3200, delayMs));
 }
 
 function toAssistantPlanSegments(input: {
@@ -144,14 +209,24 @@ function toAssistantPlanSegments(input: {
 function buildStreamingPrompt(input: {
   prompt: string;
   allowMultiReply: boolean;
+  segmentationMode: ReplySegmentationMode;
 }): string {
-  return `${input.prompt}\n\n回复风格要求：\n- 像朋友发微信一样自然回复。\n- ${input.allowMultiReply ? '可以用空行分隔多条消息（最多4条）。' : '只回复一条完整消息。'}\n- 短消息和稍长消息可以交替，节奏自然。\n- 不要输出 JSON、标签、提示词结构或解释。\n- 只输出对用户可见的回复正文。`;
+  const lines = [
+    '输出格式要求：',
+    (!input.allowMultiReply || input.segmentationMode === 'single')
+      ? '- 本轮只输出一条完整消息，不要使用空行分段。'
+      : '',
+    '- 不要输出 JSON、标签、提示词结构或解释。',
+    '- 只输出对用户可见的回复正文。',
+  ].filter(Boolean);
+  return `${input.prompt}\n\n${lines.join('\n')}`;
 }
 
 export async function runTextTurn(input: RunTextTurnInput): Promise<TextTurnResult> {
   const prompt = buildStreamingPrompt({
     prompt: input.prompt,
     allowMultiReply: input.allowMultiReply,
+    segmentationMode: input.segmentationMode || 'adaptive',
   });
 
   let fullText = '';
@@ -203,7 +278,11 @@ export async function runTextTurn(input: RunTextTurnInput): Promise<TextTurnResu
     streamCompleted = false;
   }
   const streamDurationMs = Math.max(0, Math.round(performance.now() - streamStartedAt));
-  const splitResult = splitIntoSegments(fullText, input.allowMultiReply);
+  const splitResult = splitIntoSegments(
+    fullText,
+    input.allowMultiReply,
+    input.segmentationMode || 'adaptive',
+  );
   const segments = toAssistantPlanSegments({ segments: splitResult.segments });
 
   logRendererEvent({

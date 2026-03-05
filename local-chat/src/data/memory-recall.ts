@@ -65,16 +65,77 @@ function toMemoryText(entry: string | Record<string, unknown>): string {
   return fallback === '{}' ? '' : fallback;
 }
 
-function dedupeStrings(input: string[]): string[] {
-  const deduped: string[] = [];
-  const seen = new Set<string>();
-  input.forEach((item) => {
-    const key = item.trim();
-    if (!key || seen.has(key)) return;
-    seen.add(key);
-    deduped.push(key);
-  });
-  return deduped;
+function normalizeMemoryKey(input: string): string {
+  return String(input || '')
+    .toLowerCase()
+    .replace(/喜欢|喜爱/g, '爱好')
+    .replace(/玩游戏|打游戏/g, '游戏')
+    .replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
+function parseTimestampMs(value: unknown): number | null {
+  if (!value) return null;
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return value > 10_000_000_000 ? value : value * 1000;
+  }
+  const parsed = Date.parse(String(value));
+  if (!Number.isFinite(parsed)) return null;
+  return parsed;
+}
+
+function entryTimestampMs(entry: string | Record<string, unknown>): number | null {
+  if (typeof entry === 'string') return null;
+  return (
+    parseTimestampMs(entry.updatedAt)
+    || parseTimestampMs(entry.createdAt)
+    || parseTimestampMs(entry.occurredAt)
+    || parseTimestampMs(entry.timestamp)
+  );
+}
+
+function queryTokens(queryText: string): string[] {
+  return String(queryText || '')
+    .toLowerCase()
+    .replace(/喜欢|喜爱/g, '爱好')
+    .replace(/玩游戏|打游戏/g, '游戏')
+    .split(/[^\p{L}\p{N}]+/u)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 2);
+}
+
+function scoreMemoryEntry(input: {
+  text: string;
+  queryText: string;
+  timestampMs: number | null;
+  index: number;
+}): number {
+  const normalizedText = normalizeMemoryKey(input.text);
+  if (!normalizedText) return 0;
+  const tokens = queryTokens(input.queryText);
+  const relevanceScore = tokens.reduce((score, token) => (
+    normalizedText.includes(token) ? score + 1 : score
+  ), 0);
+  const now = Date.now();
+  const ageDays = input.timestampMs
+    ? Math.max(0, (now - input.timestampMs) / 86_400_000)
+    : 999;
+  const recencyScore = input.timestampMs
+    ? Math.max(0, 1 - Math.min(1, ageDays / 30))
+    : 0.2;
+  const orderBias = Math.max(0, 0.4 - input.index * 0.02);
+  return relevanceScore * 2 + recencyScore + orderBias;
+}
+
+function resolveTopK(input: {
+  preferredTopK: number;
+  queryText: string;
+}): number {
+  const preferred = Math.max(1, Math.min(24, Math.floor(input.preferredTopK)));
+  const queryLength = String(input.queryText || '').trim().length;
+  const budgetBased = queryLength > 0
+    ? Math.max(6, Math.min(18, Math.floor(1800 / Math.max(120, queryLength))))
+    : 10;
+  return Math.max(4, Math.min(preferred, budgetBased));
 }
 
 function normalizeRecallSource(value: unknown): LocalChatMemoryRecallSource {
@@ -112,16 +173,38 @@ function filterE2EEntriesByEntity(
 function toMemoryTextList(
   entries: Array<string | Record<string, unknown>>,
   topK: number,
+  queryText: string,
 ): string[] {
-  const normalized = entries
-    .map((entry) => toMemoryText(entry))
-    .filter((item) => item.length > 0);
-  return dedupeStrings(normalized).slice(0, topK);
+  const dedupe = new Map<string, {
+    text: string;
+    score: number;
+  }>();
+  entries.forEach((entry, index) => {
+    const text = toMemoryText(entry);
+    if (!text) return;
+    const key = normalizeMemoryKey(text);
+    if (!key) return;
+    const score = scoreMemoryEntry({
+      text,
+      queryText,
+      timestampMs: entryTimestampMs(entry),
+      index,
+    });
+    const previous = dedupe.get(key);
+    if (!previous || score > previous.score) {
+      dedupe.set(key, { text, score });
+    }
+  });
+  return Array.from(dedupe.values())
+    .sort((a, b) => b.score - a.score)
+    .slice(0, Math.max(1, topK))
+    .map((item) => item.text);
 }
 
 async function queryCoreFallback(input: {
   agentId: string;
   topK: number;
+  queryText: string;
 }): Promise<string[]> {
   const payload = await requireLocalChatCoreQueryBridge().query(
     CORE_DATA_API_AGENT_MEMORY_CORE_LIST,
@@ -131,13 +214,14 @@ async function queryCoreFallback(input: {
       offset: 0,
     },
   );
-  return toMemoryTextList(toMemoryEntries(payload), input.topK);
+  return toMemoryTextList(toMemoryEntries(payload), input.topK, input.queryText);
 }
 
 async function queryE2EFallback(input: {
   agentId: string;
   entityId: string | null;
   topK: number;
+  queryText: string;
 }): Promise<string[]> {
   if (!input.entityId) return [];
   const payload = await requireLocalChatCoreQueryBridge().query(
@@ -150,7 +234,7 @@ async function queryE2EFallback(input: {
     },
   );
   const entries = toMemoryEntries(payload);
-  return toMemoryTextList(filterE2EEntriesByEntity(entries, input.entityId), input.topK);
+  return toMemoryTextList(filterE2EEntriesByEntity(entries, input.entityId), input.topK, input.queryText);
 }
 
 export async function recallLocalChatMemoryForPrompt(input: {
@@ -158,13 +242,17 @@ export async function recallLocalChatMemoryForPrompt(input: {
   userInput: string;
   topK?: number;
 }): Promise<LocalChatMemoryRecallResult> {
-  const topK = toPositiveInt(input.topK) || 10;
+  const queryText = toNonEmptyString(input.userInput);
+  const topK = resolveTopK({
+    preferredTopK: toPositiveInt(input.topK) || 10,
+    queryText,
+  });
   const entityId = resolveEntityIdFromTarget(input.target);
   const recallQuery = {
     agentId: input.target.id,
     entityId: entityId || undefined,
     topK,
-    queryText: toNonEmptyString(input.userInput),
+    queryText,
   };
 
   let coreMemory: string[] = [];
@@ -186,6 +274,7 @@ export async function recallLocalChatMemoryForPrompt(input: {
     coreMemory = toMemoryTextList(
       toMemoryEntries(response.core || response.coreMemory || response.coreMemories),
       topK,
+      queryText,
     );
     e2eMemory = toMemoryTextList(
       filterE2EEntriesByEntity(
@@ -193,6 +282,7 @@ export async function recallLocalChatMemoryForPrompt(input: {
         resolvedEntityId,
       ),
       topK,
+      queryText,
     );
   } catch (error) {
     emitLocalChatLog({
@@ -212,6 +302,7 @@ export async function recallLocalChatMemoryForPrompt(input: {
       coreMemory = await queryCoreFallback({
         agentId: input.target.id,
         topK,
+        queryText,
       });
     } catch {
       coreMemory = [];
@@ -224,6 +315,7 @@ export async function recallLocalChatMemoryForPrompt(input: {
         agentId: input.target.id,
         entityId: resolvedEntityId,
         topK,
+        queryText,
       });
     } catch {
       e2eMemory = [];
@@ -241,6 +333,7 @@ export async function recallLocalChatMemoryForPrompt(input: {
       coreCount: coreMemory.length,
       e2eCount: e2eMemory.length,
       topK,
+      queryLength: queryText.length,
     },
   });
 

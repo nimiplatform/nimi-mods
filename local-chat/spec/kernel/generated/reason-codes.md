@@ -86,4 +86,44 @@ codes:
     blocking: false
     action_hint: nsfw-policy-guardrail-applied
     source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_MEDIA_INTENT_PARSE_OK
+    stage: media-intent-parse
+    blocking: false
+    action_hint: media-intent-detected
+    source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_MEDIA_INTENT_INVALID
+    stage: media-intent-parse
+    blocking: false
+    action_hint: ignore-invalid-media-tag
+    source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_MEDIA_NSFW_BLOCKED
+    stage: media-nsfw-gate
+    blocking: false
+    action_hint: downgrade-to-text-only
+    source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_MEDIA_GENERATE_FAILED
+    stage: media-generate
+    blocking: false
+    action_hint: retry-or-switch-media-model
+    source_rule: LC-ERR-002
+  - code: LOCAL_CHAT_MEDIA_CACHE_WRITE_OK
+    stage: media-cache-persist
+    blocking: false
+    action_hint: media-cache-hit-or-write
+    source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_MEDIA_CACHE_WRITE_FAILED
+    stage: media-cache-persist
+    blocking: false
+    action_hint: fallback-to-data-uri
+    source_rule: LC-ERR-002
+  - code: LOCAL_CHAT_MEDIA_DELIVERY_OK
+    stage: media-delivery-append
+    blocking: false
+    action_hint: media-delivered-after-text
+    source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_MEDIA_SOFT_CANCELLED
+    stage: media-delivery-append
+    blocking: false
+    action_hint: drop-stale-media-result
+    source_rule: LC-ERR-001
 ```

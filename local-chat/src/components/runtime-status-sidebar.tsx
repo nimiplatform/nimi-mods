@@ -11,6 +11,7 @@ import { DefaultSettingsPanel } from './sidebar/default-settings-panel.js';
 import { ChatRoutePanel } from './sidebar/chat-route-panel.js';
 import { VoicePanel } from './sidebar/voice-panel.js';
 import { DiagnosticsPanel } from './sidebar/diagnostics-panel.js';
+import { MediaRoutePanel } from './sidebar/media-route-panel.js';
 import type { RuntimeStatusSidebarProps } from './sidebar/types.js';
 
 const ICON_SHIELD = (
@@ -125,7 +126,7 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     [chatModelOptionsRaw],
   );
 
-  const [openPanel, setOpenPanel] = useState<'defaults' | 'chat' | 'voice' | 'diagnostics' | null>('defaults');
+  const [openPanel, setOpenPanel] = useState<'defaults' | 'chat' | 'media' | 'voice' | 'diagnostics' | null>('defaults');
   const [chatModelQuery, setChatModelQuery] = useState(effectiveChatBinding?.model || '');
   const filteredChatModelOptions = useMemo(
     () => filterModelOptions(chatModelOptions, chatModelQuery),
@@ -323,6 +324,27 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
           onSttRouteSourceChange={onSttRouteSourceChange}
           onSttConnectorChange={props.onSttConnectorChange}
           onSttModelChange={props.onSttModelChange}
+        />
+
+        <MediaRoutePanel
+          open={openPanel === 'media'}
+          onToggle={() => setOpenPanel((prev) => (prev === 'media' ? null : 'media'))}
+          imageRouteOptions={props.imageRouteOptions}
+          videoRouteOptions={props.videoRouteOptions}
+          imageRouteSource={props.imageRouteSource}
+          videoRouteSource={props.videoRouteSource}
+          imageConnectorId={props.imageConnectorId}
+          imageModel={props.imageModel}
+          videoConnectorId={props.videoConnectorId}
+          videoModel={props.videoModel}
+          imageConnectors={props.imageConnectors}
+          videoConnectors={props.videoConnectors}
+          onImageRouteSourceChange={props.onImageRouteSourceChange}
+          onImageConnectorChange={props.onImageConnectorChange}
+          onImageModelChange={props.onImageModelChange}
+          onVideoRouteSourceChange={props.onVideoRouteSourceChange}
+          onVideoConnectorChange={props.onVideoConnectorChange}
+          onVideoModelChange={props.onVideoModelChange}
         />
 
         <DiagnosticsPanel

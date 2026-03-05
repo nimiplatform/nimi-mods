@@ -55,6 +55,29 @@ cases:
     reason_code: LOCAL_CHAT_NSFW_POLICY_GUARDRAIL_OK
     test_reference: local-chat-nsfw-policy.test.mjs
     source_rule: LC-ACC-002
+  - id: LC-011-MEDIA-INTENT-PARSER
+    description: Media intent parser supports explicit tags and image heuristic fallback.
+    expected_ok: true
+    reason_code: LOCAL_CHAT_MEDIA_INTENT_PARSE_OK
+    test_reference: local-chat-media-intent-parser.test.mjs
+    source_rule: LC-ACC-002
+  - id: LC-012-MEDIA-DELIVERY-LIFECYCLE
+    description: Text delivery persists first; pending media is replaced by finalized image/video turn.
+    expected_ok: true
+    reason_code: LOCAL_CHAT_MEDIA_DELIVERY_OK
+    test_reference: local-chat-media-delivery-lifecycle.test.mjs
+    source_rule: LC-ACC-002
+  - id: LC-013-MEDIA-GENERATION-SOFT-CANCEL
+    description: Switching session/context discards in-flight media result without polluting active session.
+    expected_ok: true
+    reason_code: LOCAL_CHAT_MEDIA_SOFT_CANCELLED
+    test_reference: local-chat-media-soft-cancel.test.mjs
+    source_rule: LC-ACC-002
+  - id: LC-014-MEDIA-CACHE-ROUNDTRIP
+    description: Generated media bytes persist to local cache and return renderable URI with cache hit reuse.
+    expected_ok: true
+    reason_code: LOCAL_CHAT_MEDIA_CACHE_WRITE_OK
+    source_rule: LC-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:local-chat-kernel-docs
     source_rule: LC-ACC-001

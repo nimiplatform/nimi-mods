@@ -11,7 +11,7 @@ import { createSessionTurn } from '../../services/view/messages.js';
 import type { LocalChatScheduleCancelReason } from './types.js';
 
 const MAX_SEGMENT_DELAY_MS = 8_000;
-type PersistedAssistantMessageKind = Exclude<ChatMessageKind, 'streaming'>;
+type PersistedAssistantMessageKind = Exclude<ChatMessageKind, 'streaming' | 'image-pending' | 'video-pending'>;
 
 export type TurnDeliveryScheduleHandle = {
   turnTxnId: string;
@@ -159,6 +159,41 @@ export function persistFailedTurn(input: {
   appendTurnsToSession(input.sessionId, [
     createSessionTurn({ message: input.userMessage }),
     createSessionTurn({ message: input.errorMessage, audit: input.turnAudit }),
+  ]);
+  input.setSessions(listLocalChatSessions(input.targetId));
+}
+
+export function replacePendingAssistantMessage(input: {
+  sessionId: string;
+  targetId: string;
+  pendingMessageId: string;
+  message: ChatMessage;
+  setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
+  setSessions: (sessions: LocalChatSession[]) => void;
+  promptTrace?: LocalChatPromptTrace | null;
+  turnAudit?: LocalChatTurnAudit | null;
+}) {
+  const kind = input.message.kind;
+  if (kind === 'streaming' || kind === 'image-pending' || kind === 'video-pending') {
+    return;
+  }
+  input.setMessages((prev) => {
+    let replaced = false;
+    const next = prev.map((item) => {
+      if (item.id !== input.pendingMessageId) {
+        return item;
+      }
+      replaced = true;
+      return input.message;
+    });
+    return replaced ? next : [...prev, input.message];
+  });
+  appendTurnsToSession(input.sessionId, [
+    createSessionTurn({
+      message: input.message,
+      promptTrace: input.promptTrace || null,
+      audit: input.turnAudit || null,
+    }),
   ]);
   input.setSessions(listLocalChatSessions(input.targetId));
 }

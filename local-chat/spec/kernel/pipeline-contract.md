@@ -51,3 +51,24 @@ NSFW media policy is settings + route-source gated:
 3. non-local routes must downgrade to `local-runtime-only` policy state
 
 Policy decision must be recorded in assistant turn diagnostics/audit metadata even when no media generation is executed.
+
+## LC-PIPE-009 Media Delivery Pipeline
+
+Image/video generation must follow an append-only async pipeline:
+
+1. parse explicit media tags first (`[[IMG:...]]`, `[[VID:...]]`)
+2. dispatch text deliveries immediately
+3. enqueue media pending delivery
+4. append finalized media turn after generation/cache finalize
+
+Text turn success must not be blocked by media failure.
+
+## LC-PIPE-010 Media NSFW Gate Pipeline
+
+Media execution uses the same three-state policy as diagnostics metadata:
+
+1. `disabled`: media generation is skipped
+2. `local-runtime-only`: media generation allowed only on local-runtime route source
+3. `allowed`: media generation allowed
+
+When blocked, the pipeline must emit a non-blocking reason code and keep text deliveries intact.

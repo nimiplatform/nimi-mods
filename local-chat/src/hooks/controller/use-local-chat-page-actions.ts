@@ -227,6 +227,8 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         healthStatus: state.runtimeRouteState.healthStatus,
         checkingHealth: state.runtimeRouteState.checkingHealth,
         chatRouteOptions: state.runtimeRouteState.chatRouteOptions,
+        imageRouteOptions: state.runtimeRouteState.imageRouteOptions,
+        videoRouteOptions: state.runtimeRouteState.videoRouteOptions,
         routeOverride: state.runtimeRouteState.routeOverride,
         speechProviders: state.speechSettingsState.speechProviders,
         speechVoices: state.speechSettingsState.speechVoices,
@@ -234,6 +236,8 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         selectedVoiceId: state.speechSettingsState.defaultSettings.voiceName,
         ttsRouteSource: state.speechSettingsState.defaultSettings.ttsRouteSource,
         sttRouteSource: state.speechSettingsState.defaultSettings.sttRouteSource,
+        imageRouteSource: state.speechSettingsState.defaultSettings.imageRouteSource,
+        videoRouteSource: state.speechSettingsState.defaultSettings.videoRouteSource,
         localTtsRouteAvailable,
         localSttRouteAvailable,
         autoBoundSource,
@@ -256,6 +260,10 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         ttsModel: state.effectiveTtsModel,
         sttConnectorId: state.speechSettingsState.defaultSettings.sttConnectorId,
         sttModel: state.speechSettingsState.defaultSettings.sttModel,
+        imageConnectorId: state.speechSettingsState.defaultSettings.imageConnectorId,
+        imageModel: state.speechSettingsState.defaultSettings.imageModel,
+        videoConnectorId: state.speechSettingsState.defaultSettings.videoConnectorId,
+        videoModel: state.speechSettingsState.defaultSettings.videoModel,
         ttsConnectors: (state.runtimeRouteState.ttsRouteOptions?.connectors || []).filter((c) => {
           const models = resolveModelsForScenario({
             models: c.models || [],
@@ -282,12 +290,44 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
           models: c.models || [],
           modelCapabilities: c.modelCapabilities,
         })),
+        imageConnectors: (state.runtimeRouteState.imageRouteOptions?.connectors || []).filter((c) => {
+          const models = resolveModelsForScenario({
+            models: c.models || [],
+            modelCapabilities: c.modelCapabilities,
+            scenario: 'image',
+          });
+          return models.length > 0;
+        }).map((c) => ({
+          id: c.id,
+          label: c.label || c.id,
+          models: c.models || [],
+          modelCapabilities: c.modelCapabilities,
+        })),
+        videoConnectors: (state.runtimeRouteState.videoRouteOptions?.connectors || []).filter((c) => {
+          const models = resolveModelsForScenario({
+            models: c.models || [],
+            modelCapabilities: c.modelCapabilities,
+            scenario: 'video',
+          });
+          return models.length > 0;
+        }).map((c) => ({
+          id: c.id,
+          label: c.label || c.id,
+          models: c.models || [],
+          modelCapabilities: c.modelCapabilities,
+        })),
         onTtsRouteSourceChange: state.speechSettingsState.handleTtsRouteSourceChange,
         onTtsConnectorChange: state.speechSettingsState.handleTtsConnectorChange,
         onTtsModelChange: state.speechSettingsState.handleTtsModelChange,
         onSttRouteSourceChange: state.speechSettingsState.handleSttRouteSourceChange,
         onSttConnectorChange: state.speechSettingsState.handleSttConnectorChange,
         onSttModelChange: state.speechSettingsState.handleSttModelChange,
+        onImageRouteSourceChange: state.speechSettingsState.handleImageRouteSourceChange,
+        onImageConnectorChange: state.speechSettingsState.handleImageConnectorChange,
+        onImageModelChange: state.speechSettingsState.handleImageModelChange,
+        onVideoRouteSourceChange: state.speechSettingsState.handleVideoRouteSourceChange,
+        onVideoConnectorChange: state.speechSettingsState.handleVideoConnectorChange,
+        onVideoModelChange: state.speechSettingsState.handleVideoModelChange,
         defaultSettings: state.speechSettingsState.defaultSettings,
         onDefaultSettingChange: handleDefaultSettingChange,
         onDefaultVoiceNameChange: handleDefaultVoiceNameChange,

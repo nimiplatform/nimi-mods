@@ -20,3 +20,7 @@ Minimum acceptance coverage must include:
 8. stream parser deterministic segmentation (explicit delimiter + double newline fallback + max 4)
 9. streaming placeholder finalize lifecycle (placeholder -> first finalized message replacement)
 10. NSFW guardrail policy (default disabled + local-runtime-only enforcement)
+11. media intent parser coverage (explicit tag + image heuristic fallback)
+12. media async delivery lifecycle (text first, media appended later)
+13. media soft-cancel behavior on session/context change
+14. media cache write/read roundtrip with deterministic cache key

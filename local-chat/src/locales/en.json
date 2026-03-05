@@ -6,7 +6,10 @@
     "roleAgentVoice": "Agent Voice",
     "roleAgent": "Agent",
     "generating": "Generating...",
-    "agentPending": "Agent · pending"
+    "generatingImage": "Generating image...",
+    "generatingVideo": "Generating video...",
+    "agentPending": "Agent · pending",
+    "imagePreviewDialogLabel": "Image preview"
   },
   "DefaultSettings": {
     "title": "Default Settings",
@@ -26,6 +29,17 @@
     "noModels": "No available chat model for current source.",
     "noMatchingModels": "No model matches current search.",
     "useRuntimeDefault": "Use Runtime Default"
+  },
+  "MediaRoute": {
+    "title": "Media Route Config",
+    "imageTitle": "Image Generation",
+    "videoTitle": "Video Generation",
+    "auto": "Auto",
+    "localRuntime": "Local Runtime",
+    "tokenApi": "Token API",
+    "modelPlaceholder": "Optional model override...",
+    "connectorRequiredHint": "Token API is selected but connector is not configured, media generation will fail.",
+    "autoRouteHint": "Auto mode has no media overrides. If generation fails, configure connector/model manually."
   },
   "VoicePanel": {
     "title": "Voice Model Config",

@@ -24,6 +24,8 @@ export const LOCAL_CHAT_CORE_DATA_API_AGENT_MEMORY_STATS_GET = 'data-api.core.ag
 export const LOCAL_CHAT_CAPABILITIES = [
   'llm.text.generate',
   'llm.text.stream',
+  'llm.image.generate',
+  'llm.video.generate',
   'llm.speech.providers.list',
   'llm.speech.voices.list',
   'llm.speech.synthesize',

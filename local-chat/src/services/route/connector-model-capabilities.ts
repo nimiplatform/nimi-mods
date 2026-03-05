@@ -1,6 +1,7 @@
 import { filterModelsForScenario, filterModelsForSpeechSynthesis } from '@nimiplatform/sdk/mod/model-options';
 
 type Scenario = 'tts' | 'stt';
+type ExtendedScenario = Scenario | 'image' | 'video';
 
 function dedupeModelIds(models: string[]): string[] {
   return Array.from(new Set(models.map((model) => String(model || '').trim()).filter(Boolean)));
@@ -30,7 +31,7 @@ function capabilitiesForModel(
   return Array.isArray(entry[1]) ? entry[1] : [];
 }
 
-function matchesScenarioByCapability(capabilities: string[], scenario: Scenario): boolean {
+function matchesScenarioByCapability(capabilities: string[], scenario: ExtendedScenario): boolean {
   const normalized = normalizeCapabilities(capabilities);
   if (normalized.length === 0) return false;
   const hasAny = (...tokens: string[]) => tokens.some((token) => normalized.includes(token));
@@ -42,25 +43,48 @@ function matchesScenarioByCapability(capabilities: string[], scenario: Scenario)
       'llm.speech.synthesize',
     );
   }
+  if (scenario === 'stt') {
+    return hasAny(
+      'stt',
+      'audio.transcribe',
+      'speech.transcribe',
+      'llm.speech.transcribe',
+    );
+  }
+  if (scenario === 'image') {
+    return hasAny(
+      'image',
+      't2i',
+      'i2i',
+      'llm.image.generate',
+    );
+  }
   return hasAny(
-    'stt',
-    'audio.transcribe',
-    'speech.transcribe',
-    'llm.speech.transcribe',
+    'video',
+    't2v',
+    'llm.video.generate',
+    'video.generate',
+    'text.video',
   );
 }
 
-function filterModelsByHeuristic(models: string[], scenario: Scenario): string[] {
+function filterModelsByHeuristic(models: string[], scenario: ExtendedScenario): string[] {
   if (scenario === 'tts') {
     return filterModelsForSpeechSynthesis(models);
   }
-  return filterModelsForScenario(models, 'stt');
+  if (scenario === 'stt') {
+    return filterModelsForScenario(models, 'stt');
+  }
+  if (scenario === 'image') {
+    return filterModelsForScenario(models, 'image');
+  }
+  return filterModelsForScenario(models, 'video');
 }
 
 export function resolveModelsForScenario(input: {
   models: string[];
   modelCapabilities?: Record<string, string[]>;
-  scenario: Scenario;
+  scenario: ExtendedScenario;
 }): string[] {
   const allModels = dedupeModelIds(input.models);
   if (allModels.length === 0) return [];
@@ -83,7 +107,7 @@ export function resolveModelsForScenario(input: {
 export function resolvePreferredModelForScenario(input: {
   models: string[];
   modelCapabilities?: Record<string, string[]>;
-  scenario: Scenario;
+  scenario: ExtendedScenario;
 }): string {
   const candidates = resolveModelsForScenario(input);
   return candidates[0] || '';

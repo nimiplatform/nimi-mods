@@ -21,7 +21,7 @@ export type LocalChatPromptTrace = {
     usedChars: number;
     truncated: boolean;
   };
-  compilerVersion: 'v1' | 'v2';
+  compilerVersion: 'v1' | 'v2' | 'v3';
   planner?: 'stream';
   planSegments?: number;
   voiceSegments?: number;

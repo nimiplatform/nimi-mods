@@ -14,9 +14,21 @@ export type ChatMessageMeta = {
   streamChunkCount?: number;
   nsfwPolicy?: 'disabled' | 'local-runtime-only' | 'allowed';
   segmentParseMode?: 'explicit-delimiter' | 'double-newline' | 'single-message';
+  mediaType?: 'image' | 'video';
+  mediaStatus?: 'pending' | 'ready' | 'failed' | 'blocked';
+  mediaPrompt?: string;
+  mediaIntentSource?: 'tag' | 'heuristic';
+  mediaError?: string;
 };
 
-export type ChatMessageKind = 'text' | 'voice' | 'image' | 'video' | 'streaming';
+export type ChatMessageKind =
+  | 'text'
+  | 'voice'
+  | 'image'
+  | 'video'
+  | 'image-pending'
+  | 'video-pending'
+  | 'streaming';
 
 export type ChatMessageMedia = {
   uri?: string;

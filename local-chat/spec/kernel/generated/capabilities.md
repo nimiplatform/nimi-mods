@@ -15,6 +15,10 @@ required_capabilities:
     source_rule: LC-CAP-001
   - key: llm.text.stream
     source_rule: LC-CAP-001
+  - key: llm.image.generate
+    source_rule: LC-CAP-001
+  - key: llm.video.generate
+    source_rule: LC-CAP-001
   - key: llm.speech.providers.list
     source_rule: LC-CAP-003
   - key: llm.speech.voices.list
@@ -85,6 +89,8 @@ allowed_sdk_surfaces:
       - generateText
       - streamText
       - generateObject
+      - generateImage
+      - generateVideo
       - synthesizeSpeech
       - transcribeAudio
       - generateEmbedding

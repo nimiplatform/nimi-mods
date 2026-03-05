@@ -45,6 +45,101 @@ function parseInlineMarkdown(text: string): React.ReactNode[] {
   return nodes.length > 0 ? nodes : [text];
 }
 
+function parseMarkdownBlocks(text: string): React.ReactNode[] {
+  const lines = String(text || '').replace(/\r/g, '').split('\n');
+  const blocks: React.ReactNode[] = [];
+  let i = 0;
+  let key = 0;
+
+  while (i < lines.length) {
+    const line = lines[i] || '';
+    if (!line.trim()) {
+      i += 1;
+      continue;
+    }
+
+    if (line.startsWith('```')) {
+      const language = line.slice(3).trim();
+      i += 1;
+      const codeLines: string[] = [];
+      while (i < lines.length && !lines[i]?.startsWith('```')) {
+        codeLines.push(lines[i] || '');
+        i += 1;
+      }
+      if (i < lines.length && lines[i]?.startsWith('```')) {
+        i += 1;
+      }
+      blocks.push(
+        <pre key={`block-${key++}`} className="my-1 overflow-x-auto rounded-xl bg-gray-900/95 px-3 py-2 text-[12px] text-gray-100">
+          {language ? <p className="mb-1 text-[10px] uppercase tracking-wide text-gray-400">{language}</p> : null}
+          <code>{codeLines.join('\n')}</code>
+        </pre>,
+      );
+      continue;
+    }
+
+    if (line.startsWith('>')) {
+      const quoteLines: string[] = [];
+      while (i < lines.length && (lines[i] || '').startsWith('>')) {
+        quoteLines.push((lines[i] || '').replace(/^>\s?/, ''));
+        i += 1;
+      }
+      blocks.push(
+        <blockquote key={`block-${key++}`} className="my-1 border-l-2 border-mint-300/80 pl-3 text-[13px] text-gray-700">
+          {quoteLines.join('\n')}
+        </blockquote>,
+      );
+      continue;
+    }
+
+    if (/^[-*]\s+/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^[-*]\s+/.test(lines[i] || '')) {
+        items.push((lines[i] || '').replace(/^[-*]\s+/, ''));
+        i += 1;
+      }
+      blocks.push(
+        <ul key={`block-${key++}`} className="my-1 list-disc space-y-1 pl-4">
+          {items.map((item, itemIndex) => (
+            <li key={`li-${itemIndex}`}>{parseInlineMarkdown(item)}</li>
+          ))}
+        </ul>,
+      );
+      continue;
+    }
+
+    if (/^\d+\.\s+/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^\d+\.\s+/.test(lines[i] || '')) {
+        items.push((lines[i] || '').replace(/^\d+\.\s+/, ''));
+        i += 1;
+      }
+      blocks.push(
+        <ol key={`block-${key++}`} className="my-1 list-decimal space-y-1 pl-4">
+          {items.map((item, itemIndex) => (
+            <li key={`li-${itemIndex}`}>{parseInlineMarkdown(item)}</li>
+          ))}
+        </ol>,
+      );
+      continue;
+    }
+
+    const paragraphLines: string[] = [];
+    while (i < lines.length && (lines[i] || '').trim() && !lines[i]?.startsWith('```') && !lines[i]?.startsWith('>') && !/^[-*]\s+/.test(lines[i] || '') && !/^\d+\.\s+/.test(lines[i] || '')) {
+      paragraphLines.push(lines[i] || '');
+      i += 1;
+    }
+    const paragraph = paragraphLines.join('\n');
+    blocks.push(
+      <p key={`block-${key++}`} className="whitespace-pre-wrap">
+        {parseInlineMarkdown(paragraph)}
+      </p>,
+    );
+  }
+
+  return blocks.length > 0 ? blocks : [text];
+}
+
 function VoiceBubbleContent(props: {
   isPlaying: boolean;
   onPlay: () => void;
@@ -126,10 +221,34 @@ export function ChatBubble(props: {
   const isVoice = message.kind === 'voice';
   const isImage = message.kind === 'image';
   const isVideo = message.kind === 'video';
+  const isImagePending = message.kind === 'image-pending';
+  const isVideoPending = message.kind === 'video-pending';
   const isStreaming = message.kind === 'streaming';
   const isPlaying = isVoice && voicePlayingMessageId === message.id;
   const time = message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const bubbleShapeClass = bubbleShapeFor(message.role, position);
+
+  const [imagePreviewOpen, setImagePreviewOpen] = React.useState(false);
+  const [imageLoadError, setImageLoadError] = React.useState(false);
+  const [videoLoadError, setVideoLoadError] = React.useState(false);
+
+  React.useEffect(() => {
+    setImageLoadError(false);
+    setVideoLoadError(false);
+  }, [message.id, message.media?.uri]);
+
+  React.useEffect(() => {
+    if (!imagePreviewOpen) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setImagePreviewOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [imagePreviewOpen]);
 
   const agentInitial = (String(agentName || 'A').trim().charAt(0) || 'A').toUpperCase();
   const userInitial = (String(userName || 'U').trim().charAt(0) || 'U').toUpperCase();
@@ -147,6 +266,9 @@ export function ChatBubble(props: {
     }
     if (!isUser && message.meta?.routeModel) {
       parts.push(`Model: ${message.meta.routeModel}`);
+    }
+    if (message.meta?.mediaStatus) {
+      parts.push(`Media: ${message.meta.mediaStatus}`);
     }
     if (message.latencyMs != null) {
       parts.push(`Latency: ${message.latencyMs}ms`);
@@ -172,64 +294,117 @@ export function ChatBubble(props: {
     )
   );
 
-  return (
-    <div
-      className={`flex gap-2 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
-      style={{ animation: 'chat-slide-up 0.24s cubic-bezier(0.2, 0.7, 0.2, 1) both' }}
-    >
-      {showAvatar ? avatarNode : <span className="h-8 w-8 shrink-0" aria-hidden />}
+  const mediaUri = String(message.media?.uri || '').trim();
 
-      <div className="max-w-[72%]">
-        <div
-          className={`${bubbleShapeClass} px-4 py-2.5 text-sm leading-[1.6] ${
-            isUser
-              ? 'bg-gradient-to-br from-mint-500 to-brand-500 text-white shadow-[0_2px_12px_-2px_rgb(78_204_163/0.45)]'
-              : 'border border-gray-200 bg-white text-gray-900 shadow-[0_1px_2px_rgba(15,23,42,0.05)]'
-          }`}
-        >
-          {isVoice ? (
-            <VoiceBubbleContent
-              isPlaying={isPlaying}
-              onPlay={() => onPlayVoiceMessage(message)}
-              onContextMenu={(event) => onVoiceContextMenu(message, event)}
-              playingLabel={t('ChatBubble.playingVoice')}
-              idleLabel={t('ChatBubble.voiceMessage')}
-            />
-          ) : isImage ? (
-            <p className="text-xs italic opacity-70">{t('ChatBubble.imagePlaceholder')}</p>
-          ) : isVideo ? (
-            <p className="text-xs italic opacity-70">{t('ChatBubble.videoPlaceholder')}</p>
-          ) : isStreaming ? (
-            <span className={message.content ? '' : 'italic opacity-70'}>
-              {message.content || t('ChatBubble.streamingPlaceholder')}
-              <span className="ml-0.5 inline-block animate-pulse text-mint-600">|</span>
-            </span>
-          ) : (
-            <span>{parseInlineMarkdown(message.content)}</span>
-          )}
-          {isVoice && isVoiceTranscriptVisible ? (
-            <div className="mt-2 border-t border-gray-200/30 pt-2 text-xs opacity-80">
-              {message.content}
-            </div>
+  return (
+    <>
+      <div
+        className={`flex gap-2 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
+        style={{ animation: 'chat-slide-up 0.24s cubic-bezier(0.2, 0.7, 0.2, 1) both' }}
+      >
+        {showAvatar ? avatarNode : <span className="h-8 w-8 shrink-0" aria-hidden />}
+
+        <div className="max-w-[72%]">
+          <div
+            className={`${bubbleShapeClass} px-4 py-2.5 text-sm leading-[1.6] ${
+              isUser
+                ? 'bg-gradient-to-br from-mint-500 to-brand-500 text-white shadow-[0_2px_12px_-2px_rgb(78_204_163/0.45)]'
+                : 'border border-gray-200 bg-white text-gray-900 shadow-[0_1px_2px_rgba(15,23,42,0.05)]'
+            }`}
+          >
+            {isVoice ? (
+              <VoiceBubbleContent
+                isPlaying={isPlaying}
+                onPlay={() => onPlayVoiceMessage(message)}
+                onContextMenu={(event) => onVoiceContextMenu(message, event)}
+                playingLabel={t('ChatBubble.playingVoice')}
+                idleLabel={t('ChatBubble.voiceMessage')}
+              />
+            ) : isImagePending || isVideoPending ? (
+              <div className="flex items-center gap-2 text-xs text-gray-600">
+                <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-mint-600" />
+                <span>{message.content || (isImagePending ? t('ChatBubble.generatingImage') : t('ChatBubble.generatingVideo'))}</span>
+              </div>
+            ) : isImage ? (
+              mediaUri && !imageLoadError ? (
+                <button
+                  type="button"
+                  onClick={() => setImagePreviewOpen(true)}
+                  className="group block overflow-hidden rounded-xl border border-gray-200 bg-gray-50"
+                >
+                  <img
+                    src={mediaUri}
+                    alt={message.content || t('ChatBubble.imagePlaceholder')}
+                    className="max-h-[320px] w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                    loading="lazy"
+                    onError={() => setImageLoadError(true)}
+                  />
+                </button>
+              ) : (
+                <p className="text-xs italic opacity-70">{message.meta?.mediaError || t('ChatBubble.imagePlaceholder')}</p>
+              )
+            ) : isVideo ? (
+              mediaUri && !videoLoadError ? (
+                <video
+                  src={mediaUri}
+                  controls
+                  preload="metadata"
+                  className="max-h-[320px] w-full rounded-xl border border-gray-200 bg-black"
+                  poster={message.media?.previewUri}
+                  onError={() => setVideoLoadError(true)}
+                />
+              ) : (
+                <p className="text-xs italic opacity-70">{message.meta?.mediaError || t('ChatBubble.videoPlaceholder')}</p>
+              )
+            ) : isStreaming ? (
+              <span className={message.content ? '' : 'italic opacity-70'}>
+                {message.content || t('ChatBubble.streamingPlaceholder')}
+                <span className="ml-0.5 inline-block animate-pulse text-mint-600">|</span>
+              </span>
+            ) : (
+              <div className="space-y-1">{parseMarkdownBlocks(message.content)}</div>
+            )}
+            {isVoice && isVoiceTranscriptVisible ? (
+              <div className="mt-2 border-t border-gray-200/30 pt-2 text-xs opacity-80">
+                {message.content}
+              </div>
+            ) : null}
+          </div>
+          {showTimestamp ? (
+            <p className={`mt-1 text-[10px] text-gray-400 ${isUser ? 'text-right' : 'text-left'}`}>
+              {time} · {isUser ? t('ChatBubble.roleUser') : (isVoice ? t('ChatBubble.roleAgentVoice') : t('ChatBubble.roleAgent'))}
+            </p>
+          ) : null}
+          {showTimestamp && debugMeta.length > 0 ? (
+            <details className={`mt-0.5 ${isUser ? 'text-right' : 'text-left'}`}>
+              <summary className="cursor-pointer text-[10px] text-gray-400 hover:text-gray-500">debug</summary>
+              <div className="mt-1 space-y-0.5 text-[10px] text-gray-400">
+                {debugMeta.map((line, i) => (
+                  <p key={`debug-${i}`}>{line}</p>
+                ))}
+              </div>
+            </details>
           ) : null}
         </div>
-        {showTimestamp ? (
-          <p className={`mt-1 text-[10px] text-gray-400 ${isUser ? 'text-right' : 'text-left'}`}>
-            {time} · {isUser ? t('ChatBubble.roleUser') : (isVoice ? t('ChatBubble.roleAgentVoice') : t('ChatBubble.roleAgent'))}
-          </p>
-        ) : null}
-        {showTimestamp && debugMeta.length > 0 ? (
-          <details className={`mt-0.5 ${isUser ? 'text-right' : 'text-left'}`}>
-            <summary className="cursor-pointer text-[10px] text-gray-400 hover:text-gray-500">debug</summary>
-            <div className="mt-1 space-y-0.5 text-[10px] text-gray-400">
-              {debugMeta.map((line, i) => (
-                <p key={`debug-${i}`}>{line}</p>
-              ))}
-            </div>
-          </details>
-        ) : null}
       </div>
-    </div>
+
+      {imagePreviewOpen && mediaUri ? (
+        <div
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-6"
+          onClick={() => setImagePreviewOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('ChatBubble.imagePreviewDialogLabel')}
+        >
+          <img
+            src={mediaUri}
+            alt={message.content || t('ChatBubble.imagePlaceholder')}
+            className="max-h-full max-w-full rounded-2xl object-contain shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          />
+        </div>
+      ) : null}
+    </>
   );
 }
 

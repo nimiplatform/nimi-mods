@@ -31,10 +31,13 @@ export type AssistantPlanSegment = {
   reason?: string;
 };
 
-export type LocalChatTextAiClient = Pick<ModAiClient, 'generateText' | 'generateObject' | 'streamText'>;
+export type LocalChatTurnAiClient = Pick<
+  ModAiClient,
+  'generateText' | 'generateObject' | 'streamText' | 'generateImage' | 'generateVideo' | 'resolveRoute'
+>;
 
 export type UseLocalChatTurnSendInput = {
-  aiClient: LocalChatTextAiClient;
+  aiClient: LocalChatTurnAiClient;
   inputText: string;
   setInputText: (value: string) => void;
   runtimeMode: 'STORY' | 'SCENE_TURN' | undefined;

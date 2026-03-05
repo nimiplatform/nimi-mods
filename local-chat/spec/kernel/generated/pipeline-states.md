@@ -33,6 +33,22 @@ text_turn_chain:
   - step: diagnostics-persist
     order: 6
     source_rule: LC-PIPE-004
+media_turn_chain:
+  - step: media-intent-parse
+    order: 1
+    source_rule: LC-PIPE-009
+  - step: media-nsfw-gate
+    order: 2
+    source_rule: LC-PIPE-010
+  - step: media-generate
+    order: 3
+    source_rule: LC-PIPE-009
+  - step: media-cache-persist
+    order: 4
+    source_rule: LC-PIPE-009
+  - step: media-delivery-append
+    order: 5
+    source_rule: LC-PIPE-009
 speech_turn_chain:
   - step: speech-input
     order: 1

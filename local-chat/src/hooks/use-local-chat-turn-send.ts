@@ -11,6 +11,15 @@ function buildTurnSendContextKey(input: UseLocalChatTurnSendInput): string {
   const routeOverrideModel = String(input.routeOverride?.model || '').trim();
   const routeSnapshotSource = String(input.routeSnapshot?.source || '').trim();
   const routeSnapshotModel = String(input.routeSnapshot?.model || '').trim();
+  const imageRouteSource = String(input.defaultSettings.imageRouteSource || '').trim();
+  const imageConnectorId = String(input.defaultSettings.imageConnectorId || '').trim();
+  const imageModel = String(input.defaultSettings.imageModel || '').trim();
+  const videoRouteSource = String(input.defaultSettings.videoRouteSource || '').trim();
+  const videoConnectorId = String(input.defaultSettings.videoConnectorId || '').trim();
+  const videoModel = String(input.defaultSettings.videoModel || '').trim();
+  const mediaTriggerMode = String(input.defaultSettings.mediaTriggerMode || '').trim();
+  const segmentationMode = String(input.defaultSettings.segmentationMode || '').trim();
+  const allowNsfwMedia = input.defaultSettings.allowNsfwMedia ? '1' : '0';
   return [
     targetId,
     sessionId,
@@ -19,6 +28,15 @@ function buildTurnSendContextKey(input: UseLocalChatTurnSendInput): string {
     routeOverrideModel,
     routeSnapshotSource,
     routeSnapshotModel,
+    imageRouteSource,
+    imageConnectorId,
+    imageModel,
+    videoRouteSource,
+    videoConnectorId,
+    videoModel,
+    mediaTriggerMode,
+    segmentationMode,
+    allowNsfwMedia,
   ].join('|');
 }
 
@@ -32,6 +50,15 @@ export function useLocalChatTurnSend(input: UseLocalChatTurnSendInput) {
     input.routeOverride?.source,
     input.routeSnapshot?.model,
     input.routeSnapshot?.source,
+    input.defaultSettings.imageRouteSource,
+    input.defaultSettings.imageConnectorId,
+    input.defaultSettings.imageModel,
+    input.defaultSettings.videoRouteSource,
+    input.defaultSettings.videoConnectorId,
+    input.defaultSettings.videoModel,
+    input.defaultSettings.mediaTriggerMode,
+    input.defaultSettings.segmentationMode,
+    input.defaultSettings.allowNsfwMedia,
     input.selectedSessionId,
     input.selectedTarget?.id,
   ]);

@@ -14,13 +14,15 @@ import { buildRouteOverrideForConnector, buildRouteOverrideForModel, buildRouteO
 import { loadRouteOptions, resolveRouteSnapshot, runRouteHealthCheck } from './runtime-route/queries.js';
 import type { ChatRouteSnapshot, UseLocalChatRuntimeRouteInput } from './runtime-route/types.js';
 
-type RouteCapability = 'chat' | 'tts' | 'stt';
+type RouteCapability = 'chat' | 'image' | 'video' | 'tts' | 'stt';
 
 export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
   const [healthStatus, setHealthStatus] = useState<HealthStatus>('idle');
   const [checkingHealth, setCheckingHealth] = useState(false);
   const [routeSnapshot, setRouteSnapshot] = useState<ChatRouteSnapshot | null>(null);
   const [chatRouteOptions, setChatRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
+  const [imageRouteOptions, setImageRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
+  const [videoRouteOptions, setVideoRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
   const [ttsRouteOptions, setTtsRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
   const [sttRouteOptions, setSttRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
   const [routeOverride, setRouteOverride] = useState<RuntimeRouteBinding | null>(() => loadLocalChatRouteOverride());
@@ -43,7 +45,18 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
       setTtsRouteOptions(next);
       return;
     }
-    setSttRouteOptions(next);
+    if (capability === 'image') {
+      setImageRouteOptions(next);
+      return;
+    }
+    if (capability === 'video') {
+      setVideoRouteOptions(next);
+      return;
+    }
+    if (capability === 'stt') {
+      setSttRouteOptions(next);
+      return;
+    }
   }, []);
 
   const refreshRouteSnapshot = useCallback(async () => {
@@ -111,15 +124,31 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
     () => loadRuntimeRouteOptions('stt'),
     [loadRuntimeRouteOptions],
   );
+  const loadImageRuntimeRouteOptions = useCallback(
+    () => loadRuntimeRouteOptions('image'),
+    [loadRuntimeRouteOptions],
+  );
+  const loadVideoRuntimeRouteOptions = useCallback(
+    () => loadRuntimeRouteOptions('video'),
+    [loadRuntimeRouteOptions],
+  );
 
   const loadAllRuntimeRouteOptions = useCallback(async () => {
-    const [chat, tts, stt] = await Promise.all([
+    const [chat, image, video, tts, stt] = await Promise.all([
       loadChatRuntimeRouteOptions(),
+      loadImageRuntimeRouteOptions(),
+      loadVideoRuntimeRouteOptions(),
       loadTtsRuntimeRouteOptions(),
       loadSttRuntimeRouteOptions(),
     ]);
-    return { chat, tts, stt };
-  }, [loadChatRuntimeRouteOptions, loadTtsRuntimeRouteOptions, loadSttRuntimeRouteOptions]);
+    return { chat, image, video, tts, stt };
+  }, [
+    loadChatRuntimeRouteOptions,
+    loadImageRuntimeRouteOptions,
+    loadVideoRuntimeRouteOptions,
+    loadTtsRuntimeRouteOptions,
+    loadSttRuntimeRouteOptions,
+  ]);
 
   const handleHealthCheck = useCallback(async () => {
     await runRouteHealthCheck({
@@ -271,7 +300,14 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
         let loaded: RuntimeRouteOptionsSnapshot | null = null;
         try {
           const loadedSnapshot = await loadAllRuntimeRouteOptions();
-          loaded = loadedSnapshot.chat || loadedSnapshot.tts || loadedSnapshot.stt || null;
+          loaded = (
+            loadedSnapshot.chat
+            || loadedSnapshot.image
+            || loadedSnapshot.video
+            || loadedSnapshot.tts
+            || loadedSnapshot.stt
+            || null
+          );
         } catch {
           loaded = null;
         }
@@ -289,6 +325,8 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
   useEffect(() => {
     const connectorCount = Math.max(
       chatRouteOptions?.connectors.length || 0,
+      imageRouteOptions?.connectors.length || 0,
+      videoRouteOptions?.connectors.length || 0,
       ttsRouteOptions?.connectors.length || 0,
       sttRouteOptions?.connectors.length || 0,
     );
@@ -301,6 +339,8 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
     };
   }, [
     chatRouteOptions?.connectors.length,
+    imageRouteOptions?.connectors.length,
+    videoRouteOptions?.connectors.length,
     ttsRouteOptions?.connectors.length,
     sttRouteOptions?.connectors.length,
     loadAllRuntimeRouteOptions,
@@ -311,15 +351,21 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
     checkingHealth,
     routeSnapshot,
     chatRouteOptions,
+    imageRouteOptions,
+    videoRouteOptions,
     ttsRouteOptions,
     sttRouteOptions,
     routeOptionsByCapability: {
       chat: chatRouteOptions,
+      image: imageRouteOptions,
+      video: videoRouteOptions,
       tts: ttsRouteOptions,
       stt: sttRouteOptions,
     },
     routeOverride,
     loadChatRuntimeRouteOptions,
+    loadImageRuntimeRouteOptions,
+    loadVideoRuntimeRouteOptions,
     loadTtsRuntimeRouteOptions,
     loadSttRuntimeRouteOptions,
     loadAllRuntimeRouteOptions,
