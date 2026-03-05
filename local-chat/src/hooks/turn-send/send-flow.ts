@@ -1,5 +1,6 @@
 import { createRendererFlowId, logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import type { ChatMessage } from '../../types.js';
+import { evaluateNsfwMediaPolicy } from '../../services/policy/nsfw-media-policy.js';
 import { buildErrorTurnPayload } from './error-handler.js';
 import { createUserMessage, ensureWorkingSession } from './session.js';
 import { prepareLocalChatTurn } from './prompt.js';
@@ -9,9 +10,82 @@ import type { LocalChatScheduleCancelReason, UseLocalChatTurnSendInput } from '.
 import { logTurnScheduleCancelled, logTurnSendDone, logTurnSendFailed, logTurnSendStart } from './logging.js';
 
 const LOCAL_CHAT_FALLBACK_TOAST_KEY = 'nimi.local-chat.fallback-toast-shown.v1';
+const FALLBACK_TYPING_MIN_MS = 1_400;
+const FALLBACK_TYPING_MAX_MS = 3_200;
+const FALLBACK_TYPING_PER_CHAR_MS = 22;
+const FALLBACK_TYPING_MAX_FRAMES = 36;
 
 function createTurnTxnId(): string {
   return `txn-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createStreamingMessage(turnTxnId: string): ChatMessage {
+  return {
+    id: `stream-${turnTxnId}`,
+    role: 'assistant',
+    kind: 'streaming',
+    content: '',
+    timestamp: new Date(),
+    meta: {
+      streamId: turnTxnId,
+      streamChunkCount: 0,
+    },
+  };
+}
+
+function delayMs(ms: number): Promise<void> {
+  if (!Number.isFinite(ms) || ms <= 0) return Promise.resolve();
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function animateFallbackStreamingPreview(input: {
+  streamingMessageId: string;
+  text: string;
+  turnTxnId: string;
+  sendContextKey: string;
+  getCurrentContextKey: () => string;
+  setMessages: (updater: (prev: ChatMessage[]) => ChatMessage[]) => void;
+}): Promise<void> {
+  const chars = Array.from(String(input.text || ''));
+  if (chars.length === 0) return;
+  const estimatedTotalMs = Math.round(chars.length * FALLBACK_TYPING_PER_CHAR_MS);
+  const totalMs = Math.max(
+    FALLBACK_TYPING_MIN_MS,
+    Math.min(FALLBACK_TYPING_MAX_MS, estimatedTotalMs),
+  );
+  const frameCount = Math.max(8, Math.min(FALLBACK_TYPING_MAX_FRAMES, Math.ceil(chars.length / 2)));
+  const chunkSize = Math.max(1, Math.ceil(chars.length / frameCount));
+  const stepMs = Math.max(22, Math.round(totalMs / frameCount));
+  let emitted = 0;
+  let chunkCount = 0;
+
+  while (emitted < chars.length) {
+    if (input.getCurrentContextKey() !== input.sendContextKey) {
+      return;
+    }
+    emitted = Math.min(chars.length, emitted + chunkSize);
+    chunkCount += 1;
+    const nextText = chars.slice(0, emitted).join('');
+    input.setMessages((prev) => prev.map((message) => {
+      if (message.id !== input.streamingMessageId) {
+        return message;
+      }
+      return {
+        ...message,
+        content: nextText,
+        meta: {
+          ...(message.meta || {}),
+          streamId: input.turnTxnId,
+          streamChunkCount: chunkCount,
+        },
+      };
+    }));
+    if (emitted < chars.length) {
+      await delayMs(stepMs);
+    }
+  }
 }
 
 function shouldShowFallbackToastOnce(): boolean {
@@ -73,7 +147,8 @@ export async function runLocalChatTurnSend(input: {
   const sessionId = workingSession.id;
   const userMessage: ChatMessage = createUserMessage(text);
   const turnTxnId = createTurnTxnId();
-  context.setMessages((prev) => [...prev, userMessage]);
+  const streamingMessage = createStreamingMessage(turnTxnId);
+  context.setMessages((prev) => [...prev, userMessage, streamingMessage]);
   context.setInputText('');
   input.setIsSending(true);
 
@@ -96,8 +171,26 @@ export async function runLocalChatTurnSend(input: {
       runtimeMode: context.runtimeMode,
       routeOverride: context.routeOverride,
       allowMultiReply: context.defaultSettings.allowMultiReply,
-      enableVoice: context.defaultSettings.enableVoice,
       routeSnapshot: context.routeSnapshot,
+      onStreamDelta: (delta, chunkCount) => {
+        if (input.getCurrentContextKey() !== input.sendContextKey) {
+          return;
+        }
+        context.setMessages((prev) => prev.map((message) => {
+          if (message.id !== streamingMessage.id) {
+            return message;
+          }
+          return {
+            ...message,
+            content: `${message.content}${delta}`,
+            meta: {
+              ...(message.meta || {}),
+              streamId: turnTxnId,
+              streamChunkCount: chunkCount,
+            },
+          };
+        }));
+      },
     });
     const expectedSource = context.routeOverride?.source
       || context.chatRouteOptions?.selected.source
@@ -116,6 +209,10 @@ export async function runLocalChatTurnSend(input: {
     }
 
     const latencyMs = Math.round(performance.now() - startedAt);
+    const nsfwPolicy = evaluateNsfwMediaPolicy({
+      allowNsfwMedia: context.defaultSettings.allowNsfwMedia,
+      routeSource: prepared.routeSnapshot?.source || expectedSource,
+    });
     const assistantPayload = buildAssistantTurnOutput({
       plannedSegments: prepared.textTurn.segments,
       enableVoice: context.defaultSettings.enableVoice,
@@ -126,10 +223,24 @@ export async function runLocalChatTurnSend(input: {
       routeSnapshot: prepared.routeSnapshot,
       routeOverride: prepared.routeOverride,
       chatRouteOptions: context.chatRouteOptions,
-      planner: prepared.textTurn.planner,
-      retryAttempted: prepared.textTurn.retryAttempted,
-      retryImproved: prepared.textTurn.retryImproved,
+      streamDeltaCount: prepared.textTurn.streamDeltaCount,
+      streamDurationMs: prepared.textTurn.streamDurationMs,
+      segmentParseMode: prepared.textTurn.segmentParseMode,
+      nsfwPolicy,
     });
+    if (prepared.textTurn.streamDeltaCount === 0) {
+      const fallbackPreviewText = String(prepared.textTurn.segments[0]?.content || '').trim();
+      if (fallbackPreviewText) {
+        await animateFallbackStreamingPreview({
+          streamingMessageId: streamingMessage.id,
+          text: fallbackPreviewText,
+          turnTxnId,
+          sendContextKey: input.sendContextKey,
+          getCurrentContextKey: input.getCurrentContextKey,
+          setMessages: context.setMessages,
+        });
+      }
+    }
     assistantPayload.assistantOutput.deliveries
       .filter((delivery) => delivery.kind === 'voice')
       .forEach((delivery) => {
@@ -174,6 +285,7 @@ export async function runLocalChatTurnSend(input: {
 
     const contextChanged = input.getCurrentContextKey() !== input.sendContextKey;
     if (contextChanged) {
+      context.setMessages((prev) => prev.filter((message) => message.id !== streamingMessage.id));
       const userOnly = persistSuccessfulTurn({
         sessionId,
         targetId: selectedTarget.id,
@@ -222,9 +334,13 @@ export async function runLocalChatTurnSend(input: {
       latencyMs,
       promptTrace: assistantPayload.promptTrace,
       turnAudit: assistantPayload.turnAudit,
+      replaceFirstMessageId: streamingMessage.id,
       setMessages: context.setMessages,
       setSessions: context.setSessions,
       onScheduleCancelled: (scheduleCancelled) => {
+        if (scheduleCancelled.deliveredCount === 0) {
+          context.setMessages((prev) => prev.filter((message) => message.id !== streamingMessage.id));
+        }
         const cancelledAudit = createCancelledAudit({
           reason: scheduleCancelled.reason,
           targetId: selectedTarget.id,
@@ -265,15 +381,14 @@ export async function runLocalChatTurnSend(input: {
       latencyMs,
       turnTxnId,
       planId: assistantPayload.assistantOutput.planId,
-      retryAttempted: prepared.textTurn.retryAttempted,
-      retryImproved: prepared.textTurn.retryImproved,
-      planner: prepared.textTurn.planner,
       followupSent: assistantPayload.assistantOutput.followupSent,
       segmentCount: assistantPayload.assistantOutput.segmentCount,
       textSegments: assistantPayload.assistantOutput.textSegments,
       voiceSegments: assistantPayload.assistantOutput.voiceSegments,
       schedulerTotalDelayMs: assistantPayload.assistantOutput.schedulerTotalDelayMs,
-      firstReply: prepared.textTurn.firstReply,
+      streamDeltaCount: prepared.textTurn.streamDeltaCount,
+      streamDurationMs: prepared.textTurn.streamDurationMs,
+      segmentParseMode: prepared.textTurn.segmentParseMode,
     });
   } catch (error) {
     const latencyMs = Math.round(performance.now() - startedAt);
@@ -282,6 +397,7 @@ export async function runLocalChatTurnSend(input: {
       error,
       latencyMs,
     });
+    context.setMessages((prev) => prev.filter((message) => message.id !== streamingMessage.id));
     context.setLatestPromptTrace(null);
     context.setLatestTurnAudit(errorPayload.turnAudit);
     persistFailedTurn({

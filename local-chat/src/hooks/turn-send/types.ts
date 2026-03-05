@@ -17,6 +17,7 @@ export type ChatRouteSnapshot = {
 
 export type AssistantPlanChannel = 'auto' | 'text' | 'voice';
 export type AssistantPlanIntent = 'answer' | 'clarify' | 'plan' | 'checkin' | 'followup';
+export type SegmentParseMode = 'explicit-delimiter' | 'double-newline' | 'single-message';
 export type LocalChatScheduleCancelReason =
   | 'LOCAL_CHAT_SCHEDULE_CANCELLED_BY_NEW_USER_TURN'
   | 'LOCAL_CHAT_SCHEDULE_CANCELLED_BY_CONTEXT_CHANGE';
@@ -30,7 +31,7 @@ export type AssistantPlanSegment = {
   reason?: string;
 };
 
-export type LocalChatTextAiClient = Pick<ModAiClient, 'generateText' | 'generateObject'>;
+export type LocalChatTextAiClient = Pick<ModAiClient, 'generateText' | 'generateObject' | 'streamText'>;
 
 export type UseLocalChatTurnSendInput = {
   aiClient: LocalChatTextAiClient;

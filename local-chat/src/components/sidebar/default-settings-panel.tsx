@@ -12,6 +12,12 @@ type Props = {
   onDefaultVoiceNameChange: RuntimeStatusSidebarProps['onDefaultVoiceNameChange'];
 };
 
+const CHEVRON_ICON = (
+  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M5 7.5L10 12.5L15 7.5" />
+  </svg>
+);
+
 export function DefaultSettingsPanel(props: Props) {
   const { t } = useModTranslation('local-chat');
   const {
@@ -24,25 +30,25 @@ export function DefaultSettingsPanel(props: Props) {
   } = props;
 
   return (
-    <div className="rounded-[10px] border border-gray-200 bg-gray-50 p-3 text-xs">
+    <div className="lc-card rounded-2xl p-3 text-xs">
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="flex w-full items-center justify-between text-left text-gray-700 font-medium"
+        className="flex h-7 w-full items-center justify-between text-left text-[13px] font-semibold text-gray-700"
       >
         <span>{t('DefaultSettings.title')}</span>
-        <span>{open ? '-' : '+'}</span>
+        <span className={`text-gray-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>{CHEVRON_ICON}</span>
       </button>
-      {open ? (
-        <div className="mt-3 space-y-3">
+      <div className={`grid overflow-hidden transition-all duration-200 ${open ? 'mt-3 grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+        <div className={`min-h-0 space-y-3 ${open ? 'lc-panel-expand' : ''}`}>
           <label className="flex items-center justify-between gap-3">
             <span className="text-gray-700">{t('DefaultSettings.enableVoice')}</span>
             <input
               type="checkbox"
               checked={defaultSettings.enableVoice}
               onChange={(event) => onDefaultSettingChange('enableVoice', event.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+              className="h-4 w-4 rounded border-gray-300 text-mint-600 focus:ring-mint-500"
             />
           </label>
           <label className="flex items-center justify-between gap-3">
@@ -51,7 +57,7 @@ export function DefaultSettingsPanel(props: Props) {
               type="checkbox"
               checked={defaultSettings.allowMultiReply}
               onChange={(event) => onDefaultSettingChange('allowMultiReply', event.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+              className="h-4 w-4 rounded border-gray-300 text-mint-600 focus:ring-mint-500"
             />
           </label>
           <label className="flex items-center justify-between gap-3">
@@ -60,7 +66,7 @@ export function DefaultSettingsPanel(props: Props) {
               type="checkbox"
               checked={defaultSettings.allowProactiveContact}
               onChange={(event) => onDefaultSettingChange('allowProactiveContact', event.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+              className="h-4 w-4 rounded border-gray-300 text-mint-600 focus:ring-mint-500"
             />
           </label>
           <label className="flex items-center justify-between gap-3">
@@ -69,7 +75,16 @@ export function DefaultSettingsPanel(props: Props) {
               type="checkbox"
               checked={defaultSettings.autoPlayVoiceReplies}
               onChange={(event) => onDefaultSettingChange('autoPlayVoiceReplies', event.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+              className="h-4 w-4 rounded border-gray-300 text-mint-600 focus:ring-mint-500"
+            />
+          </label>
+          <label className="flex items-center justify-between gap-3">
+            <span className="text-gray-700">{t('DefaultSettings.allowNsfwMedia')}</span>
+            <input
+              type="checkbox"
+              checked={defaultSettings.allowNsfwMedia}
+              onChange={(event) => onDefaultSettingChange('allowNsfwMedia', event.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-mint-600 focus:ring-mint-500"
             />
           </label>
           <div className="space-y-1">
@@ -90,7 +105,7 @@ export function DefaultSettingsPanel(props: Props) {
             </select>
           </div>
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }

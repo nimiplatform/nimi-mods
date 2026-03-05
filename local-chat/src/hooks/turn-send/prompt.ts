@@ -23,8 +23,8 @@ export async function prepareLocalChatTurn(input: {
   runtimeMode: 'STORY' | 'SCENE_TURN' | undefined;
   routeOverride: RuntimeRouteBinding | null;
   allowMultiReply: boolean;
-  enableVoice: boolean;
   routeSnapshot: ChatRouteSnapshot | null;
+  onStreamDelta?: (delta: string, chunkCount: number) => void;
 }): Promise<PreparedTurn> {
   const { prompt, compiledPrompt, invokeInput } = await buildTurnRequestInput({
     text: input.text,
@@ -38,9 +38,8 @@ export async function prepareLocalChatTurn(input: {
     aiClient: input.aiClient,
     invokeInput,
     prompt,
-    userText: input.text,
     allowMultiReply: input.allowMultiReply,
-    enableVoice: input.enableVoice,
+    onStreamDelta: input.onStreamDelta,
   });
 
   return {

@@ -19,6 +19,12 @@ type Props = {
   onClearRouteOverride: () => void;
 };
 
+const CHEVRON_ICON = (
+  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M5 7.5L10 12.5L15 7.5" />
+  </svg>
+);
+
 export function ChatRoutePanel(props: Props) {
   const { t } = useModTranslation('local-chat');
   const setActiveTab = useAppStore((state) => (state as { setActiveTab: (tab: string) => void }).setActiveTab);
@@ -40,26 +46,26 @@ export function ChatRoutePanel(props: Props) {
   const showEmptyLocalRuntimeCta = activeChatSource === 'local-runtime' && chatModelOptions.length === 0;
 
   return (
-    <div className="rounded-[10px] border border-gray-200 bg-gray-50 p-3 text-xs">
+    <div className="lc-card rounded-2xl p-3 text-xs">
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="flex w-full items-center justify-between text-left text-gray-700 font-medium"
+        className="flex h-7 w-full items-center justify-between text-left text-[13px] font-semibold text-gray-700"
       >
         <span>{t('ChatRoute.title')}</span>
-        <span>{open ? '-' : '+'}</span>
+        <span className={`text-gray-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>{CHEVRON_ICON}</span>
       </button>
-      {open ? (
-        <>
-          <p className="mt-2 text-[11px] text-gray-600">{t('ChatRoute.storedNote')}</p>
-          <div className="mt-3 space-y-2">
+      <div className={`grid overflow-hidden transition-all duration-200 ${open ? 'mt-3 grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+        <div className={`min-h-0 space-y-2 ${open ? 'lc-panel-expand' : ''}`}>
+          <p className="text-[11px] text-gray-600">{t('ChatRoute.storedNote')}</p>
+          <div className="space-y-2">
             <div>
               <p className="mb-1 text-gray-500">{t('ChatRoute.source')}</p>
               <select
                 value={activeChatSource}
                 onChange={(event) => onRouteSourceChange(normalizeRuntimeRouteSource(event.target.value))}
-                className="h-8 w-full rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-900"
+                className="h-8 w-full rounded-xl border border-gray-200 bg-white px-2 text-xs text-gray-900"
               >
                 <option value="local-runtime">Local Runtime</option>
                 <option value="token-api">Token API</option>
@@ -72,7 +78,7 @@ export function ChatRoutePanel(props: Props) {
                 value={activeChatConnectorId}
                 disabled={activeChatSource !== 'token-api'}
                 onChange={(event) => onRouteConnectorChange(event.target.value)}
-                className="h-8 w-full rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-900 disabled:bg-gray-100 disabled:text-gray-400"
+                className="h-8 w-full rounded-xl border border-gray-200 bg-white px-2 text-xs text-gray-900 disabled:bg-gray-100 disabled:text-gray-400"
               >
                 <option value="">--</option>
                 {(chatRouteOptions?.connectors || []).map((connector) => (
@@ -94,7 +100,7 @@ export function ChatRoutePanel(props: Props) {
                   }
                 }}
                 placeholder={t('ChatRoute.modelPlaceholder')}
-                className="h-8 w-full rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-900 outline-none transition-colors focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                className="h-8 w-full rounded-xl border border-gray-200 bg-white px-2 text-xs text-gray-900 outline-none transition-colors focus:border-mint-500 focus:ring-1 focus:ring-mint-500"
               />
               <datalist id="local-chat-chat-model-list">
                 {filteredChatModelOptions.map((model) => (
@@ -134,13 +140,13 @@ export function ChatRoutePanel(props: Props) {
             <button
               type="button"
               onClick={onClearRouteOverride}
-              className="h-8 w-full rounded-lg border border-gray-200 bg-white px-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              className="h-9 w-full rounded-xl border border-gray-200 bg-white px-2 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50"
             >
               {t('ChatRoute.useRuntimeDefault')}
             </button>
           </div>
-        </>
-      ) : null}
+        </div>
+      </div>
     </div>
   );
 }

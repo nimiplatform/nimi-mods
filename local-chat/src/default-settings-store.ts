@@ -22,13 +22,15 @@ export type LocalChatBooleanSettingKey =
   | 'enableVoice'
   | 'allowMultiReply'
   | 'allowProactiveContact'
-  | 'autoPlayVoiceReplies';
+  | 'autoPlayVoiceReplies'
+  | 'allowNsfwMedia';
 
 export type LocalChatDefaultSettings = {
   enableVoice: boolean;
   allowMultiReply: boolean;
   allowProactiveContact: boolean;
   autoPlayVoiceReplies: boolean;
+  allowNsfwMedia: boolean;
   voiceName: LocalChatTtsVoice;
   ttsRouteSource: 'auto' | 'local-runtime' | 'token-api';
   ttsConnectorId: string;
@@ -43,6 +45,7 @@ export const DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS: LocalChatDefaultSettings = {
   allowMultiReply: false,
   allowProactiveContact: false,
   autoPlayVoiceReplies: false,
+  allowNsfwMedia: false,
   voiceName: 'Cherry',
   ttsRouteSource: 'auto',
   ttsConnectorId: '',
@@ -76,6 +79,7 @@ export function normalizeLocalChatDefaultSettings(value: unknown): LocalChatDefa
     allowMultiReply: Boolean(record.allowMultiReply),
     allowProactiveContact: Boolean(record.allowProactiveContact),
     autoPlayVoiceReplies: Boolean(record.autoPlayVoiceReplies),
+    allowNsfwMedia: Boolean(record.allowNsfwMedia),
     voiceName,
     ttsRouteSource,
     ttsConnectorId,

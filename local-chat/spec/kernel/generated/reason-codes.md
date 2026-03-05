@@ -71,4 +71,19 @@ codes:
     blocking: false
     action_hint: policy-state-unavailable
     source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_STREAM_SEGMENT_PARSE_OK
+    stage: assistant-generate
+    blocking: false
+    action_hint: stream-segmentation-succeeded
+    source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_STREAM_FINALIZE_OK
+    stage: turns-persist
+    blocking: false
+    action_hint: streaming-placeholder-finalized
+    source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_NSFW_POLICY_GUARDRAIL_OK
+    stage: assistant-generate
+    blocking: false
+    action_hint: nsfw-policy-guardrail-applied
+    source_rule: LC-ERR-001
 ```

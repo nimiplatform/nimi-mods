@@ -4,12 +4,6 @@ import { SessionMenu } from '../session-menu.js';
 import type { LocalChatSession } from '../../state/index.js';
 import type { LocalChatTargetItem } from './types.js';
 
-const C = {
-  green50: '#f0fdf4',
-  gray200: '#e5e7eb',
-  white: '#ffffff',
-} as const;
-
 type LocalChatHeaderProps = {
   selectedTarget: LocalChatTargetItem | null;
   selectedTargetAvatarUrl: string | null;
@@ -138,7 +132,7 @@ export function LocalChatHeader({
   const agentIntroLabel = t('Header.viewAgentIntro');
 
   return (
-    <div className="flex h-14 shrink-0 items-center justify-between border-b px-4" style={{ borderColor: C.gray200, background: `linear-gradient(90deg, ${C.green50}, ${C.white})` }}>
+    <div className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 bg-gradient-to-r from-mint-50 to-white px-4">
       <div className="relative flex min-w-0 items-center gap-3">
         <button
           ref={avatarButtonRef}
@@ -161,7 +155,7 @@ export function LocalChatHeader({
               className="h-8 w-8 rounded-full object-cover"
             />
           ) : (
-            <div className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white" style={{ background: 'linear-gradient(135deg, #22c55e, #15803d)' }}>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-mint-500 to-mint-700 text-xs font-bold text-white">
               {selectedTargetInitial}
             </div>
           )}
@@ -178,6 +172,7 @@ export function LocalChatHeader({
           <div
             ref={introPanelRef}
             className="absolute left-0 top-[calc(100%+8px)] z-40 w-[320px] rounded-xl border border-gray-200 bg-white p-3 shadow-lg"
+            style={{ animation: 'panel-scale-in 0.15s ease-out both' }}
             onClick={(event: ReactMouseEvent<HTMLDivElement>) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-2">

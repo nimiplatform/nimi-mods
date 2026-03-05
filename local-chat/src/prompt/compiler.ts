@@ -1,9 +1,9 @@
 import { emitLocalChatLog } from '../logging.js';
 import type { LocalChatPromptCompileInput, LocalChatCompiledPrompt, PromptLayerId, PromptLayerTrace } from './types.js';
 
-const DEFAULT_MAX_PROMPT_CHARS = 8_000;
-const DEFAULT_MAX_HISTORY_CHARS = 1_200;
-const DEFAULT_MAX_JSON_CHARS = 2_000;
+const DEFAULT_MAX_PROMPT_CHARS = 24_000;
+const DEFAULT_MAX_HISTORY_CHARS = 6_000;
+const DEFAULT_MAX_JSON_CHARS = 4_000;
 
 const LAYER_ORDER: PromptLayerId[] = [
   'platformSafety',
@@ -71,7 +71,7 @@ function normalizeHistory(input: {
   userInput: string;
 }): string {
   const lines = input.history
-    .slice(-8)
+    .slice(-20)
     .map((message) => `${message.role === 'assistant' ? 'Assistant' : 'User'}: ${String(message.content || '').trim()}`)
     .filter((line) => line.length > 0)
     .join('\n');
@@ -168,7 +168,7 @@ function toLayerContent(input: LocalChatPromptCompileInput): Record<PromptLayerI
     }),
     postHistoryInstructions: [
       postHistoryInstructions ? `后置指令:\n${truncateText(postHistoryInstructions, maxJsonChars)}` : '',
-      '请直接给出最终回复正文（中文，2-6句，完整自然）。',
+      '请像朋友发微信一样回复，自然随意。你可以用空行分隔来发多条消息。短消息和长消息交替，节奏有张有弛。不要输出任何非对话内容。',
     ].filter(Boolean).join('\n'),
   };
 }
@@ -283,7 +283,7 @@ export function compileLocalChatPrompt(input: LocalChatPromptCompileInput): Loca
       worldLoreCount: countLoreEntries(worldKeywordLore),
       agentLoreCount: countLoreEntries(agentLorebook),
     },
-    compilerVersion: 'v1',
+    compilerVersion: 'v2',
   };
 
   emitLocalChatLog({

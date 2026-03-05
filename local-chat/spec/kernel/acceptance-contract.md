@@ -17,3 +17,6 @@ Minimum acceptance coverage must include:
 5. session delete recovery
 6. proactive policy guard when user setting disables proactive contact
 7. proactive policy allow path when wake strategy and idle window are eligible
+8. stream parser deterministic segmentation (explicit delimiter + double newline fallback + max 4)
+9. streaming placeholder finalize lifecycle (placeholder -> first finalized message replacement)
+10. NSFW guardrail policy (default disabled + local-runtime-only enforcement)

@@ -45,12 +45,14 @@ function parseLastUserIdleMs(input: {
 function createProactiveTurn(message: string, nowMs: number): {
   id: string;
   role: 'assistant';
+  kind: 'text';
   content: string;
   timestamp: string;
 } {
   return {
     id: `turn-${nowMs.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     role: 'assistant',
+    kind: 'text',
     content: message,
     timestamp: new Date(nowMs).toISOString(),
   };

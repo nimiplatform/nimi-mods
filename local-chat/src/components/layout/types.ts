@@ -12,6 +12,8 @@ export type LocalChatTargetItem = {
   agentMetadata?: Record<string, unknown>;
   latestLocalMessage?: string | null;
   latestLocalMessageAt?: string | null;
+  unreadCount?: number;
+  isOnline?: boolean;
 };
 
 export type LocalChatSessionItem = {

@@ -35,6 +35,7 @@ export function SessionMenu(props: SessionMenuProps) {
         <div
           ref={props.panelRef}
           className="absolute right-0 z-30 mt-2 w-80 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl"
+          style={{ animation: 'panel-scale-in 0.15s ease-out both' }}
         >
           <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2">
             <p className="text-xs font-semibold text-gray-700">{t('SessionMenu.title')}</p>
@@ -57,7 +58,7 @@ export function SessionMenu(props: SessionMenuProps) {
                 return (
                   <div
                     key={session.id}
-                    className={`border-b border-gray-100 px-3 py-2 ${active ? 'bg-green-50' : ''}`}
+                    className={`border-b border-gray-100 px-3 py-2 ${active ? 'bg-mint-50' : ''}`}
                   >
                     <button
                       type="button"

@@ -50,8 +50,13 @@ export function buildVoiceOptionItems(voices: VoicePanelVoiceOption[]): Array<{
   }));
 }
 
-const selectClassName = 'h-8 w-full rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-900 disabled:bg-gray-100 disabled:text-gray-400';
-const inputClassName = 'h-8 w-full rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-900 outline-none transition-colors focus:border-green-500 focus:ring-1 focus:ring-green-500 disabled:bg-gray-100 disabled:text-gray-400';
+const selectClassName = 'h-8 w-full rounded-xl border border-gray-200 bg-white px-2 text-xs text-gray-900 disabled:bg-gray-100 disabled:text-gray-400';
+const inputClassName = 'h-8 w-full rounded-xl border border-gray-200 bg-white px-2 text-xs text-gray-900 outline-none transition-colors focus:border-mint-500 focus:ring-1 focus:ring-mint-500 disabled:bg-gray-100 disabled:text-gray-400';
+const CHEVRON_ICON = (
+  <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M5 7.5L10 12.5L15 7.5" />
+  </svg>
+);
 
 export function VoicePanel(props: Props) {
   const { t } = useModTranslation('local-chat');
@@ -118,26 +123,25 @@ export function VoicePanel(props: Props) {
     () => filterModelOptions(sttConnectorModels, sttModelQuery),
     [sttConnectorModels, sttModelQuery],
   );
-
   const voiceOptions = useMemo(
     () => buildVoiceOptionItems(visibleSpeechVoices),
     [visibleSpeechVoices],
   );
 
   return (
-    <div className="rounded-[10px] border border-gray-200 bg-gray-50 p-3 text-xs">
+    <div className="lc-card rounded-2xl p-3 text-xs">
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="flex w-full items-center justify-between text-left text-gray-700 font-medium"
+        className="flex h-7 w-full items-center justify-between text-left text-[13px] font-semibold text-gray-700"
       >
         <span>{t('VoicePanel.title')}</span>
-        <span>{open ? '-' : '+'}</span>
+        <span className={`text-gray-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>{CHEVRON_ICON}</span>
       </button>
-      {open ? (
-        <>
-          <p className="mt-2 text-[11px] text-gray-600">
+      <div className={`grid overflow-hidden transition-all duration-200 ${open ? 'mt-3 grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+        <div className={`min-h-0 ${open ? 'lc-panel-expand' : ''}`}>
+          <p className="text-[11px] text-gray-600">
             {enableVoice ? t('VoicePanel.enabledNote') : t('VoicePanel.disabledNote')}
           </p>
           <div className="mt-3 space-y-2">
@@ -186,11 +190,13 @@ export function VoicePanel(props: Props) {
                   <input
                     list="voice-panel-tts-model-list"
                     value={ttsModelQuery}
-                    disabled={!enableVoice}
+                    disabled={!enableVoice || !ttsConnectorId}
                     onChange={(event) => {
                       const nextValue = event.target.value;
                       setTtsModelQuery(nextValue);
-                      onTtsModelChange(nextValue.trim());
+                      if (ttsConnectorModels.includes(nextValue)) {
+                        onTtsModelChange(nextValue);
+                      }
                     }}
                     placeholder={t('VoicePanel.modelPlaceholder')}
                     className={inputClassName}
@@ -366,8 +372,8 @@ export function VoicePanel(props: Props) {
               </div>
             ) : null}
           </div>
-        </>
-      ) : null}
+        </div>
+      </div>
     </div>
   );
 }

@@ -3,3 +3,4 @@ export * from './view/targets.js';
 export * from './view/reply.js';
 export * from './view/messages.js';
 export * from './view/sessions.js';
+export * from './policy/nsfw-media-policy.js';

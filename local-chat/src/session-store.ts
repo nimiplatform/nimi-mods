@@ -1,6 +1,6 @@
 import { loadLocalStorageJson, saveLocalStorageJson } from '@nimiplatform/sdk/mod/utils';
 import type { PromptLayerId } from './prompt/index.js';
-import type { ChatMessageMeta } from './types.js';
+import type { ChatMessageKind, ChatMessageMedia, ChatMessageMeta } from './types.js';
 
 export type LocalChatPromptTrace = {
   id: string;
@@ -21,14 +21,16 @@ export type LocalChatPromptTrace = {
     usedChars: number;
     truncated: boolean;
   };
-  compilerVersion: 'v1';
-  retryAttempted: boolean;
-  retryImproved: boolean;
-  planner?: 'object' | 'fallback';
+  compilerVersion: 'v1' | 'v2';
+  planner?: 'stream';
   planSegments?: number;
   voiceSegments?: number;
   textSegments?: number;
   schedulerTotalDelayMs?: number;
+  streamDeltaCount?: number;
+  streamDurationMs?: number;
+  segmentParseMode?: 'explicit-delimiter' | 'double-newline' | 'single-message';
+  nsfwPolicy?: 'disabled' | 'local-runtime-only' | 'allowed';
   createdAt: string;
 };
 
@@ -44,8 +46,9 @@ export type LocalChatTurnAudit = {
 export type LocalChatTurn = {
   id: string;
   role: 'user' | 'assistant';
-  kind?: 'text' | 'voice';
+  kind: ChatMessageKind;
   content: string;
+  media?: ChatMessageMedia;
   timestamp: string;
   latencyMs?: number;
   meta?: ChatMessageMeta;
@@ -63,7 +66,7 @@ export type LocalChatSession = {
   updatedAt: string;
 };
 
-const LOCAL_CHAT_SESSION_STORE_KEY = 'nimi.local-chat.sessions.v1';
+const LOCAL_CHAT_SESSION_STORE_KEY = 'nimi.local-chat.sessions.v2';
 const LOCAL_CHAT_SESSION_LIMIT = 80;
 const LOCAL_CHAT_SESSION_UPDATED_EVENT = 'local-chat:session-updated';
 

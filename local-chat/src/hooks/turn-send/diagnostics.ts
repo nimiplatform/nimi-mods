@@ -2,6 +2,7 @@ import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot } from '@nimiplat
 import type { LocalChatCompiledPrompt, PromptLayerId } from '../../prompt/index.js';
 import type { LocalChatTarget } from '../../data/index.js';
 import type { LocalChatPromptTrace, LocalChatTurnAudit } from '../../state/index.js';
+import type { SegmentParseMode } from './types.js';
 
 type RouteSnapshot = {
   source: string;
@@ -13,13 +14,15 @@ type BuildPromptTraceInput = {
   routeSnapshot: RouteSnapshot | null;
   routeOverride: RuntimeRouteBinding | null;
   chatRouteOptions: RuntimeRouteOptionsSnapshot | null;
-  retryAttempted: boolean;
-  retryImproved: boolean;
-  planner: 'object' | 'fallback';
+  planner: 'stream';
   planSegments: number;
   voiceSegments: number;
   textSegments: number;
   schedulerTotalDelayMs: number;
+  streamDeltaCount: number;
+  streamDurationMs: number;
+  segmentParseMode: SegmentParseMode;
+  nsfwPolicy: 'disabled' | 'local-runtime-only' | 'allowed';
 };
 
 function extractLayerIds(input: {
@@ -63,13 +66,15 @@ export function buildPromptTrace(input: BuildPromptTraceInput): LocalChatPromptT
       truncated: input.compiledPrompt.budget.truncatedLayers.length > 0,
     },
     compilerVersion: input.compiledPrompt.compilerVersion,
-    retryAttempted: input.retryAttempted,
-    retryImproved: input.retryImproved,
     planner: input.planner,
     planSegments: input.planSegments,
     voiceSegments: input.voiceSegments,
     textSegments: input.textSegments,
     schedulerTotalDelayMs: input.schedulerTotalDelayMs,
+    streamDeltaCount: input.streamDeltaCount,
+    streamDurationMs: input.streamDurationMs,
+    segmentParseMode: input.segmentParseMode,
+    nsfwPolicy: input.nsfwPolicy,
     createdAt: new Date().toISOString(),
   };
 }

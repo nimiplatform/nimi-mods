@@ -7,7 +7,7 @@ import {
 import type { LocalChatCompiledPrompt } from '../../prompt/index.js';
 import type { ChatMessage } from '../../types.js';
 
-const MAX_SEGMENT_TOKENS = 1024;
+const MAX_SEGMENT_TOKENS = 2048;
 
 type BuildTurnRequestInput = {
   text: string;
@@ -37,7 +37,7 @@ export async function buildTurnRequestInput(input: BuildTurnRequestInput): Promi
   invokeInput: TurnInvokeInput;
 }> {
   const history = input.messages
-    .slice(-8)
+    .slice(-20)
     .map((message) => ({
       role: message.role,
       content: message.content,

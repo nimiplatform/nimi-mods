@@ -1,9 +1,6 @@
 import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
-import {
-  isDegenerateAssistantReply,
-  isPromptEchoReply,
-} from '../../services/view/reply.js';
 import type { LocalChatTarget } from '../../data/index.js';
+import type { SegmentParseMode } from './types.js';
 
 export function logTurnSendStart(input: {
   flowId: string;
@@ -29,17 +26,16 @@ export function logTurnSendDone(input: {
   flowId: string;
   target: LocalChatTarget;
   latencyMs: number;
-  retryAttempted: boolean;
-  retryImproved: boolean;
   turnTxnId: string;
   planId: string;
-  planner: 'object' | 'fallback';
   followupSent: boolean;
   segmentCount: number;
   textSegments: number;
   voiceSegments: number;
   schedulerTotalDelayMs: number;
-  firstReply: string;
+  streamDeltaCount: number;
+  streamDurationMs: number;
+  segmentParseMode: SegmentParseMode;
 }) {
   logRendererEvent({
     level: 'info',
@@ -52,16 +48,15 @@ export function logTurnSendDone(input: {
       latencyMs: input.latencyMs,
       turnTxnId: input.turnTxnId,
       planId: input.planId,
-      retryAttempted: input.retryAttempted,
-      retryImproved: input.retryImproved,
-      planner: input.planner,
+      planner: 'stream',
       followupSent: input.followupSent,
       segmentCount: input.segmentCount,
       textSegments: input.textSegments,
       voiceSegments: input.voiceSegments,
       schedulerTotalDelayMs: input.schedulerTotalDelayMs,
-      firstReplyDegenerate: isDegenerateAssistantReply(input.firstReply),
-      firstReplyPromptEcho: isPromptEchoReply(input.firstReply),
+      streamDeltaCount: input.streamDeltaCount,
+      streamDurationMs: input.streamDurationMs,
+      segmentParseMode: input.segmentParseMode,
     },
   });
 }

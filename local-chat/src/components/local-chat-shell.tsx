@@ -1,4 +1,5 @@
 import React from 'react';
+import { ChatAnimationStyles } from './chat-animations.js';
 import { LocalChatHeader } from './layout/local-chat-header.js';
 import { LocalChatMessagePane } from './layout/local-chat-message-pane.js';
 import { LocalChatRightSidebar } from './layout/local-chat-right-sidebar.js';
@@ -58,19 +59,22 @@ export function LocalChatShell(props: LocalChatShellProps) {
   } = props;
 
   return (
-    <div className="flex h-full min-h-0 flex-1 overflow-hidden">
-      <LocalChatTargetPane
-        visibleTargets={visibleTargets}
-        loadingTargets={loadingTargets}
-        selectedTargetId={selectedTargetId}
-        setSelectedTargetId={setSelectedTargetId}
-        targetSearchText={targetSearchText}
-        setTargetSearchText={setTargetSearchText}
-        onRefresh={onRefresh}
-        searchIcon={ICON_SEARCH}
-      />
+    <div className="local-chat-root flex h-full min-h-0 flex-1 overflow-hidden" data-ui-version="v3">
+      <ChatAnimationStyles />
+      <div className="lc-pane-stage lc-pane-slide-left">
+        <LocalChatTargetPane
+          visibleTargets={visibleTargets}
+          loadingTargets={loadingTargets}
+          selectedTargetId={selectedTargetId}
+          setSelectedTargetId={setSelectedTargetId}
+          targetSearchText={targetSearchText}
+          setTargetSearchText={setTargetSearchText}
+          onRefresh={onRefresh}
+          searchIcon={ICON_SEARCH}
+        />
+      </div>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="lc-pane-stage lc-pane-stage-main flex min-h-0 min-w-0 flex-1 flex-col">
         <LocalChatHeader
           selectedTarget={selectedTarget}
           selectedTargetAvatarUrl={selectedTargetAvatarUrl}
@@ -119,13 +123,15 @@ export function LocalChatShell(props: LocalChatShellProps) {
         />
       </div>
 
-      <LocalChatRightSidebar
-        isRuntimeSidebarOpen={isRuntimeSidebarOpen}
-        runtimeSidebarProps={runtimeSidebarProps}
-        voiceContextMenu={voiceContextMenu}
-        voiceTranscriptVisibleById={voiceTranscriptVisibleById}
-        onToggleVoiceTranscript={onToggleVoiceTranscript}
-      />
+      <div className="lc-pane-stage lc-pane-stage-right lc-pane-slide-right">
+        <LocalChatRightSidebar
+          isRuntimeSidebarOpen={isRuntimeSidebarOpen}
+          runtimeSidebarProps={runtimeSidebarProps}
+          voiceContextMenu={voiceContextMenu}
+          voiceTranscriptVisibleById={voiceTranscriptVisibleById}
+          onToggleVoiceTranscript={onToggleVoiceTranscript}
+        />
+      </div>
     </div>
   );
 }

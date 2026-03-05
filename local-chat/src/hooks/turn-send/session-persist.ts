@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
-import type { ChatMessage } from '../../types.js';
+import type { ChatMessage, ChatMessageKind } from '../../types.js';
 import {
   appendTurnsToSession,
   listLocalChatSessions,
@@ -11,6 +11,7 @@ import { createSessionTurn } from '../../services/view/messages.js';
 import type { LocalChatScheduleCancelReason } from './types.js';
 
 const MAX_SEGMENT_DELAY_MS = 8_000;
+type PersistedAssistantMessageKind = Exclude<ChatMessageKind, 'streaming'>;
 
 export type TurnDeliveryScheduleHandle = {
   turnTxnId: string;
@@ -47,14 +48,16 @@ export function persistSuccessfulTurn(input: {
   userMessage: ChatMessage;
   assistantDeliveries: Array<{
     id: string;
-    kind: 'text' | 'voice';
+    kind: PersistedAssistantMessageKind;
     content: string;
+    media?: ChatMessage['media'];
     delayMs: number;
     meta: ChatMessage['meta'];
   }>;
   latencyMs: number;
   promptTrace: LocalChatPromptTrace;
   turnAudit: LocalChatTurnAudit;
+  replaceFirstMessageId?: string;
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   setSessions: (sessions: LocalChatSession[]) => void;
   onScheduleCancelled?: (input: {
@@ -94,6 +97,7 @@ export function persistSuccessfulTurn(input: {
         role: 'assistant',
         kind: delivery.kind,
         content: delivery.content,
+        media: delivery.media,
         timestamp: new Date(),
         latencyMs: index === 0 ? input.latencyMs : undefined,
         meta: {
@@ -101,7 +105,20 @@ export function persistSuccessfulTurn(input: {
           scheduledDelayMs: delayMs,
         },
       };
-      input.setMessages((prev) => [...prev, message]);
+      input.setMessages((prev) => {
+        if (index === 0 && input.replaceFirstMessageId) {
+          let replaced = false;
+          const next = prev.map((item) => {
+            if (item.id === input.replaceFirstMessageId) {
+              replaced = true;
+              return message;
+            }
+            return item;
+          });
+          return replaced ? next : [...prev, message];
+        }
+        return [...prev, message];
+      });
       appendTurnsToSession(input.sessionId, [
         createSessionTurn({
           message,

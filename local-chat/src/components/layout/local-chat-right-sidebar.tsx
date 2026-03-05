@@ -26,13 +26,13 @@ export function LocalChatRightSidebar({
       ) : null}
       {voiceContextMenu ? (
         <div
-          className="fixed z-50 min-w-[140px] rounded-lg border border-gray-200 bg-white p-1 shadow-xl"
-          style={{ left: `${voiceContextMenu.x}px`, top: `${voiceContextMenu.y}px` }}
+          className="fixed z-50 min-w-[160px] rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl"
+          style={{ left: `${voiceContextMenu.x}px`, top: `${voiceContextMenu.y}px`, animation: 'panel-scale-in 0.15s ease-out both' }}
           onClick={(event) => event.stopPropagation()}
         >
           <button
             type="button"
-            className="w-full rounded-md px-3 py-2 text-left text-sm text-gray-800 hover:bg-gray-100"
+            className="w-full rounded-lg px-3 py-2 text-left text-sm text-gray-800 transition-colors hover:bg-gray-100"
             onClick={() => onToggleVoiceTranscript(voiceContextMenu.messageId)}
           >
             {voiceTranscriptVisibleById[voiceContextMenu.messageId]

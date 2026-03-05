@@ -41,7 +41,7 @@ export type LocalChatCompiledPrompt = {
   layers: PromptLayerTrace[];
   budget: PromptBudgetTrace;
   retrieval: PromptRetrievalTrace;
-  compilerVersion: 'v1';
+  compilerVersion: 'v1' | 'v2';
 };
 
 export type LocalChatPromptCompileInput = {

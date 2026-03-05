@@ -13,10 +13,6 @@ import { VoicePanel } from './sidebar/voice-panel.js';
 import { DiagnosticsPanel } from './sidebar/diagnostics-panel.js';
 import type { RuntimeStatusSidebarProps } from './sidebar/types.js';
 
-const C = {
-  gray700: '#374151',
-} as const;
-
 const ICON_SHIELD = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -38,6 +34,23 @@ export function resolveVisibleSpeechVoices(input: {
     return input.speechVoices;
   }
   return input.speechVoices.filter((voice) => voice.providerId === providerId);
+}
+
+function sourceLabel(source: RuntimeRouteBinding['source'] | 'mixed' | 'unknown'): string {
+  if (source === 'token-api') return 'Token API';
+  if (source === 'local-runtime') return 'Local Runtime';
+  if (source === 'mixed') return 'Mixed';
+  return 'Unknown';
+}
+
+function bindingsEqual(a: RuntimeRouteBinding | null, b: RuntimeRouteBinding | null): boolean {
+  if (!a || !b) return false;
+  return (
+    a.source === b.source
+    && String(a.connectorId || '') === String(b.connectorId || '')
+    && String(a.model || '') === String(b.model || '')
+    && String(a.localModelId || '') === String(b.localModelId || '')
+  );
 }
 
 export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
@@ -139,70 +152,100 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     () => dependencyCapabilities.filter((item) => item.capability === 'chat' || item.required),
     [dependencyCapabilities],
   );
+  const resolvedDefaultBinding = chatRouteOptions?.resolvedDefault || chatRouteOptions?.selected || null;
+  const formatRouteBindingLabel = useMemo(() => (
+    (binding: RuntimeRouteBinding | null): string => {
+      if (!binding) return '-';
+      const routeSourceLabel = sourceLabel(binding.source);
+      if (binding.source === 'token-api') {
+        const connector = chatRouteOptions?.connectors.find((item) => item.id === binding.connectorId) || null;
+        const connectorLabel = String(connector?.label || binding.connectorId || '').trim() || '-';
+        const model = String(binding.model || '').trim() || '-';
+        return `${routeSourceLabel} · ${connectorLabel} · ${model}`;
+      }
+      const model = String(binding.model || binding.localModelId || '').trim() || '-';
+      return `${routeSourceLabel} · ${model}`;
+    }
+  ), [chatRouteOptions?.connectors]);
+  const defaultRouteLabel = resolvedDefaultBinding
+    ? formatRouteBindingLabel(resolvedDefaultBinding)
+    : `${sourceLabel(autoBoundSource)}${autoBoundModel ? ` · ${autoBoundModel}` : ''}`;
+  const effectiveRouteLabel = formatRouteBindingLabel(effectiveChatBinding);
+  const overrideApplied = Boolean(
+    routeOverride
+    && effectiveChatBinding
+    && bindingsEqual(routeOverride, effectiveChatBinding)
+    && !bindingsEqual(effectiveChatBinding, resolvedDefaultBinding),
+  );
+  const dependencyStatusLabel = (
+    dependencyStatus === 'ready'
+      ? t('RuntimeSidebar.dependencyStatusReady')
+      : dependencyStatus === 'degraded'
+        ? t('RuntimeSidebar.dependencyStatusDegraded')
+        : dependencyStatus === 'missing'
+          ? t('RuntimeSidebar.dependencyStatusMissing')
+          : t('RuntimeSidebar.dependencyStatusUnknown')
+  );
+  const failedCapabilityLabels = visibleDependencyCapabilities
+    .filter((item) => !item.matched)
+    .map((item) => item.capability.toUpperCase());
 
   return (
-    <aside className="flex h-full min-h-0 w-80 shrink-0 flex-col overflow-y-auto border-l border-gray-200 bg-white">
-      <div className="flex items-center gap-2 border-b border-gray-200 px-4 py-3">
-        <span style={{ color: C.gray700 }}>{ICON_SHIELD}</span>
+    <aside className="flex h-full min-h-0 w-80 shrink-0 flex-col overflow-y-auto border-l border-[var(--lc-border)] bg-[#f4f8f9]">
+      <div className="flex items-center gap-2 border-b border-[var(--lc-border)] px-4 py-3">
+        <span className="text-gray-700">{ICON_SHIELD}</span>
         <div>
-          <h3 className="text-sm font-semibold text-gray-900">{t('RuntimeSidebar.title')}</h3>
+          <h3 className="text-[28px] font-black tracking-tight text-gray-900">{t('RuntimeSidebar.title')}</h3>
           <p className="text-[11px] text-gray-500">{t('RuntimeSidebar.subtitle')}</p>
         </div>
       </div>
 
-      <div className="space-y-4 p-4">
-        <div className="rounded-[10px] border border-gray-200 bg-gray-50 p-3 text-xs">
-          <p className="font-medium text-gray-700">{t('RuntimeSidebar.autoBoundSource')}</p>
-          <p className="mt-1 text-gray-600">
-            {autoBoundSource === 'token-api'
-              ? 'Token API'
-              : autoBoundSource === 'local-runtime'
-                ? 'Local Runtime'
-                : autoBoundSource === 'mixed'
-                  ? 'Mixed'
-                  : '-'}
-            {autoBoundModel ? ` · ${autoBoundModel}` : ''}
+      <div className="space-y-3 p-4">
+        <div className="lc-card rounded-2xl p-3 text-xs">
+          <p className="text-[13px] font-semibold text-gray-700">{t('RuntimeSidebar.globalStatusTitle')}</p>
+          <p className="mt-1 text-[11px] text-gray-500">{t('RuntimeSidebar.globalStatusSubtitle')}</p>
+          <p className="mt-2 text-[11px] text-gray-600">
+            <span className="font-semibold text-gray-700">{t('RuntimeSidebar.defaultRouteLabel')}:</span> {defaultRouteLabel}
           </p>
-          <p className={`mt-1 ${chatCapabilityMatched ? 'text-green-700' : 'text-amber-700'}`}>
-            {chatCapabilityMatched ? t('RuntimeSidebar.capabilityHit') : t('RuntimeSidebar.capabilityMissing')}
+          <p className="mt-1 text-[11px] text-gray-600">
+            <span className="font-semibold text-gray-700">{t('RuntimeSidebar.effectiveRouteLabel')}:</span> {effectiveRouteLabel}
           </p>
-          <div className="mt-2 space-y-1">
-            <p className="text-[11px] font-medium text-gray-700">{t('RuntimeSidebar.dependencyStatus')}</p>
-            <p className={`text-[11px] ${
-              dependencyStatus === 'ready'
-                ? 'text-green-700'
-                : dependencyStatus === 'degraded'
-                  ? 'text-amber-700'
-                  : dependencyStatus === 'missing'
-                    ? 'text-amber-800'
-                    : 'text-gray-600'
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600">
+              {overrideApplied ? t('RuntimeSidebar.overrideBadge') : t('RuntimeSidebar.followsDefaultBadge')}
+            </span>
+            <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+              chatCapabilityMatched ? 'bg-mint-100 text-mint-700' : 'bg-amber-100 text-amber-800'
             }`}
             >
-              {dependencyStatus === 'ready'
-                ? t('RuntimeSidebar.dependencyStatusReady')
-                : dependencyStatus === 'degraded'
-                  ? t('RuntimeSidebar.dependencyStatusDegraded')
-                  : dependencyStatus === 'missing'
-                    ? t('RuntimeSidebar.dependencyStatusMissing')
-                    : t('RuntimeSidebar.dependencyStatusUnknown')}
-              {dependencyReasonCode ? ` · ${dependencyReasonCode}` : ''}
-            </p>
-            {visibleDependencyCapabilities.map((item) => (
-              <p
-                key={`runtime-dependency-${item.capability}`}
-                className={`text-[11px] ${item.matched ? 'text-green-700' : 'text-amber-700'}`}
-              >
-                {item.matched
-                  ? t('RuntimeSidebar.dependencyReady', { capability: item.capability.toUpperCase() })
-                  : t('RuntimeSidebar.dependencyMissing', { capability: item.capability.toUpperCase() })}
-              </p>
-            ))}
-            {dependencyUpdatedAt ? (
-              <p className="text-[10px] text-gray-500">
-                {t('RuntimeSidebar.dependencyUpdatedAt')}: {new Date(dependencyUpdatedAt).toLocaleTimeString()}
-              </p>
+              {chatCapabilityMatched ? t('RuntimeSidebar.capabilityHit') : t('RuntimeSidebar.capabilityMissing')}
+            </span>
+            <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+              dependencyStatus === 'ready'
+                ? 'bg-mint-100 text-mint-700'
+                : dependencyStatus === 'degraded' || dependencyStatus === 'missing'
+                  ? 'bg-amber-100 text-amber-800'
+                  : 'bg-gray-100 text-gray-600'
+            }`}
+            >
+              {dependencyStatusLabel}
+            </span>
+            {dependencyReasonCode ? (
+              <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600">
+                {dependencyReasonCode}
+              </span>
             ) : null}
           </div>
+          {failedCapabilityLabels.length > 0 ? (
+            <p className="mt-2 text-[11px] text-amber-700">
+              {failedCapabilityLabels.join(', ')} {t('RuntimeSidebar.capabilityMissing')}
+            </p>
+          ) : null}
+          {dependencyUpdatedAt ? (
+            <p className="mt-2 text-[10px] text-gray-500">
+              {t('RuntimeSidebar.dependencyUpdatedAt')}: {new Date(dependencyUpdatedAt).toLocaleTimeString()}
+            </p>
+          ) : null}
           {!chatCapabilityMatched || missingRequiredDependencies.length > 0 || dependencyRepairActions.length > 0 ? (
             <button
               type="button"
