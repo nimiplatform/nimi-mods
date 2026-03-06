@@ -4,6 +4,33 @@ type AssetTaskOptions = {
   taskId?: string;
 };
 
+function encodeImageArtifactBytes(bytes: Uint8Array): string {
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  if (typeof globalThis.btoa !== 'function') {
+    throw new Error('WORLD_STUDIO_IMAGE_ARTIFACT_BASE64_UNAVAILABLE');
+  }
+  return globalThis.btoa(binary);
+}
+
+function resolveGeneratedImageUrl(artifacts: Array<{ uri?: string; mimeType?: string; bytes?: Uint8Array }>): string {
+  const artifact = artifacts[0];
+  if (!artifact) {
+    throw new Error('WORLD_STUDIO_IMAGE_ARTIFACT_MISSING');
+  }
+  const artifactUri = String(artifact.uri || '').trim();
+  if (artifactUri) {
+    return artifactUri;
+  }
+  if (artifact.bytes && artifact.bytes.length > 0) {
+    const mimeType = String(artifact.mimeType || '').trim() || 'image/png';
+    return `data:${mimeType};base64,${encodeImageArtifactBytes(artifact.bytes)}`;
+  }
+  throw new Error('WORLD_STUDIO_IMAGE_ARTIFACT_MISSING');
+}
+
 export async function generateWorldCoverAsset(
   input: WorldStudioCreateActionsInput,
   _options?: AssetTaskOptions,
@@ -40,15 +67,14 @@ export async function generateWorldCoverAsset(
       `World name: ${String(world.name || 'Untitled World')}`,
       `World description: ${String(world.description || input.snapshot.knowledgeGraph.worldSetting || '')}`,
     ].join('\n');
-    const response = await input.aiClient.generateText({
-      capability: 'image.generate',
+    const response = await input.aiClient.generateImage({
       prompt,
       abortSignal: started.abortSignal,
       binding: input.bindingMap.fine || input.bindingMap.coarse || input.runtimeDefaultRouteBinding || undefined,
     });
     input.patchSnapshot({
       assets: {
-        worldCover: { status: 'succeeded', imageUrl: String(response.text || '') },
+        worldCover: { status: 'succeeded', imageUrl: resolveGeneratedImageUrl(response.artifacts) },
       },
     });
     input.setStatusBanner({ kind: 'success', message: 'World cover generated' });
@@ -113,15 +139,14 @@ export async function generateCharacterPortraitAsset(
       `Character: ${name}`,
       `World setting: ${input.snapshot.knowledgeGraph.worldSetting || 'N/A'}`,
     ].join('\n');
-    const response = await input.aiClient.generateText({
-      capability: 'image.generate',
+    const response = await input.aiClient.generateImage({
       prompt,
       abortSignal: started.abortSignal,
       binding: input.bindingMap.fine || input.bindingMap.coarse || input.runtimeDefaultRouteBinding || undefined,
     });
     const succeededPortraits = {
       ...runningPortraits,
-      [name]: { status: 'succeeded' as const, imageUrl: String(response.text || '') },
+      [name]: { status: 'succeeded' as const, imageUrl: resolveGeneratedImageUrl(response.artifacts) },
     };
     input.patchSnapshot({
       assets: {
@@ -189,8 +214,7 @@ export async function generateLocationImageAsset(
       `World setting: ${input.snapshot.knowledgeGraph.worldSetting || 'N/A'}`,
     ].join('\n');
 
-    const response = await input.aiClient.generateText({
-      capability: 'image.generate',
+    const response = await input.aiClient.generateImage({
       prompt,
       abortSignal: started.abortSignal,
       binding:
@@ -202,7 +226,7 @@ export async function generateLocationImageAsset(
 
     const succeededLocationImages = {
       ...runningLocationImages,
-      [locationName]: { status: 'succeeded' as const, imageUrl: String(response.text || '') },
+      [locationName]: { status: 'succeeded' as const, imageUrl: resolveGeneratedImageUrl(response.artifacts) },
     };
     input.patchSnapshot({ assets: { locationImages: succeededLocationImages } });
     input.setStatusBanner({ kind: 'success', message: `Location image generated: ${locationName}` });
