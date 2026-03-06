@@ -40,8 +40,8 @@ export function EventGraphMaintenance(props: EventGraphMaintenanceProps) {
         onLayoutChange={props.onLayoutChange}
       />
 
-      <section className="rounded-xl border border-gray-200 bg-white p-4">
-        <div className="mb-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700">
+      <section className="ui-sync-card ui-sync-card-inset p-4">
+        <div className="ui-sync-toolbar mb-3 px-3 py-2 text-xs text-gray-700">
           <p>Snapshot: {props.editorSnapshotVersion || '-'}</p>
           <p>Events: total {totalEvents} · primary {props.events.primary.length} · secondary {props.events.secondary.length}</p>
           <p>Primary missing evidence: {missingPrimaryEvidence} · orphan secondary: {orphanSecondary}</p>
@@ -60,24 +60,24 @@ export function EventGraphMaintenance(props: EventGraphMaintenanceProps) {
               <option value="replace">replace (active graph rewrite)</option>
             </select>
           </label>
-          <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+          <div className="ui-sync-soft-card px-3 py-2 text-xs text-gray-600">
             `replace` archives existing active events first, then writes the current graph as a new active set; `merge` only does incremental upsert.
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
-            className="rounded-md bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
-          onClick={props.onSyncEvents}
-          disabled={props.working}
+            className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+            onClick={props.onSyncEvents}
+            disabled={props.working}
           >
             Sync Events ({props.syncMode})
           </button>
           <button
             type="button"
-            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 disabled:opacity-60"
-          onClick={props.onDeleteFirstEvent}
-          disabled={props.working}
+            className="ui-sync-btn ui-sync-btn-secondary rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 disabled:opacity-60"
+            onClick={props.onDeleteFirstEvent}
+            disabled={props.working}
           >
             Delete First Event
           </button>

@@ -63,13 +63,13 @@ export function WorkspacePanel(props: {
         <button
           type="button"
           onClick={onRefresh}
-          className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700"
+          className="ui-sync-btn ui-sync-btn-secondary rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700"
         >
           {t('workspace.refresh')}
         </button>
       </div>
       <div className="min-h-0 flex-1 space-y-3 overflow-auto p-3">
-        <section className="rounded-xl border border-gray-200 bg-white p-3">
+        <section className="ui-sync-card ui-sync-card-inset rounded-xl border border-gray-200 bg-white p-3">
           <h4 className="text-sm font-semibold text-gray-900">{t('workspace.worldCardTitle')}</h4>
           {selectedWorld ? (
             <>
@@ -94,7 +94,7 @@ export function WorkspacePanel(props: {
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
-              className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="ui-sync-btn ui-sync-btn-secondary rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
               onClick={() => {
                 if (selectedWorld) onOpenMaintenance(selectedWorld.id);
               }}
@@ -105,7 +105,7 @@ export function WorkspacePanel(props: {
           </div>
         </section>
 
-        <section className="rounded-xl border border-gray-200 bg-white p-3">
+        <section className="ui-sync-card ui-sync-card-inset rounded-xl border border-gray-200 bg-white p-3">
           <h4 className="text-sm font-semibold text-gray-900">{t('workspace.draftCardTitle')}</h4>
           <p className="mt-1 text-xs font-semibold text-amber-700">{t('workspace.draftPrePublish')}</p>
           {selectedDraft ? (
@@ -132,14 +132,14 @@ export function WorkspacePanel(props: {
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
-              className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700"
+              className="ui-sync-btn ui-sync-btn-primary rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700"
               onClick={() => onOpenCreate(null)}
             >
               {t('workspace.startDraft')}
             </button>
             <button
               type="button"
-              className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="ui-sync-btn ui-sync-btn-secondary rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
               onClick={() => onOpenCreate(selectedDraft?.id || null)}
               disabled={!selectedDraft}
             >

@@ -8,7 +8,7 @@ function PreviewList(props: {
   renderItem: (item: Record<string, unknown>, index: number) => React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-3">
+    <div className="ui-sync-card p-3">
       <h4 className="text-xs font-semibold text-gray-900">{props.title}</h4>
       <div className="mt-2 space-y-2">
         {props.items.length === 0 ? (
@@ -17,7 +17,7 @@ function PreviewList(props: {
           props.items.slice(0, 8).map((item, index) => {
             if (!item || typeof item !== 'object') return null;
             return (
-              <div key={`${props.title}-${index}`} className="rounded-md border border-gray-100 bg-gray-50 px-2 py-1.5">
+              <div key={`${props.title}-${index}`} className="ui-sync-soft-card px-2 py-1.5">
                 {props.renderItem(item as Record<string, unknown>, index)}
               </div>
             );
@@ -52,7 +52,7 @@ export function Phase1PreviewGrid(props: { graph: WorldStudioKnowledgeGraphDraft
                 }`}>
                   Evidence {evidenceCount}
                 </span>
-                <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-700">
+                <span className="ui-sync-pill rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-700">
                   Secondary {children.length}
                 </span>
               </div>

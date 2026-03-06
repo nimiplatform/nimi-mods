@@ -69,12 +69,12 @@ export function Phase1Diagnostics(props: { chunkTasks: ChunkTaskResult[] }) {
   return (
     <>
       {failedTasks.length > 0 ? (
-        <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3">
+        <div className="ui-sync-alert ui-sync-alert-danger mt-3 p-3">
           <p className="text-xs font-semibold text-red-700">Chunk Failure Diagnostics</p>
           {failedByCode.length > 0 ? (
             <div className="mt-2 flex flex-wrap gap-1">
               {failedByCode.slice(0, 8).map(([code, count]) => (
-                <span key={`phase1-failed-code-${code}`} className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
+                <span key={`phase1-failed-code-${code}`} className="ui-sync-pill ui-sync-status-danger rounded px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
                   {code} × {count}
                 </span>
               ))}
@@ -93,7 +93,7 @@ export function Phase1Diagnostics(props: { chunkTasks: ChunkTaskResult[] }) {
       ) : null}
 
       {recoveredChunkCount > 0 ? (
-        <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+        <div className="ui-sync-alert ui-sync-alert-success mt-3 p-3">
           <p className="text-xs font-semibold text-emerald-700">Fallback Recovery Diagnostics</p>
           <div className="mt-2 grid gap-1">
             {recoveredTasks.map((task) => (

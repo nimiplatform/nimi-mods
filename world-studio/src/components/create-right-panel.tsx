@@ -107,7 +107,7 @@ export function CreateRightPanel(props: {
 
   return (
     <div className="flex h-full min-h-0 flex-col p-3">
-      <div className="min-h-0 flex-1 overflow-y-auto rounded-[10px] border border-gray-200 bg-white">
+      <div className="ui-sync-card min-h-0 flex-1 overflow-y-auto rounded-[10px] border border-gray-200 bg-white">
         <section className="px-3 py-3 text-xs">
           {sectionHeader({
             title: t('rightPanel.createActions'),

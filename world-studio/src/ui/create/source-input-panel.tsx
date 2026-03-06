@@ -23,7 +23,7 @@ export function SourceInputPanel(props: SourceInputPanelProps) {
   const chunkPolicy = props.parseJob.chunkPolicy;
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4">
+    <section className="ui-sync-card ui-sync-card-inset p-4">
       <h3 className="text-sm font-semibold text-gray-900">Source Input</h3>
       <p className="mt-1 text-xs text-gray-500">
         Upload a txt/md file or paste raw text. Extraction runs chunk-by-chunk with progress tracking.
@@ -73,7 +73,7 @@ export function SourceInputPanel(props: SourceInputPanelProps) {
       <div className="mt-3 flex flex-wrap gap-2">
         <button
           type="button"
-          className="rounded-md bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+          className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
           onClick={props.onRunPhase1}
           disabled={props.working}
         >
@@ -81,7 +81,7 @@ export function SourceInputPanel(props: SourceInputPanelProps) {
         </button>
         <button
           type="button"
-          className="rounded-md border border-brand-300 bg-white px-3 py-1.5 text-xs font-semibold text-brand-700 disabled:opacity-60"
+          className="ui-sync-btn ui-sync-btn-selected rounded-md border border-brand-300 bg-white px-3 py-1.5 text-xs font-semibold text-brand-700 disabled:opacity-60"
           onClick={props.onRunFailedChunks}
           disabled={props.working || !hasFailedChunks || !props.onRunFailedChunks}
         >
@@ -91,7 +91,7 @@ export function SourceInputPanel(props: SourceInputPanelProps) {
       {props.expertMode ? (
         <>
           {chunkPolicy ? (
-            <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+            <div className="ui-sync-toolbar mt-3 p-2.5">
               <p className="text-[11px] font-semibold text-slate-700">Adaptive Chunking</p>
               <div className="mt-1 grid gap-1 text-[11px] text-slate-700 md:grid-cols-2">
                 <p>coarse: {chunkPolicy.coarseModel || '-'}</p>

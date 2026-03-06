@@ -28,7 +28,7 @@ type CheckpointsPanelProps = {
 export function CheckpointsPanel(props: CheckpointsPanelProps) {
   if (!props.phase1) {
     return (
-      <section className="rounded-xl border border-gray-200 bg-white p-4">
+      <section className="ui-sync-card ui-sync-card-inset p-4">
         <h3 className="text-sm font-semibold text-gray-900">Checkpoints</h3>
         <p className="mt-2 text-xs text-gray-500">Run Phase 1 first to unlock checkpoint selection.</p>
       </section>
@@ -44,12 +44,12 @@ export function CheckpointsPanel(props: CheckpointsPanelProps) {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-xl border border-gray-200 bg-white p-4">
+      <section className="ui-sync-card ui-sync-card-inset p-4">
         <div className="flex items-start justify-between gap-3">
           <h3 className="text-sm font-semibold text-gray-900">Checkpoints</h3>
           <button
             type="button"
-            className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 disabled:opacity-60"
+            className="ui-sync-btn ui-sync-btn-secondary rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 disabled:opacity-60"
             onClick={props.onRefreshQualityGate}
             disabled={props.working}
           >
@@ -73,7 +73,7 @@ export function CheckpointsPanel(props: CheckpointsPanelProps) {
 
         <div className="mt-3">
           <label className="text-xs font-medium text-gray-700">Checkpoint 2: Character Selection</label>
-          <div className="mt-1 max-h-56 overflow-auto rounded-md border border-gray-200 p-2">
+          <div className="ui-sync-soft-card mt-1 max-h-56 overflow-auto p-2">
             {props.phase1.characterCandidates.map((item) => {
               const checked = props.selectedCharacters.includes(item.name);
               return (
@@ -100,7 +100,7 @@ export function CheckpointsPanel(props: CheckpointsPanelProps) {
         onLayoutChange={props.onEventGraphLayoutChange}
       />
 
-      <section className="rounded-xl border border-gray-200 bg-white p-4">
+      <section className="ui-sync-card ui-sync-card-inset p-4">
         <div className="flex items-center justify-between gap-2">
           <div>
             <h3 className="text-sm font-semibold text-gray-900">Run Synthesis</h3>
@@ -110,7 +110,7 @@ export function CheckpointsPanel(props: CheckpointsPanelProps) {
           </div>
           <button
             type="button"
-            className="rounded-md bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+            className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
             onClick={props.onRunPhase2}
             disabled={!canRunSynthesize}
           >
@@ -118,12 +118,12 @@ export function CheckpointsPanel(props: CheckpointsPanelProps) {
           </button>
         </div>
         {primaryMissingEvidence > 0 ? (
-          <p className="mt-2 rounded bg-red-50 px-2 py-1 text-xs text-red-700">
+          <p className="ui-sync-alert ui-sync-alert-danger mt-2 px-2 py-1 text-xs text-red-700">
             {primaryMissingEvidence} primary events are still missing evidence refs.
           </p>
         ) : null}
         {props.events.primary.length === 0 ? (
-          <p className="mt-2 rounded bg-red-50 px-2 py-1 text-xs text-red-700">
+          <p className="ui-sync-alert ui-sync-alert-danger mt-2 px-2 py-1 text-xs text-red-700">
             WORLD_STUDIO_EVENT_GRAPH_INVALID: at least one primary event is required.
           </p>
         ) : null}

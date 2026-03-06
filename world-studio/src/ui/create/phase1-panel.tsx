@@ -20,7 +20,7 @@ type Phase1PanelProps = {
 
 function CountCard(props: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+    <div className="ui-sync-metric-card px-3 py-2">
       <div className="text-[11px] uppercase tracking-wide text-gray-500">{props.label}</div>
       <div className="mt-1 text-lg font-semibold text-gray-900">{props.value}</div>
     </div>
@@ -29,7 +29,7 @@ function CountCard(props: { label: string; value: number }) {
 
 function RatioCard(props: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+    <div className="ui-sync-metric-card px-3 py-2">
       <div className="text-[11px] uppercase tracking-wide text-gray-500">{props.label}</div>
       <div className="mt-1 text-lg font-semibold text-gray-900">{Math.round(props.value * 100)}%</div>
     </div>
@@ -37,9 +37,9 @@ function RatioCard(props: { label: string; value: number }) {
 }
 
 function gateTagStyle(status: QualityGateResult['status']): string {
-  if (status === 'PASS') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-  if (status === 'WARN') return 'border-amber-200 bg-amber-50 text-amber-700';
-  return 'border-red-200 bg-red-50 text-red-700';
+  if (status === 'PASS') return 'ui-sync-alert ui-sync-alert-success border-emerald-200 bg-emerald-50 text-emerald-700';
+  if (status === 'WARN') return 'ui-sync-alert ui-sync-alert-warning border-amber-200 bg-amber-50 text-amber-700';
+  return 'ui-sync-alert ui-sync-alert-danger border-red-200 bg-red-50 text-red-700';
 }
 
 function gateLabel(status: QualityGateResult['status']): string {
@@ -58,7 +58,7 @@ function renderCharacterProfiles(
   return (
     <div className="mt-2 grid gap-2 md:grid-cols-2">
       {profiles.slice(0, 12).map((profile) => (
-        <div key={profile.name} className="rounded-md border border-gray-200 bg-gray-50 p-2.5">
+        <div key={profile.name} className="ui-sync-soft-card p-2.5">
           <p className="text-xs font-semibold text-gray-900">{profile.name}</p>
           {profile.aliases.length > 0 ? (
             <p className="mt-1 text-[11px] text-gray-600">{t('phase1.characterProfile.aliases')}: {profile.aliases.join(' / ')}</p>
@@ -94,7 +94,7 @@ export function Phase1Panel(props: Phase1PanelProps) {
 
   if (!hasData) {
     return (
-      <section className="rounded-xl border border-gray-200 bg-white p-4">
+      <section className="ui-sync-card ui-sync-card-inset p-4">
         <h3 className="text-sm font-semibold text-gray-900">{t('phase1.title')}</h3>
         <p className="mt-2 text-xs text-gray-500">
           {t('phase1.empty')}
@@ -107,7 +107,7 @@ export function Phase1Panel(props: Phase1PanelProps) {
   const narrativeArc = graph.narrativeArc;
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4">
+    <section className="ui-sync-card ui-sync-card-inset p-4">
       <h3 className="text-sm font-semibold text-gray-900">{t('phase1.title')}</h3>
       <p className="mt-1 text-xs text-gray-500">{t('phase1.subtitle')}</p>
 
@@ -142,14 +142,14 @@ export function Phase1Panel(props: Phase1PanelProps) {
         </div>
       ) : null}
 
-      <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+      <div className="ui-sync-soft-card mt-3 p-3">
         <div className="text-xs font-semibold text-gray-800">{t('phase1.worldSettingTitle')}</div>
         <p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-gray-700">
           {graph.worldSetting || t('phase1.worldSettingEmpty')}
         </p>
       </div>
 
-      <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+      <div className="ui-sync-soft-card mt-3 p-3">
         <div className="text-xs font-semibold text-gray-800">{t('phase1.narrativeArcTitle')}</div>
         {narrativeArc ? (
           <div className="mt-2 space-y-1 text-xs text-gray-700">
@@ -164,7 +164,7 @@ export function Phase1Panel(props: Phase1PanelProps) {
         )}
       </div>
 
-      <div className="mt-3 rounded-lg border border-gray-200 bg-white p-3">
+      <div className="ui-sync-card mt-3 p-3">
         <div className="text-xs font-semibold text-gray-800">{t('phase1.characterProfilesTitle')}</div>
         {renderCharacterProfiles(profiles, t)}
       </div>

@@ -44,17 +44,17 @@ const TABS: MaintainTab[] = ['WORLD', 'WORLDVIEW', 'EVENTS', 'LOREBOOKS', 'MUTAT
 export function MaintainWorkbench(props: MaintainWorkbenchProps) {
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="border-b border-gray-200 bg-white px-4 py-3">
+      <div className="ui-sync-tabbar border-b border-gray-200 bg-white px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
           {TABS.map((item) => (
             <button
               key={item}
               type="button"
               onClick={() => props.onTabChange(item)}
-              className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${
+              className={`ui-sync-btn rounded-md border px-2.5 py-1 text-xs font-semibold ${
                 props.activeTab === item
-                  ? 'border-brand-200 bg-brand-50 text-brand-700'
-                  : 'border-gray-200 bg-white text-gray-500'
+                  ? 'ui-sync-btn-selected border-brand-200 bg-brand-50 text-brand-700'
+                  : 'ui-sync-btn-secondary border-gray-200 bg-white text-gray-500'
               }`}
             >
               {item}

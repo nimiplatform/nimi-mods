@@ -46,7 +46,7 @@ function makeKnowledgeGraph() {
         id: 'p-1',
         level: 'PRIMARY',
         parentEventId: null,
-        title: '事件1',
+        title: '倒计时危机爆发',
         summary: 'summary',
         cause: 'cause',
         process: 'process',
@@ -77,7 +77,7 @@ function makeKnowledgeGraph() {
       background: 'background',
       motivation: 'motivation',
       relationships: ['常伟思:合作'],
-      keyEvents: ['事件1'],
+      keyEvents: ['倒计时危机爆发'],
     }],
     characterAliasMap: { 汪淼: '汪淼' },
   };
@@ -85,12 +85,12 @@ function makeKnowledgeGraph() {
 
 test('world-studio agent drafts flow persists phase2 drafts and publishes with draft payload', async () => {
   const snapshotRef = { current: cloneDefaultSnapshot() };
-  snapshotRef.current.selectedStartTimeId = 't-1';
+  snapshotRef.current.selectedStartTimeId = 'event:p-1';
   snapshotRef.current.selectedCharacters = ['汪淼'];
   snapshotRef.current.agentSync.selectedCharacterIds = ['汪淼'];
   snapshotRef.current.knowledgeGraph = makeKnowledgeGraph();
   snapshotRef.current.phase1Artifact = {
-    startTimeOptions: [{ id: 't-1', label: '2004', description: '', weight: 0.8 }],
+    startTimeOptions: [{ id: 'event:p-1', label: '1. 2004 · 倒计时危机爆发', description: '', weight: 0.8 }],
     characterCandidates: [{ name: '汪淼', summary: 'summary', significance: 0.8 }],
     qualityGate: makePassQualityGate(),
     chunkTasks: [],
