@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   isMediaRouteReady,
   resolveMediaRouteConfig,
+  resolveMediaRouteFromOptions,
   toPinnedRouteOverride,
 } from '../src/hooks/turn-send/media-route.ts';
 
@@ -92,6 +93,37 @@ test('isMediaRouteReady is false when route source is auto', () => {
     imageModel: '',
   });
   assert.equal(isMediaRouteReady({ kind: 'image', settings }), false);
+});
+
+test('isMediaRouteReady is true when auto route resolves from route options', () => {
+  const settings = createDefaultSettings({
+    imageRouteSource: 'auto',
+  });
+  const routeOptions = {
+    resolvedDefault: {
+      source: 'local-runtime',
+      model: 'flux-local',
+    },
+    selected: null,
+    connectors: [],
+    localRuntime: {
+      models: [],
+    },
+  };
+  const resolvedRoute = resolveMediaRouteFromOptions({
+    kind: 'image',
+    settings,
+    routeOptions,
+    routeOptionsRevision: 3,
+  });
+  assert.ok(resolvedRoute);
+  assert.equal(isMediaRouteReady({
+    kind: 'image',
+    settings,
+    routeOptions,
+    routeOptionsRevision: 3,
+    resolvedRoute,
+  }), true);
 });
 
 test('isMediaRouteReady is true for local-runtime route source', () => {

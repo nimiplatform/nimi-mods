@@ -4,6 +4,8 @@ import { useRuntimeModSettings } from '@nimiplatform/sdk/mod/settings';
 import {
   type LocalChatBooleanSettingKey,
   type LocalChatDefaultSettings,
+  type LocalChatMediaPlannerMode,
+  type LocalChatVideoAutoPolicy,
   DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
   normalizeLocalChatDefaultSettings,
 } from '../state/index.js';
@@ -48,7 +50,9 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
   const [speechProviders, setSpeechProviders] = useState<SpeechProvider[]>([]);
   const [speechVoices, setSpeechVoices] = useState<SpeechVoice[]>([]);
   const [selectedSpeechProviderId, setSelectedSpeechProviderId] = useState('');
+  const [speechCatalogLoaded, setSpeechCatalogLoaded] = useState(false);
   const latestVoiceRequestRef = useRef(0);
+  const speechCatalogInFlightRef = useRef<Promise<void> | null>(null);
   const {
     settings: defaultSettings,
     updateSettings,
@@ -116,9 +120,11 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
       setSelectedSpeechProviderId((previous) => previous || preferredProviderId);
       const activeProviderId = String(selectedSpeechProviderId || preferredProviderId).trim();
       await loadSpeechVoices(activeProviderId ? { providerId: activeProviderId } : undefined);
+      setSpeechCatalogLoaded(true);
     } catch (error) {
       setSpeechProviders([]);
       setSpeechVoices([]);
+      setSpeechCatalogLoaded(false);
       logRendererEvent({
         level: 'warn',
         area: 'local-chat',
@@ -134,11 +140,27 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
     loadSpeechVoices,
   ]);
 
-  useEffect(() => {
-    void loadSpeechCatalog();
-  }, [loadSpeechCatalog]);
+  const ensureSpeechCatalogLoaded = useCallback(async () => {
+    if (speechCatalogLoaded) {
+      return;
+    }
+    if (speechCatalogInFlightRef.current) {
+      return speechCatalogInFlightRef.current;
+    }
+    const task = loadSpeechCatalog()
+      .finally(() => {
+        if (speechCatalogInFlightRef.current === task) {
+          speechCatalogInFlightRef.current = null;
+        }
+      });
+    speechCatalogInFlightRef.current = task;
+    return task;
+  }, [loadSpeechCatalog, speechCatalogLoaded]);
 
   useEffect(() => {
+    if (!speechCatalogLoaded) {
+      return undefined;
+    }
     let cancelled = false;
     void loadSpeechVoices().then(() => {
       if (cancelled) return;
@@ -147,6 +169,7 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
       cancelled = true;
     };
   }, [
+    speechCatalogLoaded,
     loadSpeechVoices,
     defaultSettings.ttsRouteSource,
     defaultSettings.ttsConnectorId,
@@ -168,7 +191,11 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
 
   const handleSpeechProviderChange = useCallback((providerId: string) => {
     setSelectedSpeechProviderId(providerId);
-  }, []);
+    if (!speechCatalogLoaded) {
+      return;
+    }
+    void loadSpeechVoices(providerId ? { providerId } : undefined);
+  }, [loadSpeechVoices, speechCatalogLoaded]);
 
   const handleVoiceIdChange = useCallback((voiceId: string) => {
     updateSettings((previous) => ({
@@ -191,6 +218,20 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
     updateSettings((previous) => ({
       ...previous,
       voiceName: value,
+    }));
+  }, [updateSettings]);
+
+  const handleMediaPlannerModeChange = useCallback((value: LocalChatMediaPlannerMode) => {
+    updateSettings((previous) => ({
+      ...previous,
+      mediaPlannerMode: value,
+    }));
+  }, [updateSettings]);
+
+  const handleVideoAutoPolicyChange = useCallback((value: LocalChatVideoAutoPolicy) => {
+    updateSettings((previous) => ({
+      ...previous,
+      videoAutoPolicy: value,
     }));
   }, [updateSettings]);
 
@@ -282,13 +323,17 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
     speechProviders,
     speechVoices,
     selectedSpeechProviderId,
+    speechCatalogLoaded,
     defaultSettings,
     loadSpeechCatalog,
+    ensureSpeechCatalogLoaded,
     loadSpeechVoices,
     handleSpeechProviderChange,
     handleVoiceIdChange,
     handleDefaultSettingChange,
     handleDefaultVoiceNameChange,
+    handleMediaPlannerModeChange,
+    handleVideoAutoPolicyChange,
     handleTtsRouteSourceChange,
     handleTtsConnectorChange,
     handleTtsModelChange,

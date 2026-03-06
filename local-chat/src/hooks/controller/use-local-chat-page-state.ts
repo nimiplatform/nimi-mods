@@ -8,8 +8,8 @@ import { createHookClient } from '@nimiplatform/sdk/mod/hook';
 import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import { useAppStore } from '@nimiplatform/sdk/mod/ui';
 import { LOCAL_CHAT_MOD_ID } from '../../contracts.js';
-import type { LocalChatPromptTrace, LocalChatTurnAudit } from '../../session-store.js';
-import type { ChatMessage } from '../../types.js';
+import type { LocalChatPromptTrace, LocalChatTurnAudit } from '../../state/index.js';
+import type { ChatMessage, LocalChatResolvedMediaRoute } from '../../types.js';
 import { useLocalChatRuntimeRoute } from '../use-local-chat-runtime-route.js';
 import { useLocalChatSessions } from '../use-local-chat-sessions.js';
 import { useLocalChatSpeechSettings } from '../use-local-chat-speech-settings.js';
@@ -27,6 +27,12 @@ import {
   selectNextTtsModelCandidate,
 } from '../../services/tts/recovery.js';
 import { ReasonCode } from '@nimiplatform/sdk/types';
+import {
+  buildMediaSettingsRevision,
+  isResolvedMediaRouteFresh,
+  preflightResolveMediaRoute,
+  resolveMediaRouteFromOptions,
+} from '../turn-send/media-route.js';
 
 type RuntimeFieldsMap = {
   mode?: 'STORY' | 'SCENE_TURN';
@@ -51,6 +57,34 @@ type AppStoreRuntimeSelectorShape = {
 
 const DEFAULT_TTS_VOICE = 'alloy';
 const DEFAULT_TTS_FORMAT = 'mp3';
+const DEPENDENCY_SNAPSHOT_TTL_MS = 15_000;
+const MEDIA_DEPENDENCY_TTL_MS = 30_000;
+const RUNTIME_SIDEBAR_WARMUP_DELAY_MS = 700;
+type MediaDependencyCapability = 'image' | 'video';
+type MediaDependencyRouteSource = 'local-runtime' | 'token-api' | undefined;
+
+function createDependencySnapshotFailure(error: unknown): AiRuntimeDependencySnapshot {
+  return {
+    modId: LOCAL_CHAT_MOD_ID,
+    status: 'missing',
+    routeSource: 'token-api',
+    reasonCode: ReasonCode.LOCAL_AI_DEPENDENCY_SNAPSHOT_FAILED,
+    warnings: [error instanceof Error ? error.message : String(error || 'unknown error')],
+    dependencies: [],
+    repairActions: [{
+      actionId: 'runtime:open-setup',
+      label: 'Open Runtime Setup',
+      reasonCode: ReasonCode.LOCAL_AI_DEPENDENCY_SNAPSHOT_FAILED,
+    }],
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function normalizeDependencyHint(value: string): MediaDependencyRouteSource {
+  return value === 'local-runtime' || value === 'token-api'
+    ? value
+    : undefined;
+}
 
 export function useLocalChatPageState() {
   const runtimeFields = useAppStore((s) => (s as AppStoreRuntimeSelectorShape).runtimeFields);
@@ -79,17 +113,32 @@ export function useLocalChatPageState() {
   const [latestPromptTrace, setLatestPromptTrace] = useState<LocalChatPromptTrace | null>(null);
   const [latestTurnAudit, setLatestTurnAudit] = useState<LocalChatTurnAudit | null>(null);
   const [dependencySnapshot, setDependencySnapshot] = useState<AiRuntimeDependencySnapshot | null>(null);
+  const [imageDependencySnapshot, setImageDependencySnapshot] = useState<AiRuntimeDependencySnapshot | null>(null);
+  const [videoDependencySnapshot, setVideoDependencySnapshot] = useState<AiRuntimeDependencySnapshot | null>(null);
+  const [imageResolvedRoute, setImageResolvedRoute] = useState<LocalChatResolvedMediaRoute | null>(null);
+  const [videoResolvedRoute, setVideoResolvedRoute] = useState<LocalChatResolvedMediaRoute | null>(null);
+  const [mediaRouteOptionsRevisionByCapability, setMediaRouteOptionsRevisionByCapability] = useState<Record<MediaDependencyCapability, number>>({
+    image: 0,
+    video: 0,
+  });
+  const [mediaRouteProbeLoadingByCapability, setMediaRouteProbeLoadingByCapability] = useState<Record<MediaDependencyCapability, boolean>>({
+    image: false,
+    video: false,
+  });
+  const [isMediaRuntimeSidebarLoading, setIsMediaRuntimeSidebarLoading] = useState(false);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const sessionMenuAnchorRef = useRef<HTMLDivElement>(null);
   const sessionMenuPanelRef = useRef<HTMLDivElement>(null);
-
-  const targetsState = useLocalChatTargets({
-    hookClient,
-    runtimeAgentId: String(runtimeFields.agentId || '').trim(),
-    setStatusBanner,
+  const dependencySnapshotFetchedAtRef = useRef(0);
+  const dependencySnapshotInFlightRef = useRef<Promise<AiRuntimeDependencySnapshot | null> | null>(null);
+  const mediaDependencyFetchedAtRef = useRef<Record<MediaDependencyCapability, number>>({
+    image: 0,
+    video: 0,
   });
+  const mediaDependencyInFlightRef = useRef<Partial<Record<MediaDependencyCapability, Promise<AiRuntimeDependencySnapshot | null>>>>({});
+  const mediaSidebarVisibleLoadCountRef = useRef(0);
 
   const currentUserDisplayName = useMemo(
     () =>
@@ -100,10 +149,21 @@ export function useLocalChatPageState() {
       ),
     [currentUser],
   );
+  const currentUserId = useMemo(
+    () => String((currentUser as Record<string, unknown> | null)?.id || 'viewer').trim() || 'viewer',
+    [currentUser],
+  );
   const currentUserAvatarUrl = useMemo(() => {
     const raw = (currentUser as Record<string, unknown> | null)?.avatarUrl;
     return typeof raw === 'string' && raw.trim() ? raw : null;
   }, [currentUser]);
+
+  const targetsState = useLocalChatTargets({
+    hookClient,
+    viewerId: currentUserId,
+    runtimeAgentId: String(runtimeFields.agentId || '').trim(),
+    setStatusBanner,
+  });
   const selectedTargetAvatarUrl = useMemo(() => {
     const raw = targetsState.selectedTarget?.avatarUrl;
     return typeof raw === 'string' && raw.trim() ? raw : null;
@@ -123,6 +183,7 @@ export function useLocalChatPageState() {
   });
 
   const sessionsState = useLocalChatSessions({
+    viewerId: currentUserId,
     selectedTargetId: targetsState.selectedTargetId,
     selectedTarget: targetsState.selectedTarget,
     targets: targetsState.targets,
@@ -295,11 +356,202 @@ export function useLocalChatPageState() {
     || runtimeRouteState.routeSnapshot?.source
     || undefined
   ) as 'token-api' | 'local-runtime' | undefined;
+  const imageDependencyRouteHint = normalizeDependencyHint(speechSettingsState.defaultSettings.imageRouteSource);
+  const videoDependencyRouteHint = normalizeDependencyHint(speechSettingsState.defaultSettings.videoRouteSource);
+  const imageMediaSettingsRevision = useMemo(() => buildMediaSettingsRevision({
+    kind: 'image',
+    settings: speechSettingsState.defaultSettings,
+  }), [speechSettingsState.defaultSettings]);
+  const videoMediaSettingsRevision = useMemo(() => buildMediaSettingsRevision({
+    kind: 'video',
+    settings: speechSettingsState.defaultSettings,
+  }), [speechSettingsState.defaultSettings]);
 
-  const refreshDependencySnapshot = useCallback(async () => {
+  const setMediaRouteProbeLoading = useCallback((capability: MediaDependencyCapability, next: boolean) => {
+    setMediaRouteProbeLoadingByCapability((previous) => {
+      if (previous[capability] === next) {
+        return previous;
+      }
+      return {
+        ...previous,
+        [capability]: next,
+      };
+    });
+  }, []);
+
+  useEffect(() => {
+    setMediaRouteOptionsRevisionByCapability((previous) => ({
+      ...previous,
+      image: previous.image + 1,
+    }));
+  }, [runtimeRouteState.imageRouteOptions]);
+
+  useEffect(() => {
+    setMediaRouteOptionsRevisionByCapability((previous) => ({
+      ...previous,
+      video: previous.video + 1,
+    }));
+  }, [runtimeRouteState.videoRouteOptions]);
+
+  const imageRouteOptionsRevision = mediaRouteOptionsRevisionByCapability.image;
+  const videoRouteOptionsRevision = mediaRouteOptionsRevisionByCapability.video;
+
+  useEffect(() => {
+    if (speechSettingsState.defaultSettings.imageRouteSource !== 'auto') {
+      setImageResolvedRoute(null);
+      return;
+    }
+    const resolved = resolveMediaRouteFromOptions({
+      kind: 'image',
+      settings: speechSettingsState.defaultSettings,
+      routeOptions: runtimeRouteState.imageRouteOptions,
+      routeOptionsRevision: imageRouteOptionsRevision,
+    });
+    if (resolved) {
+      setImageResolvedRoute(resolved);
+      return;
+    }
+    setImageResolvedRoute((previous) => (
+      isResolvedMediaRouteFresh({
+        route: previous,
+        settingsRevision: imageMediaSettingsRevision,
+        routeOptionsRevision: imageRouteOptionsRevision,
+      })
+        ? previous
+        : null
+    ));
+  }, [
+    imageMediaSettingsRevision,
+    imageRouteOptionsRevision,
+    runtimeRouteState.imageRouteOptions,
+    speechSettingsState.defaultSettings,
+    speechSettingsState.defaultSettings.imageRouteSource,
+  ]);
+
+  useEffect(() => {
+    if (speechSettingsState.defaultSettings.videoRouteSource !== 'auto') {
+      setVideoResolvedRoute(null);
+      return;
+    }
+    const resolved = resolveMediaRouteFromOptions({
+      kind: 'video',
+      settings: speechSettingsState.defaultSettings,
+      routeOptions: runtimeRouteState.videoRouteOptions,
+      routeOptionsRevision: videoRouteOptionsRevision,
+    });
+    if (resolved) {
+      setVideoResolvedRoute(resolved);
+      return;
+    }
+    setVideoResolvedRoute((previous) => (
+      isResolvedMediaRouteFresh({
+        route: previous,
+        settingsRevision: videoMediaSettingsRevision,
+        routeOptionsRevision: videoRouteOptionsRevision,
+      })
+        ? previous
+        : null
+    ));
+  }, [
+    runtimeRouteState.videoRouteOptions,
+    speechSettingsState.defaultSettings,
+    speechSettingsState.defaultSettings.videoRouteSource,
+    videoRouteOptionsRevision,
+    videoMediaSettingsRevision,
+  ]);
+
+  const probeAutoMediaRoute = useCallback(async (input: {
+    capability: MediaDependencyCapability;
+    force?: boolean;
+  }) => {
+    const kind = input.capability;
+    const routeSource = kind === 'image'
+      ? speechSettingsState.defaultSettings.imageRouteSource
+      : speechSettingsState.defaultSettings.videoRouteSource;
+    if (routeSource !== 'auto') {
+      if (kind === 'image') {
+        setImageResolvedRoute(null);
+      } else {
+        setVideoResolvedRoute(null);
+      }
+      return null;
+    }
+    const routeOptions = kind === 'image'
+      ? runtimeRouteState.imageRouteOptions
+      : runtimeRouteState.videoRouteOptions;
+    const settingsRevision = kind === 'image'
+      ? imageMediaSettingsRevision
+      : videoMediaSettingsRevision;
+    const routeOptionsRevision = kind === 'image'
+      ? imageRouteOptionsRevision
+      : videoRouteOptionsRevision;
+    const currentRoute = kind === 'image' ? imageResolvedRoute : videoResolvedRoute;
+    const resolvedFromOptions = resolveMediaRouteFromOptions({
+      kind,
+      settings: speechSettingsState.defaultSettings,
+      routeOptions,
+      routeOptionsRevision,
+    });
+    if (resolvedFromOptions) {
+      if (kind === 'image') {
+        setImageResolvedRoute(resolvedFromOptions);
+      } else {
+        setVideoResolvedRoute(resolvedFromOptions);
+      }
+      return resolvedFromOptions;
+    }
+    if (!input.force && isResolvedMediaRouteFresh({
+      route: currentRoute,
+      settingsRevision,
+      routeOptionsRevision,
+    })) {
+      return currentRoute;
+    }
+    setMediaRouteProbeLoading(kind, true);
+    try {
+      const resolved = await preflightResolveMediaRoute({
+        aiClient,
+        kind,
+        settings: speechSettingsState.defaultSettings,
+        routeOptionsRevision,
+      });
+      if (kind === 'image') {
+        setImageResolvedRoute(resolved);
+      } else {
+        setVideoResolvedRoute(resolved);
+      }
+      return resolved;
+    } finally {
+      setMediaRouteProbeLoading(kind, false);
+    }
+  }, [
+    aiClient,
+    imageMediaSettingsRevision,
+    imageRouteOptionsRevision,
+    imageResolvedRoute,
+    runtimeRouteState.imageRouteOptions,
+    runtimeRouteState.videoRouteOptions,
+    setMediaRouteProbeLoading,
+    speechSettingsState.defaultSettings,
+    videoRouteOptionsRevision,
+    videoMediaSettingsRevision,
+    videoResolvedRoute,
+  ]);
+
+  const refreshDependencySnapshot = useCallback(async (force = false) => {
     const dependencyCapability = speechSettingsState.defaultSettings.enableVoice
       ? undefined
       : 'chat';
+    const now = Date.now();
+    const isFresh = !force
+      && dependencySnapshotFetchedAtRef.current > 0
+      && (now - dependencySnapshotFetchedAtRef.current) < DEPENDENCY_SNAPSHOT_TTL_MS;
+    if (isFresh) {
+      return dependencySnapshot;
+    }
+    if (dependencySnapshotInFlightRef.current && !force) {
+      return dependencySnapshotInFlightRef.current;
+    }
     if (dependencyCapability === 'chat') {
       setDependencySnapshot((previous) => {
         if (!previous) return previous;
@@ -309,42 +561,247 @@ export function useLocalChatPageState() {
         return hasVoiceCapabilityRow ? null : previous;
       });
     }
-    try {
-      const snapshot = await aiRuntimeInspector.getDependencySnapshot(
-        dependencyCapability,
-        effectiveRouteSource,
-      );
-      setDependencySnapshot(snapshot);
-    } catch (error) {
-      setDependencySnapshot({
-        modId: LOCAL_CHAT_MOD_ID,
-        status: 'missing',
-        routeSource: 'token-api',
-        reasonCode: ReasonCode.LOCAL_AI_DEPENDENCY_SNAPSHOT_FAILED,
-        warnings: [error instanceof Error ? error.message : String(error || 'unknown error')],
-        dependencies: [],
-        repairActions: [{
-          actionId: 'runtime:open-setup',
-          label: 'Open Runtime Setup',
-          reasonCode: ReasonCode.LOCAL_AI_DEPENDENCY_SNAPSHOT_FAILED,
-        }],
-        updatedAt: new Date().toISOString(),
-      });
+    const task = (async () => {
+      try {
+        const snapshot = await aiRuntimeInspector.getDependencySnapshot(
+          dependencyCapability,
+          effectiveRouteSource,
+        );
+        dependencySnapshotFetchedAtRef.current = Date.now();
+        setDependencySnapshot(snapshot);
+        return snapshot;
+      } catch (error) {
+        const fallbackSnapshot = createDependencySnapshotFailure(error);
+        dependencySnapshotFetchedAtRef.current = Date.now();
+        setDependencySnapshot(fallbackSnapshot);
+        return fallbackSnapshot;
+      }
+    })();
+    dependencySnapshotInFlightRef.current = task;
+    void task.finally(() => {
+      if (dependencySnapshotInFlightRef.current === task) {
+        dependencySnapshotInFlightRef.current = null;
+      }
+    });
+    return task;
+  }, [
+    aiRuntimeInspector,
+    dependencySnapshot,
+    speechSettingsState.defaultSettings.enableVoice,
+    effectiveRouteSource,
+  ]);
+
+  const refreshMediaDependencySnapshot = useCallback(async (input: {
+    capability: MediaDependencyCapability;
+    routeSourceHint?: MediaDependencyRouteSource;
+    force?: boolean;
+  }) => {
+    const now = Date.now();
+    const lastFetchedAt = mediaDependencyFetchedAtRef.current[input.capability] || 0;
+    const isFresh = !input.force && lastFetchedAt > 0 && (now - lastFetchedAt) < MEDIA_DEPENDENCY_TTL_MS;
+    if (isFresh) {
+      return input.capability === 'image' ? imageDependencySnapshot : videoDependencySnapshot;
     }
-  }, [aiRuntimeInspector, speechSettingsState.defaultSettings.enableVoice, effectiveRouteSource]);
+    const inFlight = mediaDependencyInFlightRef.current[input.capability];
+    if (inFlight && !input.force) {
+      return inFlight;
+    }
+    const task = (async () => {
+      try {
+        const snapshot = await aiRuntimeInspector.getDependencySnapshot(
+          input.capability,
+          input.routeSourceHint,
+        );
+        mediaDependencyFetchedAtRef.current[input.capability] = Date.now();
+        if (input.capability === 'image') {
+          setImageDependencySnapshot(snapshot);
+        } else {
+          setVideoDependencySnapshot(snapshot);
+        }
+        return snapshot;
+      } catch (error) {
+        const fallbackSnapshot = createDependencySnapshotFailure(error);
+        mediaDependencyFetchedAtRef.current[input.capability] = Date.now();
+        if (input.capability === 'image') {
+          setImageDependencySnapshot(fallbackSnapshot);
+        } else {
+          setVideoDependencySnapshot(fallbackSnapshot);
+        }
+        return fallbackSnapshot;
+      }
+    })();
+    mediaDependencyInFlightRef.current[input.capability] = task;
+    void task.finally(() => {
+      if (mediaDependencyInFlightRef.current[input.capability] === task) {
+        delete mediaDependencyInFlightRef.current[input.capability];
+      }
+    });
+    return task;
+  }, [
+    aiRuntimeInspector,
+    imageDependencySnapshot,
+    videoDependencySnapshot,
+  ]);
+
+  const refreshImageDependencySnapshot = useCallback((force = false) => (
+    refreshMediaDependencySnapshot({
+      capability: 'image',
+      routeSourceHint: imageDependencyRouteHint,
+      force,
+    })
+  ), [imageDependencyRouteHint, refreshMediaDependencySnapshot]);
+
+  const refreshVideoDependencySnapshot = useCallback((force = false) => (
+    refreshMediaDependencySnapshot({
+      capability: 'video',
+      routeSourceHint: videoDependencyRouteHint,
+      force,
+    })
+  ), [videoDependencyRouteHint, refreshMediaDependencySnapshot]);
+
+  const refreshMediaDependencies = useCallback(async (force = false) => {
+    await Promise.all([
+      refreshImageDependencySnapshot(force),
+      refreshVideoDependencySnapshot(force),
+    ]);
+  }, [refreshImageDependencySnapshot, refreshVideoDependencySnapshot]);
 
   useEffect(() => {
-    void refreshDependencySnapshot();
-  }, [refreshDependencySnapshot]);
-
-  useEffect(() => {
+    if (!isRuntimeSidebarOpen) {
+      return;
+    }
     void refreshDependencySnapshot();
   }, [
+    isRuntimeSidebarOpen,
     refreshDependencySnapshot,
     runtimeRouteState.routeSnapshot?.source,
     runtimeRouteState.routeSnapshot?.model,
     runtimeRouteState.routeOverride?.source,
     runtimeRouteState.routeOverride?.model,
+  ]);
+
+  useEffect(() => {
+    if (isRuntimeSidebarOpen) {
+      return;
+    }
+    if (!targetsState.selectedTargetId) {
+      return;
+    }
+    const warmTimer = setTimeout(() => {
+      void runtimeRouteState.loadBootstrapRuntimeRouteOptions();
+      void refreshDependencySnapshot();
+    }, RUNTIME_SIDEBAR_WARMUP_DELAY_MS);
+    return () => {
+      clearTimeout(warmTimer);
+    };
+  }, [
+    isRuntimeSidebarOpen,
+    targetsState.selectedTargetId,
+    runtimeRouteState.loadBootstrapRuntimeRouteOptions,
+    refreshDependencySnapshot,
+  ]);
+
+  const runMediaRuntimeSidebarLoad = useCallback(async (input?: {
+    exposeLoading?: boolean;
+    forceDependencies?: boolean;
+    forceRouteOptions?: boolean;
+    forceRouteProbe?: boolean;
+  }) => {
+    const shouldLoadImageRouteOptions = Boolean(input?.forceRouteOptions) || !runtimeRouteState.imageRouteOptions;
+    const shouldLoadVideoRouteOptions = Boolean(input?.forceRouteOptions) || !runtimeRouteState.videoRouteOptions;
+    const shouldLoadImageDependencies = Boolean(input?.forceDependencies) || !imageDependencySnapshot;
+    const shouldLoadVideoDependencies = Boolean(input?.forceDependencies) || !videoDependencySnapshot;
+    if (
+      !shouldLoadImageRouteOptions
+      && !shouldLoadVideoRouteOptions
+      && !shouldLoadImageDependencies
+      && !shouldLoadVideoDependencies
+    ) {
+      return;
+    }
+    if (input?.exposeLoading) {
+      mediaSidebarVisibleLoadCountRef.current += 1;
+      setIsMediaRuntimeSidebarLoading(true);
+    }
+    try {
+      await Promise.all([
+        shouldLoadImageRouteOptions
+          ? runtimeRouteState.loadImageRuntimeRouteOptions()
+          : Promise.resolve(runtimeRouteState.imageRouteOptions),
+        shouldLoadVideoRouteOptions
+          ? runtimeRouteState.loadVideoRuntimeRouteOptions()
+          : Promise.resolve(runtimeRouteState.videoRouteOptions),
+      ]);
+      await Promise.all([
+        probeAutoMediaRoute({
+          capability: 'image',
+          force: Boolean(input?.forceRouteProbe) || Boolean(input?.forceRouteOptions),
+        }),
+        probeAutoMediaRoute({
+          capability: 'video',
+          force: Boolean(input?.forceRouteProbe) || Boolean(input?.forceRouteOptions),
+        }),
+        shouldLoadImageDependencies
+          ? refreshImageDependencySnapshot(Boolean(input?.forceDependencies))
+          : Promise.resolve(imageDependencySnapshot),
+        shouldLoadVideoDependencies
+          ? refreshVideoDependencySnapshot(Boolean(input?.forceDependencies))
+          : Promise.resolve(videoDependencySnapshot),
+      ]);
+    } finally {
+      if (input?.exposeLoading) {
+        mediaSidebarVisibleLoadCountRef.current = Math.max(0, mediaSidebarVisibleLoadCountRef.current - 1);
+        if (mediaSidebarVisibleLoadCountRef.current === 0) {
+          setIsMediaRuntimeSidebarLoading(false);
+        }
+      }
+    }
+  }, [
+    imageDependencySnapshot,
+    probeAutoMediaRoute,
+    refreshImageDependencySnapshot,
+    refreshVideoDependencySnapshot,
+    runtimeRouteState.imageRouteOptions,
+    runtimeRouteState.loadImageRuntimeRouteOptions,
+    runtimeRouteState.loadVideoRuntimeRouteOptions,
+    runtimeRouteState.videoRouteOptions,
+    videoDependencySnapshot,
+  ]);
+
+  useEffect(() => {
+    if (!isRuntimeSidebarOpen) {
+      return;
+    }
+    const warmTimer = window.setTimeout(() => {
+      void runMediaRuntimeSidebarLoad();
+    }, 900);
+    return () => {
+      window.clearTimeout(warmTimer);
+    };
+  }, [isRuntimeSidebarOpen, runMediaRuntimeSidebarLoad]);
+
+  useEffect(() => {
+    if (!isRuntimeSidebarOpen || speechSettingsState.defaultSettings.imageRouteSource !== 'auto') {
+      return;
+    }
+    void probeAutoMediaRoute({ capability: 'image' });
+  }, [
+    imageRouteOptionsRevision,
+    isRuntimeSidebarOpen,
+    probeAutoMediaRoute,
+    speechSettingsState.defaultSettings.imageRouteSource,
+  ]);
+
+  useEffect(() => {
+    if (!isRuntimeSidebarOpen || speechSettingsState.defaultSettings.videoRouteSource !== 'auto') {
+      return;
+    }
+    void probeAutoMediaRoute({ capability: 'video' });
+  }, [
+    isRuntimeSidebarOpen,
+    probeAutoMediaRoute,
+    speechSettingsState.defaultSettings.videoRouteSource,
+    videoRouteOptionsRevision,
   ]);
 
   const localSttRouteAvailable = useMemo(
@@ -481,10 +938,16 @@ export function useLocalChatPageState() {
 
   const turnSendState = useLocalChatTurnSend({
     aiClient,
+    viewerId: currentUserId,
+    viewerDisplayName: currentUserDisplayName,
     inputText,
     setInputText,
     runtimeMode: runtimeFields.mode,
     chatRouteOptions: runtimeRouteState.chatRouteOptions,
+    imageRouteOptions: runtimeRouteState.imageRouteOptions,
+    videoRouteOptions: runtimeRouteState.videoRouteOptions,
+    imageRouteOptionsRevision,
+    videoRouteOptionsRevision,
     routeOverride: runtimeRouteState.routeOverride,
     routeSnapshot: runtimeRouteState.routeSnapshot
       ? {
@@ -492,6 +955,8 @@ export function useLocalChatPageState() {
         model: runtimeRouteState.routeSnapshot.model,
       }
       : null,
+    imageResolvedRoute,
+    videoResolvedRoute,
     defaultSettings: speechSettingsState.defaultSettings,
     selectedTarget: targetsState.selectedTarget,
     selectedSessionId: sessionsState.selectedSessionId,
@@ -501,6 +966,8 @@ export function useLocalChatPageState() {
     setSelectedSessionId: sessionsState.setSelectedSessionId,
     setLatestPromptTrace,
     setLatestTurnAudit,
+    imageDependencySnapshot,
+    videoDependencySnapshot,
     setStatusBanner,
     isTranscribing: speechTranscribeState.voiceInputState === 'transcribing',
     onOpenRuntimeSetup: () => {
@@ -510,6 +977,39 @@ export function useLocalChatPageState() {
       ? synthesizeVoice
       : undefined,
   });
+
+  const bootstrapRuntimeSidebar = useCallback(() => {
+    void runtimeRouteState.loadBootstrapRuntimeRouteOptions();
+  }, [runtimeRouteState.loadBootstrapRuntimeRouteOptions]);
+
+  const loadChatRuntimeSidebarData = useCallback(() => {
+    void runtimeRouteState.loadBootstrapRuntimeRouteOptions();
+  }, [runtimeRouteState.loadBootstrapRuntimeRouteOptions]);
+
+  const loadVoiceRuntimeSidebarData = useCallback(() => {
+    void speechSettingsState.ensureSpeechCatalogLoaded();
+    void Promise.all([
+      runtimeRouteState.loadTtsRuntimeRouteOptions(),
+      runtimeRouteState.loadSttRuntimeRouteOptions(),
+    ]);
+  }, [
+    runtimeRouteState.loadTtsRuntimeRouteOptions,
+    runtimeRouteState.loadSttRuntimeRouteOptions,
+    speechSettingsState.ensureSpeechCatalogLoaded,
+  ]);
+
+  const loadMediaRuntimeSidebarData = useCallback(() => {
+    void runMediaRuntimeSidebarLoad({ exposeLoading: true });
+  }, [runMediaRuntimeSidebarLoad]);
+
+  const refreshMediaRuntimeSidebarData = useCallback(() => {
+    void runMediaRuntimeSidebarLoad({
+      exposeLoading: true,
+      forceDependencies: true,
+      forceRouteOptions: true,
+      forceRouteProbe: true,
+    });
+  }, [runMediaRuntimeSidebarLoad]);
 
   return {
     runtimeFields,
@@ -536,7 +1036,21 @@ export function useLocalChatPageState() {
     latestTurnAudit,
     setLatestTurnAudit,
     dependencySnapshot,
+    imageDependencySnapshot,
+    videoDependencySnapshot,
+    imageResolvedRoute,
+    videoResolvedRoute,
+    imageRouteOptionsRevision,
+    videoRouteOptionsRevision,
+    mediaRouteProbeLoadingByCapability,
+    isMediaRuntimeSidebarLoading,
+    bootstrapRuntimeSidebar,
+    loadChatRuntimeSidebarData,
+    loadVoiceRuntimeSidebarData,
+    loadMediaRuntimeSidebarData,
+    refreshMediaRuntimeSidebarData,
     refreshDependencySnapshot,
+    refreshMediaDependencies,
     inputRef,
     messagesEndRef,
     sessionMenuAnchorRef,

@@ -18,36 +18,57 @@ text_turn_chain:
   - step: input-received
     order: 1
     source_rule: LC-PIPE-001
-  - step: prompt-assemble
+  - step: context-assemble
     order: 2
+    source_rule: LC-PIPE-011
+  - step: prompt-render
+    order: 3
     source_rule: LC-PIPE-001
   - step: route-resolve
-    order: 3
+    order: 4
     source_rule: LC-PIPE-001
   - step: assistant-generate
-    order: 4
-    source_rule: LC-PIPE-001
-  - step: turns-persist
     order: 5
     source_rule: LC-PIPE-001
-  - step: diagnostics-persist
+  - step: turn-bundle-persist
     order: 6
+    source_rule: LC-PIPE-012
+  - step: running-summary-update
+    order: 7
+    source_rule: LC-PIPE-013
+  - step: durable-memory-write
+    order: 8
+    source_rule: LC-PIPE-014
+  - step: context-trace-emit
+    order: 9
     source_rule: LC-PIPE-004
 media_turn_chain:
-  - step: media-intent-parse
+  - step: explicit-request-parse
     order: 1
     source_rule: LC-PIPE-009
-  - step: media-nsfw-gate
+  - step: media-local-gate
     order: 2
-    source_rule: LC-PIPE-010
-  - step: media-generate
+    source_rule: LC-PIPE-009
+  - step: media-planner-decision
     order: 3
     source_rule: LC-PIPE-009
-  - step: media-cache-persist
+  - step: media-marker-override
     order: 4
     source_rule: LC-PIPE-009
-  - step: media-delivery-append
+  - step: media-nsfw-gate
     order: 5
+    source_rule: LC-PIPE-009
+  - step: media-generate
+    order: 6
+    source_rule: LC-PIPE-009
+  - step: media-context-attach
+    order: 7
+    source_rule: LC-PIPE-012
+  - step: media-cache-persist
+    order: 8
+    source_rule: LC-PIPE-009
+  - step: media-delivery-append
+    order: 9
     source_rule: LC-PIPE-009
 speech_turn_chain:
   - step: speech-input

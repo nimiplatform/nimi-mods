@@ -24,8 +24,16 @@ export function emitLocalChatLog(options: {
       details,
     });
   } catch (error) {
+    const errorCode = typeof error === 'object' && error && 'code' in error
+      ? String((error as { code?: unknown }).code || '')
+      : '';
     const errorMessage = error instanceof Error ? error.message : String(error || '');
-    if (errorMessage.includes('MOD_SDK_HOST_NOT_READY')) {
+    if (
+      errorCode === 'SDK_MOD_HOST_MISSING'
+      || errorMessage.includes('MOD_SDK_HOST_NOT_READY')
+      || errorMessage.includes('SDK_MOD_HOST_MISSING')
+      || errorMessage.includes('mod SDK host is not ready')
+    ) {
       return;
     }
     throw error;

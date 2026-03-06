@@ -3,7 +3,6 @@ import type { LocalChatSession, LocalChatTurn } from '../../state/index.js';
 import {
   appendTurnsToSession,
   createLocalChatSession,
-  upsertLocalChatSession,
 } from '../../state/index.js';
 import type { ChatMessage } from '../../types.js';
 import { createSessionTurn } from './messages.js';
@@ -19,23 +18,25 @@ export function createProactiveGreetingTurn(target: LocalChatTarget | null): Loc
   return createSessionTurn({ message });
 }
 
-export function createSessionForTarget(input: {
+export async function createSessionForTarget(input: {
   targetId: string;
+  viewerId: string;
   target: LocalChatTarget | null;
   allowProactiveContact: boolean;
-}): LocalChatSession {
-  const createdRaw = upsertLocalChatSession(
-    createLocalChatSession({
-      targetId: input.targetId,
-      worldId: input.target?.worldId || null,
-      title: input.target?.displayName || 'Session',
-    }),
-  );
+}): Promise<LocalChatSession> {
+  const createdRaw = await createLocalChatSession({
+    targetId: input.targetId,
+    viewerId: input.viewerId,
+    worldId: input.target?.worldId || null,
+    title: input.target?.displayName || 'Session',
+  });
   if (!input.allowProactiveContact) {
     return createdRaw;
   }
-  return appendTurnsToSession(
+  return (
+    await appendTurnsToSession(
     createdRaw.id,
     [createProactiveGreetingTurn(input.target)],
+    )
   ) || createdRaw;
 }

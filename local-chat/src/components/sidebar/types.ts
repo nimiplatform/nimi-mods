@@ -1,6 +1,13 @@
 import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot, RuntimeRouteSource } from '@nimiplatform/sdk/mod/runtime-route';
-import type { LocalChatBooleanSettingKey, LocalChatDefaultSettings, LocalChatPromptTrace, LocalChatTurnAudit } from '../../state/index.js';
-import type { HealthStatus } from '../../types.js';
+import type {
+  LocalChatBooleanSettingKey,
+  LocalChatDefaultSettings,
+  LocalChatMediaPlannerMode,
+  LocalChatPromptTrace,
+  LocalChatTurnAudit,
+  LocalChatVideoAutoPolicy,
+} from '../../state/index.js';
+import type { HealthStatus, LocalChatResolvedMediaRoute } from '../../types.js';
 
 export type RuntimeStatusSidebarProps = {
   healthStatus: HealthStatus;
@@ -8,6 +15,8 @@ export type RuntimeStatusSidebarProps = {
   chatRouteOptions: RuntimeRouteOptionsSnapshot | null;
   imageRouteOptions: RuntimeRouteOptionsSnapshot | null;
   videoRouteOptions: RuntimeRouteOptionsSnapshot | null;
+  imageResolvedRoute: LocalChatResolvedMediaRoute | null;
+  videoResolvedRoute: LocalChatResolvedMediaRoute | null;
   routeOverride: RuntimeRouteBinding | null;
   speechProviders: Array<{ id: string; name: string; status: 'available' | 'unavailable' }>;
   speechVoices: Array<{ id: string; providerId: string; name: string }>;
@@ -23,13 +32,17 @@ export type RuntimeStatusSidebarProps = {
   autoBoundModel: string;
   chatCapabilityMatched: boolean;
   dependencyCapabilities: Array<{
-    capability: 'chat' | 'tts' | 'stt';
+    capability: 'chat' | 'tts' | 'stt' | 'image' | 'video';
     matched: boolean;
     required: boolean;
+    resolved: boolean;
   }>;
   dependencyStatus: 'ready' | 'missing' | 'degraded' | 'unknown';
   dependencyReasonCode?: string;
   dependencyUpdatedAt?: string;
+  isMediaRuntimeSidebarLoading: boolean;
+  isImageRouteProbeLoading: boolean;
+  isVideoRouteProbeLoading: boolean;
   dependencyRepairActions: Array<{
     actionId: string;
     label: string;
@@ -74,4 +87,11 @@ export type RuntimeStatusSidebarProps = {
   defaultSettings: LocalChatDefaultSettings;
   onDefaultSettingChange: (key: LocalChatBooleanSettingKey, value: boolean) => void;
   onDefaultVoiceNameChange: (value: string) => void;
+  onMediaPlannerModeChange: (value: LocalChatMediaPlannerMode) => void;
+  onVideoAutoPolicyChange: (value: LocalChatVideoAutoPolicy) => void;
+  onRefreshMediaDependencies: () => void;
+  onSidebarBootstrap: () => void;
+  onOpenChatPanel: () => void;
+  onOpenVoicePanel: () => void;
+  onOpenMediaPanel: () => void;
 };

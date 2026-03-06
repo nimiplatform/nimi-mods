@@ -24,7 +24,7 @@ export function SessionMenu(props: SessionMenuProps) {
         type="button"
         disabled={!props.selectedTargetId}
         onClick={() => props.setIsOpen((previous) => !previous)}
-        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+        className="lc-btn lc-btn-secondary h-8 items-center px-3 text-xs font-medium"
       >
         {t('SessionMenu.title')}
         <span className={`transition-transform ${props.isOpen ? 'rotate-180' : ''}`}>
@@ -43,7 +43,7 @@ export function SessionMenu(props: SessionMenuProps) {
               type="button"
               onClick={props.onCreateSession}
               disabled={!props.selectedTargetId}
-              className="h-7 rounded-md border border-gray-200 bg-white px-2 text-[11px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+              className="lc-btn lc-btn-secondary h-7 px-2 text-[11px] font-medium"
             >
               {t('SessionMenu.newSession')}
             </button>
@@ -58,7 +58,7 @@ export function SessionMenu(props: SessionMenuProps) {
                 return (
                   <div
                     key={session.id}
-                    className={`border-b border-gray-100 px-3 py-2 ${active ? 'bg-mint-50' : ''}`}
+                    className={`border-b border-gray-100 px-3 py-2 transition-colors duration-200 ${active ? 'bg-mint-50' : 'hover:bg-gray-50/80'}`}
                   >
                     <button
                       type="button"
@@ -80,7 +80,7 @@ export function SessionMenu(props: SessionMenuProps) {
                           event.stopPropagation();
                           props.onDeleteSession(session.id);
                         }}
-                        className="text-[11px] text-gray-500 hover:text-red-600"
+                        className="lc-btn lc-btn-ghost h-7 px-2 text-[11px]"
                       >
                         {t('SessionMenu.delete')}
                       </button>

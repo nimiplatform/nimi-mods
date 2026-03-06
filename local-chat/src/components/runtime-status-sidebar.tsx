@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import {
   filterModelOptions,
@@ -76,6 +76,7 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     dependencyStatus,
     dependencyReasonCode,
     dependencyUpdatedAt,
+    isMediaRuntimeSidebarLoading,
     dependencyRepairActions,
     latestPromptTrace,
     latestTurnAudit,
@@ -93,6 +94,13 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     defaultSettings,
     onDefaultSettingChange,
     onDefaultVoiceNameChange,
+    onMediaPlannerModeChange,
+    onVideoAutoPolicyChange,
+    onRefreshMediaDependencies,
+    onSidebarBootstrap,
+    onOpenChatPanel,
+    onOpenVoicePanel,
+    onOpenMediaPanel,
   } = props;
 
   const hasValidTokenApiOverride = (
@@ -126,8 +134,9 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     [chatModelOptionsRaw],
   );
 
-  const [openPanel, setOpenPanel] = useState<'defaults' | 'chat' | 'media' | 'voice' | 'diagnostics' | null>('defaults');
+  const [openPanel, setOpenPanel] = useState<'defaults' | 'chat' | 'media' | 'voice' | 'diagnostics' | null>(null);
   const [chatModelQuery, setChatModelQuery] = useState(effectiveChatBinding?.model || '');
+  const didBootstrapRef = useRef(false);
   const filteredChatModelOptions = useMemo(
     () => filterModelOptions(chatModelOptions, chatModelQuery),
     [chatModelOptions, chatModelQuery],
@@ -145,14 +154,44 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     setChatModelQuery(effectiveChatBinding?.model || '');
   }, [effectiveChatBinding?.model]);
 
+  useEffect(() => {
+    if (didBootstrapRef.current) {
+      return;
+    }
+    didBootstrapRef.current = true;
+    onSidebarBootstrap();
+  }, [onSidebarBootstrap]);
+
+  const togglePanel = (panel: 'defaults' | 'chat' | 'media' | 'voice' | 'diagnostics') => {
+    setOpenPanel((previous) => (previous === panel ? null : panel));
+  };
+
+  useEffect(() => {
+    if (!openPanel) {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      if (openPanel === 'chat') {
+        onOpenChatPanel();
+      }
+      if (openPanel === 'voice') {
+        onOpenVoicePanel();
+      }
+      if (openPanel === 'media') {
+        onOpenMediaPanel();
+      }
+    }, openPanel === 'media' ? 120 : 50);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [onOpenChatPanel, onOpenMediaPanel, onOpenVoicePanel, openPanel]);
+
   const missingRequiredDependencies = useMemo(
-    () => dependencyCapabilities.filter((item) => item.required && !item.matched),
+    () => dependencyCapabilities.filter((item) => item.required && item.resolved && !item.matched),
     [dependencyCapabilities],
   );
-  const visibleDependencyCapabilities = useMemo(
-    () => dependencyCapabilities.filter((item) => item.capability === 'chat' || item.required),
-    [dependencyCapabilities],
-  );
+  const visibleDependencyCapabilities = dependencyCapabilities;
+  const showMediaDependencyPending = isMediaRuntimeSidebarLoading;
   const resolvedDefaultBinding = chatRouteOptions?.resolvedDefault || chatRouteOptions?.selected || null;
   const formatRouteBindingLabel = useMemo(() => (
     (binding: RuntimeRouteBinding | null): string => {
@@ -179,7 +218,9 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     && !bindingsEqual(effectiveChatBinding, resolvedDefaultBinding),
   );
   const dependencyStatusLabel = (
-    dependencyStatus === 'ready'
+    showMediaDependencyPending
+      ? t('RuntimeSidebar.mediaDependencyChecking')
+      : dependencyStatus === 'ready'
       ? t('RuntimeSidebar.dependencyStatusReady')
       : dependencyStatus === 'degraded'
         ? t('RuntimeSidebar.dependencyStatusDegraded')
@@ -187,9 +228,15 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
           ? t('RuntimeSidebar.dependencyStatusMissing')
           : t('RuntimeSidebar.dependencyStatusUnknown')
   );
-  const failedCapabilityLabels = visibleDependencyCapabilities
-    .filter((item) => !item.matched)
-    .map((item) => item.capability.toUpperCase());
+  const failedDependencyCapabilities = visibleDependencyCapabilities
+    .filter((item) => item.required && item.resolved && !item.matched)
+    .filter((item) => !showMediaDependencyPending || (item.capability !== 'image' && item.capability !== 'video'));
+  const failedCapabilityLabels = failedDependencyCapabilities.map((item) => item.capability.toUpperCase());
+  const hasOnlyMediaFailures = missingRequiredDependencies.length > 0
+    && missingRequiredDependencies.every((item) => item.capability === 'image' || item.capability === 'video');
+  const visibleDependencyReasonCode = showMediaDependencyPending && hasOnlyMediaFailures
+    ? undefined
+    : dependencyReasonCode;
 
   return (
     <aside className="flex h-full min-h-0 w-80 shrink-0 flex-col overflow-y-auto border-l border-[var(--lc-border)] bg-[#f4f8f9]">
@@ -202,7 +249,7 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
       </div>
 
       <div className="space-y-3 p-4">
-        <div className="lc-card rounded-2xl p-3 text-xs">
+        <div className="lc-card rounded-2xl p-3 text-xs transition-all duration-200">
           <p className="text-[13px] font-semibold text-gray-700">{t('RuntimeSidebar.globalStatusTitle')}</p>
           <p className="mt-1 text-[11px] text-gray-500">{t('RuntimeSidebar.globalStatusSubtitle')}</p>
           <p className="mt-2 text-[11px] text-gray-600">
@@ -222,7 +269,9 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
               {chatCapabilityMatched ? t('RuntimeSidebar.capabilityHit') : t('RuntimeSidebar.capabilityMissing')}
             </span>
             <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-              dependencyStatus === 'ready'
+              showMediaDependencyPending
+                ? 'bg-sky-50 text-slate-600'
+                : dependencyStatus === 'ready'
                 ? 'bg-mint-100 text-mint-700'
                 : dependencyStatus === 'degraded' || dependencyStatus === 'missing'
                   ? 'bg-amber-100 text-amber-800'
@@ -231,9 +280,9 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
             >
               {dependencyStatusLabel}
             </span>
-            {dependencyReasonCode ? (
+            {visibleDependencyReasonCode ? (
               <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600">
-                {dependencyReasonCode}
+                {visibleDependencyReasonCode}
               </span>
             ) : null}
           </div>
@@ -247,10 +296,18 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
               {t('RuntimeSidebar.dependencyUpdatedAt')}: {new Date(dependencyUpdatedAt).toLocaleTimeString()}
             </p>
           ) : null}
+          <button
+            type="button"
+            className="lc-btn lc-btn-secondary mt-2 h-7 px-2 text-[11px] font-medium"
+            onClick={onRefreshMediaDependencies}
+            disabled={isMediaRuntimeSidebarLoading}
+          >
+            {isMediaRuntimeSidebarLoading ? t('RuntimeSidebar.mediaDependencyChecking') : t('RuntimeSidebar.refreshMediaDependencies')}
+          </button>
           {!chatCapabilityMatched || missingRequiredDependencies.length > 0 || dependencyRepairActions.length > 0 ? (
             <button
               type="button"
-              className="mt-2 h-7 rounded-md border border-amber-300 bg-white px-2 text-[11px] font-medium text-amber-800"
+              className="lc-btn lc-btn-warning mt-2 h-7 px-2 text-[11px] font-medium"
               onClick={onOpenRuntimeSetup}
             >
               {t('RuntimeSidebar.dependencyCta')}
@@ -262,7 +319,7 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
                 <button
                   key={`runtime-repair-${action.actionId}`}
                   type="button"
-                  className="block h-7 rounded-md border border-amber-200 bg-white px-2 text-left text-[11px] text-amber-800"
+                  className="lc-btn lc-btn-warning block h-7 px-2 text-left text-[11px]"
                   onClick={onOpenRuntimeSetup}
                   title={action.reasonCode}
                 >
@@ -275,16 +332,18 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
 
         <DefaultSettingsPanel
           open={openPanel === 'defaults'}
-          onToggle={() => setOpenPanel((prev) => (prev === 'defaults' ? null : 'defaults'))}
+          onToggle={() => togglePanel('defaults')}
           defaultSettings={defaultSettings}
           speechVoices={speechVoices}
           onDefaultSettingChange={onDefaultSettingChange}
           onDefaultVoiceNameChange={onDefaultVoiceNameChange}
+          onMediaPlannerModeChange={onMediaPlannerModeChange}
+          onVideoAutoPolicyChange={onVideoAutoPolicyChange}
         />
 
         <ChatRoutePanel
           open={openPanel === 'chat'}
-          onToggle={() => setOpenPanel((prev) => (prev === 'chat' ? null : 'chat'))}
+          onToggle={() => togglePanel('chat')}
           activeChatSource={activeChatSource}
           activeChatConnectorId={activeChatConnectorId}
           chatRouteOptions={chatRouteOptions}
@@ -300,7 +359,7 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
 
         <VoicePanel
           open={openPanel === 'voice'}
-          onToggle={() => setOpenPanel((prev) => (prev === 'voice' ? null : 'voice'))}
+          onToggle={() => togglePanel('voice')}
           enableVoice={defaultSettings.enableVoice}
           selectedSpeechProviderId={selectedSpeechProviderId}
           selectedVoiceId={selectedVoiceId}
@@ -328,9 +387,14 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
 
         <MediaRoutePanel
           open={openPanel === 'media'}
-          onToggle={() => setOpenPanel((prev) => (prev === 'media' ? null : 'media'))}
+          loading={isMediaRuntimeSidebarLoading}
+          onToggle={() => togglePanel('media')}
           imageRouteOptions={props.imageRouteOptions}
           videoRouteOptions={props.videoRouteOptions}
+          imageResolvedRoute={props.imageResolvedRoute}
+          videoResolvedRoute={props.videoResolvedRoute}
+          isImageRouteProbeLoading={props.isImageRouteProbeLoading}
+          isVideoRouteProbeLoading={props.isVideoRouteProbeLoading}
           imageRouteSource={props.imageRouteSource}
           videoRouteSource={props.videoRouteSource}
           imageConnectorId={props.imageConnectorId}
@@ -349,7 +413,7 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
 
         <DiagnosticsPanel
           open={openPanel === 'diagnostics'}
-          onToggle={() => setOpenPanel((prev) => (prev === 'diagnostics' ? null : 'diagnostics'))}
+          onToggle={() => togglePanel('diagnostics')}
           latestPromptTrace={latestPromptTrace}
           latestTurnAudit={latestTurnAudit}
           healthStatus={healthStatus}

@@ -1,4 +1,4 @@
-import type React from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import { getTargetInitial } from '../../services/index.js';
 import type { LocalChatTargetItem } from './types.js';
@@ -56,6 +56,30 @@ export function LocalChatTargetPane({
   searchIcon,
 }: LocalChatTargetPaneProps) {
   const { t } = useModTranslation('local-chat');
+  const targetButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const hasFollowedActiveTargetRef = useRef(false);
+  const visibleTargetOrderKey = useMemo(
+    () => visibleTargets.map((target) => target.id).join('|'),
+    [visibleTargets],
+  );
+
+  useEffect(() => {
+    const activeTargetId = String(selectedTargetId || '').trim();
+    if (!activeTargetId) {
+      return;
+    }
+    const activeButton = targetButtonRefs.current[activeTargetId];
+    if (!activeButton) {
+      return;
+    }
+    activeButton.scrollIntoView({
+      behavior: hasFollowedActiveTargetRef.current ? 'smooth' : 'auto',
+      block: 'nearest',
+      inline: 'nearest',
+    });
+    hasFollowedActiveTargetRef.current = true;
+  }, [selectedTargetId, visibleTargetOrderKey]);
+
   return (
     <aside className="flex h-full min-h-0 w-80 shrink-0 flex-col border-r border-[var(--lc-border)] bg-[#f3f8f8]" style={{ width: 332 }}>
       <div className="border-b border-[var(--lc-border)] px-4 pb-4 pt-4">
@@ -67,13 +91,13 @@ export function LocalChatTargetPane({
           <button
             type="button"
             onClick={onRefresh}
-            className="mt-1 h-9 shrink-0 rounded-xl border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 shadow-sm transition hover:border-mint-300 hover:text-mint-700"
+            className="lc-btn lc-btn-secondary mt-1 h-9 shrink-0 px-3 text-xs font-semibold"
           >
             {t('TargetPane.refresh')}
           </button>
         </div>
 
-        <div className="mt-4 flex h-11 items-center rounded-2xl border border-gray-200 bg-white px-3 shadow-sm">
+        <div className="mt-4 flex h-11 items-center rounded-2xl border border-gray-200 bg-white px-3 shadow-sm transition-all duration-200 focus-within:border-mint-300 focus-within:bg-white focus-within:shadow-[0_12px_24px_rgba(15,23,42,0.08)]">
           <span className="text-gray-400">{searchIcon}</span>
           <input
             className="ml-2 flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
@@ -102,11 +126,14 @@ export function LocalChatTargetPane({
               return (
                 <button
                   key={target.id}
+                  ref={(node) => {
+                    targetButtonRefs.current[target.id] = node;
+                  }}
                   type="button"
                   onClick={() => setSelectedTargetId(target.id)}
-                  className={`group lc-card relative w-full rounded-2xl p-3 text-left transition-all duration-200 ${
+                  className={`group lc-card lc-target-card relative w-full scroll-mt-3 rounded-2xl p-3 text-left ${
                     active
-                      ? 'border-mint-300 bg-mint-50 shadow-[0_10px_24px_rgba(16,185,129,0.16)]'
+                      ? 'lc-target-card-active border-mint-300 bg-gradient-to-br from-mint-50 to-white'
                       : 'hover:-translate-y-[1px] hover:border-mint-200 hover:shadow-[0_10px_24px_rgba(15,23,42,0.1)]'
                   }`}
                 >

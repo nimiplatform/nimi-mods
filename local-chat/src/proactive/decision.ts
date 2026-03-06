@@ -1,11 +1,9 @@
-import type { LocalChatSession } from '../state/index.js';
 import type {
   LocalChatProactiveDecisionInput,
   LocalChatProactiveDecisionObject,
 } from './types.js';
 
-const PROACTIVE_MAX_HISTORY_TURNS = 10;
-const PROACTIVE_MAX_HISTORY_CHARS = 3000;
+const PROACTIVE_MAX_CONTEXT_CHARS = 3200;
 const PROACTIVE_MAX_MESSAGE_CHARS = 220;
 
 function sanitizeProactiveMessage(input: string): string {
@@ -49,16 +47,38 @@ function parseProactiveDecisionObject(text: string): Record<string, unknown> {
   };
 }
 
-export function summarizeSessionForProactiveDecision(session: LocalChatSession): string {
-  const turns = Array.isArray(session.turns)
-    ? session.turns.slice(-PROACTIVE_MAX_HISTORY_TURNS)
-    : [];
-  if (turns.length === 0) return '(empty)';
+function joinLines(title: string, lines: string[]): string {
+  const filtered = lines
+    .map((line) => String(line || '').trim())
+    .filter(Boolean);
+  if (filtered.length === 0) return '';
+  return [`${title}:`, ...filtered.map((line) => `- ${line}`)].join('\n');
+}
 
-  return turns
-    .map((turn) => `${turn.role === 'assistant' ? 'Agent' : 'User'}: ${String(turn.content || '').trim()}`)
-    .join('\n')
-    .slice(0, PROACTIVE_MAX_HISTORY_CHARS);
+function summarizeContextPacket(input: LocalChatProactiveDecisionInput['contextPacket']): string {
+  const chunks = [
+    input.platformWarmStart
+      ? [
+        joinLines('平台 core warm-start', input.platformWarmStart.core),
+        joinLines('平台 e2e warm-start', input.platformWarmStart.e2e),
+      ].filter(Boolean).join('\n\n')
+      : '',
+    input.runningSummary
+      ? [
+        joinLines('关系状态', input.runningSummary.relationshipState),
+        joinLines('用户事实', input.runningSummary.userFactsEstablished),
+        joinLines('助手承诺', input.runningSummary.assistantCommitments),
+        joinLines('未完成事项', input.runningSummary.openLoops),
+        joinLines('场景状态', input.runningSummary.sceneState),
+      ].filter(Boolean).join('\n\n')
+      : '',
+    joinLines('本地 durable memory', input.durableMemory.map((entry) => `[${entry.type}] ${entry.content}`)),
+    joinLines('最近精确回合', input.recentBundles.flatMap((bundle) => [
+      `${bundle.role === 'assistant' ? 'Assistant' : 'User'} #${bundle.seq}`,
+      ...bundle.lines,
+    ])),
+  ].filter(Boolean);
+  return chunks.join('\n\n').slice(0, PROACTIVE_MAX_CONTEXT_CHARS) || '(empty)';
 }
 
 export async function generateLocalChatProactiveDecision(
@@ -76,8 +96,8 @@ export async function generateLocalChatProactiveDecision(
     '- shouldContact=true 时 message 必须是自然中文，不超过2句，不要解释规则。',
     '- reason 只描述为什么触发或不触发，不要包含多余前缀。',
     '',
-    '最近对话：',
-    input.historySummary,
+    '当前 continuity 上下文：',
+    summarizeContextPacket(input.contextPacket),
   ].join('\n');
 
   const result = await input.aiClient.generateObject({

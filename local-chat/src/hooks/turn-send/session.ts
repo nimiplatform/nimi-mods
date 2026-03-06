@@ -3,15 +3,19 @@ import { createSessionForTarget } from '../../services/view/sessions.js';
 import { getLocalChatSession, type LocalChatSession } from '../../state/index.js';
 import type { ChatMessage } from '../../types.js';
 
-export function ensureWorkingSession(input: {
+export async function ensureWorkingSession(input: {
   selectedSessionId: string;
+  viewerId: string;
   selectedTarget: LocalChatTarget;
   setSelectedSessionId: (sessionId: string) => void;
-}): LocalChatSession {
-  let workingSession = input.selectedSessionId ? getLocalChatSession(input.selectedSessionId) : null;
+}): Promise<LocalChatSession> {
+  let workingSession = input.selectedSessionId
+    ? await getLocalChatSession(input.selectedSessionId, input.viewerId)
+    : null;
   if (!workingSession || workingSession.targetId !== input.selectedTarget.id) {
-    workingSession = createSessionForTarget({
+    workingSession = await createSessionForTarget({
       targetId: input.selectedTarget.id,
+      viewerId: input.viewerId,
       target: input.selectedTarget,
       allowProactiveContact: false,
     });

@@ -1,13 +1,14 @@
 import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
-import type { ChatMessage } from '../../types.js';
 import type { LocalChatTarget } from '../../data/index.js';
 import type { LocalChatCompiledPrompt } from '../../prompt/index.js';
+import type { LocalChatContextPacket } from '../../state/index.js';
 import type { ChatRouteSnapshot, LocalChatTurnAiClient } from './types.js';
 import { buildTurnRequestInput } from './request-builder.js';
 import { runTextTurn } from './text-turn-runner.js';
 
 export type PreparedTurn = {
   prompt: string;
+  contextPacket: LocalChatContextPacket;
   compiledPrompt: LocalChatCompiledPrompt;
   textTurn: Awaited<ReturnType<typeof runTextTurn>>;
   routeSnapshot: ChatRouteSnapshot | null;
@@ -18,8 +19,10 @@ export async function prepareLocalChatTurn(input: {
   flowId: string;
   aiClient: LocalChatTurnAiClient;
   text: string;
+  viewerId: string;
+  viewerDisplayName: string;
   selectedTarget: LocalChatTarget;
-  messages: ChatMessage[];
+  selectedSessionId: string;
   runtimeMode: 'STORY' | 'SCENE_TURN' | undefined;
   routeOverride: RuntimeRouteBinding | null;
   allowMultiReply: boolean;
@@ -27,10 +30,12 @@ export async function prepareLocalChatTurn(input: {
   routeSnapshot: ChatRouteSnapshot | null;
   onStreamDelta?: (delta: string, chunkCount: number) => void;
 }): Promise<PreparedTurn> {
-  const { prompt, compiledPrompt, invokeInput } = await buildTurnRequestInput({
+  const { prompt, contextPacket, compiledPrompt, invokeInput } = await buildTurnRequestInput({
     text: input.text,
+    viewerId: input.viewerId,
+    viewerDisplayName: input.viewerDisplayName,
     selectedTarget: input.selectedTarget,
-    messages: input.messages,
+    selectedSessionId: input.selectedSessionId,
     runtimeMode: input.runtimeMode,
     routeOverride: input.routeOverride,
   });
@@ -46,6 +51,7 @@ export async function prepareLocalChatTurn(input: {
 
   return {
     prompt,
+    contextPacket,
     compiledPrompt,
     textTurn,
     routeSnapshot: input.routeSnapshot,

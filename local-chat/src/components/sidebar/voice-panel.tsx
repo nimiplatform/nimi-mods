@@ -139,8 +139,9 @@ export function VoicePanel(props: Props) {
         <span>{t('VoicePanel.title')}</span>
         <span className={`text-gray-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>{CHEVRON_ICON}</span>
       </button>
-      <div className={`grid overflow-hidden transition-all duration-200 ${open ? 'mt-3 grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
-        <div className={`min-h-0 ${open ? 'lc-panel-expand' : ''}`}>
+      {open ? (
+        <div className="mt-3">
+          <div className="min-h-0 lc-panel-expand">
           <p className="text-[11px] text-gray-600">
             {enableVoice ? t('VoicePanel.enabledNote') : t('VoicePanel.disabledNote')}
           </p>
@@ -334,14 +335,14 @@ export function VoicePanel(props: Props) {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    className="h-7 rounded-md border border-amber-300 bg-white px-2 text-[11px] font-medium text-amber-800"
+                    className="lc-btn lc-btn-warning h-7 px-2 text-[11px] font-medium"
                     onClick={() => setActiveTab('runtime')}
                   >
                     {t('VoicePanel.goRuntime')}
                   </button>
                   <button
                     type="button"
-                    className="h-7 rounded-md border border-amber-300 bg-white px-2 text-[11px] font-medium text-amber-800"
+                    className="lc-btn lc-btn-warning h-7 px-2 text-[11px] font-medium"
                     onClick={() => onTtsRouteSourceChange('token-api')}
                   >
                     {t('VoicePanel.useTokenApi')}
@@ -356,14 +357,14 @@ export function VoicePanel(props: Props) {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    className="h-7 rounded-md border border-amber-300 bg-white px-2 text-[11px] font-medium text-amber-800"
+                    className="lc-btn lc-btn-warning h-7 px-2 text-[11px] font-medium"
                     onClick={() => setActiveTab('runtime')}
                   >
                     {t('VoicePanel.goRuntime')}
                   </button>
                   <button
                     type="button"
-                    className="h-7 rounded-md border border-amber-300 bg-white px-2 text-[11px] font-medium text-amber-800"
+                    className="lc-btn lc-btn-warning h-7 px-2 text-[11px] font-medium"
                     onClick={() => onSttRouteSourceChange('token-api')}
                   >
                     {t('VoicePanel.useTokenApi')}
@@ -372,8 +373,9 @@ export function VoicePanel(props: Props) {
               </div>
             ) : null}
           </div>
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

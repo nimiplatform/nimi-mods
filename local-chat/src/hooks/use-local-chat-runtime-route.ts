@@ -150,6 +150,11 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
     loadSttRuntimeRouteOptions,
   ]);
 
+  const loadBootstrapRuntimeRouteOptions = useCallback(async () => {
+    const chat = await loadChatRuntimeRouteOptions();
+    return { chat };
+  }, [loadChatRuntimeRouteOptions]);
+
   const handleHealthCheck = useCallback(async () => {
     await runRouteHealthCheck({
       aiClient: input.aiClient,
@@ -285,67 +290,6 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
     void refreshRouteSnapshot();
   }, [refreshRouteSnapshot]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const loadWithRetry = async () => {
-      const retryDelayMs = [0, 200, 500, 1000];
-      for (const delayMs of retryDelayMs) {
-        if (cancelled) return;
-        if (delayMs > 0) {
-          await new Promise<void>((resolve) => {
-            setTimeout(() => resolve(), delayMs);
-          });
-          if (cancelled) return;
-        }
-        let loaded: RuntimeRouteOptionsSnapshot | null = null;
-        try {
-          const loadedSnapshot = await loadAllRuntimeRouteOptions();
-          loaded = (
-            loadedSnapshot.chat
-            || loadedSnapshot.image
-            || loadedSnapshot.video
-            || loadedSnapshot.tts
-            || loadedSnapshot.stt
-            || null
-          );
-        } catch {
-          loaded = null;
-        }
-        if (loaded) {
-          return;
-        }
-      }
-    };
-    void loadWithRetry();
-    return () => {
-      cancelled = true;
-    };
-  }, [loadAllRuntimeRouteOptions]);
-
-  useEffect(() => {
-    const connectorCount = Math.max(
-      chatRouteOptions?.connectors.length || 0,
-      imageRouteOptions?.connectors.length || 0,
-      videoRouteOptions?.connectors.length || 0,
-      ttsRouteOptions?.connectors.length || 0,
-      sttRouteOptions?.connectors.length || 0,
-    );
-    const pollIntervalMs = connectorCount > 0 ? 10_000 : 30_000;
-    const timer = setInterval(() => {
-      void loadAllRuntimeRouteOptions();
-    }, pollIntervalMs);
-    return () => {
-      clearInterval(timer);
-    };
-  }, [
-    chatRouteOptions?.connectors.length,
-    imageRouteOptions?.connectors.length,
-    videoRouteOptions?.connectors.length,
-    ttsRouteOptions?.connectors.length,
-    sttRouteOptions?.connectors.length,
-    loadAllRuntimeRouteOptions,
-  ]);
-
   return {
     healthStatus,
     checkingHealth,
@@ -369,6 +313,7 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
     loadTtsRuntimeRouteOptions,
     loadSttRuntimeRouteOptions,
     loadAllRuntimeRouteOptions,
+    loadBootstrapRuntimeRouteOptions,
     refreshRouteSnapshot,
     handleHealthCheck,
     handleRouteSourceChange,

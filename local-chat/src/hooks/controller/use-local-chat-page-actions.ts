@@ -6,6 +6,8 @@ import type { useLocalChatPageState } from './use-local-chat-page-state.js';
 import type { RuntimeStatusSidebarProps } from '../../components/sidebar/types.js';
 import { ReasonCode } from '@nimiplatform/sdk/types';
 import { resolveModelsForScenario } from '../../services/route/connector-model-capabilities.js';
+import { isMediaRouteReady } from '../turn-send/media-route.js';
+import { resolveRuntimeSidebarDependencyOverview } from '../../services/runtime/runtime-sidebar-overview.js';
 
 type LocalChatPageState = ReturnType<typeof useLocalChatPageState>;
 
@@ -86,6 +88,8 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
     () => {
       const resolvedDefaultSource = state.runtimeRouteState.chatRouteOptions?.resolvedDefault?.source;
       const dependencySnapshot = state.dependencySnapshot;
+      const imageDependencySnapshot = state.imageDependencySnapshot;
+      const videoDependencySnapshot = state.videoDependencySnapshot;
       const autoBoundSource: RuntimeStatusSidebarProps['autoBoundSource'] = (
         dependencySnapshot?.routeSource === 'local-runtime'
         || dependencySnapshot?.routeSource === 'token-api'
@@ -129,9 +133,35 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
 
       const isLocalSnapshotFailure = autoBoundSource === 'token-api'
         && dependencySnapshot?.reasonCode === ReasonCode.LOCAL_AI_DEPENDENCY_SNAPSHOT_FAILED;
+      const mediaPlannerEnabled = state.speechSettingsState.defaultSettings.mediaPlannerMode !== 'off';
+      const imageRouteReady = isMediaRouteReady({
+        kind: 'image',
+        settings: state.speechSettingsState.defaultSettings,
+        routeOptions: state.runtimeRouteState.imageRouteOptions,
+        resolvedRoute: state.imageResolvedRoute,
+        routeOptionsRevision: state.imageRouteOptionsRevision,
+      });
+      const videoRouteReady = isMediaRouteReady({
+        kind: 'video',
+        settings: state.speechSettingsState.defaultSettings,
+        routeOptions: state.runtimeRouteState.videoRouteOptions,
+        resolvedRoute: state.videoResolvedRoute,
+        routeOptionsRevision: state.videoRouteOptionsRevision,
+      });
+      const imageCapabilityMatched = imageRouteReady && imageDependencySnapshot?.status === 'ready';
+      const videoCapabilityMatched = videoRouteReady && videoDependencySnapshot?.status === 'ready';
+      const imageRouteResolved = state.speechSettingsState.defaultSettings.imageRouteSource !== 'auto'
+        || Boolean(state.imageResolvedRoute)
+        || imageRouteReady;
+      const videoRouteResolved = state.speechSettingsState.defaultSettings.videoRouteSource !== 'auto'
+        || Boolean(state.videoResolvedRoute)
+        || videoRouteReady;
+      const dependencyRows = dependencySnapshot?.dependencies || [];
+      const hasDependencyRowsForCapability = (capability: 'chat' | 'tts' | 'stt') => (
+        dependencyRows.some((item) => item.capability === capability)
+      );
 
       const capabilityMatchedFromSnapshot = (capability: 'chat' | 'tts' | 'stt'): boolean => {
-        const dependencyRows = dependencySnapshot?.dependencies || [];
         const rows = dependencyRows.filter((item) => item.capability === capability);
         if (rows.length === 0) {
           if (capability === 'chat') return chatCapabilityMatched;
@@ -158,70 +188,81 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
       };
 
       const isVoiceEnabled = Boolean(state.speechSettingsState.defaultSettings.enableVoice);
-      const dependencyCapabilities: RuntimeStatusSidebarProps['dependencyCapabilities'] = [
-        { capability: 'chat', matched: capabilityMatchedFromSnapshot('chat'), required: true },
-        {
-          capability: 'tts',
-          matched: capabilityMatchedFromSnapshot('tts'),
-          required: isVoiceEnabled,
-        },
-        {
-          capability: 'stt',
-          matched: capabilityMatchedFromSnapshot('stt'),
-          required: isVoiceEnabled,
-        },
-      ];
-      const dependencyRepairActions = (dependencySnapshot?.repairActions || []).filter((action) => {
-        if (isLocalSnapshotFailure) return false;
-        const capability = String(action.capability || '').trim().toLowerCase();
-        const dependencyId = String(action.dependencyId || '').trim().toLowerCase();
-        const actionId = String(action.actionId || '').trim().toLowerCase();
-        if (capability === 'chat') return true;
-        if (!isVoiceEnabled && (
-          capability === 'tts'
-          || capability === 'stt'
-          || dependencyId.includes('tts')
-          || dependencyId.includes('stt')
-          || actionId.includes('tts')
-          || actionId.includes('stt')
-          || actionId.includes('speech.')
-        )) {
-          return false;
-        }
-        return true;
+      const ttsCapabilityMatched = capabilityMatchedFromSnapshot('tts');
+      const sttCapabilityMatched = capabilityMatchedFromSnapshot('stt');
+      const dependencyRepairActions = Array.from(new Map(
+        [
+          ...(dependencySnapshot?.repairActions || []),
+          ...(imageDependencySnapshot?.repairActions || []),
+          ...(videoDependencySnapshot?.repairActions || []),
+        ].filter((action) => {
+          if (isLocalSnapshotFailure && String(action.capability || '').trim().toLowerCase() === 'chat') {
+            return false;
+          }
+          const capability = String(action.capability || '').trim().toLowerCase();
+          const dependencyId = String(action.dependencyId || '').trim().toLowerCase();
+          const actionId = String(action.actionId || '').trim().toLowerCase();
+          if (capability === 'chat') return true;
+          if (!isVoiceEnabled && (
+            capability === 'tts'
+            || capability === 'stt'
+            || dependencyId.includes('tts')
+            || dependencyId.includes('stt')
+            || actionId.includes('tts')
+            || actionId.includes('stt')
+            || actionId.includes('speech.')
+          )) {
+            return false;
+          }
+          if (!mediaPlannerEnabled && (
+            capability === 'image'
+            || capability === 'video'
+            || dependencyId.includes('image')
+            || dependencyId.includes('video')
+            || actionId.includes('image')
+            || actionId.includes('video')
+          )) {
+            return false;
+          }
+          return true;
+        }).map((action) => [
+          `${action.actionId}:${String(action.capability || '')}:${String(action.dependencyId || '')}`,
+          action,
+        ]),
+      ).values());
+      const dependencyOverview = resolveRuntimeSidebarDependencyOverview({
+        isVoiceEnabled,
+        mediaPlannerEnabled,
+        isLocalSnapshotFailure,
+        dependencySnapshotStatus: dependencySnapshot?.status,
+        dependencySnapshotReasonCode: dependencySnapshot?.reasonCode,
+        dependencySnapshotUpdatedAt: dependencySnapshot?.updatedAt,
+        imageDependencyStatus: imageDependencySnapshot?.status,
+        imageDependencyReasonCode: imageDependencySnapshot?.reasonCode,
+        imageDependencyUpdatedAt: imageDependencySnapshot?.updatedAt,
+        videoDependencyStatus: videoDependencySnapshot?.status,
+        videoDependencyReasonCode: videoDependencySnapshot?.reasonCode,
+        videoDependencyUpdatedAt: videoDependencySnapshot?.updatedAt,
+        dependencyRepairActionCount: dependencyRepairActions.length,
+        chatCapabilityMatched,
+        chatCapabilityResolved: Boolean(dependencySnapshot) || chatCapabilityMatched,
+        ttsCapabilityMatched,
+        ttsCapabilityResolved: !isVoiceEnabled || hasDependencyRowsForCapability('tts') || Boolean(state.runtimeRouteState.ttsRouteOptions),
+        sttCapabilityMatched,
+        sttCapabilityResolved: !isVoiceEnabled || hasDependencyRowsForCapability('stt') || Boolean(state.runtimeRouteState.sttRouteOptions),
+        imageCapabilityMatched,
+        imageCapabilityResolved: !mediaPlannerEnabled || (
+          !state.mediaRouteProbeLoadingByCapability.image
+          && imageRouteResolved
+          && Boolean(imageDependencySnapshot)
+        ),
+        videoCapabilityMatched,
+        videoCapabilityResolved: !mediaPlannerEnabled || (
+          !state.mediaRouteProbeLoadingByCapability.video
+          && videoRouteResolved
+          && Boolean(videoDependencySnapshot)
+        ),
       });
-      const dependencyStatus: RuntimeStatusSidebarProps['dependencyStatus'] = (() => {
-        if (isLocalSnapshotFailure) {
-          if (!chatCapabilityMatched || dependencyCapabilities.some((item) => item.required && !item.matched)) {
-            return 'missing';
-          }
-          return dependencyRepairActions.length > 0 ? 'degraded' : 'ready';
-        }
-        const snapshotStatus = dependencySnapshot?.status || 'unknown';
-        if (snapshotStatus === 'unknown') return 'unknown';
-        if (!chatCapabilityMatched || dependencyCapabilities.some((item) => item.required && !item.matched)) {
-          return 'missing';
-        }
-        if (!isVoiceEnabled) {
-          return dependencyRepairActions.length > 0 ? 'degraded' : 'ready';
-        }
-        return snapshotStatus;
-      })();
-      const dependencyReasonCode = (() => {
-        const raw = String(dependencySnapshot?.reasonCode || '').trim();
-        if (!raw || dependencyStatus === 'ready') return undefined;
-        if (!isVoiceEnabled) {
-          const normalized = raw.toLowerCase();
-          if (
-            normalized.includes('tts')
-            || normalized.includes('stt')
-            || normalized.includes('speech')
-          ) {
-            return undefined;
-          }
-        }
-        return raw;
-      })();
 
       return {
         healthStatus: state.runtimeRouteState.healthStatus,
@@ -229,6 +270,8 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         chatRouteOptions: state.runtimeRouteState.chatRouteOptions,
         imageRouteOptions: state.runtimeRouteState.imageRouteOptions,
         videoRouteOptions: state.runtimeRouteState.videoRouteOptions,
+        imageResolvedRoute: state.imageResolvedRoute,
+        videoResolvedRoute: state.videoResolvedRoute,
         routeOverride: state.runtimeRouteState.routeOverride,
         speechProviders: state.speechSettingsState.speechProviders,
         speechVoices: state.speechSettingsState.speechVoices,
@@ -243,10 +286,13 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         autoBoundSource,
         autoBoundModel: state.runtimeRouteState.chatRouteOptions?.resolvedDefault?.model || '',
         chatCapabilityMatched,
-        dependencyCapabilities,
-        dependencyStatus,
-        dependencyReasonCode,
-        dependencyUpdatedAt: dependencySnapshot?.updatedAt,
+        dependencyCapabilities: dependencyOverview.dependencyCapabilities,
+        dependencyStatus: dependencyOverview.dependencyStatus,
+        dependencyReasonCode: dependencyOverview.dependencyReasonCode,
+        dependencyUpdatedAt: dependencyOverview.dependencyUpdatedAt,
+        isMediaRuntimeSidebarLoading: state.isMediaRuntimeSidebarLoading,
+        isImageRouteProbeLoading: state.mediaRouteProbeLoadingByCapability.image,
+        isVideoRouteProbeLoading: state.mediaRouteProbeLoadingByCapability.video,
         dependencyRepairActions,
         latestPromptTrace: state.latestPromptTrace,
         latestTurnAudit: state.latestTurnAudit,
@@ -331,6 +377,15 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         defaultSettings: state.speechSettingsState.defaultSettings,
         onDefaultSettingChange: handleDefaultSettingChange,
         onDefaultVoiceNameChange: handleDefaultVoiceNameChange,
+        onMediaPlannerModeChange: state.speechSettingsState.handleMediaPlannerModeChange,
+        onVideoAutoPolicyChange: state.speechSettingsState.handleVideoAutoPolicyChange,
+        onRefreshMediaDependencies: () => {
+          void state.refreshMediaRuntimeSidebarData();
+        },
+        onSidebarBootstrap: state.bootstrapRuntimeSidebar,
+        onOpenChatPanel: state.loadChatRuntimeSidebarData,
+        onOpenVoicePanel: state.loadVoiceRuntimeSidebarData,
+        onOpenMediaPanel: state.loadMediaRuntimeSidebarData,
         onOpenRuntimeSetup: () => {
           state.setActiveTab('runtime');
         },
@@ -345,10 +400,25 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
       state.latestPromptTrace,
       state.latestTurnAudit,
       state.dependencySnapshot,
+      state.imageDependencySnapshot,
+      state.videoDependencySnapshot,
+      state.imageResolvedRoute,
+      state.videoResolvedRoute,
+      state.imageRouteOptionsRevision,
+      state.videoRouteOptionsRevision,
+      state.mediaRouteProbeLoadingByCapability,
+      state.bootstrapRuntimeSidebar,
+      state.loadChatRuntimeSidebarData,
+      state.loadVoiceRuntimeSidebarData,
+      state.loadMediaRuntimeSidebarData,
+      state.refreshMediaRuntimeSidebarData,
       handleSpeechProviderChange,
       handleVoiceIdChange,
       handleDefaultSettingChange,
       handleDefaultVoiceNameChange,
+      state.refreshMediaDependencies,
+      state.speechSettingsState.handleMediaPlannerModeChange,
+      state.speechSettingsState.handleVideoAutoPolicyChange,
     ],
   );
 

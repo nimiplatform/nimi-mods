@@ -1,4 +1,4 @@
-import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
+import type { AiRuntimeDependencySnapshot, ModAiClient } from '@nimiplatform/sdk/mod/ai';
 import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
 import type { Dispatch, SetStateAction } from 'react';
 import type { LocalChatTarget } from '../../data/index.js';
@@ -8,7 +8,7 @@ import type {
   LocalChatSession,
   LocalChatTurnAudit,
 } from '../../state/index.js';
-import type { ChatMessage } from '../../types.js';
+import type { ChatMessage, LocalChatResolvedMediaRoute } from '../../types.js';
 
 export type ChatRouteSnapshot = {
   source: string;
@@ -38,12 +38,20 @@ export type LocalChatTurnAiClient = Pick<
 
 export type UseLocalChatTurnSendInput = {
   aiClient: LocalChatTurnAiClient;
+  viewerId: string;
+  viewerDisplayName: string;
   inputText: string;
   setInputText: (value: string) => void;
   runtimeMode: 'STORY' | 'SCENE_TURN' | undefined;
   chatRouteOptions: RuntimeRouteOptionsSnapshot | null;
+  imageRouteOptions: RuntimeRouteOptionsSnapshot | null;
+  videoRouteOptions: RuntimeRouteOptionsSnapshot | null;
+  imageRouteOptionsRevision: number;
+  videoRouteOptionsRevision: number;
   routeOverride: RuntimeRouteBinding | null;
   routeSnapshot: ChatRouteSnapshot | null;
+  imageResolvedRoute: LocalChatResolvedMediaRoute | null;
+  videoResolvedRoute: LocalChatResolvedMediaRoute | null;
   defaultSettings: LocalChatDefaultSettings;
   selectedTarget: LocalChatTarget | null;
   selectedSessionId: string;
@@ -53,6 +61,8 @@ export type UseLocalChatTurnSendInput = {
   setSelectedSessionId: (sessionId: string) => void;
   setLatestPromptTrace: (trace: LocalChatPromptTrace | null) => void;
   setLatestTurnAudit: (audit: LocalChatTurnAudit | null) => void;
+  imageDependencySnapshot: AiRuntimeDependencySnapshot | null;
+  videoDependencySnapshot: AiRuntimeDependencySnapshot | null;
   setStatusBanner: (input: {
     kind: 'warn' | 'error' | 'success' | 'info';
     message: string;

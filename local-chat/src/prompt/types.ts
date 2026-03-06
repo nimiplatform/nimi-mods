@@ -1,18 +1,16 @@
-import type { LocalChatHistoryMessage, LocalChatTarget } from '../data/types.js';
+import type { LocalChatContextLaneId, LocalChatContextPacket } from '../state/ledger-types.js';
 
 export type PromptLayerId =
   | 'platformSafety'
-  | 'conversationSummary'
-  | 'worldHardRules'
-  | 'identityRules'
-  | 'identityBase'
-  | 'userNarrativeDirectives'
-  | 'worldLoreKeyword'
-  | 'agentLorebook'
-  | 'coreMemory'
-  | 'e2eMemory'
-  | 'recentMessages'
-  | 'postHistoryInstructions';
+  | 'identity'
+  | 'world'
+  | 'platformWarmStart'
+  | 'durableMemory'
+  | 'runningSummary'
+  | 'sessionRecall'
+  | 'recentBundles'
+  | 'userInput'
+  | 'replyStyle';
 
 export type PromptLayerTrace = {
   layer: PromptLayerId;
@@ -29,27 +27,24 @@ export type PromptBudgetTrace = {
 };
 
 export type PromptRetrievalTrace = {
-  recallSource: 'local-index-only' | 'local-index+remote-backfill' | 'remote-only';
-  coreCount: number;
-  e2eCount: number;
-  worldLoreCount: number;
-  agentLoreCount: number;
+  durableMemoryCount: number;
+  sessionRecallCount: number;
+  worldContextCount: number;
+  recentBundleCount: number;
 };
 
 export type LocalChatCompiledPrompt = {
   prompt: string;
   layerOrder: PromptLayerId[];
   layers: PromptLayerTrace[];
+  laneChars: Partial<Record<LocalChatContextLaneId, number>>;
+  truncationByLane: Partial<Record<LocalChatContextLaneId, boolean>>;
   budget: PromptBudgetTrace;
   retrieval: PromptRetrievalTrace;
-  compilerVersion: 'v1' | 'v2' | 'v3';
+  compilerVersion: 'v4';
 };
 
 export type LocalChatPromptCompileInput = {
-  target: LocalChatTarget;
-  history: LocalChatHistoryMessage[];
-  userInput: string;
+  contextPacket: LocalChatContextPacket;
   maxPromptChars?: number;
-  maxHistoryChars?: number;
-  maxJsonChars?: number;
 };

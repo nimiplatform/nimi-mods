@@ -2,13 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRendererFlowId, logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import {
   LOCAL_CHAT_DATA_API_CHAT_TARGET_DETAIL,
-  LOCAL_CHAT_DATA_API_CHAT_TARGETS_LIST,
 } from '../contracts.js';
-import type { LocalChatTarget } from '../data/index.js';
-import { toTargets } from '../services/view/targets.js';
+import {
+  CORE_DATA_API_FRIENDS_WITH_DETAILS_LIST,
+  deriveLocalChatTargetsFromFriendsPayload,
+  type LocalChatTarget,
+} from '../data/index.js';
 import {
   getLocalChatSessionUpdatedEventName,
-  listLocalChatSessions,
+  listLocalChatTargetPreviews,
 } from '../state/index.js';
 
 type UseLocalChatTargetsInput = {
@@ -17,6 +19,7 @@ type UseLocalChatTargetsInput = {
       query: (input: { capability: string; query: Record<string, unknown> }) => Promise<unknown>;
     };
   };
+  viewerId: string;
   runtimeAgentId: string;
   setStatusBanner: (input: { kind: 'warn' | 'error' | 'success' | 'info'; message: string }) => void;
 };
@@ -36,19 +39,17 @@ function normalizePreviewText(value: unknown): string | null {
   return `${normalized.slice(0, LOCAL_PREVIEW_MAX_LENGTH - 1)}…`;
 }
 
-function buildTargetsWithLocalPreview(source: LocalChatTarget[]): LocalChatTarget[] {
+async function buildTargetsWithLocalPreview(source: LocalChatTarget[], viewerId: string): Promise<LocalChatTarget[]> {
+  const previews = await listLocalChatTargetPreviews(viewerId);
+  const previewsByTargetId = new Map(
+    previews.map((preview) => [preview.targetId, preview]),
+  );
   const enriched = source.map((target) => {
-    const sessions = listLocalChatSessions(target.id);
-    const latestSession = sessions[0] || null;
-    const latestTurn = latestSession?.turns?.[latestSession.turns.length - 1] || null;
-    const latestLocalMessage = normalizePreviewText(latestTurn?.content);
-    const latestLocalMessageAt = latestTurn
-      ? String(latestTurn.timestamp || '')
-      : String(latestSession?.updatedAt || '').trim();
+    const preview = previewsByTargetId.get(target.id);
     return {
       ...target,
-      latestLocalMessage,
-      latestLocalMessageAt: latestLocalMessageAt || null,
+      latestLocalMessage: normalizePreviewText(preview?.latestLocalMessage),
+      latestLocalMessageAt: String(preview?.latestLocalMessageAt || '').trim() || null,
     };
   });
 
@@ -70,6 +71,26 @@ export function useLocalChatTargets(input: UseLocalChatTargetsInput) {
   const [loadingTargetDetail, setLoadingTargetDetail] = useState(false);
   const loadTargetsInFlightRef = useRef<Promise<void> | null>(null);
   const autoLoadStartedRef = useRef(false);
+  const previewRefreshTokenRef = useRef(0);
+  const previewRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(false);
+  const targetsRef = useRef<LocalChatTarget[]>([]);
+  const lastRenderStateKeyRef = useRef('');
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (previewRefreshTimerRef.current) {
+        clearTimeout(previewRefreshTimerRef.current);
+        previewRefreshTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    targetsRef.current = targets;
+  }, [targets]);
 
   const selectedTargetBase = useMemo(
     () => targets.find((target) => target.id === selectedTargetId) || null,
@@ -102,6 +123,76 @@ export function useLocalChatTargets(input: UseLocalChatTargetsInput) {
     });
   }, [targetSearchText, targets]);
 
+  useEffect(() => {
+    const nextKey = [
+      targets.length,
+      visibleTargets.length,
+      loadingTargets ? '1' : '0',
+      selectedTargetId,
+      targetSearchText,
+    ].join('|');
+    if (nextKey === lastRenderStateKeyRef.current) {
+      return;
+    }
+    lastRenderStateKeyRef.current = nextKey;
+    logRendererEvent({
+      level: 'info',
+      area: 'local-chat',
+      message: 'local-chat:targets-render-state',
+      details: {
+        targetsCount: targets.length,
+        visibleTargetsCount: visibleTargets.length,
+        loadingTargets,
+        selectedTargetId: selectedTargetId || null,
+        targetSearchText,
+      },
+    });
+  }, [loadingTargets, selectedTargetId, targetSearchText, targets.length, visibleTargets.length]);
+
+  const syncTargetsWithLocalPreview = useCallback(async (sourceTargets: LocalChatTarget[], flowId: string) => {
+    const previewRefreshToken = previewRefreshTokenRef.current + 1;
+    previewRefreshTokenRef.current = previewRefreshToken;
+    try {
+      const nextTargets = await buildTargetsWithLocalPreview(sourceTargets, input.viewerId);
+      if (!mountedRef.current || previewRefreshTokenRef.current !== previewRefreshToken) {
+        return;
+      }
+      targetsRef.current = nextTargets;
+      setTargets(nextTargets);
+      logRendererEvent({
+        level: 'info',
+        area: 'local-chat',
+        message: 'local-chat:targets-preview-sync:done',
+        flowId,
+        details: { count: nextTargets.length },
+      });
+    } catch (error) {
+      if (!mountedRef.current || previewRefreshTokenRef.current !== previewRefreshToken) {
+        return;
+      }
+      logRendererEvent({
+        level: 'warn',
+        area: 'local-chat',
+        message: 'local-chat:targets-preview-sync:failed',
+        flowId,
+        details: { error: error instanceof Error ? error.message : String(error || '') },
+      });
+    }
+  }, [input.viewerId]);
+
+  const schedulePreviewSync = useCallback((sourceTargets: LocalChatTarget[], flowId: string, delayMs = 0) => {
+    if (previewRefreshTimerRef.current) {
+      clearTimeout(previewRefreshTimerRef.current);
+    }
+    previewRefreshTimerRef.current = setTimeout(() => {
+      previewRefreshTimerRef.current = null;
+      if (!mountedRef.current || sourceTargets.length === 0) {
+        return;
+      }
+      void syncTargetsWithLocalPreview(sourceTargets, flowId);
+    }, delayMs);
+  }, [syncTargetsWithLocalPreview]);
+
   const loadTargets = useCallback(async () => {
     if (loadTargetsInFlightRef.current) {
       return loadTargetsInFlightRef.current;
@@ -111,14 +202,18 @@ export function useLocalChatTargets(input: UseLocalChatTargetsInput) {
     const task = (async () => {
       try {
         const result = await input.hookClient.data.query({
-          capability: LOCAL_CHAT_DATA_API_CHAT_TARGETS_LIST,
+          capability: CORE_DATA_API_FRIENDS_WITH_DETAILS_LIST,
           query: {},
         });
-        const nextTargets = buildTargetsWithLocalPreview(toTargets(result));
-        setTargets(nextTargets);
+        const baseTargets = deriveLocalChatTargetsFromFriendsPayload(result);
+        if (!mountedRef.current) {
+          return;
+        }
+        targetsRef.current = baseTargets;
+        setTargets(baseTargets);
         setTargetDetailsById((previous) => {
           const next = { ...previous };
-          const allowed = new Set(nextTargets.map((item) => item.id));
+          const allowed = new Set(baseTargets.map((item) => item.id));
           Object.keys(next).forEach((id) => {
             if (!allowed.has(id)) {
               delete next[id];
@@ -127,13 +222,13 @@ export function useLocalChatTargets(input: UseLocalChatTargetsInput) {
           return next;
         });
         setSelectedTargetId((previous) => {
-          if (previous && nextTargets.some((item) => item.id === previous)) {
+          if (previous && baseTargets.some((item) => item.id === previous)) {
             return previous;
           }
-          if (nextTargets.length === 0) {
+          if (baseTargets.length === 0) {
             return '';
           }
-          const preferred = nextTargets.find((item) => item.id === input.runtimeAgentId) || nextTargets[0];
+          const preferred = baseTargets.find((item) => item.id === input.runtimeAgentId) || baseTargets[0];
           return preferred?.id || '';
         });
         logRendererEvent({
@@ -141,8 +236,12 @@ export function useLocalChatTargets(input: UseLocalChatTargetsInput) {
           area: 'local-chat',
           message: 'local-chat:targets-sync:done',
           flowId,
-          details: { count: nextTargets.length },
+          details: {
+            count: baseTargets.length,
+            previewMode: 'deferred',
+          },
         });
+        schedulePreviewSync(baseTargets, flowId);
       } catch (error) {
         logRendererEvent({
           level: 'error',
@@ -156,13 +255,15 @@ export function useLocalChatTargets(input: UseLocalChatTargetsInput) {
           message: error instanceof Error ? error.message : String(error || ''),
         });
       } finally {
-        setLoadingTargets(false);
+        if (mountedRef.current) {
+          setLoadingTargets(false);
+        }
         loadTargetsInFlightRef.current = null;
       }
     })();
     loadTargetsInFlightRef.current = task;
     return task;
-  }, [input.hookClient.data, input.runtimeAgentId, input.setStatusBanner]);
+  }, [input.hookClient.data, input.runtimeAgentId, input.setStatusBanner, schedulePreviewSync]);
 
   useEffect(() => {
     if (autoLoadStartedRef.current) return;
@@ -176,13 +277,21 @@ export function useLocalChatTargets(input: UseLocalChatTargetsInput) {
     }
     const eventName = getLocalChatSessionUpdatedEventName();
     const onSessionUpdated = () => {
-      setTargets((previous) => buildTargetsWithLocalPreview(previous));
+      const currentTargets = targetsRef.current;
+      if (currentTargets.length === 0 || !mountedRef.current) {
+        return;
+      }
+      schedulePreviewSync(currentTargets, createRendererFlowId('local-chat-targets-preview'), 80);
     };
     window.addEventListener(eventName, onSessionUpdated);
     return () => {
+      if (previewRefreshTimerRef.current) {
+        clearTimeout(previewRefreshTimerRef.current);
+        previewRefreshTimerRef.current = null;
+      }
       window.removeEventListener(eventName, onSessionUpdated);
     };
-  }, []);
+  }, [schedulePreviewSync]);
 
   useEffect(() => {
     if (!selectedTargetBase || selectedTargetHasDetail) return;

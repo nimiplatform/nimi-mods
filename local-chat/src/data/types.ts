@@ -1,3 +1,5 @@
+import type { LocalChatContextPacket } from '../state/ledger-types.js';
+
 export type FetchImpl = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
 export type WorldResolutionSource = 'profile' | 'unresolved';
@@ -18,6 +20,7 @@ export type LocalChatReadContext = {
   realmBaseUrl: string;
   accessToken?: string;
   fetchImpl?: FetchImpl | null;
+  viewerId?: string | null;
 };
 
 export type LocalChatTarget = {
@@ -39,16 +42,7 @@ export type LocalChatTarget = {
   latestLocalMessageAt?: string | null;
 };
 
-export type LocalChatHistoryMessage = {
-  role: 'user' | 'assistant';
-  content: string;
-};
-
 export type LocalChatPromptInput = {
-  target: LocalChatTarget;
-  history: LocalChatHistoryMessage[];
-  userInput: string;
+  contextPacket: LocalChatContextPacket;
   maxPromptChars?: number;
-  maxHistoryChars?: number;
-  maxJsonChars?: number;
 };

@@ -1,6 +1,6 @@
 import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
 import type { LocalChatReadContext, LocalChatTarget } from '../data/index.js';
-import type { LocalChatSession } from '../state/index.js';
+import type { LocalChatContextPacket, LocalChatSession } from '../state/index.js';
 
 export type LocalChatWakeStrategy = 'PASSIVE' | 'PROACTIVE' | null;
 
@@ -37,7 +37,7 @@ export type LocalChatProactiveDecisionObject = {
 export type LocalChatProactiveDecisionInput = {
   aiClient: Pick<ModAiClient, 'generateObject'>;
   target: LocalChatTarget;
-  historySummary: string;
+  contextPacket: LocalChatContextPacket;
 };
 
 export type LocalChatProactiveAuditEvent = {

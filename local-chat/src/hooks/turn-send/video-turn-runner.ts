@@ -1,5 +1,6 @@
 import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
 import type { LocalChatDefaultSettings } from '../../state/index.js';
+import type { LocalChatResolvedMediaRoute } from '../../types.js';
 import {
   isMediaGenerationAllowed,
   isPromptLikelyNsfw,
@@ -91,6 +92,8 @@ export async function runVideoTurn(input: {
   defaultSettings: LocalChatDefaultSettings;
   nsfwPolicy: NsfwMediaPolicy;
   fallbackRouteSource?: 'local-runtime' | 'token-api';
+  resolvedRoute?: LocalChatResolvedMediaRoute | null;
+  durationSeconds?: number;
 }): Promise<VideoTurnRunnerResult> {
   const normalizedPrompt = String(input.prompt || '').trim();
   if (!normalizedPrompt) {
@@ -122,10 +125,10 @@ export async function runVideoTurn(input: {
     };
   }
   const promptLikelyNsfw = isPromptLikelyNsfw(normalizedPrompt);
-  let resolvedRouteSource: 'local-runtime' | 'token-api' = intendedRouteSource;
+  let resolvedRouteSource: 'local-runtime' | 'token-api' = input.resolvedRoute?.source || intendedRouteSource;
 
   try {
-    const resolvedRoute = await input.aiClient.resolveRoute({
+    const resolvedRoute = input.resolvedRoute || await input.aiClient.resolveRoute({
       routeHint: 'video/default',
       routeOverride: routeConfig.routeOverride,
     });
@@ -153,6 +156,9 @@ export async function runVideoTurn(input: {
       routeOverride: pinnedRouteOverride,
       model: pinnedRouteOverride.model || routeConfig.model,
       prompt: normalizedPrompt,
+      ...(Number.isFinite(input.durationSeconds) && Number(input.durationSeconds) > 0
+        ? { durationSeconds: Math.max(1, Math.floor(Number(input.durationSeconds))) }
+        : {}),
     });
     const finalRouteSource = generated.route.source === 'token-api' ? 'token-api' : 'local-runtime';
     const artifact = generated.videos.find((item) => String(item.uri || '').trim());

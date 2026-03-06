@@ -10,6 +10,7 @@ import {
   type LocalChatReadContext,
 } from '../data/index.js';
 import { createLocalChatFlowId, emitLocalChatLog } from '../logging.js';
+import { decodeJwtSubject } from '../utils/jwt.js';
 import { registerLocalChatSessionCapabilities } from './sessions.js';
 
 type FetchImpl = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -23,6 +24,7 @@ function toReadContext(input: {
     realmBaseUrl: String(input.realmBaseUrl || ''),
     accessToken: input.accessToken || undefined,
     fetchImpl: input.fetchImpl || undefined,
+    viewerId: decodeJwtSubject(input.accessToken),
   };
 }
 

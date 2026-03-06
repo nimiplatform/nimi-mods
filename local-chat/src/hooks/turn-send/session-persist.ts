@@ -1,7 +1,9 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { ChatMessage, ChatMessageKind } from '../../types.js';
 import {
+  appendSegmentToLocalChatBundle,
   appendTurnsToSession,
+  createLocalChatTurnBundle,
   listLocalChatSessions,
   type LocalChatPromptTrace,
   type LocalChatSession,
@@ -11,10 +13,12 @@ import { createSessionTurn } from '../../services/view/messages.js';
 import type { LocalChatScheduleCancelReason } from './types.js';
 
 const MAX_SEGMENT_DELAY_MS = 8_000;
+
 type PersistedAssistantMessageKind = Exclude<ChatMessageKind, 'streaming' | 'image-pending' | 'video-pending'>;
 
 export type TurnDeliveryScheduleHandle = {
   turnTxnId: string;
+  assistantBundleId: string;
   done: Promise<void>;
   cancel: (reason: LocalChatScheduleCancelReason) => void;
 };
@@ -41,9 +45,54 @@ function waitForDelivery(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
-export function persistSuccessfulTurn(input: {
+async function refreshSessions(input: {
+  targetId: string;
+  viewerId: string;
+  setSessions: (sessions: LocalChatSession[]) => void;
+}): Promise<void> {
+  input.setSessions(await listLocalChatSessions(input.targetId, input.viewerId));
+}
+
+function buildSegmentContextText(message: ChatMessage): string {
+  if (message.kind === 'image' || message.kind === 'video') {
+    const shadowText = String(message.meta?.mediaShadow?.shadowText || '').trim();
+    const mediaPrompt = String(message.meta?.mediaPrompt || '').trim();
+    const status = String(message.meta?.mediaStatus || '').trim();
+    const statusLabel = status ? `${status} ` : '';
+    if (shadowText) {
+      return shadowText;
+    }
+    if (mediaPrompt) {
+      return `${statusLabel}${message.kind}: ${mediaPrompt}`.trim();
+    }
+    if (message.content.trim()) {
+      return `${statusLabel}${message.kind}: ${message.content}`.trim();
+    }
+    return `${statusLabel}${message.kind}`.trim();
+  }
+  return String(message.content || '');
+}
+
+function buildSegmentSemanticSummary(message: ChatMessage): string | null {
+  if (message.kind !== 'image' && message.kind !== 'video') {
+    return null;
+  }
+  const shadowText = String(message.meta?.mediaShadow?.shadowText || '').trim();
+  if (shadowText) return shadowText;
+  const mediaPrompt = String(message.meta?.mediaPrompt || '').trim();
+  if (mediaPrompt) return mediaPrompt;
+  const content = String(message.content || '').trim();
+  return content || null;
+}
+
+function toPersistedKind(kind: ChatMessageKind): PersistedAssistantMessageKind {
+  return kind === 'voice' || kind === 'image' || kind === 'video' ? kind : 'text';
+}
+
+export async function persistSuccessfulTurn(input: {
   sessionId: string;
   targetId: string;
+  viewerId: string;
   turnTxnId: string;
   userMessage: ChatMessage;
   assistantDeliveries: Array<{
@@ -66,9 +115,19 @@ export function persistSuccessfulTurn(input: {
     deliveredCount: number;
     pendingCount: number;
   }) => void;
-}): TurnDeliveryScheduleHandle {
-  appendTurnsToSession(input.sessionId, [createSessionTurn({ message: input.userMessage })]);
-  input.setSessions(listLocalChatSessions(input.targetId));
+}): Promise<TurnDeliveryScheduleHandle> {
+  await appendTurnsToSession(input.sessionId, [createSessionTurn({ message: input.userMessage })]);
+  await refreshSessions({
+    targetId: input.targetId,
+    viewerId: input.viewerId,
+    setSessions: input.setSessions,
+  });
+
+  const assistantBundle = await createLocalChatTurnBundle({
+    conversationId: input.sessionId,
+    role: 'assistant',
+    turnTxnId: input.turnTxnId,
+  });
 
   const abortController = new AbortController();
   let cancelReason: LocalChatScheduleCancelReason | null = null;
@@ -119,14 +178,30 @@ export function persistSuccessfulTurn(input: {
         }
         return [...prev, message];
       });
-      appendTurnsToSession(input.sessionId, [
-        createSessionTurn({
-          message,
-          promptTrace: index === 0 ? input.promptTrace : null,
-          audit: index === 0 ? input.turnAudit : null,
-        }),
-      ]);
-      input.setSessions(listLocalChatSessions(input.targetId));
+      await appendSegmentToLocalChatBundle({
+        conversationId: input.sessionId,
+        bundleId: assistantBundle.id,
+        role: 'assistant',
+        kind: delivery.kind,
+        content: message.content,
+        contextText: buildSegmentContextText(message),
+        semanticSummary: buildSegmentSemanticSummary(message),
+        mediaSpec: message.meta?.mediaSpec,
+        mediaShadow: message.meta?.mediaShadow,
+        media: message.media,
+        timestamp: message.timestamp.toISOString(),
+        latencyMs: message.latencyMs,
+        meta: message.meta,
+        promptTrace: index === 0 ? input.promptTrace : null,
+        audit: index === 0 ? input.turnAudit : null,
+        deliveryStatus: 'ready',
+        segmentId: message.id,
+      });
+      await refreshSessions({
+        targetId: input.targetId,
+        viewerId: input.viewerId,
+        setSessions: input.setSessions,
+      });
       deliveredCount += 1;
     }
 
@@ -141,14 +216,16 @@ export function persistSuccessfulTurn(input: {
 
   return {
     turnTxnId: input.turnTxnId,
+    assistantBundleId: assistantBundle.id,
     done,
     cancel,
   };
 }
 
-export function persistFailedTurn(input: {
+export async function persistFailedTurn(input: {
   sessionId: string;
   targetId: string;
+  viewerId: string;
   userMessage: ChatMessage;
   errorMessage: ChatMessage;
   turnAudit: LocalChatTurnAudit;
@@ -156,17 +233,23 @@ export function persistFailedTurn(input: {
   setSessions: (sessions: LocalChatSession[]) => void;
 }) {
   input.setMessages((prev) => [...prev, input.errorMessage]);
-  appendTurnsToSession(input.sessionId, [
+  await appendTurnsToSession(input.sessionId, [
     createSessionTurn({ message: input.userMessage }),
     createSessionTurn({ message: input.errorMessage, audit: input.turnAudit }),
   ]);
-  input.setSessions(listLocalChatSessions(input.targetId));
+  await refreshSessions({
+    targetId: input.targetId,
+    viewerId: input.viewerId,
+    setSessions: input.setSessions,
+  });
 }
 
-export function replacePendingAssistantMessage(input: {
+export async function commitAssistantMessage(input: {
   sessionId: string;
   targetId: string;
-  pendingMessageId: string;
+  viewerId: string;
+  assistantBundleId: string;
+  messageId: string;
   message: ChatMessage;
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   setSessions: (sessions: LocalChatSession[]) => void;
@@ -180,7 +263,7 @@ export function replacePendingAssistantMessage(input: {
   input.setMessages((prev) => {
     let replaced = false;
     const next = prev.map((item) => {
-      if (item.id !== input.pendingMessageId) {
+      if (item.id !== input.messageId) {
         return item;
       }
       replaced = true;
@@ -188,12 +271,32 @@ export function replacePendingAssistantMessage(input: {
     });
     return replaced ? next : [...prev, input.message];
   });
-  appendTurnsToSession(input.sessionId, [
-    createSessionTurn({
-      message: input.message,
-      promptTrace: input.promptTrace || null,
-      audit: input.turnAudit || null,
-    }),
-  ]);
-  input.setSessions(listLocalChatSessions(input.targetId));
+  await appendSegmentToLocalChatBundle({
+    conversationId: input.sessionId,
+    bundleId: input.assistantBundleId,
+    role: 'assistant',
+    kind: toPersistedKind(input.message.kind),
+    content: input.message.content,
+    contextText: buildSegmentContextText(input.message),
+    semanticSummary: buildSegmentSemanticSummary(input.message),
+    mediaSpec: input.message.meta?.mediaSpec,
+    mediaShadow: input.message.meta?.mediaShadow,
+    media: input.message.media,
+    timestamp: input.message.timestamp.toISOString(),
+    latencyMs: input.message.latencyMs,
+    meta: input.message.meta,
+    promptTrace: input.promptTrace || null,
+    audit: input.turnAudit || null,
+    deliveryStatus: input.message.meta?.mediaStatus === 'failed'
+      ? 'failed'
+      : input.message.meta?.mediaStatus === 'blocked'
+        ? 'blocked'
+        : 'ready',
+    segmentId: input.message.id,
+  });
+  await refreshSessions({
+    targetId: input.targetId,
+    viewerId: input.viewerId,
+    setSessions: input.setSessions,
+  });
 }

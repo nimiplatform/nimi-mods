@@ -1,5 +1,6 @@
 import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
 import type { LocalChatDefaultSettings } from '../../state/index.js';
+import type { LocalChatResolvedMediaRoute } from '../../types.js';
 import {
   isMediaGenerationAllowed,
   isPromptLikelyNsfw,
@@ -91,6 +92,9 @@ export async function runImageTurn(input: {
   defaultSettings: LocalChatDefaultSettings;
   nsfwPolicy: NsfwMediaPolicy;
   fallbackRouteSource?: 'local-runtime' | 'token-api';
+  resolvedRoute?: LocalChatResolvedMediaRoute | null;
+  size?: string;
+  count?: number;
 }): Promise<ImageTurnRunnerResult> {
   const normalizedPrompt = String(input.prompt || '').trim();
   if (!normalizedPrompt) {
@@ -122,10 +126,10 @@ export async function runImageTurn(input: {
     };
   }
   const promptLikelyNsfw = isPromptLikelyNsfw(normalizedPrompt);
-  let resolvedRouteSource: 'local-runtime' | 'token-api' = intendedRouteSource;
+  let resolvedRouteSource: 'local-runtime' | 'token-api' = input.resolvedRoute?.source || intendedRouteSource;
 
   try {
-    const resolvedRoute = await input.aiClient.resolveRoute({
+    const resolvedRoute = input.resolvedRoute || await input.aiClient.resolveRoute({
       routeHint: 'image/default',
       routeOverride: routeConfig.routeOverride,
     });
@@ -153,6 +157,8 @@ export async function runImageTurn(input: {
       routeOverride: pinnedRouteOverride,
       model: pinnedRouteOverride.model || routeConfig.model,
       prompt: normalizedPrompt,
+      ...(String(input.size || '').trim() ? { size: String(input.size || '').trim() } : {}),
+      ...(Number.isFinite(input.count) && Number(input.count) > 0 ? { n: Math.max(1, Math.floor(Number(input.count))) } : {}),
     });
     const finalRouteSource = generated.route.source === 'token-api' ? 'token-api' : 'local-runtime';
     const artifact = generated.images.find((item) => {

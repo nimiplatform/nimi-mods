@@ -1,0 +1,936 @@
+import type { AiRuntimeDependencySnapshot } from '@nimiplatform/sdk/mod/ai';
+import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
+import type { ChatMessage } from '../../types.js';
+import type { LocalChatTarget } from '../../data/index.js';
+import type { LocalChatDefaultSettings, LocalChatPromptTrace } from '../../state/index.js';
+import type { NsfwMediaPolicy } from '../../services/policy/nsfw-media-policy.js';
+import {
+  isMediaGenerationAllowed,
+  isPromptLikelyNsfw,
+} from '../../services/policy/nsfw-media-policy.js';
+import type { LocalChatTurnAiClient } from './types.js';
+import { parseExplicitMediaRequest } from './explicit-media-request-parser.js';
+import { planMediaTurn, type MediaPlannerDecision } from './media-planner.js';
+import {
+  createDefaultMediaPromptTracePatch,
+  type MediaDependencyStatus,
+  type MediaExecutionDecision,
+  type MediaRouteSource,
+  type PendingMediaIntent,
+  type PreparedMediaExecution,
+} from './media-decision-types.js';
+import {
+  buildMediaGenerationSpec,
+  compileMediaExecution,
+  createMediaSpecHash,
+  type MediaIntent,
+} from './media-spec.js';
+import {
+  buildMediaSettingsRevision,
+  isMediaRouteReady,
+  preflightResolveMediaRoute,
+  resolveMediaRouteConfig,
+  resolveMediaRouteFromOptions,
+} from './media-route.js';
+import type { LocalChatResolvedMediaRoute } from '../../types.js';
+
+type AssistantTurnMediaHistory = {
+  timestampMs: number | null;
+  hasMedia: boolean;
+  hasVideo: boolean;
+};
+
+type RecentMediaSummary = {
+  autoMediaCooling: boolean;
+  autoVideoCooling: boolean;
+  hasPendingMedia: boolean;
+  summary: string;
+};
+
+type IntentGateResult =
+  | {
+      allowed: true;
+      routeSource: MediaRouteSource;
+    }
+  | {
+      allowed: false;
+      routeSource: MediaRouteSource;
+      blockedReason: string;
+    };
+
+export type DecideMediaExecutionInput = {
+  aiClient: Pick<LocalChatTurnAiClient, 'generateObject'> & Partial<Pick<LocalChatTurnAiClient, 'resolveRoute'>>;
+  turnTxnId: string;
+  routeOverride: RuntimeRouteBinding | null;
+  defaultSettings: LocalChatDefaultSettings;
+  userText: string;
+  assistantText: string;
+  target: LocalChatTarget;
+  worldId?: string | null;
+  messages: ChatMessage[];
+  promptTrace: LocalChatPromptTrace | null;
+  nsfwPolicy: NsfwMediaPolicy;
+  fallbackRouteSource: MediaRouteSource;
+  imageRouteOptions?: RuntimeRouteOptionsSnapshot | null;
+  videoRouteOptions?: RuntimeRouteOptionsSnapshot | null;
+  imageRouteOptionsRevision?: number;
+  videoRouteOptionsRevision?: number;
+  imageResolvedRoute?: LocalChatResolvedMediaRoute | null;
+  videoResolvedRoute?: LocalChatResolvedMediaRoute | null;
+  imageDependencySnapshot: AiRuntimeDependencySnapshot | null;
+  videoDependencySnapshot: AiRuntimeDependencySnapshot | null;
+  markerOverrideIntent: PendingMediaIntent | null;
+};
+
+const IMAGE_AUTO_CONFIDENCE_THRESHOLD = 0.82;
+const VIDEO_AUTO_CONFIDENCE_THRESHOLD = 0.93;
+const AUTO_MEDIA_TURN_COOLDOWN = 6;
+const AUTO_MEDIA_TIME_COOLDOWN_MS = 10 * 60 * 1_000;
+const AUTO_VIDEO_TURN_COOLDOWN = 20;
+const AUTO_VIDEO_TIME_COOLDOWN_MS = 30 * 60 * 1_000;
+
+export function normalizeMediaDependencyStatus(snapshot: AiRuntimeDependencySnapshot | null): MediaDependencyStatus {
+  if (!snapshot) return 'unknown';
+  if (snapshot.status === 'ready') return 'ready';
+  if (snapshot.status === 'missing') return 'missing';
+  if (snapshot.status === 'degraded') return 'degraded';
+  return 'unknown';
+}
+
+export function isMediaDependencyReady(snapshot: AiRuntimeDependencySnapshot | null): boolean {
+  return snapshot?.status === 'ready';
+}
+
+function resolveConfiguredMediaRouteSource(input: {
+  kind: 'image' | 'video';
+  settings: LocalChatDefaultSettings;
+  fallbackRouteSource: MediaRouteSource;
+}): MediaRouteSource {
+  const configured = input.kind === 'image'
+    ? input.settings.imageRouteSource
+    : input.settings.videoRouteSource;
+  if (configured === 'local-runtime' || configured === 'token-api') {
+    return configured;
+  }
+  return input.fallbackRouteSource;
+}
+
+function buildExplicitMediaPrompt(input: {
+  type: 'image' | 'video';
+  userText: string;
+  assistantText: string;
+}): string {
+  const lines = input.type === 'image'
+    ? ['请根据当前对话生成一张贴合语境与情绪的图片。']
+    : ['请根据当前对话生成一段贴合语境与情绪的短视频。'];
+  const userText = String(input.userText || '').trim();
+  const assistantText = String(input.assistantText || '').trim();
+  if (userText) {
+    lines.push(`用户请求: ${userText}`);
+  }
+  if (assistantText) {
+    lines.push(`助手上下文: ${assistantText}`);
+  }
+  return lines.join('\n').trim();
+}
+
+function collectAssistantTurnMediaHistory(messages: ChatMessage[]): AssistantTurnMediaHistory[] {
+  const turns: AssistantTurnMediaHistory[] = [];
+  let current: AssistantTurnMediaHistory | null = null;
+  messages.forEach((message) => {
+    if (message.role === 'user') {
+      current = null;
+      return;
+    }
+    if (!current) {
+      current = {
+        timestampMs: null,
+        hasMedia: false,
+        hasVideo: false,
+      };
+      turns.push(current);
+    }
+    const timestampMs = message.timestamp instanceof Date
+      ? message.timestamp.getTime()
+      : new Date(message.timestamp).getTime();
+    if (Number.isFinite(timestampMs)) {
+      current.timestampMs = Math.max(current.timestampMs || 0, timestampMs);
+    }
+    if (message.kind === 'image' || message.kind === 'video') {
+      current.hasMedia = true;
+      if (message.kind === 'video') {
+        current.hasVideo = true;
+      }
+    }
+  });
+  return turns.reverse();
+}
+
+function summarizeRecentMedia(messages: ChatMessage[]): RecentMediaSummary {
+  const now = Date.now();
+  const pendingMedia = messages.some((message) => (
+    message.kind === 'image-pending' || message.kind === 'video-pending'
+  ));
+  const assistantTurns = collectAssistantTurnMediaHistory(messages);
+  const lastMediaTurnIndex = assistantTurns.findIndex((turn) => turn.hasMedia);
+  const lastVideoTurnIndex = assistantTurns.findIndex((turn) => turn.hasVideo);
+  const lastMediaTurn = lastMediaTurnIndex >= 0 ? assistantTurns[lastMediaTurnIndex] : null;
+  const lastVideoTurn = lastVideoTurnIndex >= 0 ? assistantTurns[lastVideoTurnIndex] : null;
+  const turnsSinceLastMedia = lastMediaTurnIndex >= 0 ? lastMediaTurnIndex : null;
+  const turnsSinceLastVideo = lastVideoTurnIndex >= 0 ? lastVideoTurnIndex : null;
+  const msSinceLastMedia = lastMediaTurn?.timestampMs ? now - lastMediaTurn.timestampMs : null;
+  const msSinceLastVideo = lastVideoTurn?.timestampMs ? now - lastVideoTurn.timestampMs : null;
+  const autoMediaCooling = (
+    turnsSinceLastMedia !== null && turnsSinceLastMedia < AUTO_MEDIA_TURN_COOLDOWN
+  ) || (
+    msSinceLastMedia !== null && msSinceLastMedia < AUTO_MEDIA_TIME_COOLDOWN_MS
+  );
+  const autoVideoCooling = (
+    turnsSinceLastVideo !== null && turnsSinceLastVideo < AUTO_VIDEO_TURN_COOLDOWN
+  ) || (
+    msSinceLastVideo !== null && msSinceLastVideo < AUTO_VIDEO_TIME_COOLDOWN_MS
+  );
+  return {
+    autoMediaCooling,
+    autoVideoCooling,
+    hasPendingMedia: pendingMedia,
+    summary: [
+      turnsSinceLastMedia === null
+        ? 'recentMedia=none'
+        : `recentMedia=${turnsSinceLastMedia}turn/${Math.max(0, Math.round((msSinceLastMedia || 0) / 60_000))}m`,
+      turnsSinceLastVideo === null
+        ? 'recentVideo=none'
+        : `recentVideo=${turnsSinceLastVideo}turn/${Math.max(0, Math.round((msSinceLastVideo || 0) / 60_000))}m`,
+      pendingMedia ? 'pending=yes' : 'pending=no',
+    ].join(' · '),
+  };
+}
+
+function isStructuredAssistantReply(text: string): boolean {
+  const normalized = String(text || '').trim();
+  if (!normalized) return false;
+  return normalized.startsWith('{')
+    || normalized.startsWith('[')
+    || normalized.includes('```')
+    || /^(?:\d+\.\s|-\s|\*\s)/m.test(normalized);
+}
+
+function buildMediaGateBlockedMessage(input: {
+  type: 'image' | 'video';
+  reason: 'route-not-ready' | 'dependency-not-ready' | 'nsfw-blocked';
+  routeSource: MediaRouteSource;
+  nsfwPolicy?: NsfwMediaPolicy;
+}): string {
+  const noun = input.type === 'image' ? '图片' : '视频';
+  if (input.reason === 'route-not-ready') {
+    return `${noun}发送暂时不可用：当前${noun}路由还没配置好。请先在右侧“媒体路由配置”里选择可用路由。`;
+  }
+  if (input.reason === 'dependency-not-ready') {
+    return `${noun}发送暂时不可用：当前${noun}依赖还没就绪。请先安装或刷新媒体依赖后再试。`;
+  }
+  if (input.nsfwPolicy === 'disabled') {
+    return `已拦截本次${noun}发送：当前未开启 NSFW 媒体。`;
+  }
+  if (input.nsfwPolicy === 'local-runtime-only' && input.routeSource !== 'local-runtime') {
+    return `已拦截本次${noun}发送：NSFW 仅允许本地路由。请切到“本地运行时”后重试。`;
+  }
+  return `已拦截本次${noun}发送：当前 NSFW 策略不允许该请求。`;
+}
+
+function evaluateIntentGate(input: {
+  intent: PendingMediaIntent;
+  defaultSettings: LocalChatDefaultSettings;
+  fallbackRouteSource: MediaRouteSource;
+  nsfwPolicy: NsfwMediaPolicy;
+  imageRouteReady: boolean;
+  videoRouteReady: boolean;
+  imageDependencyReady: boolean;
+  videoDependencyReady: boolean;
+}): IntentGateResult {
+  const routeReady = input.intent.type === 'image' ? input.imageRouteReady : input.videoRouteReady;
+  const dependencyReady = input.intent.type === 'image' ? input.imageDependencyReady : input.videoDependencyReady;
+  const routeSource = resolveConfiguredMediaRouteSource({
+    kind: input.intent.type,
+    settings: input.defaultSettings,
+    fallbackRouteSource: input.fallbackRouteSource,
+  });
+  if (!routeReady) {
+    return {
+      allowed: false,
+      routeSource,
+      blockedReason: buildMediaGateBlockedMessage({
+        type: input.intent.type,
+        reason: 'route-not-ready',
+        routeSource,
+      }),
+    };
+  }
+  if (!dependencyReady) {
+    return {
+      allowed: false,
+      routeSource,
+      blockedReason: buildMediaGateBlockedMessage({
+        type: input.intent.type,
+        reason: 'dependency-not-ready',
+        routeSource,
+      }),
+    };
+  }
+  const nsfwAllowed = isMediaGenerationAllowed({
+    policy: input.nsfwPolicy,
+    routeSource,
+    prompt: input.intent.prompt,
+    isNsfwPrompt: input.intent.plannerSuggestsNsfw || isPromptLikelyNsfw(input.intent.prompt),
+  });
+  if (!nsfwAllowed) {
+    return {
+      allowed: false,
+      routeSource,
+      blockedReason: buildMediaGateBlockedMessage({
+        type: input.intent.type,
+        reason: 'nsfw-blocked',
+        routeSource,
+        nsfwPolicy: input.nsfwPolicy,
+      }),
+    };
+  }
+  return {
+    allowed: true,
+    routeSource,
+  };
+}
+
+function createDecisionPatch(input: Partial<ReturnType<typeof createDefaultMediaPromptTracePatch>>): ReturnType<typeof createDefaultMediaPromptTracePatch> {
+  return {
+    ...createDefaultMediaPromptTracePatch(),
+    ...input,
+  };
+}
+
+function buildSemanticIntentFromPrompt(input: {
+  kind: 'image' | 'video';
+  source: PendingMediaIntent['source'];
+  plannerTrigger: PendingMediaIntent['plannerTrigger'];
+  prompt: string;
+  confidence?: number;
+  nsfwIntent?: 'none' | 'suggested';
+}): MediaIntent {
+  const normalizedPrompt = String(input.prompt || '').trim();
+  return {
+    kind: input.kind,
+    intentSource: input.source,
+    plannerTrigger: input.plannerTrigger,
+    confidence: Number.isFinite(input.confidence) ? Number(input.confidence) : null,
+    nsfwIntent: input.nsfwIntent || (isPromptLikelyNsfw(normalizedPrompt) ? 'suggested' : 'none'),
+    subject: '当前对话中的主体',
+    scene: normalizedPrompt || '贴合当前对话语境',
+    styleIntent: '自然、精致、贴合陪伴式对话',
+    mood: '贴合当前交流氛围',
+  };
+}
+
+function buildSemanticIntentFromPlannerDecision(input: {
+  decision: MediaPlannerDecision;
+}): MediaIntent {
+  return {
+    kind: input.decision.kind === 'video' ? 'video' : 'image',
+    intentSource: 'planner',
+    plannerTrigger: input.decision.trigger,
+    confidence: input.decision.confidence,
+    nsfwIntent: input.decision.nsfwIntent,
+    subject: String(input.decision.subject || '').trim(),
+    scene: String(input.decision.scene || '').trim(),
+    styleIntent: String(input.decision.styleIntent || '').trim(),
+    mood: String(input.decision.mood || '').trim(),
+    hints: input.decision.hints,
+  };
+}
+
+async function prepareMediaExecution(input: {
+  semanticIntent: MediaIntent;
+  pendingMessageId: string;
+  targetId: string;
+  worldId?: string | null;
+}): Promise<{
+  intent: PendingMediaIntent;
+  prepared: PreparedMediaExecution;
+}> {
+  const spec = buildMediaGenerationSpec({
+    intent: input.semanticIntent,
+    targetId: input.targetId,
+    worldId: input.worldId,
+  });
+  const compiled = compileMediaExecution(spec);
+  const specHash = await createMediaSpecHash(spec);
+  const prepared = {
+    spec,
+    specHash,
+    compiled,
+    pendingMessageId: input.pendingMessageId,
+  };
+  return {
+    intent: {
+      type: spec.kind,
+      prompt: compiled.compiledPromptText,
+      source: spec.intentSource,
+      plannerTrigger: spec.plannerTrigger,
+      ...(Number.isFinite(spec.confidence) ? { plannerConfidence: Number(spec.confidence) } : {}),
+      ...(spec.nsfwIntent === 'suggested' ? { plannerSuggestsNsfw: true } : {}),
+      pendingMessageId: input.pendingMessageId,
+    },
+    prepared,
+  };
+}
+
+async function resolveAuthorityMediaRoute(input: {
+  aiClient: DecideMediaExecutionInput['aiClient'];
+  kind: 'image' | 'video';
+  defaultSettings: LocalChatDefaultSettings;
+  fallbackRouteSource: MediaRouteSource;
+  routeOptions?: RuntimeRouteOptionsSnapshot | null;
+  routeOptionsRevision?: number;
+  currentResolvedRoute?: LocalChatResolvedMediaRoute | null;
+}): Promise<{
+  routeSource: MediaRouteSource;
+  resolvedRoute: LocalChatResolvedMediaRoute;
+} | null> {
+  const routeConfig = resolveMediaRouteConfig({
+    kind: input.kind,
+    settings: input.defaultSettings,
+    fallbackSource: input.fallbackRouteSource,
+  });
+  const settingsRevision = buildMediaSettingsRevision({
+    kind: input.kind,
+    settings: input.defaultSettings,
+  });
+  const routeOptionsRevision = Number.isFinite(input.routeOptionsRevision)
+    ? Math.max(0, Math.floor(Number(input.routeOptionsRevision)))
+    : 0;
+  const resolvedFromOptions = resolveMediaRouteFromOptions({
+    kind: input.kind,
+    settings: input.defaultSettings,
+    routeOptions: input.routeOptions || null,
+    routeOptionsRevision,
+  });
+  if (resolvedFromOptions) {
+    return {
+      routeSource: resolvedFromOptions.source,
+      resolvedRoute: resolvedFromOptions,
+    };
+  }
+  if (
+    input.currentResolvedRoute
+    && isMediaRouteReady({
+      kind: input.kind,
+      settings: input.defaultSettings,
+      routeOptions: input.routeOptions || null,
+      resolvedRoute: input.currentResolvedRoute,
+      routeOptionsRevision,
+    })
+  ) {
+    return {
+      routeSource: input.currentResolvedRoute.source,
+      resolvedRoute: input.currentResolvedRoute,
+    };
+  }
+  if (routeConfig.routeSource === 'auto' && !input.aiClient.resolveRoute) {
+    return null;
+  }
+  const routeSource = routeConfig.routeSource === 'auto'
+    ? input.fallbackRouteSource
+    : routeConfig.routeSource;
+  if (input.aiClient.resolveRoute) {
+    const resolvedRoute = await preflightResolveMediaRoute({
+      aiClient: { resolveRoute: input.aiClient.resolveRoute },
+      kind: input.kind,
+      settings: input.defaultSettings,
+      fallbackSource: input.fallbackRouteSource,
+      routeOptionsRevision,
+    });
+    if (resolvedRoute) {
+      return {
+        routeSource: resolvedRoute.source,
+        resolvedRoute,
+      };
+    }
+  }
+  if (routeConfig.routeSource === 'auto') {
+    return null;
+  }
+  const connectorId = String(routeConfig.routeOverride?.connectorId || '').trim();
+  const model = String(routeConfig.model || routeConfig.routeOverride?.model || '').trim()
+    || (routeSource === 'local-runtime' ? 'selected-local-model' : 'selected-token-model');
+  return {
+    routeSource,
+    resolvedRoute: {
+      source: routeSource,
+      ...(connectorId ? { connectorId } : {}),
+      model,
+      resolvedBy: 'selected',
+      resolvedAt: new Date().toISOString(),
+      settingsRevision: buildMediaSettingsRevision({
+        kind: input.kind,
+        settings: input.defaultSettings,
+      }),
+      routeOptionsRevision,
+    },
+  };
+}
+
+async function createBlockedDecision(input: {
+  intent: PendingMediaIntent;
+  prepared: PreparedMediaExecution;
+  blockedReason: string;
+  routeSource: MediaRouteSource;
+  plannerUsed?: boolean;
+}): Promise<MediaExecutionDecision> {
+  return {
+    kind: 'blocked',
+    intent: input.intent,
+    prepared: input.prepared,
+    blockedReason: input.blockedReason,
+    routeSource: input.routeSource,
+    resolvedRoute: null,
+    promptTracePatch: createDecisionPatch({
+      plannerUsed: Boolean(input.plannerUsed),
+      plannerKind: input.intent.type,
+      plannerTrigger: input.intent.plannerTrigger,
+      plannerConfidence: input.intent.plannerConfidence ?? null,
+      plannerBlockedReason: input.blockedReason,
+      mediaDecisionSource: input.intent.source,
+      mediaDecisionKind: input.intent.type,
+      mediaExecutionStatus: 'blocked',
+      mediaExecutionRouteSource: input.routeSource,
+      mediaExecutionReason: input.blockedReason,
+      mediaSpecHash: input.prepared.specHash,
+      mediaCompilerRevision: input.prepared.compiled.compilerRevision,
+    }),
+  };
+}
+
+function createExecuteDecision(input: {
+  intent: PendingMediaIntent;
+  prepared: PreparedMediaExecution;
+  resolvedRoute: LocalChatResolvedMediaRoute;
+  plannerUsed?: boolean;
+}): MediaExecutionDecision {
+  return {
+    kind: 'execute',
+    intent: input.intent,
+    prepared: input.prepared,
+    resolvedRoute: input.resolvedRoute,
+    promptTracePatch: createDecisionPatch({
+      plannerUsed: Boolean(input.plannerUsed),
+      plannerKind: input.intent.type,
+      plannerTrigger: input.intent.plannerTrigger,
+      plannerConfidence: input.intent.plannerConfidence ?? null,
+      mediaDecisionSource: input.intent.source,
+      mediaDecisionKind: input.intent.type,
+      mediaExecutionStatus: 'pending',
+      mediaExecutionRouteSource: input.resolvedRoute.source,
+      mediaExecutionRouteModel: input.resolvedRoute.model || null,
+      mediaExecutionReason: null,
+      mediaSpecHash: input.prepared.specHash,
+      mediaCompilerRevision: input.prepared.compiled.compilerRevision,
+      mediaRouteResolvedBy: input.resolvedRoute.resolvedBy,
+    }),
+  };
+}
+
+export async function decideMediaExecution(input: DecideMediaExecutionInput): Promise<MediaExecutionDecision> {
+  let imageResolvedRoute = input.imageResolvedRoute || null;
+  let videoResolvedRoute = input.videoResolvedRoute || null;
+  let imageRouteReady = isMediaRouteReady({
+    kind: 'image',
+    settings: input.defaultSettings,
+    routeOptions: input.imageRouteOptions || null,
+    resolvedRoute: imageResolvedRoute,
+    routeOptionsRevision: input.imageRouteOptionsRevision,
+  });
+  let videoRouteReady = isMediaRouteReady({
+    kind: 'video',
+    settings: input.defaultSettings,
+    routeOptions: input.videoRouteOptions || null,
+    resolvedRoute: videoResolvedRoute,
+    routeOptionsRevision: input.videoRouteOptionsRevision,
+  });
+  if (!imageRouteReady && input.defaultSettings.imageRouteSource === 'auto') {
+    const resolved = await resolveAuthorityMediaRoute({
+      aiClient: input.aiClient,
+      kind: 'image',
+      defaultSettings: input.defaultSettings,
+      fallbackRouteSource: input.fallbackRouteSource,
+      routeOptions: input.imageRouteOptions,
+      routeOptionsRevision: input.imageRouteOptionsRevision,
+      currentResolvedRoute: imageResolvedRoute,
+    });
+    if (resolved) {
+      imageResolvedRoute = resolved.resolvedRoute;
+      imageRouteReady = true;
+    }
+  }
+  if (!videoRouteReady && input.defaultSettings.videoRouteSource === 'auto') {
+    const resolved = await resolveAuthorityMediaRoute({
+      aiClient: input.aiClient,
+      kind: 'video',
+      defaultSettings: input.defaultSettings,
+      fallbackRouteSource: input.fallbackRouteSource,
+      routeOptions: input.videoRouteOptions,
+      routeOptionsRevision: input.videoRouteOptionsRevision,
+      currentResolvedRoute: videoResolvedRoute,
+    });
+    if (resolved) {
+      videoResolvedRoute = resolved.resolvedRoute;
+      videoRouteReady = true;
+    }
+  }
+  const imageDependencyStatus = normalizeMediaDependencyStatus(input.imageDependencySnapshot);
+  const videoDependencyStatus = normalizeMediaDependencyStatus(input.videoDependencySnapshot);
+  const imageDependencyReady = isMediaDependencyReady(input.imageDependencySnapshot);
+  const videoDependencyReady = isMediaDependencyReady(input.videoDependencySnapshot);
+  const explicitRequest = parseExplicitMediaRequest(input.userText);
+  const recentMedia = summarizeRecentMedia(input.messages);
+  const sceneLikelyNsfw = isPromptLikelyNsfw(`${input.userText}\n${input.assistantText}`);
+
+  if (explicitRequest) {
+    const preparedResult = await prepareMediaExecution({
+      semanticIntent: buildSemanticIntentFromPrompt({
+        kind: explicitRequest.kind,
+        source: 'explicit',
+        plannerTrigger: 'user-explicit',
+        prompt: buildExplicitMediaPrompt({
+          type: explicitRequest.kind,
+          userText: explicitRequest.prompt,
+          assistantText: input.assistantText,
+        }),
+      }),
+      pendingMessageId: `msg-${input.turnTxnId}-explicit-media`,
+      targetId: input.target.id,
+      worldId: input.worldId,
+    });
+    const gate = evaluateIntentGate({
+      intent: preparedResult.intent,
+      defaultSettings: input.defaultSettings,
+      fallbackRouteSource: input.fallbackRouteSource,
+      nsfwPolicy: input.nsfwPolicy,
+      imageRouteReady,
+      videoRouteReady,
+      imageDependencyReady,
+      videoDependencyReady,
+    });
+    if (!gate.allowed) {
+      return createBlockedDecision({
+        intent: preparedResult.intent,
+        prepared: preparedResult.prepared,
+        blockedReason: gate.blockedReason,
+        routeSource: gate.routeSource,
+      });
+    }
+    const resolved = await resolveAuthorityMediaRoute({
+      aiClient: input.aiClient,
+      kind: preparedResult.intent.type,
+      defaultSettings: input.defaultSettings,
+      fallbackRouteSource: input.fallbackRouteSource,
+      routeOptions: preparedResult.intent.type === 'image' ? input.imageRouteOptions : input.videoRouteOptions,
+      routeOptionsRevision: preparedResult.intent.type === 'image'
+        ? input.imageRouteOptionsRevision
+        : input.videoRouteOptionsRevision,
+      currentResolvedRoute: preparedResult.intent.type === 'image' ? imageResolvedRoute : videoResolvedRoute,
+    });
+    if (!resolved) {
+      return createBlockedDecision({
+        intent: preparedResult.intent,
+        prepared: preparedResult.prepared,
+        blockedReason: buildMediaGateBlockedMessage({
+          type: preparedResult.intent.type,
+          reason: 'route-not-ready',
+          routeSource: resolveConfiguredMediaRouteSource({
+            kind: preparedResult.intent.type,
+            settings: input.defaultSettings,
+            fallbackRouteSource: input.fallbackRouteSource,
+          }),
+        }),
+        routeSource: resolveConfiguredMediaRouteSource({
+          kind: preparedResult.intent.type,
+          settings: input.defaultSettings,
+          fallbackRouteSource: input.fallbackRouteSource,
+        }),
+      });
+    }
+    return createExecuteDecision({
+      intent: preparedResult.intent,
+      prepared: preparedResult.prepared,
+      resolvedRoute: resolved.resolvedRoute,
+    });
+  }
+
+  const plannerMode = input.defaultSettings.mediaPlannerMode;
+  const videoAutoPolicy = input.defaultSettings.videoAutoPolicy;
+  const canAutoImage = imageRouteReady && imageDependencyReady;
+  const canAutoVideo = videoRouteReady && videoDependencyReady && videoAutoPolicy !== 'explicit-only';
+  const plannerLocalBlockReason = (() => {
+    if (plannerMode === 'off') return 'planner-disabled';
+    if (plannerMode === 'explicit-only') return 'explicit-only-mode';
+    if (recentMedia.hasPendingMedia) return 'pending-media-active';
+    if (recentMedia.autoMediaCooling) return 'media-cooldown-active';
+    if (isStructuredAssistantReply(input.assistantText)) return 'structured-reply';
+    if (!canAutoImage && !canAutoVideo) return 'no-ready-media-route';
+    if (
+      sceneLikelyNsfw
+      && !(
+        (canAutoImage && isMediaGenerationAllowed({
+          policy: input.nsfwPolicy,
+          routeSource: resolveConfiguredMediaRouteSource({
+            kind: 'image',
+            settings: input.defaultSettings,
+            fallbackRouteSource: input.fallbackRouteSource,
+          }),
+          prompt: `${input.userText}\n${input.assistantText}`,
+          isNsfwPrompt: true,
+        }))
+        || (canAutoVideo && isMediaGenerationAllowed({
+          policy: input.nsfwPolicy,
+          routeSource: resolveConfiguredMediaRouteSource({
+            kind: 'video',
+            settings: input.defaultSettings,
+            fallbackRouteSource: input.fallbackRouteSource,
+          }),
+          prompt: `${input.userText}\n${input.assistantText}`,
+          isNsfwPrompt: true,
+        }))
+      )
+    ) {
+      return 'nsfw-policy-blocked';
+    }
+    return null;
+  })();
+  let fallbackPromptTracePatch = createDecisionPatch({
+    plannerBlockedReason: plannerLocalBlockReason,
+  });
+
+  if (!plannerLocalBlockReason) {
+    const plannerResult = await planMediaTurn({
+      aiClient: input.aiClient,
+      routeOverride: input.routeOverride,
+      userText: input.userText,
+      assistantText: input.assistantText,
+      target: input.target,
+      worldId: input.worldId,
+      nsfwPolicy: input.nsfwPolicy,
+      imageReady: canAutoImage,
+      videoReady: canAutoVideo,
+      imageDependencyStatus,
+      videoDependencyStatus,
+      recentMediaSummary: recentMedia.summary,
+      promptTrace: input.promptTrace,
+    });
+    if (plannerResult.status === 'ok') {
+      const decision = plannerResult.decision;
+      if (decision.kind !== 'none') {
+        const preparedResult = await prepareMediaExecution({
+          semanticIntent: buildSemanticIntentFromPlannerDecision({ decision }),
+          pendingMessageId: `msg-${input.turnTxnId}-planner-media`,
+          targetId: input.target.id,
+          worldId: input.worldId,
+        });
+        const confidenceThreshold = preparedResult.intent.type === 'image'
+          ? IMAGE_AUTO_CONFIDENCE_THRESHOLD
+          : VIDEO_AUTO_CONFIDENCE_THRESHOLD;
+        const plannerBlockedReason = (() => {
+          if (decision.confidence < confidenceThreshold) return 'planner-confidence-too-low';
+          if (preparedResult.intent.type === 'video' && recentMedia.autoVideoCooling) return 'video-cooldown-active';
+          const gate = evaluateIntentGate({
+            intent: preparedResult.intent,
+            defaultSettings: input.defaultSettings,
+            fallbackRouteSource: input.fallbackRouteSource,
+            nsfwPolicy: input.nsfwPolicy,
+            imageRouteReady,
+            videoRouteReady,
+            imageDependencyReady,
+            videoDependencyReady,
+          });
+          if (!gate.allowed) return gate.blockedReason;
+          return null;
+        })();
+        if (!plannerBlockedReason) {
+          const resolved = await resolveAuthorityMediaRoute({
+            aiClient: input.aiClient,
+            kind: preparedResult.intent.type,
+            defaultSettings: input.defaultSettings,
+            fallbackRouteSource: input.fallbackRouteSource,
+            routeOptions: preparedResult.intent.type === 'image' ? input.imageRouteOptions : input.videoRouteOptions,
+            routeOptionsRevision: preparedResult.intent.type === 'image'
+              ? input.imageRouteOptionsRevision
+              : input.videoRouteOptionsRevision,
+            currentResolvedRoute: preparedResult.intent.type === 'image' ? imageResolvedRoute : videoResolvedRoute,
+          });
+          if (!resolved) {
+            fallbackPromptTracePatch = createDecisionPatch({
+              plannerUsed: true,
+              plannerKind: decision.kind,
+              plannerTrigger: decision.trigger,
+              plannerConfidence: decision.confidence,
+              plannerBlockedReason: 'route-not-ready',
+              mediaSpecHash: preparedResult.prepared.specHash,
+              mediaCompilerRevision: preparedResult.prepared.compiled.compilerRevision,
+            });
+          } else {
+            return createExecuteDecision({
+              intent: preparedResult.intent,
+              prepared: preparedResult.prepared,
+              resolvedRoute: resolved.resolvedRoute,
+              plannerUsed: true,
+            });
+          }
+        }
+        fallbackPromptTracePatch = createDecisionPatch({
+          plannerUsed: true,
+          plannerKind: decision.kind,
+          plannerTrigger: decision.trigger,
+          plannerConfidence: decision.confidence,
+          plannerBlockedReason,
+          mediaSpecHash: preparedResult.prepared.specHash,
+          mediaCompilerRevision: preparedResult.prepared.compiled.compilerRevision,
+        });
+      } else {
+        fallbackPromptTracePatch = createDecisionPatch({
+          plannerUsed: true,
+          plannerConfidence: decision.confidence,
+          plannerBlockedReason: decision.reason || null,
+        });
+      }
+    } else {
+      fallbackPromptTracePatch = createDecisionPatch({
+        plannerUsed: true,
+        plannerBlockedReason: `planner-failed:${plannerResult.reason}`,
+      });
+    }
+  }
+
+  if (input.markerOverrideIntent) {
+    const preparedResult = await prepareMediaExecution({
+      semanticIntent: buildSemanticIntentFromPrompt({
+        kind: input.markerOverrideIntent.type,
+        source: 'tag',
+        plannerTrigger: 'marker-override',
+        prompt: input.markerOverrideIntent.prompt,
+        confidence: input.markerOverrideIntent.plannerConfidence,
+        nsfwIntent: input.markerOverrideIntent.plannerSuggestsNsfw ? 'suggested' : 'none',
+      }),
+      pendingMessageId: input.markerOverrideIntent.pendingMessageId,
+      targetId: input.target.id,
+      worldId: input.worldId,
+    });
+    const gate = evaluateIntentGate({
+      intent: preparedResult.intent,
+      defaultSettings: input.defaultSettings,
+      fallbackRouteSource: input.fallbackRouteSource,
+      nsfwPolicy: input.nsfwPolicy,
+      imageRouteReady,
+      videoRouteReady,
+      imageDependencyReady,
+      videoDependencyReady,
+    });
+    if (!gate.allowed) {
+      return {
+        ...(await createBlockedDecision({
+          intent: preparedResult.intent,
+          prepared: preparedResult.prepared,
+          blockedReason: gate.blockedReason,
+          routeSource: gate.routeSource,
+        })),
+        promptTracePatch: {
+          ...fallbackPromptTracePatch,
+          plannerKind: preparedResult.intent.type,
+          plannerTrigger: 'marker-override',
+          plannerBlockedReason: gate.blockedReason,
+          mediaDecisionSource: 'tag',
+          mediaDecisionKind: preparedResult.intent.type,
+          mediaExecutionStatus: 'blocked',
+          mediaExecutionRouteSource: gate.routeSource,
+          mediaExecutionReason: gate.blockedReason,
+          mediaSpecHash: preparedResult.prepared.specHash,
+          mediaCompilerRevision: preparedResult.prepared.compiled.compilerRevision,
+        },
+      };
+    }
+    const resolved = await resolveAuthorityMediaRoute({
+      aiClient: input.aiClient,
+      kind: preparedResult.intent.type,
+      defaultSettings: input.defaultSettings,
+      fallbackRouteSource: input.fallbackRouteSource,
+      routeOptions: preparedResult.intent.type === 'image' ? input.imageRouteOptions : input.videoRouteOptions,
+      routeOptionsRevision: preparedResult.intent.type === 'image'
+        ? input.imageRouteOptionsRevision
+        : input.videoRouteOptionsRevision,
+      currentResolvedRoute: preparedResult.intent.type === 'image' ? imageResolvedRoute : videoResolvedRoute,
+    });
+    if (!resolved) {
+      return {
+        kind: 'blocked',
+        intent: preparedResult.intent,
+        prepared: preparedResult.prepared,
+        blockedReason: buildMediaGateBlockedMessage({
+          type: preparedResult.intent.type,
+          reason: 'route-not-ready',
+          routeSource: resolveConfiguredMediaRouteSource({
+            kind: preparedResult.intent.type,
+            settings: input.defaultSettings,
+            fallbackRouteSource: input.fallbackRouteSource,
+          }),
+        }),
+        routeSource: resolveConfiguredMediaRouteSource({
+          kind: preparedResult.intent.type,
+          settings: input.defaultSettings,
+          fallbackRouteSource: input.fallbackRouteSource,
+        }),
+        resolvedRoute: null,
+        promptTracePatch: {
+          ...fallbackPromptTracePatch,
+          plannerKind: preparedResult.intent.type,
+          plannerTrigger: 'marker-override',
+          plannerBlockedReason: 'route-not-ready',
+          mediaDecisionSource: 'tag',
+          mediaDecisionKind: preparedResult.intent.type,
+          mediaExecutionStatus: 'blocked',
+          mediaExecutionRouteSource: resolveConfiguredMediaRouteSource({
+            kind: preparedResult.intent.type,
+            settings: input.defaultSettings,
+            fallbackRouteSource: input.fallbackRouteSource,
+          }),
+          mediaExecutionRouteModel: null,
+          mediaExecutionReason: 'route-not-ready',
+          mediaSpecHash: preparedResult.prepared.specHash,
+          mediaCompilerRevision: preparedResult.prepared.compiled.compilerRevision,
+        },
+      };
+    }
+    return {
+      ...createExecuteDecision({
+        intent: preparedResult.intent,
+        prepared: preparedResult.prepared,
+        resolvedRoute: resolved.resolvedRoute,
+      }),
+      promptTracePatch: {
+        ...fallbackPromptTracePatch,
+        plannerKind: preparedResult.intent.type,
+        plannerTrigger: 'marker-override',
+        plannerBlockedReason: null,
+        mediaDecisionSource: 'tag',
+        mediaDecisionKind: preparedResult.intent.type,
+        mediaExecutionStatus: 'pending',
+        mediaExecutionRouteSource: resolved.resolvedRoute.source,
+        mediaExecutionRouteModel: resolved.resolvedRoute.model || null,
+        mediaExecutionReason: null,
+        mediaSpecHash: preparedResult.prepared.specHash,
+        mediaCompilerRevision: preparedResult.prepared.compiled.compilerRevision,
+        mediaRouteResolvedBy: resolved.resolvedRoute.resolvedBy,
+      },
+    };
+  }
+
+  return {
+    kind: 'none',
+    promptTracePatch: fallbackPromptTracePatch,
+  };
+}

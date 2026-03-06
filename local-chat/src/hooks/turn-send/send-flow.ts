@@ -8,15 +8,25 @@ import { buildAssistantTurnOutput } from './assistant-output.js';
 import {
   persistFailedTurn,
   persistSuccessfulTurn,
-  replacePendingAssistantMessage,
   type TurnDeliveryScheduleHandle,
 } from './session-persist.js';
 import type { LocalChatScheduleCancelReason, UseLocalChatTurnSendInput } from './types.js';
 import { logTurnScheduleCancelled, logTurnSendDone, logTurnSendFailed, logTurnSendStart } from './logging.js';
-import { parseMediaIntent, type ParsedMediaIntent } from './media-intent-parser.js';
-import { runImageTurn } from './image-turn-runner.js';
-import { runVideoTurn } from './video-turn-runner.js';
+import { listLocalChatSessions, updateLocalChatTurnArtifacts } from '../../state/index.js';
+import {
+  decideMediaExecution,
+  isMediaDependencyReady,
+  normalizeMediaDependencyStatus,
+} from './media-decision-policy.js';
+import {
+  createDefaultMediaPromptTracePatch,
+  type MediaExecutionDecision,
+  type MediaPromptTracePatch,
+} from './media-decision-types.js';
+import { executeMediaDecision } from './media-execution-pipeline.js';
 import { isMediaRouteReady } from './media-route.js';
+import { processMediaMarkerOverrides } from './media-marker-override.js';
+import { runLocalChatContinuityMaintenance } from './continuity-maintenance.js';
 
 const LOCAL_CHAT_FALLBACK_TOAST_KEY = 'nimi.local-chat.fallback-toast-shown.v1';
 const FALLBACK_TYPING_MIN_MS = 1_400;
@@ -126,83 +136,6 @@ function createCancelledAudit(input: {
   };
 }
 
-type PendingMediaIntent = ParsedMediaIntent & {
-  pendingMessageId: string;
-};
-
-function isOnlyFillerText(content: string): boolean {
-  const normalized = String(content || '').trim();
-  if (!normalized) return true;
-  return /^(\.{2,}|…+|\.{1,}\s*…+)\s*$/.test(normalized);
-}
-
-function createPendingMediaMessage(intent: PendingMediaIntent): ChatMessage {
-  const isImage = intent.type === 'image';
-  return {
-    id: intent.pendingMessageId,
-    role: 'assistant',
-    kind: isImage ? 'image-pending' : 'video-pending',
-    content: '',
-    timestamp: new Date(),
-    meta: {
-      mediaType: intent.type,
-      mediaStatus: 'pending',
-      mediaPrompt: intent.prompt,
-      mediaIntentSource: intent.triggerSource === 'marker' ? 'tag' : 'heuristic',
-    },
-  };
-}
-
-function createMediaFailureMessage(input: {
-  pendingMessageId: string;
-  type: 'image' | 'video';
-  prompt: string;
-  source: 'marker' | 'heuristic';
-  reason: string;
-  routeSource?: 'local-runtime' | 'token-api';
-}): ChatMessage {
-  return {
-    id: input.pendingMessageId,
-    role: 'assistant',
-    kind: input.type,
-    content: input.reason,
-    timestamp: new Date(),
-    meta: {
-      mediaType: input.type,
-      mediaStatus: 'failed',
-      mediaPrompt: input.prompt,
-      mediaIntentSource: input.source === 'marker' ? 'tag' : 'heuristic',
-      mediaError: input.reason,
-      routeSource: input.routeSource,
-    },
-  };
-}
-
-function createMediaBlockedMessage(input: {
-  pendingMessageId: string;
-  type: 'image' | 'video';
-  prompt: string;
-  source: 'marker' | 'heuristic';
-  reason: string;
-  routeSource: 'local-runtime' | 'token-api';
-}): ChatMessage {
-  return {
-    id: input.pendingMessageId,
-    role: 'assistant',
-    kind: input.type,
-    content: input.reason,
-    timestamp: new Date(),
-    meta: {
-      mediaType: input.type,
-      mediaStatus: 'blocked',
-      mediaPrompt: input.prompt,
-      mediaIntentSource: input.source === 'marker' ? 'tag' : 'heuristic',
-      mediaError: input.reason,
-      routeSource: input.routeSource,
-    },
-  };
-}
-
 export async function runLocalChatTurnSend(input: {
   context: UseLocalChatTurnSendInput;
   isSending: boolean;
@@ -225,8 +158,9 @@ export async function runLocalChatTurnSend(input: {
   }
   const selectedTarget = context.selectedTarget;
 
-  const workingSession = ensureWorkingSession({
+  const workingSession = await ensureWorkingSession({
     selectedSessionId: context.selectedSessionId,
+    viewerId: context.viewerId,
     selectedTarget,
     setSelectedSessionId: context.setSelectedSessionId,
   });
@@ -252,8 +186,10 @@ export async function runLocalChatTurnSend(input: {
       flowId,
       aiClient: context.aiClient,
       text,
+      viewerId: context.viewerId,
+      viewerDisplayName: context.viewerDisplayName,
       selectedTarget,
-      messages: context.messages,
+      selectedSessionId: sessionId,
       runtimeMode: context.runtimeMode,
       routeOverride: context.routeOverride,
       allowMultiReply: context.defaultSettings.allowMultiReply,
@@ -305,6 +241,7 @@ export async function runLocalChatTurnSend(input: {
       enableVoice: context.defaultSettings.enableVoice,
       autoPlayVoiceReplies: context.defaultSettings.autoPlayVoiceReplies,
       latencyMs,
+      contextPacket: prepared.contextPacket,
       compiledPrompt: prepared.compiledPrompt,
       selectedTarget,
       routeSnapshot: prepared.routeSnapshot,
@@ -315,51 +252,46 @@ export async function runLocalChatTurnSend(input: {
       segmentParseMode: prepared.textTurn.segmentParseMode,
       nsfwPolicy,
     });
-    const mediaRouteReady = {
-      image: isMediaRouteReady({ kind: 'image', settings: context.defaultSettings }),
-      video: isMediaRouteReady({ kind: 'video', settings: context.defaultSettings }),
-    };
-    const pendingMediaIntents: PendingMediaIntent[] = [];
-    const nextDeliveries = assistantPayload.assistantOutput.deliveries.flatMap((delivery, index) => {
-      if (delivery.kind !== 'text' && delivery.kind !== 'voice') {
-        return [delivery];
-      }
-      const parsed = parseMediaIntent({
-        text: delivery.content,
-        userText: text,
-        triggerMode: (
-          context.defaultSettings.mediaTriggerMode === 'marker_plus_heuristic' && index === 0
-            ? 'marker_plus_heuristic'
-            : 'marker_only'
-          ),
-      });
-      const acceptedIntents = parsed.intents.filter((intent) => mediaRouteReady[intent.type]);
-      if (acceptedIntents.length > 0) {
-        acceptedIntents.forEach((intent, intentIndex) => {
-          pendingMediaIntents.push({
-            ...intent,
-            pendingMessageId: `msg-${turnTxnId}-media-${index}-${intentIndex}`,
-          });
-        });
-      }
-      const cleanedText = String(parsed.cleanedText || '').trim();
-      if ((!cleanedText || isOnlyFillerText(cleanedText)) && acceptedIntents.length > 0) {
-        return [];
-      }
-      if (!cleanedText && parsed.intents.length > 0 && acceptedIntents.length === 0) {
-        return [];
-      }
-      if (!cleanedText) {
-        return [delivery];
-      }
-      return [{ ...delivery, content: parsed.cleanedText }];
+    const imageRouteReady = isMediaRouteReady({
+      kind: 'image',
+      settings: context.defaultSettings,
+      routeOptions: context.imageRouteOptions,
+      resolvedRoute: context.imageResolvedRoute,
+      routeOptionsRevision: context.imageRouteOptionsRevision,
     });
-    assistantPayload.assistantOutput.deliveries = nextDeliveries;
-    assistantPayload.assistantOutput.segmentCount = nextDeliveries.length;
-    assistantPayload.assistantOutput.textSegments = nextDeliveries.filter((delivery) => delivery.kind === 'text').length;
-    assistantPayload.assistantOutput.voiceSegments = nextDeliveries.filter((delivery) => delivery.kind === 'voice').length;
-    assistantPayload.assistantOutput.schedulerTotalDelayMs = nextDeliveries
-      .reduce((sum, delivery) => sum + (Number.isFinite(delivery.delayMs) ? delivery.delayMs : 0), 0);
+    const videoRouteReady = isMediaRouteReady({
+      kind: 'video',
+      settings: context.defaultSettings,
+      routeOptions: context.videoRouteOptions,
+      resolvedRoute: context.videoResolvedRoute,
+      routeOptionsRevision: context.videoRouteOptionsRevision,
+    });
+    const imageDependencyStatus = normalizeMediaDependencyStatus(context.imageDependencySnapshot);
+    const videoDependencyStatus = normalizeMediaDependencyStatus(context.videoDependencySnapshot);
+    const imageDependencyReady = isMediaDependencyReady(context.imageDependencySnapshot);
+    const videoDependencyReady = isMediaDependencyReady(context.videoDependencySnapshot);
+    const markerOverrideResult = processMediaMarkerOverrides({
+      deliveries: assistantPayload.assistantOutput.deliveries,
+      userText: text,
+      turnTxnId,
+    });
+    assistantPayload.assistantOutput.deliveries = markerOverrideResult.deliveries;
+    assistantPayload.assistantOutput.segmentCount = markerOverrideResult.segmentCount;
+    assistantPayload.assistantOutput.textSegments = markerOverrideResult.textSegments;
+    assistantPayload.assistantOutput.voiceSegments = markerOverrideResult.voiceSegments;
+    assistantPayload.assistantOutput.schedulerTotalDelayMs = markerOverrideResult.schedulerTotalDelayMs;
+    const markerOverrideCandidates = markerOverrideResult.markerOverrideCandidates;
+    const assistantVisibleText = markerOverrideResult.visibleText;
+    const fallbackRouteSource = prepared.routeSnapshot?.source === 'token-api' ? 'token-api' : 'local-runtime';
+    const initialMediaTrace = createDefaultMediaPromptTracePatch();
+    assistantPayload.promptTrace = {
+      ...assistantPayload.promptTrace,
+      ...initialMediaTrace,
+      imageReady: imageRouteReady && imageDependencyReady,
+      videoReady: videoRouteReady && videoDependencyReady,
+      imageDependencyStatus,
+      videoDependencyStatus,
+    };
     if (prepared.textTurn.streamDeltaCount === 0) {
       const fallbackPreviewText = String(prepared.textTurn.segments[0]?.content || '').trim();
       if (fallbackPreviewText) {
@@ -418,9 +350,10 @@ export async function runLocalChatTurnSend(input: {
     const contextChanged = input.getCurrentContextKey() !== input.sendContextKey;
     if (contextChanged) {
       context.setMessages((prev) => prev.filter((message) => message.id !== streamingMessage.id));
-      const userOnly = persistSuccessfulTurn({
+      const userOnly = await persistSuccessfulTurn({
         sessionId,
         targetId: selectedTarget.id,
+        viewerId: context.viewerId,
         turnTxnId,
         userMessage,
         assistantDeliveries: [],
@@ -457,9 +390,10 @@ export async function runLocalChatTurnSend(input: {
 
     context.setLatestPromptTrace(assistantPayload.promptTrace);
     context.setLatestTurnAudit(assistantPayload.turnAudit);
-    const schedule = persistSuccessfulTurn({
+    const schedule = await persistSuccessfulTurn({
       sessionId,
       targetId: selectedTarget.id,
+      viewerId: context.viewerId,
       turnTxnId,
       userMessage,
       assistantDeliveries: assistantPayload.assistantOutput.deliveries,
@@ -506,184 +440,92 @@ export async function runLocalChatTurnSend(input: {
       .finally(() => {
         input.clearScheduleByTxn(turnTxnId);
       });
-
-    if (pendingMediaIntents.length > 0) {
-      void schedule.done.then(async () => {
-        for (const intent of pendingMediaIntents) {
-          if (input.getCurrentContextKey() !== input.sendContextKey) {
-            return;
-          }
-          const pendingMessage = createPendingMediaMessage(intent);
-          context.setMessages((prev) => [...prev, pendingMessage]);
-          const fallbackRouteSource = prepared.routeSnapshot?.source === 'token-api' ? 'token-api' : 'local-runtime';
-
-          if (intent.type === 'image') {
-            const result = await runImageTurn({
-              aiClient: context.aiClient,
-              prompt: intent.prompt,
-              defaultSettings: context.defaultSettings,
-              nsfwPolicy,
-              fallbackRouteSource,
-            });
-            if (input.getCurrentContextKey() !== input.sendContextKey) {
-              context.setMessages((prev) => prev.filter((message) => message.id !== intent.pendingMessageId));
-              return;
-            }
-            if (result.status === 'ok') {
-              replacePendingAssistantMessage({
-                sessionId,
-                targetId: selectedTarget.id,
-                pendingMessageId: intent.pendingMessageId,
-                setMessages: context.setMessages,
-                setSessions: context.setSessions,
-                message: {
-                  id: intent.pendingMessageId,
-                  role: 'assistant',
-                  kind: 'image',
-                  content: '',
-                  timestamp: new Date(),
-                  media: {
-                    uri: result.uri,
-                    mimeType: result.mimeType,
-                  },
-                  meta: {
-                    mediaType: 'image',
-                    mediaStatus: 'ready',
-                    mediaPrompt: intent.prompt,
-                    mediaIntentSource: intent.triggerSource === 'marker' ? 'tag' : 'heuristic',
-                    routeSource: result.routeSource,
-                    routeModel: result.routeModel,
-                    nsfwPolicy,
-                  },
-                },
-              });
-              continue;
-            }
-            if (result.status === 'blocked') {
-              replacePendingAssistantMessage({
-                sessionId,
-                targetId: selectedTarget.id,
-                pendingMessageId: intent.pendingMessageId,
-                setMessages: context.setMessages,
-                setSessions: context.setSessions,
-                message: createMediaBlockedMessage({
-                  pendingMessageId: intent.pendingMessageId,
-                  type: 'image',
-                  prompt: intent.prompt,
-                  source: intent.triggerSource,
-                  reason: result.message,
-                  routeSource: result.routeSource,
-                }),
-              });
-              continue;
-            }
-            replacePendingAssistantMessage({
-              sessionId,
-              targetId: selectedTarget.id,
-              pendingMessageId: intent.pendingMessageId,
-              setMessages: context.setMessages,
-              setSessions: context.setSessions,
-              message: createMediaFailureMessage({
-                pendingMessageId: intent.pendingMessageId,
-                type: 'image',
-                prompt: intent.prompt,
-                source: intent.triggerSource,
-                reason: result.message,
-                routeSource: result.routeSource,
-              }),
-            });
-            continue;
-          }
-
-          const result = await runVideoTurn({
-            aiClient: context.aiClient,
-            prompt: intent.prompt,
-            defaultSettings: context.defaultSettings,
-            nsfwPolicy,
-            fallbackRouteSource,
-          });
-          if (input.getCurrentContextKey() !== input.sendContextKey) {
-            context.setMessages((prev) => prev.filter((message) => message.id !== intent.pendingMessageId));
-            return;
-          }
-          if (result.status === 'ok') {
-            replacePendingAssistantMessage({
-              sessionId,
-              targetId: selectedTarget.id,
-              pendingMessageId: intent.pendingMessageId,
-              setMessages: context.setMessages,
-              setSessions: context.setSessions,
-              message: {
-                id: intent.pendingMessageId,
-                role: 'assistant',
-                kind: 'video',
-                content: '',
-                timestamp: new Date(),
-                media: {
-                  uri: result.uri,
-                  mimeType: result.mimeType,
-                },
-                meta: {
-                  mediaType: 'video',
-                  mediaStatus: 'ready',
-                  mediaPrompt: intent.prompt,
-                  mediaIntentSource: intent.triggerSource === 'marker' ? 'tag' : 'heuristic',
-                  routeSource: result.routeSource,
-                  routeModel: result.routeModel,
-                  nsfwPolicy,
-                },
-              },
-            });
-            continue;
-          }
-          if (result.status === 'blocked') {
-            replacePendingAssistantMessage({
-              sessionId,
-              targetId: selectedTarget.id,
-              pendingMessageId: intent.pendingMessageId,
-              setMessages: context.setMessages,
-              setSessions: context.setSessions,
-              message: createMediaBlockedMessage({
-                pendingMessageId: intent.pendingMessageId,
-                type: 'video',
-                prompt: intent.prompt,
-                source: intent.triggerSource,
-                reason: result.message,
-                routeSource: result.routeSource,
-              }),
-            });
-            continue;
-          }
-          replacePendingAssistantMessage({
-            sessionId,
-            targetId: selectedTarget.id,
-            pendingMessageId: intent.pendingMessageId,
-            setMessages: context.setMessages,
-            setSessions: context.setSessions,
-            message: createMediaFailureMessage({
-              pendingMessageId: intent.pendingMessageId,
-              type: 'video',
-              prompt: intent.prompt,
-              source: intent.triggerSource,
-              reason: result.message,
-              routeSource: result.routeSource,
-            }),
-          });
-        }
-      }).catch((mediaError) => {
-        context.setStatusBanner({
-          kind: 'warn',
-          message: mediaError instanceof Error
-            ? mediaError.message
-            : String(mediaError || 'Media generation failed.'),
-        });
-        const pendingMessageIds = new Set(pendingMediaIntents.map((intent) => intent.pendingMessageId));
-        context.setMessages((prev) => prev.filter((message) => (
-          !pendingMessageIds.has(message.id)
-          || (message.kind !== 'image-pending' && message.kind !== 'video-pending')
-        )));
+    const firstAssistantTurnId = assistantPayload.assistantOutput.deliveries[0]?.id || null;
+    const attachArtifactsToMedia = assistantPayload.assistantOutput.deliveries.length === 0;
+    const applyPromptTracePatch = (patch: Partial<MediaPromptTracePatch>) => {
+      assistantPayload.promptTrace = {
+        ...assistantPayload.promptTrace,
+        ...patch,
+      };
+      context.setLatestPromptTrace(assistantPayload.promptTrace);
+    };
+    const persistPromptTracePatch = async () => {
+      if (!firstAssistantTurnId) return;
+      await schedule.done.catch(() => undefined);
+      await updateLocalChatTurnArtifacts({
+        sessionId,
+        turnId: firstAssistantTurnId,
+        promptTrace: assistantPayload.promptTrace,
       });
-    }
+      context.setSessions(await listLocalChatSessions(selectedTarget.id, context.viewerId));
+    };
+    const markerOverrideIntent = markerOverrideCandidates[0] || null;
+    const mediaDecisionTask: Promise<MediaExecutionDecision> = decideMediaExecution({
+      aiClient: context.aiClient,
+      turnTxnId,
+      routeOverride: prepared.routeOverride,
+      defaultSettings: context.defaultSettings,
+      userText: text,
+      assistantText: assistantVisibleText,
+      target: selectedTarget,
+      worldId: selectedTarget.worldId,
+      messages: context.messages,
+      promptTrace: assistantPayload.promptTrace,
+      nsfwPolicy,
+      fallbackRouteSource,
+      imageRouteOptions: context.imageRouteOptions,
+      videoRouteOptions: context.videoRouteOptions,
+      imageRouteOptionsRevision: context.imageRouteOptionsRevision,
+      videoRouteOptionsRevision: context.videoRouteOptionsRevision,
+      imageResolvedRoute: context.imageResolvedRoute,
+      videoResolvedRoute: context.videoResolvedRoute,
+      imageDependencySnapshot: context.imageDependencySnapshot,
+      videoDependencySnapshot: context.videoDependencySnapshot,
+      markerOverrideIntent,
+    });
+
+    const mediaCompletion = mediaDecisionTask.then(async (decision) => {
+      applyPromptTracePatch(decision.promptTracePatch);
+      await persistPromptTracePatch();
+      await schedule.done.catch(() => undefined);
+      if (input.getCurrentContextKey() !== input.sendContextKey) {
+        return;
+      }
+      const executionTracePatch = await executeMediaDecision({
+        decision,
+        aiClient: context.aiClient,
+        defaultSettings: context.defaultSettings,
+        nsfwPolicy,
+        fallbackRouteSource,
+        sessionId,
+        targetId: selectedTarget.id,
+        viewerId: context.viewerId,
+        assistantBundleId: schedule.assistantBundleId,
+        setMessages: context.setMessages,
+        setSessions: context.setSessions,
+        promptTrace: attachArtifactsToMedia ? assistantPayload.promptTrace : undefined,
+        turnAudit: attachArtifactsToMedia ? assistantPayload.turnAudit : undefined,
+        sendContextKey: input.sendContextKey,
+        getCurrentContextKey: input.getCurrentContextKey,
+      });
+      if (!executionTracePatch) {
+        return;
+      }
+      applyPromptTracePatch(executionTracePatch);
+      await persistPromptTracePatch();
+    }).catch(() => undefined);
+    void Promise.all([
+      schedule.done.catch(() => undefined),
+      mediaCompletion,
+    ]).then(async () => {
+      await runLocalChatContinuityMaintenance({
+        aiClient: context.aiClient,
+        routeOverride: prepared.routeOverride,
+        conversationId: sessionId,
+        viewerId: context.viewerId,
+        target: selectedTarget,
+      });
+    }).catch(() => undefined);
 
     logTurnSendDone({
       flowId,
@@ -713,6 +555,7 @@ export async function runLocalChatTurnSend(input: {
     persistFailedTurn({
       sessionId,
       targetId: selectedTarget.id,
+      viewerId: context.viewerId,
       userMessage,
       errorMessage: errorPayload.errorMessage,
       turnAudit: errorPayload.turnAudit,
