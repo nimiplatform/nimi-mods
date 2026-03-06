@@ -84,6 +84,42 @@ cases:
     expected_ok: true
     reason_code: LOCAL_CHAT_MEDIA_CACHE_WRITE_OK
     source_rule: LC-ACC-002
+  - id: LC-015-VOICE-STRICT-OFF-TEXT-ONLY
+    description: When enableVoice is false, assistant auto segments remain text and voice delivery is not scheduled.
+    expected_ok: true
+    reason_code: LOCAL_CHAT_VOICE_DISABLED_TEXT_ONLY
+    test_reference: local-chat-voice-disabled.test.mjs
+    source_rule: LC-ACC-002
+  - id: LC-016-STT-STRICT-OFF-FAIL-CLOSE
+    description: When enableVoice is false, voice input fails before recording or transcribe flow starts.
+    expected_ok: true
+    reason_code: LOCAL_CHAT_STT_VOICE_DISABLED
+    test_reference: local-chat-voice-disabled.test.mjs
+    source_rule: LC-ACC-002
+  - id: LC-017-VOICE-CATALOG-MODEL-SCOPED
+    description: Voice selection is scoped only by current route binding and resolved model, without provider filtering.
+    expected_ok: true
+    reason_code: LOCAL_CHAT_VOICE_MODEL_SCOPED_OK
+    test_reference: local-chat-voice-dropdown.e2e.test.ts
+    source_rule: LC-ACC-002
+  - id: LC-018-TTS-BYTES-PLAYBACK
+    description: Bytes-only TTS artifacts create a playable Blob URL and do not raise LOCAL_CHAT_TTS_PLAYBACK_FAILED.
+    expected_ok: true
+    reason_code: LOCAL_CHAT_TTS_BYTES_PLAYBACK_OK
+    test_reference: local-chat-voice-playback.test.ts
+    source_rule: LC-ACC-002
+  - id: LC-019-SPEECH-CATALOG-STRICT-OFF
+    description: When enableVoice is false, Local-Chat does not query preset voices or require TTS/STT dependencies.
+    expected_ok: true
+    reason_code: LOCAL_CHAT_VOICE_CATALOG_SKIPPED_WHEN_DISABLED
+    test_reference: local-chat-voice-disabled.test.mjs
+    source_rule: LC-ACC-002
+  - id: LC-020-DEPENDENCY-SNAPSHOT-CANONICAL-CAPABILITY
+    description: Local-Chat consumes dependency snapshot repair actions through runtime canonical capability tokens instead of legacy chat/tts/stt aliases.
+    expected_ok: true
+    reason_code: LOCAL_CHAT_DEPENDENCY_CAPABILITY_CANONICAL
+    test_reference: local-chat-dependency-capability.test.ts
+    source_rule: LC-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:local-chat-kernel-docs
     source_rule: LC-ACC-001

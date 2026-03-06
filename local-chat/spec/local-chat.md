@@ -28,6 +28,10 @@
 - `LC-DOM-014`: `allowProactiveContact` is opt-in and driven by heartbeat scheduling.
 - `LC-DOM-015`: Proactive heartbeat policy emits deterministic reason codes for gate/audit outcomes.
 - `LC-DOM-016`: Core social/world/memory read dependencies are explicit capability declarations.
+- `LC-DOM-017`: `enableVoice=false` is strict-off; Local-Chat MUST NOT synthesize speech, transcribe audio, or query preset voices while disabled.
+- `LC-DOM-018`: Voice catalog resolution is binding-and-model scoped; Local-Chat MUST NOT maintain a second provider-level voice truth.
+- `LC-DOM-019`: TTS playback accepts either artifact `uri` or bytes-backed audio payload; bytes-only success is not a playback failure.
+- `LC-DOM-023`: Mod-facing dependency snapshots consumed by Local-Chat MUST expose runtime canonical capability tokens, not legacy short aliases.
 
 ## 3. No Over-Design Guard
 

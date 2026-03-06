@@ -30,6 +30,36 @@ codes:
     blocking: false
     action_hint: Retry speech or switch to text-only response.
     source_rule: LC-ERR-002
+  - code: LOCAL_CHAT_VOICE_DISABLED_TEXT_ONLY
+    stage: assistant-generate
+    blocking: false
+    action_hint: keep-text-delivery-when-voice-disabled
+    source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_STT_VOICE_DISABLED
+    stage: speech-synthesize-or-transcribe
+    blocking: true
+    action_hint: enable-voice-input-before-recording
+    source_rule: LC-ERR-003
+  - code: LOCAL_CHAT_VOICE_MODEL_SCOPED_OK
+    stage: voice-catalog
+    blocking: false
+    action_hint: route-model-scoped-voice-catalog
+    source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_TTS_BYTES_PLAYBACK_OK
+    stage: speech-synthesize-or-transcribe
+    blocking: false
+    action_hint: bytes-backed-audio-playback-succeeded
+    source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_VOICE_CATALOG_SKIPPED_WHEN_DISABLED
+    stage: voice-catalog
+    blocking: false
+    action_hint: skip-voice-catalog-while-disabled
+    source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_DEPENDENCY_CAPABILITY_CANONICAL
+    stage: dependency-snapshot
+    blocking: false
+    action_hint: canonical-capability-consumed
+    source_rule: LC-ERR-001
   - code: LOCAL_CHAT_PROACTIVE_ALLOWED
     stage: proactive-policy
     blocking: false
