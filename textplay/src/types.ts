@@ -129,9 +129,11 @@ export type TextplayStorySummary = {
   entryEventId: string;
   title: string;
   summary: string;
+  materialSummary: string;
   primaryAgentId: string;
   participants: string[];
   eventHorizon: 'PAST' | 'ONGOING' | 'FUTURE';
+  entryMode: 'PRE_EVENT';
   updatedAt: string;
   playable: boolean;
   agentBindingMissing: boolean;

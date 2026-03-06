@@ -102,6 +102,9 @@ export function buildTextplayPrompt(input: {
   const openingMode = String(openingPayload?.mode || '').trim();
   const isStoryStart = openingMode === 'story-start';
   const openingInstruction = String(openingPayload?.instruction || '').trim();
+  const openingEntryMode = String(openingPayload?.entryMode || 'PRE_EVENT').trim().toUpperCase();
+  const openingHorizon = String(openingPayload?.entryEventHorizon || '').trim().toUpperCase();
+  const targetEventMaterialOnly = Boolean(openingPayload?.targetEventMaterialOnly);
   const openingPlayerIdentity = String(openingPayload?.playerIdentity || '').trim();
   const openingPlayerRole = String(openingPayload?.playerRole || '').trim();
   const openingPlayerBackground = String(openingPayload?.playerBackground || '').trim();
@@ -150,9 +153,20 @@ export function buildTextplayPrompt(input: {
   }
 
   if (isStoryStart) {
+    if (openingEntryMode === 'PRE_EVENT') {
+      constraints.push(
+        '- Opening mode: this is the pre-event threshold; the selected target event has NOT happened yet in this run.',
+        '- Opening mode: establish only past-and-present context, with no future spoilers.',
+        '- Opening mode: do not narrate the target event as already completed, even if canonical metadata says PAST or ONGOING.',
+      );
+    }
+    if (targetEventMaterialOnly) {
+      constraints.push(
+        '- Opening mode: selected target-event title/summary/cause/process/result/timeRef are reference materials only, not proof that those beats already happened on-screen.',
+        '- Opening mode: player input and later visible events decide whether and how the story converges toward the selected target event.',
+      );
+    }
     constraints.push(
-      '- Opening mode: this is the pre-event threshold; entry event outcome has NOT happened yet.',
-      '- Opening mode: establish only past-and-present context, with no future spoilers.',
       '- Explain why the player is here and what the player currently knows.',
       '- Weave player role/background into scene narration naturally, not as metadata dump.',
       '- Do not reveal hidden outcomes or end-state conclusions in opening narration.',
@@ -172,7 +186,10 @@ export function buildTextplayPrompt(input: {
     `Player Name: ${playerName || '(unspecified)'}`,
     `Player Identity: ${firstNonEmpty([playerIdentity, openingPlayerIdentity, openingPlayerRole]) || '(unspecified)'}`,
     `Opening Mode: ${openingMode || 'normal'}`,
+    `Opening Entry Mode: ${openingEntryMode || '(unspecified)'}`,
+    `Opening Horizon: ${openingHorizon || '(unspecified)'}`,
     `Opening No-Spoiler: ${openingNoSpoiler}`,
+    `Target Event Material Only: ${targetEventMaterialOnly}`,
     `Player Role: ${openingPlayerRole || '(unspecified)'}`,
     `Player Background: ${openingPlayerBackground || '(unspecified)'}`,
     `Opening Situation: ${openingSituation || '(unspecified)'}`,

@@ -153,6 +153,104 @@ function createHookClientMissingStoryContext() {
                 narrativeSetting: { pacingPolicy: { curve: 'steady' } },
                 narrativeState: {},
               },
+              {
+                id: 'ctx-story-other',
+                scope: 'STORY',
+                scopeKey: 'story:world-1:evt-other',
+                storyId: 'story.world-1.evt-other',
+                narrativeSetting: {
+                  recommendedSceneId: 'scene-docks',
+                },
+                narrativeState: {
+                  phase: 'other-story',
+                },
+              },
+            ],
+          };
+        }
+        if (capability === 'data-api.core.agent.memory.recall.for-entity') {
+          return {
+            recallSource: 'remote-only',
+            items: [],
+            core: [],
+            e2e: [],
+          };
+        }
+        throw new Error(`unsupported-capability:${capability}`);
+      },
+    },
+  };
+}
+
+function createHookClientWithCrossStoryContextLeak() {
+  return {
+    data: {
+      query: async ({ capability }) => {
+        if (capability === 'data-api.world.lorebooks.list') {
+          return { worldId: 'world-1', items: [] };
+        }
+        if (capability === 'data-api.world.scenes.list') {
+          return {
+            worldId: 'world-1',
+            items: [
+              {
+                id: 'scene-docks',
+                worldId: 'world-1',
+                name: 'Iron Docks',
+                description: 'Rain hammers the mooring towers.',
+                setting: { weather: 'rain' },
+                activeEntities: ['agent-1', 'player-1'],
+                updatedAt: '2026-03-02T09:00:00.000Z',
+              },
+            ],
+          };
+        }
+        if (capability === 'data-api.world.narrative-contexts.list') {
+          return {
+            worldId: 'world-1',
+            items: [
+              {
+                id: 'ctx-canon',
+                scope: 'CANON',
+                scopeKey: 'canon:world-1',
+                storyId: null,
+                narrativeSetting: { pacingPolicy: { curve: 'steady' } },
+                narrativeState: {},
+              },
+              {
+                id: 'ctx-story',
+                scope: 'STORY',
+                scopeKey: 'story:world-1:evt-primary',
+                storyId: 'story.world-1.evt-primary',
+                narrativeSetting: {
+                  recommendedSceneId: 'scene-docks',
+                },
+                narrativeState: {
+                  phase: 'in-progress',
+                },
+              },
+              {
+                id: 'ctx-subject-other',
+                scope: 'SUBJECT',
+                scopeKey: 'subject:world-1:agent-1:other',
+                storyId: 'story.world-1.evt-other',
+                subjectType: 'AGENT',
+                subjectId: 'agent-1',
+                narrativeSetting: { dramaticRole: 'saboteur' },
+                narrativeState: { activeObjective: 'mislead player' },
+              },
+              {
+                id: 'ctx-relation-other',
+                scope: 'RELATION',
+                scopeKey: 'relation:world-1:agent-1:player-1:other',
+                storyId: 'story.world-1.evt-other',
+                subjectType: 'AGENT',
+                subjectId: 'agent-1',
+                targetSubjectType: 'PLAYER',
+                targetSubjectId: 'player-1',
+                narrativeSetting: { relationContract: 'hostile' },
+                narrativeState: { trust: -0.6 },
+              },
             ],
           };
         }
@@ -175,11 +273,13 @@ const detail = {
   worldId: 'world-1',
   entryEventId: 'evt-primary',
   title: 'Storm Harbor Incident',
-  summary: 'A tense negotiation breaks under heavy rain.',
+  summary: 'Contraband pressure keeps building on the docks……',
+  materialSummary: 'A tense negotiation breaks under heavy rain while the target event still lies ahead.',
   primaryAgentId: 'agent-1',
   participants: ['agent-1', 'player-1'],
   updatedAt: '2026-03-02T09:00:00.000Z',
   eventHorizon: 'PAST',
+  entryMode: 'PRE_EVENT',
   playable: true,
   agentBindingMissing: false,
   cause: 'Contraband dispute',
@@ -233,4 +333,20 @@ test('startup package fails close when STORY context is missing', async () => {
     },
     /TEXTPLAY_CONTEXT_MISSING_CRITICAL/,
   );
+});
+
+test('startup package does not borrow SUBJECT or RELATION context from a different story', async () => {
+  const startup = await loadStoryStartupPackage({
+    hookClient: createHookClientWithCrossStoryContextLeak(),
+    narrativeEngine: {
+      turnLatest: async () => null,
+    },
+    detail,
+    playerId: 'player-1',
+  });
+
+  assert.equal(startup.snapshot.gapWarnings.includes('TEXTPLAY_CONTEXT_SUBJECT_MISSING_WARN'), true);
+  assert.equal(startup.snapshot.gapWarnings.includes('TEXTPLAY_CONTEXT_RELATION_MISSING_WARN'), true);
+  assert.equal(startup.materials.contexts.some((row) => row.id === 'ctx-subject-other'), false);
+  assert.equal(startup.materials.contexts.some((row) => row.id === 'ctx-relation-other'), false);
 });

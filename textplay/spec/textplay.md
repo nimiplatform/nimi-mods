@@ -33,16 +33,17 @@
 - `TXT-014`: Render output must always include `text` and `meta`.
 - `TXT-015`: Initiative events reset idle/away timers in presence state machine.
 - `TXT-016`: Resume with checkpoint hash mismatch is fail-close.
-- `TXT-017`: Playable story catalog is derived from `data-api.world.events.list` and keeps `PRIMARY` events only.
+- `TXT-017`: Playable story catalog is derived from `data-api.world.events.list`, keeps `PRIMARY` events only, preserves upstream `eventHorizon` as canonical target-event metadata, and excludes `FUTURE` events from direct player-facing selection by default.
+- `TXT-017A`: Player-facing story introduction is teaser-only: one or two background clauses with trailing ellipsis. Canonical target-event details stay in startup/prompt materials and are not fully dumped in catalog UI.
 - `TXT-018`: Story startup package is assembled from world events, scenes, narrative-contexts, lorebooks, agent memory recall, and optional narrative latest turn lookup.
 - `TXT-019`: Send action is blocked when no selected story or startup package is not ready.
 - `TXT-023`: Story switch resets run surface state and reloads persisted records by selected story id.
 - `TXT-024`: Runtime binding uses single primary agent id for turn execution and keeps other participants as context-only metadata.
 - `TXT-025`: Story startup package must include `startupPolicy` and snapshot `contextCoverage/gapWarnings` diagnostics.
 - `TXT-026`: Frontend auto tick may trigger `AgentInitiative` only when presence/cooldown/maxConsecutive policies are satisfied.
-- `TXT-027`: Missing `CANON/STORY` context is fail-close; missing `SUBJECT/RELATION/scene` is degraded with warnings.
+- `TXT-027`: Missing `CANON/STORY` context is fail-close; missing `SUBJECT/RELATION/scene` is degraded with warnings. `SUBJECT/RELATION` lookup may use exact-story match or storyless baseline only; cross-story fallback is forbidden.
 - `TXT-028`: Story selection is world-scoped and requires selecting account world first.
-- `TXT-029`: Fresh story requires explicit Start action that triggers one opening `SystemEvent` render before player input is accepted.
+- `TXT-029`: Fresh story requires explicit Start action that triggers one opening `SystemEvent` render before player input is accepted; fresh entry starts from the selected target event's pre-threshold rather than treating canonical event details as already happened opening facts.
 - `TXT-030`: Left context panel must be independently scrollable to preserve access to session controls on small viewports.
 - `TXT-031`: Tension pacing constraints are injected into render prompt based on `pacingContext.tensionBand` (HIGH/MODERATE/LOW).
 - `TXT-032`: Event type rendering guidance is appended per-event as `Rendering hint` when the event carries a recognized `type` field.

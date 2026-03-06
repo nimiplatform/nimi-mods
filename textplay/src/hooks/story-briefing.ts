@@ -97,7 +97,7 @@ export function deriveStoryNarrativeContext(input: {
     subjectScope.playerBackground,
     subjectScope.background,
     subjectScope.summary,
-    input.story.summary,
+    input.story.materialSummary,
   ]);
 
   const currentSituation = [
@@ -214,10 +214,10 @@ export function buildStoryRecapPrompt(input: {
     '- 最后一句必须给出可行动的下一步钩子。',
     '',
     `故事：${input.story.title}`,
-    `目标事件：${input.story.summary}`,
+    `目标事件：${input.startup.entry.summary || input.story.materialSummary || input.story.summary}`,
     `玩家称呼：${input.playerName || '你'}`,
     `玩家身份：${resolvedIdentity}`,
-    `背景：${truncateForPrompt(input.startup.background.summary || input.story.summary, 260) || '(暂无)'}`,
+    `背景：${truncateForPrompt(input.startup.background.summary || input.story.materialSummary || input.story.summary, 260) || '(暂无)'}`,
     `当前局势：${truncateForPrompt(context.currentSituation, 260) || '(暂无)'}`,
     `当前位置：${context.sceneLabel}`,
     '',
@@ -227,6 +227,38 @@ export function buildStoryRecapPrompt(input: {
     '输出：仅输出前情提要正文，不要标题，不要列表符号。',
   ];
   return lines.join('\n');
+}
+
+function buildOpeningInstruction(
+  story: TextplayStoryDetail,
+): string {
+  const commonLines = [
+    '你正在生成故事开场段落。',
+    '必须自然交代玩家是谁、为何在场、当前处境，并给出一个可行动的起手钩子。',
+    'Fresh story start 一律从目标事件真正发生前的临界阶段切入。',
+    '目标事件标题、摘要、起因、过程、结果、时间锚点都只是 canonical 素材，不是本次开场里已经发生的既定事实。',
+    '故事是否逼近、偏离或改写该目标事件，取决于玩家输入与后续叙事推进。',
+    '不得把目标事件直接写成已经完成，也不得默认沿原剧情结果直线推进。',
+  ];
+  if (story.eventHorizon === 'PAST') {
+    return [
+      ...commonLines,
+      '上游 world truth 中该目标事件已有既有版本，但这里只能把既有版本当作素材参考，不能把既有结果当前置结局。',
+      '只允许描述开场前已发生的背景与当下可见信息，严禁把“事件已完成”写成玩家当前现实。',
+    ].join('');
+  }
+  if (story.eventHorizon === 'ONGOING') {
+    return [
+      ...commonLines,
+      '上游 world truth 中该目标事件处于进行中素材带，但本次 fresh start 仍从其真正爆发前切入。',
+      '只能描写玩家此刻可见的前兆、压力与导火索，不得把 live conflict 当作已经正式开始的既定事实。',
+    ].join('');
+  }
+  return [
+    ...commonLines,
+    '当前处于目标事件发生前的临界阶段，只允许描述已发生背景与当下可见信息。',
+    '严禁剧透未来走向或提前揭示最终结果。',
+  ].join('');
 }
 
 export function buildOpeningSystemPayload(input: {
@@ -246,7 +278,7 @@ export function buildOpeningSystemPayload(input: {
   ]) || '未明身份的到访者';
 
   const openingBackground = [
-    input.startup.background.summary || input.story.summary,
+    input.startup.background.summary || input.story.materialSummary || input.story.summary,
     `玩家身份：${input.playerName || '你'}（${resolvedIdentity}）`,
     context.playerBackground ? `玩家背景：${context.playerBackground}` : '',
     context.currentSituation ? `当前处境：${context.currentSituation}` : '',
@@ -255,12 +287,7 @@ export function buildOpeningSystemPayload(input: {
   return {
     opening: {
       mode: 'story-start',
-      instruction: [
-        '你正在生成故事开场段落。',
-        '当前处于目标事件发生前的临界阶段，禁止把目标事件写成已完成事实。',
-        '只允许描述已发生事实与当下可见信息，严禁剧透未来走向或提前揭示最终结果。',
-        '必须自然交代玩家是谁、为何在场、当前处境，并给出一个可行动的起手钩子。',
-      ].join(''),
+      instruction: buildOpeningInstruction(input.story),
       playerId: input.playerId,
       playerName: input.playerName,
       playerIdentity: resolvedIdentity,
@@ -268,8 +295,11 @@ export function buildOpeningSystemPayload(input: {
       playerBackground: context.playerBackground,
       storyId: input.story.storyId,
       storyTitle: input.story.title,
+      entryMode: input.story.entryMode,
       entryEventId: input.story.entryEventId,
-      entrySummary: input.story.summary,
+      entryEventHorizon: input.story.eventHorizon,
+      targetEventMaterialOnly: true,
+      entrySummary: input.startup.entry.summary || input.story.materialSummary || input.story.summary,
       phase: context.storyScope.phase || 'opening',
       objective: context.storyScope.objective || 'advance-story',
       background: openingBackground,
@@ -294,7 +324,7 @@ function collectInitiativeHooks(startup: NonNullable<TextplayShellProps['startup
   const storyScope = asRecord(startup.narrativeScopes.STORY) || {};
   const storyNarrativeState = asRecord(storyScope.narrativeState) || {};
   const storyContextRows = startup.materials.contexts
-    .filter((context) => context.scope === 'STORY');
+    .filter((context) => context.scope === 'STORY' && (!context.storyId || context.storyId === startup.storyId));
 
   const fromStoryScope = (key: string): string[] => uniqueStrings([
     ...toStringArray(storyScope[key]),
