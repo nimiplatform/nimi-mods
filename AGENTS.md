@@ -45,7 +45,7 @@ Entry must export a runtime mod factory:
 Factory returns `RuntimeModRegistration` and typically performs:
 
 - `createHookClient(modId)` for hook subsystems
-- `createAiClient(modId)` for route-aware AI facade
+- `createModRuntimeClient(modId)` for runtime-aligned AI/media/voice facade
 
 ## Manifest Contract (Current Runtime)
 
@@ -57,7 +57,7 @@ Manifest is consumed by desktop runtime (`apps/desktop/src-tauri/src/runtime_mod
 
 Current built-in manifest style uses capability keys like:
 
-- `llm.text.generate`
+- `runtime.ai.text.generate`
 - `data.register.data-api.local-chat.sessions.list`
 - `data.query.data-api.local-chat.sessions.list`
 - `ui.register.ui-extension.app.sidebar.mods`
@@ -69,7 +69,7 @@ Use explicit capability keys. Do not use wildcard grants.
 Use subpath imports from `@nimiplatform/sdk/mod`:
 
 - `@nimiplatform/sdk/mod/hook`
-- `@nimiplatform/sdk/mod/ai`
+- `@nimiplatform/sdk/mod/runtime`
 - `@nimiplatform/sdk/mod/types`
 - `@nimiplatform/sdk/mod/ui`
 - `@nimiplatform/sdk/mod/logging`
@@ -96,8 +96,15 @@ Use `hook.<domain>` clients:
 - `hook.ui.register`
 - `hook.turn.register`
 - `hook.interMod.registerHandler/request`
-- `hook.llm.*` (text/image/video/embedding/speech/health)
+- `hook.profile.*`, `hook.audit`, `hook.meta`
 - `hook.audit`, `hook.meta`
+
+Use `runtime.<domain>` clients for runtime-facing AI/media/voice work:
+
+- `runtime.route.*`
+- `runtime.ai.*`
+- `runtime.media.*`
+- `runtime.voice.*`
 
 Do not use legacy `hook.eventBus` / `hook.dataApi` / `hook.uiExtension` naming.
 
