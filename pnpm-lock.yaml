@@ -60,7 +60,7 @@ importers:
   kismet:
     dependencies:
       lightweight-charts:
-        specifier: ^5.0.0
+        specifier: ^5.1.0
         version: 5.1.0
 
   knowledge-base:
@@ -84,7 +84,6 @@ importers:
   mint-you: {}
 
   narrative-engine: {}
-
   test-chat-tts: {}
 
   textplay:

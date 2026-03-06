@@ -10,6 +10,6 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "lightweight-charts": "^5.0.0"
+    "lightweight-charts": "^5.1.0"
   }
 }
