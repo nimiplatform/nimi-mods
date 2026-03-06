@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import type { KeyboardEvent, MouseEvent } from 'react';
+import type { RuntimeCanonicalCapability } from '@nimiplatform/sdk/mod/runtime-route';
 import type { LocalChatBooleanSettingKey } from '../../default-settings-store.js';
 import type { ChatMessage } from '../../types.js';
 import type { useLocalChatPageState } from './use-local-chat-page-state.js';
@@ -9,15 +10,27 @@ import { resolveModelsForScenario } from '../../services/route/connector-model-c
 
 type LocalChatPageState = ReturnType<typeof useLocalChatPageState>;
 
-export function useLocalChatPageActions(state: LocalChatPageState) {
-  const handleSpeechProviderChange = useCallback(
-    (providerId: string) => {
-      state.speechPlaybackState.stopVoicePlayback();
-      state.speechSettingsState.handleSpeechProviderChange(providerId);
-    },
-    [state.speechPlaybackState, state.speechSettingsState],
-  );
+export function shouldIncludeDependencyRepairAction(input: {
+  isLocalSnapshotFailure: boolean;
+  isVoiceEnabled: boolean;
+  capability?: RuntimeCanonicalCapability;
+}): boolean {
+  if (input.isLocalSnapshotFailure) {
+    return false;
+  }
+  if (input.capability === 'text.generate') {
+    return true;
+  }
+  if (!input.isVoiceEnabled && (
+    input.capability === 'audio.synthesize'
+    || input.capability === 'audio.transcribe'
+  )) {
+    return false;
+  }
+  return true;
+}
 
+export function useLocalChatPageActions(state: LocalChatPageState) {
   const handleVoiceIdChange = useCallback(
     (voiceId: string) => {
       state.speechPlaybackState.stopVoicePlayback();
@@ -103,16 +116,16 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
       const localSttRuntimeModels = state.runtimeRouteState.sttRouteOptions?.localRuntime.models || localChatRuntimeModels;
       const localTtsRouteAvailable = localTtsRuntimeModels.some((model) => {
         const capabilities = Array.isArray(model.capabilities) ? model.capabilities : [];
-        return capabilities.includes('tts');
+        return capabilities.includes('audio.synthesize');
       });
       const localSttRouteAvailable = localSttRuntimeModels.some((model) => {
         const capabilities = Array.isArray(model.capabilities) ? model.capabilities : [];
-        return capabilities.includes('stt');
+        return capabilities.includes('audio.transcribe');
       });
 
       const chatCapabilityMatched = (() => {
         const dependencyRows = dependencySnapshot?.dependencies || [];
-        const chatRows = dependencyRows.filter((item) => item.capability === 'chat');
+        const chatRows = dependencyRows.filter((item) => item.capability === 'text.generate');
         if (chatRows.length > 0) {
           return chatRows.some((item) => item.selected);
         }
@@ -124,18 +137,18 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
           return byId || byModel;
         });
         const capabilities = Array.isArray(localModel?.capabilities) ? localModel?.capabilities : [];
-        return capabilities.includes('chat');
+        return capabilities.includes('text.generate');
       })();
 
       const isLocalSnapshotFailure = autoBoundSource === 'token-api'
         && dependencySnapshot?.reasonCode === ReasonCode.LOCAL_AI_DEPENDENCY_SNAPSHOT_FAILED;
 
-      const capabilityMatchedFromSnapshot = (capability: 'chat' | 'tts' | 'stt'): boolean => {
+      const capabilityMatchedFromSnapshot = (capability: 'text.generate' | 'audio.synthesize' | 'audio.transcribe'): boolean => {
         const dependencyRows = dependencySnapshot?.dependencies || [];
         const rows = dependencyRows.filter((item) => item.capability === capability);
         if (rows.length === 0) {
-          if (capability === 'chat') return chatCapabilityMatched;
-          if (capability === 'tts') {
+          if (capability === 'text.generate') return chatCapabilityMatched;
+          if (capability === 'audio.synthesize') {
             if (state.speechSettingsState.defaultSettings.ttsRouteSource === 'token-api') return true;
             if (
               state.speechSettingsState.defaultSettings.ttsRouteSource === 'auto'
@@ -159,36 +172,25 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
 
       const isVoiceEnabled = Boolean(state.speechSettingsState.defaultSettings.enableVoice);
       const dependencyCapabilities: RuntimeStatusSidebarProps['dependencyCapabilities'] = [
-        { capability: 'chat', matched: capabilityMatchedFromSnapshot('chat'), required: true },
+        { capability: 'text.generate', matched: capabilityMatchedFromSnapshot('text.generate'), required: true },
         {
-          capability: 'tts',
-          matched: capabilityMatchedFromSnapshot('tts'),
+          capability: 'audio.synthesize',
+          matched: capabilityMatchedFromSnapshot('audio.synthesize'),
           required: isVoiceEnabled,
         },
         {
-          capability: 'stt',
-          matched: capabilityMatchedFromSnapshot('stt'),
+          capability: 'audio.transcribe',
+          matched: capabilityMatchedFromSnapshot('audio.transcribe'),
           required: isVoiceEnabled,
         },
       ];
       const dependencyRepairActions = (dependencySnapshot?.repairActions || []).filter((action) => {
-        if (isLocalSnapshotFailure) return false;
-        const capability = String(action.capability || '').trim().toLowerCase();
-        const dependencyId = String(action.dependencyId || '').trim().toLowerCase();
-        const actionId = String(action.actionId || '').trim().toLowerCase();
-        if (capability === 'chat') return true;
-        if (!isVoiceEnabled && (
-          capability === 'tts'
-          || capability === 'stt'
-          || dependencyId.includes('tts')
-          || dependencyId.includes('stt')
-          || actionId.includes('tts')
-          || actionId.includes('stt')
-          || actionId.includes('speech.')
-        )) {
-          return false;
-        }
-        return true;
+        const capability = action.capability;
+        return shouldIncludeDependencyRepairAction({
+          isLocalSnapshotFailure,
+          isVoiceEnabled,
+          capability,
+        });
       });
       const dependencyStatus: RuntimeStatusSidebarProps['dependencyStatus'] = (() => {
         if (isLocalSnapshotFailure) {
@@ -230,9 +232,7 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         imageRouteOptions: state.runtimeRouteState.imageRouteOptions,
         videoRouteOptions: state.runtimeRouteState.videoRouteOptions,
         routeBinding: state.runtimeRouteState.routeBinding,
-        speechProviders: state.speechSettingsState.speechProviders,
         speechVoices: state.speechSettingsState.speechVoices,
-        selectedSpeechProviderId: state.speechSettingsState.selectedSpeechProviderId,
         selectedVoiceId: state.speechSettingsState.defaultSettings.voiceName,
         ttsRouteSource: state.speechSettingsState.defaultSettings.ttsRouteSource,
         sttRouteSource: state.speechSettingsState.defaultSettings.sttRouteSource,
@@ -257,7 +257,6 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         onRouteConnectorChange: state.runtimeRouteState.handleRouteConnectorChange,
         onRouteModelChange: state.runtimeRouteState.handleRouteModelChange,
         onClearRouteBinding: state.runtimeRouteState.clearRouteBinding,
-        onSpeechProviderChange: handleSpeechProviderChange,
         onVoiceIdChange: handleVoiceIdChange,
         ttsConnectorId: state.effectiveTtsConnectorId,
         ttsModel: state.effectiveTtsModel,
@@ -271,7 +270,7 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
           const models = resolveModelsForScenario({
             models: c.models || [],
             modelCapabilities: c.modelCapabilities,
-            scenario: 'tts',
+            scenario: 'audio.synthesize',
           });
           return models.length > 0;
         }).map((c) => ({
@@ -284,7 +283,7 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
           const models = resolveModelsForScenario({
             models: c.models || [],
             modelCapabilities: c.modelCapabilities,
-            scenario: 'stt',
+            scenario: 'audio.transcribe',
           });
           return models.length > 0;
         }).map((c) => ({
@@ -297,7 +296,7 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
           const models = resolveModelsForScenario({
             models: c.models || [],
             modelCapabilities: c.modelCapabilities,
-            scenario: 'image',
+            scenario: 'image.generate',
           });
           return models.length > 0;
         }).map((c) => ({
@@ -310,7 +309,7 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
           const models = resolveModelsForScenario({
             models: c.models || [],
             modelCapabilities: c.modelCapabilities,
-            scenario: 'video',
+            scenario: 'video.generate',
           });
           return models.length > 0;
         }).map((c) => ({
@@ -348,7 +347,6 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
       state.latestPromptTrace,
       state.latestTurnAudit,
       state.dependencySnapshot,
-      handleSpeechProviderChange,
       handleVoiceIdChange,
       handleDefaultSettingChange,
       handleDefaultVoiceNameChange,
@@ -361,7 +359,6 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
     && state.speechTranscribeState.voiceInputState !== 'transcribing';
 
   return {
-    handleSpeechProviderChange,
     handleVoiceIdChange,
     handleDefaultSettingChange,
     handleDefaultVoiceNameChange,

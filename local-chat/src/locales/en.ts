@@ -16,7 +16,7 @@ const enLocale = {
   },
   DefaultSettings: {
     title: 'Default Settings',
-    enableVoice: 'Enable Voice (auto)',
+    enableVoice: 'Enable voice replies & voice input',
     allowMultiReply: 'Allow multi-reply from Agent',
     allowProactiveContact: 'Allow Agent to contact proactively',
     autoPlayVoiceReplies: 'Auto-play voice replies',
@@ -51,12 +51,11 @@ const enLocale = {
   VoicePanel: {
     title: 'Voice Model Config',
     enabledNote:
-      'Agent will auto-decide voice or text per content. This config applies to voice segments.',
-    disabledNote: 'Voice is disabled; text-only chat.',
+      'Voice replies and voice input are enabled. Voice list is scoped to the selected route and model.',
+    disabledNote: 'Voice is disabled. Local-Chat will not run TTS, STT, or voice catalog queries until you enable it.',
     ttsRouteSource: 'TTS Route Source',
     sttRouteSource: 'STT Route Source',
     routeAuto: 'Auto',
-    provider: 'Provider',
     auto: 'Auto',
     voice: 'Voice',
     ttsConnector: 'TTS Connector',
@@ -66,7 +65,7 @@ const enLocale = {
     modelPlaceholder: 'Search and select model...',
     noModels: 'No available model for current connector.',
     noMatchingModels: 'No model matches current search.',
-    noVoices: 'No available voices for current provider.',
+    noVoices: 'No available voices for the current route and model.',
     noLocalTtsRoute: 'No local TTS-capable model is available.',
     noLocalSttRoute: 'No local STT-capable model is available.',
     goRuntime: 'Open AI Runtime',

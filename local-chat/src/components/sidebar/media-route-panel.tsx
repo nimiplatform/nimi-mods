@@ -33,12 +33,12 @@ const CHEVRON_ICON = (
 
 function localRuntimeMediaModels(
   options: RuntimeStatusSidebarProps['imageRouteOptions'] | RuntimeStatusSidebarProps['videoRouteOptions'],
-  scenario: 'image' | 'video',
+  scenario: 'image.generate' | 'video.generate',
 ): string[] {
   const models = (options?.localRuntime.models || [])
     .filter((item) => {
       const capabilities = Array.isArray(item.capabilities) ? item.capabilities : [];
-      return capabilities.includes(scenario) || capabilities.includes(`${scenario}.generate`);
+      return capabilities.includes(scenario);
     })
     .map((item) => String(item.model || item.localModelId || '').trim())
     .filter(Boolean);
@@ -48,7 +48,7 @@ function localRuntimeMediaModels(
 function connectorMediaModels(input: {
   connectors: RuntimeStatusSidebarProps['imageConnectors'] | RuntimeStatusSidebarProps['videoConnectors'];
   connectorId: string;
-  scenario: 'image' | 'video';
+  scenario: 'image.generate' | 'video.generate';
 }): string[] {
   const connector = input.connectors.find((item) => item.id === input.connectorId) || null;
   if (!connector) return [];
@@ -64,19 +64,19 @@ export function MediaRoutePanel(props: Props) {
   const imageConnectorModels = useMemo(() => connectorMediaModels({
     connectors: props.imageConnectors,
     connectorId: props.imageConnectorId,
-    scenario: 'image',
+    scenario: 'image.generate',
   }), [props.imageConnectors, props.imageConnectorId]);
   const videoConnectorModels = useMemo(() => connectorMediaModels({
     connectors: props.videoConnectors,
     connectorId: props.videoConnectorId,
-    scenario: 'video',
+    scenario: 'video.generate',
   }), [props.videoConnectors, props.videoConnectorId]);
   const imageLocalModels = useMemo(
-    () => localRuntimeMediaModels(props.imageRouteOptions, 'image'),
+    () => localRuntimeMediaModels(props.imageRouteOptions, 'image.generate'),
     [props.imageRouteOptions],
   );
   const videoLocalModels = useMemo(
-    () => localRuntimeMediaModels(props.videoRouteOptions, 'video'),
+    () => localRuntimeMediaModels(props.videoRouteOptions, 'video.generate'),
     [props.videoRouteOptions],
   );
   const imageModelOptions = props.imageRouteSource === 'token-api' ? imageConnectorModels : imageLocalModels;

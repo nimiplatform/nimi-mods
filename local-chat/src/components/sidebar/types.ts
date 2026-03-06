@@ -1,4 +1,9 @@
-import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot, RuntimeRouteSource } from '@nimiplatform/sdk/mod/runtime-route';
+import type {
+  RuntimeCanonicalCapability,
+  RuntimeRouteBinding,
+  RuntimeRouteOptionsSnapshot,
+  RuntimeRouteSource,
+} from '@nimiplatform/sdk/mod/runtime-route';
 import type { LocalChatBooleanSettingKey, LocalChatDefaultSettings, LocalChatPromptTrace, LocalChatTurnAudit } from '../../state/index.js';
 import type { HealthStatus } from '../../types.js';
 
@@ -9,12 +14,10 @@ export type RuntimeStatusSidebarProps = {
   imageRouteOptions: RuntimeRouteOptionsSnapshot | null;
   videoRouteOptions: RuntimeRouteOptionsSnapshot | null;
   routeBinding: RuntimeRouteBinding | null;
-  speechProviders: Array<{ id: string; name: string; status: 'available' | 'unavailable' }>;
-  speechVoices: Array<{ id: string; providerId: string; name: string }>;
+  speechVoices: Array<{ id: string; name: string }>;
   voiceCatalogSource?: string;
   voiceCatalogModelResolved?: string;
   voiceCatalogVersion?: string;
-  selectedSpeechProviderId: string;
   selectedVoiceId: string;
   ttsRouteSource: 'auto' | 'local-runtime' | 'token-api';
   sttRouteSource: 'auto' | 'local-runtime' | 'token-api';
@@ -26,7 +29,7 @@ export type RuntimeStatusSidebarProps = {
   autoBoundModel: string;
   chatCapabilityMatched: boolean;
   dependencyCapabilities: Array<{
-    capability: 'chat' | 'tts' | 'stt';
+    capability: RuntimeCanonicalCapability;
     matched: boolean;
     required: boolean;
   }>;
@@ -38,7 +41,7 @@ export type RuntimeStatusSidebarProps = {
     label: string;
     reasonCode: string;
     dependencyId?: string;
-    capability?: string;
+    capability?: RuntimeCanonicalCapability;
   }>;
   latestPromptTrace: LocalChatPromptTrace | null;
   latestTurnAudit: LocalChatTurnAudit | null;
@@ -46,7 +49,6 @@ export type RuntimeStatusSidebarProps = {
   onRouteConnectorChange: (connectorId: string) => void;
   onRouteModelChange: (model: string) => void;
   onClearRouteBinding: () => void;
-  onSpeechProviderChange: (providerId: string) => void;
   onVoiceIdChange: (voiceId: string) => void;
   ttsConnectorId: string;
   ttsModel: string;

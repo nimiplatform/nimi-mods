@@ -10,6 +10,8 @@ export type ChatMessageMeta = {
   routeSource?: 'local-runtime' | 'token-api';
   routeModel?: string;
   audioUri?: string;
+  audioBytes?: Uint8Array;
+  audioMimeType?: string;
   streamId?: string;
   streamChunkCount?: number;
   nsfwPolicy?: 'disabled' | 'local-runtime-only' | 'allowed';

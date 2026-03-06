@@ -5,24 +5,12 @@ import { emitLocalChatLog } from '../../logging.js';
 import type { ChatRouteSnapshot, UseLocalChatRuntimeRouteInput } from './types.js';
 
 const ROUTE_OPTIONS_QUERY_TIMEOUT_MS = 6000;
-type RouteCapability = 'chat' | 'image' | 'video' | 'tts' | 'stt';
-
-function toRuntimeCapability(capability: RouteCapability): RuntimeCanonicalCapability {
-  switch (capability) {
-    case 'chat':
-      return 'text.generate';
-    case 'image':
-      return 'image.generate';
-    case 'video':
-      return 'video.generate';
-    case 'tts':
-      return 'audio.synthesize';
-    case 'stt':
-      return 'audio.transcribe';
-    default:
-      return 'text.generate';
-  }
-}
+type RouteCapability =
+  | 'text.generate'
+  | 'image.generate'
+  | 'video.generate'
+  | 'audio.synthesize'
+  | 'audio.transcribe';
 
 function safeLogRendererEvent(payload: Parameters<typeof logRendererEvent>[0]): void {
   emitLocalChatLog({
@@ -134,7 +122,7 @@ export async function loadRouteOptions(input: {
     let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
     const payload = await Promise.race<RuntimeRouteOptionsSnapshot>([
       input.runtimeClient.listOptions({
-        capability: toRuntimeCapability(input.capability),
+        capability: input.capability,
       }),
       new Promise<never>((_, reject) => {
         timeoutHandle = setTimeout(() => {

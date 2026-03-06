@@ -13,6 +13,7 @@ import { VoicePanel } from './sidebar/voice-panel.js';
 import { DiagnosticsPanel } from './sidebar/diagnostics-panel.js';
 import { MediaRoutePanel } from './sidebar/media-route-panel.js';
 import type { RuntimeStatusSidebarProps } from './sidebar/types.js';
+import type { RuntimeCanonicalCapability } from '@nimiplatform/sdk/mod/runtime-route';
 
 const ICON_SHIELD = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -20,28 +21,20 @@ const ICON_SHIELD = (
   </svg>
 );
 
-type RuntimeSpeechVoice = RuntimeStatusSidebarProps['speechVoices'][number];
-
-export function resolveVisibleSpeechVoices(input: {
-  ttsRouteSource: RuntimeStatusSidebarProps['ttsRouteSource'];
-  selectedSpeechProviderId: string;
-  speechVoices: RuntimeSpeechVoice[];
-}): RuntimeSpeechVoice[] {
-  if (input.ttsRouteSource === 'token-api') {
-    return input.speechVoices;
-  }
-  const providerId = String(input.selectedSpeechProviderId || '').trim();
-  if (!providerId) {
-    return input.speechVoices;
-  }
-  return input.speechVoices.filter((voice) => voice.providerId === providerId);
-}
-
 function sourceLabel(source: RuntimeRouteBinding['source'] | 'mixed' | 'unknown'): string {
   if (source === 'token-api') return 'Token API';
   if (source === 'local-runtime') return 'Local Runtime';
   if (source === 'mixed') return 'Mixed';
   return 'Unknown';
+}
+
+function capabilityLabel(capability: RuntimeCanonicalCapability): string {
+  if (capability === 'text.generate') return 'Chat';
+  if (capability === 'audio.synthesize') return 'TTS';
+  if (capability === 'audio.transcribe') return 'STT';
+  if (capability === 'image.generate') return 'Image';
+  if (capability === 'video.generate') return 'Video';
+  return capability;
 }
 
 function bindingsEqual(a: RuntimeRouteBinding | null, b: RuntimeRouteBinding | null): boolean {
@@ -61,9 +54,7 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     checkingHealth,
     chatRouteOptions,
     routeBinding,
-    speechProviders,
     speechVoices,
-    selectedSpeechProviderId,
     selectedVoiceId,
     ttsRouteSource,
     sttRouteSource,
@@ -86,7 +77,6 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     onRouteConnectorChange,
     onRouteModelChange,
     onClearRouteBinding,
-    onSpeechProviderChange,
     onVoiceIdChange,
     onTtsRouteSourceChange,
     onTtsConnectorChange,
@@ -135,14 +125,6 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     () => filterModelOptions(chatModelOptions, chatModelQuery),
     [chatModelOptions, chatModelQuery],
   );
-  const visibleSpeechVoices = useMemo(
-    () => resolveVisibleSpeechVoices({
-      ttsRouteSource,
-      selectedSpeechProviderId,
-      speechVoices,
-    }),
-    [selectedSpeechProviderId, speechVoices, ttsRouteSource],
-  );
 
   useEffect(() => {
     setChatModelQuery(effectiveChatBinding?.model || '');
@@ -153,7 +135,7 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     [dependencyCapabilities],
   );
   const visibleDependencyCapabilities = useMemo(
-    () => dependencyCapabilities.filter((item) => item.capability === 'chat' || item.required),
+    () => dependencyCapabilities.filter((item) => item.capability === 'text.generate' || item.required),
     [dependencyCapabilities],
   );
   const resolvedDefaultBinding = chatRouteOptions?.resolvedDefault || chatRouteOptions?.selected || null;
@@ -192,7 +174,7 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
   );
   const failedCapabilityLabels = visibleDependencyCapabilities
     .filter((item) => !item.matched)
-    .map((item) => item.capability.toUpperCase());
+    .map((item) => capabilityLabel(item.capability));
 
   return (
     <aside className="flex h-full min-h-0 w-80 shrink-0 flex-col overflow-y-auto border-l border-[var(--lc-border)] bg-[#f4f8f9]">
@@ -305,7 +287,6 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
           open={openPanel === 'voice'}
           onToggle={() => setOpenPanel((prev) => (prev === 'voice' ? null : 'voice'))}
           enableVoice={defaultSettings.enableVoice}
-          selectedSpeechProviderId={selectedSpeechProviderId}
           selectedVoiceId={selectedVoiceId}
           ttsRouteSource={ttsRouteSource}
           ttsConnectorId={props.ttsConnectorId}
@@ -317,9 +298,7 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
           sttConnectors={props.sttConnectors}
           localTtsRouteAvailable={localTtsRouteAvailable}
           localSttRouteAvailable={localSttRouteAvailable}
-          speechProviders={speechProviders}
-          visibleSpeechVoices={visibleSpeechVoices}
-          onSpeechProviderChange={onSpeechProviderChange}
+          speechVoices={speechVoices}
           onVoiceIdChange={onVoiceIdChange}
           onTtsRouteSourceChange={onTtsRouteSourceChange}
           onTtsConnectorChange={onTtsConnectorChange}

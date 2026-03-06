@@ -4,6 +4,23 @@ import type { useLocalChatPageState } from './use-local-chat-page-state.js';
 
 type LocalChatPageState = ReturnType<typeof useLocalChatPageState>;
 
+export function resolveVoiceAutoplayDecision(input: {
+  enableVoice: boolean;
+  autoPlayEnabled: boolean;
+  playingVoiceMessageId: string | null;
+}): 'skip-voice-disabled' | 'skip-disabled' | 'skip-playing' | 'play' {
+  if (!input.enableVoice) {
+    return 'skip-voice-disabled';
+  }
+  if (!input.autoPlayEnabled) {
+    return 'skip-disabled';
+  }
+  if (input.playingVoiceMessageId) {
+    return 'skip-playing';
+  }
+  return 'play';
+}
+
 function buildTurnContextKey(state: LocalChatPageState): string {
   return [
     state.targetsState.selectedTargetId,
@@ -112,11 +129,14 @@ export function useLocalChatPageEffects(state: LocalChatPageState) {
     }
     if (!candidate) return;
 
+    const enableVoice = state.speechSettingsState.defaultSettings.enableVoice;
     const autoPlayEnabled = state.speechSettingsState.defaultSettings.autoPlayVoiceReplies;
     const playingVoiceMessageId = state.speechPlaybackState.playingVoiceMessageId;
-    const decision = !autoPlayEnabled
-      ? 'skip-disabled'
-      : (playingVoiceMessageId ? 'skip-playing' : 'play');
+    const decision = resolveVoiceAutoplayDecision({
+      enableVoice,
+      autoPlayEnabled,
+      playingVoiceMessageId,
+    });
     const decisionKey = `${candidate.id}:${decision}`;
     if (decisionKey !== lastAutoplayDecisionKeyRef.current) {
       lastAutoplayDecisionKeyRef.current = decisionKey;
@@ -128,6 +148,7 @@ export function useLocalChatPageEffects(state: LocalChatPageState) {
           messageId: candidate.id,
           targetId: state.targetsState.selectedTargetId,
           sessionId: state.sessionsState.selectedSessionId,
+          enableVoice,
           autoPlayEnabled,
           decision,
           playingVoiceMessageId: playingVoiceMessageId || null,
@@ -135,13 +156,14 @@ export function useLocalChatPageEffects(state: LocalChatPageState) {
         },
       });
     }
-    if (!autoPlayEnabled || playingVoiceMessageId) return;
+    if (decision !== 'play') return;
 
     autoPlayedVoiceIdsRef.current.add(candidate.id);
     void state.speechPlaybackState.playVoiceMessage(candidate);
   }, [
     state.messages,
     state.speechPlaybackState,
+    state.speechSettingsState.defaultSettings.enableVoice,
     state.speechSettingsState.defaultSettings.autoPlayVoiceReplies,
     state.targetsState.selectedTargetId,
     state.sessionsState.selectedSessionId,

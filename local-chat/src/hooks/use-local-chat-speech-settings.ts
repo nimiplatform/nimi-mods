@@ -10,15 +10,8 @@ import {
 } from '../state/index.js';
 import { LOCAL_CHAT_MOD_ID } from '../contracts.js';
 
-type SpeechProvider = {
-  id: string;
-  name: string;
-  status: 'available' | 'unavailable';
-};
-
 type SpeechVoice = {
   id: string;
-  providerId: string;
   name: string;
   modelResolved?: string;
   voiceCatalogSource?: string;
@@ -44,17 +37,30 @@ type VoiceQueryOverride = {
 
 const MODEL_CATALOG_UPDATED_EVENT = 'nimi:runtime:model-catalog-updated';
 
-export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInput) {
-  const [speechProviders, setSpeechProviders] = useState<SpeechProvider[]>([]);
-  const [allSpeechVoices, setAllSpeechVoices] = useState<SpeechVoice[]>([]);
-  const [speechVoices, setSpeechVoices] = useState<SpeechVoice[]>([]);
-  const [speechVoiceCatalogMeta, setSpeechVoiceCatalogMeta] = useState<SpeechVoiceCatalogMeta>({
+function createEmptySpeechVoiceCatalogMeta(): SpeechVoiceCatalogMeta {
+  return {
     modelResolved: '',
     voiceCatalogSource: '',
     voiceCatalogVersion: '',
     voiceCount: 0,
-  });
-  const [selectedSpeechProviderId, setSelectedSpeechProviderId] = useState('');
+  };
+}
+
+export function shouldLoadSpeechVoices(input: {
+  enableVoice: boolean;
+  model?: string;
+}): boolean {
+  if (!input.enableVoice) {
+    return false;
+  }
+  return Boolean(String(input.model || '').trim());
+}
+
+export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInput) {
+  const [speechVoices, setSpeechVoices] = useState<SpeechVoice[]>([]);
+  const [speechVoiceCatalogMeta, setSpeechVoiceCatalogMeta] = useState<SpeechVoiceCatalogMeta>(
+    createEmptySpeechVoiceCatalogMeta(),
+  );
   const latestVoiceRequestRef = useRef(0);
   const {
     settings: defaultSettings,
@@ -69,103 +75,61 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
     const routeSource = (override?.routeSource || defaultSettings.ttsRouteSource);
     const connectorId = String(override?.connectorId || defaultSettings.ttsConnectorId || '').trim();
     const model = String(override?.model || defaultSettings.ttsModel || '').trim();
-    if (routeSource === 'token-api') {
-      return {
-        routeSource: 'token-api' as const,
-        connectorId: connectorId || undefined,
-        model: model || undefined,
-      };
-    }
-    return undefined;
+    return {
+      routeSource,
+      connectorId: connectorId || undefined,
+      model: model || undefined,
+    };
   }, [
     defaultSettings.ttsRouteSource,
     defaultSettings.ttsConnectorId,
     defaultSettings.ttsModel,
   ]);
 
-  const deriveSpeechProviders = useCallback((voices: SpeechVoice[]): SpeechProvider[] => {
-    const seen = new Set<string>();
-    const providers: SpeechProvider[] = [];
-    for (const voice of voices) {
-      const providerId = String(voice.providerId || '').trim();
-      if (!providerId || seen.has(providerId)) {
-        continue;
-      }
-      seen.add(providerId);
-      providers.push({
-        id: providerId,
-        name: providerId,
-        status: 'available',
-      });
-    }
-    return providers;
-  }, []);
-
-  const filterVisibleVoices = useCallback((voices: SpeechVoice[], providerId: string, override?: VoiceQueryOverride) => {
-    const routeSource = String(override?.routeSource || defaultSettings.ttsRouteSource || '').trim();
-    if (routeSource === 'token-api') {
-      return voices;
-    }
-    const normalizedProviderId = String(providerId || '').trim();
-    if (!normalizedProviderId) {
-      return voices;
-    }
-    return voices.filter((voice) => String(voice.providerId || '').trim() === normalizedProviderId);
-  }, [defaultSettings.ttsRouteSource]);
-
   const loadSpeechVoices = useCallback(async (override?: VoiceQueryOverride) => {
+    if (!defaultSettings.enableVoice) {
+      setSpeechVoices([]);
+      setSpeechVoiceCatalogMeta(createEmptySpeechVoiceCatalogMeta());
+      return [];
+    }
     const voiceInput = buildVoiceInput(override);
     const requestId = latestVoiceRequestRef.current + 1;
     latestVoiceRequestRef.current = requestId;
+    const binding = (
+      voiceInput.routeSource === 'token-api' || voiceInput.routeSource === 'local-runtime'
+    ) ? {
+      source: voiceInput.routeSource,
+      connectorId: voiceInput.connectorId || '',
+      model: voiceInput.model || '',
+    } : undefined;
+    const model = String(voiceInput.model || '').trim() || undefined;
+    if (!shouldLoadSpeechVoices({
+      enableVoice: defaultSettings.enableVoice,
+      model,
+    })) {
+      if (requestId === latestVoiceRequestRef.current) {
+        setSpeechVoices([]);
+        setSpeechVoiceCatalogMeta(createEmptySpeechVoiceCatalogMeta());
+      }
+      return [];
+    }
     try {
-      const binding = voiceInput
-        ? {
-          source: voiceInput.routeSource,
-          connectorId: voiceInput.connectorId || '',
-          model: voiceInput.model || '',
-        }
-        : undefined;
-      const [resolved, listed] = await Promise.all([
-        input.runtimeClient.route.resolve({
-          capability: 'audio.synthesize',
-          binding,
-        }),
-        input.runtimeClient.media.tts.listVoices({
-          binding,
-          model: String(voiceInput?.model || '').trim() || undefined,
-        }),
-      ]);
+      const listed = await input.runtimeClient.media.tts.listVoices({
+        binding,
+        model,
+      });
       const voices: SpeechVoice[] = listed.voices.map((voice) => ({
         id: voice.voiceId,
-        providerId: resolved.provider,
         name: voice.name,
         modelResolved: listed.modelResolved,
         voiceCatalogSource: listed.voiceCatalogSource,
         voiceCatalogVersion: listed.voiceCatalogVersion,
       }));
       if (requestId === latestVoiceRequestRef.current) {
-        const providers = deriveSpeechProviders(voices);
-        const nextProviderId = String(selectedSpeechProviderId || providers[0]?.id || '').trim();
-        const visibleVoices = filterVisibleVoices(voices, nextProviderId, override);
-        setAllSpeechVoices(voices);
-        setSpeechProviders(providers);
-        setSpeechVoices(visibleVoices);
-        setSelectedSpeechProviderId((previous) => {
-          const current = String(previous || '').trim();
-          if (current && providers.some((provider) => provider.id === current)) {
-            return current;
-          }
-          return nextProviderId;
-        });
         const representative = voices[0] || null;
-        const configuredModel = String(
-          override?.model
-          || voiceInput?.model
-          || defaultSettings.ttsModel
-          || '',
-        ).trim();
+        setSpeechVoices(voices);
         setSpeechVoiceCatalogMeta({
-          modelResolved: String(representative?.modelResolved || configuredModel || '').trim(),
+          modelResolved: String(representative?.modelResolved || model || '').trim(),
           voiceCatalogSource: String(representative?.voiceCatalogSource || '').trim(),
           voiceCatalogVersion: String(representative?.voiceCatalogVersion || '').trim(),
           voiceCount: voices.length,
@@ -174,19 +138,10 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
       return voices;
     } catch (error) {
       if (requestId === latestVoiceRequestRef.current) {
-        setAllSpeechVoices([]);
-        setSpeechProviders([]);
         setSpeechVoices([]);
         setSpeechVoiceCatalogMeta({
-          modelResolved: String(
-            override?.model
-            || voiceInput?.model
-            || defaultSettings.ttsModel
-            || '',
-          ).trim(),
-          voiceCatalogSource: '',
-          voiceCatalogVersion: '',
-          voiceCount: 0,
+          ...createEmptySpeechVoiceCatalogMeta(),
+          modelResolved: model || '',
         });
       }
       logRendererEvent({
@@ -201,20 +156,23 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
       return [];
     }
   }, [
+    defaultSettings.enableVoice,
     input.runtimeClient,
     buildVoiceInput,
-    defaultSettings.ttsModel,
-    deriveSpeechProviders,
-    filterVisibleVoices,
-    selectedSpeechProviderId,
   ]);
+
+  useEffect(() => {
+    if (defaultSettings.enableVoice) {
+      return;
+    }
+    setSpeechVoices([]);
+    setSpeechVoiceCatalogMeta(createEmptySpeechVoiceCatalogMeta());
+  }, [defaultSettings.enableVoice]);
 
   const loadSpeechCatalog = useCallback(async () => {
     try {
       await loadSpeechVoices();
     } catch (error) {
-      setAllSpeechVoices([]);
-      setSpeechProviders([]);
       setSpeechVoices([]);
       logRendererEvent({
         level: 'warn',
@@ -228,10 +186,16 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
   }, [loadSpeechVoices]);
 
   useEffect(() => {
+    if (!defaultSettings.enableVoice) {
+      return undefined;
+    }
     void loadSpeechCatalog();
-  }, [loadSpeechCatalog]);
+  }, [defaultSettings.enableVoice, loadSpeechCatalog]);
 
   useEffect(() => {
+    if (!defaultSettings.enableVoice) {
+      return undefined;
+    }
     let cancelled = false;
     void loadSpeechVoices().then(() => {
       if (cancelled) return;
@@ -240,6 +204,7 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
       cancelled = true;
     };
   }, [
+    defaultSettings.enableVoice,
     loadSpeechVoices,
     defaultSettings.ttsRouteSource,
     defaultSettings.ttsConnectorId,
@@ -247,6 +212,9 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
   ]);
 
   useEffect(() => {
+    if (!defaultSettings.enableVoice) {
+      return undefined;
+    }
     if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') {
       return undefined;
     }
@@ -257,22 +225,15 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
     return () => {
       window.removeEventListener(MODEL_CATALOG_UPDATED_EVENT, onCatalogUpdated as EventListener);
     };
-  }, [loadSpeechVoices]);
-
-  useEffect(() => {
-    setSpeechVoices(filterVisibleVoices(allSpeechVoices, selectedSpeechProviderId));
-  }, [allSpeechVoices, filterVisibleVoices, selectedSpeechProviderId]);
+  }, [defaultSettings.enableVoice, loadSpeechVoices]);
 
   // Auto-select first voice when voice list changes and current selection is not in the list
   useEffect(() => {
+    if (!defaultSettings.enableVoice) {
+      return;
+    }
     const currentVoice = defaultSettings.voiceName;
     if (speechVoices.length === 0) {
-      if (currentVoice) {
-        updateSettings((previous) => ({
-          ...previous,
-          voiceName: '',
-        }));
-      }
       return;
     }
     const exists = speechVoices.some((v) => v.id === currentVoice);
@@ -283,10 +244,6 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
       }));
     }
   }, [speechVoices, defaultSettings.voiceName, updateSettings]);
-
-  const handleSpeechProviderChange = useCallback((providerId: string) => {
-    setSelectedSpeechProviderId(providerId);
-  }, []);
 
   const handleVoiceIdChange = useCallback((voiceId: string) => {
     updateSettings((previous) => ({
@@ -397,14 +354,11 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
   }, [updateSettings]);
 
   return {
-    speechProviders,
     speechVoices,
     speechVoiceCatalogMeta,
-    selectedSpeechProviderId,
     defaultSettings,
     loadSpeechCatalog,
     loadSpeechVoices,
-    handleSpeechProviderChange,
     handleVoiceIdChange,
     handleDefaultSettingChange,
     handleDefaultVoiceNameChange,

@@ -28,6 +28,36 @@ type UseSpeechTranscribeInput = {
 const DEFAULT_AUDIO_MIME = 'audio/webm';
 const CHUNK_SIZE_MS = 250;
 
+export function resolveVoiceInputPreflightError(input: {
+  enableVoice: boolean;
+  selectedTargetId: string;
+  sttRouteSource: UseSpeechTranscribeInput['sttRouteSource'];
+  localSttRouteAvailable: boolean;
+}): {
+  reasonCode: string;
+  detail: string;
+} | null {
+  if (!input.enableVoice) {
+    return {
+      reasonCode: 'LOCAL_CHAT_STT_VOICE_DISABLED',
+      detail: 'Voice input is disabled',
+    };
+  }
+  if (!String(input.selectedTargetId || '').trim()) {
+    return {
+      reasonCode: 'LOCAL_CHAT_STT_TARGET_REQUIRED',
+      detail: 'Select an Agent before recording',
+    };
+  }
+  if (input.sttRouteSource === 'local-runtime' && !input.localSttRouteAvailable) {
+    return {
+      reasonCode: 'LOCAL_CHAT_STT_LOCAL_ROUTE_UNAVAILABLE',
+      detail: 'No local STT-capable model is available',
+    };
+  }
+  return null;
+}
+
 function resolveRouteBinding(
   source: UseSpeechTranscribeInput['sttRouteSource'],
 ): { source: 'local-runtime' | 'token-api'; connectorId: string; model: string } | undefined {
@@ -263,25 +293,16 @@ export function useSpeechTranscribe(input: UseSpeechTranscribeInput) {
 
   const startRecording = useCallback(async () => {
     if (voiceInputState === 'recording' || voiceInputState === 'transcribing') return;
-    if (!input.enableVoice) {
-      const reasonCode = 'LOCAL_CHAT_STT_VOICE_DISABLED';
-      setLastErrorCode(reasonCode);
+    const preflightError = resolveVoiceInputPreflightError({
+      enableVoice: input.enableVoice,
+      selectedTargetId: input.selectedTargetId,
+      sttRouteSource: input.sttRouteSource,
+      localSttRouteAvailable: input.localSttRouteAvailable,
+    });
+    if (preflightError) {
+      setLastErrorCode(preflightError.reasonCode);
       safeSetVoiceInputState('failed');
-      emitFailureBanner(reasonCode, 'Voice input is disabled');
-      return;
-    }
-    if (!input.selectedTargetId.trim()) {
-      const reasonCode = 'LOCAL_CHAT_STT_TARGET_REQUIRED';
-      setLastErrorCode(reasonCode);
-      safeSetVoiceInputState('failed');
-      emitFailureBanner(reasonCode, 'Select an Agent before recording');
-      return;
-    }
-    if (input.sttRouteSource === 'local-runtime' && !input.localSttRouteAvailable) {
-      const reasonCode = 'LOCAL_CHAT_STT_LOCAL_ROUTE_UNAVAILABLE';
-      setLastErrorCode(reasonCode);
-      safeSetVoiceInputState('failed');
-      emitFailureBanner(reasonCode, 'No local STT-capable model is available');
+      emitFailureBanner(preflightError.reasonCode, preflightError.detail);
       return;
     }
 

@@ -393,7 +393,7 @@ export async function runLocalChatTurnSend(input: {
         });
       });
 
-    // Pre-synthesize voice deliveries — audioUri stored in delivery.meta before persist
+    // Pre-synthesize voice deliveries — only stable URI results are cached in persisted delivery.meta.
     if (context.synthesizeVoice) {
       const voiceDeliveries = assistantPayload.assistantOutput.deliveries
         .filter((d) => d.kind === 'voice');

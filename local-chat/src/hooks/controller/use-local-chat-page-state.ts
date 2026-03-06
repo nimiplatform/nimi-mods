@@ -148,7 +148,7 @@ export function useLocalChatPageState() {
       models: resolveModelsForScenario({
         models: connector.models || [],
         modelCapabilities: connector.modelCapabilities,
-        scenario: 'tts',
+        scenario: 'audio.synthesize',
       }),
     })).filter((item) => item.models.length > 0)
   ), [ttsRouteOptions?.connectors]);
@@ -245,7 +245,7 @@ export function useLocalChatPageState() {
     const fallbackModel = candidate.models[0] || resolvePreferredModelForScenario({
       models: candidate.connector.models || [],
       modelCapabilities: candidate.connector.modelCapabilities,
-      scenario: 'tts',
+      scenario: 'audio.synthesize',
     });
     const nextModel = effectiveTtsModel || fallbackModel;
     if (!nextModel || nextModel === currentModel) {
@@ -263,6 +263,9 @@ export function useLocalChatPageState() {
   ]);
 
   useEffect(() => {
+    if (!speechSettingsState.defaultSettings.enableVoice) {
+      return;
+    }
     const ttsRouteSource = speechSettingsState.defaultSettings.ttsRouteSource;
     const resolvedRouteSource = ttsRouteOptions?.selected?.source;
     const shouldUseTokenRoute = ttsRouteSource === 'token-api'
@@ -284,9 +287,9 @@ export function useLocalChatPageState() {
   }, [
     effectiveTtsConnectorId,
     effectiveTtsModel,
+    speechSettingsState.defaultSettings.enableVoice,
     ttsRouteOptions?.selected?.source,
     speechSettingsState.defaultSettings.ttsRouteSource,
-    speechSettingsState.selectedSpeechProviderId,
     speechSettingsState.loadSpeechVoices,
   ]);
 
@@ -299,12 +302,12 @@ export function useLocalChatPageState() {
   const refreshDependencySnapshot = useCallback(async () => {
     const dependencyCapability = speechSettingsState.defaultSettings.enableVoice
       ? undefined
-      : 'chat';
-    if (dependencyCapability === 'chat') {
+      : 'text.generate';
+    if (dependencyCapability === 'text.generate') {
       setDependencySnapshot((previous) => {
         if (!previous) return previous;
         const hasVoiceCapabilityRow = previous.dependencies.some((item) => (
-          item.capability === 'tts' || item.capability === 'stt'
+          item.capability === 'audio.synthesize' || item.capability === 'audio.transcribe'
         ));
         return hasVoiceCapabilityRow ? null : previous;
       });
@@ -350,7 +353,7 @@ export function useLocalChatPageState() {
   const localSttRouteAvailable = useMemo(
     () => (sttRouteOptions?.localRuntime.models || runtimeRouteState.chatRouteOptions?.localRuntime.models || []).some((model) => {
       const capabilities = Array.isArray(model.capabilities) ? model.capabilities : [];
-      return capabilities.includes('stt');
+      return capabilities.includes('audio.transcribe');
     }),
     [runtimeRouteState.chatRouteOptions?.localRuntime.models, sttRouteOptions?.localRuntime.models],
   );
@@ -379,14 +382,24 @@ export function useLocalChatPageState() {
         ? { instruct: voiceStyle.stylePrompt }
         : undefined,
     });
-    const artifact = response.artifacts.find((item) => item.uri) || null;
-    return { audioUri: String(artifact?.uri || '').trim() };
+    const artifact = response.artifacts.find((item) => {
+      return Boolean(String(item.uri || '').trim())
+        || (item.bytes instanceof Uint8Array && item.bytes.length > 0);
+    }) || null;
+    const audioUri = String(artifact?.uri || '').trim();
+    const audioBytes = artifact?.bytes instanceof Uint8Array && artifact.bytes.length > 0
+      ? artifact.bytes
+      : undefined;
+    const mimeType = String(artifact?.mimeType || '').trim()
+      || (DEFAULT_TTS_FORMAT === 'mp3' ? 'audio/mpeg' : '');
+    return {
+      audioUri: audioUri || undefined,
+      audioBytes,
+      mimeType: mimeType || undefined,
+    };
   }, [
     runtimeClient,
     targetsState.selectedTarget,
-    targetsState.selectedTargetId,
-    sessionsState.selectedSessionId,
-    speechSettingsState.selectedSpeechProviderId,
     speechSettingsState.defaultSettings.ttsRouteSource,
     speechSettingsState.defaultSettings.voiceName,
     effectiveTtsConnectorId,
@@ -458,7 +471,6 @@ export function useLocalChatPageState() {
     defaultVoiceName: speechSettingsState.defaultSettings.voiceName,
     defaultVoiceId: DEFAULT_TTS_VOICE,
     ttsRouteSource: speechSettingsState.defaultSettings.ttsRouteSource,
-    selectedSpeechProviderId: speechSettingsState.selectedSpeechProviderId,
     selectedTargetId: targetsState.selectedTargetId,
     selectedTarget: targetsState.selectedTarget,
     setStatusBanner,

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import type { ChatMessage } from '../types.js';
 import type { LocalChatTarget } from '../data/index.js';
+import type { LocalChatAudioPlaybackSource } from '../runtime-ai-client.js';
 import {
   extractTtsFailureActionHint,
   extractTtsFailureReasonCode,
@@ -10,15 +11,35 @@ import {
 
 const TTS_PLAYBACK_ERROR_CODE = 'LOCAL_CHAT_TTS_PLAYBACK_FAILED';
 
+export function createVoicePlaybackUrl(input: {
+  source: LocalChatAudioPlaybackSource;
+  setObjectUrl: (value: string | null) => void;
+}): string {
+  const directUri = String(input.source.audioUri || '').trim();
+  if (directUri) {
+    input.setObjectUrl(null);
+    return directUri;
+  }
+  const bytes = input.source.audioBytes;
+  if (!(bytes instanceof Uint8Array) || bytes.length === 0) {
+    input.setObjectUrl(null);
+    return '';
+  }
+  const mimeType = String(input.source.mimeType || '').trim() || 'audio/mpeg';
+  const normalizedBytes = Uint8Array.from(bytes);
+  const objectUrl = URL.createObjectURL(new Blob([normalizedBytes], { type: mimeType }));
+  input.setObjectUrl(objectUrl);
+  return objectUrl;
+}
+
 export function useSpeechPlayback(input: {
   enableVoice: boolean;
   defaultVoiceName: string;
   defaultVoiceId: string;
   ttsRouteSource: 'auto' | 'local-runtime' | 'token-api';
-  selectedSpeechProviderId: string;
   selectedTargetId: string;
   selectedTarget: LocalChatTarget | null;
-  synthesizeVoice: (text: string) => Promise<{ audioUri: string }>;
+  synthesizeVoice: (text: string) => Promise<LocalChatAudioPlaybackSource>;
   setStatusBanner: (payload: {
     kind: 'warn' | 'error' | 'info' | 'success';
     message: string;
@@ -68,9 +89,24 @@ export function useSpeechPlayback(input: {
     stopVoicePlayback();
   }, [stopVoicePlayback]);
 
+  const resolvePlaybackUrl = useCallback((source: LocalChatAudioPlaybackSource): string => {
+    return createVoicePlaybackUrl({
+      source,
+      setObjectUrl: (value) => {
+        voiceAudioObjectUrlRef.current = value;
+      },
+    });
+  }, []);
+
   const playVoiceMessage = useCallback(async (message: ChatMessage) => {
     if (message.kind !== 'voice') return;
-    if (!input.enableVoice) return;
+    if (!input.enableVoice) {
+      input.setStatusBanner({
+        kind: 'info',
+        message: 'Voice is disabled in Default Settings.',
+      });
+      return;
+    }
     const text = String(message.content || '').trim();
     if (!text) return;
     if (!input.selectedTargetId) return;
@@ -101,7 +137,6 @@ export function useSpeechPlayback(input: {
           targetId: input.selectedTargetId,
           worldId: input.selectedTarget?.worldId || null,
           messageId: message.id,
-          providerId: input.selectedSpeechProviderId || 'auto',
           routeSource: input.ttsRouteSource,
           voiceId: input.defaultVoiceName || input.defaultVoiceId,
         },
@@ -122,11 +157,11 @@ export function useSpeechPlayback(input: {
         if (voicePlaybackTokenRef.current !== playbackToken) {
           return;
         }
-        objectUrl = String(response.audioUri || '').trim();
+        objectUrl = resolvePlaybackUrl(response);
       }
 
       if (!objectUrl) {
-        throw new Error('SPEECH_OUTPUT_INVALID: empty audioUri');
+        throw new Error('SPEECH_OUTPUT_INVALID: empty audio playback source');
       }
       const audio = new Audio(objectUrl);
       audio.onended = () => {
@@ -168,7 +203,9 @@ export function useSpeechPlayback(input: {
         });
       };
       voiceAudioRef.current = audio;
-      voiceAudioObjectUrlRef.current = objectUrl;
+      if (!cachedAudioUri && !voiceAudioObjectUrlRef.current) {
+        voiceAudioObjectUrlRef.current = objectUrl;
+      }
 
       await audio.play().catch((error) => {
         throw error instanceof Error ? error : new Error(String(error || 'LOCAL_CHAT_TTS_PLAYBACK_FAILED'));
@@ -213,14 +250,14 @@ export function useSpeechPlayback(input: {
     input.defaultVoiceId,
     input.defaultVoiceName,
     input.enableVoice,
+    input.setStatusBanner,
     input.synthesizeVoice,
     input.ttsRouteSource,
-    input.selectedSpeechProviderId,
     input.selectedTarget,
     input.selectedTargetId,
     input.onVoiceUnsupported,
-    input.setStatusBanner,
     playingVoiceMessageId,
+    resolvePlaybackUrl,
     stopVoicePlayback,
   ]);
 

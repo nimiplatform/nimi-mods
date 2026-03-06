@@ -102,6 +102,12 @@ export type LocalChatAiClient = {
   }>;
 };
 
+export type LocalChatAudioPlaybackSource = {
+  audioUri?: string;
+  audioBytes?: Uint8Array;
+  mimeType?: string;
+};
+
 function resolveCapability(
   capability: LocalChatAiRouteInput['capability'],
   fallback: RuntimeCanonicalCapability = 'text.generate',

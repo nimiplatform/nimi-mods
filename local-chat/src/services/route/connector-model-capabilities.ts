@@ -1,7 +1,7 @@
+import type { RuntimeCanonicalCapability } from '@nimiplatform/sdk/mod/runtime-route';
 import { filterModelsForScenario, filterModelsForSpeechSynthesis } from '@nimiplatform/sdk/mod/model-options';
 
-type Scenario = 'tts' | 'stt';
-type ExtendedScenario = Scenario | 'image' | 'video';
+type ExtendedScenario = RuntimeCanonicalCapability;
 
 function dedupeModelIds(models: string[]): string[] {
   return Array.from(new Set(models.map((model) => String(model || '').trim()).filter(Boolean)));
@@ -35,21 +35,21 @@ function matchesScenarioByCapability(capabilities: string[], scenario: ExtendedS
   const normalized = normalizeCapabilities(capabilities);
   if (normalized.length === 0) return false;
   const hasAny = (...tokens: string[]) => tokens.some((token) => normalized.includes(token));
-  if (scenario === 'tts') {
+  if (scenario === 'audio.synthesize') {
     return hasAny(
       'tts',
       'audio.synthesize',
       'speech.synthesize',
     );
   }
-  if (scenario === 'stt') {
+  if (scenario === 'audio.transcribe') {
     return hasAny(
       'stt',
       'audio.transcribe',
       'speech.transcribe',
     );
   }
-  if (scenario === 'image') {
+  if (scenario === 'image.generate') {
     return hasAny(
       'image',
       't2i',
@@ -66,13 +66,13 @@ function matchesScenarioByCapability(capabilities: string[], scenario: ExtendedS
 }
 
 function filterModelsByHeuristic(models: string[], scenario: ExtendedScenario): string[] {
-  if (scenario === 'tts') {
+  if (scenario === 'audio.synthesize') {
     return filterModelsForSpeechSynthesis(models);
   }
-  if (scenario === 'stt') {
+  if (scenario === 'audio.transcribe') {
     return filterModelsForScenario(models, 'stt');
   }
-  if (scenario === 'image') {
+  if (scenario === 'image.generate') {
     return filterModelsForScenario(models, 'image');
   }
   return filterModelsForScenario(models, 'video');

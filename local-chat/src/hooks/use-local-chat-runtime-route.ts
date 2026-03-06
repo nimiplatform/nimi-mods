@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type RuntimeRouteBinding,
+  type RuntimeCanonicalCapability,
   type RuntimeRouteOptionsSnapshot,
   type RuntimeRouteSource,
 } from '@nimiplatform/sdk/mod/runtime-route';
@@ -14,7 +15,13 @@ import { buildRouteBindingForConnector, buildRouteBindingForModel, buildRouteBin
 import { loadRouteOptions, resolveRouteSnapshot, runRouteHealthCheck } from './runtime-route/queries.js';
 import type { ChatRouteSnapshot, UseLocalChatRuntimeRouteInput } from './runtime-route/types.js';
 
-type RouteCapability = 'chat' | 'image' | 'video' | 'tts' | 'stt';
+type RouteCapability = RuntimeCanonicalCapability;
+type RouteOptionsCapability =
+  | 'text.generate'
+  | 'image.generate'
+  | 'video.generate'
+  | 'audio.synthesize'
+  | 'audio.transcribe';
 
 export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
   const [healthStatus, setHealthStatus] = useState<HealthStatus>('idle');
@@ -26,10 +33,10 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
   const [ttsRouteOptions, setTtsRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
   const [sttRouteOptions, setSttRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
   const [routeBinding, setRouteBinding] = useState<RuntimeRouteBinding | null>(() => loadLocalChatRouteBinding());
-  const routeOptionsLoadInFlightRef = useRef<Partial<Record<RouteCapability, Promise<RuntimeRouteOptionsSnapshot | null>>>>({});
+  const routeOptionsLoadInFlightRef = useRef<Partial<Record<RouteOptionsCapability, Promise<RuntimeRouteOptionsSnapshot | null>>>>({});
 
-  const setRouteOptionsSafely = useCallback((capability: RouteCapability, next: RuntimeRouteOptionsSnapshot | null) => {
-    if (capability === 'chat') {
+  const setRouteOptionsSafely = useCallback((capability: RouteOptionsCapability, next: RuntimeRouteOptionsSnapshot | null) => {
+    if (capability === 'text.generate') {
       setChatRouteOptions((previous) => {
         if (!next) {
           return previous;
@@ -41,19 +48,19 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
       });
       return;
     }
-    if (capability === 'tts') {
+    if (capability === 'audio.synthesize') {
       setTtsRouteOptions(next);
       return;
     }
-    if (capability === 'image') {
+    if (capability === 'image.generate') {
       setImageRouteOptions(next);
       return;
     }
-    if (capability === 'video') {
+    if (capability === 'video.generate') {
       setVideoRouteOptions(next);
       return;
     }
-    if (capability === 'stt') {
+    if (capability === 'audio.transcribe') {
       setSttRouteOptions(next);
       return;
     }
@@ -68,7 +75,7 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
     });
   }, [input.runtimeClient, input.setStatusBanner, routeBinding]);
 
-  const loadRuntimeRouteOptions = useCallback(async (capability: RouteCapability) => {
+  const loadRuntimeRouteOptions = useCallback(async (capability: RouteOptionsCapability) => {
     const inFlight = routeOptionsLoadInFlightRef.current[capability];
     if (inFlight) {
       emitLocalChatLog({
@@ -113,23 +120,23 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
   }, [input.runtimeClient, setRouteOptionsSafely]);
 
   const loadChatRuntimeRouteOptions = useCallback(
-    () => loadRuntimeRouteOptions('chat'),
+    () => loadRuntimeRouteOptions('text.generate'),
     [loadRuntimeRouteOptions],
   );
   const loadTtsRuntimeRouteOptions = useCallback(
-    () => loadRuntimeRouteOptions('tts'),
+    () => loadRuntimeRouteOptions('audio.synthesize'),
     [loadRuntimeRouteOptions],
   );
   const loadSttRuntimeRouteOptions = useCallback(
-    () => loadRuntimeRouteOptions('stt'),
+    () => loadRuntimeRouteOptions('audio.transcribe'),
     [loadRuntimeRouteOptions],
   );
   const loadImageRuntimeRouteOptions = useCallback(
-    () => loadRuntimeRouteOptions('image'),
+    () => loadRuntimeRouteOptions('image.generate'),
     [loadRuntimeRouteOptions],
   );
   const loadVideoRuntimeRouteOptions = useCallback(
-    () => loadRuntimeRouteOptions('video'),
+    () => loadRuntimeRouteOptions('video.generate'),
     [loadRuntimeRouteOptions],
   );
 
@@ -356,11 +363,11 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
     ttsRouteOptions,
     sttRouteOptions,
     routeOptionsByCapability: {
-      chat: chatRouteOptions,
-      image: imageRouteOptions,
-      video: videoRouteOptions,
-      tts: ttsRouteOptions,
-      stt: sttRouteOptions,
+      'text.generate': chatRouteOptions,
+      'image.generate': imageRouteOptions,
+      'video.generate': videoRouteOptions,
+      'audio.synthesize': ttsRouteOptions,
+      'audio.transcribe': sttRouteOptions,
     },
     routeBinding,
     loadChatRuntimeRouteOptions,

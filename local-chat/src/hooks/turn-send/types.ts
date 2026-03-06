@@ -8,7 +8,7 @@ import type {
   LocalChatTurnAudit,
 } from '../../state/index.js';
 import type { ChatMessage } from '../../types.js';
-import type { LocalChatAiClient } from '../../runtime-ai-client.js';
+import type { LocalChatAiClient, LocalChatAudioPlaybackSource } from '../../runtime-ai-client.js';
 
 export type ChatRouteSnapshot = {
   source: string;
@@ -61,5 +61,5 @@ export type UseLocalChatTurnSendInput = {
   }) => void;
   isTranscribing?: boolean;
   onOpenRuntimeSetup?: () => void;
-  synthesizeVoice?: (text: string) => Promise<{ audioUri: string }>;
+  synthesizeVoice?: (text: string) => Promise<LocalChatAudioPlaybackSource>;
 };

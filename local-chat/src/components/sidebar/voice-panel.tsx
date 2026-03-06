@@ -8,7 +8,6 @@ type Props = {
   open: boolean;
   onToggle: () => void;
   enableVoice: boolean;
-  selectedSpeechProviderId: string;
   selectedVoiceId: string;
   ttsRouteSource: 'auto' | 'local-runtime' | 'token-api';
   ttsConnectorId: string;
@@ -20,9 +19,7 @@ type Props = {
   sttConnectors: Array<{ id: string; label: string; models: string[]; modelCapabilities?: Record<string, string[]> }>;
   localTtsRouteAvailable: boolean;
   localSttRouteAvailable: boolean;
-  speechProviders: Array<{ id: string; name: string; status: 'available' | 'unavailable' }>;
-  visibleSpeechVoices: Array<{ id: string; providerId: string; name: string }>;
-  onSpeechProviderChange: (providerId: string) => void;
+  speechVoices: Array<{ id: string; name: string }>;
   onVoiceIdChange: (voiceId: string) => void;
   onTtsRouteSourceChange: (source: 'auto' | 'local-runtime' | 'token-api') => void;
   onTtsConnectorChange: (connectorId: string) => void;
@@ -34,7 +31,6 @@ type Props = {
 
 export type VoicePanelVoiceOption = {
   id: string;
-  providerId: string;
   name: string;
 };
 
@@ -44,7 +40,7 @@ export function buildVoiceOptionItems(voices: VoicePanelVoiceOption[]): Array<{
   label: string;
 }> {
   return voices.map((voice) => ({
-    key: `voice-option-${voice.providerId}-${voice.id}`,
+    key: `voice-option-${voice.id}`,
     value: voice.id,
     label: voice.name,
   }));
@@ -65,7 +61,6 @@ export function VoicePanel(props: Props) {
     open,
     onToggle,
     enableVoice,
-    selectedSpeechProviderId,
     selectedVoiceId,
     ttsRouteSource,
     ttsConnectorId,
@@ -77,9 +72,7 @@ export function VoicePanel(props: Props) {
     sttConnectors,
     localTtsRouteAvailable,
     localSttRouteAvailable,
-    speechProviders,
-    visibleSpeechVoices,
-    onSpeechProviderChange,
+    speechVoices,
     onVoiceIdChange,
     onTtsRouteSourceChange,
     onTtsConnectorChange,
@@ -99,7 +92,7 @@ export function VoicePanel(props: Props) {
     return resolveModelsForScenario({
       models: connector.models || [],
       modelCapabilities: connector.modelCapabilities,
-      scenario: 'tts',
+      scenario: 'audio.synthesize',
     });
   }, [ttsConnectors, ttsConnectorId]);
 
@@ -110,7 +103,7 @@ export function VoicePanel(props: Props) {
     return resolveModelsForScenario({
       models: connector.models || [],
       modelCapabilities: connector.modelCapabilities,
-      scenario: 'stt',
+      scenario: 'audio.transcribe',
     });
   }, [sttConnectors, sttConnectorId]);
 
@@ -124,8 +117,8 @@ export function VoicePanel(props: Props) {
     [sttConnectorModels, sttModelQuery],
   );
   const voiceOptions = useMemo(
-    () => buildVoiceOptionItems(visibleSpeechVoices),
-    [visibleSpeechVoices],
+    () => buildVoiceOptionItems(speechVoices),
+    [speechVoices],
   );
 
   return (
@@ -287,26 +280,6 @@ export function VoicePanel(props: Props) {
               </>
             ) : null}
 
-            {/* ── Provider (non-token-api) ── */}
-            {ttsRouteSource !== 'token-api' ? (
-              <div>
-                <p className="mb-1 text-gray-500">{t('VoicePanel.provider')}</p>
-                <select
-                  value={selectedSpeechProviderId}
-                  disabled={!enableVoice}
-                  onChange={(event) => onSpeechProviderChange(event.target.value)}
-                  className={selectClassName}
-                >
-                  <option value="">{t('VoicePanel.auto')}</option>
-                  {speechProviders.map((provider) => (
-                    <option key={`speech-provider-${provider.id}`} value={provider.id}>
-                      {provider.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : null}
-
             {/* ── Voice ── */}
             <div>
               <p className="mb-1 text-gray-500">{t('VoicePanel.voice')}</p>
@@ -322,7 +295,7 @@ export function VoicePanel(props: Props) {
                   </option>
                 ))}
               </select>
-              {visibleSpeechVoices.length === 0 ? (
+              {speechVoices.length === 0 ? (
                 <p className="mt-1 text-[11px] text-amber-700">{t('VoicePanel.noVoices')}</p>
               ) : null}
             </div>
