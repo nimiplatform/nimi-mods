@@ -16,7 +16,7 @@
 
 ## 1. Domain Invariants
 
-- `MY-DOM-001`: Mint-You creates a `WORLD_OWNED` agent that represents the user's social persona and is always mounted in OASIS (main world). The agent serves all social scenarios — dating, friendship, professional networking, casual exploration.
+- `MY-DOM-001`: Mint-You creates a `MASTER_OWNED` agent that represents the user's social persona and is always mounted in OASIS (main world). The agent serves all social scenarios — dating, friendship, professional networking, casual exploration.
 - `MY-DOM-002`: Personality inference relies on conversational AI interviews, not direct self-assessment questionnaires. The interview extracts trait signals from natural dialogue.
 - `MY-DOM-003`: Every valid interview turn must produce at least one trait signal mapped to an AgentDna dimension. Turns without signals are not counted as valid turns.
 - `MY-DOM-004`: Agent creation requires explicit user confirmation after persona card preview. No agent is created without user approval.

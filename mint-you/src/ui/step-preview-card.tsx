@@ -161,7 +161,7 @@ export function StepPreviewCard() {
   };
 
   return (
-    <div className="mx-auto max-w-lg space-y-4 p-4">
+    <div className="mx-auto my-4 max-w-lg space-y-4 p-4">
       <h2 className="text-lg font-semibold text-gray-900">{t('Preview.title')}</h2>
 
       <PersonaCard
@@ -179,14 +179,14 @@ export function StepPreviewCard() {
       />
 
       {/* Edit Traits */}
-      <div className="rounded-lg border border-gray-200 p-3">
+      <div className="ui-sync-card ui-sync-card-inset rounded-lg border border-gray-200 p-3">
         <h3 className="mb-2 text-sm font-medium text-gray-700">{t('Preview.editTraits')}</h3>
 
         {/* Primary archetype editor */}
         <div className="mb-2">
           <button
             onClick={() => setEditingPrimary(!editingPrimary)}
-            className="text-xs text-[#4ECCA3] hover:underline"
+            className="text-xs font-medium text-[#4ECCA3] hover:underline"
           >
             {t('Preview.changePrimary')}: {effectivePrimary}
           </button>
@@ -196,10 +196,10 @@ export function StepPreviewCard() {
                 <button
                   key={arch}
                   onClick={() => handlePrimaryChange(arch)}
-                  className={`rounded-full border px-2 py-0.5 text-xs transition-colors ${
+                  className={`ui-sync-btn rounded-full border px-2 py-0.5 text-xs transition-colors ${
                     effectivePrimary === arch
-                      ? 'border-[#4ECCA3] bg-[#4ECCA3] text-white'
-                      : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                      ? 'ui-sync-btn-primary border-[#4ECCA3] bg-[#4ECCA3] text-white'
+                      : 'ui-sync-btn-secondary border-gray-300 text-gray-600 hover:bg-gray-50'
                   }`}
                 >
                   {arch}
@@ -213,7 +213,7 @@ export function StepPreviewCard() {
         <div className="mb-3">
           <button
             onClick={() => setEditingSecondary(!editingSecondary)}
-            className="text-xs text-[#4ECCA3] hover:underline"
+            className="text-xs font-medium text-[#4ECCA3] hover:underline"
           >
             {t('Preview.changeSecondary')}: {effectiveSecondary.join(', ')}
           </button>
@@ -223,10 +223,10 @@ export function StepPreviewCard() {
                 <button
                   key={trait}
                   onClick={() => handleSecondaryToggle(trait)}
-                  className={`rounded-full border px-2 py-0.5 text-xs transition-colors ${
+                  className={`ui-sync-btn rounded-full border px-2 py-0.5 text-xs transition-colors ${
                     effectiveSecondary.includes(trait)
-                      ? 'border-[#4ECCA3] bg-[#4ECCA3] text-white'
-                      : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                      ? 'ui-sync-btn-primary border-[#4ECCA3] bg-[#4ECCA3] text-white'
+                      : 'ui-sync-btn-secondary border-gray-300 text-gray-600 hover:bg-gray-50'
                   }`}
                 >
                   {trait}
@@ -244,10 +244,10 @@ export function StepPreviewCard() {
               <button
                 key={mode}
                 onClick={() => handleRelationshipChange(mode)}
-                className={`flex-1 rounded-lg border px-2 py-1.5 text-xs transition-colors ${
+                className={`ui-sync-btn flex-1 rounded-lg border px-2 py-1.5 text-xs transition-colors ${
                   effectiveRelationship === mode
-                    ? 'border-[#4ECCA3] bg-[#4ECCA3]/10 font-medium text-[#4ECCA3]'
-                    : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                    ? 'ui-sync-btn-selected border-[#4ECCA3] bg-[#4ECCA3]/10 font-medium text-[#4ECCA3]'
+                    : 'ui-sync-btn-secondary border-gray-300 text-gray-600 hover:bg-gray-50'
                 }`}
               >
                 {mode}
@@ -264,10 +264,10 @@ export function StepPreviewCard() {
               <button
                 key={val}
                 onClick={() => handleFormalityChange(val)}
-                className={`flex-1 rounded-lg border px-2 py-1.5 text-xs transition-colors ${
+                className={`ui-sync-btn flex-1 rounded-lg border px-2 py-1.5 text-xs transition-colors ${
                   effectiveFormality === val
-                    ? 'border-[#4ECCA3] bg-[#4ECCA3]/10 font-medium text-[#4ECCA3]'
-                    : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                    ? 'ui-sync-btn-selected border-[#4ECCA3] bg-[#4ECCA3]/10 font-medium text-[#4ECCA3]'
+                    : 'ui-sync-btn-secondary border-gray-300 text-gray-600 hover:bg-gray-50'
                 }`}
               >
                 {val}
@@ -284,10 +284,10 @@ export function StepPreviewCard() {
               <button
                 key={val}
                 onClick={() => handleSentimentChange(val)}
-                className={`flex-1 rounded-lg border px-2 py-1.5 text-xs transition-colors ${
+                className={`ui-sync-btn flex-1 rounded-lg border px-2 py-1.5 text-xs transition-colors ${
                   effectiveSentiment === val
-                    ? 'border-[#4ECCA3] bg-[#4ECCA3]/10 font-medium text-[#4ECCA3]'
-                    : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                    ? 'ui-sync-btn-selected border-[#4ECCA3] bg-[#4ECCA3]/10 font-medium text-[#4ECCA3]'
+                    : 'ui-sync-btn-secondary border-gray-300 text-gray-600 hover:bg-gray-50'
                 }`}
               >
                 {val}
@@ -300,7 +300,7 @@ export function StepPreviewCard() {
           <button
             onClick={handleResynthesize}
             disabled={resynthesizing}
-            className="mt-2 rounded-lg bg-[#4ECCA3] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#3DBB92] disabled:opacity-50"
+            className="ui-sync-btn ui-sync-btn-primary mt-2 rounded-lg bg-[#4ECCA3] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#3DBB92] disabled:opacity-50"
           >
             {resynthesizing ? t('Preview.resynthesizing') : t('Preview.regenerate')}
           </button>
@@ -308,11 +308,11 @@ export function StepPreviewCard() {
       </div>
 
       {/* Photo upload */}
-      <div className="rounded-lg border border-dashed border-gray-300 p-3">
+      <div className="ui-sync-card rounded-lg border border-dashed border-gray-300 p-3">
         <label className="flex cursor-pointer flex-col items-center gap-2 text-center">
           <span className="text-sm text-gray-500">{t('Preview.photoUpload')}</span>
           <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
-          <span className="rounded-lg border border-gray-300 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50">
+          <span className="ui-sync-btn ui-sync-btn-secondary rounded-lg border border-gray-300 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50">
             {t('Preview.chooseFile')}
           </span>
         </label>
@@ -324,14 +324,14 @@ export function StepPreviewCard() {
       <div className="flex gap-3 pt-2">
         <button
           onClick={() => store.goBack()}
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+          className="ui-sync-btn ui-sync-btn-secondary rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
         >
           {t('Common.back')}
         </button>
         <button
           onClick={() => store.goNext()}
           disabled={resynthesizing}
-          className="flex-1 rounded-lg bg-[#4ECCA3] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#3DBB92] disabled:opacity-50"
+          className="ui-sync-btn ui-sync-btn-primary flex-1 rounded-lg bg-[#4ECCA3] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#3DBB92] disabled:opacity-50"
         >
           {t('Preview.next')}
         </button>

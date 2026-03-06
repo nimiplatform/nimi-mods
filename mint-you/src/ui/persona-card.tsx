@@ -43,7 +43,7 @@ export function PersonaCard({
   const { t } = useModTranslation('mint-you');
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4">
+    <div className="ui-sync-card rounded-xl border border-gray-200 bg-white p-4">
       {/* Header */}
       <div className="flex items-start gap-3">
         {/* Avatar area */}
@@ -60,7 +60,7 @@ export function PersonaCard({
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${ARCHETYPE_COLORS[dnaPrimary]}`}>
               {dnaPrimary}
             </span>
-            <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
+            <span className="ui-sync-pill rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
               {mbti}
             </span>
           </div>
@@ -79,7 +79,7 @@ export function PersonaCard({
       {!compact && (
         <>
           {/* Greeting */}
-          <div className="mt-3 rounded-lg bg-gray-50 p-3">
+          <div className="ui-sync-soft-card mt-3 rounded-lg bg-gray-50 p-3">
             <p className="text-sm italic text-gray-700">&ldquo;{greeting}&rdquo;</p>
           </div>
 

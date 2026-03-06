@@ -46,7 +46,7 @@ export function StepResult() {
 
   if (loading) {
     return (
-      <div className="mx-auto flex max-w-lg flex-col items-center gap-4 p-8">
+      <div className="ui-sync-card mx-auto my-4 flex max-w-lg flex-col items-center gap-4 p-8">
         <div className="h-12 w-12 animate-spin rounded-full border-4 border-gray-200 border-t-[#4ECCA3]" />
         <p className="text-sm text-gray-600">{t('Result.creating')}</p>
       </div>
@@ -72,7 +72,7 @@ export function StepResult() {
     const photoTrustReady = Boolean(worldId && photoTrustContext.currentUserId && photoTrustContext.otherUserId);
 
     return (
-      <div className="mx-auto flex max-w-lg flex-col items-center gap-6 p-8">
+      <div className="ui-sync-card mx-auto my-4 flex max-w-lg flex-col items-center gap-6 p-8">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#4ECCA3]/10">
           <span className="text-3xl text-[#4ECCA3]">{'\u2713'}</span>
         </div>
@@ -84,7 +84,7 @@ export function StepResult() {
           </p>
         </div>
 
-        <div className="rounded-lg bg-gray-50 px-4 py-2">
+        <div className="ui-sync-soft-card rounded-lg bg-gray-50 px-4 py-2">
           <p className="text-xs text-gray-500">Agent ID</p>
           <p className="font-mono text-sm text-gray-700">{createdAgentId}</p>
         </div>
@@ -112,7 +112,7 @@ export function StepResult() {
               store.reset();
               store.startNewSession(createUlid());
             }}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+            className="ui-sync-btn ui-sync-btn-secondary rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
           >
             {t('Result.createAnother')}
           </button>

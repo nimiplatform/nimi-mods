@@ -135,7 +135,7 @@ export function MintYouRouteSidebar() {
   };
 
   return (
-    <aside className="h-full w-80 shrink-0 overflow-hidden border-l border-gray-200 bg-white">
+    <aside className="ui-sync-pane ui-sync-pane-right h-full w-80 shrink-0 overflow-hidden border-l border-gray-200 bg-white">
       <div className="flex h-full flex-col">
         <div className="border-b border-gray-200 px-4 py-3">
           <h3 className="text-sm font-semibold text-gray-900">{t('RouteSidebar.title')}</h3>
@@ -222,7 +222,7 @@ export function MintYouRouteSidebar() {
             onClick={() => {
               setRouteOverride(null);
             }}
-            className="h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+            className="ui-sync-btn ui-sync-btn-secondary h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
           >
             {t('RouteSidebar.useRuntimeDefault')}
           </button>
@@ -233,7 +233,7 @@ export function MintYouRouteSidebar() {
               void reloadRouteOptions({ forceRefresh: true });
             }}
             disabled={loading}
-            className="h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="ui-sync-btn ui-sync-btn-secondary h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
           >
             {loading ? t('RouteSidebar.loading') : t('RouteSidebar.reload')}
           </button>

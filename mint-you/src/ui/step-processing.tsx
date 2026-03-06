@@ -139,7 +139,7 @@ export function StepProcessing() {
   };
 
   return (
-    <div className="mx-auto flex max-w-lg flex-col items-center gap-6 p-8">
+    <div className="ui-sync-card mx-auto my-4 flex max-w-lg flex-col items-center gap-6 p-8">
       {loading && (
         <>
           <div className="h-12 w-12 animate-spin rounded-full border-4 border-gray-200 border-t-[#4ECCA3]" />
