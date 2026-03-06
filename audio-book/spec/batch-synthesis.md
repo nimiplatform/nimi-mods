@@ -11,7 +11,7 @@
 | `kernel/pipeline-contract.md` | VS-PIPE-003 |
 | `kernel/synthesis-contract.md` | VS-SYNTH-001 ~ VS-SYNTH-007 |
 | `kernel/tables/job-states.yaml` | idle → running → done / done_with_errors |
-| `kernel/tables/error-codes.yaml` | AB_SYNTH_* |
+| `kernel/tables/reason-codes.yaml` | AB_SYNTH_* |
 
 ## 1. Scope
 
@@ -47,7 +47,7 @@ while (有 pending 的 SegmentJob):
 
 ```typescript
 async function synthesizeSegment(segment: ScriptSegment, casting: VoiceCasting): Promise<void> {
-  const result = await hook.llm.speech.synthesize({
+  const result = await runtime.media.tts.synthesize({
     text: segment.text,
     voiceId: casting.voiceId,
     providerId: casting.providerId,

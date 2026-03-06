@@ -275,6 +275,24 @@ test('local-chat live smoke: runTextTurn real provider with trace continuity', {
       const textModel = provider.text(providerConfig.modelId);
 
       const aiClient = {
+        streamText: async function* (input: Record<string, unknown>) {
+          const generated = await textModel.doGenerate({
+            prompt: promptFromText(String(input.prompt || '').trim() || 'Say hello from local-chat live smoke.'),
+            providerOptions: {},
+          });
+
+          const traceId = String(
+            (generated.providerMetadata as { nimi?: { traceId?: string } } | undefined)?.nimi?.traceId
+            || generated.response?.id
+            || '',
+          ).trim();
+          observedTraceId = traceId || observedTraceId;
+          const text = extractTextContent(generated.content as Array<{ type: string; text?: string }>);
+          if (text) {
+            yield { type: 'text_delta', textDelta: text };
+          }
+          yield { type: 'done' };
+        },
         generateText: async (input: Record<string, unknown>) => {
           const generated = await textModel.doGenerate({
             prompt: promptFromText(String(input.prompt || '').trim() || 'Say hello from local-chat live smoke.'),
@@ -293,34 +311,20 @@ test('local-chat live smoke: runTextTurn real provider with trace continuity', {
             traceId: traceId || undefined,
           };
         },
-        generateObject: async (input: Record<string, unknown>) => {
-          const textResult = await aiClient.generateText(input);
-          const parser = typeof input.parse === 'function'
-            ? input.parse as (text: string) => Record<string, unknown>
-            : (raw: string) => JSON.parse(raw) as Record<string, unknown>;
-          return {
-            object: parser(textResult.text),
-            text: textResult.text,
-            promptTraceId: textResult.promptTraceId,
-            traceId: textResult.traceId,
-          };
-        },
       };
 
       const result = await runTextTurn({
         flowId: 'local-chat-live-smoke',
         aiClient,
         invokeInput: {
-          routeHint: 'chat/default',
+          capability: 'text.generate',
           prompt: '你是一个简洁友好的助手。',
           mode: 'STORY',
           maxTokens: 512,
           agentId: 'agent.local-chat.live',
         },
         prompt: '请先规划回复，再回答用户。',
-        userText: '给我一句关于专注的小建议。',
         allowMultiReply: false,
-        enableVoice: false,
       });
 
       assert.ok(result.segments.length > 0, 'segments should not be empty');

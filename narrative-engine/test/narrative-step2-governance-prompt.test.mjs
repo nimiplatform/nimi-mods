@@ -13,8 +13,8 @@ function makeTurn() {
     userMessage: '我尝试潜入钟楼查看暗号来源。',
     systemContext: {},
     idempotencyKey: 'idem-step2-governance',
-    routeHint: '',
-    routeOverride: {},
+    capability: 'text.generate',
+    binding: {},
     turnId: 'turn-step2-governance',
     requestId: 'request-step2-governance',
     traceId: 'trace-step2-governance',
@@ -64,6 +64,7 @@ test('step2 prompt includes governance priorities and mandatory self-review rule
       },
       assets: {
         routeOptions: {
+          capability: 'text.generate',
           selected: {
             source: 'token-api',
             model: 'models/gemini-3-flash-preview',

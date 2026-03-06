@@ -2,7 +2,6 @@ import {
   KISMET_MOD_ID,
   KISMET_NAV_SLOT,
   KISMET_ROUTE_SLOT,
-  KISMET_DATA_API_RUNTIME_ROUTE_OPTIONS,
   KISMET_PERMISSIONS,
 } from './contracts.js';
 
@@ -23,12 +22,7 @@ export const KISMET_MANIFEST = {
   capabilities: [...KISMET_PERMISSIONS],
   dependencies: [],
   hooks: {
-    dataApis: [
-      {
-        name: KISMET_DATA_API_RUNTIME_ROUTE_OPTIONS,
-        description: 'Query available runtime route options for Kismet AI generation',
-      },
-    ],
+    dataApis: [],
     uiExtensions: [
       {
         slot: KISMET_NAV_SLOT,

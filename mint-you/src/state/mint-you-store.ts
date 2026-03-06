@@ -60,7 +60,7 @@ type MintYouStore = {
   // UI state
   loading: boolean;
   error: MintYouError | null;
-  routeOverride: RuntimeRouteBinding | null;
+  routeBinding: RuntimeRouteBinding | null;
   sessionPersistWarning: string | null;
 
   // Actions
@@ -86,7 +86,7 @@ type MintYouStore = {
   setCreatedAgentId: (id: string | null) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: MintYouError | null) => void;
-  setRouteOverride: (routeOverride: RuntimeRouteBinding | null) => void;
+  setRouteBinding: (routeBinding: RuntimeRouteBinding | null) => void;
   setSessionPersistWarning: (warning: string | null) => void;
   reset: () => void;
   startNewSession: (sessionId: string) => void;
@@ -128,7 +128,7 @@ const INITIAL_STATE = {
   createdAgentId: null as string | null,
   loading: false,
   error: null as MintYouError | null,
-  routeOverride: null as RuntimeRouteBinding | null,
+  routeBinding: null as RuntimeRouteBinding | null,
   sessionPersistWarning: null as string | null,
 };
 
@@ -177,7 +177,7 @@ export const useMintYouStore = create<MintYouStore>((set) => ({
   setCreatedAgentId: (id) => set({ createdAgentId: id }),
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error }),
-  setRouteOverride: (routeOverride) => set({ routeOverride }),
+  setRouteBinding: (routeBinding) => set({ routeBinding }),
   setSessionPersistWarning: (warning) => set({ sessionPersistWarning: warning }),
 
   reset: () => set({ ...INITIAL_STATE }),

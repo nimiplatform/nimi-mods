@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { useCallback, useEffect, useRef } from 'react';
-import { useHookClient, useAiClient, useAudioBookClients } from './use-audio-book-clients.js';
+import { useHookClient, useRuntimeClient, useAudioBookClients } from './use-audio-book-clients.js';
 import { useAudioBookUiState } from './use-audio-book-ui-state.js';
 import type { AudioBookStep } from './use-audio-book-ui-state.js';
 import { useStepNavigation } from './use-step-navigation.js';
@@ -57,11 +57,11 @@ function isBetterAnalysisQuality(candidate: AnalysisQuality, baseline: AnalysisQ
 export function useAudioBookPageController() {
   // 1. Stable singletons
   const hookClient = useHookClient();
-  const aiClient = useAiClient();
-  // 2. Route state (loads connectors for chat + TTS with retry + resolveRoute fallback)
-  const ttsRoute = useTtsRoute(hookClient, aiClient);
-  // 3. AI clients — llmClient rebuilds when chat connector changes
-  const clients = useAudioBookClients(hookClient, aiClient, ttsRoute.chatSelection);
+  const runtimeClient = useRuntimeClient();
+  // 2. Route state (loads connectors for chat + TTS through runtime.route.*)
+  const ttsRoute = useTtsRoute(runtimeClient);
+  // 3. Runtime-backed service clients — llmClient rebuilds when route binding changes
+  const clients = useAudioBookClients(hookClient, runtimeClient, ttsRoute.chatSelection, ttsRoute.ttsSelection);
   const ui = useAudioBookUiState();
   const store = useAudioBookStore();
 
@@ -306,7 +306,7 @@ export function useAudioBookPageController() {
       const shouldRetryWithDefaultRoute = primary.quality.errorChapters > 0
         || primary.quality.fallbackSegments === primary.quality.totalSegments;
       if (shouldRetryWithDefaultRoute) {
-        const fallbackLlmClient = createLlmClientAdapter(aiClient);
+        const fallbackLlmClient = createLlmClientAdapter(runtimeClient);
         const secondary = await runAnalysis(fallbackLlmClient, 'default-chat-route');
         if (isBetterAnalysisQuality(secondary.quality, primary.quality)) {
           chosen = secondary;
@@ -385,7 +385,7 @@ export function useAudioBookPageController() {
       ui.setAnalysisRunning(false);
       ui.setAnalysisProgress(null);
     }
-  }, [store, clients.llmClient, ui, aiClient]);
+  }, [store, clients.llmClient, ui, runtimeClient]);
 
   const cancelAnalysis = useCallback(() => {
     analysisAbortRef.current = true;
@@ -421,8 +421,13 @@ export function useAudioBookPageController() {
         clients.ttsClient,
         store.characters,
         {
-          connectorId: ttsRoute.ttsSelection.connectorId || undefined,
-          routeSource: ttsRoute.ttsSelection.routeSource,
+          binding: ttsRoute.ttsSelection.connectorId
+            ? {
+              source: ttsRoute.ttsSelection.routeSource === 'local-runtime' ? 'local-runtime' : 'token-api',
+              connectorId: ttsRoute.ttsSelection.connectorId,
+              model: ttsRoute.ttsSelection.model || '',
+            }
+            : undefined,
           model: ttsRoute.ttsSelection.model,
         },
       );
@@ -500,8 +505,13 @@ export function useAudioBookPageController() {
           speakingRate: casting.speakingRate,
           pitch: casting.pitch,
           emotion: casting.emotion,
-          connectorId: ttsRoute.ttsSelection.connectorId || undefined,
-          routeSource: ttsRoute.ttsSelection.routeSource,
+          binding: ttsRoute.ttsSelection.connectorId
+            ? {
+              source: ttsRoute.ttsSelection.routeSource === 'local-runtime' ? 'local-runtime' : 'token-api',
+              connectorId: ttsRoute.ttsSelection.connectorId,
+              model: ttsRoute.ttsSelection.model || '',
+            }
+            : undefined,
           model: ttsRoute.ttsSelection.model,
         });
         console.info(FLOW_LOG_PREFIX, 'cast:preview:ok', {
@@ -623,8 +633,13 @@ export function useAudioBookPageController() {
       {
         maxConcurrency: 3,
         ttsRoute: {
-          connectorId: ttsRoute.ttsSelection.connectorId || undefined,
-          routeSource: ttsRoute.ttsSelection.routeSource,
+          binding: ttsRoute.ttsSelection.connectorId
+            ? {
+              source: ttsRoute.ttsSelection.routeSource === 'local-runtime' ? 'local-runtime' : 'token-api',
+              connectorId: ttsRoute.ttsSelection.connectorId,
+              model: ttsRoute.ttsSelection.model || '',
+            }
+            : undefined,
           model: ttsRoute.ttsSelection.model,
         },
         existingJobs,

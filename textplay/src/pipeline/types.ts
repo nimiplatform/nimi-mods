@@ -1,5 +1,5 @@
-import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
 import type { HookClient } from '@nimiplatform/sdk/mod/types';
+import type { ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import type { NarrativeEngineModule } from '../../../narrative-engine/src/index.js';
 import type { TextplayRenderRequest } from '../data/schemas.js';
 import type {
@@ -10,6 +10,7 @@ import type {
   TextplayRunSnapshot,
   TextplayWarning,
 } from '../types.js';
+import type { TextplayRuntimeAiClient } from '../runtime-ai-client.js';
 
 export type TextplayPipelineStep =
   | 'received'
@@ -23,7 +24,8 @@ export type TextplayPipelineStep =
 
 export type TextplayPipelineDependencies = {
   hookClient: HookClient;
-  aiClient: Pick<ModAiClient, 'generateText'>;
+  runtimeClient: ModRuntimeClient['route'];
+  aiClient: Pick<TextplayRuntimeAiClient, 'generateText'>;
   narrativeEngine: NarrativeEngineModule;
   abortSignal?: AbortSignal;
 };

@@ -296,7 +296,7 @@ export async function extractChunkCoarse(
 ): Promise<{ extraction: ChunkExtraction; retryCount: number }> {
   const prompt = buildCoarsePrompt(input);
   const first = await llm.generateText({
-    routeHint: 'chat/coarse',
+    capability: 'text.generate',
     prompt,
     mode: 'STORY',
     abortSignal: input.abortSignal,
@@ -305,7 +305,7 @@ export async function extractChunkCoarse(
     chunkIndex: input.index,
     chunkTotal: input.total,
     attempt: 1,
-    routeHint: 'chat/coarse',
+    capability: 'text.generate',
     promptTraceId: first.promptTraceId,
     textLength: String(first.text || '').length,
   });
@@ -339,7 +339,7 @@ export async function extractChunkCoarse(
       parseError: summarizeModelError(firstError),
     });
     const second = await llm.generateText({
-      routeHint: 'chat/retry-low-temp',
+      capability: 'text.generate',
       prompt: repairPrompt,
       mode: 'STORY',
       abortSignal: input.abortSignal,
@@ -348,7 +348,7 @@ export async function extractChunkCoarse(
       chunkIndex: input.index,
       chunkTotal: input.total,
       attempt: 2,
-      routeHint: 'chat/retry-low-temp',
+      capability: 'text.generate',
       promptTraceId: second.promptTraceId,
       textLength: String(second.text || '').length,
     });
@@ -384,7 +384,7 @@ export async function extractChunkCoarse(
         secondError: summarizeModelError(secondError),
       });
       const third = await llm.generateText({
-        routeHint: 'chat/retry-low-temp',
+        capability: 'text.generate',
         prompt: strictRepairPrompt,
         mode: 'STORY',
         abortSignal: input.abortSignal,
@@ -393,7 +393,7 @@ export async function extractChunkCoarse(
         chunkIndex: input.index,
         chunkTotal: input.total,
         attempt: 3,
-        routeHint: 'chat/retry-low-temp',
+        capability: 'text.generate',
         promptTraceId: third.promptTraceId,
         textLength: String(third.text || '').length,
       });

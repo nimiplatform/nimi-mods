@@ -93,18 +93,30 @@ function makeEpisode() {
 test('generate-voice-line produces real voice audio and fallback audit', async () => {
   const episode = makeEpisode();
   const result = await buildGeneratedVoiceAssets({
-    hookClient: {
-      llm: {
-        speech: {
-          listVoices: async () => ([
-            { id: 'voice-zh-1', providerId: 'provider-main', lang: 'zh' },
-          ]),
+    runtimeClient: {
+      route: {
+        resolve: async ({ binding }) => ({
+          source: binding?.source || 'local-runtime',
+          connectorId: binding?.connectorId || '',
+          model: binding?.model || '',
+          provider: 'provider-main',
+        }),
+      },
+      media: {
+        tts: {
+          listVoices: async () => ({
+            voices: [
+              { voiceId: 'voice-zh-1', lang: 'zh' },
+            ],
+            modelResolved: '',
+            traceId: 'trace-voices-1',
+          }),
         },
       },
     },
     aiClient: {
-      checkRouteHealth: async ({ routeOverride }) => {
-        if (routeOverride?.source === 'local-runtime') {
+      checkRouteHealth: async ({ binding }) => {
+        if (binding?.source === 'local-runtime') {
           return { status: 'unhealthy', reasonCode: 'RUNTIME_ROUTE_DOWN' };
         }
         return { status: 'healthy', reasonCode: 'RUNTIME_ROUTE_HEALTHY' };

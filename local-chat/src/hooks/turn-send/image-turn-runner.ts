@@ -1,11 +1,11 @@
-import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
 import type { LocalChatDefaultSettings } from '../../state/index.js';
 import {
   isMediaGenerationAllowed,
   isPromptLikelyNsfw,
   type NsfwMediaPolicy,
 } from '../../services/policy/nsfw-media-policy.js';
-import { resolveMediaRouteConfig, toPinnedRouteOverride } from './media-route.js';
+import { resolveMediaRouteConfig, toPinnedRouteBinding } from './media-route.js';
+import type { LocalChatAiClient } from '../../runtime-ai-client.js';
 
 export type ImageTurnRunnerResult =
   | {
@@ -86,7 +86,7 @@ function toFriendlyImageErrorMessage(error: unknown): string {
 }
 
 export async function runImageTurn(input: {
-  aiClient: Pick<ModAiClient, 'resolveRoute' | 'generateImage'>;
+  aiClient: Pick<LocalChatAiClient, 'resolveRoute' | 'generateImage'>;
   prompt: string;
   defaultSettings: LocalChatDefaultSettings;
   nsfwPolicy: NsfwMediaPolicy;
@@ -112,7 +112,7 @@ export async function runImageTurn(input: {
   });
   if (
     routeConfig.routeSource === 'token-api'
-    && !String(routeConfig.routeOverride?.connectorId || '').trim()
+    && !String(routeConfig.routeBinding?.connectorId || '').trim()
   ) {
     return {
       status: 'failed',
@@ -126,8 +126,8 @@ export async function runImageTurn(input: {
 
   try {
     const resolvedRoute = await input.aiClient.resolveRoute({
-      routeHint: 'image/default',
-      routeOverride: routeConfig.routeOverride,
+      capability: 'image.generate',
+      routeBinding: routeConfig.routeBinding,
     });
     resolvedRouteSource = resolvedRoute.source === 'token-api' ? 'token-api' : 'local-runtime';
     if (!isMediaGenerationAllowed({
@@ -147,11 +147,11 @@ export async function runImageTurn(input: {
       };
     }
 
-    const pinnedRouteOverride = toPinnedRouteOverride(resolvedRoute);
+    const pinnedRouteBinding = toPinnedRouteBinding(resolvedRoute);
     const generated = await input.aiClient.generateImage({
-      routeHint: 'image/default',
-      routeOverride: pinnedRouteOverride,
-      model: pinnedRouteOverride.model || routeConfig.model,
+      capability: 'image.generate',
+      routeBinding: pinnedRouteBinding,
+      model: pinnedRouteBinding.model || routeConfig.model,
       prompt: normalizedPrompt,
     });
     const finalRouteSource = generated.route.source === 'token-api' ? 'token-api' : 'local-runtime';

@@ -95,6 +95,12 @@ function parseHtml(content: string): string {
     }
     return (doc.body?.textContent ?? '').trim();
   }
-  // Fallback: strip tags with regex
-  return content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  // Fallback: strip full block tags first so script/style text never leaks into output.
+  return content
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<(?:nav|footer|header|aside)\b[^>]*>[\s\S]*?<\/(?:nav|footer|header|aside)>/gi, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }

@@ -221,9 +221,8 @@ test('degraded chain fail-close when both route sources unavailable', async () =
   await assert.rejects(
     () => invokeWithRouteFallback({
       stage: 'render',
-      capability: 'llm.video.generate',
+      capability: 'video.generate',
       traceId: 'trace-route-fail',
-      routeHint: 'video/high',
       checkHealth: async () => ({
         status: 'down',
         reasonCode: 'RUNTIME_ROUTE_DOWN',

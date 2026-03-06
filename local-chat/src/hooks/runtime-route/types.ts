@@ -1,3 +1,4 @@
+import type { ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
 
 export type ChatRouteSnapshot = {
@@ -9,28 +10,7 @@ export type ChatRouteSnapshot = {
 };
 
 export type UseLocalChatRuntimeRouteInput = {
-  aiClient: {
-    resolveRoute: (input: {
-      routeHint: 'chat/default';
-      routeOverride?: RuntimeRouteBinding;
-    }) => Promise<{
-      source: string;
-      provider: string;
-      model: string;
-      connectorId: string;
-      localProviderEndpoint?: string;
-      localOpenAiEndpoint?: string;
-    }>;
-    checkRouteHealth: (input: {
-      routeHint: 'chat/default';
-      routeOverride?: RuntimeRouteBinding;
-    }) => Promise<unknown>;
-  };
-  hookClient: {
-    data: {
-      query: (input: { capability: string; query: Record<string, unknown> }) => Promise<unknown>;
-    };
-  };
+  runtimeClient: ModRuntimeClient['route'];
   setStatusBanner: (input: { kind: 'warn' | 'error' | 'success' | 'info'; message: string }) => void;
 };
 

@@ -7,14 +7,14 @@ rules:
   - KB 业务执行真相唯一归属本文件；`@nimiplatform/nimi/ssot/mod/governance.md` 仅定义 Mod 通用治理规则。
   - KB 执行主路径固定在 `nimi-mods/knowledge-base`，不得以独立网页壳替代 Nimi runtime mod 形态。
   - 文档数据默认仅本地处理（IndexedDB），不隐式上传；导出/分享必须由用户显式触发。
-  - AI 调用入口统一为 `@nimiplatform/sdk/mod/ai`（`generateText|streamText|generateEmbedding`），不保留 legacy 场景调用兼容路径。
+  - AI 调用入口统一为 `@nimiplatform/sdk/mod/runtime`（`runtime.ai.text.*` / `runtime.ai.embedding.generate`），不保留 legacy 场景调用兼容路径。
   - 搜索能力通过 `data.register` 暴露为 data-api capability，不使用 `inter-mod.provide`。
-  - Embedding 路由默认 cloud-first（token-api），预留 local-runtime 接口；路由来源由 `routeHint` 控制，不硬编码 provider。
+  - Embedding 路由默认 cloud-first（token-api），预留 local-runtime 接口；路由来源由 `RuntimeRouteBinding` 控制，不硬编码 provider。
   - 向量检索使用 cosine similarity 浏览器端实现，不依赖 runtime RuntimeKnowledgeService（K-KNOW Phase 1 仅 in-memory + substring matching）。
   - 多轮对话通过 query rewriting 实现上下文连贯；rewritten query 记录在 turn 中供审计。
   - Hook 客户端创建入口统一为 `createHookClient(modId)`，不得恢复历史命名与中间别名。
   - KB 作为 external/default mod 时，必须保持 `manifest + entry + dist` 统一加载链路，不恢复 builtin 专用路径。
-  - KB 对外稳定调用面固定为 `@nimiplatform/sdk/mod/ai|hook|types|ui|logging|utils|runtime-route`；禁止 root import 与 internal/host 直连。
+  - KB 对外稳定调用面固定为 `@nimiplatform/sdk/mod/runtime|hook|types|ui|logging|utils|runtime-route`；禁止 root import 与 internal/host 直连。
   - KB 的 root manifest 与源码 manifest 必须语义一致（版本、能力集合、ai 依赖声明）。
   - KB 代码组织固定为 `components/state/services/hooks` 分层；页面文件只保留容器装配，业务编排下沉到 controller hooks。
   - KB 禁止非 `index.ts/tsx` 的 re-export 壳文件；调用方必须直连真实实现模块，减少调试跳转层。
@@ -66,7 +66,7 @@ rules:
 |-------|-----------|
 | UI | React 19 + Tailwind 4 + Radix UI (Dialog, Progress, Tooltip) |
 | State | Zustand + IndexedDB (`knowledge-base-db` v1) |
-| AI | `@nimiplatform/sdk/mod/ai` (generateText, streamText, generateEmbedding) |
+| AI | `@nimiplatform/sdk/mod/runtime` (`runtime.ai.text.generate/stream`, `runtime.ai.embedding.generate`) |
 | Vector Search | In-memory cosine similarity (VectorStore) |
 | Cross-Mod | Data-API capability (search, documents, conversations) |
 

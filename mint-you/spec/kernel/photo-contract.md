@@ -10,7 +10,7 @@ The user's real photo is stored as `referenceImageUrl` on the agent profile. No 
 
 `referenceImageUrl` is not exposed to other users or agents by default. The mod intercepts read access and returns `null` unless a mutual authorization exists between the requesting user and the photo owner.
 
-**Platform dependency:** This rule requires `hook.agent-profile.read` — a hook dispatch point on agent profile read paths. The desktop app currently calls `realm.raw.request(...)` directly without hook dispatch. Before this rule can be enforced at runtime, the desktop/runtime layer must expose an agent-profile read hook that mods can intercept. Until the hook is available, the mod must degrade gracefully: store authorization state, but photo filtering cannot be enforced client-side. The creation flow and authorization state machine operate independently of the hook and are implementable immediately.
+**Platform dependency:** This rule is enforced through `runtime.profile.read.agent`. Desktop now dispatches a profile-read filter hook on the agent profile read path before returning profile data to the caller. The hook output is intentionally narrow: mods may only redact `referenceImageUrl`, not mutate arbitrary profile fields. The desktop cache stores the upstream profile and reapplies the hook per viewer/world read so filtered results are not shared across viewers.
 
 ## MY-PHOTO-003 Mutual Authorization Required
 

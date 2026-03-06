@@ -14,17 +14,17 @@ type BuildTurnRequestInput = {
   selectedTarget: LocalChatTarget;
   messages: ChatMessage[];
   runtimeMode: 'STORY' | 'SCENE_TURN' | undefined;
-  routeOverride: RuntimeRouteBinding | null;
+  routeBinding: RuntimeRouteBinding | null;
 };
 
 export type TurnInvokeInput = {
-  routeHint: 'chat/default';
+  capability: 'text.generate';
   prompt: string;
   maxTokens?: number;
   mode: 'STORY' | 'SCENE_TURN';
   worldId?: string;
   agentId: string;
-  routeOverride?: RuntimeRouteBinding;
+  routeBinding?: RuntimeRouteBinding;
 };
 
 function normalizeTurnMode(mode: BuildTurnRequestInput['runtimeMode']): 'STORY' | 'SCENE_TURN' {
@@ -64,13 +64,13 @@ export async function buildTurnRequestInput(input: BuildTurnRequestInput): Promi
   });
   const prompt = compiledPrompt.prompt;
   const invokeInput: TurnInvokeInput = {
-    routeHint: 'chat/default',
+    capability: 'text.generate',
     prompt,
     maxTokens: MAX_SEGMENT_TOKENS,
     mode: normalizeTurnMode(input.runtimeMode),
     worldId: input.selectedTarget.worldId || undefined,
     agentId: input.selectedTarget.id,
-    routeOverride: input.routeOverride || undefined,
+    routeBinding: input.routeBinding || undefined,
   };
   return {
     prompt,

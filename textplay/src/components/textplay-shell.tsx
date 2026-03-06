@@ -62,7 +62,7 @@ export type TextplayShellProps = {
     models: string[];
   }>;
   routeModelOptions: string[];
-  routeOverrideActive: boolean;
+  bindingActive: boolean;
   runId: string | null;
   records: TextplayPersistRecord[];
   selectedRecordRunId: string | null;
@@ -105,7 +105,7 @@ export type TextplayShellProps = {
   onRouteSourceChange: (source: RuntimeRouteSource) => void;
   onRouteConnectorChange: (connectorId: string) => void;
   onRouteModelChange: (model: string) => void;
-  onClearRouteOverride: () => void;
+  onClearRouteBinding: () => void;
 };
 
 type TextplayRightPanelSection = 'health' | 'route' | 'debug' | null;
@@ -1147,12 +1147,12 @@ export function TextplayShell(props: TextplayShellProps) {
 
                 <div className="mt-2 flex items-center justify-between">
                   <div className="text-[11px] text-gray-500">
-                    override: {props.routeOverrideActive ? 'on' : 'off'}
+                    override: {props.bindingActive ? 'on' : 'off'}
                   </div>
                   <button
                     type="button"
                     className="rounded border border-gray-300 bg-white px-2 py-1 text-[11px] hover:bg-gray-50"
-                    onClick={props.onClearRouteOverride}
+                    onClick={props.onClearRouteBinding}
                   >
                     Use Runtime Default
                   </button>

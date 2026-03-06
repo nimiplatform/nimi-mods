@@ -144,7 +144,7 @@ version: 1.0.0
 | Cloud-first embedding（auto 模式） | Token-api 质量更高；local-runtime 作为离线 fallback |
 | Async generator RAG 管线 | 流式输出 + 进度回调，避免 UI 阻塞 |
 | Paragraph-based chunking（`\n\n` 分割） | 简单有效，保持语义完整性；未来可升级为 sentence-level |
-| Adapter pattern（ModAiClient → LlmClient/EmbeddingClient） | 解耦 SDK 调用与业务逻辑，便于测试和路由切换 |
+| Adapter pattern（ModRuntimeClient → LlmClient/EmbeddingClient） | 解耦 SDK 调用与业务逻辑，便于测试和路由切换 |
 | 数据 API 暴露搜索而非 Turn Hook | KB 为按需查询型，不适合 turn-level 介入 |
 | Query rewriting 降级策略 | Rewriting 失败不阻断主链路，使用原始 query 继续 |
 | 会话标题自动生成 + 用户可编辑 | 降低首次使用门槛，保留用户控制权 |
@@ -174,10 +174,10 @@ version: 1.0.0
 
 | Capability Key | Usage |
 |---------------|-------|
-| `llm.text.generate` | Query rewriting, 标题生成 |
-| `llm.text.stream` | RAG 流式回答 |
-| `llm.embedding.generate` | Chunk + query embedding |
+| `runtime.ai.text.generate` | Query rewriting, 标题生成 |
+| `runtime.ai.text.stream` | RAG 流式回答 |
+| `runtime.ai.embedding.generate` | Chunk + query embedding |
 | `data.register.*` / `data.query.*` | 8 组数据 API（参考 `tables/capabilities.yaml`） |
-| `data.query.data-api.runtime.route.options` | 路由可用性查询 |
+| `runtime.route.list.options` | 路由可用性查询 |
 | `ui.register.ui-extension.app.sidebar.mods` | 侧边栏入口 |
 | `ui.register.ui-extension.app.content.routes` | 内容路由 |

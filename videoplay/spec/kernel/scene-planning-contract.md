@@ -6,11 +6,11 @@ Scene planning reads scene records from `storyPackage.materials.scenes`. Each sc
 
 ## V-SCENE-002: Environment Description Generation
 
-For each scene, the pipeline invokes `scene-planning-text` route stage (`llm.text.generate`) to produce an enriched environment description.
+For each scene, the pipeline invokes `scene-planning-text` route stage (`runtime.ai.text.generate`) to produce an enriched environment description.
 
 ## V-SCENE-003: Scene Reference Images
 
-For each scene, the pipeline invokes `scene-planning-visual` route stage (`llm.image.generate`) to generate 1-3 candidate reference images. The number of candidates is governed by `SCENE_PLANNING_POLICY.maxCandidateImages`.
+For each scene, the pipeline invokes `scene-planning-visual` route stage (`runtime.media.image.generate`) to generate 1-3 candidate reference images. The number of candidates is governed by `SCENE_PLANNING_POLICY.maxCandidateImages`.
 
 ## V-SCENE-004: ScenePlanningOutput Schema
 

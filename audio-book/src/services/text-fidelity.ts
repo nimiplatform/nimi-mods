@@ -218,8 +218,8 @@ export function rebaseChapterSegmentsToSource(input: {
       throw new Error(`VS_TEXT_FIDELITY_MISMATCH: chapter ${input.chapterIndex + 1} segment ${i} has invalid boundaries`);
     }
 
-    const startOffset = normalizedSource.originalIndexByNormalized[startNorm];
-    const endOffset = (normalizedSource.originalIndexByNormalized[endNorm - 1] || 0) + 1;
+    const startOffset = normalizedSource.originalIndexByNormalized[startNorm] ?? -1;
+    const endOffset = (normalizedSource.originalIndexByNormalized[endNorm - 1] ?? -1) + 1;
     if (!Number.isFinite(startOffset) || !Number.isFinite(endOffset) || endOffset <= startOffset) {
       throw new Error(`VS_TEXT_FIDELITY_MISMATCH: chapter ${input.chapterIndex + 1} segment ${i} offset mapping failed`);
     }

@@ -11,15 +11,21 @@ mod_identity:
   entry: ./dist/mods/videoplay/index.js
   source_rule: V-CAP-001
 required_capabilities:
-  - key: llm.text.generate
+  - key: runtime.ai.text.generate
     source_rule: V-CAP-002
-  - key: llm.image.generate
+  - key: runtime.media.image.generate
     source_rule: V-CAP-002
-  - key: llm.video.generate
+  - key: runtime.media.video.generate
     source_rule: V-CAP-002
-  - key: llm.speech.synthesize
+  - key: runtime.media.tts.synthesize
     source_rule: V-CAP-007
-  - key: data.query.data-api.runtime.route.options
+  - key: runtime.media.tts.list.voices
+    source_rule: V-CAP-007
+  - key: runtime.route.list.options
+    source_rule: V-CAP-003
+  - key: runtime.route.resolve
+    source_rule: V-CAP-003
+  - key: runtime.route.check.health
     source_rule: V-CAP-003
   - key: data.query.data-api.world.events.list
     source_rule: V-CAP-006

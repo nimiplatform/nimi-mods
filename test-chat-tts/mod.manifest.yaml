@@ -7,12 +7,12 @@ entry: ./dist/mods/test-chat-tts/index.js
 description: >
   Minimal test mod for validating chat, image, and TTS pipelines end-to-end.
 capabilities:
-  - llm.text.generate
-  - llm.image.generate
-  - llm.speech.providers.list
-  - llm.speech.voices.list
-  - llm.speech.synthesize
-  - data.query.data-api.runtime.route.options
+  - runtime.ai.text.generate
+  - runtime.media.image.generate
+  - runtime.media.tts.list.voices
+  - runtime.media.tts.synthesize
+  - runtime.route.list.options
+  - runtime.route.resolve
   - ui.register.ui-extension.app.sidebar.mods
   - ui.register.ui-extension.app.content.routes
 ai:

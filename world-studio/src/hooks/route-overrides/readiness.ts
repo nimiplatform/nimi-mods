@@ -1,5 +1,5 @@
 import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
-import type { DistillRouteOverrideMap } from '../../generation/pipeline.js';
+import type { DistillRouteBindingMap } from '../../generation/pipeline.js';
 import type { WorldStudioWorkspaceSnapshot } from '../../contracts.js';
 import { ReasonCode } from '@nimiplatform/sdk/types';
 
@@ -112,12 +112,12 @@ export function evaluateRouteBindingReadiness(
 }
 
 export function areDistillRoutesReady(
-  routeOverrides: Pick<DistillRouteOverrideMap, 'coarse' | 'fine'>,
+  bindings: Pick<DistillRouteBindingMap, 'coarse' | 'fine'>,
   routeOptions: RuntimeRouteOptionsSnapshot | null,
 ): boolean {
   return (
-    evaluateRouteBindingReadiness(routeOverrides.coarse, routeOptions).ready
-    && evaluateRouteBindingReadiness(routeOverrides.fine, routeOptions).ready
+    evaluateRouteBindingReadiness(bindings.coarse, routeOptions).ready
+    && evaluateRouteBindingReadiness(bindings.fine, routeOptions).ready
   );
 }
 

@@ -1,4 +1,3 @@
-import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
 import { splitSourceText } from '../engine/chunker.js';
 import { createEmptyAccumulatedState, compressAccumulatedState } from '../engine/accumulated-context.js';
 import { upsertMergeExtraction, toChunkExtraction } from '../engine/accumulated-merge.js';
@@ -13,20 +12,21 @@ import type {
   ChunkExtraction,
   ChunkTaskResult,
   DraftPatch,
-  DistillRouteOverrideMap,
+  DistillRouteBindingMap,
   FinalDraftAccumulator,
   Phase1Result,
   WorldStudioProgressState,
   WorldStudioTaskInterruptReason,
 } from '../engine/types.js';
 import { toFailureSummary } from './retry-policy.js';
-import { toNormalizedRouteOverrides, withRouteOverride } from './route-capability-resolver.js';
+import { toNormalizedRouteBindings, withRouteBinding } from './route-capability-resolver.js';
 import { runCoarseChunk } from './phase1/coarse-pass.js';
 import { runFineChunk } from './phase1/fine-pass.js';
 import { extractionSignal, mergeChunkExtraction, countSuccessfulChunks } from './phase1/merge-result.js';
 import { createProgressEmitter } from './phase1/progress.js';
 import { buildPhase1Result } from './phase1/quality.js';
 import { backfillChunkExtractionEventFields } from '../engine/heuristic/event-field-backfill.js';
+import type { WorldStudioRuntimeAiClient } from '../runtime-ai-client.js';
 
 type FinalDraftAccumulatorPatchUpdate = {
   chunkIndex: number;
@@ -64,13 +64,13 @@ function resolveMissingFinalDraftFields(accumulator: FinalDraftAccumulator): str
 }
 
 export async function runPhase1Extraction(
-  aiClient: ModAiClient,
+  aiClient: WorldStudioRuntimeAiClient,
   sourceText: string,
   options?: {
     onProgress?: (state: WorldStudioProgressState) => void;
     chunkSize?: number;
     overlap?: number;
-    routeOverrides?: DistillRouteOverrideMap;
+    bindings?: DistillRouteBindingMap;
     abortSignal?: AbortSignal;
     shouldInterrupt?: () => WorldStudioTaskInterruptReason | null;
     contextTokenBudget?: number;
@@ -87,11 +87,11 @@ export async function runPhase1Extraction(
 }
 
 export async function runPhase1ExtractionFromChunks(
-  aiClient: ModAiClient,
+  aiClient: WorldStudioRuntimeAiClient,
   chunks: string[],
   options?: {
     onProgress?: (state: WorldStudioProgressState) => void;
-    routeOverrides?: DistillRouteOverrideMap;
+    bindings?: DistillRouteBindingMap;
     chunkIndexMap?: number[];
     maxConcurrency?: number;
     abortSignal?: AbortSignal;
@@ -109,9 +109,9 @@ export async function runPhase1ExtractionFromChunks(
     throw new Error('WORLD_STUDIO_EMPTY_SOURCE');
   }
 
-  const routeOverrides = toNormalizedRouteOverrides(options?.routeOverrides);
-  const coarseLlm = withRouteOverride(aiClient, 'chat/coarse', routeOverrides.coarse);
-  const fineLlm = withRouteOverride(aiClient, 'chat/fine', routeOverrides.fine);
+  const bindings = toNormalizedRouteBindings(options?.bindings);
+  const coarseLlm = withRouteBinding(aiClient, 'text.generate', bindings.coarse);
+  const fineLlm = withRouteBinding(aiClient, 'text.generate', bindings.fine);
   const startedAt = Date.now();
   const emit = createProgressEmitter(startedAt, options?.onProgress);
 

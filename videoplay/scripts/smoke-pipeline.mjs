@@ -134,15 +134,6 @@ function createDeps() {
   const hookClient = {
     data: {
       query: async ({ capability, query }) => {
-        if (capability === 'data-api.runtime.route.options') {
-          return {
-            selected: {
-              source: 'local-runtime',
-              connectorId: '',
-              model: 'smoke-model',
-            },
-          };
-        }
         if (capability === 'data-api.videoplay.episode.upsert' && query.operation === 'upsert') {
           writes.episodes.push(query.episode);
           return { episode: query.episode };
@@ -159,11 +150,43 @@ function createDeps() {
         throw new Error(`VIDEOPLAY_SMOKE_UNSUPPORTED_CAPABILITY:${capability}`);
       },
     },
-    llm: {
-      speech: {
-        listVoices: async () => ([
-          { id: 'voice-zh-1', providerId: 'provider-main', name: 'ZH Voice', lang: 'zh' },
-        ]),
+  };
+
+  const runtimeClient = {
+    route: {
+      listOptions: async ({ capability }) => ({
+        capability,
+        selected: {
+          source: 'local-runtime',
+          connectorId: '',
+          model: 'smoke-model',
+        },
+        resolvedDefault: {
+          source: 'local-runtime',
+          connectorId: '',
+          model: 'smoke-model',
+        },
+        connectors: [],
+        localRuntime: {
+          models: [{ localModelId: 'm1', model: 'smoke-model' }],
+        },
+      }),
+      resolve: async ({ binding }) => ({
+        source: binding?.source || 'local-runtime',
+        connectorId: binding?.connectorId || '',
+        model: binding?.model || 'smoke-model',
+        provider: 'provider-main',
+      }),
+    },
+    media: {
+      tts: {
+        listVoices: async () => ({
+          voices: [
+            { voiceId: 'voice-zh-1', lang: 'zh' },
+          ],
+          modelResolved: 'smoke-model',
+          traceId: 'trace-smoke-voices',
+        }),
       },
     },
   };
@@ -221,6 +244,7 @@ function createDeps() {
   return {
     deps: {
       hookClient,
+      runtimeClient,
       aiClient,
       narrativeEngine,
     },

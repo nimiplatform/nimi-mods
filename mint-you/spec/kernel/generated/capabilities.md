@@ -12,7 +12,7 @@ mod_identity:
   entry: ./dist/mods/mint-you/index.js
   source_rule: MY-CAP-001
 required_capabilities:
-  - key: llm.text.generate
+  - key: runtime.ai.text.generate
     purpose: Structured DNA synthesis and Identity Card generation from trait scores
     source_rule: MY-CAP-003
   - key: data.query.data-api.creator.agents.create
@@ -24,10 +24,10 @@ required_capabilities:
   - key: data.query.data-api.world.oasis.get
     purpose: Resolve deterministic OASIS world target for agent worldId binding
     source_rule: MY-CAP-002
-  - key: data.query.data-api.runtime.route.options
+  - key: runtime.route.list.options
     purpose: Query runtime route source/connector/model options for Mint-You synthesis routing controls
     source_rule: MY-CAP-003
-  - key: hook.agent-profile.read
+  - key: runtime.profile.read.agent
     purpose: Intercept agent profile reads to filter referenceImageUrl based on photo authorization state
     source_rule: MY-CAP-005
   - key: data.store.mod-state

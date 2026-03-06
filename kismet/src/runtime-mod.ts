@@ -1,6 +1,6 @@
 import { type RuntimeModRegistration } from '@nimiplatform/sdk/mod/types';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
-import { createAiClient } from '@nimiplatform/sdk/mod/ai';
+import { createModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import { createKismetFlowId, emitKismetLog } from './logging.js';
 import {
   KISMET_CAPABILITIES,
@@ -10,14 +10,14 @@ import {
 import { registerKismetDataCapabilities } from './registrars/data.js';
 import { registerKismetUiExtensions } from './registrars/ui.js';
 
-let _aiClient: ReturnType<typeof createAiClient> | null = null;
+let _runtimeClient: ReturnType<typeof createModRuntimeClient> | null = null;
 let _hookClient: ReturnType<typeof createHookClient> | null = null;
 
-export function getKismetAiClient() {
-  if (!_aiClient) {
-    throw new Error('KISMET_AI_CLIENT_NOT_INITIALIZED');
+export function getKismetRuntimeClient() {
+  if (!_runtimeClient) {
+    throw new Error('KISMET_RUNTIME_CLIENT_NOT_INITIALIZED');
   }
-  return _aiClient;
+  return _runtimeClient;
 }
 
 export function getKismetHookClient() {
@@ -34,8 +34,8 @@ export function createKismetRuntimeMod(): RuntimeModRegistration {
     isDefaultPrivateExecution: false,
     setup: async ({ sdkRuntimeContext }) => {
       const hookClient = createHookClient(KISMET_MOD_ID, sdkRuntimeContext);
-      const aiClient = createAiClient(KISMET_MOD_ID, sdkRuntimeContext);
-      _aiClient = aiClient;
+      const runtimeClient = createModRuntimeClient(KISMET_MOD_ID, sdkRuntimeContext);
+      _runtimeClient = runtimeClient;
       _hookClient = hookClient;
       const flowId = createKismetFlowId('kismet-setup');
       const startedAt = performance.now();

@@ -13,9 +13,11 @@ module_identity:
   source_rule: N-CAP-001
 host_capability_contract:
   caller_minimum_queries:
-    - key: llm.text.generate
+    - key: runtime.ai.text.generate
       source_rule: N-CAP-002
-    - key: data.query.data-api.runtime.route.options
+    - key: runtime.route.list.options
+      source_rule: N-CAP-003
+    - key: runtime.route.resolve
       source_rule: N-CAP-003
     - key: data.query.data-api.world.access.me
       source_rule: N-CAP-003

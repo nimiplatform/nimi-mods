@@ -37,8 +37,8 @@
 |-------|-----------|
 | UI | React 19 (mod component) |
 | Storage | IndexedDB (audio + project data) |
-| AI (text) | hook.llm.text.generate/stream |
-| AI (speech) | hook.llm.speech.synthesize |
+| AI (text) | runtime.ai.text.generate/stream |
+| AI (speech) | runtime.media.tts.synthesize |
 | Playback | HTML5 Audio API |
 | Export (optional) | Web Audio API |
 

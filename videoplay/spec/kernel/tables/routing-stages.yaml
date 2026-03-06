@@ -5,62 +5,62 @@ route_sources:
   source_rule: V-ROUTE-001
 stages:
   - stage: screenplay
-    capability: llm.text.generate
+    capability: runtime.ai.text.generate
     fallback_on_unavailable: token-api
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002
   - stage: storyboard
-    capability: llm.text.generate
+    capability: runtime.ai.text.generate
     fallback_on_unavailable: token-api
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002
   - stage: asset-render-image
-    capability: llm.image.generate
+    capability: runtime.media.image.generate
     fallback_on_unavailable: token-api
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002
   - stage: asset-render-video
-    capability: llm.video.generate
+    capability: runtime.media.video.generate
     fallback_on_unavailable: token-api
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002
   - stage: asset-render-voice
-    capability: llm.speech.synthesize
+    capability: runtime.media.tts.synthesize
     fallback_on_unavailable: token-api
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002
   - stage: character-casting-text
-    capability: llm.text.generate
+    capability: runtime.ai.text.generate
     fallback_on_unavailable: token-api
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002
   - stage: character-casting-visual
-    capability: llm.image.generate
+    capability: runtime.media.image.generate
     fallback_on_unavailable: token-api
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002
   - stage: scene-planning-text
-    capability: llm.text.generate
+    capability: runtime.ai.text.generate
     fallback_on_unavailable: token-api
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002
   - stage: scene-planning-visual
-    capability: llm.image.generate
+    capability: runtime.media.image.generate
     fallback_on_unavailable: token-api
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002
   - stage: storyboard-cinematography
-    capability: llm.text.generate
+    capability: runtime.ai.text.generate
     fallback_on_unavailable: token-api
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002
   - stage: storyboard-acting
-    capability: llm.text.generate
+    capability: runtime.ai.text.generate
     fallback_on_unavailable: token-api
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002
   - stage: audio-design-bgm
-    capability: llm.text.generate
+    capability: runtime.ai.text.generate
     fallback_on_unavailable: token-api
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002

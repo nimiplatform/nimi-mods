@@ -129,7 +129,7 @@ export function buildWorldStudioPanels(viewModel: WorldStudioViewModel): {
     onRouteSourceChange: viewModel.routing.onRouteSourceChange,
     onRouteConnectorChange: viewModel.routing.onRouteConnectorChange,
     onRouteModelChange: viewModel.routing.onRouteModelChange,
-    onClearRouteOverride: viewModel.routing.onClearRouteOverride,
+    onClearRouteBinding: viewModel.routing.onClearRouteBinding,
     onOpenRuntimeSetup: viewModel.routing.onOpenRuntimeSetup,
     onRebuildEmbeddingIndex: viewModel.routing.onRebuildEmbeddingIndex,
     onSetExpertMode: bindings.right.onSetExpertMode,

@@ -5,12 +5,12 @@ import {
   type RuntimeRouteSource,
 } from '@nimiplatform/sdk/mod/runtime-route';
 import {
-  loadLocalChatRouteOverride,
-  persistLocalChatRouteOverride,
+  loadLocalChatRouteBinding,
+  persistLocalChatRouteBinding,
 } from '../services/route/route-override-store.js';
 import { emitLocalChatLog } from '../logging.js';
 import type { HealthStatus } from '../types.js';
-import { buildRouteOverrideForConnector, buildRouteOverrideForModel, buildRouteOverrideForSource } from './runtime-route/override-actions.js';
+import { buildRouteBindingForConnector, buildRouteBindingForModel, buildRouteBindingForSource } from './runtime-route/override-actions.js';
 import { loadRouteOptions, resolveRouteSnapshot, runRouteHealthCheck } from './runtime-route/queries.js';
 import type { ChatRouteSnapshot, UseLocalChatRuntimeRouteInput } from './runtime-route/types.js';
 
@@ -25,7 +25,7 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
   const [videoRouteOptions, setVideoRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
   const [ttsRouteOptions, setTtsRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
   const [sttRouteOptions, setSttRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
-  const [routeOverride, setRouteOverride] = useState<RuntimeRouteBinding | null>(() => loadLocalChatRouteOverride());
+  const [routeBinding, setRouteBinding] = useState<RuntimeRouteBinding | null>(() => loadLocalChatRouteBinding());
   const routeOptionsLoadInFlightRef = useRef<Partial<Record<RouteCapability, Promise<RuntimeRouteOptionsSnapshot | null>>>>({});
 
   const setRouteOptionsSafely = useCallback((capability: RouteCapability, next: RuntimeRouteOptionsSnapshot | null) => {
@@ -61,12 +61,12 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
 
   const refreshRouteSnapshot = useCallback(async () => {
     await resolveRouteSnapshot({
-      aiClient: input.aiClient,
-      routeOverride,
+      runtimeClient: input.runtimeClient,
+      routeBinding,
       setRouteSnapshot,
       setStatusBanner: input.setStatusBanner,
     });
-  }, [input.aiClient, input.setStatusBanner, routeOverride]);
+  }, [input.runtimeClient, input.setStatusBanner, routeBinding]);
 
   const loadRuntimeRouteOptions = useCallback(async (capability: RouteCapability) => {
     const inFlight = routeOptionsLoadInFlightRef.current[capability];
@@ -86,7 +86,7 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
       });
       const loaded = await loadRouteOptions({
         capability,
-        hookClient: input.hookClient,
+        runtimeClient: input.runtimeClient,
         setRouteOptions: (value) => setRouteOptionsSafely(capability, value),
       });
       emitLocalChatLog({
@@ -110,7 +110,7 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
       }
     });
     return task;
-  }, [input.hookClient, setRouteOptionsSafely]);
+  }, [input.runtimeClient, setRouteOptionsSafely]);
 
   const loadChatRuntimeRouteOptions = useCallback(
     () => loadRuntimeRouteOptions('chat'),
@@ -152,16 +152,16 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
 
   const handleHealthCheck = useCallback(async () => {
     await runRouteHealthCheck({
-      aiClient: input.aiClient,
-      routeOverride,
+      runtimeClient: input.runtimeClient,
+      routeBinding,
       setCheckingHealth,
       setHealthStatus,
       setStatusBanner: input.setStatusBanner,
     });
-  }, [input.aiClient, input.setStatusBanner, routeOverride]);
+  }, [input.runtimeClient, input.setStatusBanner, routeBinding]);
 
   const handleRouteSourceChange = useCallback((source: RuntimeRouteSource) => {
-    setRouteOverride((previous) => buildRouteOverrideForSource({
+    setRouteBinding((previous) => buildRouteBindingForSource({
       source,
       previous,
       options: chatRouteOptions,
@@ -169,7 +169,7 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
   }, [chatRouteOptions]);
 
   const handleRouteConnectorChange = useCallback((connectorId: string) => {
-    setRouteOverride((previous) => buildRouteOverrideForConnector({
+    setRouteBinding((previous) => buildRouteBindingForConnector({
       connectorId,
       previous,
       options: chatRouteOptions,
@@ -177,42 +177,42 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
   }, [chatRouteOptions]);
 
   const handleRouteModelChange = useCallback((model: string) => {
-    setRouteOverride((previous) => buildRouteOverrideForModel({
+    setRouteBinding((previous) => buildRouteBindingForModel({
       model,
       previous,
       options: chatRouteOptions,
     }));
   }, [chatRouteOptions]);
 
-  const clearRouteOverride = useCallback(() => {
-    setRouteOverride(null);
+  const clearRouteBinding = useCallback(() => {
+    setRouteBinding(null);
   }, []);
 
   useEffect(() => {
-    persistLocalChatRouteOverride(routeOverride);
-  }, [routeOverride]);
+    persistLocalChatRouteBinding(routeBinding);
+  }, [routeBinding]);
 
   useEffect(() => {
-    if (!routeOverride || routeOverride.source !== 'token-api') {
+    if (!routeBinding || routeBinding.source !== 'token-api') {
       return;
     }
     const connectors = chatRouteOptions?.connectors || [];
     if (connectors.length === 0) {
       return;
     }
-    const matched = connectors.find((item) => item.id === routeOverride.connectorId) || null;
+    const matched = connectors.find((item) => item.id === routeBinding.connectorId) || null;
     if (matched) {
       if (matched.models.length === 0) {
         return;
       }
-      if (routeOverride.model && matched.models.includes(routeOverride.model)) {
+      if (routeBinding.model && matched.models.includes(routeBinding.model)) {
         return;
       }
       const fallbackModel = matched.models[0] || '';
-      if (!fallbackModel || fallbackModel === routeOverride.model) {
+      if (!fallbackModel || fallbackModel === routeBinding.model) {
         return;
       }
-      setRouteOverride((previous) => {
+      setRouteBinding((previous) => {
         if (!previous || previous.source !== 'token-api') {
           return previous;
         }
@@ -235,7 +235,7 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
       return;
     }
     const fallbackModel = fallbackConnector.models[0] || '';
-    setRouteOverride((previous) => {
+    setRouteBinding((previous) => {
       if (!previous || previous.source !== 'token-api') {
         return previous;
       }
@@ -250,7 +250,7 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
         model: nextModel,
       };
     });
-  }, [chatRouteOptions, routeOverride]);
+  }, [chatRouteOptions, routeBinding]);
 
   useEffect(() => {
     if (routeSnapshot?.source !== 'token-api') {
@@ -261,7 +261,7 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
     if (!snapshotConnectorId && !snapshotModel) {
       return;
     }
-    setRouteOverride((previous) => {
+    setRouteBinding((previous) => {
       if (!previous || previous.source !== 'token-api') {
         return previous;
       }
@@ -362,7 +362,7 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
       tts: ttsRouteOptions,
       stt: sttRouteOptions,
     },
-    routeOverride,
+    routeBinding,
     loadChatRuntimeRouteOptions,
     loadImageRuntimeRouteOptions,
     loadVideoRuntimeRouteOptions,
@@ -374,6 +374,6 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
     handleRouteSourceChange,
     handleRouteConnectorChange,
     handleRouteModelChange,
-    clearRouteOverride,
+    clearRouteBinding,
   };
 }

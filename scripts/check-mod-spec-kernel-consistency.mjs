@@ -8,7 +8,7 @@ import { getConfig } from './spec-kernel-config.mjs';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const modsRoot = path.resolve(scriptDir, '..');
-const CAPABILITY_KEY_RE = /^(llm|data|ui|turn|inter-mod|hook|audit|meta)\./;
+const CAPABILITY_KEY_RE = /^(runtime|event|action|llm|data|ui|turn|inter-mod|hook|audit|meta)\./;
 
 function parseArgs(argv) {
   let mod = '';

@@ -154,7 +154,7 @@ function createRuntimeTtsClient(endpoint: string, modelId: string): TtsClient {
         throw new Error('TTS returned empty audio');
       }
 
-      const audioBlob = new Blob([artifact.bytes], { type: artifact.mimeType || 'audio/mpeg' });
+      const audioBlob = new Blob([new Uint8Array(artifact.bytes)], { type: artifact.mimeType || 'audio/mpeg' });
       const totalLength = artifact.bytes.length;
 
       // Estimate duration: MP3 at ~128kbps → bytes * 8 / 128000 * 1000

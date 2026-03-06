@@ -46,6 +46,7 @@ export function KBShell(props: KBShellProps) {
       return () => clearTimeout(timer);
     }
     setToastVisible(false);
+    return undefined;
   }, [props.error]);
 
   return (

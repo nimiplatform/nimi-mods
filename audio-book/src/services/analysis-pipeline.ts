@@ -238,6 +238,8 @@ async function analyzeChapterInChunks(
           id: `tmp-${idx}`,
           chapterIndex,
           index: idx,
+          startOffset: 0,
+          endOffset: 0,
           ...s,
         })));
       }
@@ -293,7 +295,6 @@ async function analyzeChapter(
 
   // Attempt 1: standard
   const first = await llm.generateText({
-    routeHint: 'chat/default',
     systemPrompt,
     userPrompt,
     maxTokens,
@@ -315,7 +316,6 @@ async function analyzeChapter(
       parseError: summarizeModelError(firstError),
     });
     const second = await llm.generateText({
-      routeHint: 'chat/retry-low-temp',
       systemPrompt: 'You are a JSON repair assistant. Return valid JSON only.',
       userPrompt: repairPrompt,
       temperature: 0.1,
@@ -340,7 +340,6 @@ async function analyzeChapter(
         secondError: summarizeModelError(secondError),
       });
       const third = await llm.generateText({
-        routeHint: 'chat/retry-low-temp',
         systemPrompt: 'CRITICAL JSON REPAIR. Return one valid JSON object.',
         userPrompt: strictPrompt,
         temperature: 0,

@@ -1,4 +1,4 @@
-import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
+import type { ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 import type { KismetInput, KismetResult, KismetError } from '../types.js';
 import { KISMET_REASON } from '../contracts.js';
@@ -11,9 +11,9 @@ import { emitKismetLog } from '../logging.js';
 import { ReasonCode } from '@nimiplatform/sdk/types';
 
 type GenerateViaAiInput = {
-  aiClient: ModAiClient;
+  runtimeClient: ModRuntimeClient;
   input: KismetInput;
-  routeOverride?: RuntimeRouteBinding;
+  binding?: RuntimeRouteBinding;
   abortSignal?: AbortSignal;
 };
 
@@ -22,12 +22,14 @@ type GenerateViaAiOutput =
   | { ok: false; error: KismetError };
 
 export async function generateViaAi(opts: GenerateViaAiInput): Promise<GenerateViaAiOutput> {
-  const { aiClient, input, routeOverride, abortSignal } = opts;
-  const routeInput = { routeHint: 'chat/default' as const, routeOverride };
+  const { runtimeClient, input, binding, abortSignal } = opts;
 
   // Check route health first
   try {
-    const health = await aiClient.checkRouteHealth(routeInput);
+    const health = await runtimeClient.route.checkHealth({
+      capability: 'text.generate',
+      binding,
+    });
     if (health.reasonCode !== ReasonCode.RUNTIME_ROUTE_HEALTHY && health.reasonCode !== ReasonCode.RUNTIME_ROUTE_DEGRADED) {
       return {
         ok: false,
@@ -54,16 +56,15 @@ export async function generateViaAi(opts: GenerateViaAiInput): Promise<GenerateV
     const systemPrompt = buildKismetSystemPrompt(input);
     const userPrompt = buildKismetUserPrompt(input);
 
-    const result = await aiClient.generateText({
-      prompt: userPrompt,
-      systemPrompt,
+    const result = await runtimeClient.ai.text.generate({
+      input: userPrompt,
+      system: systemPrompt,
       maxTokens: 4096,
       temperature: 0.7,
-      ...routeInput,
-      abortSignal,
+      binding,
     });
 
-    const routeSource = result.route?.source || 'unavailable';
+    const routeSource = result.trace.routeDecision || 'unavailable';
 
     emitKismetLog({
       level: 'debug',
@@ -76,7 +77,7 @@ export async function generateViaAi(opts: GenerateViaAiInput): Promise<GenerateV
       },
     });
 
-    const parseResult = parseResultFromText(result.text);
+      const parseResult = parseResultFromText(result.text);
     if (!parseResult.ok) {
       emitKismetLog({
         level: 'warn',

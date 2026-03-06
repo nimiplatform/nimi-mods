@@ -576,7 +576,16 @@ export const ReleasePackageSchema = z.object({
     fallbackAudits: z.array(z.object({
       traceId: z.string().min(1),
       stage: z.enum(VIDEOPLAY_ROUTE_STAGES),
-      capability: z.string().min(1),
+      capability: z.enum([
+        'text.generate',
+        'text.embed',
+        'image.generate',
+        'video.generate',
+        'audio.synthesize',
+        'audio.transcribe',
+        'voice_workflow.tts_v2v',
+        'voice_workflow.tts_t2v',
+      ]),
       from: z.literal('local-runtime'),
       to: z.literal('token-api'),
       reason: z.string().min(1),

@@ -32,7 +32,7 @@ export type ExtractionLoopContext = {
   taskId: string;
   abortSignal: AbortSignal | undefined;
   shouldInterrupt: () => 'cancel' | 'pause' | null;
-  routeOverrides: { coarse: RuntimeRouteBinding | null; fine: RuntimeRouteBinding | null };
+  bindings: { coarse: RuntimeRouteBinding | null; fine: RuntimeRouteBinding | null };
   effectiveMode: 'all' | 'failed';
   isResumeRun: boolean;
   usedLegacyFileChunks: boolean;
@@ -60,7 +60,7 @@ export async function executePhase1ExtractionLoop(
   loopInput: ExtractionLoopInput,
 ): Promise<void> {
   const {
-    input, taskId, abortSignal, shouldInterrupt, routeOverrides,
+    input, taskId, abortSignal, shouldInterrupt, bindings,
     effectiveMode, isResumeRun, usedLegacyFileChunks, sourceDigest,
     initialChunkPolicy, updateTaskCheckpoint,
   } = ctx;
@@ -143,7 +143,7 @@ export async function executePhase1ExtractionLoop(
           });
         }
       },
-      routeOverrides,
+      bindings,
       chunkIndexMap: attemptInput.chunkIndexMap,
       maxConcurrency: 1,
       abortSignal,
@@ -498,7 +498,7 @@ export async function executePhase1ExtractionLoop(
             });
             input.setCreateStep(nextStep);
           },
-          routeOverrides,
+          bindings,
           maxConcurrency: 1,
           abortSignal,
           shouldInterrupt,

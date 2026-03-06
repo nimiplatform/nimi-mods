@@ -36,7 +36,7 @@
 ```
 输入:
   - CharacterProfile { name, gender, ageGroup, traits }
-  - 可用声线列表（从 hook.llm.speech.listVoices() 获取）
+  - 可用声线列表（从 `runtime.media.tts.listVoices()` 获取）
 
 LLM 任务:
   "从可用声线列表中，为以下角色选择最合适的声线。
@@ -53,7 +53,7 @@ LLM 任务:
 ### 3.2 批量推荐
 
 点击「一键生成全部主要角色音色」时：
-1. 调用 `hook.llm.speech.listVoices()` 获取当前可用声线。
+1. 调用 `runtime.media.tts.listVoices()` 获取当前可用声线。
 2. 将全部 major + supporting 角色的 profiles 打包，一次 LLM 调用完成所有推荐。
 3. LLM 需确保不同角色尽量分配不同声线（避免声音重复）。
 4. 若可用声线不足以覆盖全部角色，可复用但调整 speakingRate / pitch 以区分。
@@ -75,8 +75,8 @@ minor 角色不调用 LLM，直接按规则分配：
   例: "中年男性，嗓音低沉略带沙哑，说话直接豪爽"
 
 调用:
-  hook.llm.speech.designVoice(prompt, provider)
-  → 需要 runtime 扩展 DesignVoice RPC
+  runtime.media.jobs.submit({ scenario: VOICE_DESIGN, ... })
+  → 使用 `voice_workflow.tts_t2v` 选路并在作业完成后通过 `runtime.voice.listAssets()` 读取生成音色
 
 输出:
   { designedVoiceId: "qwen3-voice-xxx", previewAudioUri: "..." }
@@ -108,7 +108,7 @@ VoiceCasting 实体已预留 `voiceSource = 'designed'` 路径：
 ### 6.1 试听流程
 
 1. 从该角色的 segments 中选取一句代表性台词（默认选段落数最多的前 3 句之一）。
-2. 调用 `hook.llm.speech.synthesize({ text, voiceId, providerId, speakingRate, pitch, emotion })`。
+2. 调用 `runtime.media.tts.synthesize({ text, voiceId, speakingRate, pitch, emotion, binding })`。
 3. 返回的 `audioUri` 在浏览器端播放。
 4. 用户可点击「换一句」随机切换试听台词。
 

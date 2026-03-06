@@ -46,7 +46,7 @@ function makeKnowledgeGraph() {
         id: 'p-1',
         level: 'PRIMARY',
         parentEventId: null,
-        title: '事件1',
+        title: '倒计时危机',
         summary: 'summary',
         cause: 'cause',
         process: 'process',
@@ -77,7 +77,7 @@ function makeKnowledgeGraph() {
       background: 'background',
       motivation: 'motivation',
       relationships: ['常伟思:合作'],
-      keyEvents: ['事件1'],
+      keyEvents: ['倒计时危机'],
     }],
     characterAliasMap: { 汪淼: '汪淼' },
   };
@@ -85,12 +85,12 @@ function makeKnowledgeGraph() {
 
 test('world-studio agent drafts flow persists phase2 drafts and publishes with draft payload', async () => {
   const snapshotRef = { current: cloneDefaultSnapshot() };
-  snapshotRef.current.selectedStartTimeId = 't-1';
+  snapshotRef.current.selectedStartTimeId = 'event:p-1';
   snapshotRef.current.selectedCharacters = ['汪淼'];
   snapshotRef.current.agentSync.selectedCharacterIds = ['汪淼'];
   snapshotRef.current.knowledgeGraph = makeKnowledgeGraph();
   snapshotRef.current.phase1Artifact = {
-    startTimeOptions: [{ id: 't-1', label: '2004', description: '', weight: 0.8 }],
+    startTimeOptions: [{ id: 'event:p-1', label: '1. 2004 · 倒计时危机', description: 'summary', weight: 0.8 }],
     characterCandidates: [{ name: '汪淼', summary: 'summary', significance: 0.8 }],
     qualityGate: makePassQualityGate(),
     chunkTasks: [],
@@ -107,6 +107,7 @@ test('world-studio agent drafts flow persists phase2 drafts and publishes with d
 
   const taskController = createMockTaskController();
   const batchPayloadRef = { current: null };
+  let lastError = null;
 
   const baseInput = {
     aiClient: {
@@ -218,9 +219,9 @@ test('world-studio agent drafts flow persists phase2 drafts and publishes with d
     retryErrorCode: null,
     retryScope: 'all',
     retryWithFineRoute: false,
-    resolveEffectiveRouteOverrides: () => ({ coarse: binding, fine: binding }),
+    resolveEffectiveRouteBindings: () => ({ coarse: binding, fine: binding }),
     resolveRuntimeDefaultRouteBinding: async () => binding,
-    routeOverrideMap: { coarse: binding, fine: binding },
+    bindingMap: { coarse: binding, fine: binding },
     runtimeDefaultRouteBinding: binding,
     selectedDraftId: 'draft-1',
     selectedWorldId: '',
@@ -242,7 +243,9 @@ test('world-studio agent drafts flow persists phase2 drafts and publishes with d
       },
     },
     setStatusBanner: () => {},
-    setError: () => {},
+    setError: (value) => {
+      lastError = value;
+    },
     setNotice: () => {},
     taskController,
   };
@@ -250,7 +253,7 @@ test('world-studio agent drafts flow persists phase2 drafts and publishes with d
   await runCreatePhase2(baseInput);
 
   const draftKeys = Object.keys(snapshotRef.current.agentSync.draftsByCharacter || {});
-  assert.equal(draftKeys.length > 0, true);
+  assert.equal(draftKeys.length > 0, true, String(lastError || 'expected synthesized drafts'));
   const wDraft = snapshotRef.current.agentSync.draftsByCharacter['汪淼']
     || snapshotRef.current.agentSync.draftsByCharacter[draftKeys[0]];
   assert.equal(wDraft.handle, '~wangmiao');
@@ -353,9 +356,9 @@ test('world-studio publish normalizes invalid handle to ASCII fallback', async (
     retryErrorCode: null,
     retryScope: 'all',
     retryWithFineRoute: false,
-    resolveEffectiveRouteOverrides: () => ({ coarse: null, fine: null }),
+    resolveEffectiveRouteBindings: () => ({ coarse: null, fine: null }),
     resolveRuntimeDefaultRouteBinding: async () => null,
-    routeOverrideMap: { coarse: null, fine: null },
+    bindingMap: { coarse: null, fine: null },
     runtimeDefaultRouteBinding: null,
     selectedDraftId: 'draft-1',
     selectedWorldId: '',
@@ -462,9 +465,9 @@ test('world-studio publish sanitizes dna traits to backend enums', async () => {
     retryErrorCode: null,
     retryScope: 'all',
     retryWithFineRoute: false,
-    resolveEffectiveRouteOverrides: () => ({ coarse: null, fine: null }),
+    resolveEffectiveRouteBindings: () => ({ coarse: null, fine: null }),
     resolveRuntimeDefaultRouteBinding: async () => null,
-    routeOverrideMap: { coarse: null, fine: null },
+    bindingMap: { coarse: null, fine: null },
     runtimeDefaultRouteBinding: null,
     selectedDraftId: 'draft-1',
     selectedWorldId: '',

@@ -15,7 +15,7 @@
 
 - `KIS-DOM-001`: Kismet provides BaZi analysis workbench inside desktop mod runtime.
 - `KIS-DOM-002`: Prompt-Import and Runtime-AI must produce one unified `KismetResult` schema.
-- `KIS-DOM-003`: Runtime-AI calls must use `@nimiplatform/sdk/mod/ai` surfaces.
+- `KIS-DOM-003`: Runtime-AI calls must use `@nimiplatform/sdk/mod/runtime` surfaces.
 - `KIS-DOM-004`: Route unavailable must expose visible fallback to Prompt-Import.
 - `KIS-DOM-005`: Export is explicit user action only (JSON/PDF/HTML).
 

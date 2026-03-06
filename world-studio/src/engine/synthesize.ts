@@ -1023,7 +1023,7 @@ export async function runSynthesizeDraft(
   for (const attempt of attempts) {
     try {
       response = await llm.generateText({
-        routeHint: 'chat/fine',
+        capability: 'text.generate',
         prompt: buildSynthesizePrompt({
           ...input,
           finalDraftAccumulator,

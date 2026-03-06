@@ -4,6 +4,7 @@ import type {
   NARRATIVE_VISIBILITY_VALUES,
   NarrativeReasonCode,
 } from './contracts.js';
+import type { RuntimeCanonicalCapability } from '@nimiplatform/sdk/mod/runtime-route';
 
 export type NarrativeTriggerSource = 'UserTurn' | 'AgentInitiative' | 'SystemEvent';
 
@@ -64,8 +65,8 @@ export type NarrativeTurnInput = {
   userMessage?: string;
   systemContext?: Record<string, unknown>;
   idempotencyKey?: string;
-  routeHint?: string;
-  routeOverride?: Record<string, unknown>;
+  capability?: RuntimeCanonicalCapability;
+  binding?: Record<string, unknown>;
   turnId?: string;
   requestId?: string;
   traceId?: string;
@@ -87,8 +88,8 @@ export type NarrativeTurnInputNormalized = {
   userMessage: string;
   systemContext: Record<string, unknown>;
   idempotencyKey: string;
-  routeHint: string;
-  routeOverride: Record<string, unknown>;
+  capability: RuntimeCanonicalCapability;
+  binding: Record<string, unknown>;
   turnId: string;
   requestId: string;
   traceId: string;
@@ -177,6 +178,23 @@ export type NarrativeProjectionEvent = {
   decider?: string;
   experiencer?: string;
   owner?: string;
+};
+
+export type NarrativeAiTextRequest = {
+  prompt: string;
+  systemPrompt?: string;
+  maxTokens?: number;
+  temperature?: number;
+  mode?: 'SCENE_TURN' | 'STORY';
+  worldId?: string;
+  agentId?: string;
+  abortSignal?: AbortSignal;
+  capability?: RuntimeCanonicalCapability;
+  binding?: Record<string, unknown>;
+};
+
+export type NarrativeAiClient = {
+  generateText: (payload: NarrativeAiTextRequest) => Promise<{ text: string }>;
 };
 
 export type NarrativeRenderInput = {
@@ -277,6 +295,7 @@ export type NarrativeStepResult<T> = {
 };
 
 export type NarrativeRouteOptionsSnapshot = {
+  capability?: RuntimeCanonicalCapability;
   selected: {
     source?: string;
     model?: string;

@@ -1,35 +1,48 @@
 // ---------------------------------------------------------------------------
-// TTS adapter — bridges HookLlmClient.speech → service-layer TtsClient interface
+// TTS adapter — bridges runtime.media.tts → service-layer TtsClient interface
 // ---------------------------------------------------------------------------
 
-import type { HookLlmClient } from '@nimiplatform/sdk/mod/types';
+import type { ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
+import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 import type { TtsClient } from '../types.js';
 import { getQwenSystemVoices, isQwenSystemTtsModel } from '../services/qwen-voice-catalog.js';
 
-type HookSpeech = HookLlmClient['speech'];
-
 /**
- * Wrap hookClient.llm.speech into the service-layer TtsClient abstraction.
+ * Wrap runtime.media.tts into the service-layer TtsClient abstraction.
  *
  * Mapping:
  *   listVoices(): { id, providerId, name, lang } → { voiceId, providerId, voiceName, language }
  *   synthesize(): audioUri → fetch → Blob; emotion → stylePrompt
  */
-export function createTtsClientAdapter(speech: HookSpeech): TtsClient {
+export function createTtsClientAdapter(
+  runtimeClient: ModRuntimeClient,
+  defaultBinding?: RuntimeRouteBinding,
+): TtsClient {
   return {
     async listVoices(options) {
-      const voices = await speech.listVoices({
-        connectorId: options?.connectorId,
-        routeSource: options?.routeSource,
-      });
-      const mapped = voices.map((v) => ({
-        providerId: v.providerId,
-        voiceId: v.id,
-        voiceName: v.name,
-        language: v.lang,
+      const binding = options?.binding || defaultBinding;
+      const model = String(options?.model || binding?.model || '').trim();
+      if (!model) {
+        throw new Error('AUDIO_BOOK_TTS_MODEL_REQUIRED');
+      }
+      const [voices, resolved] = await Promise.all([
+        runtimeClient.media.tts.listVoices({
+          binding,
+          model,
+        }),
+        runtimeClient.route.resolve({
+          capability: 'audio.synthesize',
+          binding,
+        }),
+      ]);
+      const mapped = voices.voices.map((voice) => ({
+        providerId: resolved.provider,
+        voiceId: voice.voiceId,
+        voiceName: voice.name,
+        language: voice.lang,
       }));
       if (mapped.length > 0) return mapped;
-      if (!isQwenSystemTtsModel(options?.model)) return mapped;
+      if (!isQwenSystemTtsModel(model)) return mapped;
       return getQwenSystemVoices().map((voice) => ({
         providerId: voice.providerId,
         voiceId: voice.voiceId,
@@ -40,24 +53,28 @@ export function createTtsClientAdapter(speech: HookSpeech): TtsClient {
     },
 
     async synthesize(input) {
-      const result = await speech.synthesize({
+      const binding = input.binding || defaultBinding;
+      const model = String(input.model || binding?.model || '').trim();
+      if (!model) {
+        throw new Error('AUDIO_BOOK_TTS_MODEL_REQUIRED');
+      }
+      const result = await runtimeClient.media.tts.synthesize({
         text: input.text,
-        voiceId: input.voiceId,
-        providerId: input.providerId,
-        speakingRate: input.speakingRate,
+        voice: input.voiceId,
+        speed: input.speakingRate,
         pitch: input.pitch,
-        stylePrompt: input.emotion,
-        connectorId: input.connectorId,
-        routeSource: input.routeSource,
-        model: input.model,
+        emotion: input.emotion,
+        binding,
+        model,
       });
 
-      // audioUri may be a blob URL, data URL, or tauri:// protocol — fetch handles all
-      const response = await fetch(result.audioUri);
+      const artifact = result.artifacts.find((item) => item.uri) || null;
+      if (!artifact?.uri) {
+        throw new Error('AUDIO_BOOK_TTS_ARTIFACT_MISSING');
+      }
+      const response = await fetch(artifact.uri);
       const audioBlob = await response.blob();
-
-      // Use server-reported duration if available, otherwise estimate from blob size
-      const durationMs = result.durationMs ?? estimateDurationMs(audioBlob.size, result.mimeType);
+      const durationMs = estimateDurationMs(audioBlob.size, artifact.mimeType || audioBlob.type || 'audio/mpeg');
 
       return { audioBlob, durationMs };
     },

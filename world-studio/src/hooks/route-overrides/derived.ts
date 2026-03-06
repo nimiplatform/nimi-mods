@@ -3,25 +3,25 @@ import type {
   RuntimeRouteBinding,
   RuntimeRouteOptionsSnapshot,
 } from '@nimiplatform/sdk/mod/runtime-route';
-import type { DistillRouteOverrideMap } from '../../generation/pipeline.js';
+import type { DistillRouteBindingMap } from '../../generation/pipeline.js';
 import type { WorldStudioWorkspaceSnapshot } from '../../contracts.js';
 import { formatRouteBindingSummary } from '../../services/mutation-payload.js';
 import { evaluateEmbeddingReadiness, evaluateRouteBindingReadiness } from './readiness.js';
 import { ReasonCode } from '@nimiplatform/sdk/types';
 
-export function useWorldStudioRouteOverrideDerived(input: {
-  routeOverrideMap: DistillRouteOverrideMap;
+export function useWorldStudioRouteBindingDerived(input: {
+  bindingMap: DistillRouteBindingMap;
   routeOptions: RuntimeRouteOptionsSnapshot | null;
   runtimeDefaultRouteBinding: RuntimeRouteBinding | null;
   snapshot: WorldStudioWorkspaceSnapshot;
 }) {
   const effectiveCoarseRouteBinding = useMemo(
-    () => input.routeOverrideMap.coarse || input.runtimeDefaultRouteBinding || null,
-    [input.routeOverrideMap.coarse, input.runtimeDefaultRouteBinding],
+    () => input.bindingMap.coarse || input.runtimeDefaultRouteBinding || null,
+    [input.bindingMap.coarse, input.runtimeDefaultRouteBinding],
   );
   const effectiveFineRouteBinding = useMemo(
-    () => input.routeOverrideMap.fine || input.runtimeDefaultRouteBinding || null,
-    [input.routeOverrideMap.fine, input.runtimeDefaultRouteBinding],
+    () => input.bindingMap.fine || input.runtimeDefaultRouteBinding || null,
+    [input.bindingMap.fine, input.runtimeDefaultRouteBinding],
   );
   const effectiveCoarseRouteSummary = useMemo(
     () => formatRouteBindingSummary(effectiveCoarseRouteBinding),

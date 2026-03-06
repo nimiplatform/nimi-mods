@@ -1,10 +1,10 @@
 import type { HookClient } from '@nimiplatform/sdk/mod/types';
 import { createMintYouFlowId, emitMintYouLog } from '../logging.js';
+import { canSeePhoto } from '../services/photo-auth.js';
 
 export async function registerMintYouDataCapabilities(input: {
   hookClient: HookClient;
 }): Promise<void> {
-  const { hookClient: _hookClient } = input;
   const flowId = createMintYouFlowId('mint-you-data-registrar');
 
   emitMintYouLog({
@@ -20,10 +20,31 @@ export async function registerMintYouDataCapabilities(input: {
   //   data.query.data-api.world.oasis.get         — provided by host runtime
   // No custom data handlers needed for these capabilities.
 
-  // TODO: hook.agent-profile.read — photo access control interception.
-  // Blocked on platform dispatch point for agent profile reads.
-  // When available, register a data handler here that filters
-  // referenceImageUrl based on photo authorization state.
+  await input.hookClient.profile.registerAgentReadFilter({
+    handler: async ({ viewerUserId, ownerAgentId, worldId, profile }) => {
+      const referenceImageUrl = String(profile.referenceImageUrl || '').trim();
+      if (!referenceImageUrl) {
+        return { referenceImageUrl: null };
+      }
+      const viewer = String(viewerUserId || '').trim();
+      const owner = String(ownerAgentId || '').trim();
+      const resolvedWorldId = String(worldId || profile.worldId || '').trim();
+      if (!viewer || !owner) {
+        return { referenceImageUrl: null };
+      }
+      if (viewer === owner) {
+        return { referenceImageUrl };
+      }
+      if (!resolvedWorldId) {
+        return { referenceImageUrl: null };
+      }
+      return {
+        referenceImageUrl: canSeePhoto(viewer, owner, resolvedWorldId)
+          ? referenceImageUrl
+          : null,
+      };
+    },
+  });
 
   emitMintYouLog({
     level: 'info',

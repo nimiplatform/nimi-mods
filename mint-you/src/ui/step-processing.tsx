@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback } from 'react';
 import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import { useMintYouStore } from '../state/mint-you-store.js';
-import { getMintYouAiClient } from '../runtime-mod.js';
+import { getMintYouRuntimeClient } from '../runtime-mod.js';
 import { extractTraitsFromInterview } from '../pipeline/trait-extract.js';
 import { synthesizeDna } from '../pipeline/dna-synthesize.js';
 import { emitMintYouLog, createMintYouFlowId } from '../logging.js';
@@ -38,7 +38,7 @@ export function StepProcessing() {
     selectedInterests,
     loading,
     error,
-    routeOverride,
+    routeBinding,
   } = store;
 
   const isExtracting = currentStep === 'trait-extract';
@@ -76,15 +76,15 @@ export function StepProcessing() {
       store.setError(null);
       emitMintYouLog({ message: MINTYOU_AUDIT.DNA_SYNTHESIS_STARTED, flowId, source: 'StepProcessing' });
 
-      const aiClient = getMintYouAiClient();
+      const runtimeClient = getMintYouRuntimeClient();
       let lastError: MintYouError | null = null;
       for (let attempt = 1; attempt <= DNA_SYNTHESIS_MAX_ATTEMPTS; attempt += 1) {
         const result = await synthesizeDna({
-          aiClient,
+          runtimeClient,
           basicInfo,
           traitResult,
           interests: selectedInterests,
-          routeOverride,
+          binding: routeBinding,
         });
 
         if (result.ok) {
@@ -128,7 +128,7 @@ export function StepProcessing() {
         store.setError(lastError);
       }
     }
-  }, [isExtracting, isSynthesizing, basicInfo, interviewSignals, interviewTurnCount, interviewValidTurnCount, selectedInterests, routeOverride, store]);
+  }, [isExtracting, isSynthesizing, basicInfo, interviewSignals, interviewTurnCount, interviewValidTurnCount, selectedInterests, routeBinding, store]);
 
   useEffect(() => {
     runPipeline();

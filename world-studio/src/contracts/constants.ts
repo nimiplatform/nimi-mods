@@ -28,4 +28,3 @@ export const WORLD_STUDIO_DATA_API_MUTATIONS_LIST = 'data-api.world.mutations.li
 export const WORLD_STUDIO_DATA_API_CREATOR_AGENTS_LIST = 'data-api.creator.agents.list';
 export const WORLD_STUDIO_DATA_API_CREATOR_AGENTS_CREATE = 'data-api.creator.agents.create';
 export const WORLD_STUDIO_DATA_API_CREATOR_AGENTS_BATCH_CREATE = 'data-api.creator.agents.batch-create';
-export const WORLD_STUDIO_DATA_API_RUNTIME_ROUTE_OPTIONS = 'data-api.runtime.route.options';

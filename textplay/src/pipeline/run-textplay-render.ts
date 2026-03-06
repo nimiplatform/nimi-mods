@@ -181,7 +181,7 @@ function toFallbackRoute(request: TextplayRenderExecutionInput['request']): {
   provider: string;
   endpoint: string;
 } {
-  const override = asRecord(request.routeOverride);
+  const override = asRecord(request.binding);
   return {
     source: firstNonEmpty([override.source, 'fallback']),
     connectorId: String(override.connectorId || ''),
@@ -441,7 +441,7 @@ export async function runTextplayRender(input: TextplayRenderExecutionInput): Pr
         triggerSource: input.request.triggerSource,
         userMessage: input.request.userMessage,
         systemContext: input.request.systemPayload,
-        routeOverride: input.request.routeOverride,
+        binding: input.request.binding,
         runId: input.request.runId,
         traceId: input.request.traceId,
         idempotencyKey: `textplay:${input.request.storyId}:${input.request.runId}`,
@@ -508,16 +508,16 @@ export async function runTextplayRender(input: TextplayRenderExecutionInput): Pr
     assertNotAborted(input.deps.abortSignal);
 
     appendStepStart('generate');
-    if (!input.request.routeOverride) {
+    if (!input.request.binding) {
       await assertTextplayChatRouteAvailable({
-        hookClient: input.deps.hookClient,
+        runtimeClient: input.deps.runtimeClient,
       });
     }
     const generated = await generateTextplayOutput({
       aiClient: input.deps.aiClient,
       worldId: normalized.worldId,
       prompt,
-      routeOverride: input.request.routeOverride,
+      binding: input.request.binding,
       abortSignal: input.deps.abortSignal,
     });
     checkpointToken = createUlid();

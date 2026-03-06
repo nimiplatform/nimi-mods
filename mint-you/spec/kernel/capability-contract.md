@@ -13,8 +13,8 @@ Session scoping uses `data-api.world.access.me`; world mounting target resolutio
 
 ## MY-CAP-003 LLM Boundary
 
-Mint-You uses `llm.text.generate` for structured DNA synthesis and Identity Card generation (JSON object parsing happens in-mod). No streaming is required.
-Mint-You may query `data-api.runtime.route.options` to expose route source / connector / model controls for synthesis routing.
+Mint-You uses `runtime.ai.text.generate` for structured DNA synthesis and Identity Card generation (JSON object parsing happens in-mod). No streaming is required.
+Mint-You uses `runtime.route.list.options` to expose route source / connector / model controls for synthesis routing.
 
 ## MY-CAP-004 Agent Creation Boundary
 
@@ -23,9 +23,9 @@ Mint-You resolves the target world via `data-api.world.oasis.get`; agent `worldI
 
 ## MY-CAP-005 Photo Access Control Boundary
 
-Mint-You manages photo visibility through a mod-level authorization layer on top of the existing `referenceImageUrl` field. The mod requires `hook.agent-profile.read` to intercept agent profile reads and filter `referenceImageUrl` based on mutual authorization state.
+Mint-You manages photo visibility through a mod-level authorization layer on top of the existing `referenceImageUrl` field. The mod requires `runtime.profile.read.agent` to intercept agent profile reads and filter `referenceImageUrl` based on mutual authorization state.
 
-**Platform dependency:** `hook.agent-profile.read` requires a hook dispatch point in the desktop/runtime agent profile read path. This dispatch point does not exist yet — the desktop app currently reads agent profiles via direct `realm.raw.request(...)` calls. The photo authorization state machine (request/accept/decline/revoke) and all UI flows are implementable immediately. The read-time filtering enforcement is blocked until the platform exposes the hook. See `MY-PHOTO-002` for graceful degradation strategy.
+The hook dispatch point lives in the desktop/runtime agent profile read path. The hook output is limited to `referenceImageUrl` redaction; it does not allow arbitrary profile mutation.
 
 ## MY-CAP-006 Capability Drift Gate
 

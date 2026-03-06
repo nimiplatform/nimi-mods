@@ -21,7 +21,7 @@ test('extractChunkCoarse succeeds on third attempt via strict repair prompt', as
   const llm = {
     generateText: async (request) => {
       calls.push({
-        routeHint: request.routeHint,
+        capability: request.capability,
         prompt: String(request.prompt || ''),
       });
       if (calls.length === 1) {
@@ -42,9 +42,9 @@ test('extractChunkCoarse succeeds on third attempt via strict repair prompt', as
 
   assert.equal(result.retryCount, 2);
   assert.equal(calls.length, 3);
-  assert.equal(calls[0].routeHint, 'chat/coarse');
-  assert.equal(calls[1].routeHint, 'chat/retry-low-temp');
-  assert.equal(calls[2].routeHint, 'chat/retry-low-temp');
+  assert.equal(calls[0].capability, 'text.generate');
+  assert.equal(calls[1].capability, 'text.generate');
+  assert.equal(calls[2].capability, 'text.generate');
   assert.equal(calls[2].prompt.includes('CRITICAL JSON REPAIR MODE.'), true);
   assert.equal(result.extraction.worldSetting, 'world');
 });

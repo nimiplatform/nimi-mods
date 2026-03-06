@@ -11,7 +11,7 @@ import {
   toTerminalChunkTaskMap,
 } from '../../../services/event-graph-map.js';
 import type {
-  DistillRouteOverrideMap,
+  DistillRouteBindingMap,
   FinalDraftAccumulator,
   Phase1Result,
 } from '../../../generation/pipeline.js';
@@ -182,14 +182,14 @@ export function buildParseJobStartState(
   };
 }
 
-export async function resolveCreatePhase1RouteOverrides(
+export async function resolveCreatePhase1RouteBindings(
   input: WorldStudioCreateActionsInput,
   mode: 'all' | 'failed',
-): Promise<{ runtimeDefaultBinding: RuntimeRouteBinding | null; routeOverrides: DistillRouteOverrideMap }> {
+): Promise<{ runtimeDefaultBinding: RuntimeRouteBinding | null; bindings: DistillRouteBindingMap }> {
   const runtimeDefaultBinding = await input.resolveRuntimeDefaultRouteBinding();
   return {
     runtimeDefaultBinding,
-    routeOverrides: input.resolveEffectiveRouteOverrides({
+    bindings: input.resolveEffectiveRouteBindings({
       mode,
       retryWithFineRoute: input.retryWithFineRoute,
       runtimeDefaultBinding: runtimeDefaultBinding || null,

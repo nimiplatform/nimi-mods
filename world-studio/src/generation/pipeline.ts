@@ -1,7 +1,7 @@
 export type {
   ChunkTaskResult,
   FinalDraftAccumulator,
-  DistillRouteOverrideMap,
+  DistillRouteBindingMap,
   EventNodeDraft,
   Phase1Character,
   Phase1Option,
@@ -9,7 +9,7 @@ export type {
   Phase2Result,
   WorldStudioKnowledgeGraphDraft,
   WorldStudioProgressState,
-  WorldStudioRouteOverride,
+  WorldStudioRouteBinding,
 } from '../engine/types.js';
 
 export { runPhase1Extraction, runPhase1ExtractionFromChunks } from './phase1-adapter.js';

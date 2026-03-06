@@ -7,7 +7,7 @@ import type { Phase1Result } from '../generation/pipeline.js';
 import type { WorldStudioWorkspaceSnapshot } from '../contracts.js';
 import { useWorldStudioResourceQueries } from '../hooks/use-world-studio-queries.js';
 import { useWorldStudioMutations } from '../hooks/use-world-studio-mutations.js';
-import { useWorldStudioRouteOverrides } from '../hooks/use-world-studio-route-overrides.js';
+import { useWorldStudioRouteBindings } from '../hooks/use-world-studio-route-overrides.js';
 import { useWorldStudioStatusMetrics } from '../hooks/use-world-studio-status-metrics.js';
 import { isTaskBlockingStatus } from '../hooks/actions/task-control/state-machine.js';
 import { useWorldStudioWorkspaceStore } from '../state/workspace-store.js';
@@ -95,7 +95,7 @@ export function useWorldStudioControllerContext(input: UseWorldStudioControllerC
     : input.snapshot.selectedCharacters;
   const runtimeDefaultRouteBinding = input.routeOptions?.resolvedDefault || input.routeOptions?.selected || null;
 
-  const routeOverrides = useWorldStudioRouteOverrides({
+  const bindings = useWorldStudioRouteBindings({
     userId: input.userId,
     routeOptions: input.routeOptions,
     runtimeDefaultRouteBinding,
@@ -139,7 +139,7 @@ export function useWorldStudioControllerContext(input: UseWorldStudioControllerC
     maintenanceEditorSnapshotVersion,
     storyProjectionSummary,
     runtimeDefaultRouteBinding,
-    ...routeOverrides,
+    ...bindings,
     ...statusMetrics,
   };
 }

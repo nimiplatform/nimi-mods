@@ -4,7 +4,7 @@ import { useKismetRoute } from './use-kismet-route.js';
 import { validateKismetInput } from '../validation/validate-input.js';
 import { generatePrompts, parseImportedResult } from '../services/prompt-import.js';
 import { generateViaAi } from '../services/runtime-ai.js';
-import { getKismetAiClient } from '../runtime-mod.js';
+import { getKismetRuntimeClient } from '../runtime-mod.js';
 import { emitKismetLog } from '../logging.js';
 import { KISMET_AUDIT } from '../contracts.js';
 import { ReasonCode } from '@nimiplatform/sdk/types';
@@ -46,11 +46,11 @@ export function useKismetController() {
       store.setError(null);
       emitKismetLog({ message: KISMET_AUDIT.AI_GENERATE_STARTED, source: 'useKismetController' });
 
-      const aiClient = getKismetAiClient();
+      const runtimeClient = getKismetRuntimeClient();
       const result = await generateViaAi({
-        aiClient,
+        runtimeClient,
         input: validInput,
-        routeOverride: route.routeOverride || undefined,
+        binding: route.routeBinding || undefined,
       });
 
       store.setLoading(false);

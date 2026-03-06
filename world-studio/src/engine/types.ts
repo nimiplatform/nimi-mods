@@ -1,5 +1,4 @@
-import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
-import type { RuntimeRouteOverride } from '@nimiplatform/sdk/mod/types';
+import type { RuntimeCanonicalCapability, RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 
 export type DistillStage =
   | 'INGEST'
@@ -13,11 +12,11 @@ export type DistillStage =
 
 export type DistillRouteStage = 'coarse' | 'fine';
 
-export type WorldStudioRouteOverride = RuntimeRouteBinding;
+export type WorldStudioRouteBinding = RuntimeRouteBinding;
 
-export type DistillRouteOverrideMap = {
-  coarse: WorldStudioRouteOverride | null;
-  fine: WorldStudioRouteOverride | null;
+export type DistillRouteBindingMap = {
+  coarse: WorldStudioRouteBinding | null;
+  fine: WorldStudioRouteBinding | null;
 };
 
 export type EvidenceRefDraft = {
@@ -283,7 +282,7 @@ export type Phase2Result = {
 
 export type RouteCapabilityLlmInvoker = {
   generateText: (input: {
-    routeHint?: string;
+    capability?: RuntimeCanonicalCapability;
     prompt: string;
     maxTokens?: number;
     temperature?: number;
@@ -291,7 +290,7 @@ export type RouteCapabilityLlmInvoker = {
     worldId?: string;
     agentId?: string;
     abortSignal?: AbortSignal;
-    routeOverride?: RuntimeRouteOverride;
+    binding?: RuntimeRouteBinding;
   }) => Promise<{ text: string; promptTraceId: string }>;
 };
 

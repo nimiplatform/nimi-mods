@@ -46,7 +46,7 @@ const enLocale = {
     tokenApi: 'Token API',
     modelPlaceholder: 'Optional model override...',
     connectorRequiredHint: 'Token API is selected but connector is not configured, media generation will fail.',
-    autoRouteHint: 'Auto mode has no media overrides. If generation fails, configure connector/model manually.',
+    autoCapability: 'Auto mode has no media overrides. If generation fails, configure connector/model manually.',
   },
   VoicePanel: {
     title: 'Voice Model Config',

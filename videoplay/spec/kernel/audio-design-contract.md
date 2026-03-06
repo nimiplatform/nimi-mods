@@ -6,7 +6,7 @@ Audio design analyzes storyboard beats and emotional arc from `screenplay.beats`
 
 ## V-AUDIO-002: BGM Recommendation
 
-The pipeline invokes `audio-design-bgm` route stage (`llm.text.generate`) to recommend a BGM track. The output includes `BgmTrack` with `trackId`, `uri`, `durationMs`, `fadeInMs`, `fadeOutMs`, `volume`, `startOffsetMs`. Default values are governed by `AUDIO_DESIGN_POLICY`.
+The pipeline invokes `audio-design-bgm` route stage (`runtime.ai.text.generate`) to recommend a BGM track. The output includes `BgmTrack` with `trackId`, `uri`, `durationMs`, `fadeInMs`, `fadeOutMs`, `volume`, `startOffsetMs`. Default values are governed by `AUDIO_DESIGN_POLICY`.
 
 ## V-AUDIO-003: SFX Layer Planning
 

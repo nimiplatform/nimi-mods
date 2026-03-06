@@ -14,8 +14,8 @@ function makeTurn() {
     userMessage: '我先观察局势，再决定是否动手。',
     systemContext: {},
     idempotencyKey: 'idem-step1-hints',
-    routeHint: '',
-    routeOverride: {},
+    capability: 'text.generate',
+    binding: {},
     turnId: 'turn-step1-hints',
     requestId: 'request-step1-hints',
     traceId: 'trace-step1-hints',
@@ -33,13 +33,6 @@ function makeTurn() {
 test('step1 compiles hidden future notes and advance hints for stagnation control', async () => {
   const result = await runNarrativeStep1Assembly({
     turn: makeTurn(),
-    queryRuntimeRouteOptions: async () => ({
-      selected: {
-        source: 'token-api',
-        model: 'models/gemini-3-flash-preview',
-        connectorId: 'connector-1',
-      },
-    }),
     queryWorldEvents: async () => ([
       {
         id: 'event-past-1',

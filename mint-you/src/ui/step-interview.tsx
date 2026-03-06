@@ -9,7 +9,7 @@ import {
   needsExtension,
   MIN_VALID_TURNS,
 } from '../services/interview-engine.js';
-import { getMintYouAiClient } from '../runtime-mod.js';
+import { getMintYouRuntimeClient } from '../runtime-mod.js';
 import { createUlid } from '../utils/ulid.js';
 import { emitMintYouLog } from '../logging.js';
 import { InterviewChatPane } from './interview-chat-pane.js';
@@ -30,7 +30,7 @@ export function StepInterview() {
     interviewStatus,
     memoryDigest,
     selectedInterests,
-    routeOverride,
+    routeBinding,
     currentRequestId,
     sessionPersistWarning,
     error,
@@ -88,11 +88,11 @@ export function StepInterview() {
     const effectiveUserMessageId = options?.reuseUserMessageId ?? userMsg?.id;
 
     try {
-      const aiClient = getMintYouAiClient();
+      const runtimeClient = getMintYouRuntimeClient();
       const state = useMintYouStore.getState();
 
       const result = await processInterviewTurn({
-        aiClient,
+        runtimeClient,
         userMessage: userText,
         userMessageId: effectiveUserMessageId,
         messages: state.interviewMessages,
@@ -102,7 +102,7 @@ export function StepInterview() {
         validTurnCount: state.interviewValidTurnCount,
         interests: state.selectedInterests,
         language,
-        routeOverride: state.routeOverride || undefined,
+        binding: state.routeBinding || undefined,
       });
 
       // Concurrency guard: discard if a newer request superseded this one

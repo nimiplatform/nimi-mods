@@ -1,3 +1,5 @@
+import type { ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
+import type { RuntimeCanonicalCapability, RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 import { VIDEOPLAY_OPERATION_TYPE, type VideoPlayOperationType } from '../contracts.js';
 import { createHash, createUlid } from '../id.js';
 import { invokeWithRouteFallback } from '../pipeline/orchestrator.js';
@@ -7,22 +9,12 @@ import type {
   RenderedAsset,
 } from '../types.js';
 
-type HookClientLike = {
-  llm: {
-    speech: {
-      listVoices: (input: { routeSource: 'local-runtime' | 'token-api' }) => Promise<Array<{
-        id?: string;
-        providerId?: string;
-        lang?: string;
-      }>>;
-    };
-  };
-};
+type RuntimeSpeechClientLike = Pick<ModRuntimeClient, 'route' | 'media'>;
 
 type AiClientLike = {
   checkRouteHealth: (input: {
-    routeHint: string;
-    routeOverride?: { source?: 'local-runtime' | 'token-api' };
+    capability: RuntimeCanonicalCapability;
+    binding?: RuntimeRouteBinding;
   }) => Promise<{
     status?: string;
     reasonCode?: string;
@@ -33,8 +25,8 @@ type AiClientLike = {
     providerId?: string;
     language?: string;
     format?: 'mp3';
-    routeHint: string;
-    routeOverride?: { source?: 'local-runtime' | 'token-api' };
+    capability: RuntimeCanonicalCapability;
+    binding?: RuntimeRouteBinding;
   }) => Promise<{
     audioUri?: string;
     mimeType?: string;
@@ -138,7 +130,7 @@ export function buildManualLipSyncAssets(input: {
 }
 
 async function resolveCreatorVoiceProfile(input: {
-  hookClient: HookClientLike;
+  runtimeClient: RuntimeSpeechClientLike;
   routeSource: 'local-runtime' | 'token-api';
   preferredLanguage: string;
 }): Promise<{
@@ -146,9 +138,26 @@ async function resolveCreatorVoiceProfile(input: {
   providerId: string | null;
   language: string;
 }> {
-  const voices = await input.hookClient.llm.speech.listVoices({
-    routeSource: input.routeSource,
-  });
+  const binding = {
+    source: input.routeSource,
+    connectorId: '',
+    model: '',
+  } as const;
+  const [resolved, listed] = await Promise.all([
+    input.runtimeClient.route.resolve({
+      capability: 'audio.synthesize',
+      binding,
+    }),
+    input.runtimeClient.media.tts.listVoices({
+      binding,
+      model: '',
+    }),
+  ]);
+  const voices = listed.voices.map((voice) => ({
+    id: voice.voiceId,
+    providerId: resolved.provider,
+    lang: voice.lang,
+  }));
   if (!Array.isArray(voices) || voices.length === 0) {
     throw new Error('VIDEOPLAY_TTS_VOICE_LIST_EMPTY');
   }
@@ -167,7 +176,7 @@ async function resolveCreatorVoiceProfile(input: {
 }
 
 export async function buildGeneratedVoiceAssets(input: {
-  hookClient: HookClientLike;
+  runtimeClient: RuntimeSpeechClientLike;
   aiClient: AiClientLike;
   traceId: string;
   episode: EpisodeRecord;
@@ -190,14 +199,13 @@ export async function buildGeneratedVoiceAssets(input: {
 
   const voiceResult = await invokeWithRouteFallback({
     stage: 'asset-render-voice',
-    capability: 'llm.speech.synthesize',
-    traceId: input.traceId,
-    routeHint: 'tts/default',
-    checkHealth: async (routeHint, routeOverride) => input.aiClient.checkRouteHealth({ routeHint, routeOverride }),
-    invoke: async (routeOverride) => {
-      const routeSource = routeOverride?.source === 'token-api' ? 'token-api' : 'local-runtime';
+          capability: 'audio.synthesize',
+          traceId: input.traceId,
+          checkHealth: async (capability, binding) => input.aiClient.checkRouteHealth({ capability, binding }),
+    invoke: async (binding) => {
+      const routeSource = binding?.source === 'token-api' ? 'token-api' : 'local-runtime';
       const profile = await resolveCreatorVoiceProfile({
-        hookClient: input.hookClient,
+        runtimeClient: input.runtimeClient,
         routeSource,
         preferredLanguage,
       });
@@ -207,8 +215,8 @@ export async function buildGeneratedVoiceAssets(input: {
         ...(profile.providerId ? { providerId: profile.providerId } : {}),
         language: profile.language,
         format: 'mp3',
-        routeHint: 'tts/default',
-        routeOverride,
+        capability: 'audio.synthesize',
+        binding,
       });
       return {
         speech,

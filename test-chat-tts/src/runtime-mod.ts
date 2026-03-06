@@ -1,6 +1,6 @@
 import { type RuntimeModRegistration } from '@nimiplatform/sdk/mod/types';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
-import { createAiClient } from '@nimiplatform/sdk/mod/ai';
+import { createModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import {
   TEST_CHAT_TTS_CAPABILITIES,
   TEST_CHAT_TTS_MOD_ID,
@@ -8,21 +8,13 @@ import {
 } from './contracts.js';
 import { registerTestChatTtsUiExtensions } from './registrars/ui.js';
 
-let _aiClient: ReturnType<typeof createAiClient> | null = null;
-let _hookClient: ReturnType<typeof createHookClient> | null = null;
+let _runtimeClient: ReturnType<typeof createModRuntimeClient> | null = null;
 
-export function getTestChatTtsAiClient() {
-  if (!_aiClient) {
-    throw new Error('TEST_CHAT_TTS_AI_CLIENT_NOT_INITIALIZED');
+export function getTestChatTtsRuntimeClient() {
+  if (!_runtimeClient) {
+    throw new Error('TEST_CHAT_TTS_RUNTIME_CLIENT_NOT_INITIALIZED');
   }
-  return _aiClient;
-}
-
-export function getTestChatTtsHookClient() {
-  if (!_hookClient) {
-    throw new Error('TEST_CHAT_TTS_HOOK_CLIENT_NOT_INITIALIZED');
-  }
-  return _hookClient;
+  return _runtimeClient;
 }
 
 export function createTestChatTtsRuntimeMod(): RuntimeModRegistration {
@@ -32,9 +24,8 @@ export function createTestChatTtsRuntimeMod(): RuntimeModRegistration {
     isDefaultPrivateExecution: false,
     setup: async ({ sdkRuntimeContext }) => {
       const hookClient = createHookClient(TEST_CHAT_TTS_MOD_ID, sdkRuntimeContext);
-      const aiClient = createAiClient(TEST_CHAT_TTS_MOD_ID, sdkRuntimeContext);
-      _aiClient = aiClient;
-      _hookClient = hookClient;
+      const runtimeClient = createModRuntimeClient(TEST_CHAT_TTS_MOD_ID, sdkRuntimeContext);
+      _runtimeClient = runtimeClient;
       await registerTestChatTtsUiExtensions({ hookClient });
     },
   };

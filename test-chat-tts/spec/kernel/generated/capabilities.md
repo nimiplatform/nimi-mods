@@ -11,17 +11,17 @@ mod_identity:
   entry: ./dist/mods/test-chat-tts/index.js
   source_rule: TCT-CAP-001
 required_capabilities:
-  - key: llm.text.generate
+  - key: runtime.ai.text.generate
     source_rule: TCT-CAP-001
-  - key: llm.image.generate
+  - key: runtime.media.image.generate
     source_rule: TCT-CAP-001
-  - key: llm.speech.providers.list
+  - key: runtime.media.tts.list.voices
     source_rule: TCT-CAP-001
-  - key: llm.speech.voices.list
+  - key: runtime.media.tts.synthesize
     source_rule: TCT-CAP-001
-  - key: llm.speech.synthesize
+  - key: runtime.route.list.options
     source_rule: TCT-CAP-001
-  - key: data.query.data-api.runtime.route.options
+  - key: runtime.route.resolve
     source_rule: TCT-CAP-001
   - key: ui.register.ui-extension.app.sidebar.mods
     source_rule: TCT-CAP-001

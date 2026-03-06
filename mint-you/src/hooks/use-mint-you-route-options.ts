@@ -1,16 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  parseRuntimeRouteOptions,
-  type RuntimeRouteOptionsSnapshot,
-} from '@nimiplatform/sdk/mod/runtime-route';
-import {
-  MINTYOU_DATA_API_RUNTIME_ROUTE_OPTIONS,
-  MINTYOU_MOD_ID,
-} from '../contracts.js';
+import type { RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
 import { emitMintYouLog } from '../logging.js';
-import { getMintYouHookClient } from '../runtime-mod.js';
-
-const ROUTE_OPTIONS_TIMEOUT_MS = 7000;
+import { getMintYouRuntimeClient } from '../runtime-mod.js';
 
 export function useMintYouRouteOptions() {
   const [routeOptions, setRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
@@ -30,49 +21,26 @@ export function useMintYouRouteOptions() {
       setError(null);
 
       try {
-        const hookClient = getMintYouHookClient();
-        let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
-        const payload = await Promise.race<unknown>([
-          hookClient.data.query({
-            capability: MINTYOU_DATA_API_RUNTIME_ROUTE_OPTIONS,
-            query: {
-              capability: 'chat',
-              modId: MINTYOU_MOD_ID,
-              forceRefresh,
-            },
-          }),
-          new Promise<never>((_, reject) => {
-            timeoutHandle = setTimeout(() => {
-              reject(new Error(`mint-you route options query timeout (${ROUTE_OPTIONS_TIMEOUT_MS}ms)`));
-            }, ROUTE_OPTIONS_TIMEOUT_MS);
-          }),
-        ]).finally(() => {
-          if (timeoutHandle) {
-            clearTimeout(timeoutHandle);
-          }
+        const runtimeClient = getMintYouRuntimeClient();
+        const snapshot = await runtimeClient.route.listOptions({
+          capability: 'text.generate',
         });
-
-        const parsed = parseRuntimeRouteOptions(payload, { includeResolvedDefault: true });
-        if (!parsed) {
-          throw new Error('MINTYOU_ROUTE_OPTIONS_PARSE_FAILED');
-        }
-
-        setRouteOptions(parsed);
+        setRouteOptions(snapshot);
         emitMintYouLog({
           level: 'debug',
           message: 'action:route-options:loaded',
           source: 'useMintYouRouteOptions',
           details: {
             forceRefresh,
-            selectedSource: parsed.selected.source,
-            selectedConnectorId: parsed.selected.connectorId,
-            selectedModel: parsed.selected.model,
-            localModelCount: parsed.localRuntime.models.length,
-            connectorCount: parsed.connectors.length,
+            selectedSource: snapshot.selected.source,
+            selectedConnectorId: snapshot.selected.connectorId,
+            selectedModel: snapshot.selected.model,
+            localModelCount: snapshot.localRuntime.models.length,
+            connectorCount: snapshot.connectors.length,
           },
         });
 
-        return parsed;
+        return snapshot;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err || '');
         setError(msg);

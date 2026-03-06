@@ -1,7 +1,7 @@
 import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot, RuntimeRouteSource } from '@nimiplatform/sdk/mod/runtime-route';
 import { pickChatModelForConnector } from '../../services/route/route-override-store.js';
 
-export function buildRouteOverrideForSource(input: {
+export function buildRouteBindingForSource(input: {
   source: RuntimeRouteSource;
   previous: RuntimeRouteBinding | null;
   options: RuntimeRouteOptionsSnapshot | null;
@@ -31,7 +31,7 @@ export function buildRouteOverrideForSource(input: {
   };
 }
 
-export function buildRouteOverrideForConnector(input: {
+export function buildRouteBindingForConnector(input: {
   connectorId: string;
   previous: RuntimeRouteBinding | null;
   options: RuntimeRouteOptionsSnapshot | null;
@@ -49,7 +49,7 @@ export function buildRouteOverrideForConnector(input: {
   };
 }
 
-export function buildRouteOverrideForModel(input: {
+export function buildRouteBindingForModel(input: {
   model: string;
   previous: RuntimeRouteBinding | null;
   options: RuntimeRouteOptionsSnapshot | null;

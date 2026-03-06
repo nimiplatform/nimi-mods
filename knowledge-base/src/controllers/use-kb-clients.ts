@@ -3,46 +3,35 @@
 // ---------------------------------------------------------------------------
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { createAiClient, type ModAiClient } from '@nimiplatform/sdk/mod/ai';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
+import { createModRuntimeClient, type ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import type { HookClient } from '@nimiplatform/sdk/mod/types';
-import { parseRuntimeRouteOptions, type RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
-import { KB_DATA_API_ROUTE_OPTIONS, KB_MOD_ID } from '../contracts.js';
+import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
+import { KB_MOD_ID } from '../contracts.js';
 import { createLlmClientAdapter } from '../adapters/llm-adapter.js';
 import { createEmbeddingClientAdapter } from '../adapters/embedding-adapter.js';
-import type { LlmClient, EmbeddingClient, KBSettings } from '../types.js';
+import type { LlmClient, EmbeddingClient, KBSettings, KBRoutePreference } from '../types.js';
 import { createKBFlowId, emitKBLog } from '../logging.js';
 
-type RouteCapability = 'chat' | 'embedding';
-type EffectiveRouteOverride = {
-  source: 'local-runtime' | 'token-api';
-  connectorId?: string;
-  model?: string;
-  localModelId?: string;
-};
-type TokenApiRouteOverride = {
-  source: 'token-api';
-  connectorId?: string;
-  model?: string;
-};
+type RouteCapability = 'text.generate' | 'text.embed';
 
 export function useHookClient(): HookClient {
   return useMemo(() => createHookClient(KB_MOD_ID), []);
 }
 
-export function useAiClient(): ModAiClient {
-  return useMemo(() => createAiClient(KB_MOD_ID), []);
+export function useRuntimeClient(): ModRuntimeClient {
+  return useMemo(() => createModRuntimeClient(KB_MOD_ID), []);
 }
 
 function asString(value: unknown): string {
   return String(value || '').trim();
 }
 
-function resolveTokenApiRouteOverrideFromOptions(
+function resolveTokenApiBindingFromOptions(
   options: RuntimeRouteOptionsSnapshot | null,
   preferredConnectorId: string,
   preferredModel: string,
-): TokenApiRouteOverride | undefined {
+): RuntimeRouteBinding | undefined {
   if (!options) return undefined;
   const targetConnectorId = asString(preferredConnectorId);
   const selectedConnectorId = options.selected.source === 'token-api'
@@ -69,17 +58,22 @@ function resolveTokenApiRouteOverrideFromOptions(
     || selectedModel
   );
 
+  if (!connectorId || !model) {
+    return undefined;
+  }
+
   return {
     source: 'token-api',
-    ...(connectorId ? { connectorId } : {}),
-    ...(model ? { model } : {}),
+    connectorId,
+    model,
   };
 }
 
-function resolveLocalRuntimeRouteOverrideFromOptions(
+function resolveLocalRuntimeBindingFromOptions(
   options: RuntimeRouteOptionsSnapshot | null,
   preferredModel: string,
-): EffectiveRouteOverride {
+): RuntimeRouteBinding | undefined {
+  if (!options) return undefined;
   const targetModel = asString(preferredModel);
   const selectedModel = options?.selected.source === 'local-runtime'
     ? asString(options.selected.model)
@@ -93,29 +87,31 @@ function resolveLocalRuntimeRouteOverrideFromOptions(
   const fallbackModel = matchedModel || options?.localRuntime.models[0] || null;
   const model = asString(matchedModel?.model || targetModel || selectedModel || fallbackModel?.model);
   const localModelId = asString(matchedModel?.localModelId || fallbackModel?.localModelId);
+  if (!model) {
+    return undefined;
+  }
   return {
     source: 'local-runtime',
-    ...(model ? { model } : {}),
+    connectorId: '',
+    model,
     ...(localModelId ? { localModelId } : {}),
+    ...(asString(fallbackModel?.engine) ? { engine: asString(fallbackModel?.engine) } : {}),
   };
 }
 
-function resolveConfiguredRouteOverride(
-  source: KBSettings['chatRouteSource'] | KBSettings['embeddingRouteSource'],
+function resolveConfiguredBinding(
+  preference: KBRoutePreference,
   options: RuntimeRouteOptionsSnapshot | null,
-  connectorId: string,
-  model: string,
-): EffectiveRouteOverride | undefined {
-  if (source === 'auto') return undefined;
-  if (source === 'token-api') {
-    return resolveTokenApiRouteOverrideFromOptions(options, connectorId, model) || { source: 'token-api' };
+): RuntimeRouteBinding | undefined {
+  if (preference.source === 'auto') return undefined;
+  if (preference.source === 'token-api') {
+    return resolveTokenApiBindingFromOptions(options, preference.connectorId, preference.model);
   }
-  return resolveLocalRuntimeRouteOverrideFromOptions(options, model);
+  return resolveLocalRuntimeBindingFromOptions(options, preference.model);
 }
 
 export function useKBClients(
-  aiClient: ModAiClient,
-  hookClient: HookClient,
+  runtimeClient: ModRuntimeClient,
   settings: KBSettings,
 ) {
   const [chatRouteOptions, setChatRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
@@ -124,29 +120,7 @@ export function useKBClients(
   const loadRouteOptions = useCallback(async (capability: RouteCapability): Promise<RuntimeRouteOptionsSnapshot | null> => {
     const flowId = createKBFlowId(`route-options-${capability}`);
     try {
-      const payload = await hookClient.data.query({
-        capability: KB_DATA_API_ROUTE_OPTIONS,
-        query: {
-          capability,
-          modId: KB_MOD_ID,
-        },
-      });
-      const parsed = parseRuntimeRouteOptions(payload, { includeResolvedDefault: true });
-      if (!parsed) {
-        emitKBLog({
-          level: 'warn',
-          message: 'route-options:parse-failed',
-          flowId,
-          source: 'useKBClients.loadRouteOptions',
-          details: { capability },
-        });
-        if (capability === 'chat') {
-          setChatRouteOptions(null);
-        } else {
-          setEmbeddingRouteOptions(null);
-        }
-        return null;
-      }
+      const options = await runtimeClient.route.listOptions({ capability });
 
       emitKBLog({
         level: 'info',
@@ -155,19 +129,19 @@ export function useKBClients(
         source: 'useKBClients.loadRouteOptions',
         details: {
           capability,
-          selectedSource: parsed.selected.source,
-          selectedConnectorId: parsed.selected.connectorId || null,
-          selectedModel: parsed.selected.model || null,
-          connectorsCount: parsed.connectors.length,
-          localModelsCount: parsed.localRuntime.models.length,
+          selectedSource: options.selected.source,
+          selectedConnectorId: options.selected.connectorId || null,
+          selectedModel: options.selected.model || null,
+          connectorsCount: options.connectors.length,
+          localModelsCount: options.localRuntime.models.length,
         },
       });
-      if (capability === 'chat') {
-        setChatRouteOptions(parsed);
+      if (capability === 'text.generate') {
+        setChatRouteOptions(options);
       } else {
-        setEmbeddingRouteOptions(parsed);
+        setEmbeddingRouteOptions(options);
       }
-      return parsed;
+      return options;
     } catch (error) {
       emitKBLog({
         level: 'warn',
@@ -179,14 +153,19 @@ export function useKBClients(
           error: error instanceof Error ? error.message : String(error || ''),
         },
       });
+      if (capability === 'text.generate') {
+        setChatRouteOptions(null);
+      } else {
+        setEmbeddingRouteOptions(null);
+      }
       return null;
     }
-  }, [hookClient]);
+  }, [runtimeClient]);
 
   const refreshRouteOptions = useCallback(async () => {
     await Promise.all([
-      loadRouteOptions('chat'),
-      loadRouteOptions('embedding'),
+      loadRouteOptions('text.generate'),
+      loadRouteOptions('text.embed'),
     ]);
   }, [loadRouteOptions]);
 
@@ -198,23 +177,21 @@ export function useKBClients(
     return () => clearInterval(timer);
   }, [refreshRouteOptions]);
 
-  const configuredChatRouteOverride = useMemo(
-    () => resolveConfiguredRouteOverride(
-      settings.chatRouteSource,
-      chatRouteOptions,
-      settings.chatConnectorId,
-      settings.chatModel,
-    ),
+  const configuredChatBinding = useMemo(
+    () => resolveConfiguredBinding({
+      source: settings.chatRouteSource,
+      connectorId: settings.chatConnectorId,
+      model: settings.chatModel,
+    }, chatRouteOptions),
     [settings.chatRouteSource, settings.chatConnectorId, settings.chatModel, chatRouteOptions],
   );
 
-  const configuredEmbeddingRouteOverride = useMemo(
-    () => resolveConfiguredRouteOverride(
-      settings.embeddingRouteSource,
-      embeddingRouteOptions,
-      settings.embeddingConnectorId,
-      settings.embeddingModel,
-    ),
+  const configuredEmbeddingBinding = useMemo(
+    () => resolveConfiguredBinding({
+      source: settings.embeddingRouteSource,
+      connectorId: settings.embeddingConnectorId,
+      model: settings.embeddingModel,
+    }, embeddingRouteOptions),
     [
       settings.embeddingRouteSource,
       settings.embeddingConnectorId,
@@ -223,64 +200,29 @@ export function useKBClients(
     ],
   );
 
-  const resolveChatTokenApiRouteOverride = useCallback(async (): Promise<TokenApiRouteOverride | undefined> => {
-    const current = resolveTokenApiRouteOverrideFromOptions(
-      chatRouteOptions,
-      settings.chatConnectorId,
-      settings.chatModel,
-    );
-    if (current?.connectorId) return current;
-    const loaded = await loadRouteOptions('chat');
-    return resolveTokenApiRouteOverrideFromOptions(loaded, settings.chatConnectorId, settings.chatModel) || current;
-  }, [chatRouteOptions, settings.chatConnectorId, settings.chatModel, loadRouteOptions]);
-
-  const resolveEmbeddingTokenApiRouteOverride = useCallback(async (): Promise<TokenApiRouteOverride | undefined> => {
-    const current = resolveTokenApiRouteOverrideFromOptions(
-      embeddingRouteOptions,
-      settings.embeddingConnectorId,
-      settings.embeddingModel,
-    );
-    if (current?.connectorId) return current;
-    const loaded = await loadRouteOptions('embedding');
-    return resolveTokenApiRouteOverrideFromOptions(
-      loaded,
-      settings.embeddingConnectorId,
-      settings.embeddingModel,
-    ) || current;
-  }, [
-    embeddingRouteOptions,
-    settings.embeddingConnectorId,
-    settings.embeddingModel,
-    loadRouteOptions,
-  ]);
-
   const llmClient: LlmClient = useMemo(
-    () => createLlmClientAdapter(aiClient, settings.chatRouteSource, {
-      preferredRouteOverride: configuredChatRouteOverride,
-      resolveTokenApiRouteOverride: settings.chatRouteSource === 'token-api' || settings.chatRouteSource === 'auto'
-        ? resolveChatTokenApiRouteOverride
-        : undefined,
+    () => createLlmClientAdapter(runtimeClient, {
+      resolveRoute: () => ({
+        binding: configuredChatBinding || chatRouteOptions?.selected,
+      }),
     }),
     [
-      aiClient,
-      settings.chatRouteSource,
-      configuredChatRouteOverride,
-      resolveChatTokenApiRouteOverride,
+      runtimeClient,
+      configuredChatBinding,
+      chatRouteOptions,
     ],
   );
 
   const embeddingClient: EmbeddingClient = useMemo(
-    () => createEmbeddingClientAdapter(aiClient, settings.embeddingRouteSource, {
-      preferredRouteOverride: configuredEmbeddingRouteOverride,
-      resolveTokenApiRouteOverride: settings.embeddingRouteSource === 'token-api' || settings.embeddingRouteSource === 'auto'
-        ? resolveEmbeddingTokenApiRouteOverride
-        : undefined,
+    () => createEmbeddingClientAdapter(runtimeClient, {
+      resolveRoute: () => ({
+        binding: configuredEmbeddingBinding || embeddingRouteOptions?.selected,
+      }),
     }),
     [
-      aiClient,
-      settings.embeddingRouteSource,
-      configuredEmbeddingRouteOverride,
-      resolveEmbeddingTokenApiRouteOverride,
+      runtimeClient,
+      configuredEmbeddingBinding,
+      embeddingRouteOptions,
     ],
   );
 

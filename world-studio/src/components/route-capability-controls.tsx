@@ -22,7 +22,7 @@ type RouteCapabilityControlsProps = {
   onRouteSourceChange: (profile: RouteStage, source: RuntimeRouteSource) => void;
   onRouteConnectorChange: (profile: RouteStage, connectorId: string) => void;
   onRouteModelChange: (profile: RouteStage, model: string) => void;
-  onClearRouteOverride: (profile: RouteStage | 'all') => void;
+  onClearRouteBinding: (profile: RouteStage | 'all') => void;
   onOpenRuntimeSetup?: () => void;
 };
 
@@ -137,7 +137,7 @@ export function RouteCapabilityControls(props: RouteCapabilityControlsProps) {
       <button
         type="button"
         className="w-full rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700"
-        onClick={() => props.onClearRouteOverride(props.profile)}
+        onClick={() => props.onClearRouteBinding(props.profile)}
       >
         {t('routeCapabilityControls.useRuntimeDefault')}
       </button>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
 import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
+import type { LocalChatAiClient } from '../runtime-ai-client.js';
 
 type VoiceInputState = 'idle' | 'recording' | 'transcribing' | 'failed';
 
@@ -13,7 +13,7 @@ type StatusBannerPayload = {
 };
 
 type UseSpeechTranscribeInput = {
-  aiClient: Pick<ModAiClient, 'transcribeAudio'>;
+  aiClient: Pick<LocalChatAiClient, 'transcribeAudio'>;
   enableVoice: boolean;
   sttRouteSource: 'auto' | 'local-runtime' | 'token-api';
   localSttRouteAvailable: boolean;
@@ -28,13 +28,17 @@ type UseSpeechTranscribeInput = {
 const DEFAULT_AUDIO_MIME = 'audio/webm';
 const CHUNK_SIZE_MS = 250;
 
-function resolveRouteOverride(
+function resolveRouteBinding(
   source: UseSpeechTranscribeInput['sttRouteSource'],
-): { source?: 'local-runtime' | 'token-api' } {
+): { source: 'local-runtime' | 'token-api'; connectorId: string; model: string } | undefined {
   if (source === 'local-runtime' || source === 'token-api') {
-    return { source };
+    return {
+      source,
+      connectorId: '',
+      model: '',
+    };
   }
-  return {};
+  return undefined;
 }
 
 function resolveRecorderMimeType(): string {
@@ -199,10 +203,10 @@ export function useSpeechTranscribe(input: UseSpeechTranscribeInput) {
         throw new Error('LOCAL_CHAT_STT_EMPTY_AUDIO_BASE64');
       }
 
-      const routeOverride = resolveRouteOverride(input.sttRouteSource);
+      const routeBinding = resolveRouteBinding(input.sttRouteSource);
       const response = await input.aiClient.transcribeAudio({
-        routeHint: 'stt/default',
-        routeOverride,
+        capability: 'audio.transcribe',
+        routeBinding,
         audioBase64,
         mimeType: blob.type || recorderMimeTypeRef.current || DEFAULT_AUDIO_MIME,
       });

@@ -38,7 +38,7 @@ function localRuntimeMediaModels(
   const models = (options?.localRuntime.models || [])
     .filter((item) => {
       const capabilities = Array.isArray(item.capabilities) ? item.capabilities : [];
-      return capabilities.includes(scenario) || capabilities.includes(`llm.${scenario}.generate`);
+      return capabilities.includes(scenario) || capabilities.includes(`${scenario}.generate`);
     })
     .map((item) => String(item.model || item.localModelId || '').trim())
     .filter(Boolean);
@@ -112,7 +112,7 @@ export function MediaRoutePanel(props: Props) {
           ) : null}
           {fullyAutoWithoutOverrides ? (
             <p className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-[11px] text-gray-600">
-              {t('MediaRoute.autoRouteHint')}
+              {t('MediaRoute.autoCapability')}
             </p>
           ) : null}
           <div className="space-y-2 rounded-xl border border-gray-200 bg-white p-2">

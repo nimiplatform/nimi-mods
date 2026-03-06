@@ -130,7 +130,11 @@ export function DiagnosticsPanel(props: Props) {
               </p>
               <p>
                 <span className="font-medium">Retry:</span>{' '}
-                {latestPromptTrace ? `${latestPromptTrace.retryAttempted ? 'yes' : 'no'}${latestPromptTrace.retryImproved ? ' (improved)' : ''}` : '-'}
+                {latestPromptTrace
+                  ? `${(latestPromptTrace.planner === 'stream' && typeof latestPromptTrace.streamDeltaCount === 'number')
+                    ? 'stream'
+                    : 'none'}`
+                  : '-'}
               </p>
               <p>
                 <span className="font-medium">Planner:</span>{' '}

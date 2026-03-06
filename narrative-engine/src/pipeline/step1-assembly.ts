@@ -127,10 +127,10 @@ function toRecordArray(value: unknown): Array<Record<string, unknown>> {
   return [];
 }
 
-function toNarrativeRouteOptions(value: unknown): NarrativeRouteOptionsSnapshot {
-  const record = asRecord(value);
-  const selected = asRecord(record.selected);
+function toNarrativeRouteOptions(turn: NarrativeTurnInputNormalized): NarrativeRouteOptionsSnapshot {
+  const selected = asRecord(turn.binding);
   return {
+    capability: turn.capability,
     selected: {
       source: toString(selected.source),
       model: toString(selected.model),
@@ -993,7 +993,6 @@ function buildCompiledPromptContext(input: {
 
 export async function runNarrativeStep1Assembly(input: {
   turn: NarrativeTurnInputNormalized;
-  queryRuntimeRouteOptions: () => Promise<unknown>;
   queryWorldEvents: () => Promise<unknown>;
   queryWorldLorebooks: () => Promise<unknown>;
   queryWorldScenes: () => Promise<unknown>;
@@ -1003,14 +1002,12 @@ export async function runNarrativeStep1Assembly(input: {
 }): Promise<NarrativeStepResult<NarrativeStep1AssemblyResult>> {
   try {
     const [
-      routePayload,
       worldEventsPayload,
       worldLorebooksPayload,
       worldScenesPayload,
       narrativeContextsPayload,
       memoryRecallPayload,
     ] = await Promise.all([
-      input.queryRuntimeRouteOptions(),
       input.queryWorldEvents(),
       input.queryWorldLorebooks(),
       input.queryWorldScenes(),
@@ -1028,7 +1025,7 @@ export async function runNarrativeStep1Assembly(input: {
     const worldScenes = toRecordArray(worldScenesPayload);
     const narrativeContexts = toRecordArray(narrativeContextsPayload);
     const memoryRecall = asRecord(memoryRecallPayload);
-    const routeOptions = toNarrativeRouteOptions(routePayload);
+    const routeOptions = toNarrativeRouteOptions(input.turn);
 
     const resolved = resolveNarrativeScopes({
       rows: narrativeContexts,
@@ -1045,8 +1042,6 @@ export async function runNarrativeStep1Assembly(input: {
     }
     resolved.coverage.scene = Boolean(scene);
 
-    const routePayloadRecord = asRecord(routePayload);
-    const routePayloadSelected = asRecord(routePayloadRecord.selected);
     const phase = toString(resolved.scopes.STORY.phase || asRecord(resolved.scopes.STORY.narrativeState).phase)
       || 'opening';
     const objective = toString(
@@ -1093,8 +1088,9 @@ export async function runNarrativeStep1Assembly(input: {
       }),
       narrativeStyle: {
         ...asRecord(resolved.scopes.CANON),
-        routeSource: toString(routePayloadSelected.source || routePayloadRecord.source),
-        routeModel: toString(routePayloadSelected.model || routePayloadRecord.model),
+        routeCapability: input.turn.capability,
+        routeSource: toString(routeOptions.selected.source),
+        routeModel: toString(routeOptions.selected.model),
       },
       characterRelations: extractCharacterRelations(resolved.scopes),
       phase,

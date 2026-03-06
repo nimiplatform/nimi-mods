@@ -3,10 +3,11 @@
 // ---------------------------------------------------------------------------
 
 import { useMemo } from 'react';
-import { createAiClient, type ModAiClient } from '@nimiplatform/sdk/mod/ai';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
+import { createModRuntimeClient, type ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
+import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 import { AUDIO_BOOK_MOD_ID } from '../contracts.js';
-import { createLlmClientAdapter, type LlmRouteOverride } from '../adapters/llm-adapter.js';
+import { createLlmClientAdapter } from '../adapters/llm-adapter.js';
 import { createTtsClientAdapter } from '../adapters/tts-adapter.js';
 import type { RouteSelection } from './use-tts-route.js';
 
@@ -15,9 +16,26 @@ export function useHookClient() {
   return useMemo(() => createHookClient(AUDIO_BOOK_MOD_ID), []);
 }
 
-/** Stable singleton AI client — call once, pass to useTtsRoute + useAudioBookClients. */
-export function useAiClient() {
-  return useMemo(() => createAiClient(AUDIO_BOOK_MOD_ID), []);
+/** Stable singleton runtime client — call once, pass to route + service hooks. */
+export function useRuntimeClient() {
+  return useMemo(() => createModRuntimeClient(AUDIO_BOOK_MOD_ID), []);
+}
+
+function toBinding(selection?: RouteSelection): RuntimeRouteBinding | undefined {
+  if (!selection) return undefined;
+  const source = selection.routeSource === 'token-api' || selection.routeSource === 'local-runtime'
+    ? selection.routeSource
+    : undefined;
+  const connectorId = String(selection.connectorId || '').trim();
+  const model = String(selection.model || '').trim();
+  if (!source && !connectorId && !model) {
+    return undefined;
+  }
+  return {
+    source: source || 'token-api',
+    connectorId,
+    model,
+  };
 }
 
 /**
@@ -26,26 +44,21 @@ export function useAiClient() {
  */
 export function useAudioBookClients(
   hookClient: ReturnType<typeof createHookClient>,
-  aiClient: ModAiClient,
+  runtimeClient: ModRuntimeClient,
   chatSelection?: RouteSelection,
+  ttsSelection?: RouteSelection,
 ) {
-  // Build routeOverride from chat connector selection
-  const chatRouteOverride: LlmRouteOverride | undefined = chatSelection?.connectorId
-    ? {
-      source: chatSelection.routeSource as 'token-api',
-      connectorId: chatSelection.connectorId,
-      ...(String(chatSelection.model || '').trim() ? { model: String(chatSelection.model || '').trim() } : {}),
-    }
-    : undefined;
+  const chatBinding = toBinding(chatSelection);
+  const ttsBinding = toBinding(ttsSelection);
 
-  // Rebuild llmClient when chat connector changes
   const llmClient = useMemo(
-    () => createLlmClientAdapter(aiClient, chatRouteOverride),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [aiClient, chatSelection?.connectorId, chatSelection?.routeSource, chatSelection?.model],
+    () => createLlmClientAdapter(runtimeClient, chatBinding),
+    [runtimeClient, chatBinding?.connectorId, chatBinding?.model, chatBinding?.source],
+  );
+  const ttsClient = useMemo(
+    () => createTtsClientAdapter(runtimeClient, ttsBinding),
+    [runtimeClient, ttsBinding?.connectorId, ttsBinding?.model, ttsBinding?.source],
   );
 
-  const ttsClient = useMemo(() => createTtsClientAdapter(hookClient.llm.speech), [hookClient]);
-
-  return { hookClient, aiClient, llmClient, ttsClient };
+  return { hookClient, runtimeClient, llmClient, ttsClient };
 }

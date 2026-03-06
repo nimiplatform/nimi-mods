@@ -1,7 +1,6 @@
 import { runTextplayRender } from '../src/pipeline/run-textplay-render.ts';
 import {
   TEXTPLAY_DATA_API_RENDER_PERSIST,
-  TEXTPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS,
 } from '../src/contracts.ts';
 
 function makeId(prefix) {
@@ -12,32 +11,6 @@ function createHookClient() {
   return {
     data: {
       query: async ({ capability, query }) => {
-        if (capability === TEXTPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS) {
-          return {
-            selected: {
-              source: 'token-api',
-              connectorId: '01KJPF2VWTYXQ0Y40Q3Y3EAHF0',
-              model: 'models/gemini-3-flash-preview',
-            },
-            resolvedDefault: {
-              source: 'token-api',
-              connectorId: '01KJPF2VWTYXQ0Y40Q3Y3EAHF0',
-              model: 'models/gemini-3-flash-preview',
-            },
-            localRuntime: {
-              models: [],
-              defaultEndpoint: 'http://127.0.0.1:8080/v1',
-            },
-            connectors: [
-              {
-                id: '01KJPF2VWTYXQ0Y40Q3Y3EAHF0',
-                label: 'API Connector 1',
-                models: ['models/gemini-3-flash-preview'],
-              },
-            ],
-          };
-        }
-
         if (capability === TEXTPLAY_DATA_API_RENDER_PERSIST) {
           return {
             ok: true,
@@ -51,7 +24,36 @@ function createHookClient() {
   };
 }
 
-function createAiClient() {
+function createRuntimeRouteClient() {
+  return {
+    listOptions: async () => ({
+      capability: 'text.generate',
+      selected: {
+        source: 'token-api',
+        connectorId: '01KJPF2VWTYXQ0Y40Q3Y3EAHF0',
+        model: 'models/gemini-3-flash-preview',
+      },
+      resolvedDefault: {
+        source: 'token-api',
+        connectorId: '01KJPF2VWTYXQ0Y40Q3Y3EAHF0',
+        model: 'models/gemini-3-flash-preview',
+      },
+      localRuntime: {
+        models: [],
+        defaultEndpoint: 'http://127.0.0.1:8080/v1',
+      },
+      connectors: [
+        {
+          id: '01KJPF2VWTYXQ0Y40Q3Y3EAHF0',
+          label: 'API Connector 1',
+          models: ['models/gemini-3-flash-preview'],
+        },
+      ],
+    }),
+  };
+}
+
+function createRuntimeTextClient() {
   return {
     generateText: async () => ({
       text: '开场风雷已起，韩立立于余烬之上，下一步由你决断。',
@@ -125,7 +127,7 @@ async function main() {
           background: '灵界风暴未歇，新的冲突即将降临。',
         },
       },
-      routeOverride: {
+      binding: {
         source: 'token-api',
         connectorId: '01KJPF2VWTYXQ0Y40Q3Y3EAHF0',
         model: 'models/gemini-3-flash-preview',
@@ -135,7 +137,8 @@ async function main() {
     },
     deps: {
       hookClient: createHookClient(),
-      aiClient: createAiClient(),
+      runtimeClient: createRuntimeRouteClient(),
+      aiClient: createRuntimeTextClient(),
       narrativeEngine: createNarrativeEngine(),
     },
     presenceReports: [],

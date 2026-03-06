@@ -28,4 +28,4 @@ VideoPlay may read `world.events/scenes/narrative-contexts/lorebooks` and `core.
 
 ## V-CAP-007 Speech Capability Boundary
 
-Voice generation must use runtime-managed speech capability (`llm.speech.synthesize`) and route resolution (`local-runtime -> token-api`) only.
+Voice generation must use runtime-managed speech capability (`runtime.media.tts.synthesize`) and route resolution (`local-runtime -> token-api`) only.

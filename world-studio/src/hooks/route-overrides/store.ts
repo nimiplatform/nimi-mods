@@ -1,26 +1,26 @@
 import { useEffect, useState } from 'react';
-import type { DistillRouteOverrideMap } from '../../generation/pipeline.js';
+import type { DistillRouteBindingMap } from '../../generation/pipeline.js';
 import {
-  loadWorldStudioRouteOverrideMap,
-  persistWorldStudioRouteOverrideMap,
+  loadWorldStudioRouteBindingMap,
+  persistWorldStudioRouteBindingMap,
 } from '../../services/mutation-payload.js';
 
-export function useWorldStudioRouteOverrideStore(userId: string) {
-  const [routeOverrideMap, setRouteOverrideMap] = useState<DistillRouteOverrideMap>({
+export function useWorldStudioRouteBindingStore(userId: string) {
+  const [bindingMap, setRouteBindingMap] = useState<DistillRouteBindingMap>({
     coarse: null,
     fine: null,
   });
 
   useEffect(() => {
-    setRouteOverrideMap(loadWorldStudioRouteOverrideMap(userId));
+    setRouteBindingMap(loadWorldStudioRouteBindingMap(userId));
   }, [userId]);
 
   useEffect(() => {
-    persistWorldStudioRouteOverrideMap(userId, routeOverrideMap);
-  }, [routeOverrideMap, userId]);
+    persistWorldStudioRouteBindingMap(userId, bindingMap);
+  }, [bindingMap, userId]);
 
   return {
-    routeOverrideMap,
-    setRouteOverrideMap,
+    bindingMap,
+    setRouteBindingMap,
   };
 }

@@ -1,12 +1,28 @@
 import { asRecord } from '@nimiplatform/sdk/mod/utils';
-import { parseRuntimeRouteOptions, type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
+import { type RuntimeCanonicalCapability, type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
 import { createRendererFlowId, logRendererEvent } from '@nimiplatform/sdk/mod/logging';
-import { LOCAL_CHAT_DATA_API_RUNTIME_ROUTE_OPTIONS, LOCAL_CHAT_MOD_ID } from '../../contracts.js';
 import { emitLocalChatLog } from '../../logging.js';
 import type { ChatRouteSnapshot, UseLocalChatRuntimeRouteInput } from './types.js';
 
 const ROUTE_OPTIONS_QUERY_TIMEOUT_MS = 6000;
 type RouteCapability = 'chat' | 'image' | 'video' | 'tts' | 'stt';
+
+function toRuntimeCapability(capability: RouteCapability): RuntimeCanonicalCapability {
+  switch (capability) {
+    case 'chat':
+      return 'text.generate';
+    case 'image':
+      return 'image.generate';
+    case 'video':
+      return 'video.generate';
+    case 'tts':
+      return 'audio.synthesize';
+    case 'stt':
+      return 'audio.transcribe';
+    default:
+      return 'text.generate';
+  }
+}
 
 function safeLogRendererEvent(payload: Parameters<typeof logRendererEvent>[0]): void {
   emitLocalChatLog({
@@ -73,15 +89,15 @@ function normalizeRouteOptionsSnapshot(
 }
 
 export async function resolveRouteSnapshot(input: {
-  aiClient: UseLocalChatRuntimeRouteInput['aiClient'];
-  routeOverride: RuntimeRouteBinding | null;
+  runtimeClient: UseLocalChatRuntimeRouteInput['runtimeClient'];
+  routeBinding: RuntimeRouteBinding | null;
   setRouteSnapshot: (value: ChatRouteSnapshot | null) => void;
   setStatusBanner: UseLocalChatRuntimeRouteInput['setStatusBanner'];
 }) {
   try {
-    const resolved = await input.aiClient.resolveRoute({
-      routeHint: 'chat/default',
-      routeOverride: input.routeOverride || undefined,
+    const resolved = await input.runtimeClient.resolve({
+      capability: 'text.generate',
+      binding: input.routeBinding || undefined,
     });
     input.setRouteSnapshot({
       source: resolved.source,
@@ -103,9 +119,9 @@ export async function resolveRouteSnapshot(input: {
 
 export async function loadRouteOptions(input: {
   capability: RouteCapability;
-  hookClient: UseLocalChatRuntimeRouteInput['hookClient'];
-  setRouteOptions: (value: ReturnType<typeof parseRuntimeRouteOptions>) => void;
-}): Promise<ReturnType<typeof parseRuntimeRouteOptions>> {
+  runtimeClient: UseLocalChatRuntimeRouteInput['runtimeClient'];
+  setRouteOptions: (value: RuntimeRouteOptionsSnapshot | null) => void;
+}): Promise<RuntimeRouteOptionsSnapshot | null> {
   try {
     safeLogRendererEvent({
       level: 'debug',
@@ -116,13 +132,9 @@ export async function loadRouteOptions(input: {
       },
     });
     let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
-    const payload = await Promise.race<unknown>([
-      input.hookClient.data.query({
-        capability: LOCAL_CHAT_DATA_API_RUNTIME_ROUTE_OPTIONS,
-        query: {
-          capability: input.capability,
-          modId: LOCAL_CHAT_MOD_ID,
-        },
+    const payload = await Promise.race<RuntimeRouteOptionsSnapshot>([
+      input.runtimeClient.listOptions({
+        capability: toRuntimeCapability(input.capability),
       }),
       new Promise<never>((_, reject) => {
         timeoutHandle = setTimeout(() => {
@@ -134,24 +146,7 @@ export async function loadRouteOptions(input: {
         clearTimeout(timeoutHandle);
       }
     });
-    const parsed = parseRuntimeRouteOptions(payload, { includeResolvedDefault: true });
-    if (!parsed) {
-      const record = asRecord(payload);
-      safeLogRendererEvent({
-        level: 'warn',
-        area: 'local-chat',
-        message: `local-chat:${input.capability}-route-options:parsed-null`,
-        details: {
-          payloadKeys: Object.keys(record),
-          hasSelected: typeof record.selected === 'object' && record.selected !== null,
-          hasConnectors: Array.isArray(record.connectors),
-          connectorsCount: Array.isArray(record.connectors) ? record.connectors.length : -1,
-        },
-      });
-      input.setRouteOptions(null);
-      return null;
-    }
-    const resolved = normalizeRouteOptionsSnapshot(parsed);
+    const resolved = normalizeRouteOptionsSnapshot(payload);
     safeLogRendererEvent({
       level: 'debug',
       area: 'local-chat',
@@ -181,8 +176,8 @@ export async function loadRouteOptions(input: {
 }
 
 export async function runRouteHealthCheck(input: {
-  aiClient: UseLocalChatRuntimeRouteInput['aiClient'];
-  routeOverride: RuntimeRouteBinding | null;
+  runtimeClient: UseLocalChatRuntimeRouteInput['runtimeClient'];
+  routeBinding: RuntimeRouteBinding | null;
   setCheckingHealth: (value: boolean) => void;
   setHealthStatus: (value: 'idle' | 'checking' | 'healthy' | 'unreachable') => void;
   setStatusBanner?: (value: { kind: 'warn' | 'error' | 'success' | 'info'; message: string }) => void;
@@ -191,9 +186,9 @@ export async function runRouteHealthCheck(input: {
   input.setHealthStatus('checking');
   const flowId = createRendererFlowId('local-chat-health-check');
   try {
-    const result = await input.aiClient.checkRouteHealth({
-      routeHint: 'chat/default',
-      routeOverride: input.routeOverride || undefined,
+    const result = await input.runtimeClient.checkHealth({
+      capability: 'text.generate',
+      binding: input.routeBinding || undefined,
     });
     const record = asRecord(result);
     const status = String(record.status || '');

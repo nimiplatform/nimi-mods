@@ -120,8 +120,11 @@ async function synthesizeWithChunking(
     speakingRate?: number;
     pitch?: number;
     emotion?: string;
-    connectorId?: string;
-    routeSource?: 'auto' | 'local-runtime' | 'token-api';
+    binding?: {
+      source: 'local-runtime' | 'token-api';
+      connectorId: string;
+      model: string;
+    };
     model?: string;
   },
 ): Promise<{ audioBlob: Blob; durationMs: number }> {
@@ -219,8 +222,11 @@ export function runSynthesisJob(
     onProgress?: SynthesisProgressCallback;
     onAudioReady?: (segmentId: string, audioBlob: Blob, durationMs: number) => void | Promise<void>;
     existingJobs?: SegmentJob[];
-    /** TTS routing options — connectorId and routeSource passed to every synthesize call. */
-    ttsRoute?: { connectorId?: string; routeSource?: 'auto' | 'local-runtime' | 'token-api'; model?: string };
+    /** TTS routing options — runtime route binding passed to every synthesize call. */
+    ttsRoute?: {
+      binding?: { source: 'local-runtime' | 'token-api'; connectorId: string; model: string };
+      model?: string;
+    };
   },
 ): SynthesisJobHandle {
   const maxConcurrency = options?.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY;
@@ -308,8 +314,7 @@ export function runSynthesisJob(
               speakingRate: casting.speakingRate,
               pitch: casting.pitch,
               emotion: sanitizeEmotion(segment.emotion ?? casting.emotion),
-              connectorId: options?.ttsRoute?.connectorId,
-              routeSource: options?.ttsRoute?.routeSource,
+              binding: options?.ttsRoute?.binding,
               model: options?.ttsRoute?.model,
             });
 

@@ -28,9 +28,12 @@ ai_profile:
   source_rule: WS-CAP-003
 capabilities:
   llm:
-    - llm.text.generate
-    - llm.text.stream
-    - llm.image.generate
+    - runtime.ai.text.generate
+    - runtime.ai.text.stream
+    - runtime.media.image.generate
+    - runtime.ai.embedding.generate
+    - runtime.route.list.options
+    - runtime.route.resolve
   data_query:
     - data.query.data-api.world.access.me
     - data.query.data-api.world.landing.resolve
@@ -55,7 +58,6 @@ capabilities:
     - data.query.data-api.creator.agents.list
     - data.query.data-api.creator.agents.create
     - data.query.data-api.creator.agents.batch-create
-    - data.query.data-api.runtime.route.options
   ui_register:
     - ui.register.ui-extension.app.sidebar.mods
     - ui.register.ui-extension.app.content.routes

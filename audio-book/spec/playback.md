@@ -9,7 +9,7 @@
 |---|---|
 | `kernel/entity-contract.md` | VS-ENT-008, VS-ENT-009 |
 | `kernel/pipeline-contract.md` | VS-PIPE-007 |
-| `kernel/tables/error-codes.yaml` | AB_PLAY_* |
+| `kernel/tables/reason-codes.yaml` | AB_PLAY_* |
 
 ## 1. Scope
 

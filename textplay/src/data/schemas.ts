@@ -174,7 +174,7 @@ export const NarrativeTurnResultUpsertRequestSchema = z.strictObject({
   triggerSource: NarrativeTriggerSourceSchema,
   userMessage: z.string().optional(),
   systemContext: z.record(z.string(), z.unknown()).optional(),
-  routeOverride: z.record(z.string(), z.unknown()).optional(),
+  binding: z.record(z.string(), z.unknown()).optional(),
   idempotencyKey: z.string().min(1).optional(),
   runId: z.string().min(1).optional(),
   traceId: z.string().min(1).optional(),
@@ -501,7 +501,7 @@ export const TextplayRenderRequestSchema = z.strictObject({
   triggerSource: NarrativeTriggerSourceSchema,
   userMessage: z.string().optional(),
   systemPayload: z.record(z.string(), z.unknown()).optional(),
-  routeOverride: z.record(z.string(), z.unknown()).optional(),
+  binding: z.record(z.string(), z.unknown()).optional(),
   runId: z.string().min(1),
   traceId: z.string().min(1),
 }).superRefine((value, context) => {

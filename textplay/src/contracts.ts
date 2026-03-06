@@ -4,7 +4,6 @@ export const TEXTPLAY_TAB_ID = 'mod:textplay';
 export const TEXTPLAY_NAV_SLOT = 'ui-extension.app.sidebar.mods';
 export const TEXTPLAY_ROUTE_SLOT = 'ui-extension.app.content.routes';
 
-export const TEXTPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS = 'data-api.runtime.route.options';
 export const TEXTPLAY_DATA_API_WORLD_ACCESS_ME = 'data-api.world.access.me';
 export const TEXTPLAY_DATA_API_WORLD_WORLDS_MINE = 'data-api.world.worlds.mine';
 export const TEXTPLAY_DATA_API_WORLD_EVENTS_LIST = 'data-api.world.events.list';
@@ -19,8 +18,10 @@ export const TEXTPLAY_DATA_API_RENDER_PERSIST = 'data-api.textplay.render.persis
 export const TEXTPLAY_DATA_API_SESSIONS_MINE = 'data-api.textplay.sessions.mine';
 
 export const TEXTPLAY_CAPABILITIES = [
-  'llm.text.generate',
-  `data.query.${TEXTPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS}`,
+  'runtime.ai.text.generate',
+  'runtime.route.list.options',
+  'runtime.route.resolve',
+  'runtime.route.check.health',
   `data.query.${TEXTPLAY_DATA_API_WORLD_ACCESS_ME}`,
   `data.query.${TEXTPLAY_DATA_API_WORLD_WORLDS_MINE}`,
   `data.query.${TEXTPLAY_DATA_API_WORLD_EVENTS_LIST}`,

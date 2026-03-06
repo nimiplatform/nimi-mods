@@ -7,6 +7,8 @@
     "build": "node ../scripts/build-mod.mjs --mod world-studio",
     "watch": "node ../scripts/build-mod.mjs --mod world-studio --watch",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "test": "npx tsx --test test/*.mjs",
+    "verify": "pnpm run typecheck && pnpm run test && pnpm run build",
     "clean": "rm -rf dist"
   }
 }

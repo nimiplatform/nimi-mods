@@ -1,8 +1,6 @@
-import type { AiTextRequest } from '@nimiplatform/sdk/mod/ai';
 import {
   NARRATIVE_ACTION_HINT_BY_REASON_CODE,
   NARRATIVE_ENGINE_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY,
-  NARRATIVE_ENGINE_DATA_API_RUNTIME_ROUTE_OPTIONS,
   NARRATIVE_ENGINE_DATA_API_WORLD_ACCESS_ME,
   NARRATIVE_ENGINE_DATA_API_WORLD_EVENTS_LIST,
   NARRATIVE_ENGINE_DATA_API_WORLD_LOREBOOKS_LIST,
@@ -27,6 +25,7 @@ import {
 } from '../store/repository.js';
 import type {
   NarrativeCoreOutput,
+  NarrativeAiTextRequest,
   NarrativeRenderInput,
   NarrativeRunEnvelope,
   NarrativeTurnInputNormalized,
@@ -43,7 +42,7 @@ import { runNarrativeStep3Guard } from './step3-guard.js';
 
 export type NarrativeProcessTurnDeps = {
   queryData: (capability: string, query: Record<string, unknown>) => Promise<unknown>;
-  generateText: (payload: AiTextRequest) => Promise<{ text: string }>;
+  generateText: (payload: NarrativeAiTextRequest) => Promise<{ text: string }>;
 };
 
 function toRecord(value: unknown): Record<string, unknown> {
@@ -138,8 +137,8 @@ function toStepInputHash(input: NarrativeTurnInputNormalized): string {
     triggerSource: input.triggerSource,
     userMessage: input.userMessage,
     systemContext: input.systemContext,
-    routeHint: input.routeHint,
-    routeOverride: input.routeOverride,
+    capability: input.capability,
+    binding: input.binding,
     cancelRequested: input.cancelRequested,
   });
 }
@@ -451,10 +450,6 @@ export async function processNarrativeTurn(input: {
   const step1 = await runNarrativeStep1Assembly({
     turn: normalized,
     recentSpineEvents: step1SpineHistory,
-    queryRuntimeRouteOptions: () => deps.queryData(
-      NARRATIVE_ENGINE_DATA_API_RUNTIME_ROUTE_OPTIONS,
-      {},
-    ),
     queryWorldEvents: () => deps.queryData(
       NARRATIVE_ENGINE_DATA_API_WORLD_EVENTS_LIST,
       { worldId: normalized.worldId },

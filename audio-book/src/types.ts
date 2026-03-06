@@ -2,6 +2,8 @@
 // Audio Book domain types
 // ---------------------------------------------------------------------------
 
+import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
+
 /** Segment speech type */
 export type SegmentType = 'dialogue' | 'narration' | 'inner_thought' | 'sound_effect';
 
@@ -186,20 +188,18 @@ export type AnalysisChapterOutput = {
 /** LLM text generation client abstraction */
 export type LlmClient = {
   generateText(input: {
-    routeHint?: string;
     systemPrompt: string;
     userPrompt: string;
     maxTokens?: number;
     temperature?: number;
-    routeOverride?: { source?: string; connectorId?: string; model?: string };
+    binding?: RuntimeRouteBinding;
   }): Promise<{ text: string }>;
 };
 
 /** TTS synthesis client abstraction */
 export type TtsClient = {
   listVoices(options?: {
-    connectorId?: string;
-    routeSource?: 'auto' | 'local-runtime' | 'token-api';
+    binding?: RuntimeRouteBinding;
     model?: string;
   }): Promise<Array<{
     providerId: string;
@@ -216,8 +216,7 @@ export type TtsClient = {
     speakingRate?: number;
     pitch?: number;
     emotion?: string;
-    connectorId?: string;
-    routeSource?: 'auto' | 'local-runtime' | 'token-api';
+    binding?: RuntimeRouteBinding;
     model?: string;
   }): Promise<{ audioBlob: Blob; durationMs: number }>;
 };

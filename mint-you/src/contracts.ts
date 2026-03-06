@@ -6,15 +6,15 @@ export const MINTYOU_ROUTE_SLOT = 'ui-extension.app.content.routes';
 export const MINTYOU_DATA_API_AGENTS_CREATE = 'data-api.creator.agents.create';
 export const MINTYOU_DATA_API_WORLD_ACCESS_ME = 'data-api.world.access.me';
 export const MINTYOU_DATA_API_WORLD_OASIS_GET = 'data-api.world.oasis.get';
-export const MINTYOU_DATA_API_RUNTIME_ROUTE_OPTIONS = 'data-api.runtime.route.options';
+export const MINTYOU_RUNTIME_PROFILE_READ_AGENT = 'runtime.profile.read.agent';
 
 export const MINTYOU_CAPABILITIES = [
-  'llm.text.generate',
+  'runtime.ai.text.generate',
+  'runtime.route.list.options',
   `data.query.${MINTYOU_DATA_API_AGENTS_CREATE}`,
   `data.query.${MINTYOU_DATA_API_WORLD_ACCESS_ME}`,
   `data.query.${MINTYOU_DATA_API_WORLD_OASIS_GET}`,
-  `data.query.${MINTYOU_DATA_API_RUNTIME_ROUTE_OPTIONS}`,
-  'hook.agent-profile.read',
+  MINTYOU_RUNTIME_PROFILE_READ_AGENT,
   'data.store.mod-state',
   `ui.register.${MINTYOU_NAV_SLOT}`,
   `ui.register.${MINTYOU_ROUTE_SLOT}`,

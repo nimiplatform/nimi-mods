@@ -255,7 +255,7 @@ export async function runLocalChatTurnSend(input: {
       selectedTarget,
       messages: context.messages,
       runtimeMode: context.runtimeMode,
-      routeOverride: context.routeOverride,
+      routeBinding: context.routeBinding,
       allowMultiReply: context.defaultSettings.allowMultiReply,
       segmentationMode: context.defaultSettings.segmentationMode,
       routeSnapshot: context.routeSnapshot,
@@ -279,7 +279,7 @@ export async function runLocalChatTurnSend(input: {
         }));
       },
     });
-    const expectedSource = context.routeOverride?.source
+    const expectedSource = context.routeBinding?.source
       || context.chatRouteOptions?.selected.source
       || 'local-runtime';
     const actualSource = prepared.routeSnapshot?.source || expectedSource;
@@ -308,7 +308,7 @@ export async function runLocalChatTurnSend(input: {
       compiledPrompt: prepared.compiledPrompt,
       selectedTarget,
       routeSnapshot: prepared.routeSnapshot,
-      routeOverride: prepared.routeOverride,
+      routeBinding: prepared.routeBinding,
       chatRouteOptions: context.chatRouteOptions,
       streamDeltaCount: prepared.textTurn.streamDeltaCount,
       streamDurationMs: prepared.textTurn.streamDurationMs,

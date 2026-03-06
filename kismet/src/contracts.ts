@@ -3,12 +3,11 @@ export const KISMET_MOD_ID = 'world.nimi.kismet';
 export const KISMET_NAV_SLOT = 'ui-extension.app.sidebar.mods';
 export const KISMET_ROUTE_SLOT = 'ui-extension.app.content.routes';
 
-export const KISMET_DATA_API_RUNTIME_ROUTE_OPTIONS = 'data-api.runtime.route.options';
-
 export const KISMET_CAPABILITIES = [
-  'llm.text.generate',
-  'llm.text.stream',
-  `data.query.${KISMET_DATA_API_RUNTIME_ROUTE_OPTIONS}`,
+  'runtime.ai.text.generate',
+  'runtime.route.list.options',
+  'runtime.route.resolve',
+  'runtime.route.check.health',
   `ui.register.${KISMET_NAV_SLOT}`,
   `ui.register.${KISMET_ROUTE_SLOT}`,
 ] as const;

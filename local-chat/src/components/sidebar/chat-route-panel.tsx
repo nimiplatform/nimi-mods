@@ -16,7 +16,7 @@ type Props = {
   onRouteSourceChange: (source: RuntimeRouteBinding['source']) => void;
   onRouteConnectorChange: (connectorId: string) => void;
   onRouteModelChange: (model: string) => void;
-  onClearRouteOverride: () => void;
+  onClearRouteBinding: () => void;
 };
 
 const CHEVRON_ICON = (
@@ -41,7 +41,7 @@ export function ChatRoutePanel(props: Props) {
     onRouteSourceChange,
     onRouteConnectorChange,
     onRouteModelChange,
-    onClearRouteOverride,
+    onClearRouteBinding,
   } = props;
   const showEmptyLocalRuntimeCta = activeChatSource === 'local-runtime' && chatModelOptions.length === 0;
 
@@ -139,7 +139,7 @@ export function ChatRoutePanel(props: Props) {
 
             <button
               type="button"
-              onClick={onClearRouteOverride}
+              onClick={onClearRouteBinding}
               className="h-9 w-full rounded-xl border border-gray-200 bg-white px-2 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50"
             >
               {t('ChatRoute.useRuntimeDefault')}

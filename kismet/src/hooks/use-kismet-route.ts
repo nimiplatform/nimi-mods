@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { parseRuntimeRouteOptions, type RuntimeRouteBinding, type RuntimeRouteSource } from '@nimiplatform/sdk/mod/runtime-route';
+import type { RuntimeRouteBinding, RuntimeRouteSource } from '@nimiplatform/sdk/mod/runtime-route';
 import type { RouteSourceDisplay } from '../types.js';
 import { useKismetStore } from '../state/kismet-store.js';
-import { getKismetAiClient, getKismetHookClient } from '../runtime-mod.js';
-import { KISMET_DATA_API_RUNTIME_ROUTE_OPTIONS, KISMET_MOD_ID } from '../contracts.js';
+import { getKismetRuntimeClient } from '../runtime-mod.js';
 import { emitKismetLog } from '../logging.js';
 import { ReasonCode } from '@nimiplatform/sdk/types';
 
-const STORAGE_KEY = 'nimi.kismet.route-override.v1';
+const STORAGE_KEY = 'nimi.kismet.route-binding.v1';
 
-function loadPersistedOverride(): RuntimeRouteBinding | null {
+function loadPersistedBinding(): RuntimeRouteBinding | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
@@ -21,9 +20,9 @@ function loadPersistedOverride(): RuntimeRouteBinding | null {
   return null;
 }
 
-function persistOverride(override: RuntimeRouteBinding | null) {
-  if (override) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(override));
+function persistBinding(binding: RuntimeRouteBinding | null) {
+  if (binding) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(binding));
   } else {
     localStorage.removeItem(STORAGE_KEY);
   }
@@ -32,7 +31,7 @@ function persistOverride(override: RuntimeRouteBinding | null) {
 export function useKismetRoute() {
   const {
     routeSource, setRouteSource,
-    routeOverride, setRouteOverride,
+    routeBinding, setRouteBinding,
     chatRouteOptions, setChatRouteOptions,
   } = useKismetStore();
   const [checking, setChecking] = useState(false);
@@ -40,26 +39,25 @@ export function useKismetRoute() {
 
   // Load persisted override on mount
   useEffect(() => {
-    const persisted = loadPersistedOverride();
-    if (persisted) setRouteOverride(persisted);
+    const persisted = loadPersistedBinding();
+    if (persisted) setRouteBinding(persisted);
     mountedRef.current = true;
-  }, [setRouteOverride]);
+  }, [setRouteBinding]);
 
-  // Persist override changes
+  // Persist binding changes
   useEffect(() => {
-    persistOverride(routeOverride);
-  }, [routeOverride]);
+    persistBinding(routeBinding);
+  }, [routeBinding]);
 
   // Load route options (once on mount)
   useEffect(() => {
     (async () => {
       try {
-        const hookClient = getKismetHookClient();
-        const payload = await hookClient.data.query({
-          capability: KISMET_DATA_API_RUNTIME_ROUTE_OPTIONS,
-          query: { capability: 'chat', modId: KISMET_MOD_ID },
+        const runtimeClient = getKismetRuntimeClient();
+        const snapshot = await runtimeClient.route.listOptions({
+          capability: 'text.generate',
         });
-        setChatRouteOptions(parseRuntimeRouteOptions(payload, { includeResolvedDefault: true }));
+        setChatRouteOptions(snapshot);
       } catch (err) {
         emitKismetLog({
           level: 'warn',
@@ -72,22 +70,27 @@ export function useKismetRoute() {
     })();
   }, [setChatRouteOptions]);
 
-  // Health check — uses ref to read latest routeOverride
-  const routeOverrideRef = useRef(routeOverride);
-  routeOverrideRef.current = routeOverride;
+  // Health check — uses ref to read latest binding
+  const routeBindingRef = useRef(routeBinding);
+  routeBindingRef.current = routeBinding;
 
   const checkRouteHealth = useCallback(async (): Promise<RouteSourceDisplay> => {
-    const currentOverride = routeOverrideRef.current;
+    const currentBinding = routeBindingRef.current;
     setChecking(true);
     try {
-      const aiClient = getKismetAiClient();
-      const routeInput = { routeHint: 'chat/default' as const, routeOverride: currentOverride || undefined };
-      const health = await aiClient.checkRouteHealth(routeInput);
+      const runtimeClient = getKismetRuntimeClient();
+      const health = await runtimeClient.route.checkHealth({
+        capability: 'text.generate',
+        binding: currentBinding || undefined,
+      });
       if (health.reasonCode !== ReasonCode.RUNTIME_ROUTE_HEALTHY && health.reasonCode !== ReasonCode.RUNTIME_ROUTE_DEGRADED) {
         setRouteSource('unavailable');
         return 'unavailable';
       }
-      const route = await aiClient.resolveRoute(routeInput);
+      const route = await runtimeClient.route.resolve({
+        capability: 'text.generate',
+        binding: currentBinding || undefined,
+      });
       const source = (route.source === 'local-runtime' ? 'local-runtime' : 'token-api') as RouteSourceDisplay;
       setRouteSource(source);
       return source;
@@ -105,12 +108,12 @@ export function useKismetRoute() {
     }
   }, [setRouteSource]);
 
-  // Re-check health when routeOverride changes
+  // Re-check health when binding changes
   useEffect(() => {
     if (mountedRef.current) {
       checkRouteHealth();
     }
-  }, [routeOverride, checkRouteHealth]);
+  }, [routeBinding, checkRouteHealth]);
 
   // Initial health check
   useEffect(() => {
@@ -121,7 +124,7 @@ export function useKismetRoute() {
   const handleSourceChange = useCallback((source: RuntimeRouteSource) => {
     if (source === 'local-runtime') {
       const firstModel = chatRouteOptions?.localRuntime.models[0];
-      setRouteOverride(firstModel ? {
+      setRouteBinding(firstModel ? {
         source: 'local-runtime',
         connectorId: '',
         model: firstModel.model,
@@ -130,51 +133,51 @@ export function useKismetRoute() {
       } : { source: 'local-runtime', connectorId: '', model: '' });
     } else {
       const firstConnector = chatRouteOptions?.connectors[0];
-      setRouteOverride(firstConnector ? {
+      setRouteBinding(firstConnector ? {
         source: 'token-api',
         connectorId: firstConnector.id,
         model: firstConnector.models[0] || '',
       } : { source: 'token-api', connectorId: '', model: '' });
     }
-  }, [chatRouteOptions, setRouteOverride]);
+  }, [chatRouteOptions, setRouteBinding]);
 
   const handleConnectorChange = useCallback((connectorId: string) => {
     const connector = chatRouteOptions?.connectors.find((c) => c.id === connectorId);
-    setRouteOverride({
+    setRouteBinding({
       source: 'token-api',
       connectorId,
       model: connector?.models[0] || '',
     });
-  }, [chatRouteOptions, setRouteOverride]);
+  }, [chatRouteOptions, setRouteBinding]);
 
   const handleModelChange = useCallback((model: string) => {
-    const current = useKismetStore.getState().routeOverride;
+    const current = useKismetStore.getState().routeBinding;
     const source = current?.source || 'local-runtime';
     const localModel = source === 'local-runtime'
       ? chatRouteOptions?.localRuntime.models.find((m) => m.model === model)
       : undefined;
-    setRouteOverride({
+    setRouteBinding({
       source,
       connectorId: current?.connectorId || '',
       model,
       localModelId: localModel?.localModelId,
       engine: localModel?.engine,
     });
-  }, [chatRouteOptions, setRouteOverride]);
+  }, [chatRouteOptions, setRouteBinding]);
 
-  const clearOverride = useCallback(() => {
-    setRouteOverride(null);
-  }, [setRouteOverride]);
+  const clearBinding = useCallback(() => {
+    setRouteBinding(null);
+  }, [setRouteBinding]);
 
   return {
     routeSource,
-    routeOverride,
+    routeBinding,
     chatRouteOptions,
     checking,
     checkRouteHealth,
     handleSourceChange,
     handleConnectorChange,
     handleModelChange,
-    clearOverride,
+    clearBinding,
   };
 }

@@ -1,7 +1,7 @@
 # Synthesis Contract
 
 > Owner Domain: `VS-SYNTH-*`
-> Authoritative fact source: `tables/job-states.yaml`, `tables/error-codes.yaml`
+> Authoritative fact source: `tables/job-states.yaml`, `tables/reason-codes.yaml`
 
 本合约定义批量 TTS 合成的执行策略、并发控制与错误处理规则。
 
@@ -9,7 +9,7 @@
 
 ## VS-SYNTH-001 — 批量合成执行策略
 
-- 合成以 **segment** 为最小执行单位，每个 segment 独立调用 `hook.llm.speech.synthesize()`。
+- 合成以 **segment** 为最小执行单位，每个 segment 独立调用 `runtime.media.tts.synthesize()`。
 - 合成顺序：按章节顺序 → 章节内按 segment 顺序。
 - 每个 segment 的合成参数由其 speaker 关联的 VoiceCasting 决定：
   - `voiceId` / `providerId` / `speakingRate` / `pitch` / `emotion`

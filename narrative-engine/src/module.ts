@@ -1,4 +1,3 @@
-import type { AiTextRequest, ModAiClient } from '@nimiplatform/sdk/mod/ai';
 import type { HookClient } from '@nimiplatform/sdk/mod/types';
 import {
   NARRATIVE_ENGINE_DATA_API_CONTEXT_RESOLVE,
@@ -20,7 +19,7 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 export type NarrativeEngineModuleInput = {
   queryData: (capability: string, query: Record<string, unknown>) => Promise<unknown>;
-  generateText: (payload: AiTextRequest) => Promise<{ text: string }>;
+  generateText: (payload: NarrativeAiTextRequest) => Promise<{ text: string }>;
 };
 
 export type NarrativeEngineModule = {
@@ -54,9 +53,9 @@ export function createNarrativeEngineModule(input: NarrativeEngineModuleInput): 
     },
   } as unknown as HookClient;
 
-  const aiClient = {
-    generateText: async (payload: AiTextRequest) => input.generateText(payload),
-  } as unknown as ModAiClient;
+  const aiClient: NarrativeAiClient = {
+    generateText: async (payload: NarrativeAiTextRequest) => input.generateText(payload),
+  };
 
   async function ensureSetup(): Promise<void> {
     if (!setupPromise) {
@@ -87,3 +86,4 @@ export function createNarrativeEngineModule(input: NarrativeEngineModuleInput): 
     projectionRenderInput: (query) => invoke(NARRATIVE_ENGINE_DATA_API_PROJECTION_RENDER_INPUT, query),
   };
 }
+import type { NarrativeAiClient, NarrativeAiTextRequest } from './types.js';

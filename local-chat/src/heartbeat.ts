@@ -1,9 +1,9 @@
-import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
 import { createLocalChatFlowId, emitLocalChatLog } from './logging.js';
 import type { LocalChatReadContext } from './data/index.js';
 import { runLocalChatProactiveHeartbeatCycle } from './proactive/engine.js';
 import { startLocalChatProactiveScheduler } from './proactive/scheduler.js';
 import type { LocalChatProactiveAuditEvent } from './proactive/types.js';
+import type { LocalChatAiClient } from './runtime-ai-client.js';
 
 let stopProactiveHeartbeatScheduler: (() => void) | null = null;
 
@@ -24,7 +24,7 @@ function emitProactiveSchedulerError(error: unknown): void {
 }
 
 export async function runLocalChatProactiveHeartbeatOnce(input: {
-  aiClient: Pick<ModAiClient, 'generateObject'>;
+  aiClient: Pick<LocalChatAiClient, 'generateObject'>;
   getReadContext: () => LocalChatReadContext;
   nowMs?: () => number;
   onAuditEvent?: (event: LocalChatProactiveAuditEvent) => void;
@@ -39,7 +39,7 @@ export function stopLocalChatProactiveHeartbeat(): void {
 }
 
 export function startLocalChatProactiveHeartbeat(input: {
-  aiClient: Pick<ModAiClient, 'generateObject'>;
+  aiClient: Pick<LocalChatAiClient, 'generateObject'>;
   getReadContext: () => LocalChatReadContext;
 }): void {
   stopLocalChatProactiveHeartbeat();

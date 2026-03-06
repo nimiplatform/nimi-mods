@@ -71,12 +71,12 @@ KnowledgeBasePage
 
 | Adapter | SDK Interface | Service Interface |
 |---------|--------------|-------------------|
-| `llm-adapter.ts` | `ModAiClient` | `LlmClient { generateText, streamText }` |
-| `embedding-adapter.ts` | `ModAiClient` | `EmbeddingClient { generateEmbedding }` |
+| `llm-adapter.ts` | `ModRuntimeClient` | `LlmClient { generateText, streamText }` |
+| `embedding-adapter.ts` | `ModRuntimeClient` | `EmbeddingClient { generateEmbedding }` |
 
 路由解析在 `use-kb-clients.ts`：
 
-- 每 15s 轮询 `data.query.data-api.runtime.route.options`
+- 按 capability 调 `runtime.route.listOptions()`
 - 根据 `KBSettings.*RouteSource` 选择 token-api / local-runtime / auto
 - Auto 模式 embedding adapter 实现 token-api → local-runtime 回退（KB-CAP-002）
 

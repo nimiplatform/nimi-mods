@@ -6,8 +6,7 @@ import {
 import {
   createRuntimeMod,
   createTestChatTtsRuntimeMod,
-  getTestChatTtsAiClient,
-  getTestChatTtsHookClient,
+  getTestChatTtsRuntimeClient,
 } from './runtime-mod.js';
 
 export {
@@ -16,6 +15,5 @@ export {
   TEST_CHAT_TTS_PERMISSIONS,
   createRuntimeMod,
   createTestChatTtsRuntimeMod,
-  getTestChatTtsAiClient,
-  getTestChatTtsHookClient,
+  getTestChatTtsRuntimeClient,
 };

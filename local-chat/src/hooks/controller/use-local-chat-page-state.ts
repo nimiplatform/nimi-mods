@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  createAiClient,
-  createAiRuntimeInspector,
-  type AiRuntimeDependencySnapshot,
-} from '@nimiplatform/sdk/mod/ai';
+  createModRuntimeInspector,
+  type ModRuntimeDependencySnapshot,
+} from '@nimiplatform/sdk/mod/runtime';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
+import { createModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import { useAppStore } from '@nimiplatform/sdk/mod/ui';
 import { LOCAL_CHAT_MOD_ID } from '../../contracts.js';
@@ -27,6 +27,7 @@ import {
   selectNextTtsModelCandidate,
 } from '../../services/tts/recovery.js';
 import { ReasonCode } from '@nimiplatform/sdk/types';
+import { createLocalChatAiClient } from '../../runtime-ai-client.js';
 
 type RuntimeFieldsMap = {
   mode?: 'STORY' | 'SCENE_TURN';
@@ -63,8 +64,9 @@ export function useLocalChatPageState() {
   );
 
   const hookClient = useMemo(() => createHookClient(LOCAL_CHAT_MOD_ID), []);
-  const aiClient = useMemo(() => createAiClient(LOCAL_CHAT_MOD_ID), []);
-  const aiRuntimeInspector = useMemo(() => createAiRuntimeInspector(LOCAL_CHAT_MOD_ID), []);
+  const runtimeClient = useMemo(() => createModRuntimeClient(LOCAL_CHAT_MOD_ID), []);
+  const aiClient = useMemo(() => createLocalChatAiClient(runtimeClient), [runtimeClient]);
+  const runtimeInspector = useMemo(() => createModRuntimeInspector(LOCAL_CHAT_MOD_ID), []);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -78,7 +80,7 @@ export function useLocalChatPageState() {
   } | null>(null);
   const [latestPromptTrace, setLatestPromptTrace] = useState<LocalChatPromptTrace | null>(null);
   const [latestTurnAudit, setLatestTurnAudit] = useState<LocalChatTurnAudit | null>(null);
-  const [dependencySnapshot, setDependencySnapshot] = useState<AiRuntimeDependencySnapshot | null>(null);
+  const [dependencySnapshot, setDependencySnapshot] = useState<ModRuntimeDependencySnapshot | null>(null);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -119,7 +121,7 @@ export function useLocalChatPageState() {
   );
 
   const speechSettingsState = useLocalChatSpeechSettings({
-    hookClient,
+    runtimeClient,
   });
 
   const sessionsState = useLocalChatSessions({
@@ -133,8 +135,7 @@ export function useLocalChatPageState() {
   });
 
   const runtimeRouteState = useLocalChatRuntimeRoute({
-    aiClient,
-    hookClient,
+    runtimeClient: runtimeClient.route,
     setStatusBanner,
   });
 
@@ -279,8 +280,7 @@ export function useLocalChatPageState() {
       });
       return;
     }
-    const providerId = String(speechSettingsState.selectedSpeechProviderId || '').trim();
-    void speechSettingsState.loadSpeechVoices(providerId ? { providerId } : undefined);
+    void speechSettingsState.loadSpeechVoices();
   }, [
     effectiveTtsConnectorId,
     effectiveTtsModel,
@@ -291,7 +291,7 @@ export function useLocalChatPageState() {
   ]);
 
   const effectiveRouteSource = (
-    runtimeRouteState.routeOverride?.source
+    runtimeRouteState.routeBinding?.source
     || runtimeRouteState.routeSnapshot?.source
     || undefined
   ) as 'token-api' | 'local-runtime' | undefined;
@@ -310,7 +310,7 @@ export function useLocalChatPageState() {
       });
     }
     try {
-      const snapshot = await aiRuntimeInspector.getDependencySnapshot(
+      const snapshot = await runtimeInspector.getDependencySnapshot(
         dependencyCapability,
         effectiveRouteSource,
       );
@@ -331,7 +331,7 @@ export function useLocalChatPageState() {
         updatedAt: new Date().toISOString(),
       });
     }
-  }, [aiRuntimeInspector, speechSettingsState.defaultSettings.enableVoice, effectiveRouteSource]);
+  }, [runtimeInspector, speechSettingsState.defaultSettings.enableVoice, effectiveRouteSource]);
 
   useEffect(() => {
     void refreshDependencySnapshot();
@@ -343,8 +343,8 @@ export function useLocalChatPageState() {
     refreshDependencySnapshot,
     runtimeRouteState.routeSnapshot?.source,
     runtimeRouteState.routeSnapshot?.model,
-    runtimeRouteState.routeOverride?.source,
-    runtimeRouteState.routeOverride?.model,
+    runtimeRouteState.routeBinding?.source,
+    runtimeRouteState.routeBinding?.model,
   ]);
 
   const localSttRouteAvailable = useMemo(
@@ -360,22 +360,29 @@ export function useLocalChatPageState() {
       target: targetsState.selectedTarget,
       messageText: text,
     });
-    const response = await hookClient.llm.speech.synthesize({
+    const selectedModel = String(modelOverride || effectiveTtsModel || '').trim();
+    const binding = speechSettingsState.defaultSettings.ttsRouteSource === 'token-api' || speechSettingsState.defaultSettings.ttsRouteSource === 'local-runtime'
+      ? {
+        source: speechSettingsState.defaultSettings.ttsRouteSource,
+        connectorId: String(effectiveTtsConnectorId || '').trim(),
+        model: selectedModel,
+      }
+      : undefined;
+    const response = await runtimeClient.media.tts.synthesize({
       text,
-      providerId: speechSettingsState.selectedSpeechProviderId || undefined,
-      routeSource: speechSettingsState.defaultSettings.ttsRouteSource,
-      connectorId: effectiveTtsConnectorId || undefined,
-      model: String(modelOverride || effectiveTtsModel || '').trim() || undefined,
-      voiceId: speechSettingsState.defaultSettings.voiceName,
-      format: DEFAULT_TTS_FORMAT,
+      voice: speechSettingsState.defaultSettings.voiceName,
+      audioFormat: DEFAULT_TTS_FORMAT,
       language: voiceStyle.language,
-      stylePrompt: voiceStyle.stylePrompt,
-      targetId: targetsState.selectedTargetId,
-      sessionId: sessionsState.selectedSessionId || undefined,
+      model: selectedModel || undefined,
+      binding,
+      extensions: voiceStyle.stylePrompt
+        ? { instruct: voiceStyle.stylePrompt }
+        : undefined,
     });
-    return { audioUri: String(response.audioUri || '').trim() };
+    const artifact = response.artifacts.find((item) => item.uri) || null;
+    return { audioUri: String(artifact?.uri || '').trim() };
   }, [
-    hookClient.llm.speech,
+    runtimeClient,
     targetsState.selectedTarget,
     targetsState.selectedTargetId,
     sessionsState.selectedSessionId,
@@ -485,7 +492,7 @@ export function useLocalChatPageState() {
     setInputText,
     runtimeMode: runtimeFields.mode,
     chatRouteOptions: runtimeRouteState.chatRouteOptions,
-    routeOverride: runtimeRouteState.routeOverride,
+    routeBinding: runtimeRouteState.routeBinding,
     routeSnapshot: runtimeRouteState.routeSnapshot
       ? {
         source: runtimeRouteState.routeSnapshot.source,

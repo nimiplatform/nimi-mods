@@ -11,27 +11,19 @@ mod_identity:
   entry: ./dist/mods/local-chat/index.js
   source_rule: LC-CAP-001
 required_capabilities:
-  - key: llm.text.generate
+  - key: runtime.ai.text.generate
     source_rule: LC-CAP-001
-  - key: llm.text.stream
+  - key: runtime.ai.text.stream
     source_rule: LC-CAP-001
-  - key: llm.image.generate
+  - key: runtime.media.image.generate
     source_rule: LC-CAP-001
-  - key: llm.video.generate
+  - key: runtime.media.video.generate
     source_rule: LC-CAP-001
-  - key: llm.speech.providers.list
+  - key: runtime.media.tts.list.voices
     source_rule: LC-CAP-003
-  - key: llm.speech.voices.list
+  - key: runtime.media.tts.synthesize
     source_rule: LC-CAP-003
-  - key: llm.speech.synthesize
-    source_rule: LC-CAP-003
-  - key: llm.speech.stream.open
-    source_rule: LC-CAP-003
-  - key: llm.speech.stream.control
-    source_rule: LC-CAP-003
-  - key: llm.speech.stream.close
-    source_rule: LC-CAP-003
-  - key: llm.speech.transcribe
+  - key: runtime.media.stt.transcribe
     source_rule: LC-CAP-003
   - key: data.register.data-api.local-chat.chat-targets.list
     source_rule: LC-CAP-001
@@ -57,7 +49,11 @@ required_capabilities:
     source_rule: LC-CAP-001
   - key: data.query.data-api.local-chat.sessions.delete
     source_rule: LC-CAP-001
-  - key: data.query.data-api.runtime.route.options
+  - key: runtime.route.list.options
+    source_rule: LC-CAP-004
+  - key: runtime.route.resolve
+    source_rule: LC-CAP-004
+  - key: runtime.route.check.health
     source_rule: LC-CAP-004
   - key: data.query.data-api.core.social.friends-with-details.list
     source_rule: LC-CAP-005
@@ -84,16 +80,18 @@ required_capabilities:
   - key: ui.register.ui-extension.runtime.devtools.panel
     source_rule: LC-CAP-001
 allowed_sdk_surfaces:
-  - package: "@nimiplatform/sdk/mod/ai"
+  - package: "@nimiplatform/sdk/mod/runtime"
     apis:
-      - generateText
-      - streamText
-      - generateObject
-      - generateImage
-      - generateVideo
-      - synthesizeSpeech
-      - transcribeAudio
-      - generateEmbedding
+      - ai.text.generate
+      - ai.text.stream
+      - media.image.generate
+      - media.video.generate
+      - media.tts.listVoices
+      - media.tts.synthesize
+      - media.stt.transcribe
+      - route.listOptions
+      - route.resolve
+      - route.checkHealth
     source_rule: LC-CAP-002
   - package: "@nimiplatform/sdk/mod/hook"
     source_rule: LC-CAP-002

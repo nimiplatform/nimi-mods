@@ -8,7 +8,7 @@ export type RuntimeStatusSidebarProps = {
   chatRouteOptions: RuntimeRouteOptionsSnapshot | null;
   imageRouteOptions: RuntimeRouteOptionsSnapshot | null;
   videoRouteOptions: RuntimeRouteOptionsSnapshot | null;
-  routeOverride: RuntimeRouteBinding | null;
+  routeBinding: RuntimeRouteBinding | null;
   speechProviders: Array<{ id: string; name: string; status: 'available' | 'unavailable' }>;
   speechVoices: Array<{ id: string; providerId: string; name: string }>;
   voiceCatalogSource?: string;
@@ -45,7 +45,7 @@ export type RuntimeStatusSidebarProps = {
   onRouteSourceChange: (source: RuntimeRouteSource) => void;
   onRouteConnectorChange: (connectorId: string) => void;
   onRouteModelChange: (model: string) => void;
-  onClearRouteOverride: () => void;
+  onClearRouteBinding: () => void;
   onSpeechProviderChange: (providerId: string) => void;
   onVoiceIdChange: (voiceId: string) => void;
   ttsConnectorId: string;

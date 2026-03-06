@@ -32,7 +32,10 @@
 
 ```typescript
 const result = await aiClient.generateObject({
-  routeHint: meeting.localOnly ? 'chat/local' : 'chat/default',
+  capability: 'text.generate',
+  binding: meeting.localOnly
+    ? { source: 'local-runtime', connectorId: '', model: '' }
+    : { source: 'token-api', connectorId: '', model: '' },
   systemPrompt: buildSystemPrompt(meeting.language),
   prompt: buildAnalysisPrompt(meeting.transcript),
   schema: MeetingSummarySchema,
@@ -144,11 +147,12 @@ const analyzeStage: PipelineStage<TranscriptSegment[], MeetingSummary> = {
   id: 'analyze',
   async execute(segments, ctx) {
     const transcript = formatTranscriptForAnalysis(segments);
-    return ctx.aiClient.generateObject({
-      routeHint: ctx.localOnly ? 'chat/local' : 'chat/default',
+    return ctx.runtimeClient.ai.text.generate({
+      binding: ctx.localOnly
+        ? { source: 'local-runtime', connectorId: '', model: '' }
+        : { source: 'token-api', connectorId: '', model: '' },
       systemPrompt: buildSystemPrompt(ctx.language),
       prompt: transcript,
-      schema: MeetingSummarySchema,
     });
   },
 };

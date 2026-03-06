@@ -1,18 +1,18 @@
-import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
-import type { RuntimeRouteOverride } from '@nimiplatform/sdk/mod/types';
+import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 import type {
   WorldLorebookDraftRow,
   WorldStudioEmbeddingIndex,
   WorldStudioEmbeddingIndexEntry,
   WorldStudioWorkspaceSnapshot,
 } from '../contracts.js';
+import type { WorldStudioRuntimeAiClient } from '../runtime-ai-client.js';
 
 const MAX_EMBEDDING_LOREBOOKS = 64;
 
 export type BuildWorldStudioEmbeddingIndexInput = {
-  aiClient: Pick<ModAiClient, 'generateEmbedding'>;
+  aiClient: Pick<WorldStudioRuntimeAiClient, 'generateEmbedding'>;
   snapshot: WorldStudioWorkspaceSnapshot;
-  routeOverride?: RuntimeRouteOverride | null;
+  binding?: RuntimeRouteBinding | null;
   lorebooksDraft?: WorldLorebookDraftRow[];
 };
 
@@ -43,7 +43,7 @@ function buildLorebookId(lorebook: WorldLorebookDraftRow, index: number): string
   return key ? `${key}:${index}` : `lorebook:${index}`;
 }
 
-function toRouteSource(binding: RuntimeRouteOverride | null | undefined): 'local-runtime' | 'token-api' | null {
+function toRouteSource(binding: RuntimeRouteBinding | null | undefined): 'local-runtime' | 'token-api' | null {
   const source = String(binding?.source || '').trim();
   if (source === 'local-runtime' || source === 'token-api') {
     return source;
@@ -51,7 +51,7 @@ function toRouteSource(binding: RuntimeRouteOverride | null | undefined): 'local
   return null;
 }
 
-function toRouteModel(binding: RuntimeRouteOverride | null | undefined): string | null {
+function toRouteModel(binding: RuntimeRouteBinding | null | undefined): string | null {
   const model = String(binding?.model || '').trim();
   return model || null;
 }
@@ -63,8 +63,8 @@ export async function buildWorldStudioEmbeddingIndex(
   const lorebooks = (input.lorebooksDraft || input.snapshot.lorebooksDraft || [])
     .slice(0, MAX_EMBEDDING_LOREBOOKS);
 
-  const routeSource = toRouteSource(input.routeOverride);
-  const routeModel = toRouteModel(input.routeOverride);
+  const routeSource = toRouteSource(input.binding);
+  const routeModel = toRouteModel(input.binding);
 
   if (lorebooks.length === 0) {
     return {
@@ -111,8 +111,7 @@ export async function buildWorldStudioEmbeddingIndex(
 
   try {
     const result = await input.aiClient.generateEmbedding({
-      routeHint: 'embedding/default',
-      ...(input.routeOverride ? { routeOverride: input.routeOverride } : {}),
+      ...(input.binding ? { binding: input.binding } : {}),
       input: payloadItems.map((item) => item.text),
     });
 

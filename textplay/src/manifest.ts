@@ -2,7 +2,6 @@ import {
   TEXTPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY,
   TEXTPLAY_DATA_API_RENDER_PERSIST,
   TEXTPLAY_DATA_API_SESSIONS_MINE,
-  TEXTPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS,
   TEXTPLAY_DATA_API_WORLD_ACCESS_ME,
   TEXTPLAY_DATA_API_WORLD_WORLDS_MINE,
   TEXTPLAY_DATA_API_WORLD_EVENTS_LIST,
@@ -36,10 +35,6 @@ export const TEXTPLAY_MANIFEST = {
   dependencies: [],
   hooks: {
     dataApis: [
-      {
-        name: TEXTPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS,
-        description: 'Query runtime route options for renderer precondition checks',
-      },
       {
         name: TEXTPLAY_DATA_API_WORLD_ACCESS_ME,
         description: 'Read world access contract required by narrative compile context assembly',

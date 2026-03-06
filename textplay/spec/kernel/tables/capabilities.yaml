@@ -5,9 +5,13 @@ mod_identity:
   entry: ./dist/mods/textplay/index.js
   source_rule: T-CAP-001
 required_capabilities:
-  - key: llm.text.generate
+  - key: runtime.ai.text.generate
     source_rule: T-CAP-002
-  - key: data.query.data-api.runtime.route.options
+  - key: runtime.route.list.options
+    source_rule: T-CAP-003
+  - key: runtime.route.resolve
+    source_rule: T-CAP-003
+  - key: runtime.route.check.health
     source_rule: T-CAP-003
   - key: data.query.data-api.world.access.me
     source_rule: T-CAP-003

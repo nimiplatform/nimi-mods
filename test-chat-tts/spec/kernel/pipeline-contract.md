@@ -15,5 +15,5 @@ TTS diagnostics flow must include provider list, voice list, synthesize, and pla
 Image diagnostics flow must support both minimal text-to-image and image-to-image request shapes:
 
 1. normalize t2i/i2i inputs
-2. execute `llm.image.generate`
+2. execute `runtime.media.image.generate`
 3. render generated image preview and structured raw response

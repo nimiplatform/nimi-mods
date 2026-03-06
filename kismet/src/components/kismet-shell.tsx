@@ -32,12 +32,12 @@ export function KismetShell() {
 
         <div className="mb-4">
           <ModelSelector
-            routeOverride={route.routeOverride}
+            routeBinding={route.routeBinding}
             chatRouteOptions={route.chatRouteOptions}
             onSourceChange={route.handleSourceChange}
             onConnectorChange={route.handleConnectorChange}
             onModelChange={route.handleModelChange}
-            onClear={route.clearOverride}
+            onClearBinding={route.clearBinding}
           />
         </div>
 

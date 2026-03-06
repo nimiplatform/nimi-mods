@@ -5,6 +5,7 @@ import {
   NARRATIVE_VISIBILITY_VALUES,
 } from '../contracts.js';
 import { NarrativeCoreOutputSchema } from '../schemas.js';
+import type { RuntimeCanonicalCapability } from '@nimiplatform/sdk/mod/runtime-route';
 import type {
   NarrativeCoreOutput,
   NarrativeStepResult,
@@ -344,8 +345,8 @@ export async function runNarrativeStep2Generate(input: {
   generateText: (payload: {
     prompt: string;
     systemPrompt?: string;
-    routeHint?: string;
-    routeOverride?: Record<string, unknown>;
+    capability?: RuntimeCanonicalCapability;
+    binding?: Record<string, unknown>;
     worldId?: string;
     agentId?: string;
     maxTokens?: number;
@@ -374,8 +375,8 @@ export async function runNarrativeStep2Generate(input: {
     const response = await input.generateText({
       prompt,
       systemPrompt: 'You are a narrative compiler. Output strict JSON only.',
-      routeHint: input.turn.routeHint,
-      routeOverride: asRecord(input.turn.routeOverride),
+      capability: input.turn.capability,
+      binding: asRecord(input.turn.binding),
       worldId: input.turn.worldId,
       agentId: input.turn.agentId,
       maxTokens: 1600,
@@ -392,8 +393,8 @@ export async function runNarrativeStep2Generate(input: {
       const repairedResponse = await input.generateText({
         prompt: repairPrompt,
         systemPrompt: 'Repair malformed JSON into valid CoreOutput. Return JSON only.',
-        routeHint: input.turn.routeHint,
-        routeOverride: asRecord(input.turn.routeOverride),
+        capability: input.turn.capability,
+        binding: asRecord(input.turn.binding),
         worldId: input.turn.worldId,
         agentId: input.turn.agentId,
         maxTokens: 1000,

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import { useRuntimeModSettings } from '@nimiplatform/sdk/mod/settings';
+import type { ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import {
   type LocalChatBooleanSettingKey,
   type LocalChatDefaultSettings,
@@ -32,23 +33,10 @@ type SpeechVoiceCatalogMeta = {
 };
 
 type UseLocalChatSpeechSettingsInput = {
-  hookClient: {
-    llm: {
-      speech: {
-        listProviders: () => Promise<SpeechProvider[]>;
-        listVoices: (input?: {
-          providerId?: string;
-          routeSource?: 'auto' | 'local-runtime' | 'token-api';
-          connectorId?: string;
-          model?: string;
-        }) => Promise<SpeechVoice[]>;
-      };
-    };
-  };
+  runtimeClient: Pick<ModRuntimeClient, 'route' | 'media'>;
 };
 
 type VoiceQueryOverride = {
-  providerId?: string;
   routeSource?: 'auto' | 'local-runtime' | 'token-api';
   connectorId?: string;
   model?: string;
@@ -58,6 +46,7 @@ const MODEL_CATALOG_UPDATED_EVENT = 'nimi:runtime:model-catalog-updated';
 
 export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInput) {
   const [speechProviders, setSpeechProviders] = useState<SpeechProvider[]>([]);
+  const [allSpeechVoices, setAllSpeechVoices] = useState<SpeechVoice[]>([]);
   const [speechVoices, setSpeechVoices] = useState<SpeechVoice[]>([]);
   const [speechVoiceCatalogMeta, setSpeechVoiceCatalogMeta] = useState<SpeechVoiceCatalogMeta>({
     modelResolved: '',
@@ -80,7 +69,6 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
     const routeSource = (override?.routeSource || defaultSettings.ttsRouteSource);
     const connectorId = String(override?.connectorId || defaultSettings.ttsConnectorId || '').trim();
     const model = String(override?.model || defaultSettings.ttsModel || '').trim();
-    const providerId = String(override?.providerId || selectedSpeechProviderId || '').trim();
     if (routeSource === 'token-api') {
       return {
         routeSource: 'token-api' as const,
@@ -88,25 +76,87 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
         model: model || undefined,
       };
     }
-    if (providerId) {
-      return { providerId };
-    }
     return undefined;
   }, [
     defaultSettings.ttsRouteSource,
     defaultSettings.ttsConnectorId,
     defaultSettings.ttsModel,
-    selectedSpeechProviderId,
   ]);
+
+  const deriveSpeechProviders = useCallback((voices: SpeechVoice[]): SpeechProvider[] => {
+    const seen = new Set<string>();
+    const providers: SpeechProvider[] = [];
+    for (const voice of voices) {
+      const providerId = String(voice.providerId || '').trim();
+      if (!providerId || seen.has(providerId)) {
+        continue;
+      }
+      seen.add(providerId);
+      providers.push({
+        id: providerId,
+        name: providerId,
+        status: 'available',
+      });
+    }
+    return providers;
+  }, []);
+
+  const filterVisibleVoices = useCallback((voices: SpeechVoice[], providerId: string, override?: VoiceQueryOverride) => {
+    const routeSource = String(override?.routeSource || defaultSettings.ttsRouteSource || '').trim();
+    if (routeSource === 'token-api') {
+      return voices;
+    }
+    const normalizedProviderId = String(providerId || '').trim();
+    if (!normalizedProviderId) {
+      return voices;
+    }
+    return voices.filter((voice) => String(voice.providerId || '').trim() === normalizedProviderId);
+  }, [defaultSettings.ttsRouteSource]);
 
   const loadSpeechVoices = useCallback(async (override?: VoiceQueryOverride) => {
     const voiceInput = buildVoiceInput(override);
     const requestId = latestVoiceRequestRef.current + 1;
     latestVoiceRequestRef.current = requestId;
     try {
-      const voices = await input.hookClient.llm.speech.listVoices(voiceInput ? { ...voiceInput } : undefined);
+      const binding = voiceInput
+        ? {
+          source: voiceInput.routeSource,
+          connectorId: voiceInput.connectorId || '',
+          model: voiceInput.model || '',
+        }
+        : undefined;
+      const [resolved, listed] = await Promise.all([
+        input.runtimeClient.route.resolve({
+          capability: 'audio.synthesize',
+          binding,
+        }),
+        input.runtimeClient.media.tts.listVoices({
+          binding,
+          model: String(voiceInput?.model || '').trim() || undefined,
+        }),
+      ]);
+      const voices: SpeechVoice[] = listed.voices.map((voice) => ({
+        id: voice.voiceId,
+        providerId: resolved.provider,
+        name: voice.name,
+        modelResolved: listed.modelResolved,
+        voiceCatalogSource: listed.voiceCatalogSource,
+        voiceCatalogVersion: listed.voiceCatalogVersion,
+      }));
       if (requestId === latestVoiceRequestRef.current) {
-        setSpeechVoices(voices);
+        const providers = deriveSpeechProviders(voices);
+        const nextProviderId = String(selectedSpeechProviderId || providers[0]?.id || '').trim();
+        const visibleVoices = filterVisibleVoices(voices, nextProviderId, override);
+        setAllSpeechVoices(voices);
+        setSpeechProviders(providers);
+        setSpeechVoices(visibleVoices);
+        setSelectedSpeechProviderId((previous) => {
+          const current = String(previous || '').trim();
+          if (current && providers.some((provider) => provider.id === current)) {
+            return current;
+          }
+          return nextProviderId;
+        });
         const representative = voices[0] || null;
         const configuredModel = String(
           override?.model
@@ -124,6 +174,8 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
       return voices;
     } catch (error) {
       if (requestId === latestVoiceRequestRef.current) {
+        setAllSpeechVoices([]);
+        setSpeechProviders([]);
         setSpeechVoices([]);
         setSpeechVoiceCatalogMeta({
           modelResolved: String(
@@ -148,17 +200,20 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
       });
       return [];
     }
-  }, [input.hookClient.llm.speech, buildVoiceInput, defaultSettings.ttsModel]);
+  }, [
+    input.runtimeClient,
+    buildVoiceInput,
+    defaultSettings.ttsModel,
+    deriveSpeechProviders,
+    filterVisibleVoices,
+    selectedSpeechProviderId,
+  ]);
 
   const loadSpeechCatalog = useCallback(async () => {
     try {
-      const providers = await input.hookClient.llm.speech.listProviders();
-      setSpeechProviders(providers);
-      const preferredProviderId = providers[0]?.id || '';
-      setSelectedSpeechProviderId((previous) => previous || preferredProviderId);
-      const activeProviderId = String(selectedSpeechProviderId || preferredProviderId).trim();
-      await loadSpeechVoices(activeProviderId ? { providerId: activeProviderId } : undefined);
+      await loadSpeechVoices();
     } catch (error) {
+      setAllSpeechVoices([]);
       setSpeechProviders([]);
       setSpeechVoices([]);
       logRendererEvent({
@@ -170,11 +225,7 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
         },
       });
     }
-  }, [
-    input.hookClient.llm.speech,
-    selectedSpeechProviderId,
-    loadSpeechVoices,
-  ]);
+  }, [loadSpeechVoices]);
 
   useEffect(() => {
     void loadSpeechCatalog();
@@ -207,6 +258,10 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
       window.removeEventListener(MODEL_CATALOG_UPDATED_EVENT, onCatalogUpdated as EventListener);
     };
   }, [loadSpeechVoices]);
+
+  useEffect(() => {
+    setSpeechVoices(filterVisibleVoices(allSpeechVoices, selectedSpeechProviderId));
+  }, [allSpeechVoices, filterVisibleVoices, selectedSpeechProviderId]);
 
   // Auto-select first voice when voice list changes and current selection is not in the list
   useEffect(() => {

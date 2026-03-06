@@ -117,7 +117,7 @@ export const DEFAULT_KB_SETTINGS: KBSettings = {
 /** LLM text generation client */
 export type LlmClient = {
   generateText(input: {
-    routeHint?: string;
+    capability?: RuntimeCanonicalCapability;
     systemPrompt: string;
     userPrompt: string;
     maxTokens?: number;
@@ -125,7 +125,7 @@ export type LlmClient = {
   }): Promise<{ text: string }>;
 
   streamText(input: {
-    routeHint?: string;
+    capability?: RuntimeCanonicalCapability;
     systemPrompt: string;
     userPrompt: string;
     maxTokens?: number;
@@ -137,8 +137,18 @@ export type LlmClient = {
 export type EmbeddingClient = {
   generateEmbedding(input: {
     texts: string[];
-    routeHint?: string;
+    capability?: RuntimeCanonicalCapability;
   }): Promise<{ embeddings: number[][] }>;
+};
+
+export type KBRoutePreference = {
+  source: 'auto' | 'local-runtime' | 'token-api';
+  connectorId: string;
+  model: string;
+};
+
+export type KBResolvedRoute = {
+  binding?: RuntimeRouteBinding;
 };
 
 // ---------------------------------------------------------------------------
@@ -159,3 +169,7 @@ export type KBSearchResult = {
 // ---------------------------------------------------------------------------
 
 export type KBViewTab = 'documents' | 'chat' | 'settings';
+import type {
+  RuntimeCanonicalCapability,
+  RuntimeRouteBinding,
+} from '@nimiplatform/sdk/mod/runtime-route';

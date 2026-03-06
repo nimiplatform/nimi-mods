@@ -11,15 +11,18 @@ mod_identity:
   entry: ./dist/mods/knowledge-base/index.js
   source_rule: KB-CAP-001
 required_capabilities:
-  - key: llm.text.generate
+  - key: runtime.ai.text.generate
     purpose: Single-turn text generation (query rewriting, title generation)
     source_rule: KB-CAP-002
-  - key: llm.text.stream
+  - key: runtime.ai.text.stream
     purpose: Streaming text generation (RAG answer)
     source_rule: KB-CAP-002
-  - key: llm.embedding.generate
+  - key: runtime.ai.embedding.generate
     purpose: Vectorization (chunk embedding + query embedding)
     source_rule: KB-CAP-002
+  - key: runtime.route.list.options
+    purpose: Query available text.generate / text.embed route options (15s polling)
+    source_rule: KB-CAP-006
   - key: data.register.data-api.knowledge-base.documents.list
     purpose: Register document list API
     source_rule: KB-CAP-003
@@ -68,9 +71,6 @@ required_capabilities:
   - key: data.query.data-api.knowledge-base.conversations.delete
     purpose: Query conversation delete
     source_rule: KB-CAP-005
-  - key: data.query.data-api.runtime.route.options
-    purpose: Query available chat/embedding routes (15s polling)
-    source_rule: KB-CAP-006
   - key: ui.register.ui-extension.app.sidebar.mods
     purpose: Sidebar nav-item entry (priority 160)
     source_rule: KB-CAP-001
@@ -78,11 +78,9 @@ required_capabilities:
     purpose: Content route page
     source_rule: KB-CAP-001
 allowed_sdk_surfaces:
-  - package: "@nimiplatform/sdk/mod/ai"
+  - package: "@nimiplatform/sdk/mod/runtime"
     apis:
-      - generateText
-      - streamText
-      - generateEmbedding
+      - createModRuntimeClient
     source_rule: KB-CAP-002
   - package: "@nimiplatform/sdk/mod/hook"
     source_rule: KB-CAP-002

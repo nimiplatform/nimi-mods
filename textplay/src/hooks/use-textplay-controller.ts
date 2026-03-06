@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createAiClient } from '@nimiplatform/sdk/mod/ai';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
+import { createModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import type {
   RuntimeRouteBinding,
   RuntimeRouteOptionsSnapshot,
@@ -57,6 +57,7 @@ import {
   createFallbackPersistRecord,
   hasPersistenceWarning,
 } from './session-orchestrator.js';
+import { createTextplayRuntimeAiClient } from '../runtime-ai-client.js';
 
 type AppStoreShape = {
   runtimeFields?: Record<string, unknown>;
@@ -526,7 +527,7 @@ function formatRouteLabel(binding: RuntimeRouteBinding | null): string {
   return `${binding.source}/${binding.connectorId || 'default'}:${binding.model}`;
 }
 
-function toRouteOverrideRecord(binding: RuntimeRouteBinding | null): Record<string, unknown> | undefined {
+function toRouteBindingRecord(binding: RuntimeRouteBinding | null): Record<string, unknown> | undefined {
   if (!binding) {
     return undefined;
   }
@@ -622,7 +623,8 @@ export function useTextplayController(): TextplayShellProps {
   const authUser = useAppStore((state) => ((state as AppStoreShape).auth?.user || null));
 
   const hookClient = useMemo(() => createHookClient(TEXTPLAY_MOD_ID), []);
-  const aiClient = useMemo(() => createAiClient(TEXTPLAY_MOD_ID), []);
+  const runtimeClient = useMemo(() => createModRuntimeClient(TEXTPLAY_MOD_ID), []);
+  const aiClient = useMemo(() => createTextplayRuntimeAiClient(runtimeClient), [runtimeClient]);
   const narrativeEngine = useMemo(() => createNarrativeEngineModule({
     queryData: (capability, query) => hookClient.data.query({
       capability,
@@ -678,7 +680,7 @@ export function useTextplayController(): TextplayShellProps {
   const [selectedHistoryRunId, setSelectedHistoryRunId] = useState<string | null>(null);
 
   const [chatRouteOptions, setChatRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
-  const [routeOverride, setRouteOverride] = useState<RuntimeRouteBinding | null>(null);
+  const [binding, setRouteBinding] = useState<RuntimeRouteBinding | null>(null);
   const [routeLabel, setRouteLabel] = useState<string>('unresolved');
 
   const [stories, setStories] = useState<TextplayStorySummary[]>([]);
@@ -725,7 +727,7 @@ export function useTextplayController(): TextplayShellProps {
   const playerProfileScope = toPlayerProfileScope(worldId);
   const previousPlayerProfileScopeRef = useRef(playerProfileScope);
   const agentId = agentIdRuntime || selectedStory?.primaryAgentId || '';
-  const effectiveRouteBinding = routeOverride || chatRouteOptions?.selected || null;
+  const effectiveRouteBinding = binding || chatRouteOptions?.selected || null;
   const routeSource = effectiveRouteBinding?.source || 'local-runtime';
   const routeConnectorId = effectiveRouteBinding?.connectorId || '';
   const routeModel = effectiveRouteBinding?.model || '';
@@ -802,10 +804,10 @@ export function useTextplayController(): TextplayShellProps {
   const refreshRouteAvailability = useCallback(async () => {
     try {
       const options = await queryTextplayChatRouteOptions({
-        hookClient,
+        runtimeClient: runtimeClient.route,
       });
       setChatRouteOptions(options);
-      const selectedBinding = routeOverride || options.selected;
+      const selectedBinding = binding || options.selected;
       setRouteLabel(formatRouteLabel(selectedBinding));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error || '');
@@ -818,7 +820,7 @@ export function useTextplayController(): TextplayShellProps {
         });
       }
     }
-  }, [hookClient, routeOverride, setStatusBanner]);
+  }, [binding, runtimeClient.route, setStatusBanner]);
 
   const queryStoryRecords = useCallback(async (input: {
     storyId: string;
@@ -1745,7 +1747,7 @@ export function useTextplayController(): TextplayShellProps {
   }, [isRunning]);
 
   const onRouteSourceChange = useCallback((source: RuntimeRouteSource) => {
-    setRouteOverride((previous) => {
+    setRouteBinding((previous) => {
       const next = deriveRouteBindingBySource({
         source,
         previous,
@@ -1761,7 +1763,7 @@ export function useTextplayController(): TextplayShellProps {
     if (!normalizedConnectorId) {
       return;
     }
-    setRouteOverride((previous) => {
+    setRouteBinding((previous) => {
       const next = deriveRouteBindingByConnector({
         connectorId: normalizedConnectorId,
         previous,
@@ -1773,7 +1775,7 @@ export function useTextplayController(): TextplayShellProps {
   }, [chatRouteOptions]);
 
   const onRouteModelChange = useCallback((model: string) => {
-    setRouteOverride((previous) => {
+    setRouteBinding((previous) => {
       const next = deriveRouteBindingByModel({
         model,
         previous,
@@ -1784,8 +1786,8 @@ export function useTextplayController(): TextplayShellProps {
     });
   }, [chatRouteOptions]);
 
-  const onClearRouteOverride = useCallback(() => {
-    setRouteOverride(null);
+  const onClearRouteBinding = useCallback(() => {
+    setRouteBinding(null);
     setRouteLabel(formatRouteLabel(chatRouteOptions?.selected || null));
   }, [chatRouteOptions]);
 
@@ -1952,12 +1954,13 @@ export function useTextplayController(): TextplayShellProps {
               playerName: normalizedPlayerName,
               playerIdentity: normalizedPlayerIdentity,
             }),
-            routeOverride: toRouteOverrideRecord(routeOverride),
+            binding: toRouteBindingRecord(binding),
             runId: nextRunId,
             traceId,
           },
           deps: {
             hookClient,
+            runtimeClient: runtimeClient.route,
             aiClient,
             narrativeEngine,
             abortSignal: controller.signal,
@@ -2107,7 +2110,7 @@ export function useTextplayController(): TextplayShellProps {
     playerName,
     presenceMachine,
     records.length,
-    routeOverride,
+    binding,
     selectedStory,
     selectedWorldId,
     sessionPaused,
@@ -2234,12 +2237,13 @@ export function useTextplayController(): TextplayShellProps {
             triggerSource: 'AgentInitiative',
             userMessage: initiativeDirector.directive,
             systemPayload: initiativePayload,
-            routeOverride: toRouteOverrideRecord(routeOverride),
+            binding: toRouteBindingRecord(binding),
             runId: nextRunId,
             traceId,
           },
           deps: {
             hookClient,
+            runtimeClient: runtimeClient.route,
             aiClient,
             narrativeEngine,
             abortSignal: controller.signal,
@@ -2369,7 +2373,7 @@ export function useTextplayController(): TextplayShellProps {
     playerIdentity,
     playerName,
     presenceMachine,
-    routeOverride,
+    binding,
     records,
     selectedStory,
     selectedWorldId,
@@ -2525,8 +2529,8 @@ export function useTextplayController(): TextplayShellProps {
             canonicalTurns,
           });
           const recapResult = await aiClient.generateText({
-            routeHint: 'chat/default',
-            routeOverride: toRouteOverrideRecord(routeOverride),
+            capability: 'text.generate',
+            binding: toRouteBindingRecord(binding),
             prompt: recapPrompt,
             mode: 'SCENE_TURN',
             worldId: normalizedWorldId,
@@ -2660,12 +2664,13 @@ export function useTextplayController(): TextplayShellProps {
             playerIdentity: normalizedPlayerIdentity || undefined,
             triggerSource: 'SystemEvent',
             systemPayload: openingSystemPayload,
-            routeOverride: toRouteOverrideRecord(routeOverride),
+            binding: toRouteBindingRecord(binding),
             runId: nextRunId,
             traceId,
           },
           deps: {
             hookClient,
+            runtimeClient: runtimeClient.route,
             aiClient,
             narrativeEngine,
             abortSignal: controller.signal,
@@ -2808,7 +2813,7 @@ export function useTextplayController(): TextplayShellProps {
     queryWorldAgentCandidatesByStory,
     queryNarrativeTurnWindow,
     records,
-    routeOverride,
+    binding,
     selectedStory,
     selectedWorldId,
     setStatusBanner,
@@ -2897,7 +2902,7 @@ export function useTextplayController(): TextplayShellProps {
           routeSource,
           routeConnectorId,
           routeModel,
-          routeOverrideActive: Boolean(routeOverride),
+          bindingActive: Boolean(binding),
         },
         runtime: {
           runId,
@@ -3001,7 +3006,7 @@ export function useTextplayController(): TextplayShellProps {
     routeConnectorId,
     routeLabel,
     routeModel,
-    routeOverride,
+    binding,
     routeSource,
     runEvents,
     runId,
@@ -3280,7 +3285,7 @@ export function useTextplayController(): TextplayShellProps {
     routeModel,
     routeConnectors,
     routeModelOptions,
-    routeOverrideActive: Boolean(routeOverride),
+    bindingActive: Boolean(binding),
     runId,
     records,
     selectedRecordRunId,
@@ -3314,6 +3319,6 @@ export function useTextplayController(): TextplayShellProps {
     onRouteSourceChange,
     onRouteConnectorChange,
     onRouteModelChange,
-    onClearRouteOverride,
+    onClearRouteBinding,
   };
 }

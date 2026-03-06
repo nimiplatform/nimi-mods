@@ -81,7 +81,7 @@ export async function generateLocalChatProactiveDecision(
   ].join('\n');
 
   const result = await input.aiClient.generateObject({
-    routeHint: 'chat/default',
+    capability: 'text.generate',
     mode: 'STORY',
     prompt,
     worldId: target.worldId || undefined,

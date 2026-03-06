@@ -41,10 +41,10 @@ export async function generateWorldCoverAsset(
       `World description: ${String(world.description || input.snapshot.knowledgeGraph.worldSetting || '')}`,
     ].join('\n');
     const response = await input.aiClient.generateText({
-      routeHint: 'image/default',
+      capability: 'image.generate',
       prompt,
       abortSignal: started.abortSignal,
-      routeOverride: input.routeOverrideMap.fine || input.routeOverrideMap.coarse || input.runtimeDefaultRouteBinding || undefined,
+      binding: input.bindingMap.fine || input.bindingMap.coarse || input.runtimeDefaultRouteBinding || undefined,
     });
     input.patchSnapshot({
       assets: {
@@ -114,10 +114,10 @@ export async function generateCharacterPortraitAsset(
       `World setting: ${input.snapshot.knowledgeGraph.worldSetting || 'N/A'}`,
     ].join('\n');
     const response = await input.aiClient.generateText({
-      routeHint: 'image/default',
+      capability: 'image.generate',
       prompt,
       abortSignal: started.abortSignal,
-      routeOverride: input.routeOverrideMap.fine || input.routeOverrideMap.coarse || input.runtimeDefaultRouteBinding || undefined,
+      binding: input.bindingMap.fine || input.bindingMap.coarse || input.runtimeDefaultRouteBinding || undefined,
     });
     const succeededPortraits = {
       ...runningPortraits,
@@ -190,12 +190,12 @@ export async function generateLocationImageAsset(
     ].join('\n');
 
     const response = await input.aiClient.generateText({
-      routeHint: 'image/default',
+      capability: 'image.generate',
       prompt,
       abortSignal: started.abortSignal,
-      routeOverride:
-        input.routeOverrideMap.fine ||
-        input.routeOverrideMap.coarse ||
+      binding:
+        input.bindingMap.fine ||
+        input.bindingMap.coarse ||
         input.runtimeDefaultRouteBinding ||
         undefined,
     });

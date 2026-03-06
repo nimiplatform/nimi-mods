@@ -12,11 +12,11 @@ export type DistillStage =
 
 export type DistillRouteStage = 'coarse' | 'fine';
 
-export type RouteOverride = RuntimeRouteBinding;
+export type RouteBinding = RuntimeRouteBinding;
 
-export type DistillRouteOverrideMap = {
-  coarse: RouteOverride | null;
-  fine: RouteOverride | null;
+export type DistillRouteBindingMap = {
+  coarse: RouteBinding | null;
+  fine: RouteBinding | null;
 };
 
 export type ChunkTaskResult = {

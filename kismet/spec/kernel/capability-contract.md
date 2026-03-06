@@ -12,7 +12,7 @@ Capability registry is authoritative in `tables/capabilities.yaml` and must matc
 
 ## KIS-CAP-003 Allowed SDK Surfaces
 
-Kismet AI path must use `@nimiplatform/sdk/mod/ai` surfaces.
+Kismet AI path must use `@nimiplatform/sdk/mod/runtime` surfaces.
 
 ## KIS-CAP-004 Forbidden Direct Vendor Calls
 

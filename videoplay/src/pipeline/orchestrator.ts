@@ -1,9 +1,9 @@
-import type { RuntimeRouteHealthResult, RuntimeRouteOverride } from '@nimiplatform/sdk/mod/types';
+import type { RuntimeRouteHealthResult } from '@nimiplatform/sdk/mod/types';
+import type { RuntimeCanonicalCapability, RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 import {
   VIDEOPLAY_DATA_API_ASSET_BATCH_UPSERT,
   VIDEOPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY,
   VIDEOPLAY_DATA_API_EPISODE_UPSERT,
-  VIDEOPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS,
   VIDEOPLAY_PROMPT_ID,
   VIDEOPLAY_PIPELINE_CHAIN,
   VIDEOPLAY_QUALITY_RULE,
@@ -269,34 +269,12 @@ async function loadRuntimeRouteCatalog(input: {
   deps: VideoPlayPipelineDeps;
   modId: string;
 }): Promise<RuntimeRouteCatalog> {
-  const chatRaw = await input.deps.hookClient.data.query({
-    capability: VIDEOPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS,
-    query: {
-      capability: 'chat',
-      modId: input.modId,
-    },
-  });
-  const imageRaw = await input.deps.hookClient.data.query({
-    capability: VIDEOPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS,
-    query: {
-      capability: 'image',
-      modId: input.modId,
-    },
-  });
-  const videoRaw = await input.deps.hookClient.data.query({
-    capability: VIDEOPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS,
-    query: {
-      capability: 'video',
-      modId: input.modId,
-    },
-  });
-  const ttsRaw = await input.deps.hookClient.data.query({
-    capability: VIDEOPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS,
-    query: {
-      capability: 'tts',
-      modId: input.modId,
-    },
-  });
+  const [chatRaw, imageRaw, videoRaw, ttsRaw] = await Promise.all([
+    input.deps.runtimeClient.route.listOptions({ capability: 'text.generate' }),
+    input.deps.runtimeClient.route.listOptions({ capability: 'image.generate' }),
+    input.deps.runtimeClient.route.listOptions({ capability: 'video.generate' }),
+    input.deps.runtimeClient.route.listOptions({ capability: 'audio.synthesize' }),
+  ]);
 
   const chat = parseRuntimeRouteCatalogSnapshot(chatRaw);
   const image = parseRuntimeRouteCatalogSnapshot(imageRaw);
@@ -965,13 +943,17 @@ export function evaluateQualityGates(input: {
   return parsed.data;
 }
 
-function toRouteOverride(source: 'local-runtime' | 'token-api'): RuntimeRouteOverride {
-  return { source };
+function toRouteBinding(source: 'local-runtime' | 'token-api'): RuntimeRouteBinding {
+  return {
+    source,
+    connectorId: '',
+    model: '',
+  };
 }
 
 export async function invokeWithRouteFallback<T>(
   input: RouteInvokeInput<T> & {
-    checkHealth: (routeHint: string, routeOverride?: RuntimeRouteOverride) => Promise<RuntimeRouteHealthResult>;
+    checkHealth: (capability: RuntimeCanonicalCapability, binding?: RuntimeRouteBinding) => Promise<RuntimeRouteHealthResult>;
   },
 ): Promise<{
   result: T;
@@ -980,10 +962,10 @@ export async function invokeWithRouteFallback<T>(
 }> {
   let localReason = 'local-runtime-unavailable';
   try {
-    const health = await input.checkHealth(input.routeHint, toRouteOverride('local-runtime'));
+    const health = await input.checkHealth(input.capability, toRouteBinding('local-runtime'));
     if (isRouteHealthy(health)) {
       try {
-        const result = await input.invoke(toRouteOverride('local-runtime'));
+        const result = await input.invoke(toRouteBinding('local-runtime'));
         return {
           result,
           routeSource: 'local-runtime',
@@ -1001,7 +983,7 @@ export async function invokeWithRouteFallback<T>(
 
   let tokenHealth: RuntimeRouteHealthResult | null = null;
   try {
-    tokenHealth = await input.checkHealth(input.routeHint, toRouteOverride('token-api'));
+    tokenHealth = await input.checkHealth(input.capability, toRouteBinding('token-api'));
   } catch {
     tokenHealth = null;
   }
@@ -1021,7 +1003,7 @@ export async function invokeWithRouteFallback<T>(
   }
 
   try {
-    const result = await input.invoke(toRouteOverride('token-api'));
+    const result = await input.invoke(toRouteBinding('token-api'));
     return {
       result,
       routeSource: 'token-api',
@@ -1955,13 +1937,30 @@ type VoiceProfile = {
 
 async function resolveVoiceProfile(input: {
   deps: VideoPlayPipelineDeps;
-  routeOverride: RuntimeRouteOverride | undefined;
+  binding: RuntimeRouteBinding | undefined;
   preferredLanguage: string;
 }): Promise<VoiceProfile> {
-  const routeSource = input.routeOverride?.source === 'token-api' ? 'token-api' : 'local-runtime';
-  const voices = await input.deps.hookClient.llm.speech.listVoices({
-    routeSource,
-  });
+  const routeSource = input.binding?.source === 'token-api' ? 'token-api' : 'local-runtime';
+  const binding = {
+    source: routeSource,
+    connectorId: '',
+    model: '',
+  } as const;
+  const [resolved, listed] = await Promise.all([
+    input.deps.runtimeClient.route.resolve({
+      capability: 'audio.synthesize',
+      binding,
+    }),
+    input.deps.runtimeClient.media.tts.listVoices({
+      binding,
+      model: '',
+    }),
+  ]);
+  const voices = listed.voices.map((voice) => ({
+    id: voice.voiceId,
+    providerId: resolved.provider,
+    lang: voice.lang,
+  }));
 
   if (!Array.isArray(voices) || voices.length === 0) {
     throw new VideoPlayError({
@@ -2204,15 +2203,14 @@ async function executeStep(input: {
 
         const castingTextResult = await invokeWithRouteFallback({
           stage: 'character-casting-text',
-          capability: 'llm.text.generate',
+          capability: 'text.generate',
           traceId: input.traceId,
-          routeHint: 'chat/fine',
-          checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
-          invoke: async (routeOverride) => input.deps.aiClient.generateText({
+          checkHealth: async (capability, binding) => input.deps.aiClient.checkRouteHealth({ capability, binding }),
+          invoke: async (binding) => input.deps.aiClient.generateText({
             prompt: castingTextPrompt,
             systemPrompt: 'Return JSON with agentId, name, visualKeywords, appearanceDescription.',
-            routeHint: 'chat/fine',
-            routeOverride,
+            capability: 'text.generate',
+            binding,
             maxTokens: 512,
           }),
         });
@@ -2232,14 +2230,13 @@ async function executeStep(input: {
           try {
             const imageResult = await invokeWithRouteFallback({
               stage: 'character-casting-visual',
-              capability: 'llm.image.generate',
-              traceId: input.traceId,
-              routeHint: 'image/default',
-              checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
-              invoke: async (routeOverride) => input.deps.aiClient.generateImage({
+          capability: 'image.generate',
+          traceId: input.traceId,
+          checkHealth: async (capability, binding) => input.deps.aiClient.checkRouteHealth({ capability, binding }),
+              invoke: async (binding) => input.deps.aiClient.generateImage({
                 prompt: `Character portrait: ${description}. Keywords: ${visualKeywords.join(', ')}`,
-                routeHint: 'image/default',
-                routeOverride,
+                capability: 'image.generate',
+                binding,
               }),
             });
             if (imageResult.fallbackAudit) {
@@ -2350,15 +2347,14 @@ async function executeStep(input: {
 
         const sceneTextResult = await invokeWithRouteFallback({
           stage: 'scene-planning-text',
-          capability: 'llm.text.generate',
+          capability: 'text.generate',
           traceId: input.traceId,
-          routeHint: 'chat/fine',
-          checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
-          invoke: async (routeOverride) => input.deps.aiClient.generateText({
+          checkHealth: async (capability, binding) => input.deps.aiClient.checkRouteHealth({ capability, binding }),
+          invoke: async (binding) => input.deps.aiClient.generateText({
             prompt: sceneTextPrompt,
             systemPrompt: 'Return JSON with sceneId, environmentDescription.',
-            routeHint: 'chat/fine',
-            routeOverride,
+            capability: 'text.generate',
+            binding,
             maxTokens: 512,
           }),
         });
@@ -2377,14 +2373,13 @@ async function executeStep(input: {
           try {
             const imageResult = await invokeWithRouteFallback({
               stage: 'scene-planning-visual',
-              capability: 'llm.image.generate',
-              traceId: input.traceId,
-              routeHint: 'image/default',
-              checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
-              invoke: async (routeOverride) => input.deps.aiClient.generateImage({
+          capability: 'image.generate',
+          traceId: input.traceId,
+          checkHealth: async (capability, binding) => input.deps.aiClient.checkRouteHealth({ capability, binding }),
+              invoke: async (binding) => input.deps.aiClient.generateImage({
                 prompt: `Scene environment: ${environmentDescription}`,
-                routeHint: 'image/default',
-                routeOverride,
+                capability: 'image.generate',
+                binding,
               }),
             });
             if (imageResult.fallbackAudit) {
@@ -2543,15 +2538,14 @@ async function executeStep(input: {
 
         const screenplayInvoke = await invokeWithRouteFallback({
           stage: 'screenplay',
-          capability: 'llm.text.generate',
+          capability: 'text.generate',
           traceId: input.traceId,
-          routeHint: 'chat/fine',
-          checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
-          invoke: async (routeOverride) => input.deps.aiClient.generateText({
+          checkHealth: async (capability, binding) => input.deps.aiClient.checkRouteHealth({ capability, binding }),
+          invoke: async (binding) => input.deps.aiClient.generateText({
             prompt: screenplayPrompt,
             systemPrompt: 'Return concise structured planning hints in JSON.',
-            routeHint: 'chat/fine',
-            routeOverride,
+            capability: 'text.generate',
+            binding,
             maxTokens: 1024,
           }),
         });
@@ -2637,11 +2631,10 @@ async function executeStep(input: {
 
         const storyboardInvoke = await invokeWithRouteFallback({
           stage: 'storyboard',
-          capability: 'llm.text.generate',
+          capability: 'text.generate',
           traceId: input.traceId,
-          routeHint: 'chat/fine',
-          checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
-          invoke: async (routeOverride) => input.deps.aiClient.generateText({
+          checkHealth: async (capability, binding) => input.deps.aiClient.checkRouteHealth({ capability, binding }),
+          invoke: async (binding) => input.deps.aiClient.generateText({
             prompt: renderPromptTemplate('storyboard-plan', context.projectionLocale, {
               storyId: input.pipelineInput.storyId,
               episodeId: context.segmentedEpisode.episodeId,
@@ -2653,8 +2646,8 @@ async function executeStep(input: {
               }))),
             }),
             systemPrompt: 'Return JSON with episodeId, clipPlans, shotPlans, sourceEventIds.',
-            routeHint: 'chat/fine',
-            routeOverride,
+            capability: 'text.generate',
+            binding,
             maxTokens: 1024,
           }),
         });
@@ -2706,15 +2699,14 @@ async function executeStep(input: {
           try {
             const cinematographyResult = await invokeWithRouteFallback({
               stage: 'storyboard-cinematography',
-              capability: 'llm.text.generate',
-              traceId: input.traceId,
-              routeHint: 'chat/fine',
-              checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
-              invoke: async (routeOverride) => input.deps.aiClient.generateText({
+          capability: 'text.generate',
+          traceId: input.traceId,
+          checkHealth: async (capability, binding) => input.deps.aiClient.checkRouteHealth({ capability, binding }),
+              invoke: async (binding) => input.deps.aiClient.generateText({
                 prompt: cinematographyPrompt,
                 systemPrompt: 'Return JSON array of per-shot photography rules with composition, lighting, colorPalette, atmosphere.',
-                routeHint: 'chat/fine',
-                routeOverride,
+                capability: 'text.generate',
+                binding,
                 maxTokens: 1024,
               }),
             });
@@ -2762,15 +2754,14 @@ async function executeStep(input: {
           try {
             const actingResult = await invokeWithRouteFallback({
               stage: 'storyboard-acting',
-              capability: 'llm.text.generate',
-              traceId: input.traceId,
-              routeHint: 'chat/fine',
-              checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
-              invoke: async (routeOverride) => input.deps.aiClient.generateText({
+          capability: 'text.generate',
+          traceId: input.traceId,
+          checkHealth: async (capability, binding) => input.deps.aiClient.checkRouteHealth({ capability, binding }),
+              invoke: async (binding) => input.deps.aiClient.generateText({
                 prompt: actingPrompt,
                 systemPrompt: 'Return JSON array of per-shot acting directions with characters array.',
-                routeHint: 'chat/fine',
-                routeOverride,
+                capability: 'text.generate',
+                binding,
                 maxTokens: 1024,
               }),
             });
@@ -2945,14 +2936,13 @@ async function executeStep(input: {
                 for (let ci = 0; ci < candidateCount; ci += 1) {
                   const imageResult = await invokeWithRouteFallback({
                     stage: 'asset-render-image',
-                    capability: 'llm.image.generate',
-                    traceId: input.traceId,
-                    routeHint: 'image/default',
-                    checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
-                    invoke: async (routeOverride) => input.deps.aiClient.generateImage({
+          capability: 'image.generate',
+          traceId: input.traceId,
+          checkHealth: async (capability, binding) => input.deps.aiClient.checkRouteHealth({ capability, binding }),
+                    invoke: async (binding) => input.deps.aiClient.generateImage({
                       prompt: storyboardShot.visualPrompt,
-                      routeHint: 'image/default',
-                      routeOverride,
+                      capability: 'image.generate',
+                      binding,
                     }),
                   });
                   if (imageResult.fallbackAudit) {
@@ -3000,15 +2990,24 @@ async function executeStep(input: {
                 }
                 const videoResult = await invokeWithRouteFallback({
                   stage: 'asset-render-video',
-                  capability: 'llm.video.generate',
-                  traceId: input.traceId,
-                  routeHint: 'video/default',
-                  checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
-                  invoke: async (routeOverride) => input.deps.aiClient.generateVideo({
+          capability: 'video.generate',
+          traceId: input.traceId,
+          checkHealth: async (capability, binding) => input.deps.aiClient.checkRouteHealth({ capability, binding }),
+                  invoke: async (binding) => input.deps.aiClient.generateVideo({
+                    mode: 't2v',
                     prompt: `${storyboardShot.visualPrompt}. motion=${storyboardShot.motionCue}${lipSyncAsset ? `. lipSyncAnchors=${JSON.stringify((lipSyncAsset.metadata as Record<string, unknown>).anchors || [])}` : ''}`,
-                    routeHint: 'video/default',
-                    routeOverride,
-                    durationSeconds: Math.max(1, Math.round(storyboardShot.durationMs / 1000)),
+                    content: [
+                      {
+                        type: 'text',
+                        role: 'prompt',
+                        text: storyboardShot.videoPrompt || storyboardShot.visualPrompt,
+                      },
+                    ],
+                    capability: 'video.generate',
+                    binding,
+                    options: {
+                      durationSec: Math.max(1, Math.round(storyboardShot.durationMs / 1000)),
+                    },
                   }),
                 });
                 if (videoResult.fallbackAudit) {
@@ -3041,18 +3040,17 @@ async function executeStep(input: {
 
               const voiceResult = await invokeWithRouteFallback({
                 stage: 'asset-render-voice',
-                capability: 'llm.speech.synthesize',
-                traceId: input.traceId,
-                routeHint: 'tts/default',
-                checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
-                invoke: async (routeOverride) => {
-                  const routeSource = routeOverride?.source === 'token-api' ? 'token-api' : 'local-runtime';
+          capability: 'audio.synthesize',
+          traceId: input.traceId,
+          checkHealth: async (capability, binding) => input.deps.aiClient.checkRouteHealth({ capability, binding }),
+                invoke: async (binding) => {
+                  const routeSource = binding?.source === 'token-api' ? 'token-api' : 'local-runtime';
                   const cacheKey = `${routeSource}:${plan.language}`;
                   let profile = voiceProfileCache.get(cacheKey);
                   if (!profile) {
                     profile = await resolveVoiceProfile({
                       deps: input.deps,
-                      routeOverride,
+                      binding,
                       preferredLanguage: plan.language,
                     });
                     voiceProfileCache.set(cacheKey, profile);
@@ -3063,8 +3061,8 @@ async function executeStep(input: {
                     ...(profile.providerId ? { providerId: profile.providerId } : {}),
                     language: profile.language || plan.language,
                     format: 'mp3',
-                    routeHint: 'tts/default',
-                    routeOverride,
+                    capability: 'audio.synthesize',
+                    binding,
                   });
                   return {
                     speech,
@@ -3440,15 +3438,14 @@ async function executeStep(input: {
 
         const audioResult = await invokeWithRouteFallback({
           stage: 'audio-design-bgm',
-          capability: 'llm.text.generate',
+          capability: 'text.generate',
           traceId: input.traceId,
-          routeHint: 'chat/fine',
-          checkHealth: async (routeHint, routeOverride) => input.deps.aiClient.checkRouteHealth({ routeHint, routeOverride }),
-          invoke: async (routeOverride) => input.deps.aiClient.generateText({
+          checkHealth: async (capability, binding) => input.deps.aiClient.checkRouteHealth({ capability, binding }),
+          invoke: async (binding) => input.deps.aiClient.generateText({
             prompt: audioPrompt,
             systemPrompt: 'Return JSON with bgmRecommendation and sfxPlan.',
-            routeHint: 'chat/fine',
-            routeOverride,
+            capability: 'text.generate',
+            binding,
             maxTokens: 512,
           }),
         });

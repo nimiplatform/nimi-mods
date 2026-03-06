@@ -6,9 +6,9 @@ import type { LocalChatScheduleCancelReason, UseLocalChatTurnSendInput } from '.
 function buildTurnSendContextKey(input: UseLocalChatTurnSendInput): string {
   const targetId = String(input.selectedTarget?.id || '').trim();
   const sessionId = String(input.selectedSessionId || '').trim();
-  const routeOverrideSource = String(input.routeOverride?.source || '').trim();
-  const routeOverrideConnector = String(input.routeOverride?.connectorId || '').trim();
-  const routeOverrideModel = String(input.routeOverride?.model || '').trim();
+  const routeBindingSource = String(input.routeBinding?.source || '').trim();
+  const routeBindingConnector = String(input.routeBinding?.connectorId || '').trim();
+  const routeBindingModel = String(input.routeBinding?.model || '').trim();
   const routeSnapshotSource = String(input.routeSnapshot?.source || '').trim();
   const routeSnapshotModel = String(input.routeSnapshot?.model || '').trim();
   const imageRouteSource = String(input.defaultSettings.imageRouteSource || '').trim();
@@ -23,9 +23,9 @@ function buildTurnSendContextKey(input: UseLocalChatTurnSendInput): string {
   return [
     targetId,
     sessionId,
-    routeOverrideSource,
-    routeOverrideConnector,
-    routeOverrideModel,
+    routeBindingSource,
+    routeBindingConnector,
+    routeBindingModel,
     routeSnapshotSource,
     routeSnapshotModel,
     imageRouteSource,
@@ -45,9 +45,9 @@ export function useLocalChatTurnSend(input: UseLocalChatTurnSendInput) {
   const activeScheduleRef = useRef<TurnDeliveryScheduleHandle | null>(null);
 
   const contextKey = useMemo(() => buildTurnSendContextKey(input), [
-    input.routeOverride?.connectorId,
-    input.routeOverride?.model,
-    input.routeOverride?.source,
+    input.routeBinding?.connectorId,
+    input.routeBinding?.model,
+    input.routeBinding?.source,
     input.routeSnapshot?.model,
     input.routeSnapshot?.source,
     input.defaultSettings.imageRouteSource,

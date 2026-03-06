@@ -51,7 +51,10 @@
 const result = await aiClient.transcribeAudio({
   audioBase64: meeting.audioBase64,
   mimeType: meeting.audioMimeType,
-  routeHint: meeting.localOnly ? 'stt/local' : 'stt/default',
+  capability: 'audio.transcribe',
+  binding: meeting.localOnly
+    ? { source: 'local-runtime', connectorId: '', model: '' }
+    : { source: 'token-api', connectorId: '', model: '' },
 });
 ```
 
@@ -122,7 +125,7 @@ interface PipelineStage<TIn, TOut> {
 }
 
 interface PipelineContext {
-  aiClient: ModAiClient;
+  runtimeClient: ModRuntimeClient;
   localOnly: boolean;
   onProgress?: (progress: number) => void;
 }
@@ -131,10 +134,12 @@ interface PipelineContext {
 const transcribeStage: PipelineStage<AudioInput, TranscriptSegment[]> = {
   id: 'transcribe',
   async execute(input, ctx) {
-    return ctx.aiClient.transcribeAudio({
+    return ctx.runtimeClient.media.stt.transcribe({
       audioBase64: input.audioBase64,
       mimeType: input.mimeType,
-      routeHint: ctx.localOnly ? 'stt/local' : 'stt/default',
+      binding: ctx.localOnly
+        ? { source: 'local-runtime', connectorId: '', model: '' }
+        : { source: 'token-api', connectorId: '', model: '' },
     });
   },
 };

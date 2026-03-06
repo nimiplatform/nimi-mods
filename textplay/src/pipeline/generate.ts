@@ -5,8 +5,8 @@ import type { TextplayGenerateResult } from './types.js';
 export async function generateTextplayOutput(input: {
   aiClient: {
     generateText: (input: {
-      routeHint: 'chat/default';
-      routeOverride?: Record<string, unknown>;
+      capability: 'text.generate';
+      binding?: Record<string, unknown>;
       prompt: string;
       mode: 'SCENE_TURN';
       worldId?: string;
@@ -27,12 +27,12 @@ export async function generateTextplayOutput(input: {
   };
   worldId: string;
   prompt: string;
-  routeOverride?: Record<string, unknown>;
+  binding?: Record<string, unknown>;
   abortSignal?: AbortSignal;
 }): Promise<TextplayGenerateResult> {
   const response = await input.aiClient.generateText({
-    routeHint: 'chat/default',
-    routeOverride: input.routeOverride,
+    capability: 'text.generate',
+    binding: input.binding,
     prompt: input.prompt,
     mode: 'SCENE_TURN',
     worldId: input.worldId,

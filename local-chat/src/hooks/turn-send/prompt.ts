@@ -11,7 +11,7 @@ export type PreparedTurn = {
   compiledPrompt: LocalChatCompiledPrompt;
   textTurn: Awaited<ReturnType<typeof runTextTurn>>;
   routeSnapshot: ChatRouteSnapshot | null;
-  routeOverride: RuntimeRouteBinding | null;
+  routeBinding: RuntimeRouteBinding | null;
 };
 
 export async function prepareLocalChatTurn(input: {
@@ -21,7 +21,7 @@ export async function prepareLocalChatTurn(input: {
   selectedTarget: LocalChatTarget;
   messages: ChatMessage[];
   runtimeMode: 'STORY' | 'SCENE_TURN' | undefined;
-  routeOverride: RuntimeRouteBinding | null;
+  routeBinding: RuntimeRouteBinding | null;
   allowMultiReply: boolean;
   segmentationMode: 'adaptive' | 'single';
   routeSnapshot: ChatRouteSnapshot | null;
@@ -32,7 +32,7 @@ export async function prepareLocalChatTurn(input: {
     selectedTarget: input.selectedTarget,
     messages: input.messages,
     runtimeMode: input.runtimeMode,
-    routeOverride: input.routeOverride,
+    routeBinding: input.routeBinding,
   });
   const textTurn = await runTextTurn({
     flowId: input.flowId,
@@ -49,6 +49,6 @@ export async function prepareLocalChatTurn(input: {
     compiledPrompt,
     textTurn,
     routeSnapshot: input.routeSnapshot,
-    routeOverride: input.routeOverride,
+    routeBinding: input.routeBinding,
   };
 }

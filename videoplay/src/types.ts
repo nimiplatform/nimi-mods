@@ -1,7 +1,8 @@
 import type { HookClient } from '@nimiplatform/sdk/mod/types';
-import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
-import type { RuntimeRouteOverride } from '@nimiplatform/sdk/mod/types';
+import type { ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
+import type { RuntimeCanonicalCapability, RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 import type { NarrativeEngineModule } from '../../narrative-engine/src/index.js';
+import type { VideoPlayRuntimeAiClient } from './runtime-ai-client.js';
 import type {
   VideoPlayOperationType,
   VideoPlayPipelineStep,
@@ -454,7 +455,7 @@ export type QualityGateReport = {
 export type FallbackAuditRecord = {
   traceId: string;
   stage: VideoPlayRouteStage;
-  capability: string;
+  capability: RuntimeCanonicalCapability;
   from: 'local-runtime';
   to: 'token-api';
   reason: string;
@@ -714,14 +715,14 @@ export type VideoPlayPipelineResult = {
 
 export type VideoPlayPipelineDeps = {
   hookClient: HookClient;
-  aiClient: ModAiClient;
+  aiClient: VideoPlayRuntimeAiClient;
+  runtimeClient: ModRuntimeClient;
   narrativeEngine: NarrativeEngineModule;
 };
 
 export type RouteInvokeInput<T> = {
   stage: VideoPlayRouteStage;
-  capability: string;
+  capability: RuntimeCanonicalCapability;
   traceId: string;
-  routeHint: string;
-  invoke: (routeOverride: RuntimeRouteOverride | undefined) => Promise<T>;
+  invoke: (binding: RuntimeRouteBinding | undefined) => Promise<T>;
 };

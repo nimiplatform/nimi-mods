@@ -11,14 +11,17 @@ mod_identity:
   entry: ./dist/mods/kismet/index.js
   source_rule: KIS-CAP-001
 required_capabilities:
-  - key: llm.text.generate
+  - key: runtime.ai.text.generate
     purpose: runtime-ai text generation
     source_rule: KIS-CAP-002
-  - key: llm.text.stream
-    purpose: runtime-ai streaming text generation
+  - key: runtime.route.list.options
+    purpose: route-options listing
     source_rule: KIS-CAP-002
-  - key: data.query.data-api.runtime.route.options
-    purpose: runtime route options query
+  - key: runtime.route.resolve
+    purpose: runtime route resolution
+    source_rule: KIS-CAP-002
+  - key: runtime.route.check.health
+    purpose: runtime route health checks
     source_rule: KIS-CAP-002
   - key: ui.register.ui-extension.app.sidebar.mods
     purpose: sidebar registration
@@ -27,10 +30,9 @@ required_capabilities:
     purpose: route registration
     source_rule: KIS-CAP-002
 allowed_sdk_surfaces:
-  - package: "@nimiplatform/sdk/mod/ai"
+  - package: "@nimiplatform/sdk/mod/runtime"
     apis:
-      - generateText
-      - streamText
+      - createModRuntimeClient
     source_rule: KIS-CAP-003
 forbidden_patterns:
   - pattern: direct-vendor-http-endpoint

@@ -73,15 +73,6 @@ function createNarrativeEngine() {
           ],
         };
       }
-      if (capability === 'data-api.runtime.route.options') {
-        return {
-          selected: {
-            source: 'token-api',
-            model: 'deepseek/deepseek-chat',
-            connectorId: 'connector-1',
-          },
-        };
-      }
       if (capability === 'data-api.world.events.list') {
         return worldEvents;
       }

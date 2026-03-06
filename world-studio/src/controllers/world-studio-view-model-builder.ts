@@ -180,7 +180,7 @@ export function buildWorldStudioViewModel(args: BuildWorldStudioViewModelArgs): 
       onRouteSourceChange: args.context.onRouteSourceChange,
       onRouteConnectorChange: args.context.onRouteConnectorChange,
       onRouteModelChange: args.context.onRouteModelChange,
-      onClearRouteOverride: args.context.onClearRouteOverride,
+      onClearRouteBinding: args.context.onClearRouteBinding,
       onOpenRuntimeSetup: args.onOpenRuntimeSetup,
       onRebuildEmbeddingIndex: args.actions.onRebuildEmbeddingIndex,
       routeConfigReady: args.context.routeConfigReady,

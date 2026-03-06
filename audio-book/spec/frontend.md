@@ -36,7 +36,7 @@ audio-book/
 ```typescript
 // 1. 创建 clients
 const hookClient = createHookClient(MOD_ID, sdkRuntimeContext);
-const aiClient = createAiClient(MOD_ID, sdkRuntimeContext);
+const runtimeClient = createModRuntimeClient(MOD_ID, sdkRuntimeContext);
 
 // 2. 注册 sidebar nav
 await hookClient.ui.register({
@@ -61,7 +61,7 @@ await hookClient.ui.register({
       useAudioBookPageController()       ← 单一 Controller Hook（编排全部逻辑）
         ├─ useAudioBookStore()           ← Zustand 持久状态
         ├─ useAudioBookUiState()         ← React 临时 UI 状态
-        ├─ useAudioBookClients()         ← hookClient + aiClient + llmClient + ttsClient
+        ├─ useAudioBookClients()         ← hookClient + runtimeClient + llmClient + ttsClient
         ├─ useStepNavigation()           ← Step 导航逻辑
         ├─ useTtsRoute()                 ← TTS/Chat connector 发现与 model 选择
         └─ renders:
@@ -128,8 +128,8 @@ type TtsRouteState = {
 };
 ```
 
-- Connector 发现：调 `hookClient.data.query({ capability: 'data-api.runtime.route.options' })`，4 次重试，15/30s 轮询。
-- Model 选择：按 vendor 字符串匹配（DashScope/OpenAI）+ 硬编码偏好列表。见 `TODO.md` 改进计划。
+- Connector / model 发现：调 `runtimeClient.route.listOptions({ capability })`，按 capability-scoped route snapshot 选择 binding。
+- Model 选择：直接消费 runtime 返回的 connector/model 集，不再硬编码 provider/vendor 偏好表。
 - 选择持久化于 `localStorage`（`audio-book:chat-connector`、`audio-book:tts-connector`）。
 
 ## 5. Adapter 层
@@ -138,8 +138,8 @@ Controller 通过 adapter 层将 SDK client 转换为 service 层可用的抽象
 
 | Adapter | 输入 | 输出 | 文件 |
 |---------|------|------|------|
-| `createLlmClientAdapter` | `ModAiClient` | `LlmClient` | `adapters/llm-adapter.ts` |
-| `createTtsClientAdapter` | `HookLlmClient.speech` | `TtsClient` | `adapters/tts-adapter.ts` |
+| `createLlmClientAdapter` | `ModRuntimeClient` | `LlmClient` | `adapters/llm-adapter.ts` |
+| `createTtsClientAdapter` | `ModRuntimeClient.media.tts` | `TtsClient` | `adapters/tts-adapter.ts` |
 
 `LlmClient` 和 `TtsClient` 是 `types.ts` 中定义的纯接口，service 层只依赖接口不依赖 SDK，便于单元测试。
 
@@ -148,9 +148,9 @@ Controller 通过 adapter 层将 SDK client 转换为 service 层可用的抽象
 ```typescript
 function useAudioBookPageController() {
   const hookClient = useHookClient();
-  const aiClient = useAiClient();
-  const ttsRoute = useTtsRoute(hookClient, aiClient);
-  const clients = useAudioBookClients(hookClient, aiClient, ttsRoute.chatSelection);
+  const runtimeClient = useRuntimeClient();
+  const ttsRoute = useTtsRoute(runtimeClient);
+  const clients = useAudioBookClients(hookClient, runtimeClient, ttsRoute.chatSelection);
   const store = useAudioBookStore();
   const ui = useAudioBookUiState();
   const navigation = useStepNavigation({ currentStep, setCurrentStep, projectState, ... });
@@ -286,7 +286,7 @@ audio-book/src/
 ├── audio-book-page.tsx                   # 顶层页面入口（项目列表 / step 内容切换）
 │
 ├── adapters/
-│   ├── llm-adapter.ts                    # ModAiClient → LlmClient
+│   ├── llm-adapter.ts                    # runtime facade -> LlmClient
 │   └── tts-adapter.ts                    # HookLlmClient.speech → TtsClient
 │
 ├── controllers/

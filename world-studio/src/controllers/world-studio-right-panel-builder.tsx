@@ -66,7 +66,7 @@ type BuildWorldStudioRightPanelInput = {
   onRouteSourceChange: (profile: 'coarse' | 'fine', source: RuntimeRouteSource) => void;
   onRouteConnectorChange: (profile: 'coarse' | 'fine', connectorId: string) => void;
   onRouteModelChange: (profile: 'coarse' | 'fine', model: string) => void;
-  onClearRouteOverride: (profile: 'coarse' | 'fine' | 'all') => void;
+  onClearRouteBinding: (profile: 'coarse' | 'fine' | 'all') => void;
   onOpenRuntimeSetup?: () => void;
   onRebuildEmbeddingIndex: () => Promise<void>;
   onSetExpertMode: (value: boolean) => void;
@@ -119,7 +119,7 @@ export function buildWorldStudioRightPanel(input: BuildWorldStudioRightPanelInpu
         onRouteSourceChange={input.onRouteSourceChange}
         onRouteConnectorChange={input.onRouteConnectorChange}
         onRouteModelChange={input.onRouteModelChange}
-        onClearRouteOverride={input.onClearRouteOverride}
+        onClearRouteBinding={input.onClearRouteBinding}
         onOpenRuntimeSetup={input.onOpenRuntimeSetup}
         onRebuildEmbeddingIndex={input.onRebuildEmbeddingIndex}
         onSetExpertMode={input.onSetExpertMode}
@@ -179,7 +179,7 @@ export function buildWorldStudioRightPanel(input: BuildWorldStudioRightPanelInpu
       onRouteSourceChange={input.onRouteSourceChange}
       onRouteConnectorChange={input.onRouteConnectorChange}
       onRouteModelChange={input.onRouteModelChange}
-      onClearRouteOverride={input.onClearRouteOverride}
+      onClearRouteBinding={input.onClearRouteBinding}
       onOpenRuntimeSetup={input.onOpenRuntimeSetup}
       onRebuildEmbeddingIndex={input.onRebuildEmbeddingIndex}
       onSetExpertMode={input.onSetExpertMode}

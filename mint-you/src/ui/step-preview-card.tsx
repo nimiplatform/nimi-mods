@@ -14,7 +14,7 @@ import {
   type FormalityValue,
   type SentimentValue,
 } from '../contracts.js';
-import { getMintYouAiClient } from '../runtime-mod.js';
+import { getMintYouRuntimeClient } from '../runtime-mod.js';
 import { synthesizeDna } from '../pipeline/dna-synthesize.js';
 import { emitMintYouLog, createMintYouFlowId } from '../logging.js';
 import { PersonaCard } from './persona-card.js';
@@ -31,7 +31,7 @@ export function StepPreviewCard() {
     traitOverrides,
     referenceImageUrl,
     error,
-    routeOverride,
+    routeBinding,
   } = store;
   const [resynthesizing, setResynthesizing] = useState(false);
   const [editingPrimary, setEditingPrimary] = useState(false);
@@ -115,13 +115,13 @@ export function StepPreviewCard() {
       sentiment: traitOverrides?.sentiment ?? traitResult.sentiment,
     };
 
-    const aiClient = getMintYouAiClient();
+    const runtimeClient = getMintYouRuntimeClient();
     const result = await synthesizeDna({
-      aiClient,
+      runtimeClient,
       basicInfo,
       traitResult: effectiveTraitResult,
       interests: selectedInterests,
-      routeOverride,
+      binding: routeBinding,
     });
 
     setResynthesizing(false);
@@ -131,7 +131,7 @@ export function StepPreviewCard() {
     } else {
       store.setError(result.error);
     }
-  }, [basicInfo, traitResult, traitOverrides, selectedInterests, routeOverride, store]);
+  }, [basicInfo, traitResult, traitOverrides, selectedInterests, routeBinding, store]);
 
   const hasOverrides = traitOverrides && (
     traitOverrides.dnaPrimary !== undefined

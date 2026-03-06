@@ -1,6 +1,6 @@
 import { type RuntimeModRegistration } from '@nimiplatform/sdk/mod/types';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
-import { createAiClient } from '@nimiplatform/sdk/mod/ai';
+import { createModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import { createMintYouFlowId, emitMintYouLog } from './logging.js';
 import {
   MINTYOU_CAPABILITIES,
@@ -9,14 +9,14 @@ import {
 import { registerMintYouDataCapabilities } from './registrars/data.js';
 import { registerMintYouUiExtensions } from './registrars/ui.js';
 
-let _aiClient: ReturnType<typeof createAiClient> | null = null;
+let _runtimeClient: ReturnType<typeof createModRuntimeClient> | null = null;
 let _hookClient: ReturnType<typeof createHookClient> | null = null;
 
-export function getMintYouAiClient() {
-  if (!_aiClient) {
-    throw new Error('MINTYOU_AI_CLIENT_NOT_INITIALIZED');
+export function getMintYouRuntimeClient() {
+  if (!_runtimeClient) {
+    throw new Error('MINTYOU_RUNTIME_CLIENT_NOT_INITIALIZED');
   }
-  return _aiClient;
+  return _runtimeClient;
 }
 
 export function getMintYouHookClient() {
@@ -33,8 +33,8 @@ export function createMintYouRuntimeMod(): RuntimeModRegistration {
     isDefaultPrivateExecution: false,
     setup: async ({ sdkRuntimeContext }) => {
       const hookClient = createHookClient(MINTYOU_MOD_ID, sdkRuntimeContext);
-      const aiClient = createAiClient(MINTYOU_MOD_ID, sdkRuntimeContext);
-      _aiClient = aiClient;
+      const runtimeClient = createModRuntimeClient(MINTYOU_MOD_ID, sdkRuntimeContext);
+      _runtimeClient = runtimeClient;
       _hookClient = hookClient;
       const flowId = createMintYouFlowId('mint-you-setup');
       const startedAt = performance.now();

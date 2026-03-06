@@ -1,14 +1,15 @@
-import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
 import type {
-  DistillRouteOverrideMap,
+  DistillRouteBindingMap,
   RouteCapabilityLlmInvoker,
-  WorldStudioRouteOverride,
+  WorldStudioRouteBinding,
 } from '../engine/types.js';
+import type { RuntimeCanonicalCapability } from '@nimiplatform/sdk/mod/runtime-route';
+import type { WorldStudioRuntimeAiClient } from '../runtime-ai-client.js';
 
-export function withRouteOverride(
-  ai: ModAiClient,
-  defaultRouteHint: string,
-  routeOverride?: WorldStudioRouteOverride | null,
+export function withRouteBinding(
+  ai: WorldStudioRuntimeAiClient,
+  defaultCapability: RuntimeCanonicalCapability,
+  binding?: WorldStudioRouteBinding | null,
 ): RouteCapabilityLlmInvoker {
   return {
     generateText: (input) => ai.generateText({
@@ -19,15 +20,15 @@ export function withRouteOverride(
       worldId: input.worldId,
       agentId: input.agentId,
       abortSignal: input.abortSignal,
-      routeHint: input.routeHint || defaultRouteHint,
-      routeOverride: input.routeOverride || routeOverride || undefined,
+      capability: input.capability || defaultCapability,
+      binding: input.binding || binding || undefined,
     }),
   };
 }
 
-export function toNormalizedRouteOverrides(
-  input?: DistillRouteOverrideMap,
-): DistillRouteOverrideMap {
+export function toNormalizedRouteBindings(
+  input?: DistillRouteBindingMap,
+): DistillRouteBindingMap {
   return {
     coarse: input?.coarse || null,
     fine: input?.fine || null,

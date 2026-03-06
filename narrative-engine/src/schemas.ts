@@ -3,6 +3,18 @@ import {
   NARRATIVE_CONTEXT_SCOPES,
 } from './contracts.js';
 
+function isRuntimeCanonicalCapability(value: unknown): boolean {
+  const normalized = String(value || '').trim();
+  return normalized === 'text.generate'
+    || normalized === 'text.embed'
+    || normalized === 'image.generate'
+    || normalized === 'video.generate'
+    || normalized === 'audio.synthesize'
+    || normalized === 'audio.transcribe'
+    || normalized === 'voice_workflow.tts_v2v'
+    || normalized === 'voice_workflow.tts_t2v';
+}
+
 export const NarrativeTriggerSourceSchema = z.enum(['UserTurn', 'AgentInitiative', 'SystemEvent']);
 
 export const NarrativeContextScopesSchema = z.object({
@@ -39,8 +51,11 @@ export const NarrativeTurnInputSchema = z.object({
   userMessage: z.string().optional(),
   systemContext: z.record(z.string(), z.unknown()).optional(),
   idempotencyKey: z.string().min(1).optional(),
-  routeHint: z.string().min(1).optional(),
-  routeOverride: z.record(z.string(), z.unknown()).optional(),
+  capability: z.string().trim().optional().refine(
+    (value) => !value || isRuntimeCanonicalCapability(value),
+    'capability must be a runtime canonical capability',
+  ),
+  binding: z.record(z.string(), z.unknown()).optional(),
   turnId: z.string().min(1).optional(),
   requestId: z.string().min(1).optional(),
   traceId: z.string().min(1).optional(),

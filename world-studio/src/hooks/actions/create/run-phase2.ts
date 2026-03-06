@@ -37,37 +37,31 @@ function diagLog(message: string, details?: Record<string, unknown>) {
   }
 }
 
-function resolveEmbeddingRouteOverride(input: WorldStudioCreateActionsInput) {
-  const binding = input.routeOverrideMap.fine
-    || input.routeOverrideMap.coarse
+function resolveEmbeddingRouteBinding(input: WorldStudioCreateActionsInput) {
+  const binding = input.bindingMap.fine
+    || input.bindingMap.coarse
     || input.runtimeDefaultRouteBinding
     || null;
   if (!binding) return null;
-  return {
-    source: binding.source,
-    ...(binding.connectorId ? { connectorId: binding.connectorId } : {}),
-    ...(binding.model ? { model: binding.model } : {}),
-    ...(binding.localModelId ? { localModelId: binding.localModelId } : {}),
-    ...(binding.engine ? { engine: binding.engine } : {}),
-  };
+  return binding;
 }
 
 async function rebuildEmbeddingIndex(
   input: WorldStudioCreateActionsInput,
   lorebooksDraft?: WorldLorebookDraftRow[],
 ) {
-  const routeOverride = resolveEmbeddingRouteOverride(input);
+  const binding = resolveEmbeddingRouteBinding(input);
   diagLog('Phase2 embedding rebuild start', {
-    routeSource: routeOverride?.source || null,
-    routeModel: routeOverride?.model || null,
+    routeSource: binding?.source || null,
+    routeModel: binding?.model || null,
     lorebooksDraftCount: lorebooksDraft?.length || input.snapshot.lorebooksDraft.length,
   });
   input.patchSnapshot({
     embeddingIndex: {
       ...input.snapshot.embeddingIndex,
       status: 'building',
-      routeSource: routeOverride?.source || input.snapshot.embeddingIndex.routeSource,
-      routeModel: routeOverride?.model || input.snapshot.embeddingIndex.routeModel,
+      routeSource: binding?.source || input.snapshot.embeddingIndex.routeSource,
+      routeModel: binding?.model || input.snapshot.embeddingIndex.routeModel,
       errorMessage: null,
     },
   });
@@ -75,7 +69,7 @@ async function rebuildEmbeddingIndex(
   const result = await buildWorldStudioEmbeddingIndex({
     aiClient: input.aiClient,
     snapshot: input.snapshot,
-    routeOverride,
+    binding,
     ...(lorebooksDraft ? { lorebooksDraft } : {}),
   });
 
@@ -344,12 +338,12 @@ export async function runCreatePhase2(
 
   try {
     const runtimeDefaultBinding = await input.resolveRuntimeDefaultRouteBinding();
-    const routeOverride = input.routeOverrideMap.fine || input.routeOverrideMap.coarse || runtimeDefaultBinding || null;
+    const binding = input.bindingMap.fine || input.bindingMap.coarse || runtimeDefaultBinding || null;
     diagLog('Phase2 generateText start', {
       taskId,
-      routeSource: routeOverride?.source || null,
-      routeModel: routeOverride?.model || null,
-      routeConnectorId: routeOverride?.connectorId || null,
+      routeSource: binding?.source || null,
+      routeModel: binding?.model || null,
+      routeConnectorId: binding?.connectorId || null,
     });
     const result = await runPhase2DraftGeneration(input.aiClient, {
       selectedStartTimeId,
@@ -357,7 +351,7 @@ export async function runCreatePhase2(
       knowledgeGraph: projectedKnowledgeGraph,
       finalDraftAccumulator: input.snapshot.finalDraftAccumulator,
     }, {
-      routeOverride: routeOverride || undefined,
+      binding: binding || undefined,
       abortSignal,
     });
     diagLog('Phase2 generateText done', {

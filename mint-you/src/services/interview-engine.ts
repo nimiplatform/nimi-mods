@@ -1,4 +1,4 @@
-import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
+import type { ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 import { z } from 'zod';
 import {
@@ -229,7 +229,7 @@ function filterSignals(
 // ── Main engine ──
 
 export type InterviewTurnInput = {
-  aiClient: ModAiClient;
+  runtimeClient: ModRuntimeClient;
   userMessage: string;
   userMessageId?: string;
   messages: InterviewMessage[];
@@ -239,7 +239,7 @@ export type InterviewTurnInput = {
   validTurnCount: number;
   interests: string[];
   language: string;
-  routeOverride?: RuntimeRouteBinding | null;
+  binding?: RuntimeRouteBinding | null;
 };
 
 export type InterviewTurnResult = {
@@ -254,7 +254,7 @@ export async function processInterviewTurn(
   input: InterviewTurnInput,
 ): Promise<MintYouResult<InterviewTurnResult>> {
   const {
-    aiClient,
+    runtimeClient,
     userMessage,
     userMessageId,
     messages,
@@ -264,7 +264,7 @@ export async function processInterviewTurn(
     validTurnCount,
     interests,
     language,
-    routeOverride,
+    binding,
   } = input;
 
   // Use the caller-provided message ID for signal attribution.
@@ -285,17 +285,16 @@ export async function processInterviewTurn(
       // messages already includes the user message added by the UI layer
       const prompt = buildUserPrompt({ messages, memoryDigest });
 
-      const result = await aiClient.generateObject({
-        routeHint: 'chat/default',
-        routeOverride: routeOverride || undefined,
-        systemPrompt,
-        prompt,
+      const result = await runtimeClient.ai.text.generate({
+        input: prompt,
+        system: systemPrompt,
         maxTokens: 1536,
         temperature: attempt === 0 ? 0.6 : (attempt === 1 ? 0.3 : 0.2),
-        parse: parseJsonFromText,
+        binding: binding || undefined,
       });
 
-      const validation = InterviewTurnOutputSchema.safeParse(result.object);
+      const parsedObject = parseJsonFromText(result.text);
+      const validation = InterviewTurnOutputSchema.safeParse(parsedObject);
       if (!validation.success) {
         const issues = validation.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ');
         emitMintYouLog({

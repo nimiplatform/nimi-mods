@@ -6,11 +6,11 @@ Character casting reads agent IDs from `storyPackage.cast.participants` and retr
 
 ## V-CHAR-002: Appearance Description Generation
 
-For each participant agent, the pipeline invokes `character-casting-text` route stage (`llm.text.generate`) to produce an appearance description from memory recall data.
+For each participant agent, the pipeline invokes `character-casting-text` route stage (`runtime.ai.text.generate`) to produce an appearance description from memory recall data.
 
 ## V-CHAR-003: Appearance Candidate Images
 
-For each participant agent, the pipeline invokes `character-casting-visual` route stage (`llm.image.generate`) to generate 1-3 candidate appearance images. The number of candidates is governed by `CHARACTER_CASTING_POLICY.maxCandidateImages`.
+For each participant agent, the pipeline invokes `character-casting-visual` route stage (`runtime.media.image.generate`) to generate 1-3 candidate appearance images. The number of candidates is governed by `CHARACTER_CASTING_POLICY.maxCandidateImages`.
 
 ## V-CHAR-004: CharacterCastingOutput Schema
 

@@ -1,11 +1,11 @@
-import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
 import type { LocalChatDefaultSettings } from '../../state/index.js';
 import {
   isMediaGenerationAllowed,
   isPromptLikelyNsfw,
   type NsfwMediaPolicy,
 } from '../../services/policy/nsfw-media-policy.js';
-import { resolveMediaRouteConfig, toPinnedRouteOverride } from './media-route.js';
+import { resolveMediaRouteConfig, toPinnedRouteBinding } from './media-route.js';
+import type { LocalChatAiClient } from '../../runtime-ai-client.js';
 
 export type VideoTurnRunnerResult =
   | {
@@ -86,7 +86,7 @@ function toFriendlyVideoErrorMessage(error: unknown): string {
 }
 
 export async function runVideoTurn(input: {
-  aiClient: Pick<ModAiClient, 'resolveRoute' | 'generateVideo'>;
+  aiClient: Pick<LocalChatAiClient, 'resolveRoute' | 'generateVideo'>;
   prompt: string;
   defaultSettings: LocalChatDefaultSettings;
   nsfwPolicy: NsfwMediaPolicy;
@@ -112,7 +112,7 @@ export async function runVideoTurn(input: {
   });
   if (
     routeConfig.routeSource === 'token-api'
-    && !String(routeConfig.routeOverride?.connectorId || '').trim()
+    && !String(routeConfig.routeBinding?.connectorId || '').trim()
   ) {
     return {
       status: 'failed',
@@ -126,8 +126,8 @@ export async function runVideoTurn(input: {
 
   try {
     const resolvedRoute = await input.aiClient.resolveRoute({
-      routeHint: 'video/default',
-      routeOverride: routeConfig.routeOverride,
+      capability: 'video.generate',
+      routeBinding: routeConfig.routeBinding,
     });
     resolvedRouteSource = resolvedRoute.source === 'token-api' ? 'token-api' : 'local-runtime';
     if (!isMediaGenerationAllowed({
@@ -147,12 +147,14 @@ export async function runVideoTurn(input: {
       };
     }
 
-    const pinnedRouteOverride = toPinnedRouteOverride(resolvedRoute);
+    const pinnedRouteBinding = toPinnedRouteBinding(resolvedRoute);
     const generated = await input.aiClient.generateVideo({
-      routeHint: 'video/default',
-      routeOverride: pinnedRouteOverride,
-      model: pinnedRouteOverride.model || routeConfig.model,
+      capability: 'video.generate',
+      routeBinding: pinnedRouteBinding,
+      model: pinnedRouteBinding.model || routeConfig.model,
       prompt: normalizedPrompt,
+      mode: 't2v',
+      content: [{ type: 'text', text: normalizedPrompt }],
     });
     const finalRouteSource = generated.route.source === 'token-api' ? 'token-api' : 'local-runtime';
     const artifact = generated.videos.find((item) => String(item.uri || '').trim());

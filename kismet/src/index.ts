@@ -12,13 +12,12 @@ import {
   KISMET_PERMISSIONS,
   KISMET_NAV_SLOT,
   KISMET_ROUTE_SLOT,
-  KISMET_DATA_API_RUNTIME_ROUTE_OPTIONS,
   KISMET_AUDIT,
   KISMET_REASON,
   ANALYSIS_DIMENSIONS,
 } from './contracts.js';
 import { createKismetFlowId, emitKismetLog } from './logging.js';
-import { createKismetRuntimeMod, createRuntimeMod, getKismetAiClient } from './runtime-mod.js';
+import { createKismetRuntimeMod, createRuntimeMod, getKismetRuntimeClient } from './runtime-mod.js';
 
 export {
   KISMET_CAPABILITIES,
@@ -26,13 +25,12 @@ export {
   KISMET_PERMISSIONS,
   KISMET_NAV_SLOT,
   KISMET_ROUTE_SLOT,
-  KISMET_DATA_API_RUNTIME_ROUTE_OPTIONS,
   KISMET_AUDIT,
   KISMET_REASON,
   ANALYSIS_DIMENSIONS,
   createKismetRuntimeMod,
   createRuntimeMod,
-  getKismetAiClient,
+  getKismetRuntimeClient,
 };
 
 type ManifestValidationResult = {

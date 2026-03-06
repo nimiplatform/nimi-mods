@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
-import { createAiClient } from '@nimiplatform/sdk/mod/ai';
+import { createModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import { useAppStore } from '@nimiplatform/sdk/mod/ui';
 import { WORLD_STUDIO_MOD_ID } from '../contracts.js';
@@ -17,6 +17,7 @@ import {
 import { useWorldStudioControllerActions } from './use-world-studio-controller-actions.js';
 import { buildWorldStudioViewModel } from './world-studio-view-model-builder.js';
 import { buildWorldStudioPanels } from './world-studio-panels.js';
+import { createWorldStudioRuntimeAiClient } from '../runtime-ai-client.js';
 
 function isRouteConfigBlockingNotice(message: string | null): boolean {
   if (!message) return false;
@@ -40,7 +41,8 @@ type WorldStudioAppStoreState = {
 export function useWorldStudioPageContent() {
   const { t } = useModTranslation('world-studio');
   const hookClient = useMemo(() => createHookClient(WORLD_STUDIO_MOD_ID), []);
-  const aiClient = useMemo(() => createAiClient(WORLD_STUDIO_MOD_ID), []);
+  const runtimeClient = useMemo(() => createModRuntimeClient(WORLD_STUDIO_MOD_ID), []);
+  const aiClient = useMemo(() => createWorldStudioRuntimeAiClient(runtimeClient), [runtimeClient]);
   const flowId = useMemo(() => createWorldStudioFlowId('world-studio-page'), []);
   const runtimeUser = useAppStore((state) => (state as WorldStudioAppStoreState).auth.user);
   const bootstrapReady = useAppStore((state) => (state as WorldStudioAppStoreState).bootstrapReady);
@@ -69,6 +71,7 @@ export function useWorldStudioPageContent() {
     bootstrapReady,
     flowId,
     hookClient,
+    runtimeClient,
     runtimeDefaultRouteBinding: context.runtimeDefaultRouteBinding,
     setRouteOptions: ui.setRouteOptions,
     setLanding: ui.setLanding,
@@ -161,9 +164,9 @@ export function useWorldStudioPageContent() {
       retryErrorCode: ui.retryErrorCode,
       retryScope: ui.retryScope,
       retryWithFineRoute: ui.retryWithFineRoute,
-      resolveEffectiveRouteOverrides: context.resolveEffectiveRouteOverrides,
+      resolveEffectiveRouteBindings: context.resolveEffectiveRouteBindings,
       resolveRuntimeDefaultRouteBinding,
-      routeOverrideMap: context.routeOverrideMap,
+      bindingMap: context.bindingMap,
       runtimeDefaultRouteBinding: context.runtimeDefaultRouteBinding,
       selectedDraftId: context.selectedDraftId,
       selectedWorldId: context.selectedWorldId,

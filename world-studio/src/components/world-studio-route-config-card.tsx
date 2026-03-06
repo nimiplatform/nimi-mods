@@ -18,7 +18,7 @@ export function WorldStudioRouteConfigCard(props: {
   onRouteSourceChange: (profile: 'coarse' | 'fine', source: RuntimeRouteSource) => void;
   onRouteConnectorChange: (profile: 'coarse' | 'fine', connectorId: string) => void;
   onRouteModelChange: (profile: 'coarse' | 'fine', model: string) => void;
-  onClearRouteOverride: (profile: 'coarse' | 'fine' | 'all') => void;
+  onClearRouteBinding: (profile: 'coarse' | 'fine' | 'all') => void;
   effectiveCoarseRouteSummary: string;
   effectiveFineRouteSummary: string;
   routeConfigReady: boolean;
@@ -61,7 +61,7 @@ export function WorldStudioRouteConfigCard(props: {
           onRouteSourceChange={props.onRouteSourceChange}
           onRouteConnectorChange={props.onRouteConnectorChange}
           onRouteModelChange={props.onRouteModelChange}
-          onClearRouteOverride={props.onClearRouteOverride}
+          onClearRouteBinding={props.onClearRouteBinding}
           onOpenRuntimeSetup={props.onOpenRuntimeSetup}
         />
         <RouteCapabilityControls
@@ -76,7 +76,7 @@ export function WorldStudioRouteConfigCard(props: {
           onRouteSourceChange={props.onRouteSourceChange}
           onRouteConnectorChange={props.onRouteConnectorChange}
           onRouteModelChange={props.onRouteModelChange}
-          onClearRouteOverride={props.onClearRouteOverride}
+          onClearRouteBinding={props.onClearRouteBinding}
           onOpenRuntimeSetup={props.onOpenRuntimeSetup}
         />
       </div>
@@ -84,7 +84,7 @@ export function WorldStudioRouteConfigCard(props: {
       <button
         type="button"
         className="mt-2 w-full rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700"
-        onClick={() => props.onClearRouteOverride('all')}
+        onClick={() => props.onClearRouteBinding('all')}
       >
         {t('routeConfig.resetAll')}
       </button>

@@ -1,6 +1,6 @@
 import { type RuntimeModRegistration } from '@nimiplatform/sdk/mod/types';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
-import { createAiClient } from '@nimiplatform/sdk/mod/ai';
+import { createModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import {
   VIDEOPLAY_CAPABILITIES,
   VIDEOPLAY_MOD_ID,
@@ -8,14 +8,15 @@ import {
 import { createVideoPlayFlowId, emitVideoPlayLog } from './logging.js';
 import { registerVideoPlayDataCapabilities } from './registrars/data.js';
 import { registerVideoPlayUiExtensions } from './registrars/ui.js';
+import { createVideoPlayRuntimeAiClient } from './runtime-ai-client.js';
 
-let _aiClient: ReturnType<typeof createAiClient> | null = null;
+let _runtimeAiClient: ReturnType<typeof createVideoPlayRuntimeAiClient> | null = null;
 
 export function getVideoPlayAiClient() {
-  if (!_aiClient) {
+  if (!_runtimeAiClient) {
     throw new Error('VIDEOPLAY_AI_CLIENT_NOT_INITIALIZED');
   }
-  return _aiClient;
+  return _runtimeAiClient;
 }
 
 export function createVideoPlayRuntimeMod(): RuntimeModRegistration {
@@ -25,8 +26,8 @@ export function createVideoPlayRuntimeMod(): RuntimeModRegistration {
     isDefaultPrivateExecution: false,
     setup: async ({ sdkRuntimeContext }) => {
       const hookClient = createHookClient(VIDEOPLAY_MOD_ID, sdkRuntimeContext);
-      const aiClient = createAiClient(VIDEOPLAY_MOD_ID, sdkRuntimeContext);
-      _aiClient = aiClient;
+      const runtimeClient = createModRuntimeClient(VIDEOPLAY_MOD_ID, sdkRuntimeContext);
+      _runtimeAiClient = createVideoPlayRuntimeAiClient(runtimeClient);
 
       const flowId = createVideoPlayFlowId('videoplay-setup');
       const startedAt = performance.now();

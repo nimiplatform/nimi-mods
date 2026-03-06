@@ -110,7 +110,7 @@ async function synthesizeOne(
   }
 
   // Log artifact providerRaw to verify voice was actually used by provider
-  const raw = artifact.providerRaw ?? {};
+  const raw = ((artifact as unknown as { metadata?: Record<string, unknown> }).metadata) ?? {};
   console.log(`    [debug] requested voice=${voiceId}, providerRaw=${JSON.stringify(raw)}`);
 
   const estimatedDurationMs = Math.round(artifact.bytes.length * 8 / 128000 * 1000);

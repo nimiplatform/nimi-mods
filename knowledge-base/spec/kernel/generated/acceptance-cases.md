@@ -48,6 +48,8 @@ verification_commands:
     source_rule: KB-ACC-001
   - command: pnpm -C nimi-mods run check:spec:knowledge-base-kernel-consistency
     source_rule: KB-ACC-001
+  - command: pnpm --filter @nimiplatform/mod-knowledge-base run test
+    source_rule: KB-ACC-001
   - command: pnpm -C nimi-mods run check
     source_rule: KB-ACC-001
 ```

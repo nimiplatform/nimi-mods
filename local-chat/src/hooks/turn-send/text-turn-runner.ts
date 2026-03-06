@@ -237,13 +237,13 @@ export async function runTextTurn(input: RunTextTurnInput): Promise<TextTurnResu
   const streamStartedAt = performance.now();
   try {
     for await (const event of input.aiClient.streamText({
-      routeHint: input.invokeInput.routeHint,
+      capability: input.invokeInput.capability,
       prompt,
       maxTokens: input.invokeInput.maxTokens,
       mode: input.invokeInput.mode,
       worldId: input.invokeInput.worldId,
       agentId: input.invokeInput.agentId,
-      routeOverride: input.invokeInput.routeOverride,
+      routeBinding: input.invokeInput.routeBinding,
     })) {
       if (event.type === 'done') {
         streamCompleted = true;
@@ -266,13 +266,13 @@ export async function runTextTurn(input: RunTextTurnInput): Promise<TextTurnResu
   }
   if (streamFailed || !fullText.trim()) {
     const textResult = await input.aiClient.generateText({
-      routeHint: input.invokeInput.routeHint,
+      capability: input.invokeInput.capability,
       prompt,
       maxTokens: input.invokeInput.maxTokens,
       mode: input.invokeInput.mode,
       worldId: input.invokeInput.worldId,
       agentId: input.invokeInput.agentId,
-      routeOverride: input.invokeInput.routeOverride,
+      routeBinding: input.invokeInput.routeBinding,
     });
     fullText = String(textResult.text || '').trim();
     streamCompleted = false;

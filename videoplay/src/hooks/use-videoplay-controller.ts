@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
-import { createAiClient } from '@nimiplatform/sdk/mod/ai';
-import { parseRuntimeRouteOptions } from '@nimiplatform/sdk/mod/runtime-route';
+import { createModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import { useAppStore } from '@nimiplatform/sdk/mod/ui';
 import { createNarrativeEngineModule } from '../../../narrative-engine/src/index.js';
 import {
   VIDEOPLAY_DATA_API_ASSET_BATCH_UPSERT,
   VIDEOPLAY_DATA_API_EPISODE_UPSERT,
   VIDEOPLAY_DATA_API_RELEASE_PUBLISH,
-  VIDEOPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS,
   VIDEOPLAY_MOD_ID,
   VIDEOPLAY_OPERATION_TYPE,
   VIDEOPLAY_PIPELINE_CHAIN,
@@ -56,6 +54,7 @@ import {
   computeStageAdvancePlan,
   deriveWorkbenchStageProgress,
 } from '../workbench/stage-flow.js';
+import { createVideoPlayRuntimeAiClient } from '../runtime-ai-client.js';
 
 type AppStoreState = {
   setStatusBanner?: (value: { kind: 'warn' | 'error' | 'success' | 'info'; message: string }) => void;
@@ -156,7 +155,8 @@ function stageFromNextStep(step: VideoPlayPipelineStep | null): VideoPlayWorkben
 
 export function useVideoPlayController(): VideoPlayWorkbenchProps {
   const hookClient = useMemo(() => createHookClient(VIDEOPLAY_MOD_ID), []);
-  const aiClient = useMemo(() => createAiClient(VIDEOPLAY_MOD_ID), []);
+  const runtimeClient = useMemo(() => createModRuntimeClient(VIDEOPLAY_MOD_ID), []);
+  const aiClient = useMemo(() => createVideoPlayRuntimeAiClient(runtimeClient), [runtimeClient]);
   const narrativeEngine = useMemo(() => createNarrativeEngineModule({
     queryData: (capability, query) => hookClient.data.query({
       capability,
@@ -279,36 +279,27 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
   );
 
   const refreshRouteStatuses = useCallback(async () => {
-    const capabilities = ['chat', 'image', 'video', 'tts'] as const;
+    const capabilities = [
+      ['chat', 'text.generate'],
+      ['image', 'image.generate'],
+      ['video', 'video.generate'],
+      ['tts', 'audio.synthesize'],
+    ] as const;
     const next = await Promise.all(capabilities.map(async (capability) => {
       try {
-        const raw = await hookClient.data.query({
-          capability: VIDEOPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS,
-          query: {
-            capability,
-            modId: VIDEOPLAY_MOD_ID,
-          },
+        const options = await runtimeClient.route.listOptions({
+          capability: capability[1],
         });
-        const parsed = parseRuntimeRouteOptions(raw, { includeResolvedDefault: true });
-        if (!parsed) {
-          return {
-            capability,
-            source: 'unknown',
-            model: '',
-            connectorId: '',
-            ready: false,
-          };
-        }
         return {
-          capability,
-          source: parsed.selected.source,
-          model: parsed.selected.model,
-          connectorId: parsed.selected.connectorId,
-          ready: true,
+          capability: capability[0],
+          source: options.selected.source,
+          model: options.selected.model,
+          connectorId: options.selected.connectorId,
+          ready: Boolean(options.selected.model),
         };
       } catch {
         return {
-          capability,
+          capability: capability[0],
           source: 'unknown',
           model: '',
           connectorId: '',
@@ -317,7 +308,7 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
       }
     }));
     setRouteStatuses(next);
-  }, [hookClient]);
+  }, [runtimeClient]);
 
   const refreshStoryCatalog = useCallback(async () => {
     try {
@@ -574,6 +565,7 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
         {
           hookClient,
           aiClient,
+          runtimeClient,
           narrativeEngine,
         },
         {
@@ -789,7 +781,7 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
       let operationAssets: RenderedAsset[] = [];
       if (operationType === VIDEOPLAY_OPERATION_TYPE.GENERATE_VOICE_LINE) {
         const generated = await buildGeneratedVoiceAssets({
-          hookClient,
+          runtimeClient,
           aiClient,
           traceId: createUlid(),
           episode: applied.episode,

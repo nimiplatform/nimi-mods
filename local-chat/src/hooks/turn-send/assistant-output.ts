@@ -16,7 +16,7 @@ export function buildAssistantTurnOutput(input: {
   compiledPrompt: LocalChatCompiledPrompt;
   selectedTarget: LocalChatTarget;
   routeSnapshot: ChatRouteSnapshot | null;
-  routeOverride: RuntimeRouteBinding | null;
+  routeBinding: RuntimeRouteBinding | null;
   chatRouteOptions: RuntimeRouteOptionsSnapshot | null;
   streamDeltaCount: number;
   streamDurationMs: number;
@@ -31,7 +31,7 @@ export function buildAssistantTurnOutput(input: {
     planId,
   });
   const routeSource = input.routeSnapshot?.source === 'token-api' ? 'token-api' : 'local-runtime';
-  const routeModel = String(input.routeSnapshot?.model || input.routeOverride?.model || input.chatRouteOptions?.selected.model || '').trim();
+  const routeModel = String(input.routeSnapshot?.model || input.routeBinding?.model || input.chatRouteOptions?.selected.model || '').trim();
   assistantOutput.deliveries.forEach((delivery) => {
     delivery.meta = {
       ...(delivery.meta || {}),
@@ -45,7 +45,7 @@ export function buildAssistantTurnOutput(input: {
   const promptTrace: LocalChatPromptTrace = buildPromptTrace({
     compiledPrompt: input.compiledPrompt,
     routeSnapshot: input.routeSnapshot,
-    routeOverride: input.routeOverride,
+    routeBinding: input.routeBinding,
     chatRouteOptions: input.chatRouteOptions,
     planner: 'stream',
     planSegments: assistantOutput.segmentCount,

@@ -14,8 +14,8 @@ export async function registerKismetDataCapabilities(input: {
     source: 'registerKismetDataCapabilities',
   });
 
-  // Kismet only consumes data.query.data-api.runtime.route.options
-  // which is provided by the host runtime - no custom data handlers needed.
+  // Kismet only consumes runtime.route.* and runtime.ai.* from the host runtime.
+  // It does not register custom data handlers.
 
   emitKismetLog({
     level: 'info',

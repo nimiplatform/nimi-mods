@@ -427,7 +427,7 @@ export async function extractChunkFine(
 ): Promise<{ extraction: ChunkExtraction; draftPatch: DraftPatch; retryCount: number }> {
   const prompt = buildFinePrompt(input);
   const first = await llm.generateText({
-    routeHint: 'chat/fine',
+    capability: 'text.generate',
     prompt,
     mode: 'STORY',
     abortSignal: input.abortSignal,
@@ -436,7 +436,7 @@ export async function extractChunkFine(
     chunkIndex: input.index,
     chunkTotal: input.total,
     attempt: 1,
-    routeHint: 'chat/fine',
+    capability: 'text.generate',
     promptTraceId: first.promptTraceId,
     textLength: String(first.text || '').length,
   });
@@ -471,7 +471,7 @@ export async function extractChunkFine(
       parseError: summarizeModelError(firstError),
     });
     const second = await llm.generateText({
-      routeHint: 'chat/retry-low-temp',
+      capability: 'text.generate',
       prompt: repairPrompt,
       mode: 'STORY',
       abortSignal: input.abortSignal,
@@ -480,7 +480,7 @@ export async function extractChunkFine(
       chunkIndex: input.index,
       chunkTotal: input.total,
       attempt: 2,
-      routeHint: 'chat/retry-low-temp',
+      capability: 'text.generate',
       promptTraceId: second.promptTraceId,
       textLength: String(second.text || '').length,
     });

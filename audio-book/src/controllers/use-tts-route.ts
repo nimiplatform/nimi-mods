@@ -1,23 +1,18 @@
 // ---------------------------------------------------------------------------
 // Route selector — loads available connectors for chat + TTS, manages selection
-// Modeled after local-chat's useLocalChatRuntimeRoute pattern:
-//   1. data.query for route options (with retry)
-//   2. aiClient.resolveRoute() for effective route binding
+// Route data comes from runtime.route.* only:
+//   1. runtime.route.listOptions() for capability-scoped options
+//   2. runtime.route.resolve() for effective route binding
 //   3. Periodic polling to keep options fresh
 // ---------------------------------------------------------------------------
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  parseRuntimeRouteOptions,
+  type RuntimeCanonicalCapability,
   type RuntimeRouteConnectorOption,
   type RuntimeRouteOptionsSnapshot,
 } from '@nimiplatform/sdk/mod/runtime-route';
-import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
-import { AUDIO_BOOK_DATA_API_ROUTE_OPTIONS, AUDIO_BOOK_MOD_ID } from '../contracts.js';
-
-type HookClient = {
-  data: { query: (input: { capability: string; query: Record<string, unknown> }) => Promise<unknown> };
-};
+import type { ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 
 export type RouteSelection = {
   connectorId: string;
@@ -78,75 +73,57 @@ function persist(key: string, selection: RouteSelection): void {
 }
 
 // ---------------------------------------------------------------------------
-// Query route options via hookClient.data.query (same as local-chat loadRouteOptions)
-// ---------------------------------------------------------------------------
 async function loadRouteOptions(
-  hookClient: HookClient,
+  runtimeClient: ModRuntimeClient,
+  capability: RuntimeCanonicalCapability,
 ): Promise<RuntimeRouteOptionsSnapshot | null> {
-  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
   try {
-    const payload = await Promise.race<unknown>([
-      hookClient.data.query({
-        capability: AUDIO_BOOK_DATA_API_ROUTE_OPTIONS,
-        query: { capability: 'chat', modId: AUDIO_BOOK_MOD_ID },
-      }),
+    const snapshot = await Promise.race<RuntimeRouteOptionsSnapshot>([
+      runtimeClient.route.listOptions({ capability }),
       new Promise<never>((_, reject) => {
-        timeoutHandle = setTimeout(
+        setTimeout(
           () => reject(new Error(`Route options timeout (${QUERY_TIMEOUT_MS}ms)`)),
           QUERY_TIMEOUT_MS,
         );
       }),
-    ]).finally(() => {
-      if (timeoutHandle) clearTimeout(timeoutHandle);
+    ]);
+    console.info(LOG_PREFIX, 'loadRouteOptions:ok', {
+      capability,
+      selectedSource: snapshot.selected.source,
+      selectedConnectorId: snapshot.selected.connectorId || '(none)',
+      connectorsCount: snapshot.connectors.length,
+      connectorIds: snapshot.connectors.map((connector) => connector.id),
     });
-
-    const parsed = parseRuntimeRouteOptions(payload, { includeResolvedDefault: true });
-    if (parsed) {
-      console.info(LOG_PREFIX, 'loadRouteOptions:ok', {
-        selectedSource: parsed.selected.source,
-        selectedConnectorId: parsed.selected.connectorId || '(none)',
-        connectorsCount: parsed.connectors.length,
-        connectorIds: parsed.connectors.map((c) => c.id),
-      });
-    }
-    return parsed;
+    return snapshot;
   } catch (err) {
     console.warn(LOG_PREFIX, 'loadRouteOptions:failed', {
+      capability,
       error: err instanceof Error ? err.message : String(err),
     });
     return null;
   }
 }
 
-// ---------------------------------------------------------------------------
-// Resolve route via aiClient.resolveRoute() (like local-chat resolveRouteSnapshot)
-// ---------------------------------------------------------------------------
 async function resolveRouteBinding(
-  aiClient: ModAiClient,
-  input: {
-    routeHint: string;
-    connectorId?: string;
-    routeSource?: 'auto' | 'local-runtime' | 'token-api';
-  },
+  runtimeClient: ModRuntimeClient,
+  capability: RuntimeCanonicalCapability,
+  selection?: RouteSelection,
 ): Promise<{ source: string; connectorId: string; model: string } | null> {
   try {
-    const routeOverride = (() => {
-      const source = input.routeSource === 'token-api' || input.routeSource === 'local-runtime'
-        ? input.routeSource
-        : undefined;
-      const connectorId = String(input.connectorId || '').trim();
-      if (!source && !connectorId) return undefined;
-      return {
-        ...(source ? { source } : {}),
-        ...(connectorId ? { connectorId } : {}),
-      };
-    })();
-    const resolved = await aiClient.resolveRoute({
-      routeHint: input.routeHint,
-      ...(routeOverride ? { routeOverride } : {}),
+    const resolved = await runtimeClient.route.resolve({
+      capability,
+      binding: selection
+        ? {
+          source: selection.routeSource === 'token-api' || selection.routeSource === 'local-runtime'
+            ? selection.routeSource
+            : 'token-api',
+          connectorId: String(selection.connectorId || '').trim(),
+          model: String(selection.model || '').trim(),
+        }
+        : undefined,
     });
     console.info(LOG_PREFIX, 'resolveRoute:ok', {
-      routeHint: input.routeHint,
+      capability,
       source: resolved.source,
       connectorId: resolved.connectorId || '(none)',
       model: resolved.model || '(none)',
@@ -159,7 +136,7 @@ async function resolveRouteBinding(
     };
   } catch (err) {
     console.warn(LOG_PREFIX, 'resolveRoute:failed', {
-      routeHint: input.routeHint,
+      capability,
       error: err instanceof Error ? err.message : String(err),
     });
     return null;
@@ -350,55 +327,39 @@ function resolveSelection(
 // ---------------------------------------------------------------------------
 // Main hook
 // ---------------------------------------------------------------------------
-export function useTtsRoute(hookClient: HookClient, aiClient: ModAiClient): TtsRouteState {
+export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
   const [chatConnectors, setChatConnectors] = useState<RuntimeRouteConnectorOption[]>([]);
   const [ttsConnectors, setTtsConnectors] = useState<RuntimeRouteConnectorOption[]>([]);
   const [chatSelection, setChatSelection] = useState<RouteSelection>(() => loadPersisted(STORAGE_KEY_CHAT));
   const [ttsSelection, setTtsSelection] = useState<RouteSelection>(() => loadPersisted(STORAGE_KEY_TTS));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const loadInFlightRef = useRef<Promise<RuntimeRouteOptionsSnapshot | null> | null>(null);
+  const loadInFlightRef = useRef(new Map<RuntimeCanonicalCapability, Promise<RuntimeRouteOptionsSnapshot | null>>());
 
-  // Safe setter — don't overwrite valid options with null/empty
-  const setRouteOptionsSafely = useCallback((
-    connectors: RuntimeRouteConnectorOption[],
-    defaults: {
-      chat: RouteSelectionFallback;
-      tts: RouteSelectionFallback;
-    },
-  ) => {
-    setChatConnectors((prev) => connectors.length > 0 ? connectors : prev);
-    setTtsConnectors((prev) => connectors.length > 0 ? connectors : prev);
-
-    const safeConnectors = connectors.length > 0 ? connectors : [];
-    const chatSel = resolveSelection(safeConnectors, defaults.chat, STORAGE_KEY_CHAT);
-    const ttsSel = resolveSelection(safeConnectors, defaults.tts, STORAGE_KEY_TTS);
-
-    if (chatSel.connectorId) setChatSelection(chatSel);
-    if (ttsSel.connectorId) setTtsSelection(ttsSel);
-  }, []);
-
-  // Load route options with dedup (like local-chat loadChatRuntimeRouteOptions)
-  const loadRouteOptionsDeduped = useCallback(async (): Promise<RuntimeRouteOptionsSnapshot | null> => {
-    if (loadInFlightRef.current) return loadInFlightRef.current;
-
-    const task = loadRouteOptions(hookClient);
-    loadInFlightRef.current = task;
+  const loadRouteOptionsDeduped = useCallback(async (
+    capability: RuntimeCanonicalCapability,
+  ): Promise<RuntimeRouteOptionsSnapshot | null> => {
+    const existing = loadInFlightRef.current.get(capability);
+    if (existing) {
+      return existing;
+    }
+    const task = loadRouteOptions(runtimeClient, capability);
+    loadInFlightRef.current.set(capability, task);
     void task.finally(() => {
-      if (loadInFlightRef.current === task) loadInFlightRef.current = null;
+      if (loadInFlightRef.current.get(capability) === task) {
+        loadInFlightRef.current.delete(capability);
+      }
     });
     return task;
-  }, [hookClient]);
+  }, [runtimeClient]);
 
-  // Initial load with retry + resolveRoute fallback
   useEffect(() => {
     let cancelled = false;
 
     async function init() {
-      // 1. Try resolveRoute first (fast, doesn't need data capability)
       const [resolvedChat, resolvedTts] = await Promise.all([
-        resolveRouteBinding(aiClient, { routeHint: 'chat/default' }),
-        resolveRouteBinding(aiClient, { routeHint: 'tts/default' }),
+        resolveRouteBinding(runtimeClient, 'text.generate'),
+        resolveRouteBinding(runtimeClient, 'audio.synthesize'),
       ]);
       if (cancelled) return;
 
@@ -407,18 +368,6 @@ export function useTtsRoute(hookClient: HookClient, aiClient: ModAiClient): TtsR
       const resolvedTtsConnectorId = resolvedTts?.connectorId || '';
       const resolvedTtsModel = resolvedTts?.model || '';
 
-      // If resolveRoute gave us connector(s), use them immediately as initial fallback.
-      if (resolvedChatConnectorId || resolvedTtsConnectorId) {
-        setRouteOptionsSafely([], {
-          chat: { connectorId: resolvedChatConnectorId, model: resolvedChatModel },
-          tts: {
-            connectorId: resolvedTtsConnectorId || resolvedChatConnectorId,
-            model: resolvedTtsModel,
-          },
-        });
-      }
-
-      // 2. Try loading full route options with retry (like local-chat)
       for (const delayMs of RETRY_DELAYS_MS) {
         if (cancelled) return;
         if (delayMs > 0) {
@@ -426,31 +375,43 @@ export function useTtsRoute(hookClient: HookClient, aiClient: ModAiClient): TtsR
           if (cancelled) return;
         }
 
-        const snapshot = await loadRouteOptionsDeduped();
-        if (snapshot) {
+        const [chatSnapshot, ttsSnapshot] = await Promise.all([
+          loadRouteOptionsDeduped('text.generate'),
+          loadRouteOptionsDeduped('audio.synthesize'),
+        ]);
+        if (chatSnapshot || ttsSnapshot) {
           if (cancelled) return;
-          const connectors = snapshot.connectors;
-          const defaultChatConnectorId = snapshot.selected?.connectorId || resolvedChatConnectorId;
+          const nextChatConnectors = chatSnapshot?.connectors || [];
+          const nextTtsConnectors = ttsSnapshot?.connectors || [];
+          setChatConnectors(nextChatConnectors);
+          setTtsConnectors(nextTtsConnectors);
+
+          const defaultChatConnectorId = chatSnapshot?.selected?.connectorId || resolvedChatConnectorId;
           const defaultChatModel = pickChatModelForConnector(
-            connectors,
+            nextChatConnectors,
             defaultChatConnectorId,
-            resolvedChatModel || snapshot.selected?.model || '',
+            resolvedChatModel || chatSnapshot?.selected?.model || '',
           );
-          const defaultTtsConnectorId = resolvedTtsConnectorId || defaultChatConnectorId;
+          const defaultTtsConnectorId = resolvedTtsConnectorId || ttsSnapshot?.selected?.connectorId || defaultChatConnectorId;
           const defaultTtsModel = pickTtsModelForConnector(
-            connectors,
+            nextTtsConnectors,
             defaultTtsConnectorId,
-            resolvedTtsModel,
+            resolvedTtsModel || ttsSnapshot?.selected?.model || '',
           );
-          setRouteOptionsSafely(connectors, {
-            chat: { connectorId: defaultChatConnectorId, model: defaultChatModel },
-            tts: { connectorId: defaultTtsConnectorId, model: defaultTtsModel },
-          });
+          setChatSelection(resolveSelection(nextChatConnectors, {
+            connectorId: defaultChatConnectorId,
+            model: defaultChatModel,
+          }, STORAGE_KEY_CHAT));
+          setTtsSelection(resolveSelection(nextTtsConnectors, {
+            connectorId: defaultTtsConnectorId,
+            model: defaultTtsModel,
+          }, STORAGE_KEY_TTS));
 
           console.info(LOG_PREFIX, 'init:loaded', {
-            connectorsCount: connectors.length,
+            chatConnectorsCount: nextChatConnectors.length,
             defaultChatConnectorId: defaultChatConnectorId || '(none)',
             selectedChatModel: defaultChatModel || '(none)',
+            ttsConnectorsCount: nextTtsConnectors.length,
             defaultTtsConnectorId: defaultTtsConnectorId || '(none)',
             resolvedTtsModel: resolvedTtsModel || '(none)',
             selectedTtsModel: defaultTtsModel || '(none)',
@@ -475,32 +436,44 @@ export function useTtsRoute(hookClient: HookClient, aiClient: ModAiClient): TtsR
 
     init();
     return () => { cancelled = true; };
-  }, [hookClient, aiClient, loadRouteOptionsDeduped, setRouteOptionsSafely]);
+  }, [loadRouteOptionsDeduped, runtimeClient]);
 
-  // Periodic polling (like local-chat)
   useEffect(() => {
-    const hasConnectors = chatConnectors.length > 0;
+    const hasConnectors = chatConnectors.length > 0 || ttsConnectors.length > 0;
     const intervalMs = hasConnectors ? POLL_INTERVAL_WITH_CONNECTORS_MS : POLL_INTERVAL_WITHOUT_CONNECTORS_MS;
 
     const timer = setInterval(async () => {
-      const snapshot = await loadRouteOptionsDeduped();
-      if (snapshot) {
-        const defaultChatConnectorId = snapshot.selected?.connectorId || '';
+      const [chatSnapshot, ttsSnapshot] = await Promise.all([
+        loadRouteOptionsDeduped('text.generate'),
+        loadRouteOptionsDeduped('audio.synthesize'),
+      ]);
+      if (chatSnapshot) {
+        setChatConnectors(chatSnapshot.connectors);
         const defaultChatModel = pickChatModelForConnector(
-          snapshot.connectors,
-          defaultChatConnectorId,
+          chatSnapshot.connectors,
+          chatSnapshot.selected?.connectorId || '',
           chatSelection.model || '',
         );
-        const defaultTtsConnectorId = ttsSelection.connectorId || defaultChatConnectorId;
+        setChatSelection(resolveSelection(chatSnapshot.connectors, {
+          connectorId: chatSnapshot.selected?.connectorId || '',
+          model: defaultChatModel,
+        }, STORAGE_KEY_CHAT));
+      }
+      if (ttsSnapshot) {
+        setTtsConnectors(ttsSnapshot.connectors);
+        const defaultTtsConnectorId = ttsSelection.connectorId || ttsSnapshot.selected?.connectorId || '';
         const defaultTtsModel = pickTtsModelForConnector(
-          snapshot.connectors,
+          ttsSnapshot.connectors,
           defaultTtsConnectorId,
           ttsSelection.model || '',
         );
-        setRouteOptionsSafely(snapshot.connectors, {
-          chat: { connectorId: defaultChatConnectorId, model: defaultChatModel },
-          tts: { connectorId: defaultTtsConnectorId, model: defaultTtsModel },
-        });
+        setTtsSelection(resolveSelection(ttsSnapshot.connectors, {
+          connectorId: defaultTtsConnectorId,
+          model: defaultTtsModel,
+        }, STORAGE_KEY_TTS));
+      }
+      if (chatSnapshot && ttsSnapshot) {
+        setError(null);
       }
     }, intervalMs);
 
@@ -509,7 +482,7 @@ export function useTtsRoute(hookClient: HookClient, aiClient: ModAiClient): TtsR
     chatConnectors.length,
     chatSelection.model,
     loadRouteOptionsDeduped,
-    setRouteOptionsSafely,
+    ttsConnectors.length,
     ttsSelection.connectorId,
     ttsSelection.model,
   ]);
@@ -519,11 +492,7 @@ export function useTtsRoute(hookClient: HookClient, aiClient: ModAiClient): TtsR
     let cancelled = false;
 
     async function syncSelectedTtsModel() {
-      const resolved = await resolveRouteBinding(aiClient, {
-        routeHint: 'tts/default',
-        connectorId: ttsSelection.connectorId,
-        routeSource: 'token-api',
-      });
+      const resolved = await resolveRouteBinding(runtimeClient, 'audio.synthesize', ttsSelection);
       if (cancelled) return;
       const resolvedModel = String(resolved?.model || '').trim();
       const preferredModel = pickTtsModelForConnector(
@@ -548,7 +517,7 @@ export function useTtsRoute(hookClient: HookClient, aiClient: ModAiClient): TtsR
 
     void syncSelectedTtsModel();
     return () => { cancelled = true; };
-  }, [aiClient, ttsConnectors, ttsSelection.connectorId, ttsSelection.routeSource]);
+  }, [runtimeClient, ttsConnectors, ttsSelection.connectorId, ttsSelection.model, ttsSelection.routeSource]);
 
   const selectChatConnector = useCallback((connectorId: string) => {
     const nextModel = connectorId

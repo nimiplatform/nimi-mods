@@ -16,19 +16,18 @@
 
 ## KB-CAP-002 — AI 能力消费
 
-KB mod 消费三种 AI 能力：
+KB mod 消费三种 runtime 能力：
 
-- `llm.text.generate`：query rewriting、对话标题生成。
-- `llm.text.stream`：RAG 流式回答生成。
-- `llm.embedding.generate`：chunk embedding + query embedding。
+- `runtime.ai.text.generate`：query rewriting、对话标题生成。
+- `runtime.ai.text.stream`：RAG 流式回答生成。
+- `runtime.ai.embedding.generate`：chunk embedding + query embedding。
 
-调用入口统一为 `@nimiplatform/sdk/mod/ai`（`generateText` | `streamText` | `generateEmbedding`）。
+调用入口统一为 `@nimiplatform/sdk/mod/runtime`（`createModRuntimeClient`）。
 
 路由策略：
 - Chat route：`auto`（cloud-first）| `token-api` | `local-runtime`，由 `KBSettings.chatRouteSource` 控制。
 - Embedding route：`auto`（cloud-first）| `token-api` | `local-runtime`，由 `KBSettings.embeddingRouteSource` 控制。
-- Adapter 层（`llm-adapter.ts`、`embedding-adapter.ts`）桥接 `ModAiClient` → 服务层接口。
-- Auto 模式下 embedding adapter 实现智能回退：token-api 失败 → local-runtime。
+- Adapter 层（`llm-adapter.ts`、`embedding-adapter.ts`）桥接 `ModRuntimeClient` + selected binding → 服务层接口。
 
 ## KB-CAP-003 — 文档数据 API
 
@@ -59,9 +58,9 @@ KB mod 消费三种 AI 能力：
 
 ## KB-CAP-006 — Runtime Route 查询
 
-- 通过 `data.query.data-api.runtime.route.options` 查询可用的 chat/embedding 路由。
+- 通过 `runtime.route.listOptions` 查询可用的 `text.generate` / `text.embed` 路由。
 - 每 15 秒自动轮询更新（`use-kb-clients.ts`）。
-- 路由选择遵循 mod 本地 route override，否则使用全局默认。
+- 路由选择遵循 mod 本地 source/connector/model 偏好，否则使用 runtime 默认 binding。
 
 ## KB-CAP-007 — 跨 Mod 集成
 

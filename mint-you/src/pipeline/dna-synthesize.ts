@@ -1,4 +1,4 @@
-import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
+import type { ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 import { MINTYOU_REASON } from '../contracts.js';
 import { DnaSynthesisOutputSchema } from '../schemas.js';
@@ -87,18 +87,18 @@ function parseJsonFromText(text: string): Record<string, unknown> {
 }
 
 export async function synthesizeDna(input: {
-  aiClient: ModAiClient;
+  runtimeClient: ModRuntimeClient;
   basicInfo: BasicInfo;
   traitResult: TraitExtractionResult;
   interests: string[];
-  routeOverride?: RuntimeRouteBinding | null;
+  binding?: RuntimeRouteBinding | null;
 }): Promise<MintYouResult<DnaSynthesisOutput>> {
   const {
-    aiClient,
+    runtimeClient,
     basicInfo,
     traitResult,
     interests,
-    routeOverride,
+    binding,
   } = input;
 
   const systemPrompt = buildSystemPrompt();
@@ -109,17 +109,15 @@ export async function synthesizeDna(input: {
   );
 
   try {
-    const result = await aiClient.generateObject({
-      routeHint: 'chat/default',
-      routeOverride: routeOverride || undefined,
-      systemPrompt,
-      prompt,
+    const result = await runtimeClient.ai.text.generate({
+      input: prompt,
+      system: systemPrompt,
       maxTokens: 4096,
       temperature: 0.7,
-      parse: parseJsonFromText,
+      binding: binding || undefined,
     });
 
-    const raw = result.object;
+    const raw = parseJsonFromText(result.text);
 
     // Normalize rules: LLM returns string[], we need to validate that
     const validation = DnaSynthesisOutputSchema.safeParse(raw);

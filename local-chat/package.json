@@ -6,9 +6,11 @@
   "scripts": {
     "build": "node ../scripts/build-mod.mjs --mod local-chat",
     "watch": "node ../scripts/build-mod.mjs --mod local-chat --watch",
+    "test": "tsx --test test/*.mjs test/*.e2e.test.ts",
     "test:e2e": "tsx --test test/*.e2e.test.ts",
     "test:live-smoke": "tsx --test test/local-chat-live-smoke.test.ts",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "verify": "pnpm run typecheck && pnpm run test && pnpm run build",
     "clean": "rm -rf dist"
   }
 }

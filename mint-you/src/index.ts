@@ -15,13 +15,13 @@ import {
   MINTYOU_DATA_API_AGENTS_CREATE,
   MINTYOU_DATA_API_WORLD_ACCESS_ME,
   MINTYOU_DATA_API_WORLD_OASIS_GET,
-  MINTYOU_DATA_API_RUNTIME_ROUTE_OPTIONS,
+  MINTYOU_RUNTIME_PROFILE_READ_AGENT,
   MINTYOU_AUDIT,
   MINTYOU_REASON,
   MINTYOU_PIPELINE_STEPS,
 } from './contracts.js';
 import { createMintYouFlowId, emitMintYouLog } from './logging.js';
-import { createMintYouRuntimeMod, createRuntimeMod, getMintYouAiClient, getMintYouHookClient } from './runtime-mod.js';
+import { createMintYouRuntimeMod, createRuntimeMod, getMintYouHookClient, getMintYouRuntimeClient } from './runtime-mod.js';
 
 export {
   MINTYOU_CAPABILITIES,
@@ -32,13 +32,13 @@ export {
   MINTYOU_DATA_API_AGENTS_CREATE,
   MINTYOU_DATA_API_WORLD_ACCESS_ME,
   MINTYOU_DATA_API_WORLD_OASIS_GET,
-  MINTYOU_DATA_API_RUNTIME_ROUTE_OPTIONS,
+  MINTYOU_RUNTIME_PROFILE_READ_AGENT,
   MINTYOU_AUDIT,
   MINTYOU_REASON,
   MINTYOU_PIPELINE_STEPS,
   createMintYouRuntimeMod,
   createRuntimeMod,
-  getMintYouAiClient,
+  getMintYouRuntimeClient,
   getMintYouHookClient,
 };
 

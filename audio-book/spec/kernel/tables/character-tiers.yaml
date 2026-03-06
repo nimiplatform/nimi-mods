@@ -1,6 +1,6 @@
 version: 1
 description: Character classification tiers for voice assignment strategy
-source_rule: VS-ENT-005, VS-PIPE-006
+source_rule: VS-PIPE-006
 
 tiers:
   - id: major

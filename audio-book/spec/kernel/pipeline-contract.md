@@ -85,7 +85,7 @@ Audio Book 的用户流程为严格有序的五个阶段：
   - female → 默认女声预设
   - neutral → 默认中性预设
 - 进入 Step 4 的前提：全部非低频角色已分配声线。
-- 试听：选择该角色的一句代表性台词，调用 `hook.llm.speech.synthesize()` 即时生成。
+- 试听：选择该角色的一句代表性台词，调用 `runtime.media.tts.synthesize()` 即时生成。
 
 ## VS-PIPE-007 — Step 4.5 测试合成
 

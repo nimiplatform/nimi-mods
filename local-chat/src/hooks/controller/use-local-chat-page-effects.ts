@@ -8,9 +8,9 @@ function buildTurnContextKey(state: LocalChatPageState): string {
   return [
     state.targetsState.selectedTargetId,
     state.sessionsState.selectedSessionId,
-    state.runtimeRouteState.routeOverride?.source || '',
-    state.runtimeRouteState.routeOverride?.connectorId || '',
-    state.runtimeRouteState.routeOverride?.model || '',
+    state.runtimeRouteState.routeBinding?.source || '',
+    state.runtimeRouteState.routeBinding?.connectorId || '',
+    state.runtimeRouteState.routeBinding?.model || '',
     state.runtimeRouteState.routeSnapshot?.source || '',
     state.runtimeRouteState.routeSnapshot?.model || '',
   ].join('|');

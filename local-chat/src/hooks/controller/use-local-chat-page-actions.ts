@@ -116,7 +116,7 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         if (chatRows.length > 0) {
           return chatRows.some((item) => item.selected);
         }
-        const selected = state.runtimeRouteState.routeOverride || state.runtimeRouteState.chatRouteOptions?.selected || null;
+        const selected = state.runtimeRouteState.routeBinding || state.runtimeRouteState.chatRouteOptions?.selected || null;
         if (!selected || selected.source !== 'local-runtime') return true;
         const localModel = localChatRuntimeModels.find((model) => {
           const byId = String(model.localModelId || '').trim() === String(selected.localModelId || '').trim();
@@ -229,7 +229,7 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         chatRouteOptions: state.runtimeRouteState.chatRouteOptions,
         imageRouteOptions: state.runtimeRouteState.imageRouteOptions,
         videoRouteOptions: state.runtimeRouteState.videoRouteOptions,
-        routeOverride: state.runtimeRouteState.routeOverride,
+        routeBinding: state.runtimeRouteState.routeBinding,
         speechProviders: state.speechSettingsState.speechProviders,
         speechVoices: state.speechSettingsState.speechVoices,
         selectedSpeechProviderId: state.speechSettingsState.selectedSpeechProviderId,
@@ -256,7 +256,7 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         onRouteSourceChange: state.runtimeRouteState.handleRouteSourceChange,
         onRouteConnectorChange: state.runtimeRouteState.handleRouteConnectorChange,
         onRouteModelChange: state.runtimeRouteState.handleRouteModelChange,
-        onClearRouteOverride: state.runtimeRouteState.clearRouteOverride,
+        onClearRouteBinding: state.runtimeRouteState.clearRouteBinding,
         onSpeechProviderChange: handleSpeechProviderChange,
         onVoiceIdChange: handleVoiceIdChange,
         ttsConnectorId: state.effectiveTtsConnectorId,

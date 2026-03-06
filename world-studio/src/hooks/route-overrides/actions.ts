@@ -3,25 +3,25 @@ import {
   normalizeRuntimeRouteSource,
 } from '@nimiplatform/sdk/mod/runtime-route';
 import { type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot, type RuntimeRouteSource } from '@nimiplatform/sdk/mod/runtime-route';
-import type { DistillRouteOverrideMap } from '../../generation/pipeline.js';
+import type { DistillRouteBindingMap } from '../../generation/pipeline.js';
 
 export type RouteStage = 'coarse' | 'fine';
 
-type ResolveRouteOverridesInput = {
+type ResolveRouteBindingsInput = {
   mode: 'all' | 'failed';
   retryWithFineRoute: boolean;
   runtimeDefaultBinding?: RuntimeRouteBinding | null;
 };
 
-export function useWorldStudioRouteOverrideActions(input: {
-  routeOverrideMap: DistillRouteOverrideMap;
-  setRouteOverrideMap: Dispatch<SetStateAction<DistillRouteOverrideMap>>;
+export function useWorldStudioRouteBindingActions(input: {
+  bindingMap: DistillRouteBindingMap;
+  setRouteBindingMap: Dispatch<SetStateAction<DistillRouteBindingMap>>;
   routeOptions: RuntimeRouteOptionsSnapshot | null;
   runtimeDefaultRouteBinding: RuntimeRouteBinding | null;
 }) {
   const onRouteSourceChange = useCallback((profile: RouteStage, sourceInput: string) => {
     const source = normalizeRuntimeRouteSource(sourceInput);
-    input.setRouteOverrideMap((previous) => {
+    input.setRouteBindingMap((previous) => {
       const current = previous[profile];
       const firstLocalModel = input.routeOptions?.localRuntime.models[0] || null;
       const base = current || input.routeOptions?.selected || {
@@ -53,10 +53,10 @@ export function useWorldStudioRouteOverrideActions(input: {
         },
       };
     });
-  }, [input.routeOptions, input.setRouteOverrideMap]);
+  }, [input.routeOptions, input.setRouteBindingMap]);
 
   const onRouteConnectorChange = useCallback((profile: RouteStage, connectorId: string) => {
-    input.setRouteOverrideMap((previous) => {
+    input.setRouteBindingMap((previous) => {
       const connector = input.routeOptions?.connectors.find((item) => item.id === connectorId) || null;
       const base = previous[profile] || input.routeOptions?.selected || {
         source: 'token-api' as const,
@@ -72,10 +72,10 @@ export function useWorldStudioRouteOverrideActions(input: {
         },
       };
     });
-  }, [input.routeOptions, input.setRouteOverrideMap]);
+  }, [input.routeOptions, input.setRouteBindingMap]);
 
   const onRouteModelChange = useCallback((profile: RouteStage, model: string) => {
-    input.setRouteOverrideMap((previous) => {
+    input.setRouteBindingMap((previous) => {
       const base = previous[profile] || input.routeOptions?.selected || {
         source: 'local-runtime' as const,
         connectorId: '',
@@ -89,10 +89,10 @@ export function useWorldStudioRouteOverrideActions(input: {
         },
       };
     });
-  }, [input.routeOptions, input.setRouteOverrideMap]);
+  }, [input.routeOptions, input.setRouteBindingMap]);
 
-  const onClearRouteOverride = useCallback((profile: RouteStage | 'all') => {
-    input.setRouteOverrideMap((previous) => {
+  const onClearRouteBinding = useCallback((profile: RouteStage | 'all') => {
+    input.setRouteBindingMap((previous) => {
       if (profile === 'all') {
         return {
           coarse: null,
@@ -104,29 +104,29 @@ export function useWorldStudioRouteOverrideActions(input: {
         [profile]: null,
       };
     });
-  }, [input.setRouteOverrideMap]);
+  }, [input.setRouteBindingMap]);
 
-  const resolveEffectiveRouteOverrides = useCallback((options: ResolveRouteOverridesInput) => {
+  const resolveEffectiveRouteBindings = useCallback((options: ResolveRouteBindingsInput) => {
     const defaultBinding = options.runtimeDefaultBinding ?? input.runtimeDefaultRouteBinding;
     const normalized = {
-      coarse: input.routeOverrideMap.coarse || defaultBinding || null,
-      fine: input.routeOverrideMap.fine || defaultBinding || null,
-    } as DistillRouteOverrideMap;
+      coarse: input.bindingMap.coarse || defaultBinding || null,
+      fine: input.bindingMap.fine || defaultBinding || null,
+    } as DistillRouteBindingMap;
     if (options.mode !== 'failed' || !options.retryWithFineRoute) return normalized;
-    const preferred = input.routeOverrideMap.fine || input.routeOverrideMap.coarse || null;
+    const preferred = input.bindingMap.fine || input.bindingMap.coarse || null;
     if (!preferred) return normalized;
     return {
       coarse: preferred,
       fine: preferred,
-    } as DistillRouteOverrideMap;
-  }, [input.routeOverrideMap, input.runtimeDefaultRouteBinding]);
+    } as DistillRouteBindingMap;
+  }, [input.bindingMap, input.runtimeDefaultRouteBinding]);
 
   return {
     onRouteSourceChange,
     onRouteConnectorChange,
     onRouteModelChange,
-    onClearRouteOverride,
-    resolveEffectiveRouteOverrides,
+    onClearRouteBinding,
+    resolveEffectiveRouteBindings,
   };
 }
 

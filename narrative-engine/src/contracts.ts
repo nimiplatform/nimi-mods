@@ -1,6 +1,5 @@
 export const NARRATIVE_ENGINE_MOD_ID = 'world.nimi.narrative-engine';
 
-export const NARRATIVE_ENGINE_DATA_API_RUNTIME_ROUTE_OPTIONS = 'data-api.runtime.route.options';
 export const NARRATIVE_ENGINE_DATA_API_WORLD_ACCESS_ME = 'data-api.world.access.me';
 export const NARRATIVE_ENGINE_DATA_API_WORLD_EVENTS_LIST = 'data-api.world.events.list';
 export const NARRATIVE_ENGINE_DATA_API_WORLD_LOREBOOKS_LIST = 'data-api.world.lorebooks.list';

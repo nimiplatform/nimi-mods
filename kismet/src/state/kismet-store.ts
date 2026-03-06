@@ -31,8 +31,8 @@ type KismetStore = {
   // Route
   routeSource: RouteSourceDisplay;
   setRouteSource: (source: RouteSourceDisplay) => void;
-  routeOverride: RuntimeRouteBinding | null;
-  setRouteOverride: (override: RuntimeRouteBinding | null) => void;
+  routeBinding: RuntimeRouteBinding | null;
+  setRouteBinding: (binding: RuntimeRouteBinding | null) => void;
   chatRouteOptions: RuntimeRouteOptionsSnapshot | null;
   setChatRouteOptions: (options: RuntimeRouteOptionsSnapshot | null) => void;
 
@@ -48,7 +48,7 @@ const initialState = {
   error: null as KismetError | null,
   generatedPrompts: null as { systemPrompt: string; userPrompt: string } | null,
   routeSource: 'unavailable' as RouteSourceDisplay,
-  routeOverride: null as RuntimeRouteBinding | null,
+  routeBinding: null as RuntimeRouteBinding | null,
   chatRouteOptions: null as RuntimeRouteOptionsSnapshot | null,
 };
 
@@ -66,7 +66,7 @@ export const useKismetStore = create<KismetStore>((set) => ({
   setError: (error) => set({ error, result: null }),
   setGeneratedPrompts: (generatedPrompts) => set({ generatedPrompts }),
   setRouteSource: (routeSource) => set({ routeSource }),
-  setRouteOverride: (routeOverride) => set({ routeOverride }),
+  setRouteBinding: (routeBinding) => set({ routeBinding }),
   setChatRouteOptions: (chatRouteOptions) => set({ chatRouteOptions }),
 
   reset: () => set(initialState),

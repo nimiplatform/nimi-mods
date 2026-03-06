@@ -11,13 +11,13 @@
 
 Meeting Scribe 支持两种路由模式，由用户在 UI 上通过 `localOnly` 开关切换：
 
-| 模式 | localOnly | STT route hint | Chat route hint | 说话人分离 |
-|------|-----------|---------------|-----------------|-----------|
-| Cloud (default) | `false` | `stt/default` | `chat/default` | Gemini 原生支持 |
-| Local-only | `true` | `stt/local` | `chat/local` | 不可用（降级为 Unknown） |
+| 模式 | localOnly | STT capability + binding.source | Chat capability + binding.source | 说话人分离 |
+|------|-----------|---------------------------------|----------------------------------|-----------|
+| Cloud (default) | `false` | `audio.transcribe` + `token-api` | `text.generate` + `token-api` | Gemini 原生支持 |
+| Local-only | `true` | `audio.transcribe` + `local-runtime` | `text.generate` + `local-runtime` | 不可用（降级为 Unknown） |
 
 - 路由模式在创建会议时确定，处理过程中不可切换。
-- 路由切换通过 `aiClient` 的 route hint 参数实现，mod 代码不感知具体 provider。
+- 路由切换通过 `runtime.route.resolve()` 选出 binding，并由 runtime facade 调用携带 binding；mod 不感知具体 provider。
 
 ## MS-ROUTE-002 — Local-only 隐私保证
 

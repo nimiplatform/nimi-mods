@@ -368,20 +368,6 @@ function createPipelineDeps(options = {}) {
   const hookClient = {
     data: {
       query: async ({ capability, query }) => {
-        if (capability === 'data-api.runtime.route.options') {
-          return {
-            selected: {
-              source: 'local-runtime',
-              connectorId: '',
-              model: 'mock-model',
-            },
-            connectors: [],
-            localRuntime: {
-              models: [{ localModelId: 'm1', model: 'mock-model' }],
-            },
-          };
-        }
-
         if (capability === 'data-api.videoplay.episode.upsert') {
           if (query.operation === 'upsert') {
             writes.episodes.push(query.episode);
@@ -409,17 +395,49 @@ function createPipelineDeps(options = {}) {
         throw new Error(`unhandled capability: ${capability}`);
       },
     },
-    llm: {
-      speech: {
-        listVoices: async () => {
-          if (typeof options.listVoices === 'function') {
-            return options.listVoices();
-          }
-          return [
-            { id: 'voice-zh-1', providerId: 'provider-main', name: 'ZH Voice', lang: 'zh' },
-            { id: 'voice-en-1', providerId: 'provider-main', name: 'EN Voice', lang: 'en' },
-          ];
+  };
+
+  const runtimeClient = {
+    route: {
+      listOptions: async ({ capability }) => ({
+        capability,
+        selected: {
+          source: 'local-runtime',
+          connectorId: '',
+          model: 'mock-model',
         },
+        resolvedDefault: {
+          source: 'local-runtime',
+          connectorId: '',
+          model: 'mock-model',
+        },
+        connectors: [],
+        localRuntime: {
+          models: [{ localModelId: 'm1', model: 'mock-model' }],
+        },
+      }),
+      resolve: async ({ binding }) => ({
+        source: binding?.source || 'local-runtime',
+        connectorId: binding?.connectorId || '',
+        model: binding?.model || 'mock-model',
+        provider: 'provider-main',
+      }),
+    },
+    media: {
+      tts: {
+        listVoices: async () => ({
+          voices: typeof options.listVoices === 'function'
+            ? options.listVoices().map((voice) => ({
+              voiceId: voice.id,
+              lang: voice.lang,
+            }))
+            : [
+              { voiceId: 'voice-zh-1', lang: 'zh' },
+              { voiceId: 'voice-en-1', lang: 'en' },
+            ],
+          modelResolved: 'mock-model',
+          traceId: 'trace-voices-1',
+        }),
       },
     },
   };
@@ -452,11 +470,11 @@ function createPipelineDeps(options = {}) {
   };
 
   const aiClient = {
-    checkRouteHealth: async ({ routeHint, routeOverride }) => {
+    checkRouteHealth: async ({ capability, binding }) => {
       if (typeof options.checkRouteHealth === 'function') {
-        return options.checkRouteHealth({ routeHint, routeOverride });
+        return options.checkRouteHealth({ capability, binding });
       }
-      if (routeOverride?.source === 'local-runtime') {
+      if (binding?.source === 'local-runtime') {
         return {
           status: 'healthy',
           reasonCode: 'RUNTIME_ROUTE_HEALTHY',
@@ -485,6 +503,7 @@ function createPipelineDeps(options = {}) {
   return {
     deps: {
       hookClient,
+      runtimeClient,
       aiClient,
       narrativeEngine,
     },
@@ -549,11 +568,10 @@ test('sourceEventIds out-of-baseline fails close in quality gate', () => {
 test('route fallback audit fields are complete', async () => {
   const result = await invokeWithRouteFallback({
     stage: 'screenplay',
-    capability: 'llm.text.generate',
+    capability: 'text.generate',
     traceId: 'trace-1',
-    routeHint: 'chat/fine',
-    checkHealth: async (routeHint, routeOverride) => {
-      if (routeOverride?.source === 'local-runtime') {
+    checkHealth: async (_capability, binding) => {
+      if (binding?.source === 'local-runtime') {
         return { status: 'unhealthy', reasonCode: 'RUNTIME_ROUTE_DOWN' };
       }
       return { status: 'healthy', reasonCode: 'RUNTIME_ROUTE_HEALTHY' };
@@ -565,7 +583,7 @@ test('route fallback audit fields are complete', async () => {
   assert.ok(result.fallbackAudit);
   assert.equal(result.fallbackAudit.traceId, 'trace-1');
   assert.equal(result.fallbackAudit.stage, 'screenplay');
-  assert.equal(result.fallbackAudit.capability, 'llm.text.generate');
+  assert.equal(result.fallbackAudit.capability, 'text.generate');
   assert.equal(result.fallbackAudit.from, 'local-runtime');
   assert.equal(result.fallbackAudit.to, 'token-api');
   assert.ok(result.fallbackAudit.reason.length > 0);
@@ -882,8 +900,8 @@ test('asset render emits analysis/queue trace and voice assets', async () => {
 
 test('voice route fallback is audited in pipeline', async () => {
   const { deps } = createPipelineDeps({
-    checkRouteHealth: ({ routeHint, routeOverride }) => {
-      if (routeHint === 'tts/default' && routeOverride?.source === 'local-runtime') {
+    checkRouteHealth: ({ capability, binding }) => {
+      if (capability === 'audio.synthesize' && binding?.source === 'local-runtime') {
         return { status: 'unhealthy', reasonCode: 'RUNTIME_ROUTE_DOWN' };
       }
       return { status: 'healthy', reasonCode: 'RUNTIME_ROUTE_HEALTHY' };
@@ -902,7 +920,7 @@ test('voice route fallback is audited in pipeline', async () => {
   assert.ok(voiceFallback);
   assert.equal(voiceFallback.from, 'local-runtime');
   assert.equal(voiceFallback.to, 'token-api');
-  assert.equal(voiceFallback.capability, 'llm.speech.synthesize');
+  assert.equal(voiceFallback.capability, 'audio.synthesize');
 });
 
 test('release package contains mandatory minimum fields', async () => {

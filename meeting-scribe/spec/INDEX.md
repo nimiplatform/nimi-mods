@@ -117,9 +117,9 @@ meeting-scribe (nimi-mod)
 ### Mod Capabilities (Required)
 
 ```yaml
-- llm.text.generate
-- llm.text.stream
-- llm.speech.transcribe
+- runtime.ai.text.generate
+- runtime.ai.text.stream
+- runtime.media.stt.transcribe
 - ui.register.ui-extension.app.sidebar.mods
 - ui.register.ui-extension.app.content.routes
 - event.publish.ms:*

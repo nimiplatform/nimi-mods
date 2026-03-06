@@ -8,29 +8,46 @@ afterEach(() => {
 
 describe('createTtsClientAdapter', () => {
   it('forwards connector route options to speech.listVoices', async () => {
-    const listVoices = vi.fn().mockResolvedValue([
-      {
-        id: 'Cherry',
-        providerId: 'dashscope',
-        name: 'Cherry',
-        lang: 'zh',
+    const listVoices = vi.fn().mockResolvedValue({
+      voices: [
+        {
+          voiceId: 'Cherry',
+          name: 'Cherry',
+          lang: 'zh',
+          supportedLangs: ['zh'],
+        },
+      ],
+      modelResolved: 'cloud/default',
+      traceId: 'trace-audio-book-tts-list',
+    });
+    const runtimeClient = {
+      media: {
+        tts: {
+          listVoices,
+          synthesize: vi.fn(),
+        },
       },
-    ]);
-    const speech = {
-      listVoices,
-      synthesize: vi.fn(),
+      route: {
+        resolve: vi.fn().mockResolvedValue({
+          provider: 'dashscope',
+        }),
+      },
     } as unknown as Parameters<typeof createTtsClientAdapter>[0];
-    const adapter = createTtsClientAdapter(speech);
+    const binding = {
+      source: 'token-api' as const,
+      connectorId: 'conn-1',
+      model: 'cloud/default',
+    };
+    const adapter = createTtsClientAdapter(runtimeClient);
 
     const voices = await adapter.listVoices({
-      connectorId: 'conn-1',
-      routeSource: 'token-api',
+      binding,
       model: 'cloud/default',
     });
 
     expect(listVoices).toHaveBeenCalledWith({
-      connectorId: 'conn-1',
-      routeSource: 'token-api',
+      binding,
+      model: 'cloud/default',
     });
     expect(voices).toEqual([
       {
@@ -44,40 +61,61 @@ describe('createTtsClientAdapter', () => {
 
   it('forwards model to speech.synthesize', async () => {
     const synthesize = vi.fn().mockResolvedValue({
-      audioUri: 'data:audio/mpeg;base64,AAAA',
-      mimeType: 'audio/mpeg',
-      durationMs: 1234,
+      job: {
+        jobId: 'job-audio-book-tts',
+      },
+      artifacts: [
+        {
+          uri: 'data:audio/mpeg;base64,AAAA',
+          mimeType: 'audio/mpeg',
+        },
+      ],
+      trace: {
+        traceId: 'trace-audio-book-tts',
+      },
     });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      blob: async () => new Blob(['audio'], { type: 'audio/mpeg' }),
+      blob: async () => new Blob([new Uint8Array(16_000)], { type: 'audio/mpeg' }),
     }));
 
-    const speech = {
-      listVoices: vi.fn().mockResolvedValue([]),
-      synthesize,
+    const runtimeClient = {
+      media: {
+        tts: {
+          listVoices: vi.fn().mockResolvedValue([]),
+          synthesize,
+        },
+      },
+      route: {
+        resolve: vi.fn().mockResolvedValue({
+          provider: 'dashscope',
+        }),
+      },
     } as unknown as Parameters<typeof createTtsClientAdapter>[0];
-    const adapter = createTtsClientAdapter(speech);
+    const binding = {
+      source: 'token-api' as const,
+      connectorId: 'conn-1',
+      model: 'cloud/default',
+    };
+    const adapter = createTtsClientAdapter(runtimeClient);
 
     const result = await adapter.synthesize({
       text: 'hello',
       voiceId: 'Cherry',
       providerId: 'dashscope',
-      connectorId: 'conn-1',
-      routeSource: 'token-api',
+      binding,
       model: 'cloud/default',
     });
 
     expect(synthesize).toHaveBeenCalledWith({
       text: 'hello',
-      voiceId: 'Cherry',
-      providerId: 'dashscope',
-      speakingRate: undefined,
+      voice: 'Cherry',
+      speed: undefined,
       pitch: undefined,
-      stylePrompt: undefined,
-      connectorId: 'conn-1',
-      routeSource: 'token-api',
+      emotion: undefined,
+      binding,
       model: 'cloud/default',
     });
-    expect(result.durationMs).toBe(1234);
+    expect(result.audioBlob.type).toBe('audio/mpeg');
+    expect(result.durationMs).toBeGreaterThan(0);
   });
 });

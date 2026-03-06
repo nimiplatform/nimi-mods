@@ -1,15 +1,15 @@
-import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
 import { runSynthesizeDraft } from '../engine/synthesize.js';
 import type {
   FinalDraftAccumulator,
   Phase2Result,
   WorldStudioKnowledgeGraphDraft,
-  WorldStudioRouteOverride,
+  WorldStudioRouteBinding,
 } from '../engine/types.js';
-import { withRouteOverride } from './route-capability-resolver.js';
+import { withRouteBinding } from './route-capability-resolver.js';
+import type { WorldStudioRuntimeAiClient } from '../runtime-ai-client.js';
 
 export async function runPhase2DraftGeneration(
-  aiClient: ModAiClient,
+  aiClient: WorldStudioRuntimeAiClient,
   input: {
     selectedStartTimeId: string;
     selectedCharacters: string[];
@@ -17,11 +17,11 @@ export async function runPhase2DraftGeneration(
     finalDraftAccumulator?: FinalDraftAccumulator;
   },
   options?: {
-    routeOverride?: WorldStudioRouteOverride | null;
+    binding?: WorldStudioRouteBinding | null;
     abortSignal?: AbortSignal;
   },
 ): Promise<Phase2Result> {
-  const scopedLlm = withRouteOverride(aiClient, 'chat/fine', options?.routeOverride);
+  const scopedLlm = withRouteBinding(aiClient, 'text.generate', options?.binding);
   return runSynthesizeDraft(scopedLlm, {
     selectedStartTimeId: input.selectedStartTimeId,
     selectedCharacters: input.selectedCharacters,

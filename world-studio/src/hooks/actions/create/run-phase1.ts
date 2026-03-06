@@ -8,7 +8,7 @@ import type { WorldStudioCreateActionsInput } from './types.js';
 import { resolveAdaptiveChunkPolicy } from './chunk-policy.js';
 import {
   buildParseJobStartState,
-  resolveCreatePhase1RouteOverrides,
+  resolveCreatePhase1RouteBindings,
   resolvePhase1Chunks,
   resolveRetryChunks,
 } from './run-phase1-helpers.js';
@@ -31,7 +31,7 @@ export async function runCreatePhase1(
   const resumeTask = resolvePhase1ResumeTask(input, options);
   const isResumeRun = Boolean(resumeTask);
   const effectiveMode: 'all' | 'failed' = isResumeRun ? 'failed' : mode;
-  const { routeOverrides } = await resolveCreatePhase1RouteOverrides(input, effectiveMode);
+  const { bindings } = await resolveCreatePhase1RouteBindings(input, effectiveMode);
   diagLog('Phase1 ENTER', {
     mode,
     effectiveMode,
@@ -46,9 +46,9 @@ export async function runCreatePhase1(
     sourceChunkCount: input.sourceChunksRef.current.length,
   });
 
-  if (!isResumeRun && !areDistillRoutesReady(routeOverrides, input.routeOptions)) {
-    const coarse = evaluateRouteBindingReadiness(routeOverrides.coarse, input.routeOptions);
-    const fine = evaluateRouteBindingReadiness(routeOverrides.fine, input.routeOptions);
+  if (!isResumeRun && !areDistillRoutesReady(bindings, input.routeOptions)) {
+    const coarse = evaluateRouteBindingReadiness(bindings.coarse, input.routeOptions);
+    const fine = evaluateRouteBindingReadiness(bindings.fine, input.routeOptions);
     const firstFailure = !coarse.ready ? coarse : fine;
     diagLog('Phase1 route not ready', {
       coarseReady: coarse.ready,
@@ -70,8 +70,8 @@ export async function runCreatePhase1(
     return;
   }
   let activeChunkPolicy = resolveAdaptiveChunkPolicy({
-    coarseRouteBinding: routeOverrides.coarse,
-    fineRouteBinding: routeOverrides.fine,
+    coarseRouteBinding: bindings.coarse,
+    fineRouteBinding: bindings.fine,
     routeOptions: input.routeOptions,
     sourceSample: sourceSampleForPolicy(input),
   });
@@ -272,8 +272,8 @@ export async function runCreatePhase1(
       coarseModel: activeChunkPolicy.coarseModel || null,
       fineModel: activeChunkPolicy.fineModel || null,
       autoShrinkRetried: false,
-      coarseRoute: formatRouteBindingSummary(routeOverrides.coarse as RuntimeRouteBinding | null),
-      fineRoute: formatRouteBindingSummary(routeOverrides.fine as RuntimeRouteBinding | null),
+      coarseRoute: formatRouteBindingSummary(bindings.coarse as RuntimeRouteBinding | null),
+      fineRoute: formatRouteBindingSummary(bindings.fine as RuntimeRouteBinding | null),
       resume: isResumeRun,
       taskId,
     },
@@ -291,7 +291,7 @@ export async function runCreatePhase1(
       taskId,
       abortSignal,
       shouldInterrupt,
-      routeOverrides,
+      bindings,
       effectiveMode,
       isResumeRun,
       usedLegacyFileChunks,

@@ -4,7 +4,6 @@ export const VIDEOPLAY_TAB_ID = 'mod:videoplay';
 export const VIDEOPLAY_NAV_SLOT = 'ui-extension.app.sidebar.mods';
 export const VIDEOPLAY_ROUTE_SLOT = 'ui-extension.app.content.routes';
 
-export const VIDEOPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS = 'data-api.runtime.route.options';
 export const VIDEOPLAY_DATA_API_WORLD_EVENTS_LIST = 'data-api.world.events.list';
 export const VIDEOPLAY_DATA_API_WORLD_LOREBOOKS_LIST = 'data-api.world.lorebooks.list';
 export const VIDEOPLAY_DATA_API_WORLD_SCENES_LIST = 'data-api.world.scenes.list';
@@ -16,11 +15,14 @@ export const VIDEOPLAY_DATA_API_ASSET_BATCH_UPSERT = 'data-api.videoplay.asset.b
 export const VIDEOPLAY_DATA_API_RELEASE_PUBLISH = 'data-api.videoplay.release.publish';
 
 export const VIDEOPLAY_CAPABILITIES = [
-  'llm.text.generate',
-  'llm.image.generate',
-  'llm.video.generate',
-  'llm.speech.synthesize',
-  `data.query.${VIDEOPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS}`,
+  'runtime.ai.text.generate',
+  'runtime.media.image.generate',
+  'runtime.media.video.generate',
+  'runtime.media.tts.list.voices',
+  'runtime.media.tts.synthesize',
+  'runtime.route.list.options',
+  'runtime.route.resolve',
+  'runtime.route.check.health',
   `data.query.${VIDEOPLAY_DATA_API_WORLD_EVENTS_LIST}`,
   `data.query.${VIDEOPLAY_DATA_API_WORLD_LOREBOOKS_LIST}`,
   `data.query.${VIDEOPLAY_DATA_API_WORLD_SCENES_LIST}`,
@@ -165,18 +167,18 @@ export const VIDEOPLAY_ROUTE_STAGES = [
 ] as const;
 
 export const VIDEOPLAY_STAGE_CAPABILITY = {
-  'screenplay': 'llm.text.generate',
-  'storyboard': 'llm.text.generate',
-  'asset-render-image': 'llm.image.generate',
-  'asset-render-video': 'llm.video.generate',
-  'asset-render-voice': 'llm.speech.synthesize',
-  'character-casting-text': 'llm.text.generate',
-  'character-casting-visual': 'llm.image.generate',
-  'scene-planning-text': 'llm.text.generate',
-  'scene-planning-visual': 'llm.image.generate',
-  'storyboard-cinematography': 'llm.text.generate',
-  'storyboard-acting': 'llm.text.generate',
-  'audio-design-bgm': 'llm.text.generate',
+  'screenplay': 'text.generate',
+  'storyboard': 'text.generate',
+  'asset-render-image': 'image.generate',
+  'asset-render-video': 'video.generate',
+  'asset-render-voice': 'audio.synthesize',
+  'character-casting-text': 'text.generate',
+  'character-casting-visual': 'image.generate',
+  'scene-planning-text': 'text.generate',
+  'scene-planning-visual': 'image.generate',
+  'storyboard-cinematography': 'text.generate',
+  'storyboard-acting': 'text.generate',
+  'audio-design-bgm': 'text.generate',
 } as const;
 
 export type VideoPlayRouteStage =

@@ -1,9 +1,9 @@
 import { useCallback, useEffect } from 'react';
 import type { createHookClient } from '@nimiplatform/sdk/mod/hook';
+import type { createModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import {
   asRecord } from '@nimiplatform/sdk/mod/utils';
-import { parseRuntimeRouteOptions, type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
-import { WORLD_STUDIO_DATA_API_RUNTIME_ROUTE_OPTIONS, WORLD_STUDIO_MOD_ID } from '../contracts.js';
+import { type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
 import { getMyWorldAccess, resolveWorldLanding } from '../data.js';
 import {
   deriveLandingFromAccess,
@@ -16,6 +16,7 @@ type UseWorldStudioBootstrapInput = {
   bootstrapReady: boolean;
   flowId: string;
   hookClient: ReturnType<typeof createHookClient>;
+  runtimeClient: ReturnType<typeof createModRuntimeClient>;
   runtimeDefaultRouteBinding: RuntimeRouteBinding | null;
   setRouteOptions: (value: RuntimeRouteOptionsSnapshot | null) => void;
   setLanding: (value: LandingState) => void;
@@ -26,41 +27,30 @@ type UseWorldStudioBootstrapInput = {
 export function useWorldStudioBootstrap(input: UseWorldStudioBootstrapInput) {
   const loadRuntimeRouteOptions = useCallback(async () => {
     try {
-      const payload = await input.hookClient.data.query({
-        capability: WORLD_STUDIO_DATA_API_RUNTIME_ROUTE_OPTIONS,
-        query: {
-          capability: 'chat',
-          modId: WORLD_STUDIO_MOD_ID,
-        },
+      const options = await input.runtimeClient.route.listOptions({
+        capability: 'text.generate',
       });
-      input.setRouteOptions(parseRuntimeRouteOptions(payload, { includeResolvedDefault: true }));
+      input.setRouteOptions(options);
     } catch {
       input.setRouteOptions(null);
     }
-  }, [input.hookClient.data, input.setRouteOptions]);
+  }, [input.runtimeClient.route, input.setRouteOptions]);
 
   const resolveRuntimeDefaultRouteBinding = useCallback(async () => {
     if (input.runtimeDefaultRouteBinding) {
       return input.runtimeDefaultRouteBinding;
     }
     try {
-      const payload = await input.hookClient.data.query({
-        capability: WORLD_STUDIO_DATA_API_RUNTIME_ROUTE_OPTIONS,
-        query: {
-          capability: 'chat',
-          modId: WORLD_STUDIO_MOD_ID,
-        },
+      const options = await input.runtimeClient.route.listOptions({
+        capability: 'text.generate',
       });
-      const parsed = parseRuntimeRouteOptions(payload, { includeResolvedDefault: true });
-      if (parsed) {
-        input.setRouteOptions(parsed);
-        return parsed.resolvedDefault || parsed.selected;
-      }
+      input.setRouteOptions(options);
+      return options.resolvedDefault || options.selected;
     } catch {
       // no-op
     }
     return null;
-  }, [input.hookClient.data, input.runtimeDefaultRouteBinding, input.setRouteOptions]);
+  }, [input.runtimeClient.route, input.runtimeDefaultRouteBinding, input.setRouteOptions]);
 
   const loadLanding = useCallback(async () => {
     input.setLandingLoading(true);

@@ -1,4 +1,3 @@
-import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
 import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
 import type { Dispatch, SetStateAction } from 'react';
 import type { LocalChatTarget } from '../../data/index.js';
@@ -9,6 +8,7 @@ import type {
   LocalChatTurnAudit,
 } from '../../state/index.js';
 import type { ChatMessage } from '../../types.js';
+import type { LocalChatAiClient } from '../../runtime-ai-client.js';
 
 export type ChatRouteSnapshot = {
   source: string;
@@ -32,7 +32,7 @@ export type AssistantPlanSegment = {
 };
 
 export type LocalChatTurnAiClient = Pick<
-  ModAiClient,
+  LocalChatAiClient,
   'generateText' | 'generateObject' | 'streamText' | 'generateImage' | 'generateVideo' | 'resolveRoute'
 >;
 
@@ -42,7 +42,7 @@ export type UseLocalChatTurnSendInput = {
   setInputText: (value: string) => void;
   runtimeMode: 'STORY' | 'SCENE_TURN' | undefined;
   chatRouteOptions: RuntimeRouteOptionsSnapshot | null;
-  routeOverride: RuntimeRouteBinding | null;
+  routeBinding: RuntimeRouteBinding | null;
   routeSnapshot: ChatRouteSnapshot | null;
   defaultSettings: LocalChatDefaultSettings;
   selectedTarget: LocalChatTarget | null;

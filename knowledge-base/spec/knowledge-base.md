@@ -14,8 +14,8 @@ knowledge-base/
 │   ├── index.ts, runtime-mod.ts, manifest.ts   # 入口与注册
 │   ├── types.ts, contracts.ts                    # 实体与能力定义 → KB-DOM-*, KB-CAP-*
 │   ├── adapters/                                 # SDK → 服务层桥接
-│   │   ├── llm-adapter.ts                        # ModAiClient → LlmClient
-│   │   └── embedding-adapter.ts                  # ModAiClient → EmbeddingClient
+│   │   ├── llm-adapter.ts                        # ModRuntimeClient → LlmClient
+│   │   └── embedding-adapter.ts                  # ModRuntimeClient → EmbeddingClient
 │   ├── controllers/                              # React hooks 编排层
 │   │   ├── use-kb-page-controller.ts             # 顶层 facade
 │   │   ├── use-kb-clients.ts                     # 路由解析 + adapter 创建
@@ -82,6 +82,6 @@ knowledge-base/
 |-------|-----------|
 | UI | React 19 + Tailwind 4 + Radix UI (Dialog, Progress, Tooltip) |
 | State | Zustand + IndexedDB (`knowledge-base-db` v1) |
-| AI | `@nimiplatform/sdk/mod/ai` (generateText, streamText, generateEmbedding) |
+| AI | `@nimiplatform/sdk/mod/runtime` (`runtime.ai.text.generate/stream`, `runtime.ai.embedding.generate`) |
 | Vector Search | In-memory cosine similarity (VectorStore class) |
 | Routing | Tab-based (Documents / Chat / Settings) via Zustand `activeTab` |

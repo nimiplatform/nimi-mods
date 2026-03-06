@@ -1,4 +1,4 @@
-import type { ResolvedRuntimeRouteBinding, RuntimeRouteOverride } from '@nimiplatform/sdk/mod/types';
+import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 import type { LocalChatDefaultSettings } from '../../state/index.js';
 
 type MediaKind = 'image' | 'video';
@@ -21,7 +21,7 @@ export function resolveMediaRouteConfig(input: {
   fallbackSource?: 'local-runtime' | 'token-api';
 }): {
   routeSource: MediaRouteSource;
-  routeOverride?: RuntimeRouteOverride;
+  routeBinding?: RuntimeRouteBinding;
   model?: string;
 } {
   const routeSource = normalizeRouteSource(
@@ -42,41 +42,47 @@ export function resolveMediaRouteConfig(input: {
   const fallbackSource = input.fallbackSource || 'local-runtime';
 
   if (routeSource === 'local-runtime') {
-    const override: RuntimeRouteOverride = {
+    const override: RuntimeRouteBinding = {
       source: 'local-runtime',
+      connectorId: '',
+      model: model || '',
       ...(model ? { model, localModelId: model } : {}),
     };
     return {
       routeSource,
-      routeOverride: override,
+      routeBinding: override,
       model: model || undefined,
     };
   }
 
   if (routeSource === 'token-api') {
-    const override: RuntimeRouteOverride = {
+    const override: RuntimeRouteBinding = {
       source: 'token-api',
+      connectorId,
+      model: model || '',
       ...(connectorId ? { connectorId } : {}),
       ...(model ? { model } : {}),
     };
     return {
       routeSource,
-      routeOverride: override,
+      routeBinding: override,
       model: model || undefined,
     };
   }
 
   if (connectorId || model) {
     const inferredSource = connectorId ? 'token-api' : fallbackSource;
-    const override: RuntimeRouteOverride = {
+    const override: RuntimeRouteBinding = {
       source: inferredSource,
+      connectorId,
+      model: model || '',
       ...(connectorId ? { connectorId } : {}),
       ...(model ? { model } : {}),
       ...(model && inferredSource === 'local-runtime' ? { localModelId: model } : {}),
     };
     return {
       routeSource,
-      routeOverride: override,
+      routeBinding: override,
       model: model || undefined,
     };
   }
@@ -110,21 +116,27 @@ export function isMediaRouteReady(input: {
   return Boolean(connectorId);
 }
 
-export function toPinnedRouteOverride(route: ResolvedRuntimeRouteBinding): RuntimeRouteOverride {
+export function toPinnedRouteBinding(route: {
+  source: string;
+  connectorId?: string;
+  model?: string;
+  localModelId?: string;
+}): RuntimeRouteBinding {
   if (route.source === 'token-api') {
     const connectorId = asTrimmedString(route.connectorId);
     const model = asTrimmedString(route.model);
     return {
       source: 'token-api',
-      ...(connectorId ? { connectorId } : {}),
-      ...(model ? { model } : {}),
+      connectorId,
+      model,
     };
   }
   const model = asTrimmedString(route.model);
   const localModelId = asTrimmedString(route.localModelId) || model;
   return {
     source: 'local-runtime',
-    ...(model ? { model } : {}),
+    connectorId: '',
+    model,
     ...(localModelId ? { localModelId } : {}),
   };
 }

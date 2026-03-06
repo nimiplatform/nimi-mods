@@ -16,9 +16,9 @@ function dedupeModelIds(models: string[]): string[] {
   ));
 }
 
-function toDefaultBinding(routeOverride: RuntimeRouteBinding | null, routeOptions: ReturnType<typeof useMintYouRouteOptions>['routeOptions']): RuntimeRouteBinding {
-  if (routeOverride) {
-    return routeOverride;
+function toDefaultBinding(routeBinding: RuntimeRouteBinding | null, routeOptions: ReturnType<typeof useMintYouRouteOptions>['routeOptions']): RuntimeRouteBinding {
+  if (routeBinding) {
+    return routeBinding;
   }
   if (routeOptions?.selected) {
     return routeOptions.selected;
@@ -32,8 +32,8 @@ function toDefaultBinding(routeOverride: RuntimeRouteBinding | null, routeOption
 
 export function MintYouRouteSidebar() {
   const { t } = useModTranslation('mint-you');
-  const routeOverride = useMintYouStore((state) => state.routeOverride);
-  const setRouteOverride = useMintYouStore((state) => state.setRouteOverride);
+  const routeBinding = useMintYouStore((state) => state.routeBinding);
+  const setRouteBinding = useMintYouStore((state) => state.setRouteBinding);
 
   const {
     routeOptions,
@@ -42,7 +42,7 @@ export function MintYouRouteSidebar() {
     reloadRouteOptions,
   } = useMintYouRouteOptions();
 
-  const effectiveBinding = toDefaultBinding(routeOverride, routeOptions);
+  const effectiveBinding = toDefaultBinding(routeBinding, routeOptions);
   const activeSource = effectiveBinding.source;
 
   const connectors = routeOptions?.connectors || [];
@@ -87,14 +87,14 @@ export function MintYouRouteSidebar() {
         localModelId: matchedLocalModel?.localModelId,
         engine: matchedLocalModel?.engine,
       };
-    setRouteOverride(nextBinding);
+    setRouteBinding(nextBinding);
   };
 
   const handleSourceChange = (sourceRaw: string) => {
     const source = normalizeRuntimeRouteSource(sourceRaw);
     if (source === 'token-api') {
       const fallbackConnector = connectors[0] || null;
-      setRouteOverride({
+      setRouteBinding({
         source: 'token-api',
         connectorId: fallbackConnector?.id || '',
         model: fallbackConnector?.models[0] || '',
@@ -103,7 +103,7 @@ export function MintYouRouteSidebar() {
     }
 
     const fallbackLocalModel = routeOptions?.localRuntime.models[0] || null;
-    setRouteOverride({
+    setRouteBinding({
       source: 'local-runtime',
       connectorId: '',
       model: fallbackLocalModel?.model || '',
@@ -115,7 +115,7 @@ export function MintYouRouteSidebar() {
   const handleConnectorChange = (connectorId: string) => {
     const connector = connectors.find((item) => item.id === connectorId) || null;
     if (!connector) {
-      setRouteOverride({
+      setRouteBinding({
         source: 'token-api',
         connectorId,
         model: '',
@@ -127,7 +127,7 @@ export function MintYouRouteSidebar() {
       ? effectiveBinding.model
       : (connector.models[0] || '');
 
-    setRouteOverride({
+    setRouteBinding({
       source: 'token-api',
       connectorId,
       model,
@@ -220,7 +220,7 @@ export function MintYouRouteSidebar() {
           <button
             type="button"
             onClick={() => {
-              setRouteOverride(null);
+              setRouteBinding(null);
             }}
             className="h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
           >

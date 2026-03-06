@@ -60,7 +60,7 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     healthStatus,
     checkingHealth,
     chatRouteOptions,
-    routeOverride,
+    routeBinding,
     speechProviders,
     speechVoices,
     selectedSpeechProviderId,
@@ -85,7 +85,7 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     onRouteSourceChange,
     onRouteConnectorChange,
     onRouteModelChange,
-    onClearRouteOverride,
+    onClearRouteBinding,
     onSpeechProviderChange,
     onVoiceIdChange,
     onTtsRouteSourceChange,
@@ -99,17 +99,17 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
   } = props;
 
   const hasValidTokenApiOverride = (
-    routeOverride?.source === 'token-api'
+    routeBinding?.source === 'token-api'
       ? (
         (chatRouteOptions?.connectors.length || 0) === 0
-          || chatRouteOptions?.connectors.some((connector) => connector.id === routeOverride.connectorId)
+          || chatRouteOptions?.connectors.some((connector) => connector.id === routeBinding.connectorId)
       )
       : true
   );
   const effectiveChatBinding: RuntimeRouteBinding | null = (
-    routeOverride && hasValidTokenApiOverride
-      ? routeOverride
-      : chatRouteOptions?.selected || routeOverride || null
+    routeBinding && hasValidTokenApiOverride
+      ? routeBinding
+      : chatRouteOptions?.selected || routeBinding || null
   );
   const activeChatSource = effectiveChatBinding?.source || 'local-runtime';
   const fallbackConnectorId = chatRouteOptions?.connectors[0]?.id || '';
@@ -176,9 +176,9 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     : `${sourceLabel(autoBoundSource)}${autoBoundModel ? ` · ${autoBoundModel}` : ''}`;
   const effectiveRouteLabel = formatRouteBindingLabel(effectiveChatBinding);
   const overrideApplied = Boolean(
-    routeOverride
+    routeBinding
     && effectiveChatBinding
-    && bindingsEqual(routeOverride, effectiveChatBinding)
+    && bindingsEqual(routeBinding, effectiveChatBinding)
     && !bindingsEqual(effectiveChatBinding, resolvedDefaultBinding),
   );
   const dependencyStatusLabel = (
@@ -298,7 +298,7 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
           onRouteSourceChange={onRouteSourceChange}
           onRouteConnectorChange={onRouteConnectorChange}
           onRouteModelChange={onRouteModelChange}
-          onClearRouteOverride={onClearRouteOverride}
+          onClearRouteBinding={onClearRouteBinding}
         />
 
         <VoicePanel

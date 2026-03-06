@@ -10,7 +10,6 @@ export const LOCAL_CHAT_DATA_API_SESSIONS_LIST = 'data-api.local-chat.sessions.l
 export const LOCAL_CHAT_DATA_API_SESSIONS_GET = 'data-api.local-chat.sessions.get';
 export const LOCAL_CHAT_DATA_API_SESSIONS_UPSERT = 'data-api.local-chat.sessions.upsert';
 export const LOCAL_CHAT_DATA_API_SESSIONS_DELETE = 'data-api.local-chat.sessions.delete';
-export const LOCAL_CHAT_DATA_API_RUNTIME_ROUTE_OPTIONS = 'data-api.runtime.route.options';
 export const LOCAL_CHAT_CORE_DATA_API_FRIENDS_WITH_DETAILS_LIST = 'data-api.core.social.friends-with-details.list';
 export const LOCAL_CHAT_CORE_DATA_API_USER_BY_ID_GET = 'data-api.core.user.by-id.get';
 export const LOCAL_CHAT_CORE_DATA_API_USER_BY_HANDLE_GET = 'data-api.core.user.by-handle.get';
@@ -22,17 +21,16 @@ export const LOCAL_CHAT_CORE_DATA_API_AGENT_MEMORY_E2E_LIST = 'data-api.core.age
 export const LOCAL_CHAT_CORE_DATA_API_AGENT_MEMORY_STATS_GET = 'data-api.core.agent.memory.stats.get';
 
 export const LOCAL_CHAT_CAPABILITIES = [
-  'llm.text.generate',
-  'llm.text.stream',
-  'llm.image.generate',
-  'llm.video.generate',
-  'llm.speech.providers.list',
-  'llm.speech.voices.list',
-  'llm.speech.synthesize',
-  'llm.speech.stream.open',
-  'llm.speech.stream.control',
-  'llm.speech.stream.close',
-  'llm.speech.transcribe',
+  'runtime.ai.text.generate',
+  'runtime.ai.text.stream',
+  'runtime.media.image.generate',
+  'runtime.media.video.generate',
+  'runtime.media.tts.list.voices',
+  'runtime.media.tts.synthesize',
+  'runtime.media.stt.transcribe',
+  'runtime.route.list.options',
+  'runtime.route.resolve',
+  'runtime.route.check.health',
   `data.register.${LOCAL_CHAT_DATA_API_CHAT_TARGETS_LIST}`,
   `data.query.${LOCAL_CHAT_DATA_API_CHAT_TARGETS_LIST}`,
   `data.register.${LOCAL_CHAT_DATA_API_CHAT_TARGET_DETAIL}`,
@@ -45,7 +43,6 @@ export const LOCAL_CHAT_CAPABILITIES = [
   `data.query.${LOCAL_CHAT_DATA_API_SESSIONS_UPSERT}`,
   `data.register.${LOCAL_CHAT_DATA_API_SESSIONS_DELETE}`,
   `data.query.${LOCAL_CHAT_DATA_API_SESSIONS_DELETE}`,
-  `data.query.${LOCAL_CHAT_DATA_API_RUNTIME_ROUTE_OPTIONS}`,
   `data.query.${LOCAL_CHAT_CORE_DATA_API_FRIENDS_WITH_DETAILS_LIST}`,
   `data.query.${LOCAL_CHAT_CORE_DATA_API_USER_BY_ID_GET}`,
   `data.query.${LOCAL_CHAT_CORE_DATA_API_USER_BY_HANDLE_GET}`,

@@ -4,7 +4,6 @@ import { runTextplayRender } from '../src/pipeline/run-textplay-render.ts';
 import {
   TEXTPLAY_CHAIN_REASON,
   TEXTPLAY_DATA_API_RENDER_PERSIST,
-  TEXTPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS,
   TEXTPLAY_REASON,
 } from '../src/contracts.ts';
 
@@ -82,6 +81,7 @@ function createProjection() {
 
 function createRouteOptionsPayload() {
   return {
+    capability: 'text.generate',
     selected: {
       source: 'token-api',
       connectorId: 'connector-main',
@@ -108,20 +108,12 @@ function createRouteOptionsPayload() {
 
 function createHookClient(options = {}) {
   const persistCalls = [];
-  const failRoute = options.failRoute === true;
 
   return {
     persistCalls,
     hookClient: {
       data: {
         query: async ({ capability, query }) => {
-          if (capability === TEXTPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS) {
-            if (failRoute) {
-              throw new Error('route-capability-missing');
-            }
-            return createRouteOptionsPayload();
-          }
-
           if (capability === TEXTPLAY_DATA_API_RENDER_PERSIST) {
             persistCalls.push(query);
             return {
@@ -133,6 +125,18 @@ function createHookClient(options = {}) {
           throw new Error(`unsupported-capability:${capability}`);
         },
       },
+    },
+  };
+}
+
+function createRuntimeRouteClient(options = {}) {
+  const failRoute = options.failRoute === true;
+  return {
+    listOptions: async () => {
+      if (failRoute) {
+        throw new Error('route-capability-missing');
+      }
+      return createRouteOptionsPayload();
     },
   };
 }
@@ -238,7 +242,7 @@ function createNarrativeEngine(options = {}) {
   };
 }
 
-function createAiClient(options = {}) {
+function createRuntimeTextClient(options = {}) {
   const generateCalls = [];
   const failGenerate = options.failGenerate === true;
   const failMessage = typeof options.failMessage === 'string' ? options.failMessage : 'llm-temporary-failure';
@@ -275,7 +279,8 @@ test('textplay pipeline success returns text+meta and persists output', async ()
     request: createBaseRequest(),
     deps: {
       hookClient,
-      aiClient: createAiClient(),
+      runtimeClient: createRuntimeRouteClient(),
+      aiClient: createRuntimeTextClient(),
       narrativeEngine,
     },
     presenceReports: [],
@@ -301,7 +306,8 @@ test('textplay persist accepts empty route endpoint without persistence warning'
     request: createBaseRequest(),
     deps: {
       hookClient,
-      aiClient: createAiClient({ endpoint: '' }),
+      runtimeClient: createRuntimeRouteClient(),
+      aiClient: createRuntimeTextClient({ endpoint: '' }),
       narrativeEngine,
     },
     presenceReports: [],
@@ -315,13 +321,14 @@ test('textplay persist accepts empty route endpoint without persistence warning'
 });
 
 test('textplay route unavailable returns structured failure', async () => {
-  const { hookClient } = createHookClient({ failRoute: true });
+  const { hookClient } = createHookClient();
   const narrativeEngine = createNarrativeEngine();
   const result = await runTextplayRender({
     request: createBaseRequest(),
     deps: {
       hookClient,
-      aiClient: createAiClient(),
+      runtimeClient: createRuntimeRouteClient({ failRoute: true }),
+      aiClient: createRuntimeTextClient(),
       narrativeEngine,
     },
     presenceReports: [],
@@ -344,7 +351,8 @@ test('textplay cancel path emits run.canceled with CANCELED terminal state', asy
     request: createBaseRequest(),
     deps: {
       hookClient,
-      aiClient: createAiClient(),
+      runtimeClient: createRuntimeRouteClient(),
+      aiClient: createRuntimeTextClient(),
       narrativeEngine,
       abortSignal: controller.signal,
     },
@@ -365,7 +373,8 @@ test('textplay narrative rejection surfaces chain narrative-rejected failure', a
     request: createBaseRequest(),
     deps: {
       hookClient,
-      aiClient: createAiClient(),
+      runtimeClient: createRuntimeRouteClient(),
+      aiClient: createRuntimeTextClient(),
       narrativeEngine,
     },
     presenceReports: [],
@@ -389,7 +398,8 @@ test('textplay maps narrative schema rejection to prompt-build failure', async (
     request: createBaseRequest(),
     deps: {
       hookClient,
-      aiClient: createAiClient(),
+      runtimeClient: createRuntimeRouteClient(),
+      aiClient: createRuntimeTextClient(),
       narrativeEngine,
     },
     presenceReports: [],
@@ -402,13 +412,13 @@ test('textplay maps narrative schema rejection to prompt-build failure', async (
   assert.equal(result.runSnapshot.status, 'FAILED');
 });
 
-test('textplay forwards routeOverride and skips default route precheck when override exists', async () => {
-  const { hookClient } = createHookClient({ failRoute: true });
+test('textplay forwards binding and skips default route precheck when binding exists', async () => {
+  const { hookClient } = createHookClient();
   const narrativeEngine = createNarrativeEngine();
-  const aiClient = createAiClient();
+  const aiClient = createRuntimeTextClient();
   const request = {
     ...createBaseRequest(),
-    routeOverride: {
+    binding: {
       source: 'token-api',
       connectorId: 'connector-override',
       model: 'gpt-override',
@@ -418,6 +428,7 @@ test('textplay forwards routeOverride and skips default route precheck when over
     request,
     deps: {
       hookClient,
+      runtimeClient: createRuntimeRouteClient({ failRoute: true }),
       aiClient,
       narrativeEngine,
     },
@@ -426,9 +437,9 @@ test('textplay forwards routeOverride and skips default route precheck when over
 
   assert.equal(result.ok, true);
   assert.equal(narrativeEngine.turnResultUpsertCalls.length > 0, true);
-  assert.equal(narrativeEngine.turnResultUpsertCalls[0].routeOverride.model, 'gpt-override');
+  assert.equal(narrativeEngine.turnResultUpsertCalls[0].binding.model, 'gpt-override');
   assert.equal(aiClient.generateCalls.length > 0, true);
-  assert.equal(aiClient.generateCalls[0].routeOverride.model, 'gpt-override');
+  assert.equal(aiClient.generateCalls[0].binding.model, 'gpt-override');
 });
 
 test('textplay normalize tolerates whitespace in request identity fields', async () => {
@@ -445,7 +456,8 @@ test('textplay normalize tolerates whitespace in request identity fields', async
     request,
     deps: {
       hookClient,
-      aiClient: createAiClient(),
+      runtimeClient: createRuntimeRouteClient(),
+      aiClient: createRuntimeTextClient(),
       narrativeEngine,
     },
     presenceReports: [],
@@ -467,7 +479,8 @@ test('textplay normalize falls back triggerSource and player id when projection 
     request: createBaseRequest(),
     deps: {
       hookClient,
-      aiClient: createAiClient(),
+      runtimeClient: createRuntimeRouteClient(),
+      aiClient: createRuntimeTextClient(),
       narrativeEngine,
     },
     presenceReports: [],
@@ -487,7 +500,8 @@ test('textplay legacy null projection blocks fallback to safe context summaries'
     request: createBaseRequest(),
     deps: {
       hookClient,
-      aiClient: createAiClient(),
+      runtimeClient: createRuntimeRouteClient(),
+      aiClient: createRuntimeTextClient(),
       narrativeEngine,
     },
     presenceReports: [],
@@ -502,7 +516,7 @@ test('textplay legacy null projection blocks fallback to safe context summaries'
 test('textplay generate failure degrades to fallback-render and returns playable output', async () => {
   const { hookClient, persistCalls } = createHookClient();
   const narrativeEngine = createNarrativeEngine();
-  const aiClient = createAiClient({
+  const aiClient = createRuntimeTextClient({
     failGenerate: true,
     failMessage: 'provider-timeout',
   });
@@ -511,6 +525,7 @@ test('textplay generate failure degrades to fallback-render and returns playable
     request: createBaseRequest(),
     deps: {
       hookClient,
+      runtimeClient: createRuntimeRouteClient(),
       aiClient,
       narrativeEngine,
     },
@@ -544,7 +559,8 @@ test('textplay start-style request accepts SystemEvent with empty userMessage wh
     request,
     deps: {
       hookClient,
-      aiClient: createAiClient(),
+      runtimeClient: createRuntimeRouteClient(),
+      aiClient: createRuntimeTextClient(),
       narrativeEngine,
     },
     presenceReports: [],
@@ -584,7 +600,8 @@ test('textplay start-style request survives missing projection context via openi
     request,
     deps: {
       hookClient,
-      aiClient: createAiClient(),
+      runtimeClient: createRuntimeRouteClient(),
+      aiClient: createRuntimeTextClient(),
       narrativeEngine,
     },
     presenceReports: [],

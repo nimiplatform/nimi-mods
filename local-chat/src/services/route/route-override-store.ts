@@ -11,7 +11,7 @@ export function dedupeModelIds(models: string[]): string[] {
   ));
 }
 
-export function loadLocalChatRouteOverride(): RuntimeRouteBinding | null {
+export function loadLocalChatRouteBinding(): RuntimeRouteBinding | null {
   return loadLocalStorageJson<RuntimeRouteBinding | null>(
     LOCAL_CHAT_ROUTE_OVERRIDE_STORAGE_KEY,
     null,
@@ -40,7 +40,7 @@ export function loadLocalChatRouteOverride(): RuntimeRouteBinding | null {
   );
 }
 
-export function persistLocalChatRouteOverride(value: RuntimeRouteBinding | null): void {
+export function persistLocalChatRouteBinding(value: RuntimeRouteBinding | null): void {
   if (!value) {
     removeLocalStorageKey(LOCAL_CHAT_ROUTE_OVERRIDE_STORAGE_KEY);
     return;

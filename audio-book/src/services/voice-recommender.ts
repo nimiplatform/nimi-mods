@@ -120,12 +120,14 @@ export async function recommendAllVoices(
   llm: LlmClient,
   tts: TtsClient,
   characters: CharacterProfile[],
-  options?: { connectorId?: string; routeSource?: 'auto' | 'local-runtime' | 'token-api'; model?: string },
+  options?: {
+    binding?: { source: 'local-runtime' | 'token-api'; connectorId: string; model: string };
+    model?: string;
+  },
 ): Promise<VoiceCasting[]> {
   // Fetch available voices from TTS provider
   const listedVoices = await tts.listVoices({
-    connectorId: options?.connectorId,
-    routeSource: options?.routeSource,
+    binding: options?.binding,
     model: options?.model,
   });
   const availableVoices = listedVoices.length > 0
@@ -166,7 +168,7 @@ export async function recommendAllVoices(
   const { systemPrompt, userPrompt } = buildVoiceRecommendPrompt(llmEligible, availableVoices);
 
   let assignments: VoiceAssignment[] = [];
-  const first = await llm.generateText({ routeHint: 'chat/default', systemPrompt, userPrompt });
+  const first = await llm.generateText({ systemPrompt, userPrompt });
   try {
     assignments = normalizeAssignments(parseJsonRecord(first.text));
   } catch (firstError) {
@@ -179,7 +181,6 @@ export async function recommendAllVoices(
       parseError: summarizeModelError(firstError),
     });
     const second = await llm.generateText({
-      routeHint: 'chat/retry-low-temp',
       systemPrompt: 'You are a JSON repair assistant. Return valid JSON only.',
       userPrompt: repairPrompt,
       temperature: 0.1,

@@ -1,4 +1,3 @@
-import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
 import type { HookClient } from '@nimiplatform/sdk/mod/types';
 import {
   NARRATIVE_ACTION_HINT_BY_REASON_CODE,
@@ -44,6 +43,7 @@ import {
   upsertNarrativeContext,
 } from '../store/repository.js';
 import type {
+  NarrativeAiClient,
   NarrativeRunEvent,
   NarrativeSpineEvent,
   NarrativeTurnRecord,
@@ -312,7 +312,7 @@ function resolveProjectionFromTurn(turn: NarrativeTurnRecord): Record<string, un
 
 export async function registerNarrativeDataCapabilities(input: {
   hookClient: HookClient;
-  aiClient: ModAiClient;
+  aiClient: NarrativeAiClient;
 }): Promise<void> {
   const { hookClient, aiClient } = input;
   const flowId = createNarrativeFlowId('narrative-data-registrar');

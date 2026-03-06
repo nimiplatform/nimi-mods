@@ -1,5 +1,4 @@
 import type { MutableRefObject } from 'react';
-import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
 import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
 import type {
   WorldStudioCreateStep,
@@ -7,7 +6,7 @@ import type {
   WorldStudioWorkspaceSnapshot,
 } from '../../../contracts.js';
 import type {
-  DistillRouteOverrideMap,
+  DistillRouteBindingMap,
   Phase1Result,
   Phase2Result,
 } from '../../../generation/pipeline.js';
@@ -16,6 +15,7 @@ import type { LandingState } from '../../../ui/types.js';
 import type { useWorldStudioMutations } from '../../use-world-studio-mutations.js';
 import type { useWorldStudioResourceQueries } from '../../use-world-studio-queries.js';
 import type { WorldStudioTaskController } from '../task-control/types.js';
+import type { WorldStudioRuntimeAiClient } from '../../../runtime-ai-client.js';
 
 export type WorldStudioMutations = ReturnType<typeof useWorldStudioMutations>;
 export type WorldStudioQueries = ReturnType<typeof useWorldStudioResourceQueries>;
@@ -25,14 +25,14 @@ export type StatusBannerInput = {
   message: string;
 };
 
-export type ResolveEffectiveRouteOverridesInput = {
+export type ResolveEffectiveRouteBindingsInput = {
   mode: 'all' | 'failed';
   retryWithFineRoute: boolean;
   runtimeDefaultBinding?: RuntimeRouteBinding | null;
 };
 
 export type WorldStudioCreateActionsInput = {
-  aiClient: ModAiClient;
+  aiClient: WorldStudioRuntimeAiClient;
   flowId: string;
   sourceEncoding: SupportedEncoding;
   setSourceEncoding: (value: SupportedEncoding) => void;
@@ -53,9 +53,9 @@ export type WorldStudioCreateActionsInput = {
   retryErrorCode: string | null;
   retryScope: 'all' | 'json' | 'coarse' | 'fine';
   retryWithFineRoute: boolean;
-  resolveEffectiveRouteOverrides: (input: ResolveEffectiveRouteOverridesInput) => DistillRouteOverrideMap;
+  resolveEffectiveRouteBindings: (input: ResolveEffectiveRouteBindingsInput) => DistillRouteBindingMap;
   resolveRuntimeDefaultRouteBinding: () => Promise<RuntimeRouteBinding | null>;
-  routeOverrideMap: DistillRouteOverrideMap;
+  bindingMap: DistillRouteBindingMap;
   runtimeDefaultRouteBinding: RuntimeRouteBinding | null;
   selectedDraftId: string;
   selectedWorldId: string;

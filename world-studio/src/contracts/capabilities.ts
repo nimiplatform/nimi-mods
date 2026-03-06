@@ -21,16 +21,17 @@ import {
   WORLD_STUDIO_DATA_API_MAINTENANCE_GET,
   WORLD_STUDIO_DATA_API_MAINTENANCE_UPDATE,
   WORLD_STUDIO_DATA_API_MUTATIONS_LIST,
-  WORLD_STUDIO_DATA_API_RUNTIME_ROUTE_OPTIONS,
   WORLD_STUDIO_DATA_API_WORLDS_MINE,
   WORLD_STUDIO_NAV_SLOT,
   WORLD_STUDIO_ROUTE_SLOT,
 } from './constants.js';
 
 export const WORLD_STUDIO_CAPABILITIES = [
-  'llm.text.generate',
-  'llm.text.stream',
-  'llm.image.generate',
+  'runtime.ai.text.generate',
+  'runtime.ai.text.stream',
+  'runtime.ai.embedding.generate',
+  'runtime.route.list.options',
+  'runtime.route.resolve',
   `data.query.${WORLD_STUDIO_DATA_API_ACCESS_ME}`,
   `data.query.${WORLD_STUDIO_DATA_API_LANDING_RESOLVE}`,
   `data.query.${WORLD_STUDIO_DATA_API_DRAFT_CREATE}`,
@@ -54,7 +55,6 @@ export const WORLD_STUDIO_CAPABILITIES = [
   `data.query.${WORLD_STUDIO_DATA_API_CREATOR_AGENTS_LIST}`,
   `data.query.${WORLD_STUDIO_DATA_API_CREATOR_AGENTS_CREATE}`,
   `data.query.${WORLD_STUDIO_DATA_API_CREATOR_AGENTS_BATCH_CREATE}`,
-  `data.query.${WORLD_STUDIO_DATA_API_RUNTIME_ROUTE_OPTIONS}`,
   `ui.register.${WORLD_STUDIO_NAV_SLOT}`,
   `ui.register.${WORLD_STUDIO_ROUTE_SLOT}`,
 ] as const;

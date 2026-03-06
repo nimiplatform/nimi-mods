@@ -2,7 +2,6 @@ import { createNarrativeEngineModule } from '../../narrative-engine/src/module.t
 import { runTextplayRender } from '../src/pipeline/run-textplay-render.ts';
 import {
   TEXTPLAY_DATA_API_RENDER_PERSIST,
-  TEXTPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS,
 } from '../src/contracts.ts';
 
 const WORLD_ID = '01JKFANREN00000000000001';
@@ -56,31 +55,6 @@ function createHookClient() {
   return {
     data: {
       query: async ({ capability, query }) => {
-        if (capability === TEXTPLAY_DATA_API_RUNTIME_ROUTE_OPTIONS) {
-          return {
-            selected: {
-              source: 'token-api',
-              connectorId: CONNECTOR_ID,
-              model: MODEL_ID,
-            },
-            resolvedDefault: {
-              source: 'token-api',
-              connectorId: CONNECTOR_ID,
-              model: MODEL_ID,
-            },
-            localRuntime: {
-              models: [],
-              defaultEndpoint: 'http://127.0.0.1:8080/v1',
-            },
-            connectors: [
-              {
-                id: CONNECTOR_ID,
-                label: 'API Connector 1',
-                models: [MODEL_ID],
-              },
-            ],
-          };
-        }
         if (capability === TEXTPLAY_DATA_API_RENDER_PERSIST) {
           return {
             ok: true,
@@ -100,15 +74,6 @@ function createNarrativeEngine() {
         return {
           hasActiveAccess: true,
           records: [{ scopeWorldId: String(query.worldId || '') }],
-        };
-      }
-      if (capability === 'data-api.runtime.route.options') {
-        return {
-          selected: {
-            source: 'token-api',
-            connectorId: CONNECTOR_ID,
-            model: MODEL_ID,
-          },
         };
       }
       if (capability === 'data-api.world.events.list') {
@@ -230,7 +195,36 @@ function createNarrativeEngine() {
   });
 }
 
-function createTextplayAiClient() {
+function createRuntimeRouteClient() {
+  return {
+    listOptions: async () => ({
+      capability: 'text.generate',
+      selected: {
+        source: 'token-api',
+        connectorId: CONNECTOR_ID,
+        model: MODEL_ID,
+      },
+      resolvedDefault: {
+        source: 'token-api',
+        connectorId: CONNECTOR_ID,
+        model: MODEL_ID,
+      },
+      localRuntime: {
+        models: [],
+        defaultEndpoint: 'http://127.0.0.1:8080/v1',
+      },
+      connectors: [
+        {
+          id: CONNECTOR_ID,
+          label: 'API Connector 1',
+          models: [MODEL_ID],
+        },
+      ],
+    }),
+  };
+}
+
+function createRuntimeTextClient() {
   return {
     generateText: async () => ({
       text: '开场风雷已起，韩立立于余烬之上，下一步由你决断。',
@@ -268,7 +262,7 @@ async function runStartOnce(input) {
           background: '灵界风暴未歇，新的冲突即将降临。',
         },
       },
-      routeOverride: {
+      binding: {
         source: 'token-api',
         connectorId: CONNECTOR_ID,
         model: MODEL_ID,
@@ -278,6 +272,7 @@ async function runStartOnce(input) {
     },
     deps: {
       hookClient: input.hookClient,
+      runtimeClient: input.runtimeClient,
       aiClient: input.aiClient,
       narrativeEngine: input.narrativeEngine,
     },
@@ -287,13 +282,15 @@ async function runStartOnce(input) {
 
 async function main() {
   const hookClient = createHookClient();
-  const aiClient = createTextplayAiClient();
+  const runtimeClient = createRuntimeRouteClient();
+  const aiClient = createRuntimeTextClient();
   const narrativeEngine = createNarrativeEngine();
 
   const first = await runStartOnce({
     runId: makeId('run-1'),
     traceId: makeId('trace-1'),
     hookClient,
+    runtimeClient,
     aiClient,
     narrativeEngine,
   });
@@ -306,6 +303,7 @@ async function main() {
     runId: makeId('run-2'),
     traceId: makeId('trace-2'),
     hookClient,
+    runtimeClient,
     aiClient,
     narrativeEngine,
   });

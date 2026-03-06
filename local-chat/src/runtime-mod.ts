@@ -1,6 +1,6 @@
 import { type RuntimeModRegistration } from '@nimiplatform/sdk/mod/types';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
-import { createAiClient } from '@nimiplatform/sdk/mod/ai';
+import { createModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import { createLocalChatFlowId, emitLocalChatLog } from './logging.js';
 import {
   LOCAL_CHAT_CAPABILITIES,
@@ -9,6 +9,7 @@ import {
 import { registerLocalChatDataCapabilities, createLocalChatReadContextResolver } from './registrars/data.js';
 import { registerLocalChatUiExtensions } from './registrars/ui.js';
 import { startLocalChatProactiveHeartbeat } from './heartbeat.js';
+import { createLocalChatAiClient } from './runtime-ai-client.js';
 
 type FetchImpl = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -19,7 +20,8 @@ export function createLocalChatRuntimeMod(): RuntimeModRegistration {
     isDefaultPrivateExecution: false,
     setup: async ({ getHttpContext, sdkRuntimeContext }) => {
       const hookClient = createHookClient(LOCAL_CHAT_MOD_ID, sdkRuntimeContext);
-      const aiClient = createAiClient(LOCAL_CHAT_MOD_ID, sdkRuntimeContext);
+      const runtimeClient = createModRuntimeClient(LOCAL_CHAT_MOD_ID, sdkRuntimeContext);
+      const aiClient = createLocalChatAiClient(runtimeClient);
       const flowId = createLocalChatFlowId('local-chat-setup');
       const startedAt = performance.now();
 

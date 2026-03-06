@@ -36,10 +36,10 @@ function makeQualityGatePass() {
 
 test('world-studio phase2 can synthesize without full source text after refresh', async () => {
   const snapshotRef = { current: cloneDefaultSnapshot() };
-  snapshotRef.current.selectedStartTimeId = 't-1';
+  snapshotRef.current.selectedStartTimeId = 'event:p-1';
   snapshotRef.current.selectedCharacters = ['汪淼'];
   snapshotRef.current.phase1Artifact = {
-    startTimeOptions: [{ id: 't-1', label: '2004', description: '', weight: 0.8 }],
+    startTimeOptions: [{ id: 'event:p-1', label: '1. 2004 · 倒计时危机', description: 'summary', weight: 0.8 }],
     characterCandidates: [{ name: '汪淼', summary: 'summary', significance: 0.8 }],
     qualityGate: makeQualityGatePass(),
     chunkTasks: [],
@@ -63,7 +63,7 @@ test('world-studio phase2 can synthesize without full source text after refresh'
         id: 'p-1',
         level: 'PRIMARY',
         parentEventId: null,
-        title: '事件1',
+        title: '倒计时危机',
         summary: 'summary',
         cause: 'cause',
         process: 'process',
@@ -86,7 +86,7 @@ test('world-studio phase2 can synthesize without full source text after refresh'
       background: 'background',
       motivation: 'motivation',
       relationships: ['常伟思:合作'],
-      keyEvents: ['事件1'],
+      keyEvents: ['倒计时危机'],
     }],
     characterAliasMap: { 汪淼: '汪淼' },
   };
@@ -97,6 +97,7 @@ test('world-studio phase2 can synthesize without full source text after refresh'
   let seenFullSource = false;
   let lastNotice = null;
   let lastStatusBanner = null;
+  let lastError = null;
 
   const binding = {
     source: 'token-api',
@@ -185,9 +186,9 @@ test('world-studio phase2 can synthesize without full source text after refresh'
     retryErrorCode: null,
     retryScope: 'all',
     retryWithFineRoute: false,
-    resolveEffectiveRouteOverrides: () => ({ coarse: binding, fine: binding }),
+    resolveEffectiveRouteBindings: () => ({ coarse: binding, fine: binding }),
     resolveRuntimeDefaultRouteBinding: async () => binding,
-    routeOverrideMap: { coarse: binding, fine: binding },
+    bindingMap: { coarse: binding, fine: binding },
     runtimeDefaultRouteBinding: binding,
     selectedDraftId: '',
     selectedWorldId: '',
@@ -197,7 +198,9 @@ test('world-studio phase2 can synthesize without full source text after refresh'
     setStatusBanner: (value) => {
       lastStatusBanner = value;
     },
-    setError: () => {},
+    setError: (value) => {
+      lastError = value;
+    },
     setNotice: (value) => {
       lastNotice = value;
     },
@@ -206,7 +209,7 @@ test('world-studio phase2 can synthesize without full source text after refresh'
 
   await runCreatePhase2(input);
 
-  assert.equal(Boolean(phase2), true);
+  assert.equal(Boolean(phase2), true, String(lastError || 'expected phase2 result'));
   assert.equal(seenStructuredContext, true);
   assert.equal(seenFullSource, false);
   assert.equal(snapshotRef.current.agentSync.draftsByCharacter['汪淼'].handle, '~wangmiao');
