@@ -75,6 +75,7 @@ type TestState = {
   output: unknown;
   rawResponse: string;
   busy: boolean;
+  busyLabel?: string;
   error: string;
   diagnostics: DiagnosticsInfo;
 };
@@ -150,13 +151,79 @@ function hydrateTokenApiBinding(
   };
 }
 
+function normalizeLocalRuntimeModelRoot(value: unknown): string {
+  const trimmed = asString(value);
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith('localai/')) return trimmed.slice('localai/'.length).trim();
+  if (lower.startsWith('nexa/')) return trimmed.slice('nexa/'.length).trim();
+  if (lower.startsWith('local/')) return trimmed.slice('local/'.length).trim();
+  return trimmed;
+}
+
+function localRuntimeBindingFromOption(
+  option: RuntimeRouteOptionsSnapshot['localRuntime']['models'][number],
+): RuntimeRouteBinding {
+  const modelId = asString(option.modelId || option.model);
+  return {
+    source: 'local-runtime',
+    connectorId: '',
+    model: modelId,
+    modelId: modelId || undefined,
+    provider: asString(option.provider || option.engine) || undefined,
+    localModelId: asString(option.localModelId) || undefined,
+    engine: asString(option.engine) || undefined,
+    adapter: asString(option.adapter) || undefined,
+    endpoint: asString(option.endpoint) || undefined,
+    goRuntimeLocalModelId: asString(option.goRuntimeLocalModelId) || undefined,
+    goRuntimeStatus: asString(option.goRuntimeStatus) || undefined,
+    ...(option.providerHints ? { providerHints: option.providerHints } : {}),
+  };
+}
+
+function hydrateLocalRuntimeBinding(
+  snapshot: RuntimeRouteOptionsSnapshot | null,
+  binding: RuntimeRouteBinding | null,
+): RuntimeRouteBinding | null {
+  if (!snapshot || !binding || binding.source !== 'local-runtime') {
+    return binding;
+  }
+  const normalizedLocalModelId = asString(binding.localModelId);
+  const normalizedModelId = normalizeLocalRuntimeModelRoot(binding.modelId || binding.model);
+  const normalizedEngine = asString(binding.engine || binding.provider).toLowerCase();
+  const localModel = snapshot.localRuntime.models.find((item) => (
+    (normalizedLocalModelId && asString(item.localModelId) === normalizedLocalModelId)
+    || (
+      normalizeLocalRuntimeModelRoot(item.modelId || item.model) === normalizedModelId
+      && (!normalizedEngine || asString(item.engine || item.provider).toLowerCase() === normalizedEngine)
+    )
+  )) || null;
+  if (!localModel) {
+    return {
+      ...binding,
+      model: normalizedModelId || asString(binding.model),
+      modelId: normalizedModelId || undefined,
+    };
+  }
+  return {
+    ...localRuntimeBindingFromOption(localModel),
+    model: normalizedModelId || asString(localModel.modelId || localModel.model),
+    modelId: normalizedModelId || asString(localModel.modelId || localModel.model) || undefined,
+    localModelId: asString(binding.localModelId || localModel.localModelId) || undefined,
+  };
+}
+
 function resolveEffectiveBinding(
   snapshot: RuntimeRouteOptionsSnapshot | null,
   binding: RuntimeRouteBinding | null,
 ): RuntimeRouteBinding | null {
-  if (binding) return hydrateTokenApiBinding(snapshot, binding);
+  if (binding?.source === 'token-api') return hydrateTokenApiBinding(snapshot, binding);
+  if (binding?.source === 'local-runtime') return hydrateLocalRuntimeBinding(snapshot, binding);
   if (!snapshot) return null;
-  return hydrateTokenApiBinding(snapshot, snapshot.selected || snapshot.resolvedDefault || null);
+  const fallback = snapshot.selected || snapshot.resolvedDefault || null;
+  if (fallback?.source === 'local-runtime') {
+    return hydrateLocalRuntimeBinding(snapshot, fallback);
+  }
+  return hydrateTokenApiBinding(snapshot, fallback);
 }
 
 function tokenApiBindingForConnector(
@@ -182,7 +249,7 @@ function bindingForSource(
   }
   const local = snapshot?.localRuntime.models[0] || null;
   if (!local) return null;
-  return { source: 'local-runtime', connectorId: '', model: local.model, localModelId: local.localModelId, engine: local.engine };
+  return localRuntimeBindingFromOption(local);
 }
 
 function bindingForConnector(
@@ -214,8 +281,27 @@ export function bindingForModel(
       model: normalizedModel,
     };
   }
-  const localModel = snapshot?.localRuntime.models.find((item) => item.model === normalizedModel) || null;
-  return { source: 'local-runtime', connectorId: '', model: normalizedModel, localModelId: localModel?.localModelId, engine: localModel?.engine };
+  const normalizedLocalModel = normalizeLocalRuntimeModelRoot(normalizedModel);
+  const localModel = snapshot?.localRuntime.models.find((item) => (
+    normalizeLocalRuntimeModelRoot(item.modelId || item.model) === normalizedLocalModel
+  )) || null;
+  if (localModel) {
+    return localRuntimeBindingFromOption(localModel);
+  }
+  return {
+    source: 'local-runtime',
+    connectorId: '',
+    model: normalizedLocalModel,
+    modelId: normalizedLocalModel || undefined,
+    provider: asString(effective.provider) || undefined,
+    localModelId: asString(effective.localModelId) || undefined,
+    engine: asString(effective.engine) || undefined,
+    adapter: asString(effective.adapter) || undefined,
+    endpoint: asString(effective.endpoint) || undefined,
+    goRuntimeLocalModelId: asString(effective.goRuntimeLocalModelId) || undefined,
+    goRuntimeStatus: asString(effective.goRuntimeStatus) || undefined,
+    ...(effective.providerHints ? { providerHints: effective.providerHints } : {}),
+  };
 }
 
 export function resolveImageResponseFormat(mode: ImageResponseFormatMode): 'base64' | 'url' | undefined {
@@ -264,10 +350,12 @@ export function resolveRouteModelPickerState(
   const activeSource = effectiveBinding?.source || snapshot?.selected?.source || 'local-runtime';
   const activeConnectorId = effectiveBinding?.connectorId || snapshot?.selected?.connectorId || '';
   const activeConnector = snapshot?.connectors.find((item) => item.id === activeConnectorId) || null;
-  const activeModel = effectiveBinding?.model || snapshot?.selected?.model || '';
+  const activeModel = activeSource === 'local-runtime'
+    ? normalizeLocalRuntimeModelRoot(effectiveBinding?.modelId || effectiveBinding?.model || snapshot?.selected?.modelId || snapshot?.selected?.model || '')
+    : (effectiveBinding?.model || snapshot?.selected?.model || '');
   const localModels = snapshot?.localRuntime.models || [];
   const modelOptions = activeSource === 'local-runtime'
-    ? localModels.map((item) => item.model)
+    ? localModels.map((item) => normalizeLocalRuntimeModelRoot(item.modelId || item.model))
     : (activeConnector?.models || []);
   return {
     effectiveBinding,
@@ -294,6 +382,7 @@ function makeInitialCapabilityState(): CapabilityState {
     output: null,
     rawResponse: '',
     busy: false,
+    busyLabel: '',
     error: '',
     diagnostics: makeEmptyDiagnostics(),
   };
@@ -495,6 +584,11 @@ function RouteBindingEditor(props: RouteBindingEditorProps) {
           ? `${effectiveBinding.source} · ${effectiveBinding.provider || '—'} · ${effectiveBinding.connectorId || '—'} · ${effectiveBinding.model || '—'}`
           : 'runtime default'}
       </div>
+      {effectiveBinding?.source === 'local-runtime' ? (
+        <div className="mt-1 text-xs text-gray-500">
+          {`adapter=${effectiveBinding.adapter || '—'} · go-runtime=${effectiveBinding.goRuntimeStatus || 'unknown'} · localModelId=${effectiveBinding.localModelId || '—'}`}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -561,12 +655,15 @@ function DiagnosticsPanel(props: DiagnosticsPanelProps) {
           <div className="mb-1.5 font-semibold text-gray-600">Route Preview</div>
           <KVRow label="source" value={route.source} mono highlight="blue" />
           <KVRow label="provider" value={route.provider} mono />
-          <KVRow label="model" value={route.model} mono />
+          <KVRow label="modelSelector" value={route.model} mono />
+          <KVRow label="modelId" value={route.modelId} mono />
           <KVRow label="connectorId" value={route.connectorId} mono />
           <KVRow label="endpoint" value={route.endpoint} mono />
           <KVRow label="adapter" value={route.adapter} mono />
           <KVRow label="engine" value={route.engine} mono />
           <KVRow label="localModelId" value={route.localModelId} mono />
+          <KVRow label="goRuntimeLocalModelId" value={route.goRuntimeLocalModelId} mono />
+          <KVRow label="goRuntimeStatus" value={route.goRuntimeStatus} mono />
           <KVRow label="localProviderEndpoint" value={route.localProviderEndpoint} mono />
         </div>
       ) : null}
@@ -660,7 +757,7 @@ function CapabilitySidebar(props: SidebarProps) {
 
 // ── Shared UI atoms ───────────────────────────────────────────────────────────
 
-function RunButton(props: { busy: boolean; label: string; onClick: () => void }) {
+function RunButton(props: { busy: boolean; busyLabel?: string; label: string; onClick: () => void }) {
   return (
     <button
       type="button"
@@ -668,7 +765,7 @@ function RunButton(props: { busy: boolean; label: string; onClick: () => void })
       disabled={props.busy}
       onClick={props.onClick}
     >
-      {props.busy ? 'Running...' : props.label}
+      {props.busy ? (asString(props.busyLabel) || 'Running...') : props.label}
     </button>
   );
 }
@@ -676,6 +773,12 @@ function RunButton(props: { busy: boolean; label: string; onClick: () => void })
 function ErrorBox(props: { message: string }) {
   return (
     <div className="rounded-md bg-red-50 p-2 text-xs text-red-700">{props.message}</div>
+  );
+}
+
+function InfoBox(props: { message: string }) {
+  return (
+    <div className="rounded-md bg-blue-50 p-2 text-xs text-blue-700">{props.message}</div>
   );
 }
 
@@ -720,7 +823,7 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
       onStateChange((prev) => ({ ...prev, error: 'Prompt is empty.' }));
       return;
     }
-    onStateChange((prev) => ({ ...prev, busy: true, error: '', diagnostics: makeEmptyDiagnostics() }));
+    onStateChange((prev) => ({ ...prev, busy: true, busyLabel: 'Preparing route...', error: '', diagnostics: makeEmptyDiagnostics() }));
     const t0 = Date.now();
     const binding = resolveEffectiveBinding(state.snapshot, state.binding) || undefined;
     const tempNum = temperature ? Number(temperature) : undefined;
@@ -735,6 +838,11 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
     let resolved: ModRuntimeResolvedBinding | undefined;
     try {
       resolved = await runtimeClient.route.resolve({ capability: 'text.generate', binding });
+      onStateChange((prev) => ({
+        ...prev,
+        busy: true,
+        busyLabel: resolved?.source === 'local-runtime' ? 'Warming local model...' : 'Running...',
+      }));
       const result = await runtimeClient.ai.text.generate({
         input: prompt,
         ...(system ? { system } : {}),
@@ -747,6 +855,7 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
       onStateChange((prev) => ({
         ...prev,
         busy: false,
+        busyLabel: '',
         result: 'passed',
         output: asString(result.text) || '(empty output)',
         rawResponse: toPrettyJson({ request: requestParams, resolved, response: result }),
@@ -770,6 +879,7 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
       onStateChange((prev) => ({
         ...prev,
         busy: false,
+        busyLabel: '',
         result: 'failed',
         error: message,
         rawResponse: toPrettyJson({ request: requestParams, resolved, error: message }),
@@ -835,7 +945,15 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
           </label>
         </div>
       ) : null}
-      <RunButton busy={state.busy} label="Run Text Generate" onClick={() => { void handleRun(); }} />
+      <RunButton
+        busy={state.busy}
+        busyLabel={state.busyLabel}
+        label="Run Text Generate"
+        onClick={() => { void handleRun(); }}
+      />
+      {state.busy && state.busyLabel === 'Warming local model...' ? (
+        <InfoBox message="Local runtime is prewarming the selected model before sending your prompt." />
+      ) : null}
       {state.error ? <ErrorBox message={state.error} /> : null}
       {state.output ? (
         <pre className="max-h-60 overflow-auto rounded-md bg-gray-50 p-2 text-xs">{asString(state.output)}</pre>
