@@ -10,17 +10,20 @@ import type {
 import {
   buildCompatibilitySystemPrompt,
   buildDailySystemPrompt,
+  buildFortuneStickSystemPrompt,
   buildNatalSystemPrompt,
 } from '../prompt/system-prompt.js';
 import {
   buildCompatibilityUserPrompt,
   buildDailyUserPrompt,
+  buildFortuneStickUserPrompt,
   buildNatalUserPrompt,
 } from '../prompt/user-prompt.js';
 import { parseResultFromText } from '../validation/parse-result-json.js';
 import {
   validateCompatibilityResult,
   validateDailyResult,
+  validateFortuneStickResult,
   validateNatalAiOutput,
 } from '../validation/validate-result.js';
 import { KISMET_REASON } from '../contracts.js';
@@ -90,6 +93,18 @@ export function buildDailyPromptPackage(input: {
   };
 }
 
+export function buildFortuneStickPromptPackage(input: {
+  canonicalProfile: KismetCanonicalProfile;
+  dailyResult: KismetDailyFortuneResult;
+}): GeneratedPromptPackage {
+  return {
+    kind: 'fortune-stick',
+    title: '求签 Prompt',
+    systemPrompt: buildFortuneStickSystemPrompt(),
+    userPrompt: buildFortuneStickUserPrompt(input),
+  };
+}
+
 export function buildCompatibilityPromptPackage(input: KismetCompatibilityInput): GeneratedPromptPackage {
   return {
     kind: 'compatibility',
@@ -117,6 +132,9 @@ export function parseImportedResult(kind: KismetPromptKind, rawText: string):
   }
   if (kind === 'daily-fortune') {
     return validateDailyResult(parseResult.data);
+  }
+  if (kind === 'fortune-stick') {
+    return validateFortuneStickResult(parseResult.data);
   }
   return validateCompatibilityResult(parseResult.data);
 }

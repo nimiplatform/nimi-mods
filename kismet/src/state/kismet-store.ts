@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
+import type { KismetPrimaryProfile } from '../services/local-share-profiles.js';
 import type {
   KismetAiRawResponse,
   GeneratedPromptPackage,
@@ -9,6 +10,7 @@ import type {
   KismetDailyFortuneResult,
   KismetError,
   KismetFeatureTab,
+  KismetFortuneStickResult,
   KismetLocalShareProfile,
   KismetNatalAnalysisResult,
   RouteSourceDisplay,
@@ -30,6 +32,8 @@ type KismetStore = {
   setDraftProfile: (profile: KismetCanonicalProfile | null) => void;
   confirmedProfile: KismetCanonicalProfile | null;
   setConfirmedProfile: (profile: KismetCanonicalProfile | null) => void;
+  primaryProfile: KismetPrimaryProfile | null;
+  setPrimaryProfile: (profile: KismetPrimaryProfile | null) => void;
 
   natalResult: KismetNatalAnalysisResult | null;
   setNatalResult: (result: KismetNatalAnalysisResult | null) => void;
@@ -37,6 +41,10 @@ type KismetStore = {
   setDailyResult: (result: KismetDailyFortuneResult | null) => void;
   compatibilityResult: KismetCompatibilityResult | null;
   setCompatibilityResult: (result: KismetCompatibilityResult | null) => void;
+  fortuneStickResult: KismetFortuneStickResult | null;
+  setFortuneStickResult: (result: KismetFortuneStickResult | null) => void;
+  shareMessage: string | null;
+  setShareMessage: (message: string | null) => void;
 
   savedProfiles: KismetLocalShareProfile[];
   setSavedProfiles: (profiles: KismetLocalShareProfile[]) => void;
@@ -60,6 +68,10 @@ type KismetStore = {
   setRouteOverride: (override: RuntimeRouteBinding | null) => void;
   chatRouteOptions: RuntimeRouteOptionsSnapshot | null;
   setChatRouteOptions: (options: RuntimeRouteOptionsSnapshot | null | ((prev: RuntimeRouteOptionsSnapshot | null) => RuntimeRouteOptionsSnapshot | null)) => void;
+  routeOptionsLoading: boolean;
+  setRouteOptionsLoading: (loading: boolean) => void;
+  routeOptionsError: string | null;
+  setRouteOptionsError: (error: string | null) => void;
 
   resetTransientState: () => void;
 };
@@ -70,7 +82,7 @@ const initialBirthInput: Partial<KismetBirthInputV2> = {
   consent: {
     allowCityAffinityUse: true,
     allowLocalProfileMatchUse: false,
-    allowLocalProfilePersist: false,
+    allowLocalProfilePersist: true,
   },
 };
 
@@ -88,9 +100,12 @@ const initialState = {
   } as Partial<KismetBirthInputV2>,
   draftProfile: null as KismetCanonicalProfile | null,
   confirmedProfile: null as KismetCanonicalProfile | null,
+  primaryProfile: null as KismetPrimaryProfile | null,
   natalResult: null as KismetNatalAnalysisResult | null,
   dailyResult: null as KismetDailyFortuneResult | null,
   compatibilityResult: null as KismetCompatibilityResult | null,
+  fortuneStickResult: null as KismetFortuneStickResult | null,
+  shareMessage: null as string | null,
   savedProfiles: [] as KismetLocalShareProfile[],
   selectedSavedProfileId: null as string | null,
   loading: false,
@@ -100,6 +115,8 @@ const initialState = {
   routeSource: 'unavailable' as RouteSourceDisplay,
   routeOverride: null as RuntimeRouteBinding | null,
   chatRouteOptions: null as RuntimeRouteOptionsSnapshot | null,
+  routeOptionsLoading: false,
+  routeOptionsError: null as string | null,
 };
 
 export const useKismetStore = create<KismetStore>((set) => ({
@@ -110,7 +127,7 @@ export const useKismetStore = create<KismetStore>((set) => ({
     const nextConsent = {
       allowCityAffinityUse: input.consent?.allowCityAffinityUse ?? state.birthInput.consent?.allowCityAffinityUse ?? true,
       allowLocalProfileMatchUse: input.consent?.allowLocalProfileMatchUse ?? state.birthInput.consent?.allowLocalProfileMatchUse ?? false,
-      allowLocalProfilePersist: input.consent?.allowLocalProfilePersist ?? state.birthInput.consent?.allowLocalProfilePersist ?? false,
+      allowLocalProfilePersist: input.consent?.allowLocalProfilePersist ?? state.birthInput.consent?.allowLocalProfilePersist ?? true,
     };
     return {
       birthInput: {
@@ -140,9 +157,12 @@ export const useKismetStore = create<KismetStore>((set) => ({
 
   setDraftProfile: (draftProfile) => set({ draftProfile }),
   setConfirmedProfile: (confirmedProfile) => set({ confirmedProfile }),
+  setPrimaryProfile: (primaryProfile) => set({ primaryProfile }),
   setNatalResult: (natalResult) => set({ natalResult, error: null }),
   setDailyResult: (dailyResult) => set({ dailyResult, error: null }),
   setCompatibilityResult: (compatibilityResult) => set({ compatibilityResult, error: null }),
+  setFortuneStickResult: (fortuneStickResult) => set({ fortuneStickResult, error: null }),
+  setShareMessage: (shareMessage) => set({ shareMessage }),
 
   setSavedProfiles: (savedProfiles) => set({ savedProfiles }),
   setSelectedSavedProfileId: (selectedSavedProfileId) => set({ selectedSavedProfileId }),
@@ -159,6 +179,8 @@ export const useKismetStore = create<KismetStore>((set) => ({
       ? chatRouteOptions(state.chatRouteOptions)
       : chatRouteOptions,
   })),
+  setRouteOptionsLoading: (routeOptionsLoading) => set({ routeOptionsLoading }),
+  setRouteOptionsError: (routeOptionsError) => set({ routeOptionsError }),
 
   resetTransientState: () => set({
     draftProfile: null,
@@ -166,6 +188,8 @@ export const useKismetStore = create<KismetStore>((set) => ({
     natalResult: null,
     dailyResult: null,
     compatibilityResult: null,
+    fortuneStickResult: null,
+    shareMessage: null,
     error: null,
     generatedPrompt: null,
     lastAiRawResponse: null,

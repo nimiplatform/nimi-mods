@@ -217,7 +217,7 @@ export type KismetCompatibilityResult = {
   advice: string;
 };
 
-export type KismetPromptKind = 'natal-profile' | 'daily-fortune' | 'compatibility';
+export type KismetPromptKind = 'natal-profile' | 'daily-fortune' | 'compatibility' | 'fortune-stick';
 
 export type GeneratedPromptPackage = {
   kind: KismetPromptKind;
@@ -265,6 +265,19 @@ export type KismetAiKeyNode = {
   high: number;
   low: number;
   tag: string;
+};
+
+export type KismetFortuneStickResult = {
+  stickNumber: number;
+  rank: '上上签' | '上签' | '中上签' | '中签' | '中下签' | '下签' | '下下签';
+  rankEn: string;
+  poem: string[];
+  interpretation: string;
+  career: string;
+  relationship: string;
+  wealth: string;
+  health: string;
+  advice: string;
 };
 
 export type KismetNatalAiOutput = {

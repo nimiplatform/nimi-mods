@@ -103,6 +103,10 @@ const KISMET_STYLES = `
 .ks-seal-line {
   width: 1px; background: linear-gradient(to bottom, transparent, #8B2620, transparent);
 }
+@keyframes ks-toast-in {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 .ks-ritual-box {
   position: relative; z-index: 10;
   background: rgba(10,9,8,0.6); backdrop-filter: blur(8px);
@@ -205,6 +209,27 @@ export function KismetShell() {
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: KISMET_STYLES }} />
+      {/* Share toast */}
+      {store.shareMessage && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 20,
+            right: 20,
+            zIndex: 10000,
+            padding: '12px 24px',
+            background: 'rgba(138,114,84,0.95)',
+            color: '#E8E3D7',
+            fontSize: '0.85rem',
+            fontFamily: "'Noto Serif SC', serif",
+            letterSpacing: 2,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+            animation: 'ks-toast-in 0.3s ease',
+          }}
+        >
+          {t('Share.copiedToast')}
+        </div>
+      )}
       <div className="kismet-root flex h-full min-h-0">
         {/* Sidebar */}
         <div className="w-[320px] shrink-0 overflow-y-auto p-6" style={{ borderRight: '1px solid rgba(138,114,84,0.2)' }}>
@@ -237,10 +262,15 @@ export function KismetShell() {
             <ModelSelector
               routeOverride={route.routeOverride}
               chatRouteOptions={route.chatRouteOptions}
+              routeOptionsLoading={route.routeOptionsLoading}
+              routeOptionsError={route.routeOptionsError}
               onSourceChange={route.handleSourceChange}
               onConnectorChange={route.handleConnectorChange}
               onModelChange={route.handleModelChange}
               onClear={route.clearOverride}
+              onReload={() => {
+                void route.reloadRouteOptions();
+              }}
             />
           </div>
 
@@ -267,7 +297,7 @@ export function KismetShell() {
                   }}
                   onGenerate={controller.generateNatalAnalysis}
                   onSave={controller.saveLocalProfile}
-                  canSave={Boolean(store.birthInput.consent?.allowLocalProfilePersist)}
+                  canSave
                   loading={store.loading}
                 />
               )}
@@ -279,6 +309,16 @@ export function KismetShell() {
               <div className="gu-card" style={{ padding: 20 }}>
                 <h3 className="ks-serif text-sm" style={{ color: '#8A7254', fontWeight: 600 }}>{t('DailyFortune.title')}</h3>
                 <p className="mt-2 text-sm" style={{ lineHeight: 1.8, color: '#8C857B' }}>{t('DailyFortune.description')}</p>
+                {store.confirmedProfile && (
+                  <div className="mt-3" style={{ padding: '10px 14px', background: 'rgba(138,114,84,0.08)', border: '1px solid rgba(138,114,84,0.15)' }}>
+                    <div className="ks-serif text-xs" style={{ color: '#8A7254' }}>
+                      {t('DailyFortune.savedProfileLabel')}
+                    </div>
+                    <div className="ks-serif mt-1" style={{ fontSize: '0.9rem', color: '#E8E3D7' }}>
+                      {store.birthInput.name || store.confirmedProfile.dayMaster.label} · {store.confirmedProfile.zodiac}
+                    </div>
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={controller.generateDailyFortune}
@@ -399,7 +439,15 @@ export function KismetShell() {
             )}
 
             {store.activeTab === 'natal-profile' && store.natalResult && <ResultView result={store.natalResult} />}
-            {store.activeTab === 'daily-fortune' && store.dailyResult && <DailyFortuneView result={store.dailyResult} />}
+            {store.activeTab === 'daily-fortune' && store.dailyResult && (
+              <DailyFortuneView
+                result={store.dailyResult}
+                fortuneStickResult={store.fortuneStickResult}
+                loading={store.loading}
+                onDrawFortuneStick={controller.generateFortuneStick}
+                onShare={controller.shareContent}
+              />
+            )}
             {!store.loading && !store.error && (
               <>
                 {store.activeTab === 'natal-profile' && !store.natalResult && (

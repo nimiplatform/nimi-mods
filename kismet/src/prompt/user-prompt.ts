@@ -69,6 +69,24 @@ export function buildDailyUserPrompt(input: {
   }, null, 2);
 }
 
+export function buildFortuneStickUserPrompt(input: {
+  canonicalProfile: KismetCanonicalProfile;
+  dailyResult: KismetDailyFortuneResult;
+}): string {
+  return JSON.stringify({
+    dayMaster: input.canonicalProfile.dayMaster.label,
+    favorableElements: input.canonicalProfile.favorableElements,
+    unfavorableElements: input.canonicalProfile.unfavorableElements,
+    todayGanZhi: input.dailyResult.todayGanZhi,
+    overallScore: input.dailyResult.overallScore,
+    careerScore: input.dailyResult.careerScore,
+    relationshipScore: input.dailyResult.relationshipScore,
+    wealthScore: input.dailyResult.wealthScore,
+    healthScore: input.dailyResult.healthScore,
+    date: input.dailyResult.date,
+  });
+}
+
 export function buildCompatibilityUserPrompt(input: KismetCompatibilityInput): string {
   return JSON.stringify({
     selfProfile: input.selfProfile,

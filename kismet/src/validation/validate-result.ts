@@ -1,6 +1,7 @@
 import {
   KismetCompatibilityResultSchema,
   KismetDailyFortuneResultSchema,
+  KismetFortuneStickResultSchema,
   KismetNatalAiOutputSchema,
   KismetNatalAnalysisResultSchema,
 } from '../schemas.js';
@@ -9,6 +10,7 @@ import type {
   KismetCompatibilityResult,
   KismetDailyFortuneResult,
   KismetError,
+  KismetFortuneStickResult,
   KismetNatalAiOutput,
   KismetNatalAnalysisResult,
 } from '../types.js';
@@ -55,6 +57,17 @@ export function validateDailyResult(raw: unknown):
   if (!result.success) {
     const issues = result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ');
     return buildSchemaError('今日运势结果 schema 校验失败', '请确认导入内容是完整的今日运势 JSON。', issues);
+  }
+  return { ok: true, data: result.data };
+}
+
+export function validateFortuneStickResult(raw: unknown):
+  | { ok: true; data: KismetFortuneStickResult }
+  | ValidationFailure {
+  const result = KismetFortuneStickResultSchema.safeParse(raw);
+  if (!result.success) {
+    const issues = result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ');
+    return buildSchemaError('求签结果 schema 校验失败', '请确认输出内容是完整的求签 JSON。', issues);
   }
   return { ok: true, data: result.data };
 }

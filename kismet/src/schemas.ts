@@ -244,6 +244,19 @@ export const KismetCompatibilityResultSchema = z.object({
   advice: z.string().min(1),
 });
 
+export const KismetFortuneStickResultSchema = z.object({
+  stickNumber: z.number().int().min(1).max(100),
+  rank: z.enum(['上上签', '上签', '中上签', '中签', '中下签', '下签', '下下签']),
+  rankEn: z.string().min(1),
+  poem: z.array(z.string().min(1)).length(4),
+  interpretation: z.string().min(1),
+  career: z.string().min(1),
+  relationship: z.string().min(1),
+  wealth: z.string().min(1),
+  health: z.string().min(1),
+  advice: z.string().min(1),
+});
+
 export const KismetLocalShareProfileSchema = z.object({
   id: z.string().min(1),
   displayName: z.string().min(1),

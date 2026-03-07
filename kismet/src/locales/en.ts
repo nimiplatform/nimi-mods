@@ -45,6 +45,24 @@ const enLocale = {
     actionsTitle: 'Actions',
     recommendedActions: 'Do',
     avoidActions: 'Avoid',
+    shareButton: 'Share',
+    savedProfileLabel: 'Current Profile',
+  },
+  FortuneStick: {
+    drawButton: 'Draw Fortune Stick',
+    generating: 'Drawing...',
+    stickLabel: 'No.',
+    stickSuffix: '',
+    interpretationTitle: 'Interpretation',
+    career: 'Career',
+    relationship: 'Relationship',
+    wealth: 'Wealth',
+    health: 'Health',
+    adviceTitle: 'Fortune Message',
+    share: 'Share Fortune',
+  },
+  Share: {
+    copiedToast: 'Copied to clipboard — paste into a new post',
   },
   Compatibility: {
     title: 'Compatibility',
@@ -62,10 +80,13 @@ const enLocale = {
   ModelSelector: {
     title: 'AI Route',
     loading: 'Loading route options...',
+    loadFailed: 'Failed to load route options.',
     localRuntime: 'Local Runtime',
     tokenApi: 'Token API',
     selectModel: 'Select model',
     reset: 'Reset',
+    retry: 'Retry',
+    reloading: 'Retrying...',
     noLocalModels: 'No local models installed. Switch to Token API or install models in Runtime settings.',
     noConnectorModels: 'No models available for this connector. Check connector settings.',
   },
@@ -147,6 +168,12 @@ const enLocale = {
     natal: 'Derive pillars and generate a natal profile first.',
     daily: 'Daily fortune will appear after a natal profile is confirmed.',
     compatibility: 'Select a saved local profile or enter a manual target profile.',
+  },
+  ShareCard: {
+    generate: 'Generate Card',
+    rendering: 'Rendering...',
+    download: 'Save Image',
+    close: 'Close',
   },
 } as const;
 

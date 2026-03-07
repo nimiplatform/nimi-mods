@@ -6,6 +6,7 @@ import { validateKismetBirthInput } from '../validation/validate-input.js';
 import {
   buildCompatibilityPromptPackage,
   buildDailyPromptPackage,
+  buildFortuneStickPromptPackage,
   buildNatalPromptPackage,
   parseImportedResult,
 } from '../services/prompt-import.js';
@@ -20,17 +21,21 @@ import { buildDailyDefaults } from '../services/daily-context.js';
 import {
   validateCompatibilityResult,
   validateDailyResult,
+  validateFortuneStickResult,
   validateNatalAiOutput,
 } from '../validation/validate-result.js';
 import {
   createLocalShareProfile,
   loadLocalShareProfiles,
+  loadPrimaryProfile,
   persistLocalShareProfiles,
+  persistPrimaryProfile,
 } from '../services/local-share-profiles.js';
 import { buildCompatibilityFallback, scoreCompatibility } from '../services/compatibility.js';
 import type {
   KismetCompatibilityResult,
   KismetDailyFortuneResult,
+  KismetFortuneStickResult,
   KismetNatalAiOutput,
 } from '../types.js';
 
@@ -62,6 +67,15 @@ export function useKismetController() {
 
   useEffect(() => {
     setSavedProfiles(loadLocalShareProfiles());
+    const primary = loadPrimaryProfile();
+    if (primary) {
+      store.setPrimaryProfile(primary);
+      store.setBirthInput(primary.birthInput);
+      store.setConfirmedProfile(primary.canonicalProfile);
+      store.setDraftProfile(primary.canonicalProfile);
+      emitKismetLog({ message: 'kismet.primary-profile.restored', source: 'useKismetController' });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setSavedProfiles]);
 
   const deriveBirthProfile = useCallback(() => {
@@ -137,6 +151,17 @@ export function useKismetController() {
         recommendedCities: result.data.recommendedCities,
         citySummary: result.data.citySummary,
       });
+      // Auto-save as primary profile on first generation
+      if (!store.primaryProfile) {
+        const primary = {
+          birthInput: derived.birthInput,
+          canonicalProfile: derived.canonicalProfile,
+          savedAt: new Date().toISOString(),
+        };
+        persistPrimaryProfile(primary);
+        store.setPrimaryProfile(primary);
+        emitKismetLog({ message: KISMET_AUDIT.LOCAL_PROFILE_SAVED, source: 'useKismetController.auto-save' });
+      }
       emitKismetLog({ message: KISMET_AUDIT.NATAL_GENERATE_SUCCEEDED, source: 'useKismetController' });
       return;
     }
@@ -285,6 +310,65 @@ export function useKismetController() {
     emitKismetLog({ level: 'error', message: KISMET_AUDIT.COMPATIBILITY_GENERATE_FAILED, source: 'useKismetController' });
   }, [deriveBirthProfile, route.routeOverride, setLastAiRawResponse, store]);
 
+  const generateFortuneStick = useCallback(async () => {
+    const confirmedProfile = store.confirmedProfile;
+    const dailyResult = store.dailyResult;
+    if (!confirmedProfile || !dailyResult) {
+      return;
+    }
+
+    const promptPackage = buildFortuneStickPromptPackage({
+      canonicalProfile: confirmedProfile,
+      dailyResult,
+    });
+    store.setGeneratedPrompt(promptPackage);
+    if (route.routeOverride && !route.isUsableRouteBinding(route.routeOverride)) {
+      setLastAiRawResponse(null);
+      store.setRouteSource('unavailable');
+      store.setError(buildRouteUnavailableError());
+      return;
+    }
+    setLastAiRawResponse(null);
+    store.setLoading(true);
+    store.setError(null);
+    emitKismetLog({ message: KISMET_AUDIT.FORTUNE_STICK_GENERATE_STARTED, source: 'useKismetController' });
+
+    const result = await generateJsonViaAi({
+      aiClient: getKismetAiClient(),
+      systemPrompt: promptPackage.systemPrompt,
+      userPrompt: promptPackage.userPrompt,
+      routeOverride: route.routeOverride || undefined,
+      validate: validateFortuneStickResult,
+    });
+
+    store.setLoading(false);
+    if (result.ok) {
+      setLastAiRawResponse(result.rawResponse);
+      store.setRouteSource(result.routeSource);
+      store.setFortuneStickResult(result.data);
+      emitKismetLog({ message: KISMET_AUDIT.FORTUNE_STICK_GENERATE_SUCCEEDED, source: 'useKismetController' });
+      return;
+    }
+
+    setLastAiRawResponse(result.rawResponse || null);
+    if (result.error.reasonCode === KISMET_REASON.ROUTE_UNAVAILABLE) {
+      store.setRouteSource('unavailable');
+    }
+    store.setError(result.error);
+    emitKismetLog({ level: 'error', message: KISMET_AUDIT.FORTUNE_STICK_GENERATE_FAILED, source: 'useKismetController' });
+  }, [route.routeOverride, setLastAiRawResponse, store]);
+
+  const shareContent = useCallback((text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      store.setShareMessage(text);
+      setTimeout(() => store.setShareMessage(null), 3000);
+      emitKismetLog({ message: KISMET_AUDIT.SHARE_COPIED, source: 'useKismetController' });
+    });
+    window.dispatchEvent(new CustomEvent('nimi:share-content', {
+      detail: { source: 'kismet', text },
+    }));
+  }, [store]);
+
   const importResult = useCallback((rawText: string) => {
     if (!store.generatedPrompt) {
       return;
@@ -323,6 +407,8 @@ export function useKismetController() {
       });
     } else if (store.generatedPrompt.kind === 'daily-fortune') {
       store.setDailyResult(result.data as KismetDailyFortuneResult);
+    } else if (store.generatedPrompt.kind === 'fortune-stick') {
+      store.setFortuneStickResult(result.data as KismetFortuneStickResult);
     } else {
       store.setCompatibilityResult(result.data as KismetCompatibilityResult);
     }
@@ -336,28 +422,45 @@ export function useKismetController() {
     emitKismetLog({ message: KISMET_AUDIT.PROMPT_COPIED, source: 'useKismetController' });
   }, [store.generatedPrompt]);
 
+  const savePrimaryProfile = useCallback(() => {
+    const profileToSave = store.confirmedProfile || store.draftProfile;
+    if (!profileToSave) {
+      return;
+    }
+    const validation = validateKismetBirthInput(store.birthInput);
+    if (!validation.ok) {
+      store.setError(validation.error);
+      return;
+    }
+    const primary = {
+      birthInput: validation.data,
+      canonicalProfile: profileToSave,
+      savedAt: new Date().toISOString(),
+    };
+    persistPrimaryProfile(primary);
+    store.setPrimaryProfile(primary);
+    store.setConfirmedProfile(profileToSave);
+    emitKismetLog({ message: KISMET_AUDIT.LOCAL_PROFILE_SAVED, source: 'useKismetController' });
+  }, [store]);
+
   const saveLocalProfile = useCallback(() => {
     const profileToSave = store.confirmedProfile || store.draftProfile;
     if (!profileToSave) {
       return;
     }
-    if (!store.birthInput.consent?.allowLocalProfilePersist) {
-      store.setError({
-        reasonCode: KISMET_REASON.LOCAL_PROFILE_CONSENT_REQUIRED,
-        message: '当前未授权保存本地匹配画像。',
-        actionHint: '勾选”允许保存本地画像”后再保存。',
-      });
-      return;
+    // Save as primary profile
+    savePrimaryProfile();
+    // Also save to compatibility profiles list
+    if (store.birthInput.consent?.allowLocalProfileMatchUse) {
+      const profile = createLocalShareProfile(
+        store.birthInput.name || store.birthInput.birthPlaceLabel || 'Kismet Profile',
+        profileToSave,
+      );
+      const nextProfiles = [profile, ...store.savedProfiles.filter((item) => item.displayName !== profile.displayName)];
+      store.setSavedProfiles(nextProfiles);
+      persistLocalShareProfiles(nextProfiles);
     }
-    const profile = createLocalShareProfile(
-      store.birthInput.name || store.birthInput.birthPlaceLabel || 'Kismet Profile',
-      profileToSave,
-    );
-    const nextProfiles = [profile, ...store.savedProfiles.filter((item) => item.displayName !== profile.displayName)];
-    store.setSavedProfiles(nextProfiles);
-    persistLocalShareProfiles(nextProfiles);
-    emitKismetLog({ message: KISMET_AUDIT.LOCAL_PROFILE_SAVED, source: 'useKismetController' });
-  }, [store]);
+  }, [savePrimaryProfile, store]);
 
   const removeSavedProfile = useCallback((profileId: string) => {
     const nextProfiles = store.savedProfiles.filter((profile) => profile.id !== profileId);
@@ -373,9 +476,12 @@ export function useKismetController() {
     deriveBirthProfile,
     generateNatalAnalysis,
     generateDailyFortune,
+    generateFortuneStick,
     generateCompatibility,
+    shareContent,
     importResult,
     copyPrompts,
+    savePrimaryProfile,
     saveLocalProfile,
     removeSavedProfile,
     route,

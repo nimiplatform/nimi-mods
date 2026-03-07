@@ -37,6 +37,11 @@ export const KISMET_AUDIT = {
   EXPORT_JSON: 'kismet.export.json',
   EXPORT_PDF: 'kismet.export.pdf',
   EXPORT_HTML: 'kismet.export.html',
+  FORTUNE_STICK_GENERATE_STARTED: 'kismet.fortune-stick.generate.started',
+  FORTUNE_STICK_GENERATE_FAILED: 'kismet.fortune-stick.generate.failed',
+  FORTUNE_STICK_GENERATE_SUCCEEDED: 'kismet.fortune-stick.generate.succeeded',
+  SHARE_COPIED: 'kismet.share.copied',
+  PRIMARY_PROFILE_RESTORED: 'kismet.primary-profile.restored',
 } as const;
 
 export const KISMET_REASON = {
@@ -52,6 +57,7 @@ export const KISMET_REASON = {
   ROUTE_UNAVAILABLE: 'KISMET_ROUTE_UNAVAILABLE',
   AI_GENERATE_FAILED: 'KISMET_AI_GENERATE_FAILED',
   IMPORT_PARSE_FAILED: 'KISMET_IMPORT_PARSE_FAILED',
+  FORTUNE_STICK_FAILED: 'KISMET_FORTUNE_STICK_FAILED',
 } as const;
 
 export const ANALYSIS_DIMENSIONS = [

@@ -1,8 +1,13 @@
 import { useTranslation } from 'react-i18next';
-import type { KismetDailyFortuneResult } from '../types.js';
+import type { KismetDailyFortuneResult, KismetFortuneStickResult } from '../types.js';
+import { FortuneStickView } from './fortune-stick-view.js';
 
 type DailyFortuneViewProps = {
   result: KismetDailyFortuneResult;
+  fortuneStickResult: KismetFortuneStickResult | null;
+  loading: boolean;
+  onDrawFortuneStick: () => void;
+  onShare: (text: string) => void;
 };
 
 const CN_NUMERALS = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
@@ -22,7 +27,24 @@ function ScoreCard(props: { title: string; score: number }) {
   );
 }
 
-export function DailyFortuneView({ result }: DailyFortuneViewProps) {
+function buildDailyShareText(result: KismetDailyFortuneResult): string {
+  const lines = [
+    `【天机 · 今日运势 · ${result.date}】`,
+    `干支: ${result.todayGanZhi}`,
+    '',
+    result.summary,
+    '',
+    `综合 ${result.overallScore} | 事业 ${result.careerScore} | 关系 ${result.relationshipScore} | 财运 ${result.wealthScore} | 健康 ${result.healthScore}`,
+    '',
+    `宜: ${result.recommendedActions.join('、')}`,
+    `忌: ${result.avoidActions.join('、')}`,
+    '',
+    '#天机司命 #今日运势 #Kismet',
+  ];
+  return lines.join('\n');
+}
+
+export function DailyFortuneView({ result, fortuneStickResult, loading, onDrawFortuneStick, onShare }: DailyFortuneViewProps) {
   const { t } = useTranslation('kismet');
 
   const overallSeal = Math.round(result.overallScore / 10);
@@ -95,6 +117,41 @@ export function DailyFortuneView({ result }: DailyFortuneViewProps) {
           </div>
         </div>
       </div>
+
+      {/* Action buttons: Fortune Stick + Share */}
+      <div className="flex gap-3">
+        <button
+          type="button"
+          onClick={onDrawFortuneStick}
+          disabled={loading}
+          className="ks-btn-seal flex-1"
+          style={{ letterSpacing: '4px', maxWidth: 280 }}
+        >
+          {loading ? t('FortuneStick.generating') : t('FortuneStick.drawButton')}
+        </button>
+        <button
+          type="button"
+          onClick={() => onShare(buildDailyShareText(result))}
+          className="ks-serif"
+          style={{
+            padding: '14px 28px',
+            background: 'transparent',
+            border: '1px solid rgba(138,114,84,0.4)',
+            color: '#8A7254',
+            fontSize: '1rem',
+            cursor: 'pointer',
+            letterSpacing: 2,
+            transition: 'all 0.3s',
+          }}
+        >
+          {t('DailyFortune.shareButton')}
+        </button>
+      </div>
+
+      {/* Fortune Stick Result */}
+      {fortuneStickResult && (
+        <FortuneStickView result={fortuneStickResult} onShare={onShare} />
+      )}
     </div>
   );
 }
