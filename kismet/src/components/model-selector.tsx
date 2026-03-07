@@ -5,19 +5,25 @@ import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot, RuntimeRouteSour
 type ModelSelectorProps = {
   routeOverride: RuntimeRouteBinding | null;
   chatRouteOptions: RuntimeRouteOptionsSnapshot | null;
+  routeOptionsLoading: boolean;
+  routeOptionsError: string | null;
   onSourceChange: (source: RuntimeRouteSource) => void;
   onConnectorChange: (connectorId: string) => void;
   onModelChange: (model: string) => void;
   onClear: () => void;
+  onReload: () => void;
 };
 
 export function ModelSelector({
   routeOverride,
   chatRouteOptions,
+  routeOptionsLoading,
+  routeOptionsError,
   onSourceChange,
   onConnectorChange,
   onModelChange,
   onClear,
+  onReload,
 }: ModelSelectorProps) {
   const { t } = useTranslation('kismet');
 
@@ -48,16 +54,36 @@ export function ModelSelector({
     return modelOptions.filter((m) => m.toLowerCase().includes(q));
   }, [modelOptions, modelQuery]);
 
+  const routeOptionsAlert = routeOptionsError ? (
+    <div
+      className="space-y-2 text-xs"
+      style={{ color: '#C07C52', border: '1px solid rgba(166,56,46,0.35)', padding: '8px 12px' }}
+    >
+      <div>{t('ModelSelector.loadFailed')}</div>
+      <div className="break-all" style={{ color: '#8C857B' }}>{routeOptionsError}</div>
+      <button
+        type="button"
+        onClick={onReload}
+        style={{ background: 'none', border: 'none', color: '#8A7254', cursor: 'pointer', padding: 0, fontSize: '0.75rem' }}
+      >
+        {routeOptionsLoading ? t('ModelSelector.reloading') : t('ModelSelector.retry')}
+      </button>
+    </div>
+  ) : null;
+
   if (!chatRouteOptions) {
     return (
-      <div className="text-xs" style={{ color: '#8C857B', border: '1px solid rgba(138,114,84,0.2)', padding: '8px 12px' }}>
-        {t('ModelSelector.loading')}
-      </div>
+      routeOptionsAlert || (
+        <div className="text-xs" style={{ color: '#8C857B', border: '1px solid rgba(138,114,84,0.2)', padding: '8px 12px' }}>
+          {t('ModelSelector.loading')}
+        </div>
+      )
     );
   }
 
   return (
     <div className="space-y-2">
+      {routeOptionsAlert}
       <div className="flex items-center justify-between">
         <label className="text-xs" style={{ color: '#8C857B', letterSpacing: 1 }}>{t('ModelSelector.title')}</label>
         {routeOverride && (

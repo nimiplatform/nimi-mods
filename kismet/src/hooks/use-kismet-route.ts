@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useUiExtensionContext } from '@nimiplatform/sdk/mod/ui';
 import { parseRuntimeRouteOptions, type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot, type RuntimeRouteSource } from '@nimiplatform/sdk/mod/runtime-route';
 import type { RouteSourceDisplay } from '../types.js';
 import { useKismetStore } from '../state/kismet-store.js';
 import { getKismetRouteClient } from '../runtime-mod.js';
 import { KISMET_RUNTIME_TEXT_CAPABILITY } from '../contracts.js';
 import { emitKismetLog } from '../logging.js';
-import { ReasonCode } from '@nimiplatform/sdk/types';
 
 const STORAGE_KEY = 'nimi.kismet.route-override.v1';
 const ROUTE_OPTIONS_QUERY_TIMEOUT_MS = 6000;
@@ -76,6 +76,25 @@ function normalizeTokenApiBinding(
   return { ...binding, connectorId, model };
 }
 
+function isConnectorNotFoundError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error || '');
+  return message.includes('AI_CONNECTOR_NOT_FOUND');
+}
+
+export function isKismetRouteHealthHealthy(
+  health: { healthy?: boolean; status?: string; reasonCode?: string },
+): boolean {
+  const status = String(health.status || '').trim().toLowerCase();
+  if (status === 'healthy' || status === 'degraded') {
+    return true;
+  }
+  if (typeof health.healthy === 'boolean') {
+    return health.healthy;
+  }
+  const reasonCode = String(health.reasonCode || '').trim();
+  return reasonCode === 'RUNTIME_ROUTE_HEALTHY' || reasonCode === 'RUNTIME_ROUTE_DEGRADED';
+}
+
 async function loadRouteOptionsWithTimeout(routeClient: ReturnType<typeof getKismetRouteClient>): Promise<RuntimeRouteOptionsSnapshot | null> {
   console.log('[KISMET:route] loadRouteOptions: start');
   let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
@@ -118,7 +137,10 @@ export function useKismetRoute() {
     routeSource, setRouteSource,
     routeOverride, setRouteOverride,
     chatRouteOptions, setChatRouteOptions,
+    routeOptionsLoading, setRouteOptionsLoading,
+    routeOptionsError, setRouteOptionsError,
   } = useKismetStore();
+  const { runtimeFields, setRuntimeFields } = useUiExtensionContext();
   const [checking, setChecking] = useState(false);
   const mountedRef = useRef(false);
 
@@ -135,11 +157,33 @@ export function useKismetRoute() {
     persistOverride(routeOverride);
   }, [routeOverride]);
 
+  const recoverFromMissingConnector = useCallback((binding: RuntimeRouteBinding | null | undefined): boolean => {
+    let recovered = false;
+    if (binding?.source === 'token-api' && String(binding.connectorId || '').trim()) {
+      setRouteOverride(null);
+      recovered = true;
+    }
+    if (String(runtimeFields.connectorId || '').trim()) {
+      setRuntimeFields({
+        connectorId: '',
+        localProviderModel: '',
+      });
+      recovered = true;
+    }
+    return recovered;
+  }, [runtimeFields.connectorId, setRouteOverride, setRuntimeFields]);
+
   // Load route options with retry and timeout
   const loadRouteOptions = useCallback(async (): Promise<RuntimeRouteOptionsSnapshot | null> => {
+    setRouteOptionsLoading(true);
+    setRouteOptionsError(null);
     try {
       const routeClient = getKismetRouteClient();
       const result = await loadRouteOptionsWithTimeout(routeClient);
+      if (!result) {
+        setRouteOptionsError('KISMET_ROUTE_OPTIONS_INVALID');
+        return null;
+      }
       if (result) {
         setChatRouteOptions((prev) => {
           if (!result) return prev;
@@ -147,17 +191,26 @@ export function useKismetRoute() {
           return result;
         });
       }
+      setRouteOptionsError(null);
       return result;
     } catch (err) {
+      if (isConnectorNotFoundError(err) && recoverFromMissingConnector(routeOverride)) {
+        setRouteOptionsError('AI_CONNECTOR_NOT_FOUND');
+        return null;
+      }
+      const errorMessage = err instanceof Error ? err.message : String(err);
       emitKismetLog({
         level: 'warn',
         message: 'action:route-options:failed',
         source: 'useKismetRoute',
-        details: { error: err instanceof Error ? err.message : String(err) },
+        details: { error: errorMessage },
       });
+      setRouteOptionsError(errorMessage);
       return null;
+    } finally {
+      setRouteOptionsLoading(false);
     }
-  }, [setChatRouteOptions]);
+  }, [recoverFromMissingConnector, routeOverride, setChatRouteOptions, setRouteOptionsError, setRouteOptionsLoading]);
 
   // Initial load with retry
   useEffect(() => {
@@ -176,6 +229,13 @@ export function useKismetRoute() {
     })();
     return () => { cancelled = true; };
   }, [loadRouteOptions]);
+
+  useEffect(() => {
+    if (!mountedRef.current) {
+      return;
+    }
+    void loadRouteOptions();
+  }, [loadRouteOptions, runtimeFields.connectorId]);
 
   // Poll route options periodically
   useEffect(() => {
@@ -219,6 +279,10 @@ export function useKismetRoute() {
   const checkRouteHealth = useCallback(async (): Promise<RouteSourceDisplay> => {
     const currentOverride = routeOverrideRef.current;
     console.log('[KISMET:health] checkRouteHealth: start', { override: currentOverride });
+    if (!chatRouteOptions && !currentOverride) {
+      setRouteSource('unavailable');
+      return 'unavailable';
+    }
     setChecking(true);
     try {
       if (currentOverride && !isUsableRouteBinding(currentOverride, chatRouteOptions)) {
@@ -249,8 +313,12 @@ export function useKismetRoute() {
         provider: (health as Record<string, unknown>).provider,
         allKeys: Object.keys(health),
       });
-      if (health.reasonCode !== ReasonCode.RUNTIME_ROUTE_HEALTHY && health.reasonCode !== ReasonCode.RUNTIME_ROUTE_DEGRADED) {
-        console.log('[KISMET:health] route NOT healthy, expected', ReasonCode.RUNTIME_ROUTE_HEALTHY, 'or', ReasonCode.RUNTIME_ROUTE_DEGRADED, 'got', health.reasonCode);
+      if (!isKismetRouteHealthHealthy(health)) {
+        console.log('[KISMET:health] route NOT healthy, got', {
+          status: (health as Record<string, unknown>).status,
+          healthy: (health as Record<string, unknown>).healthy,
+          reasonCode: health.reasonCode,
+        });
         setRouteSource('unavailable');
         return 'unavailable';
       }
@@ -265,6 +333,10 @@ export function useKismetRoute() {
       setRouteSource(source);
       return source;
     } catch (err) {
+      if (isConnectorNotFoundError(err) && recoverFromMissingConnector(currentOverride)) {
+        setRouteSource('unavailable');
+        return 'unavailable';
+      }
       console.error('[KISMET:health] checkRouteHealth: EXCEPTION', err);
       emitKismetLog({
         level: 'warn',
@@ -277,7 +349,7 @@ export function useKismetRoute() {
     } finally {
       setChecking(false);
     }
-  }, [chatRouteOptions, setRouteSource]);
+  }, [chatRouteOptions, recoverFromMissingConnector, setRouteSource]);
 
   // Re-check health when routeOverride changes
   useEffect(() => {
@@ -344,9 +416,12 @@ export function useKismetRoute() {
     routeSource,
     routeOverride,
     chatRouteOptions,
+    routeOptionsLoading,
+    routeOptionsError,
     checking,
     isUsableRouteBinding: (binding: RuntimeRouteBinding | null | undefined) => isUsableRouteBinding(binding, chatRouteOptions),
     checkRouteHealth,
+    reloadRouteOptions: loadRouteOptions,
     handleSourceChange,
     handleConnectorChange,
     handleModelChange,
