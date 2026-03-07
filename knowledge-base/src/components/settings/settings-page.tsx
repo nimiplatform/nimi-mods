@@ -367,6 +367,9 @@ export function SettingsPage(props: SettingsPageProps) {
               modelListId="kb-embedding-model-list"
             />
           </div>
+          <p className="mt-3 text-[10px] text-gray-400">
+            Changing the embedding route or embedding model does not re-embed existing documents. Re-import documents after an embedding route change.
+          </p>
         </SettingsCard>
       </div>
     </div>

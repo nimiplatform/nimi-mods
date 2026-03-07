@@ -59,9 +59,15 @@ export function createEmbeddingClientAdapter(
             resolvedModel: binding?.model || null,
             batchSize: input.texts.length,
             embeddings: result.vectors.length,
+            traceId: result.trace?.traceId || null,
+            modelResolved: result.trace?.modelResolved || null,
           },
         });
-        return { embeddings: result.vectors };
+        return {
+          embeddings: result.vectors,
+          model: result.trace?.modelResolved || binding?.model || undefined,
+          trace: result.trace,
+        };
       } catch (error) {
         emitKBLog({
           level: 'error',

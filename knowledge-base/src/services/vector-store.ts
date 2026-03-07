@@ -10,6 +10,14 @@ export type VectorSearchResult = {
   score: number;
 };
 
+export type VectorSearchDiagnostics = {
+  scannedVectors: number;
+  comparedVectors: number;
+  dimensionMismatchCount: number;
+  modelMismatchCount: number;
+  unknownModelCount: number;
+};
+
 /**
  * Cosine similarity between two vectors.
  * Returns value in [-1, 1]; 1 = identical direction.
@@ -86,13 +94,57 @@ export class VectorStore {
     threshold: number,
     documentIds?: string[],
   ): VectorSearchResult[] {
+    return this.searchWithDiagnostics(queryEmbedding, topK, threshold, documentIds).results;
+  }
+
+  searchWithDiagnostics(
+    queryEmbedding: number[],
+    topK: number,
+    threshold: number,
+    documentIds?: string[],
+    options?: {
+      expectedDimensions?: number;
+      expectedModel?: string;
+    },
+  ): {
+    results: VectorSearchResult[];
+    diagnostics: VectorSearchDiagnostics;
+  } {
     const docIdSet = documentIds ? new Set(documentIds) : null;
     const results: VectorSearchResult[] = [];
+    const expectedDimensions = options?.expectedDimensions || queryEmbedding.length;
+    const expectedModel = String(options?.expectedModel || '').trim();
+    const diagnostics: VectorSearchDiagnostics = {
+      scannedVectors: 0,
+      comparedVectors: 0,
+      dimensionMismatchCount: 0,
+      modelMismatchCount: 0,
+      unknownModelCount: 0,
+    };
 
     for (const vector of this.store.values()) {
       if (docIdSet && !docIdSet.has(vector.documentId)) continue;
+      diagnostics.scannedVectors += 1;
+
+      const vectorDimensions = Number.isFinite(vector.dimensions) && vector.dimensions > 0
+        ? vector.dimensions
+        : vector.embedding.length;
+      if (vectorDimensions !== expectedDimensions) {
+        diagnostics.dimensionMismatchCount += 1;
+        continue;
+      }
+
+      const vectorModel = String(vector.model || '').trim();
+      if (expectedModel && vectorModel && vectorModel !== expectedModel) {
+        diagnostics.modelMismatchCount += 1;
+        continue;
+      }
+      if (expectedModel && !vectorModel) {
+        diagnostics.unknownModelCount += 1;
+      }
 
       const score = cosineSimilarity(queryEmbedding, vector.embedding);
+      diagnostics.comparedVectors += 1;
       if (score >= threshold) {
         results.push({
           chunkId: vector.chunkId,
@@ -103,7 +155,10 @@ export class VectorStore {
     }
 
     results.sort((a, b) => b.score - a.score);
-    return results.slice(0, topK);
+    return {
+      results: results.slice(0, topK),
+      diagnostics,
+    };
   }
 
   clear(): void {

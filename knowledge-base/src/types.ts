@@ -95,6 +95,12 @@ export type KBSettings = {
   queryRewritingEnabled: boolean;
 };
 
+export type KBAiTrace = {
+  traceId?: string;
+  modelResolved?: string;
+  routeDecision?: 'local-runtime' | 'token-api' | string;
+};
+
 export const DEFAULT_KB_SETTINGS: KBSettings = {
   chunkSize: 512,
   chunkOverlap: 64,
@@ -122,7 +128,8 @@ export type LlmClient = {
     userPrompt: string;
     maxTokens?: number;
     temperature?: number;
-  }): Promise<{ text: string }>;
+    signal?: AbortSignal;
+  }): Promise<{ text: string; trace?: KBAiTrace }>;
 
   streamText(input: {
     capability?: RuntimeCanonicalCapability;
@@ -130,7 +137,8 @@ export type LlmClient = {
     userPrompt: string;
     maxTokens?: number;
     temperature?: number;
-  }): AsyncIterable<{ type: 'text_delta'; textDelta: string } | { type: 'done' }>;
+    signal?: AbortSignal;
+  }): AsyncIterable<{ type: 'text_delta'; textDelta: string } | { type: 'done'; trace?: KBAiTrace }>;
 };
 
 /** Embedding generation client */
@@ -138,7 +146,7 @@ export type EmbeddingClient = {
   generateEmbedding(input: {
     texts: string[];
     capability?: RuntimeCanonicalCapability;
-  }): Promise<{ embeddings: number[][] }>;
+  }): Promise<{ embeddings: number[][]; model?: string; trace?: KBAiTrace }>;
 };
 
 export type KBRoutePreference = {

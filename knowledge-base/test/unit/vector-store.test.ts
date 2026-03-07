@@ -7,9 +7,9 @@ function buildVector(id: string, documentId: string, chunkId: string, embedding:
     id,
     documentId,
     chunkId,
-    embedding,
-    dimension: embedding.length,
-    createdAt: '2026-03-06T00:00:00.000Z',
+    embedding: new Float32Array(embedding),
+    model: 'openai/text-embedding-3-small',
+    dimensions: embedding.length,
   };
 }
 
@@ -50,5 +50,30 @@ describe('vector-store', () => {
     store.removeByDocumentId('doc-2');
     expect(store.size).toBe(1);
     expect(store.search([1, 0], 10, 0.1, ['doc-2'])).toHaveLength(0);
+  });
+
+  it('reports vector/model compatibility diagnostics', () => {
+    const store = new VectorStore();
+    store.loadAll([
+      buildVector('v1', 'doc-1', 'chunk-1', [1, 0]),
+      {
+        ...buildVector('v2', 'doc-2', 'chunk-2', [1, 0, 0]),
+        dimensions: 3,
+      },
+      {
+        ...buildVector('v3', 'doc-3', 'chunk-3', [1, 0]),
+        model: 'other/embedding-model',
+      },
+    ]);
+
+    const search = store.searchWithDiagnostics([1, 0], 5, 0.1, undefined, {
+      expectedDimensions: 2,
+      expectedModel: 'openai/text-embedding-3-small',
+    });
+
+    expect(search.results).toHaveLength(1);
+    expect(search.diagnostics.dimensionMismatchCount).toBe(1);
+    expect(search.diagnostics.modelMismatchCount).toBe(1);
+    expect(search.diagnostics.comparedVectors).toBe(1);
   });
 });

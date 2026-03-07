@@ -30,6 +30,7 @@ export async function embedChunks(input: {
   const { chunks, embeddingClient, generateId, documentId, onProgress, startFromIndex = 0 } = input;
   const vectors: KBVector[] = [];
   let model = '';
+  let expectedDimensions: number | null = null;
   const flowId = createKBFlowId(`embed-${documentId.slice(-6)}`);
 
   emitKBLog({
@@ -59,7 +60,7 @@ export async function embedChunks(input: {
       },
     });
 
-    let result: { embeddings: number[][] };
+    let result: { embeddings: number[][]; model?: string };
     try {
       result = await embeddingClient.generateEmbedding({ texts });
     } catch (err) {
@@ -79,6 +80,15 @@ export async function embedChunks(input: {
         },
       });
       throw err; // Re-throw so document-pipeline can catch and set error status
+    }
+
+    const batchModel = String(result.model || '').trim();
+    if (batchModel) {
+      if (!model) {
+        model = batchModel;
+      } else if (model !== batchModel) {
+        throw new Error(`KB_EMBEDDING_MODEL_MISMATCH:${model}:${batchModel}`);
+      }
     }
 
     emitKBLog({
@@ -107,6 +117,12 @@ export async function embedChunks(input: {
         continue;
       }
 
+      if (expectedDimensions === null) {
+        expectedDimensions = embedding.length;
+      } else if (expectedDimensions !== embedding.length) {
+        throw new Error(`KB_EMBEDDING_DIMENSION_MISMATCH:${expectedDimensions}:${embedding.length}`);
+      }
+
       vectors.push({
         id: generateId(),
         chunkId: chunk.id,
@@ -125,7 +141,7 @@ export async function embedChunks(input: {
     onProgress?.({
       completed: batchEnd,
       total: chunks.length,
-      model,
+      model: model || batchModel,
     });
   }
 

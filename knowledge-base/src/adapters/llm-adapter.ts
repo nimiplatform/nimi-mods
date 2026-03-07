@@ -38,7 +38,7 @@ export function createLlmClientAdapter(
           'x-nimi-mod-capability': capability,
         },
       });
-      return { text: result.text };
+      return { text: result.text, trace: result.trace };
     },
 
     async *streamText(input) {
@@ -51,6 +51,7 @@ export function createLlmClientAdapter(
         temperature: input.temperature,
         binding,
         model: binding?.model,
+        signal: input.signal,
         metadata: {
           'x-nimi-mod-capability': capability,
         },
@@ -59,7 +60,7 @@ export function createLlmClientAdapter(
         if (event.type === 'delta') {
           yield { type: 'text_delta' as const, textDelta: event.text };
         } else if (event.type === 'finish') {
-          yield { type: 'done' as const };
+          yield { type: 'done' as const, trace: event.trace };
         }
       }
     },
