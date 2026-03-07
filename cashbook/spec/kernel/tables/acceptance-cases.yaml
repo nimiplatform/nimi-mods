@@ -1,0 +1,71 @@
+version: 1
+cases:
+  - id: CSB-001-TEXT-SINGLE-PARSE
+    description: Text input with single expense produces valid transaction.
+    expected_ok: true
+    reason_code: null
+    source_rule: CSB-ACC-002
+  - id: CSB-002-TEXT-MULTI-PARSE
+    description: Text input with multiple expenses produces multiple valid transactions.
+    expected_ok: true
+    reason_code: null
+    source_rule: CSB-ACC-002
+  - id: CSB-003-VOICE-STT-PARSE
+    description: Voice input transcribed via STT and parsed into valid transaction.
+    expected_ok: true
+    reason_code: null
+    source_rule: CSB-ACC-002
+  - id: CSB-004-QUERY-AGGREGATION
+    description: Natural language query returns correct aggregated answer with cited data.
+    expected_ok: true
+    reason_code: null
+    source_rule: CSB-ACC-002
+  - id: CSB-005-RETROACTIVE-ENRICHMENT
+    description: Query triggers retroactive enrichment, extracts new dimension from raw records.
+    expected_ok: true
+    reason_code: null
+    source_rule: CSB-ACC-002
+  - id: CSB-006-INVALID-INPUT-FAIL-CLOSE
+    description: Input with no detectable amount fails close without persisting.
+    expected_ok: false
+    reason_code: CASHBOOK_PARSE_NO_AMOUNT
+    source_rule: CSB-ACC-002
+  - id: CSB-007-STT-FAILURE-ISOLATION
+    description: STT failure does not block text input mode.
+    expected_ok: true
+    reason_code: CASHBOOK_STT_FAILED
+    source_rule: CSB-ACC-002
+  - id: CSB-008-BUDGET-ALERT
+    description: Transaction that exceeds category budget triggers threshold alert.
+    expected_ok: true
+    reason_code: null
+    source_rule: CSB-ACC-002
+  - id: CSB-009-SUBSCRIPTION-DETECTION
+    description: Recurring transactions with similar description/amount are flagged as subscriptions.
+    expected_ok: true
+    reason_code: null
+    source_rule: CSB-ACC-002
+  - id: CSB-010-ASSET-SNAPSHOT
+    description: Asset snapshot recorded and net worth calculated correctly.
+    expected_ok: true
+    reason_code: null
+    source_rule: CSB-ACC-002
+  - id: CSB-011-MULTI-CURRENCY
+    description: Transaction with non-default currency parsed and stored correctly.
+    expected_ok: true
+    reason_code: null
+    source_rule: CSB-ACC-002
+  - id: CSB-012-EXPORT-CSV
+    description: Export produces valid CSV with all transaction fields.
+    expected_ok: true
+    reason_code: null
+    source_rule: CSB-ACC-002
+verification_commands:
+  - command: pnpm -C nimi-mods run generate:spec:cashbook-kernel-docs
+    source_rule: CSB-ACC-001
+  - command: pnpm -C nimi-mods run check:spec:cashbook-kernel-docs-drift
+    source_rule: CSB-ACC-001
+  - command: pnpm -C nimi-mods run check:spec:cashbook-kernel-consistency
+    source_rule: CSB-ACC-001
+  - command: pnpm -C nimi-mods run check
+    source_rule: CSB-ACC-001

@@ -1,0 +1,31 @@
+version: 1
+builtin_dimensions:
+  - key: relatedPerson
+    description: people involved in the transaction
+    extraction_hint: names, pronouns, relationships mentioned in rawInput
+    example_query: "上个月我的钱都花在谁身上了"
+    source_rule: CSB-ENR-003
+  - key: location
+    description: geographic location or venue of the transaction
+    extraction_hint: place names, addresses, store names
+    example_query: "我在朝阳区消费了多少"
+    source_rule: CSB-ENR-003
+  - key: occasion
+    description: context or event type (business trip, date, daily, social)
+    extraction_hint: contextual clues about why the spending happened
+    example_query: "出差期间总共花了多少"
+    source_rule: CSB-ENR-003
+  - key: sentiment
+    description: emotional context of the spending
+    extraction_hint: mood indicators, impulse signals, satisfaction markers
+    example_query: "心情不好的时候我会多花钱吗"
+    source_rule: CSB-ENR-003
+  - key: sharedWith
+    description: whether expense was split or shared with others
+    extraction_hint: AA, split, treat, pay-for-others signals
+    example_query: "这个月请客花了多少"
+    source_rule: CSB-ENR-003
+open_extension:
+  policy: LLM may extract any additional dimension from rawInput on demand
+  cache_behavior: new dimensions are added to enriched map without schema migration
+  source_rule: CSB-ENR-003
