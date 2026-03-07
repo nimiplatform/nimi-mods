@@ -1,0 +1,63 @@
+version: 1
+input_fields:
+  - field: name
+    type: string
+    required: false
+    sensitive: false
+    user_visible: true
+    source_rule: KIS-IN-001
+  - field: gender
+    type: enum
+    values: [male, female]
+    required: true
+    sensitive: true
+    user_visible: true
+    source_rule: KIS-IN-001
+  - field: birthDate
+    type: date
+    required: true
+    sensitive: true
+    user_visible: true
+    source_rule: KIS-IN-001
+  - field: birthTime
+    type: time
+    required: true
+    sensitive: true
+    user_visible: true
+    source_rule: KIS-IN-001
+  - field: birthPlaceLabel
+    type: string
+    required: true
+    sensitive: true
+    user_visible: true
+    source_rule: KIS-IN-002
+  - field: birthPlaceId
+    type: string
+    required: true
+    sensitive: false
+    user_visible: false
+    source_rule: KIS-IN-002
+  - field: timezone
+    type: string
+    required: true
+    sensitive: false
+    user_visible: true
+    source_rule: KIS-IN-001
+  - field: consent.allowCityAffinityUse
+    type: boolean
+    required: true
+    sensitive: false
+    user_visible: true
+    source_rule: KIS-IN-004
+  - field: consent.allowLocalProfilePersist
+    type: boolean
+    required: true
+    sensitive: false
+    user_visible: true
+    source_rule: KIS-IN-004
+  - field: consent.allowLocalProfileMatchUse
+    type: boolean
+    required: true
+    sensitive: false
+    user_visible: true
+    source_rule: KIS-IN-004

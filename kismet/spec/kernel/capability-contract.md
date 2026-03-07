@@ -2,18 +2,21 @@
 
 > Owner Domain: `KIS-CAP-*`
 
-## KIS-CAP-001 Mod Identity Stability
+## KIS-CAP-001 Mods-Only Scope
 
-`modId`, entry path, and manifest capability semantics must remain stable once released.
+Kismet v2 MUST be fully implementable inside `nimi-mods/kismet/**` plus `scripts/spec-kernel-config.mjs`.
+No SDK, desktop, runtime, or realm changes are permitted in scope.
 
-## KIS-CAP-002 Capability Source of Truth
+## KIS-CAP-002 Hook Boundary
 
-Capability registry is authoritative in `tables/capabilities.yaml` and must match manifest/runtime registration.
+Kismet MUST consume AI and route options only through mod hook capabilities and `@nimiplatform/sdk/mod/*` subpath imports.
 
-## KIS-CAP-003 Allowed SDK Surfaces
+## KIS-CAP-003 Local-Only Matching
 
-Kismet AI path must use `@nimiplatform/sdk/mod/runtime` surfaces.
+Compatibility in this version is local-only.
+No public profile publish, cross-device profile sync, or platform-user lookup is allowed.
 
-## KIS-CAP-004 Forbidden Direct Vendor Calls
+## KIS-CAP-004 Internal Data Assets
 
-Do not encode direct vendor HTTP endpoints in mod business flow.
+Deterministic city catalogs, pillar derivation data, and local share profiles are internal mod assets.
+They do not require new host capabilities.

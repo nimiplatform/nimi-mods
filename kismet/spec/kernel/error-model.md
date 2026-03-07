@@ -2,14 +2,25 @@
 
 > Owner Domain: `KIS-ERR-*`
 
-## KIS-ERR-001 Reason Code Source
+## KIS-ERR-001 Structured Errors
 
-Reason code registry is authoritative in `tables/reason-codes.yaml`.
+Error codes are authoritative in `tables/reason-codes.yaml`.
+All user-visible failures MUST expose `reasonCode`, `message`, and `actionHint`.
 
-## KIS-ERR-002 Structured Envelope
+## KIS-ERR-002 Upstream Preservation
 
-Failures must expose parseable `reasonCode + actionHint`.
+Runtime AI failures MUST preserve upstream `reasonCode` and `traceId` when provided.
 
-## KIS-ERR-003 Fail-Close Boundaries
+## KIS-ERR-003 Fail-Close Domains
 
-Invalid input/schema/points must fail-close and must not render as success.
+The following domains fail close:
+
+1. birth intake validation
+2. canonical profile validation
+3. AI JSON schema validation
+4. city resolution for location context
+
+## KIS-ERR-004 Route Fallback
+
+Route unavailability is not silent degradation.
+It MUST surface as `KISMET_ROUTE_UNAVAILABLE` and enable prompt-import fallback for the current task.

@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>司命 - 命理匹配 (结缘阵法)</title>
+    <!-- 引入思源宋体与黑体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600;900&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-base: #0a0908;       /* 极深的玄黑 */
+            --bg-panel: #141211;      /* 左侧面板底色 */
+            --text-main: #E8E3D7;     /* 纸白 */
+            --text-muted: #736b60;    /* 蟹壳青 (更暗沉一些) */
+            --border-gold: #8A7254;   /* 古铜金 */
+            --border-gold-dim: rgba(138, 114, 84, 0.2);
+            --accent-red: #8B2620;    /* 暗朱砂红 */
+            --glow-gold: rgba(138, 114, 84, 0.15);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: 'Noto Sans SC', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            overflow: hidden; /* 防止阵法动画撑开滚动条 */
+        }
+
+        .serif { font-family: 'Noto Serif SC', serif; }
+
+        /* ================= 左侧导航控制台 ================= */
+        .sidebar {
+            width: 320px;
+            background-color: var(--bg-panel);
+            border-right: 1px solid var(--border-gold-dim);
+            padding: 40px 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+            z-index: 10;
+            box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+        }
+
+        /* 顶部竖排大标题 */
+        .app-title-container {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 10px;
+        }
+        .app-title {
+            font-size: 2.5rem;
+            color: var(--border-gold);
+            font-weight: 600;
+            letter-spacing: 8px;
+            writing-mode: vertical-rl;
+            text-orientation: upright;
+            border-left: 2px solid var(--accent-red);
+            padding-left: 16px;
+            height: 140px;
+            text-shadow: 0 0 20px var(--glow-gold);
+        }
+
+        /* 模块切换 Tab (优化为类似木牌/印章的质感) */
+        .nav-tabs {
+            display: flex;
+            border: 1px solid var(--border-gold-dim);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .nav-tab {
+            flex: 1;
+            text-align: center;
+            padding: 12px 0;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.3s;
+            border-right: 1px solid var(--border-gold-dim);
+            background: transparent;
+        }
+        .nav-tab:last-child { border-right: none; }
+        .nav-tab:hover { color: var(--text-main); background: rgba(138, 114, 84, 0.05); }
+        .nav-tab.active {
+            background: rgba(138, 114, 84, 0.1);
+            color: var(--border-gold);
+            border-bottom: 2px solid var(--border-gold);
+        }
+
+        /* 左侧 AI 路由设置区 (弱化视觉层级) */
+        .settings-section {
+            margin-top: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .setting-item {
+            border-bottom: 1px solid var(--border-gold-dim);
+            padding-bottom: 12px;
+        }
+        .setting-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .setting-value {
+            font-size: 0.95rem;
+            color: var(--text-main);
+            font-family: 'Noto Serif SC', serif;
+        }
+
+        /* ================= 右侧：仪式感法阵区 ================= */
+        .main-content {
+            flex-grow: 1;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            /* 径向渐变营造舞台聚光灯效果 */
+            background: radial-gradient(circle at 50% 50%, rgba(20, 18, 17, 1) 0%, var(--bg-base) 80%);
+        }
+
+        .header-top {
+            padding: 30px 40px;
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            letter-spacing: 2px;
+            position: absolute;
+            top: 0; left: 0; width: 100%;
+            z-index: 2;
+        }
+
+        /* 核心仪式感容器 */
+        .ritual-container {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        /* --- 纯 CSS 绘制的结缘法阵 (Dormant Array) --- */
+        .astrolabe-array {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none; /* 防止遮挡点击 */
+        }
+
+        /* 外圈八卦盘 (缓慢顺时针旋转) */
+        .ring-outer {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 1px dashed rgba(138, 114, 84, 0.2);
+            border-radius: 50%;
+            animation: spin 60s linear infinite;
+        }
+        .ring-outer::before, .ring-outer::after {
+            content: ''; position: absolute; width: 100%; height: 100%; border: 1px solid rgba(138, 114, 84, 0.1); border-radius: 50%; transform: scale(0.95);
+        }
+
+        /* 内圈星轨 (缓慢逆时针旋转) */
+        .ring-inner {
+            position: absolute;
+            width: 65%;
+            height: 65%;
+            border: 2px solid rgba(138, 114, 84, 0.05);
+            border-radius: 50%;
+            animation: spin-reverse 40s linear infinite;
+        }
+        /* 阵法节点发光点 */
+        .ring-inner::before {
+            content: ''; position: absolute; top: -3px; left: 50%; transform: translateX(-50%); width: 6px; height: 6px; background: var(--border-gold); border-radius: 50%; box-shadow: 0 0 10px var(--border-gold);
+        }
+        .ring-inner::after {
+            content: ''; position: absolute; bottom: -3px; left: 50%; transform: translateX(-50%); width: 6px; height: 6px; background: var(--border-gold); border-radius: 50%; box-shadow: 0 0 10px var(--border-gold);
+        }
+
+        /* 阵眼呼吸光晕 */
+        .core-glow {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(138, 114, 84, 0.08) 0%, transparent 70%);
+            border-radius: 50%;
+            animation: breathe 4s ease-in-out infinite alternate;
+        }
+
+        /* --- 中心文案框 (书简质感) --- */
+        .message-box {
+            position: relative;
+            z-index: 10;
+            background: rgba(10, 9, 8, 0.6);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border-gold-dim);
+            padding: 50px 80px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        /* 框的古典四角装饰 */
+        .message-box::before, .message-box::after {
+            content: ''; position: absolute; width: 15px; height: 15px; border: 1px solid var(--border-gold); opacity: 0.6;
+        }
+        .message-box::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+        .message-box::after { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+
+        /* 中心竖线 (分割线/封印线) */
+        .seal-line {
+            width: 1px;
+            height: 40px;
+            background: linear-gradient(to bottom, transparent, var(--accent-red), transparent);
+        }
+
+        .main-title {
+            font-size: 2.2rem;
+            color: var(--border-gold);
+            font-weight: 500;
+            letter-spacing: 12px;
+            margin-right: -12px; /* 修正 letter-spacing 带来的偏移 */
+            text-shadow: 0 0 15px rgba(138, 114, 84, 0.3);
+        }
+
+        .sub-desc {
+            font-size: 1rem;
+            color: var(--text-muted);
+            line-height: 2;
+            max-width: 400px;
+            letter-spacing: 2px;
+        }
+
+        .highlight-red { color: var(--accent-red); font-weight: 600; }
+
+        /* 动画定义 */
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        @keyframes spin-reverse { 100% { transform: rotate(-360deg); } }
+        @keyframes breathe { 0% { transform: scale(0.9); opacity: 0.5; } 100% { transform: scale(1.1); opacity: 1; } }
+
+    </style>
+</head>
+<body>
+
+    <!-- 左侧控制台 -->
+    <div class="sidebar">
+        <!-- 竖排主标题 -->
+        <div class="app-title-container">
+            <div class="app-title serif">天机 · 司命</div>
+        </div>
+
+        <!-- 导航 Tabs -->
+        <div class="nav-tabs serif">
+            <div class="nav-tab">命盘批算</div>
+            <div class="nav-tab">流年运势</div>
+            <div class="nav-tab active">命轨结缘</div>
+        </div>
+
+        <!-- 左下角 API 设置区 -->
+        <div class="settings-section">
+            <div class="setting-item">
+                <div class="setting-label">当前路径 <span>不可用</span></div>
+                <div class="setting-value" style="color: var(--text-muted);">暂未开启</div>
+            </div>
+            <div class="setting-item">
+                <div class="setting-label">AI 路由枢纽 <span style="color: var(--border-gold); cursor:pointer;">重置</span></div>
+                <div class="setting-value">Token API</div>
+            </div>
+            <div class="setting-item">
+                <div class="setting-label">推演核心</div>
+                <div class="setting-value">Gemini 2.5 Flash</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧仪式感区域 -->
+    <div class="main-content">
+        <div class="header-top serif">命理匹配 / Matchmaking</div>
+
+        <div class="ritual-container">
+            
+            <!-- 纯 CSS 绘制的背景星盘阵法 -->
+            <div class="astrolabe-array">
+                <div class="ring-outer"></div>
+                <div class="ring-inner"></div>
+                <div class="core-glow"></div>
+            </div>
+
+            <!-- 悬浮的文案中心框 -->
+            <div class="message-box serif">
+                <div class="seal-line"></div>
+                
+                <div class="main-title">天机未显</div>
+                
+                <div class="sub-desc">
+                    结缘阵法当前处于 <span class="highlight-red">封印状态</span>。<br>
+                    此功能将在星轨就位后开启，届时可基于已落定的命盘，推演天地五行之契合度。
+                </div>
+                
+                <div class="seal-line" style="height: 20px;"></div>
+            </div>
+
+        </div>
+    </div>
+
+</body>
+</html>

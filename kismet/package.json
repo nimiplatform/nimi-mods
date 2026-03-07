@@ -7,7 +7,9 @@
     "build": "node ../scripts/build-mod.mjs --mod kismet",
     "watch": "node ../scripts/build-mod.mjs --mod kismet --watch",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
-    "test": "npx tsx --test test/*.test.ts",
+    "generate:city-catalog": "node data/generate-city-catalog.mjs",
+    "probe:runtime": "node ../node_modules/.pnpm/node_modules/tsx/dist/cli.mjs test/scripts/run-kismet-runtime-probe.ts",
+    "test": "node ../node_modules/.pnpm/node_modules/tsx/dist/cli.mjs --test test/*.test.ts",
     "verify": "pnpm run typecheck && pnpm run test && pnpm run build",
     "clean": "rm -rf dist"
   },

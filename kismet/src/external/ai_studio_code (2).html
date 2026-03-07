@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>司命 - 核心命盘重构</title>
+    <!-- 引入谷歌字体：思源宋体 + 思源黑体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;600;900&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+
+    <style>
+        :root {
+            --bg-base: #100f0d;       /* 玄黑 */
+            --bg-card: #181615;       /* 鸦青 */
+            --bg-card-hover: #1e1b1a;
+            --text-main: #E8E3D7;     /* 纸白 */
+            --text-muted: #8C857B;    /* 蟹壳青 */
+            --border-gold: #8A7254;   /* 古铜 */
+            --accent-red: #A6382E;    /* 朱砂 */
+            --accent-blue: #3A4B59;   /* 靛蓝 */
+            
+            /* 五行专属色 */
+            --wu-metal: #D1D1D1;
+            --wu-wood: #526B5D;
+            --wu-water: #3A4B59;
+            --wu-fire: #A6382E;
+            --wu-earth: #B08D57;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            background-image: radial-gradient(circle at 50% 0%, #201D1A 0%, transparent 70%);
+            color: var(--text-main);
+            font-family: 'Noto Sans SC', sans-serif;
+            padding: 40px;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+        }
+
+        .serif { font-family: 'Noto Serif SC', serif; }
+
+        /* --- 整体容器 (对应红框) --- */
+        .natal-profile-section {
+            width: 100%;
+            max-width: 1100px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* --- 顶部 Header 与 导出按钮 --- */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(138, 114, 84, 0.2);
+            padding-bottom: 15px;
+        }
+        
+        .section-title {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            letter-spacing: 2px;
+        }
+
+        .export-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn-export {
+            background: transparent;
+            border: 1px solid rgba(138, 114, 84, 0.4);
+            color: var(--border-gold);
+            padding: 6px 16px;
+            font-size: 0.85rem;
+            font-family: 'Noto Serif SC', serif;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-radius: 2px;
+        }
+        .btn-export:hover {
+            background: rgba(138, 114, 84, 0.1);
+            border-color: var(--border-gold);
+            color: var(--text-main);
+        }
+
+        /* --- 古风卡片基础样式 --- */
+        .gu-card {
+            background: var(--bg-card);
+            border: 1px solid rgba(138, 114, 84, 0.2);
+            padding: 30px;
+            position: relative;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+        }
+        
+        /* 经典折角装饰 */
+        .gu-card::before, .gu-card::after {
+            content: ''; position: absolute; width: 10px; height: 10px; border: 1px solid var(--border-gold); opacity: 0.5;
+        }
+        .gu-card::before { top: 0; left: 0; border-right: none; border-bottom: none; }
+        .gu-card::after { bottom: 0; right: 0; border-left: none; border-top: none; }
+
+        /* --- Natal Core (核心命盘卡片) --- */
+        .core-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+        
+        .core-title-group { display: flex; flex-direction: column; gap: 8px; }
+        .core-title { font-size: 1.4rem; color: var(--border-gold); font-weight: 600; letter-spacing: 2px; }
+        .core-subtitle { font-size: 1.1rem; color: var(--text-main); }
+        .core-subtitle span { color: var(--accent-red); margin-right: 4px;} /* 丁火标红 */
+
+        /* 右上角的四柱小签 */
+        .bazi-pill {
+            display: flex;
+            border: 1px solid rgba(138, 114, 84, 0.3);
+            background: rgba(0,0,0,0.2);
+            padding: 4px 12px;
+            gap: 12px;
+        }
+        .bazi-pill span { color: var(--border-gold); font-size: 1rem; letter-spacing: 2px; }
+        .bazi-pill .divider { color: rgba(138, 114, 84, 0.3); }
+
+        /* 命盘内容布局 (图表 + 详情) */
+        .core-content {
+            display: flex;
+            align-items: center;
+            gap: 40px;
+        }
+
+        /* 图表容器 */
+        .chart-container {
+            width: 240px;
+            height: 240px;
+            flex-shrink: 0;
+            position: relative;
+        }
+        #wuxing-pie { width: 100%; height: 100%; }
+
+        /* 图表旁的古典图例 */
+        .custom-legend {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding-right: 40px;
+            border-right: 1px dashed rgba(138, 114, 84, 0.2);
+        }
+        .legend-item { display: flex; align-items: center; gap: 10px; font-size: 0.95rem; }
+        .dot { width: 8px; height: 8px; transform: rotate(45deg); } /* 菱形点 */
+        .pct { color: var(--border-gold); font-family: 'Noto Serif SC', serif; min-width: 40px; text-align: right;}
+
+        /* 右侧解析文本区 */
+        .core-details {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        
+        .detail-row { display: flex; align-items: center; gap: 12px; }
+        .detail-label { font-size: 0.85rem; color: var(--text-muted); }
+        .detail-value { font-size: 1rem; color: var(--text-main); font-weight: 500; }
+
+        /* 喜忌标签 */
+        .gu-tag { padding: 2px 8px; border: 1px solid; font-size: 0.85rem; }
+        .gu-tag.favorable { color: var(--border-gold); border-color: var(--border-gold); background: rgba(138, 114, 84, 0.1); }
+        .gu-tag.avoid { color: var(--accent-red); border-color: var(--accent-red); background: rgba(166, 56, 46, 0.1); }
+
+        .narrative-text {
+            margin-top: 10px;
+            font-size: 1.05rem;
+            line-height: 1.8;
+            color: var(--text-main);
+            background: rgba(138, 114, 84, 0.03);
+            padding: 16px;
+            border-left: 2px solid var(--border-gold);
+        }
+
+        /* --- Recommended Cities (推荐城市卡片) --- */
+        .cities-title { font-size: 1.2rem; color: var(--border-gold); margin-bottom: 20px; letter-spacing: 2px; }
+        
+        .cities-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+        }
+
+        .city-card {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid rgba(138, 114, 84, 0.15);
+            padding: 16px;
+            position: relative;
+            transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .city-card:hover {
+            background: rgba(138, 114, 84, 0.05);
+            border-color: rgba(138, 114, 84, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .city-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .city-rank {
+            font-family: 'Noto Serif SC', serif;
+            font-size: 1.2rem;
+            color: var(--accent-red);
+            font-weight: 900;
+            opacity: 0.8;
+        }
+
+        .city-name {
+            font-size: 1.1rem;
+            color: var(--text-main);
+            font-weight: 600;
+        }
+
+        .city-score {
+            font-family: 'Noto Sans SC', sans-serif;
+            font-size: 0.85rem;
+            color: var(--border-gold);
+            margin-left: auto;
+            background: rgba(138, 114, 84, 0.1);
+            padding: 2px 6px;
+            border-radius: 2px;
+        }
+
+        .city-desc {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="natal-profile-section">
+        
+        <!-- 顶部功能栏 -->
+        <div class="section-header">
+            <div class="section-title">Natal Profile / 命理总览</div>
+            <div class="export-actions">
+                <button class="btn-export">结缘 JSON</button>
+                <button class="btn-export">拓印 PDF</button>
+                <button class="btn-export">卷轴 HTML</button>
+            </div>
+        </div>
+
+        <!-- 核心命盘卡片 -->
+        <div class="gu-card">
+            <div class="core-header">
+                <div class="core-title-group">
+                    <div class="core-title serif">Natal Core · 核心命盘</div>
+                    <div class="core-subtitle serif"><span>丁火</span> · 猪 (亥)</div>
+                </div>
+                <!-- 还原你原图右上角的四柱小签 -->
+                <div class="bazi-pill serif">
+                    <span>乙亥</span>
+                    <span class="divider">|</span>
+                    <span>己卯</span>
+                    <span class="divider">|</span>
+                    <span>丁酉</span>
+                    <span class="divider">|</span>
+                    <span>戊申</span>
+                </div>
+            </div>
+
+            <div class="core-content">
+                <!-- 左侧：五行环形图 (用 Echarts) -->
+                <div class="chart-container">
+                    <div id="wuxing-pie"></div>
+                </div>
+
+                <!-- 中间：定制化的古风图例 -->
+                <div class="custom-legend serif">
+                    <div class="legend-item"><div class="dot" style="background: var(--wu-metal);"></div> 金 <span class="pct">16%</span></div>
+                    <div class="legend-item"><div class="dot" style="background: var(--wu-wood);"></div> 木 <span class="pct">40%</span></div>
+                    <div class="legend-item"><div class="dot" style="background: var(--wu-water);"></div> 水 <span class="pct">8%</span></div>
+                    <div class="legend-item"><div class="dot" style="background: var(--wu-fire);"></div> 火 <span class="pct">12%</span></div>
+                    <div class="legend-item"><div class="dot" style="background: var(--wu-earth);"></div> 土 <span class="pct">24%</span></div>
+                </div>
+
+                <!-- 右侧：解析详情 -->
+                <div class="core-details">
+                    <div class="detail-row">
+                        <span class="detail-label">Birth City Context 分野:</span>
+                        <span class="detail-value serif">东莞</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="gu-tag favorable serif">喜 水 / 土</span>
+                        <span class="gu-tag avoid serif">忌 火 / 木</span>
+                    </div>
+                    <div class="narrative-text serif">
+                        寻找八字中水土旺盛，火木较弱的伴侣，能带来命理磁场之平衡与支持。阴阳调和，方能致远。
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 推荐城市卡片 -->
+        <div class="gu-card">
+            <div class="cities-title serif">Recommended Cities · 堪舆分野</div>
+            
+            <div class="cities-grid">
+                <!-- 城市 1 -->
+                <div class="city-card">
+                    <div class="city-header">
+                        <div class="city-rank">一</div>
+                        <div class="city-name serif">杭州</div>
+                        <div class="city-score">90</div>
+                    </div>
+                    <div class="city-desc serif">西湖灵秀，水气充盈，利于身心。</div>
+                </div>
+
+                <!-- 城市 2 -->
+                <div class="city-card">
+                    <div class="city-header">
+                        <div class="city-rank">二</div>
+                        <div class="city-name serif">成都</div>
+                        <div class="city-score">88</div>
+                    </div>
+                    <div class="city-desc serif">天府之国，土气厚重，助运稳固。</div>
+                </div>
+
+                <!-- 城市 3 -->
+                <div class="city-card">
+                    <div class="city-header">
+                        <div class="city-rank">三</div>
+                        <div class="city-name serif">重庆</div>
+                        <div class="city-score">85</div>
+                    </div>
+                    <div class="city-desc serif">山水交融，水土两旺，平衡命局。</div>
+                </div>
+
+                <!-- 城市 4 -->
+                <div class="city-card">
+                    <div class="city-header">
+                        <div class="city-rank">四</div>
+                        <div class="city-name serif">青岛</div>
+                        <div class="city-score">82</div>
+                    </div>
+                    <div class="city-desc serif">海滨城市，水旺财丰，事业顺遂。</div>
+                </div>
+
+                <!-- 城市 5 -->
+                <div class="city-card">
+                    <div class="city-header">
+                        <div class="city-rank">五</div>
+                        <div class="city-name serif">西安</div>
+                        <div class="city-score">80</div>
+                    </div>
+                    <div class="city-desc serif">古都厚土，文化底蕴，滋养身心。</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // 初始化红框内的环形图
+        var pieChart = echarts.init(document.getElementById('wuxing-pie'));
+        var option = {
+            tooltip: {
+                trigger: 'item',
+                backgroundColor: 'rgba(24, 22, 21, 0.9)',
+                borderColor: '#8A7254',
+                textStyle: { color: '#E8E3D7', fontFamily: 'Noto Serif SC' }
+            },
+            series: [
+                {
+                    name: '五行占比',
+                    type: 'pie',
+                    radius: ['45%', '85%'], // 保持环形图的样式
+                    avoidLabelOverlap: false,
+                    itemStyle: {
+                        borderColor: '#181615', // 用卡片底色做描边，产生间隙感
+                        borderWidth: 2
+                    },
+                    label: { show: false }, // 隐藏自带标签，使用我们外面手写的古风图例
+                    // 遵循传统五行色
+                    color: ['#D1D1D1', '#526B5D', '#3A4B59', '#A6382E', '#B08D57'],
+                    data: [
+                        { value: 16, name: '金 (Metal)' },
+                        { value: 40, name: '木 (Wood)' },
+                        { value: 8,  name: '水 (Water)' },
+                        { value: 12, name: '火 (Fire)' },
+                        { value: 24, name: '土 (Earth)' }
+                    ]
+                }
+            ]
+        };
+        pieChart.setOption(option);
+
+        window.addEventListener('resize', function() {
+            pieChart.resize();
+        });
+    </script>
+</body>
+</html>

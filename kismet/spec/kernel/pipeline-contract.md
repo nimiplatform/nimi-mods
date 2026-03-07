@@ -2,18 +2,24 @@
 
 > Owner Domain: `KIS-PIPE-*`
 
-## KIS-PIPE-001 Dual Entry Contract
+## KIS-PIPE-001 Canonical Natal Chain
 
-Kismet has two entries: `prompt-import` and `runtime-ai`, both converging to one unified result contract.
+The canonical natal chain is authoritative in `tables/pipeline-states.yaml` and MUST include:
 
-## KIS-PIPE-002 Unified Result Validation
+`birth-intake -> birth-normalize -> pillar-derive -> canonical-profile-validate -> natal-analysis-generate -> city-affinity-score -> render`
 
-Both entries must pass the same JSON extraction and schema validation pipeline.
+## KIS-PIPE-002 Daily Subflow
 
-## KIS-PIPE-003 Route Failure Fallback
+Daily fortune is a subflow that starts from a canonical profile and local day context.
 
-Runtime route unavailable must surface structured error and fallback guidance to prompt-import.
+## KIS-PIPE-003 Compatibility Subflow
 
-## KIS-PIPE-004 Export Trigger Policy
+Compatibility is a subflow that checks consent, loads local derived profiles, computes a deterministic score, then generates explanatory JSON.
 
-Exports are explicit user-triggered actions only.
+## KIS-PIPE-004 Prompt Import Fallback
+
+If runtime AI generation cannot route, Kismet MUST preserve structured error metadata and present prompt-import fallback for the active generation kind.
+
+## KIS-PIPE-005 Export Trigger Policy
+
+Exports remain explicit user-triggered actions only.

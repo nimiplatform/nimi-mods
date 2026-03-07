@@ -4,38 +4,36 @@
 > Source: `kismet/spec/kernel/tables/capabilities.yaml`
 
 ```yaml
-version: 1
-mod_identity:
-  mod_id: world.nimi.kismet
-  name: Kismet
-  entry: ./dist/mods/kismet/index.js
-  source_rule: KIS-CAP-001
-required_capabilities:
-  - key: runtime.ai.text.generate
-    purpose: runtime-ai text generation
+version: 2
+capabilities:
+  - key: llm.text.generate
+    direction: consume
+    purpose: generate natal, daily, and compatibility narratives
     source_rule: KIS-CAP-002
-  - key: runtime.route.list.options
-    purpose: route-options listing
+  - key: llm.text.stream
+    direction: consume
+    purpose: route compatibility with host AI contract surface
     source_rule: KIS-CAP-002
-  - key: runtime.route.resolve
-    purpose: runtime route resolution
-    source_rule: KIS-CAP-002
-  - key: runtime.route.check.health
-    purpose: runtime route health checks
+  - key: data.query.data-api.runtime.route.options
+    direction: consume
+    purpose: discover route and model options for AI generation
     source_rule: KIS-CAP-002
   - key: ui.register.ui-extension.app.sidebar.mods
-    purpose: sidebar registration
-    source_rule: KIS-CAP-002
+    direction: consume
+    purpose: register mod navigation
+    source_rule: KIS-CAP-001
   - key: ui.register.ui-extension.app.content.routes
-    purpose: route registration
-    source_rule: KIS-CAP-002
-allowed_sdk_surfaces:
-  - package: "@nimiplatform/sdk/mod/runtime"
-    apis:
-      - createModRuntimeClient
-    source_rule: KIS-CAP-003
-forbidden_patterns:
-  - pattern: direct-vendor-http-endpoint
-    reason: bypasses runtime route governance
+    direction: consume
+    purpose: register Kismet page
+    source_rule: KIS-CAP-001
+internal_assets:
+  - asset: deterministic-bazi-derivation
+    storage: mod-local source code
     source_rule: KIS-CAP-004
+  - asset: city-catalog
+    storage: mod-local checked-in data
+    source_rule: KIS-CAP-004
+  - asset: local-share-profiles
+    storage: browser localStorage
+    source_rule: KIS-COMP-001
 ```

@@ -5,6 +5,10 @@
 | File | Source |
 |---|---|
 | `capabilities.md` | `tables/capabilities.yaml` |
+| `input-fields.md` | `tables/input-fields.yaml` |
+| `canonical-profile-fields.md` | `tables/canonical-profile-fields.yaml` |
+| `city-affinity-model.md` | `tables/city-affinity-model.yaml` |
+| `privacy-consent-policies.md` | `tables/privacy-consent-policies.yaml` |
 | `pipeline-states.md` | `tables/pipeline-states.yaml` |
 | `reason-codes.md` | `tables/reason-codes.yaml` |
 | `acceptance-cases.md` | `tables/acceptance-cases.yaml` |

@@ -1,127 +1,187 @@
-import type { ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
+import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
 import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
-import type { KismetInput, KismetResult, KismetError } from '../types.js';
+import type { KismetAiRawResponse, KismetError, RouteSourceDisplay } from '../types.js';
 import { KISMET_REASON } from '../contracts.js';
-import { buildKismetSystemPrompt } from '../prompt/system-prompt.js';
-import { buildKismetUserPrompt } from '../prompt/user-prompt.js';
 import { parseResultFromText } from '../validation/parse-result-json.js';
-import { validateAiOutput } from '../validation/validate-result.js';
-import { interpolateKeyNodes } from './interpolation.js';
 import { emitKismetLog } from '../logging.js';
-import { ReasonCode } from '@nimiplatform/sdk/types';
 
-type GenerateViaAiInput = {
-  runtimeClient: ModRuntimeClient;
-  input: KismetInput;
-  binding?: RuntimeRouteBinding;
+const ROUTE_UNAVAILABLE_REASON_CODES = new Set([
+  'RUNTIME_ROUTE_UNAVAILABLE',
+  'AI_ROUTE_UNAVAILABLE',
+  'AI_CONNECTOR_ID_REQUIRED',
+  'AI_MODEL_REQUIRED',
+  'AI_CONNECTOR_NOT_FOUND',
+  'AI_CONNECTOR_UNAVAILABLE',
+]);
+
+type GenerateJsonViaAiInput<T> = {
+  aiClient: ModAiClient;
+  systemPrompt: string;
+  userPrompt: string;
+  routeOverride?: RuntimeRouteBinding;
   abortSignal?: AbortSignal;
+  validate: (raw: unknown) => { ok: true; data: T } | { ok: false; error: KismetError };
 };
 
-type GenerateViaAiOutput =
-  | { ok: true; data: KismetResult; routeSource: string }
-  | { ok: false; error: KismetError };
+type GenerateJsonViaAiOutput<T> =
+  | { ok: true; data: T; routeSource: RouteSourceDisplay; rawResponse: KismetAiRawResponse }
+  | { ok: false; error: KismetError; rawResponse?: KismetAiRawResponse };
 
-export async function generateViaAi(opts: GenerateViaAiInput): Promise<GenerateViaAiOutput> {
-  const { runtimeClient, input, binding, abortSignal } = opts;
+type NormalizedAiFailure = {
+  message: string;
+  reasonCode: string;
+  actionHint: string;
+  traceId?: string;
+  upstreamReasonCode?: string;
+};
 
-  // Check route health first
+function asRecord(input: unknown): Record<string, unknown> {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return {};
+  }
+  return input as Record<string, unknown>;
+}
+
+function extractReasonCodeFromMessage(message: string): string {
+  const matched = String(message || '').match(/\b(AI_[A-Z_]+|RUNTIME_ROUTE_[A-Z_]+)\b/);
+  return String(matched?.[1] || '').trim();
+}
+
+function isRouteUnavailable(input: { reasonCode: string; message: string }): boolean {
+  const reasonCode = String(input.reasonCode || '').trim();
+  const message = String(input.message || '').toLowerCase();
+  if (ROUTE_UNAVAILABLE_REASON_CODES.has(reasonCode)) {
+    return true;
+  }
+  if (reasonCode.startsWith('RUNTIME_ROUTE_') && reasonCode !== 'RUNTIME_ROUTE_HEALTHY') {
+    return true;
+  }
+  return (
+    message.includes('route unavailable')
+    || (message.includes('connector') && message.includes('required'))
+    || (message.includes('model') && message.includes('required'))
+  );
+}
+
+function normalizeAiFailure(error: unknown): NormalizedAiFailure {
+  const record = asRecord(error);
+  const rawMessage = String(
+    error instanceof Error ? error.message : record.message || error || '',
+  ).trim();
+  const rawReasonCode = String(record.reasonCode || record.code || '').trim() || extractReasonCodeFromMessage(rawMessage);
+  const rawActionHint = String(record.actionHint || record.action_hint || '').trim();
+  const traceId = String(record.traceId || record.promptTraceId || record.providerTraceId || '').trim();
+  const routeUnavailable = isRouteUnavailable({
+    reasonCode: rawReasonCode,
+    message: rawMessage,
+  });
+
+  return {
+    reasonCode: routeUnavailable ? KISMET_REASON.ROUTE_UNAVAILABLE : KISMET_REASON.AI_GENERATE_FAILED,
+    message: rawMessage
+      ? `AI 生成失败: ${rawMessage}`
+      : routeUnavailable
+        ? 'AI 生成失败: Runtime 路由不可用'
+        : 'AI 生成失败',
+    actionHint: rawActionHint || (
+      routeUnavailable
+        ? '请切换到 Prompt-Import 模式，或检查 Runtime 路由配置后重试。'
+        : '请重试或切换到 Prompt-Import 模式。'
+    ),
+    ...(traceId ? { traceId } : {}),
+    ...(rawReasonCode && rawReasonCode !== (routeUnavailable ? KISMET_REASON.ROUTE_UNAVAILABLE : KISMET_REASON.AI_GENERATE_FAILED)
+      ? { upstreamReasonCode: rawReasonCode }
+      : {}),
+  };
+}
+
+export async function generateJsonViaAi<T>(input: GenerateJsonViaAiInput<T>): Promise<GenerateJsonViaAiOutput<T>> {
   try {
-    const health = await runtimeClient.route.checkHealth({
-      capability: 'text.generate',
-      binding,
+    const result = await input.aiClient.generateText({
+      prompt: input.userPrompt,
+      systemPrompt: input.systemPrompt,
+      temperature: 0.4,
+      routeHint: 'chat/default',
+      routeOverride: input.routeOverride,
+      abortSignal: input.abortSignal,
     });
-    if (health.reasonCode !== ReasonCode.RUNTIME_ROUTE_HEALTHY && health.reasonCode !== ReasonCode.RUNTIME_ROUTE_DEGRADED) {
+
+    const routeSource = result.route?.source || 'unavailable';
+    const rawText = String(result.text || '');
+    const rawResponse = {
+      text: rawText,
+      traceId: result.traceId || result.promptTraceId || undefined,
+      routeSource,
+      resolvedModel: String(result.route?.model || '').trim() || undefined,
+      resolvedConnectorId: String(result.route?.connectorId || '').trim() || undefined,
+      resolvedProvider: String(result.route?.provider || '').trim() || undefined,
+      length: rawText.length,
+      escapedText: JSON.stringify(rawText),
+      firstChar: rawText[0],
+      lastChar: rawText[rawText.length - 1],
+    } satisfies KismetAiRawResponse;
+    emitKismetLog({
+      level: 'info',
+      message: 'action:ai-generate:raw-text',
+      source: 'generateJsonViaAi',
+      details: {
+        traceId: rawResponse.traceId,
+        routeSource,
+        resolvedModel: rawResponse.resolvedModel,
+        resolvedConnectorId: rawResponse.resolvedConnectorId,
+        resolvedProvider: rawResponse.resolvedProvider,
+        length: rawResponse.length,
+        firstChar: rawResponse.firstChar,
+        lastChar: rawResponse.lastChar,
+        previewHead: rawText.slice(0, 120),
+        previewTail: rawText.slice(-120),
+      },
+    });
+    const parseResult = parseResultFromText(rawText);
+    if (!parseResult.ok) {
       return {
         ok: false,
         error: {
-          reasonCode: KISMET_REASON.ROUTE_UNAVAILABLE,
-          message: 'Chat 路由不可用',
-          actionHint: '请检查模型状态或切换路由',
+          ...parseResult.error,
+          traceId: result.traceId || result.promptTraceId || undefined,
         },
+        rawResponse,
       };
     }
-  } catch {
-    return {
-      ok: false,
-      error: {
-        reasonCode: KISMET_REASON.ROUTE_UNAVAILABLE,
-        message: 'Chat 路由健康检查失败',
-        actionHint: '请检查 AI Runtime 状态或切换路由',
-      },
-    };
-  }
 
-  // Generate via AI
-  try {
-    const systemPrompt = buildKismetSystemPrompt(input);
-    const userPrompt = buildKismetUserPrompt(input);
-
-    const result = await runtimeClient.ai.text.generate({
-      input: userPrompt,
-      system: systemPrompt,
-      maxTokens: 4096,
-      temperature: 0.7,
-      binding,
-    });
-
-    const routeSource = result.trace.routeDecision || 'unavailable';
-
-    emitKismetLog({
-      level: 'debug',
-      message: 'action:ai-generate:response',
-      source: 'generateViaAi',
-      details: {
-        routeSource,
-        textLength: result.text?.length ?? 0,
-        textPreview: (result.text || '').slice(0, 500),
-      },
-    });
-
-      const parseResult = parseResultFromText(result.text);
-    if (!parseResult.ok) {
-      emitKismetLog({
-        level: 'warn',
-        message: 'action:ai-generate:parse-failed',
-        source: 'generateViaAi',
-        details: {
-          reasonCode: parseResult.error.reasonCode,
-          textLength: result.text?.length ?? 0,
-          textTail: (result.text || '').slice(-200),
+    const validated = input.validate(parseResult.data);
+    if (!validated.ok) {
+      return {
+        ok: false,
+        error: {
+          ...validated.error,
+          traceId: result.traceId || result.promptTraceId || undefined,
         },
-      });
-      return { ok: false, error: parseResult.error };
+        rawResponse,
+      };
     }
-
-    const validateResult = validateAiOutput(parseResult.data);
-    if (!validateResult.ok) {
-      emitKismetLog({
-        level: 'warn',
-        message: 'action:ai-generate:validate-failed',
-        source: 'generateViaAi',
-        details: {
-          reasonCode: validateResult.error.reasonCode,
-          message: validateResult.error.message,
-        },
-      });
-      return { ok: false, error: validateResult.error };
-    }
-
-    const chartData = interpolateKeyNodes(validateResult.data.keyNodes, input.birthYear);
 
     return {
       ok: true,
-      data: { analysis: validateResult.data.analysis, chartData },
+      data: validated.data,
       routeSource,
+      rawResponse,
     };
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error || '');
+    const normalized = normalizeAiFailure(error);
+    emitKismetLog({
+      level: 'error',
+      message: 'action:ai-generate:failed',
+      source: 'generateJsonViaAi',
+      details: {
+        reasonCode: normalized.reasonCode,
+        upstreamReasonCode: normalized.upstreamReasonCode,
+        traceId: normalized.traceId,
+      },
+    });
     return {
       ok: false,
-      error: {
-        reasonCode: KISMET_REASON.AI_GENERATE_FAILED,
-        message: `AI 生成失败: ${msg}`,
-        actionHint: '请重试或切换到 Prompt-Import 模式',
-      },
+      error: normalized,
     };
   }
 }

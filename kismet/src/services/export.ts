@@ -1,100 +1,86 @@
-import type { KismetInput, KismetResult } from '../types.js';
+import type {
+  KismetBirthInputV2,
+  KismetCompatibilityResult,
+  KismetDailyFortuneResult,
+  KismetNatalAnalysisResult,
+} from '../types.js';
+
+type ExportPayload = {
+  birthInput: Partial<KismetBirthInputV2>;
+  natalResult: KismetNatalAnalysisResult | null;
+  dailyResult: KismetDailyFortuneResult | null;
+  compatibilityResult: KismetCompatibilityResult | null;
+};
 
 function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
   URL.revokeObjectURL(url);
 }
 
-function buildFilename(input: KismetInput, ext: string): string {
-  const name = input.name || 'kismet';
+function buildFilename(input: Partial<KismetBirthInputV2>, ext: string): string {
+  const name = input.name || input.birthPlaceLabel || 'kismet-v2';
   const date = new Date().toISOString().slice(0, 10);
   return `${name}-${date}.${ext}`;
 }
 
-export function exportAsJson(result: KismetResult, input: KismetInput): void {
-  const payload = {
-    meta: {
-      exportedAt: new Date().toISOString(),
-      input,
-    },
-    result,
-  };
-  const json = JSON.stringify(payload, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  downloadBlob(blob, buildFilename(input, 'json'));
+export function exportAsJson(payload: ExportPayload): void {
+  const json = JSON.stringify({
+    exportedAt: new Date().toISOString(),
+    ...payload,
+  }, null, 2);
+  downloadBlob(new Blob([json], { type: 'application/json' }), buildFilename(payload.birthInput, 'json'));
 }
 
-export function exportAsHtml(result: KismetResult, input: KismetInput): void {
-  const name = input.name || '未命名';
-  const gender = input.gender === 'Male' ? '男' : '女';
-  const html = `<!DOCTYPE html>
+function renderHtml(payload: ExportPayload): string {
+  const subject = payload.birthInput.name || payload.birthInput.birthPlaceLabel || 'Kismet';
+  const natalSummary = payload.natalResult
+    ? `<section><h2>命盘分析</h2><p>${payload.natalResult.analysis.summary}</p></section>`
+    : '';
+  const dailySummary = payload.dailyResult
+    ? `<section><h2>今日运势</h2><p>${payload.dailyResult.summary}</p></section>`
+    : '';
+  const compatibilitySummary = payload.compatibilityResult
+    ? `<section><h2>命理匹配</h2><p>${payload.compatibilityResult.summary}</p></section>`
+    : '';
+
+  return `<!DOCTYPE html>
 <html lang="zh">
 <head>
-<meta charset="UTF-8">
-<title>Kismet 人生K线 - ${name}</title>
-<style>
-  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; color: #333; }
-  h1 { text-align: center; color: #1a1a2e; }
-  .meta { text-align: center; color: #666; margin-bottom: 24px; }
-  .dimension { background: #f8f9fa; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
-  .dimension h3 { margin: 0 0 8px; }
-  .score-bar { height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; }
-  .score-fill { height: 100%; background: #4caf50; border-radius: 4px; }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 24px; }
-  th, td { border: 1px solid #ddd; padding: 4px 8px; text-align: center; }
-  th { background: #f5f5f5; }
-</style>
+  <meta charset="UTF-8" />
+  <title>Kismet v2 - ${subject}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 960px; margin: 0 auto; padding: 32px; color: #111827; }
+    h1, h2 { margin-bottom: 8px; }
+    section { margin-bottom: 20px; padding: 16px; border: 1px solid #e5e7eb; border-radius: 16px; background: #ffffff; }
+    .meta { color: #6b7280; margin-bottom: 24px; }
+    pre { white-space: pre-wrap; word-break: break-word; background: #f9fafb; border-radius: 12px; padding: 12px; }
+  </style>
 </head>
 <body>
-<h1>Kismet 人生K线分析报告</h1>
-<div class="meta">${name} · ${gender} · ${input.birthYear}年 · 四柱: ${input.yearPillar} ${input.monthPillar} ${input.dayPillar} ${input.hourPillar}</div>
-
-${['summary', 'personality', 'industry', 'fengShui', 'wealth', 'marriage', 'health', 'family', 'crypto'].map((key) => {
-    const text = (result.analysis as Record<string, unknown>)[key] as string;
-    const score = (result.analysis as Record<string, unknown>)[`${key}Score`] as number;
-    return `<div class="dimension"><h3>${key} (${score}/10)</h3><div class="score-bar"><div class="score-fill" style="width:${score * 10}%"></div></div><p>${text}</p></div>`;
-  }).join('\n')}
-
-<table>
-<thead><tr><th>岁</th><th>年</th><th>干支</th><th>大运</th><th>开</th><th>收</th><th>高</th><th>低</th><th>分</th><th>批断</th></tr></thead>
-<tbody>
-${result.chartData.map((p) => `<tr><td>${p.age}</td><td>${p.year}</td><td>${p.ganZhi}</td><td>${p.daYun}</td><td>${p.open}</td><td>${p.close}</td><td>${p.high}</td><td>${p.low}</td><td>${p.score}</td><td>${p.reason}</td></tr>`).join('\n')}
-</tbody>
-</table>
-<p style="text-align:center;color:#999;margin-top:24px;">Generated by Kismet · ${new Date().toISOString()}</p>
+  <h1>Kismet v2 导出</h1>
+  <p class="meta">${subject} · ${payload.birthInput.birthDate || '-'} ${payload.birthInput.birthTime || ''} · ${payload.birthInput.birthPlaceLabel || '-'}</p>
+  ${natalSummary}
+  ${dailySummary}
+  ${compatibilitySummary}
+  <section><h2>原始导出 JSON</h2><pre>${JSON.stringify(payload, null, 2)}</pre></section>
 </body>
 </html>`;
-  const blob = new Blob([html], { type: 'text/html' });
-  downloadBlob(blob, buildFilename(input, 'html'));
 }
 
-export function exportAsPdf(result: KismetResult, input: KismetInput): void {
-  // Generate HTML then trigger print dialog for PDF
-  const name = input.name || '未命名';
-  const gender = input.gender === 'Male' ? '男' : '女';
+export function exportAsHtml(payload: ExportPayload): void {
+  downloadBlob(new Blob([renderHtml(payload)], { type: 'text/html' }), buildFilename(payload.birthInput, 'html'));
+}
+
+export function exportAsPdf(payload: ExportPayload): void {
   const printWindow = window.open('', '_blank');
-  if (!printWindow) return;
-
-  const dims = ['summary', 'personality', 'industry', 'fengShui', 'wealth', 'marriage', 'health', 'family', 'crypto'];
-  const dimHtml = dims.map((key) => {
-    const text = (result.analysis as Record<string, unknown>)[key] as string;
-    const score = (result.analysis as Record<string, unknown>)[`${key}Score`] as number;
-    return `<div style="margin-bottom:12px"><strong>${key} (${score}/10)</strong><p style="margin:4px 0">${text}</p></div>`;
-  }).join('');
-
-  printWindow.document.write(`<!DOCTYPE html><html><head><title>Kismet - ${name}</title>
-<style>body{font-family:sans-serif;max-width:800px;margin:0 auto;padding:20px;font-size:12px}h1{text-align:center}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:3px 6px;text-align:center;font-size:11px}th{background:#f5f5f5}</style>
-</head><body>
-<h1>Kismet 人生K线分析报告</h1>
-<p style="text-align:center">${name} · ${gender} · ${input.birthYear}年</p>
-${dimHtml}
-<table><thead><tr><th>岁</th><th>年</th><th>干支</th><th>大运</th><th>开</th><th>收</th><th>高</th><th>低</th><th>分</th><th>批断</th></tr></thead>
-<tbody>${result.chartData.map((p) => `<tr><td>${p.age}</td><td>${p.year}</td><td>${p.ganZhi}</td><td>${p.daYun}</td><td>${p.open}</td><td>${p.close}</td><td>${p.high}</td><td>${p.low}</td><td>${p.score}</td><td>${p.reason}</td></tr>`).join('')}</tbody></table>
-</body></html>`);
+  if (!printWindow) {
+    return;
+  }
+  printWindow.document.write(renderHtml(payload));
   printWindow.document.close();
   printWindow.print();
 }

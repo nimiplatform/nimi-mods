@@ -12,26 +12,22 @@ export function ExportToolbar({ canExport, onExportJson, onExportPdf, onExportHt
 
   if (!canExport) return null;
 
+  const btnStyle: React.CSSProperties = {
+    background: 'transparent',
+    border: '1px solid rgba(138,114,84,0.4)',
+    color: '#8A7254',
+    padding: '5px 14px',
+    fontSize: '0.8rem',
+    cursor: 'pointer',
+    transition: 'all 0.3s',
+    fontFamily: "'Noto Serif SC', serif",
+  };
+
   return (
     <div className="flex gap-2">
-      <button
-        onClick={onExportJson}
-        className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-      >
-        {t('ExportToolbar.exportJson')}
-      </button>
-      <button
-        onClick={onExportPdf}
-        className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-      >
-        {t('ExportToolbar.exportPdf')}
-      </button>
-      <button
-        onClick={onExportHtml}
-        className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-      >
-        {t('ExportToolbar.exportHtml')}
-      </button>
+      <button onClick={onExportJson} style={btnStyle}>{t('ExportToolbar.exportJson')}</button>
+      <button onClick={onExportPdf} style={btnStyle}>{t('ExportToolbar.exportPdf')}</button>
+      <button onClick={onExportHtml} style={btnStyle}>{t('ExportToolbar.exportHtml')}</button>
     </div>
   );
 }

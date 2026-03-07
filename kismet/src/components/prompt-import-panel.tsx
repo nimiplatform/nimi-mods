@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type PromptImportPanelProps = {
+  title?: string;
   systemPrompt: string;
   userPrompt: string;
   onCopyAll: () => void;
@@ -9,7 +10,7 @@ type PromptImportPanelProps = {
   loading?: boolean;
 };
 
-export function PromptImportPanel({ systemPrompt, userPrompt, onCopyAll, onImport, loading }: PromptImportPanelProps) {
+export function PromptImportPanel({ title, systemPrompt, userPrompt, onCopyAll, onImport, loading }: PromptImportPanelProps) {
   const { t } = useTranslation('kismet');
   const [importText, setImportText] = useState('');
   const [copied, setCopied] = useState(false);
@@ -23,11 +24,12 @@ export function PromptImportPanel({ systemPrompt, userPrompt, onCopyAll, onImpor
   return (
     <div className="space-y-4">
       <div>
-        <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-800">{t('PromptImportPanel.title')}</h3>
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="ks-serif text-sm" style={{ color: '#8A7254', fontWeight: 600 }}>{title || t('PromptImportPanel.title')}</h3>
           <button
             onClick={handleCopy}
-            className="rounded-md bg-indigo-100 px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-200"
+            className="ks-serif text-xs"
+            style={{ background: 'rgba(138,114,84,0.1)', border: '1px solid rgba(138,114,84,0.3)', color: '#8A7254', padding: '4px 12px', cursor: 'pointer' }}
           >
             {copied ? t('PromptImportPanel.copied') : t('PromptImportPanel.copyAll')}
           </button>
@@ -35,14 +37,20 @@ export function PromptImportPanel({ systemPrompt, userPrompt, onCopyAll, onImpor
 
         <div className="space-y-3">
           <div>
-            <div className="mb-1 text-xs font-medium text-gray-500">{t('PromptImportPanel.systemPromptLabel')}</div>
-            <pre className="max-h-48 overflow-auto rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
+            <div className="mb-1 text-xs" style={{ color: '#8C857B' }}>{t('PromptImportPanel.systemPromptLabel')}</div>
+            <pre
+              className="overflow-auto text-xs"
+              style={{ maxHeight: 192, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(138,114,84,0.15)', padding: 12, color: '#8C857B', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}
+            >
               {systemPrompt}
             </pre>
           </div>
           <div>
-            <div className="mb-1 text-xs font-medium text-gray-500">{t('PromptImportPanel.userPromptLabel')}</div>
-            <pre className="max-h-32 overflow-auto rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
+            <div className="mb-1 text-xs" style={{ color: '#8C857B' }}>{t('PromptImportPanel.userPromptLabel')}</div>
+            <pre
+              className="overflow-auto text-xs"
+              style={{ maxHeight: 128, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(138,114,84,0.15)', padding: 12, color: '#8C857B', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}
+            >
               {userPrompt}
             </pre>
           </div>
@@ -50,18 +58,30 @@ export function PromptImportPanel({ systemPrompt, userPrompt, onCopyAll, onImpor
       </div>
 
       <div>
-        <h3 className="mb-2 text-sm font-semibold text-gray-800">{t('PromptImportPanel.importTitle')}</h3>
+        <h3 className="ks-serif mb-2 text-sm" style={{ color: '#8A7254', fontWeight: 600 }}>{t('PromptImportPanel.importTitle')}</h3>
+        <p className="mb-2 text-xs" style={{ color: '#8C857B' }}>{t('PromptImportPanel.importHint')}</p>
         <textarea
           value={importText}
           onChange={(e) => setImportText(e.target.value)}
           placeholder={t('PromptImportPanel.importPlaceholder')}
-          className="h-40 w-full rounded-lg border border-gray-300 px-3 py-2 text-xs font-mono focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          className="w-full text-xs"
+          style={{
+            height: 160,
+            background: 'rgba(0,0,0,0.3)',
+            border: '1px solid rgba(138,114,84,0.3)',
+            padding: 12,
+            color: '#E8E3D7',
+            fontFamily: 'monospace',
+            outline: 'none',
+            resize: 'vertical',
+          }}
           disabled={loading}
         />
         <button
           onClick={() => onImport(importText)}
           disabled={!importText.trim() || loading}
-          className="mt-2 w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="ks-btn-seal mt-2"
+          style={{ letterSpacing: '4px' }}
         >
           {loading ? t('PromptImportPanel.importing') : t('PromptImportPanel.importButton')}
         </button>

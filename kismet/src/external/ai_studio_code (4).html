@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>司命 - 命轨结缘与签文生成</title>
+    <!-- 引入谷歌字体：思源宋体与黑体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600;900&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
+    <!-- 引入截图库 html2canvas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        :root {
+            --bg-base: #0a0908;       /* 玄黑 */
+            --bg-panel: #141211;      /* 左侧面板 */
+            --text-main: #E8E3D7;     /* 纸白 */
+            --text-muted: #736b60;    /* 蟹壳青 */
+            --border-gold: #8A7254;   /* 古铜金 */
+            --border-gold-dim: rgba(138, 114, 84, 0.2);
+            --accent-red: #8B2620;    /* 朱砂红 */
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: 'Noto Sans SC', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .serif { font-family: 'Noto Serif SC', serif; }
+
+        /* ================= 左侧控制台 (印章 Header 重构) ================= */
+        .sidebar {
+            width: 320px;
+            background-color: var(--bg-panel);
+            border-right: 1px solid var(--border-gold-dim);
+            padding: 40px 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+            z-index: 10;
+            box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+        }
+
+        /* 顶部品牌 Header (印章 + 双列排版) */
+        .brand-header {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            height: 140px;
+            padding-left: 10px;
+        }
+
+        /* 1. 朱文印章 */
+        .brand-seal {
+            width: 42px;
+            height: 110px;
+            border: 3px solid var(--accent-red);
+            border-radius: 2px;
+            display: flex; justify-content: center; align-items: center;
+            color: var(--accent-red);
+            font-size: 1.3rem; font-weight: 900; letter-spacing: 6px;
+            box-shadow: 0 0 15px rgba(139, 38, 32, 0.2), inset 0 0 10px rgba(139, 38, 32, 0.1);
+            transform: rotate(-2deg); /* 微微倾斜 */
+        }
+        .brand-seal span { writing-mode: vertical-rl; text-orientation: upright; }
+
+        /* 2. 朱砂分割线 */
+        .brand-divider {
+            width: 2px; height: 100%;
+            background: linear-gradient(to bottom, transparent 5%, var(--accent-red) 30%, var(--accent-red) 70%, transparent 95%);
+            opacity: 0.7;
+        }
+
+        /* 3. 双列古籍标题 */
+        .brand-title-wrap {
+            display: flex; flex-direction: row-reverse; gap: 16px; align-items: center; height: 100%;
+        }
+        .brand-col {
+            writing-mode: vertical-rl; text-orientation: upright;
+            font-family: 'Noto Serif SC', serif; font-size: 2.2rem;
+            color: var(--border-gold); font-weight: 500; letter-spacing: 12px;
+            text-shadow: 0 0 20px rgba(138, 114, 84, 0.3);
+        }
+
+        /* 导航 Tabs */
+        .nav-tabs {
+            display: flex; border: 1px solid var(--border-gold-dim); border-radius: 2px; overflow: hidden;
+        }
+        .nav-tab {
+            flex: 1; text-align: center; padding: 12px 0; font-size: 0.85rem; color: var(--text-muted);
+            cursor: pointer; transition: all 0.3s; border-right: 1px solid var(--border-gold-dim);
+        }
+        .nav-tab:last-child { border-right: none; }
+        .nav-tab.active { background: rgba(138, 114, 84, 0.1); color: var(--border-gold); border-bottom: 2px solid var(--border-gold); }
+
+        /* ================= 右侧：仪式感法阵区 ================= */
+        .main-content {
+            flex-grow: 1; position: relative; display: flex; flex-direction: column;
+            background: radial-gradient(circle at 50% 50%, rgba(20, 18, 17, 1) 0%, var(--bg-base) 80%);
+        }
+
+        .header-top {
+            padding: 30px 40px; display: flex; justify-content: space-between; align-items: center;
+            position: absolute; top: 0; left: 0; width: 100%; z-index: 10;
+        }
+        
+        .page-title { font-size: 1.1rem; color: var(--text-muted); letter-spacing: 2px; }
+
+        /* 导出书签按钮 */
+        .btn-export {
+            background: transparent; border: 1px solid var(--border-gold); color: var(--border-gold);
+            padding: 8px 20px; font-size: 0.9rem; letter-spacing: 2px; cursor: pointer;
+            transition: all 0.3s; border-radius: 2px;
+        }
+        .btn-export:hover { background: rgba(138, 114, 84, 0.1); color: var(--text-main); box-shadow: 0 0 15px rgba(138, 114, 84, 0.3); }
+
+        /* 阵法容器 */
+        .ritual-container { flex-grow: 1; display: flex; align-items: center; justify-content: center; position: relative; }
+
+        /* CSS 星盘阵法 */
+        .astrolabe-array { position: absolute; width: 600px; height: 600px; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+        .ring-outer {
+            position: absolute; width: 100%; height: 100%; border: 1px dashed var(--border-gold-dim); border-radius: 50%;
+            animation: spin 60s linear infinite;
+        }
+        .ring-inner {
+            position: absolute; width: 65%; height: 65%; border: 2px solid rgba(138, 114, 84, 0.05); border-radius: 50%;
+            animation: spin-reverse 40s linear infinite;
+        }
+        .ring-inner::before, .ring-inner::after {
+            content: ''; position: absolute; left: 50%; transform: translateX(-50%); width: 6px; height: 6px;
+            background: var(--border-gold); border-radius: 50%; box-shadow: 0 0 10px var(--border-gold);
+        }
+        .ring-inner::before { top: -3px; } .ring-inner::after { bottom: -3px; }
+        .core-glow {
+            position: absolute; width: 300px; height: 300px; background: radial-gradient(circle, rgba(138, 114, 84, 0.08) 0%, transparent 70%);
+            border-radius: 50%; animation: breathe 4s ease-in-out infinite alternate;
+        }
+
+        /* 封印文案框 */
+        .message-box {
+            position: relative; z-index: 10; background: rgba(10, 9, 8, 0.6); backdrop-filter: blur(8px);
+            border: 1px solid var(--border-gold-dim); padding: 50px 80px; text-align: center;
+            display: flex; flex-direction: column; align-items: center; gap: 20px;
+        }
+        .message-box::before, .message-box::after {
+            content: ''; position: absolute; width: 15px; height: 15px; border: 1px solid var(--border-gold); opacity: 0.6;
+        }
+        .message-box::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+        .message-box::after { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+
+        .seal-line { width: 1px; height: 40px; background: linear-gradient(to bottom, transparent, var(--accent-red), transparent); }
+        .main-title { font-size: 2.2rem; color: var(--border-gold); font-weight: 500; letter-spacing: 12px; margin-right: -12px; }
+        .sub-desc { font-size: 1rem; color: var(--text-muted); line-height: 2; max-width: 400px; letter-spacing: 2px; }
+        .highlight-red { color: var(--accent-red); font-weight: 600; }
+
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        @keyframes spin-reverse { 100% { transform: rotate(-360deg); } }
+        @keyframes breathe { 0% { transform: scale(0.9); opacity: 0.5; } 100% { transform: scale(1.1); opacity: 1; } }
+
+
+        /* ================= 隐藏的分享书签模板 (用于生成图片) ================= */
+ /* ================= 书签分享图专属样式 (古法盖章版) ================= */
+        .bookmark-wrapper {
+            position: fixed; left: -9999px; top: 0;
+            width: 375px; height: 667px; 
+            background-color: #0c0a09; /* 极深的玄黑 */
+            color: #E8E3D7;
+            padding: 30px; box-sizing: border-box;
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        /* 1. 纸张噪点 */
+        .bookmark-bg-texture {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noiseFilter)" opacity="0.04"/></svg>');
+            pointer-events: none; z-index: 0;
+        }
+
+        /* 2. 马年神骏暗纹 (核心图腾) */
+        .zodiac-watermark {
+            position: absolute; top: 40%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px; height: 300px;
+            /* 一匹骏马的 SVG Silhouette，颜色调整为暗红/暗金混合 */
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="%235a1c17" d="M351.4 39.3c-28.8-12.2-61.9-5.1-84 18.2L249 76.5l-4.2-3.8c-14.8-13.4-36.5-16.1-54-6.8-21.7 11.6-28.5 39.8-14.6 59.5l14.9 21.1-39.7 19.8c-34.8 17.4-53.5 56.4-44.5 93.8l8.5 35.4-31 28.5c-20 18.4-23.8 48.7-8.9 71.3l21 31.5c11.9 17.8 32.4 27.6 53.8 25.5l59.6-5.9 33.5 67c7.8 15.6 23.4 25.7 40.8 26.2s33.4-8.8 42-23.9l36.5-63.9 44.9-5.6c24.6-3.1 44.4-21.3 49.6-45.5l14-65.5c4-18.7-2.6-38.3-17.6-50.5l-42-34.1 27.2-51c11.3-21.2 5.1-48.2-14.5-61.6L351.4 39.3zM252.7 202l35.8-17.9-19.1-27c-4.6-6.6-2.4-15.7 4.7-19.8 7.2-4.1 16.5-1.9 21.1 4.7l21.3 30.2 12.3-12.6c11.3-11.6 28.4-15.3 43.6-9.5l11.4 4.3-18.4 34.5c-6.8 12.7-4.3 28.6 5.9 38.6l37.2 36.3-9.5 44.5c-1.7 8.1-8.3 14.1-16.5 15.2l-51 6.4c-9.2 1.1-17.6 6.3-22.9 14.2l-32.9 57.6-26.6-53.1c-4.4-8.8-12.7-15.1-22.3-17l-60-12 11.2-46.6c2-8.5 7.6-15.5 15.5-19.3l49.2-23.7z"/></svg>');
+            background-size: contain; background-repeat: no-repeat; background-position: center;
+            opacity: 0.15; /* 若隐若现的感觉 */
+            z-index: 1; pointer-events: none;
+            mix-blend-mode: screen; /* 增加融合感 */
+        }
+
+        /* 3. 边框 */
+        .bookmark-border {
+            position: absolute; top: 15px; left: 15px; right: 15px; bottom: 15px;
+            border: 1px solid rgba(138, 114, 84, 0.2); z-index: 2; pointer-events: none;
+        }
+        .bookmark-border .corner { position: absolute; width: 12px; height: 12px; border: 1px solid #8A7254; opacity: 0.5;}
+        .bookmark-border .corner.top-left { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+        .bookmark-border .corner.top-right { top: -1px; right: -1px; border-left: none; border-bottom: none; }
+        .bookmark-border .corner.bottom-left { bottom: -1px; left: -1px; border-right: none; border-top: none; }
+        .bookmark-border .corner.bottom-right { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+
+        /* 内容容器 */
+        .bm-content { position: relative; z-index: 3; display: flex; flex-direction: column; height: 100%; }
+
+        /* ================= 核心视觉：真实感印章系列 ================= */
+        /* 左上角引首章：长条形，模拟刻石边缘不平整 */
+        .authentic-seal-yinshou {
+            width: 32px; height: 75px; 
+            color: #E8E3D7; /* 白文印 (红底白字) */
+            background-color: #8B2620; /* 朱砂红 */
+            display: flex; justify-content: center; align-items: center;
+            font-size: 1.1rem; font-weight: 400; font-family: '楷体', 'STKaiti', serif; /* 楷体/隶书最像印章 */
+            writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 4px;
+            transform: rotate(-3deg);
+            /* 关键：用多重阴影和极小的圆角模拟印泥晕染和刻石残缺 */
+            border-radius: 2px 4px 3px 2px;
+            box-shadow: 
+                0 0 4px rgba(139, 38, 32, 0.8),
+                inset 1px 1px 3px rgba(0,0,0,0.4),
+                inset -1px -1px 2px rgba(255,255,255,0.2);
+            opacity: 0.85; /* 印泥透出底色的感觉 */
+            margin-right: 20px;
+        }
+
+        /* 画面正中心巨大的压印：方印，极度虚化，透底 */
+        .authentic-seal-big {
+            position: absolute; top: 45%; left: 50%;
+            transform: translate(-50%, -50%) rotate(-12deg); /* 随意的倾斜角度 */
+            width: 140px; height: 140px;
+            color: #8B2620; /* 朱文印 (白底红字) */
+            border: 6px solid #8B2620;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 4rem; font-weight: 900; font-family: '楷体', 'STKaiti', serif;
+            letter-spacing: 10px;
+            /* 模拟斑驳边缘 */
+            border-radius: 8px 5px 12px 6px;
+            box-shadow: 
+                0 0 10px rgba(139, 38, 32, 0.3),
+                inset 0 0 15px rgba(139, 38, 32, 0.1);
+            opacity: 0.25; /* 核心：透明度必须低，作为垫底背景，不抢文字 */
+            z-index: 1; /* 在文字下方 */
+            pointer-events: none;
+        }
+
+        /* 底部落款小方印 */
+        .authentic-seal-small {
+            width: 30px; height: 30px;
+            color: #8B2620; border: 2px solid #8B2620;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 0.8rem; font-weight: 600; font-family: '楷体', 'STKaiti', serif;
+            transform: rotate(5deg);
+            border-radius: 2px 3px 2px 4px;
+            opacity: 0.7;
+        }
+
+        /* 顶部标题区 */
+        .bm-header { display: flex; align-items: flex-start; margin-bottom: 25px; }
+        .bm-title { display: flex; flex-direction: row-reverse; gap: 8px; margin-top: 5px;}
+        .bm-title div { writing-mode: vertical-rl; text-orientation: upright; font-size: 1.4rem; color: #8A7254; letter-spacing: 6px; }
+
+        /* 中间：精简的三柱八字 */
+        .bm-core { align-self: center; display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 5;}
+        .bm-subject { font-size: 1.1rem; color: #8A7254; letter-spacing: 2px; }
+        .bm-bazi { 
+            display: flex; flex-direction: row-reverse; gap: 24px; 
+            padding: 15px 30px; border-top: 1px solid rgba(138, 114, 84, 0.3); border-bottom: 1px solid rgba(138, 114, 84, 0.3);
+            background: linear-gradient(90deg, transparent, rgba(138, 114, 84, 0.05), transparent);
+        }
+        .bm-col { display: flex; flex-direction: column; gap: 10px; font-size: 1.7rem; color: #8A7254; }
+        .bm-col.highlight { color: #A6382E; font-weight: 600; text-shadow: 0 0 10px rgba(166, 56, 46, 0.4);}
+
+        /* 运程批语区域 */
+        .bm-fortune-area {
+            position: relative; margin-top: 30px; flex-grow: 1; display: flex; justify-content: center;
+        }
+        .bm-poetry {
+            display: flex; flex-direction: row-reverse; justify-content: center; gap: 18px; z-index: 5; padding-top: 20px;
+        }
+        .bm-line { writing-mode: vertical-rl; text-orientation: upright; font-size: 1.1rem; color: #E8E3D7; letter-spacing: 4px; line-height: 2; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+        .bm-line.title-line { color: #8A7254; font-size: 0.95rem; opacity: 0.8; margin-left: 10px; }
+
+        /* 底部区域 */
+        .bm-footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; z-index: 5;}
+        .bm-qr-area { display: flex; align-items: center; gap: 10px; }
+        .bm-qr { width: 40px; height: 40px; background: repeating-linear-gradient(45deg, rgba(138, 114, 84, 0.8) 0, rgba(138, 114, 84, 0.8) 2px, transparent 2px, transparent 4px); border: 1px solid #8A7254; opacity: 0.6;}
+        .bm-qr-text { display: flex; flex-direction: column; gap: 4px; }
+    </style>
+</head>
+<body>
+
+    <!-- 1. 左侧控制台 -->
+    <div class="sidebar">
+        <!-- 头部：引首章设计 -->
+        <div class="brand-header">
+            <div class="brand-seal serif"><span>推演</span></div>
+            <div class="brand-divider"></div>
+            <div class="brand-title-wrap">
+                <div class="brand-col">天机</div>
+                <div class="brand-col" style="margin-top: 20px;">司命</div>
+            </div>
+        </div>
+
+        <div class="nav-tabs serif">
+            <div class="nav-tab">命盘批算</div>
+            <div class="nav-tab">流年运势</div>
+            <div class="nav-tab active">命轨结缘</div>
+        </div>
+    </div>
+
+    <!-- 2. 右侧主体：结缘阵法 -->
+    <div class="main-content">
+        <div class="header-top serif">
+            <span class="page-title">命理匹配 / Matchmaking</span>
+            <!-- 触发截图的按钮 -->
+            <button class="btn-export serif" onclick="generateBookmark()">结缘书签 (Share)</button>
+        </div>
+
+        <div class="ritual-container">
+            <div class="astrolabe-array">
+                <div class="ring-outer"></div>
+                <div class="ring-inner"></div>
+                <div class="core-glow"></div>
+            </div>
+
+            <div class="message-box serif">
+                <div class="seal-line"></div>
+                <div class="main-title">天机未显</div>
+                <div class="sub-desc">
+                    结缘阵法当前处于 <span class="highlight-red">封印状态</span>。<br>
+                    待星轨就位，方可基于既定命盘，推演天地五行之契合度。
+                </div>
+                <div class="seal-line" style="height: 20px;"></div>
+            </div>
+        </div>
+    </div>
+
+<!-- ========================================================================= -->
+    <!-- 隐藏的分享书签模板 (高阶古法盖章版) -->
+    <!-- ========================================================================= -->
+    <div id="share-bookmark-template" class="bookmark-wrapper">
+        <!-- 1. 最底层的纸张噪点 -->
+        <div class="bookmark-bg-texture"></div>
+        
+        <!-- 2. 马年专属暗纹 (汉代画像砖风格/水墨写意马的 SVG Base64) -->
+        <div class="zodiac-watermark"></div>
+
+        <!-- 3. 古法细边框与折角 -->
+        <div class="bookmark-border">
+            <div class="corner top-left"></div><div class="corner top-right"></div>
+            <div class="corner bottom-left"></div><div class="corner bottom-right"></div>
+        </div>
+        
+        <div class="bm-content">
+            <!-- 顶部 Logo 与 引首章 -->
+            <div class="bm-header">
+                <!-- 模拟真实残缺感的古印 -->
+                <div class="authentic-seal-yinshou serif">天机</div>
+                <div class="bm-title serif">
+                    <div>司命</div><div style="margin-top: 15px; font-size: 1.1rem; color: #736b60;">KISMET</div>
+                </div>
+            </div>
+
+            <!-- 中间：精简后的生辰 (隐去时柱) -->
+            <div class="bm-core">
+                <div class="bm-subject serif" style="margin-bottom: 5px;">
+                    <span style="color: #736b60; font-size: 0.8rem; margin-right: 8px;">命主</span> L
+                </div>
+                <!-- 仅展示年月日三柱 -->
+                <div class="bm-bazi serif">
+                    <div class="bm-col highlight"><span>丁</span><span>酉</span></div>
+                    <div class="bm-col"><span>己</span><span>卯</span></div>
+                    <div class="bm-col"><span>乙</span><span>亥</span></div>
+                </div>
+            </div>
+
+            <!-- 核心运程区 & 大吉盖章 -->
+            <div class="bm-fortune-area">
+                <!-- 巨大的半透明压印 (垫在文字下方) -->
+                <div class="authentic-seal-big serif">大吉</div>
+                
+                <!-- 竖排运势批语 -->
+                <div class="bm-poetry serif">
+                    <div class="bm-line title-line">【甲辰流年运程总批】</div>
+                    <div class="bm-line">木旺生火，得流年之助。</div>
+                    <div class="bm-line" style="margin-top: 30px;">宜乘奔御风，扩宽格局，</div>
+                    <div class="bm-line" style="margin-top: 60px;">忌囿于旧守，错失机锋。</div>
+                </div>
+            </div>
+
+            <!-- 底部二维码与落款 -->
+            <div class="bm-footer">
+                <div class="bm-qr-area">
+                    <div class="bm-qr"></div>
+                    <div class="bm-qr-text">
+                        <span class="serif" style="color: #8A7254; font-size: 0.8rem; letter-spacing: 2px;">扫码推演流年</span>
+                        <span style="font-size: 0.6rem; color: #736b60; font-family: sans-serif;">司命 V2</span>
+                    </div>
+                </div>
+                <!-- 落款小印 -->
+                <div class="authentic-seal-small serif">御印</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript：截图逻辑 -->
+    <script>
+        async function generateBookmark() {
+            const btn = document.querySelector('.btn-export');
+            const originalText = btn.innerText;
+            
+            // 按钮状态变为生成中
+            btn.innerText = "正在凝结天机...";
+            btn.style.opacity = "0.7";
+            btn.style.pointerEvents = "none";
+
+            try {
+                // 等待字体加载完成，防止截图时字体回退为默认黑体
+                await document.fonts.ready;
+
+                const bookmarkNode = document.getElementById('share-bookmark-template');
+                
+                // 调用 html2canvas 渲染隐藏的 DOM
+                const canvas = await html2canvas(bookmarkNode, {
+                    scale: 2, // 2倍缩放保证手机上看足够清晰 (Retina级别)
+                    backgroundColor: '#0d0c0b', // 指定底色，避免透明黑边
+                    logging: false
+                });
+
+                // 将 Canvas 转换为 PNG 数据
+                const imgData = canvas.toDataURL('image/png');
+
+                // 创建一个隐藏的 a 标签触发下载
+                const link = document.createElement('a');
+                link.download = '司命_天机签文.png';
+                link.href = imgData;
+                link.click();
+
+            } catch (error) {
+                console.error("生成书签失败:", error);
+                alert("天机受阻，生成图片失败，请稍后再试。");
+            } finally {
+                // 恢复按钮初始状态
+                btn.innerText = originalText;
+                btn.style.opacity = "1";
+                btn.style.pointerEvents = "auto";
+            }
+        }
+    </script>
+</body>
+</html>

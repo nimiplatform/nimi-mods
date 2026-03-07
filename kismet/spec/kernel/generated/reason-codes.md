@@ -4,36 +4,66 @@
 > Source: `kismet/spec/kernel/tables/reason-codes.yaml`
 
 ```yaml
-version: 1
+version: 2
 codes:
   - code: KISMET_INPUT_INVALID
-    stage: input
+    stage: birth-intake
     blocking: true
-    action_hint: Fix required BaZi fields and retry.
+    action_hint: fix-birth-intake
     source_rule: KIS-ERR-001
+  - code: KISMET_BIRTH_PLACE_UNRESOLVED
+    stage: birth-normalize
+    blocking: true
+    action_hint: choose-catalog-city
+    source_rule: KIS-ERR-003
+  - code: KISMET_CANONICAL_PROFILE_INVALID
+    stage: canonical-profile-validate
+    blocking: true
+    action_hint: recheck-birth-input
+    source_rule: KIS-ERR-003
+  - code: KISMET_DAILY_CONTEXT_INVALID
+    stage: day-context-derive
+    blocking: true
+    action_hint: retry-day-context
+    source_rule: KIS-ERR-003
+  - code: KISMET_COMPATIBILITY_INPUT_INVALID
+    stage: public-profile-load
+    blocking: true
+    action_hint: fix-target-profile
+    source_rule: KIS-ERR-003
+  - code: KISMET_LOCAL_PROFILE_CONSENT_REQUIRED
+    stage: consent-check
+    blocking: true
+    action_hint: enable-local-profile-persist
+    source_rule: KIS-ERR-003
+  - code: KISMET_LOCAL_PROFILE_NOT_FOUND
+    stage: public-profile-load
+    blocking: true
+    action_hint: reselect-local-profile
+    source_rule: KIS-ERR-003
   - code: KISMET_RESULT_SCHEMA_INVALID
     stage: schema-validate
     blocking: true
-    action_hint: Regenerate result with required schema fields.
-    source_rule: KIS-ERR-001
+    action_hint: regenerate-json
+    source_rule: KIS-ERR-003
   - code: KISMET_RESULT_POINTS_INVALID
     stage: schema-validate
     blocking: true
-    action_hint: Ensure chartData has 100 monotonic age points.
-    source_rule: KIS-ERR-001
+    action_hint: regenerate-points
+    source_rule: KIS-ERR-003
   - code: KISMET_ROUTE_UNAVAILABLE
     stage: route-resolve
     blocking: true
-    action_hint: Switch to Prompt-Import mode.
-    source_rule: KIS-ERR-002
+    action_hint: switch-to-prompt-import
+    source_rule: KIS-ERR-004
   - code: KISMET_AI_GENERATE_FAILED
-    stage: generate-result
+    stage: generate-json
     blocking: true
-    action_hint: Retry runtime-ai generation or switch to Prompt-Import.
-    source_rule: KIS-ERR-002
+    action_hint: retry-or-switch-route
+    source_rule: KIS-ERR-001
   - code: KISMET_IMPORT_PARSE_FAILED
     stage: import-result
     blocking: true
-    action_hint: Paste valid JSON payload and retry.
-    source_rule: KIS-ERR-003
+    action_hint: fix-import-json
+    source_rule: KIS-ERR-001
 ```
