@@ -1,4 +1,4 @@
-import type { ModAiClient } from '@nimiplatform/sdk/mod/ai';
+import type { ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 import type { KismetAiRawResponse, KismetError, RouteSourceDisplay } from '../types.js';
 import { KISMET_REASON } from '../contracts.js';
@@ -15,7 +15,7 @@ const ROUTE_UNAVAILABLE_REASON_CODES = new Set([
 ]);
 
 type GenerateJsonViaAiInput<T> = {
-  aiClient: ModAiClient;
+  aiClient: ModRuntimeClient['ai']['text'];
   systemPrompt: string;
   userPrompt: string;
   routeOverride?: RuntimeRouteBinding;
@@ -97,24 +97,25 @@ function normalizeAiFailure(error: unknown): NormalizedAiFailure {
 
 export async function generateJsonViaAi<T>(input: GenerateJsonViaAiInput<T>): Promise<GenerateJsonViaAiOutput<T>> {
   try {
-    const result = await input.aiClient.generateText({
-      prompt: input.userPrompt,
-      systemPrompt: input.systemPrompt,
+    const result = await input.aiClient.generate({
+      input: input.userPrompt,
+      system: input.systemPrompt,
       temperature: 0.4,
-      routeHint: 'chat/default',
-      routeOverride: input.routeOverride,
-      abortSignal: input.abortSignal,
+      ...(input.routeOverride ? {
+        binding: input.routeOverride,
+        model: input.routeOverride.model,
+      } : {}),
     });
 
-    const routeSource = result.route?.source || 'unavailable';
+    const routeSource = result.trace.routeDecision || 'local-runtime';
     const rawText = String(result.text || '');
     const rawResponse = {
       text: rawText,
-      traceId: result.traceId || result.promptTraceId || undefined,
+      traceId: result.trace.traceId || undefined,
       routeSource,
-      resolvedModel: String(result.route?.model || '').trim() || undefined,
-      resolvedConnectorId: String(result.route?.connectorId || '').trim() || undefined,
-      resolvedProvider: String(result.route?.provider || '').trim() || undefined,
+      resolvedModel: String(result.trace.modelResolved || '').trim() || undefined,
+      resolvedConnectorId: undefined,
+      resolvedProvider: undefined,
       length: rawText.length,
       escapedText: JSON.stringify(rawText),
       firstChar: rawText[0],
@@ -143,7 +144,7 @@ export async function generateJsonViaAi<T>(input: GenerateJsonViaAiInput<T>): Pr
         ok: false,
         error: {
           ...parseResult.error,
-          traceId: result.traceId || result.promptTraceId || undefined,
+          traceId: result.trace.traceId || undefined,
         },
         rawResponse,
       };
@@ -155,7 +156,7 @@ export async function generateJsonViaAi<T>(input: GenerateJsonViaAiInput<T>): Pr
         ok: false,
         error: {
           ...validated.error,
-          traceId: result.traceId || result.promptTraceId || undefined,
+          traceId: result.trace.traceId || undefined,
         },
         rawResponse,
       };

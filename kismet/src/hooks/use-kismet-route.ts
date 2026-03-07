@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseRuntimeRouteOptions, type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot, type RuntimeRouteSource } from '@nimiplatform/sdk/mod/runtime-route';
 import type { RouteSourceDisplay } from '../types.js';
 import { useKismetStore } from '../state/kismet-store.js';
-import { getKismetAiClient, getKismetHookClient } from '../runtime-mod.js';
-import { KISMET_DATA_API_RUNTIME_ROUTE_OPTIONS, KISMET_MOD_ID } from '../contracts.js';
+import { getKismetRouteClient } from '../runtime-mod.js';
+import { KISMET_RUNTIME_TEXT_CAPABILITY } from '../contracts.js';
 import { emitKismetLog } from '../logging.js';
 import { ReasonCode } from '@nimiplatform/sdk/types';
 
@@ -76,13 +76,12 @@ function normalizeTokenApiBinding(
   return { ...binding, connectorId, model };
 }
 
-async function loadRouteOptionsWithTimeout(hookClient: ReturnType<typeof getKismetHookClient>): Promise<RuntimeRouteOptionsSnapshot | null> {
+async function loadRouteOptionsWithTimeout(routeClient: ReturnType<typeof getKismetRouteClient>): Promise<RuntimeRouteOptionsSnapshot | null> {
   console.log('[KISMET:route] loadRouteOptions: start');
   let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
   const payload = await Promise.race<unknown>([
-    hookClient.data.query({
-      capability: KISMET_DATA_API_RUNTIME_ROUTE_OPTIONS,
-      query: { capability: 'chat', modId: KISMET_MOD_ID },
+    routeClient.listOptions({
+      capability: KISMET_RUNTIME_TEXT_CAPABILITY,
     }),
     new Promise<never>((_, reject) => {
       timeoutHandle = setTimeout(() => {
@@ -139,8 +138,8 @@ export function useKismetRoute() {
   // Load route options with retry and timeout
   const loadRouteOptions = useCallback(async (): Promise<RuntimeRouteOptionsSnapshot | null> => {
     try {
-      const hookClient = getKismetHookClient();
-      const result = await loadRouteOptionsWithTimeout(hookClient);
+      const routeClient = getKismetRouteClient();
+      const result = await loadRouteOptionsWithTimeout(routeClient);
       if (result) {
         setChatRouteOptions((prev) => {
           if (!result) return prev;
@@ -236,9 +235,12 @@ export function useKismetRoute() {
         setRouteSource('unavailable');
         return 'unavailable';
       }
-      const aiClient = getKismetAiClient();
-      const routeInput = { routeHint: 'chat/default' as const, routeOverride: currentOverride || undefined };
-      const health = await aiClient.checkRouteHealth(routeInput);
+      const routeClient = getKismetRouteClient();
+      const routeInput = {
+        capability: KISMET_RUNTIME_TEXT_CAPABILITY,
+        binding: currentOverride || undefined,
+      };
+      const health = await routeClient.checkHealth(routeInput);
       console.log('[KISMET:health] checkRouteHealth: result', {
         status: (health as Record<string, unknown>).status,
         healthy: (health as Record<string, unknown>).healthy,
@@ -252,7 +254,7 @@ export function useKismetRoute() {
         setRouteSource('unavailable');
         return 'unavailable';
       }
-      const route = await aiClient.resolveRoute(routeInput);
+      const route = await routeClient.resolve(routeInput);
       console.log('[KISMET:health] resolveRoute result', {
         source: route.source,
         model: route.model,

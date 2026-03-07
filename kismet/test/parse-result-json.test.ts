@@ -45,10 +45,21 @@ test('parseResultFromText rejects text without json object', () => {
 });
 
 test('parseImportedResult rejects natal user prompt payload', () => {
-  const result = parseImportedResult('natal-profile', JSON.stringify({
-    canonicalProfile: { pillars: {}, dayMaster: {}, fiveElementRatio: {}, favorableElements: [], unfavorableElements: [] },
-    locationContext: { birthCity: {}, topCities: [] },
-    instructions: {},
+  const result = parseImportedResult('natal-profile', buildNatalUserPrompt({
+    canonicalProfile: {
+      pillars: { year: '甲子', month: '乙丑', day: '丙寅', hour: '丁卯' },
+      zodiac: '鼠',
+      dayMaster: { label: '丙火', stem: '丙', element: 'fire', yinYang: 'yang' },
+      fiveElementRatio: { metal: 10, wood: 30, water: 20, fire: 25, earth: 15 },
+      favorableElements: ['wood'],
+      unfavorableElements: ['water'],
+      compatibleArchetypes: ['木旺之人'],
+      conflictArchetypes: ['水旺之人'],
+      startAge: 1,
+      firstDaYun: '戊辰',
+      bigLuckCycles: ['戊辰'],
+    },
+    birthCityLabel: 'Macau',
   }));
   assert.equal(result.ok, false);
   if (!result.ok) {
@@ -56,7 +67,7 @@ test('parseImportedResult rejects natal user prompt payload', () => {
   }
 });
 
-test('buildNatalUserPrompt includes locationContext for natal analysis', () => {
+test('buildNatalUserPrompt includes birthCity for natal analysis', () => {
   const prompt = buildNatalUserPrompt({
     canonicalProfile: {
       pillars: { year: '甲子', month: '乙丑', day: '丙寅', hour: '丁卯' },
@@ -71,47 +82,12 @@ test('buildNatalUserPrompt includes locationContext for natal analysis', () => {
       firstDaYun: '戊辰',
       bigLuckCycles: ['戊辰'],
     },
-    locationContext: {
-      birthCity: {
-        cityId: 'cn-macau',
-        city: 'Macau',
-        cityZh: '澳门',
-        country: 'China',
-        countryZh: '中国',
-        lat: 22.2,
-        lng: 113.54,
-        baseElement: 'water',
-        elementWeights: { metal: 10, wood: 10, water: 40, fire: 30, earth: 10 },
-        themeColor: '#2F6BFF',
-        score: 48,
-        reason: '澳门以水为主。',
-        relationToDayMaster: 'supports',
-        summary: '澳门偏水，对丙火属于drains环境。',
-      },
-      topCityId: 'cn-beijing',
-      topCities: [{
-        cityId: 'cn-beijing',
-        city: 'Beijing',
-        cityZh: '北京',
-        country: 'China',
-        countryZh: '中国',
-        lat: 39.9,
-        lng: 116.4,
-        baseElement: 'earth',
-        elementWeights: { metal: 30, wood: 10, water: 10, fire: 10, earth: 40 },
-        themeColor: '#C9A227',
-        score: 90,
-        reason: '北京以土为主。',
-      }],
-    },
+    birthCityLabel: 'Macau',
   });
 
   const parsed = JSON.parse(prompt) as Record<string, unknown>;
-  const locationContext = parsed.locationContext as Record<string, unknown>;
-
-  assert.ok(locationContext);
-  assert.equal('topCities' in locationContext, true);
-  assert.equal('topCityId' in locationContext, true);
+  assert.equal(parsed.birthCity, 'Macau');
+  assert.equal('locationContext' in parsed, false);
 });
 
 test('parseResultFromText accepts json object wrapped in a json string', () => {

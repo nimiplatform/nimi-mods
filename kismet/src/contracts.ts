@@ -13,6 +13,7 @@ export const KISMET_CAPABILITIES = [
 ] as const;
 
 export const KISMET_PERMISSIONS = [...KISMET_CAPABILITIES] as const;
+export const KISMET_RUNTIME_TEXT_CAPABILITY = 'text.generate' as const;
 
 export const KISMET_AUDIT = {
   BIRTH_INPUT_DERIVED: 'kismet.birth-input.derived',

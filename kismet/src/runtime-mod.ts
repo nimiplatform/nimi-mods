@@ -1,6 +1,6 @@
 import { type RuntimeModRegistration } from '@nimiplatform/sdk/mod/types';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
-import { createModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
+import { createModRuntimeClient, type ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import { createKismetFlowId, emitKismetLog } from './logging.js';
 import {
   KISMET_CAPABILITIES,
@@ -18,6 +18,14 @@ export function getKismetRuntimeClient() {
     throw new Error('KISMET_RUNTIME_CLIENT_NOT_INITIALIZED');
   }
   return _runtimeClient;
+}
+
+export function getKismetAiClient(): ModRuntimeClient['ai']['text'] {
+  return getKismetRuntimeClient().ai.text;
+}
+
+export function getKismetRouteClient(): ModRuntimeClient['route'] {
+  return getKismetRuntimeClient().route;
 }
 
 export function getKismetHookClient() {

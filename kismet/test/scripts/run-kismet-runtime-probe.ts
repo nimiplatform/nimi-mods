@@ -86,7 +86,7 @@ function buildPromptPackage(kind: ProbeKind, birthInput: KismetBirthInputV2) {
 
   return buildNatalPromptPackage({
     canonicalProfile,
-    locationContext: locationContext.data,
+    birthCityLabel: birthInput.birthPlaceLabel,
   });
 }
 
