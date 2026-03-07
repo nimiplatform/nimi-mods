@@ -32,24 +32,9 @@ function normalizeTokenApiBinding(
   binding: RuntimeRouteBinding,
   connectors: RuntimeRouteOptionsSnapshot['connectors'],
 ): RuntimeRouteBinding {
-  if (binding.source !== 'token-api' || connectors.length === 0) {
-    return binding;
-  }
-  const matched = connectors.find((item) => item.id === binding.connectorId) || connectors[0];
-  if (!matched) {
-    return binding;
-  }
-  const connectorId = matched.id;
-  const model = matched.models.includes(binding.model)
-    ? binding.model
-    : (matched.models[0] || binding.model || '');
-  if (connectorId === binding.connectorId && model === binding.model) {
-    return binding;
-  }
+  void connectors;
   return {
     ...binding,
-    connectorId,
-    model,
   };
 }
 

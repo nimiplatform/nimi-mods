@@ -1,6 +1,7 @@
 import type { ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import type { RuntimeCanonicalCapability, RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
-import { VIDEOPLAY_OPERATION_TYPE, type VideoPlayOperationType } from '../contracts.js';
+import { VIDEOPLAY_OPERATION_TYPE, VIDEOPLAY_REASON, type VideoPlayOperationType } from '../contracts.js';
+import { VideoPlayError } from '../errors.js';
 import { createHash, createUlid } from '../id.js';
 import { invokeWithRouteFallback } from '../pipeline/orchestrator.js';
 import type {
@@ -33,6 +34,23 @@ type AiClientLike = {
     durationMs?: number;
   }>;
 };
+
+function createJsonDataUri(value: unknown): string {
+  return `data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify(value))}`;
+}
+
+function requireAudioUri(uri: unknown): string {
+  const normalized = String(uri || '').trim();
+  if (normalized.length > 0 && !normalized.startsWith('videoplay://')) {
+    return normalized;
+  }
+  throw new VideoPlayError({
+    reasonCode: VIDEOPLAY_REASON.VOICE_RENDER_FAILED,
+    actionHint: 'Fix TTS route or voice profile, then rerun render.',
+    stage: 'asset-render-voice',
+    message: 'VIDEOPLAY_VOICE_AUDIO_URI_REQUIRED',
+  });
+}
 
 function normalizeLanguageTag(input: string): string {
   const normalized = String(input || '').trim().toLowerCase();
@@ -113,7 +131,12 @@ export function buildManualLipSyncAssets(input: {
       shotId: shot.shotId,
       clipId: shot.clipId,
       assetType: 'lip-sync',
-      uri: `videoplay://lip-sync/${input.episode.episodeId}/${shot.shotId}.json`,
+      uri: createJsonDataUri({
+        kind: 'videoplay.lip-sync',
+        episodeId: input.episode.episodeId,
+        shotId: shot.shotId,
+        anchors,
+      }),
       mimeType: 'application/json',
       durationMs: shot.durationMs,
       fps: 30,
@@ -240,7 +263,16 @@ export async function buildGeneratedVoiceAssets(input: {
         shotId: shot.shotId,
         clipId: shot.clipId,
         assetType: 'voice-script',
-        uri: `videoplay://voice-script/${input.episode.episodeId}/${shot.shotId}.json`,
+        uri: createJsonDataUri({
+          kind: 'videoplay.voice-script',
+          episodeId: input.episode.episodeId,
+          shotId: shot.shotId,
+          text: voiceLine,
+          locale: preferredLanguage,
+          language: voiceResult.result.profile.language,
+          voiceId: voiceResult.result.profile.voiceId,
+          providerId: voiceResult.result.profile.providerId || '',
+        }),
         mimeType: 'application/json',
         durationMs,
         fps: 1,
@@ -262,7 +294,7 @@ export async function buildGeneratedVoiceAssets(input: {
         shotId: shot.shotId,
         clipId: shot.clipId,
         assetType: 'voice-audio',
-        uri: String(voiceResult.result.speech.audioUri || `videoplay://voice/${input.episode.episodeId}/${shot.shotId}.mp3`),
+        uri: requireAudioUri(voiceResult.result.speech.audioUri),
         mimeType: String(voiceResult.result.speech.mimeType || 'audio/mpeg'),
         durationMs,
         fps: 1,
@@ -283,7 +315,13 @@ export async function buildGeneratedVoiceAssets(input: {
         shotId: shot.shotId,
         clipId: shot.clipId,
         assetType: 'lip-sync',
-        uri: `videoplay://lip-sync/${input.episode.episodeId}/${shot.shotId}.json`,
+        uri: createJsonDataUri({
+          kind: 'videoplay.lip-sync',
+          episodeId: input.episode.episodeId,
+          shotId: shot.shotId,
+          voiceAssetId,
+          anchors: lipSyncAnchors,
+        }),
         mimeType: 'application/json',
         durationMs,
         fps: 30,

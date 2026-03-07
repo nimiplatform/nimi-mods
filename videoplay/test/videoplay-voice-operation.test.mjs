@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { VIDEOPLAY_OPERATION_TYPE } from '../src/contracts.ts';
+import { VIDEOPLAY_OPERATION_TYPE, VIDEOPLAY_REASON } from '../src/contracts.ts';
 import {
   buildGeneratedVoiceAssets,
   buildManualLipSyncAssets,
@@ -90,63 +90,60 @@ function makeEpisode() {
   };
 }
 
-test('generate-voice-line produces real voice audio and fallback audit', async () => {
+test('generate-voice-line hard rejects route fallback and records audit details', async () => {
   const episode = makeEpisode();
-  const result = await buildGeneratedVoiceAssets({
-    runtimeClient: {
-      route: {
-        resolve: async ({ binding }) => ({
-          source: binding?.source || 'local-runtime',
-          connectorId: binding?.connectorId || '',
-          model: binding?.model || '',
-          provider: 'provider-main',
-        }),
-      },
-      media: {
-        tts: {
-          listVoices: async () => ({
-            voices: [
-              { voiceId: 'voice-zh-1', lang: 'zh' },
-            ],
-            modelResolved: '',
-            traceId: 'trace-voices-1',
+  await assert.rejects(
+    () => buildGeneratedVoiceAssets({
+      runtimeClient: {
+        route: {
+          resolve: async ({ binding }) => ({
+            source: binding?.source || 'local-runtime',
+            connectorId: binding?.connectorId || '',
+            model: binding?.model || '',
+            provider: 'provider-main',
           }),
         },
+        media: {
+          tts: {
+            listVoices: async () => ({
+              voices: [
+                { voiceId: 'voice-zh-1', lang: 'zh' },
+              ],
+              modelResolved: '',
+              traceId: 'trace-voices-1',
+            }),
+          },
+        },
       },
-    },
-    aiClient: {
-      checkRouteHealth: async ({ binding }) => {
-        if (binding?.source === 'local-runtime') {
-          return { status: 'unhealthy', reasonCode: 'RUNTIME_ROUTE_DOWN' };
-        }
-        return { status: 'healthy', reasonCode: 'RUNTIME_ROUTE_HEALTHY' };
+      aiClient: {
+        checkRouteHealth: async ({ binding }) => {
+          if (binding?.source === 'local-runtime') {
+            return { status: 'unhealthy', reasonCode: 'RUNTIME_ROUTE_DOWN' };
+          }
+          return { status: 'healthy', reasonCode: 'RUNTIME_ROUTE_HEALTHY' };
+        },
+        synthesizeSpeech: async () => ({
+          audioUri: 'audio://voice-1',
+          mimeType: 'audio/mpeg',
+          durationMs: 2100,
+        }),
       },
-      synthesizeSpeech: async () => ({
-        audioUri: 'audio://voice-1',
-        mimeType: 'audio/mpeg',
-        durationMs: 2100,
-      }),
+      traceId: 'trace-voice-op-1',
+      episode,
+      payload: {
+        shotId: 'shot-1',
+        voiceLine: '你好，这是测试台词',
+        language: 'zh',
+      },
+    }),
+    (error) => {
+      assert.equal(error?.reasonCode, VIDEOPLAY_REASON.ROUTE_UNAVAILABLE);
+      assert.equal(error?.details?.fallbackAudit?.traceId, 'trace-voice-op-1');
+      assert.equal(error?.details?.fallbackAudit?.from, 'local-runtime');
+      assert.equal(error?.details?.fallbackAudit?.to, 'token-api');
+      return true;
     },
-    traceId: 'trace-voice-op-1',
-    episode,
-    payload: {
-      shotId: 'shot-1',
-      voiceLine: '你好，这是测试台词',
-      language: 'zh',
-    },
-  });
-
-  const assetTypes = result.assets.map((asset) => asset.assetType);
-  assert.ok(assetTypes.includes('voice-script'));
-  assert.ok(assetTypes.includes('voice-audio'));
-  assert.ok(assetTypes.includes('lip-sync'));
-  const voice = result.assets.find((asset) => asset.assetType === 'voice-audio');
-  assert.ok(voice);
-  assert.equal(voice.uri, 'audio://voice-1');
-  assert.equal(voice.routeSource, 'token-api');
-  assert.ok(result.fallbackAudit);
-  assert.equal(result.fallbackAudit.from, 'local-runtime');
-  assert.equal(result.fallbackAudit.to, 'token-api');
+  );
 });
 
 test('apply-lip-sync operation emits deterministic lip-sync asset', () => {

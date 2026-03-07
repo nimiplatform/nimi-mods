@@ -74,7 +74,7 @@ test('local-chat runTextTurn e2e: stream path returns normalized segments', asyn
   });
 });
 
-test('local-chat runTextTurn e2e: fallback path uses generateText when stream fails', async () => {
+test('local-chat runTextTurn e2e: stream failure is surfaced without generate fallback', async () => {
   await withNoopModSdkHost(async () => {
     const aiClient: TestAiClient = {
       streamText: async function* () {
@@ -87,17 +87,14 @@ test('local-chat runTextTurn e2e: fallback path uses generateText when stream fa
       }),
     };
 
-    const result = await runTextTurn(createBaseInput(aiClient));
-
-    assert.equal(result.planner, 'stream');
-    assert.equal(result.streamCompleted, false);
-    assert.equal(result.segments.length, 1);
-    assert.equal(result.segments[0]?.content.length > 0, true);
-    assert.equal(result.firstReply.includes('最小可执行动作'), true);
+    await assert.rejects(
+      () => runTextTurn(createBaseInput(aiClient)),
+      /stream failed with structured metadata/,
+    );
   });
 });
 
-test('local-chat runTextTurn e2e: fallback recovers from empty stream output', async () => {
+test('local-chat runTextTurn e2e: empty stream fails close', async () => {
   await withNoopModSdkHost(async () => {
     let generateTextCall = 0;
     const aiClient: TestAiClient = {
@@ -114,12 +111,10 @@ test('local-chat runTextTurn e2e: fallback recovers from empty stream output', a
       },
     };
 
-    const result = await runTextTurn(createBaseInput(aiClient));
-
-    assert.equal(result.planner, 'stream');
-    assert.equal(result.streamCompleted, false);
-    assert.equal(result.segments.length, 1);
-    assert.equal(result.segments[0]?.content.includes('先做一件你今天就能完成的小事'), true);
-    assert.equal(generateTextCall, 1);
+    await assert.rejects(
+      () => runTextTurn(createBaseInput(aiClient)),
+      /LOCAL_CHAT_AI_STREAM_EMPTY/,
+    );
+    assert.equal(generateTextCall, 0);
   });
 });

@@ -4,7 +4,7 @@ packages:
   - 'mint-you'
   - 'narrative-engine'
   - 'textplay'
-  - 'test-chat-tts'
+  - 'test-ai'
   - 'videoplay'
   - 'audio-book'
   - 'world-studio'

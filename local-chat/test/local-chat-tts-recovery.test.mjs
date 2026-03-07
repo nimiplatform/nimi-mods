@@ -5,8 +5,6 @@ import {
   extractTtsFailureActionHint,
   extractTtsFailureReasonCode,
   isVoiceUnsupportedTtsFailure,
-  isRetryableTtsModelFailure,
-  selectNextTtsModelCandidate,
 } from '../src/services/tts/recovery.ts';
 
 test('extractTtsFailureReasonCode reads structured reasonCode from error object', () => {
@@ -22,19 +20,30 @@ test('extractTtsFailureReasonCode parses AI reason from error message', () => {
   assert.equal(reasonCode, 'AI_MODALITY_NOT_SUPPORTED');
 });
 
+test('extractTtsFailureReasonCode normalizes plain timeout messages to AI_PROVIDER_TIMEOUT', () => {
+  assert.equal(
+    extractTtsFailureReasonCode(new Error('Timeout expired')),
+    'AI_PROVIDER_TIMEOUT',
+  );
+  assert.equal(
+    extractTtsFailureReasonCode(new Error('operation timed out after 30000ms')),
+    'AI_PROVIDER_TIMEOUT',
+  );
+});
+
+test('extractTtsFailureReasonCode normalizes transport protocol errors to RUNTIME_GRPC_UNAVAILABLE', () => {
+  assert.equal(
+    extractTtsFailureReasonCode(new Error('h2 protocol error: http2 error')),
+    'RUNTIME_GRPC_UNAVAILABLE',
+  );
+});
+
 test('extractTtsFailureReasonCode prefers AI reason from message over non-AI object reason', () => {
   const reasonCode = extractTtsFailureReasonCode({
     reasonCode: 'RUNTIME_CALL_FAILED',
     message: 'rpc error: code = InvalidArgument desc = {"reasonCode":"AI_MEDIA_OPTION_UNSUPPORTED"}',
   });
   assert.equal(reasonCode, 'AI_MEDIA_OPTION_UNSUPPORTED');
-});
-
-test('isRetryableTtsModelFailure only allows model-correctable categories', () => {
-  assert.equal(isRetryableTtsModelFailure('AI_MODEL_NOT_FOUND'), true);
-  assert.equal(isRetryableTtsModelFailure('AI_MODALITY_NOT_SUPPORTED'), true);
-  assert.equal(isRetryableTtsModelFailure('AI_MEDIA_OPTION_UNSUPPORTED'), false);
-  assert.equal(isRetryableTtsModelFailure('AI_INPUT_INVALID'), false);
 });
 
 test('extractTtsFailureActionHint reads actionHint from payload and message', () => {
@@ -59,11 +68,4 @@ test('isVoiceUnsupportedTtsFailure matches reason + hint exactly', () => {
     isVoiceUnsupportedTtsFailure('AI_MEDIA_OPTION_UNSUPPORTED', 'switch_tts_model_or_refresh_connector_models'),
     false,
   );
-});
-
-test('selectNextTtsModelCandidate returns next model once and does not loop', () => {
-  const models = ['cloud/qwen-tts-1', 'cloud/qwen-tts-2', 'cloud/qwen-tts-3'];
-  assert.equal(selectNextTtsModelCandidate(models, 'cloud/qwen-tts-1'), 'cloud/qwen-tts-2');
-  assert.equal(selectNextTtsModelCandidate(models, 'cloud/qwen-tts-3'), '');
-  assert.equal(selectNextTtsModelCandidate(models, 'cloud/unknown'), 'cloud/qwen-tts-1');
 });

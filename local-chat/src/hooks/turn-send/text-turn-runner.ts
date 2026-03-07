@@ -265,17 +265,8 @@ export async function runTextTurn(input: RunTextTurnInput): Promise<TextTurnResu
     streamFailureMessage = error instanceof Error ? error.message : String(error || '');
   }
   if (streamFailed || !fullText.trim()) {
-    const textResult = await input.aiClient.generateText({
-      capability: input.invokeInput.capability,
-      prompt,
-      maxTokens: input.invokeInput.maxTokens,
-      mode: input.invokeInput.mode,
-      worldId: input.invokeInput.worldId,
-      agentId: input.invokeInput.agentId,
-      routeBinding: input.invokeInput.routeBinding,
-    });
-    fullText = String(textResult.text || '').trim();
-    streamCompleted = false;
+    const detail = streamFailureMessage || 'LOCAL_CHAT_AI_STREAM_EMPTY';
+    throw new Error(detail);
   }
   const streamDurationMs = Math.max(0, Math.round(performance.now() - streamStartedAt));
   const splitResult = splitIntoSegments(

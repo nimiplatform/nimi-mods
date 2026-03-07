@@ -1,8 +1,3 @@
-const TTS_CORRECTABLE_REASON_CODES = new Set<string>([
-  'AI_MODEL_NOT_FOUND',
-  'AI_MODALITY_NOT_SUPPORTED',
-]);
-
 function readObjectReasonCode(input: unknown): string {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     return '';
@@ -53,6 +48,20 @@ export function extractTtsFailureReasonCode(error: unknown): string {
   if (!message) {
     return fromObject;
   }
+  const normalizedMessage = message.toLowerCase();
+  if (
+    normalizedMessage.includes('timeout expired')
+    || normalizedMessage.includes('timed out')
+    || normalizedMessage.includes('deadline exceeded')
+  ) {
+    return 'AI_PROVIDER_TIMEOUT';
+  }
+  if (
+    normalizedMessage.includes('h2 protocol error')
+    || normalizedMessage.includes('http2 error')
+  ) {
+    return 'RUNTIME_GRPC_UNAVAILABLE';
+  }
   const matched = message.match(/\b(AI_[A-Z_]+)\b/);
   return matched?.[1] || fromObject;
 }
@@ -75,35 +84,7 @@ export function extractTtsFailureActionHint(error: unknown): string {
   return String(matched?.[1] || '').trim();
 }
 
-export function isRetryableTtsModelFailure(reasonCode: string): boolean {
-  return TTS_CORRECTABLE_REASON_CODES.has(String(reasonCode || '').trim());
-}
-
 export function isVoiceUnsupportedTtsFailure(reasonCode: string, actionHint: string): boolean {
   return String(reasonCode || '').trim() === 'AI_MEDIA_OPTION_UNSUPPORTED'
     && String(actionHint || '').trim() === 'adjust_tts_voice_or_audio_options';
-}
-
-export function selectNextTtsModelCandidate(models: string[], currentModel: string): string {
-  const normalizedCurrent = String(currentModel || '').trim();
-  const normalizedModels = models
-    .map((item) => String(item || '').trim())
-    .filter(Boolean);
-  if (normalizedModels.length === 0) {
-    return '';
-  }
-  if (!normalizedCurrent) {
-    return normalizedModels[0] || '';
-  }
-  const currentIndex = normalizedModels.findIndex((model) => model === normalizedCurrent);
-  if (currentIndex < 0) {
-    return normalizedModels[0] || '';
-  }
-  for (let index = currentIndex + 1; index < normalizedModels.length; index += 1) {
-    const candidate = normalizedModels[index];
-    if (candidate && candidate !== normalizedCurrent) {
-      return candidate;
-    }
-  }
-  return '';
 }

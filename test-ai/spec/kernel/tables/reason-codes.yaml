@@ -1,0 +1,47 @@
+version: 1
+codes:
+  - code: TEST_AI_ROUTE_OPTIONS_UNAVAILABLE
+    stage: route-options-query
+    blocking: true
+    action_hint: Verify runtime route options endpoint and retry.
+    source_rule: TAI-ERR-001
+  - code: TEST_AI_TEXT_GENERATE_FAILED
+    stage: text-generate
+    blocking: true
+    action_hint: Retry text generation.
+    source_rule: TAI-ERR-001
+  - code: TEST_AI_TEXT_EMBED_FAILED
+    stage: text-embed
+    blocking: true
+    action_hint: Verify embedding route or provider and retry.
+    source_rule: TAI-ERR-001
+  - code: TEST_AI_IMAGE_GENERATE_FAILED
+    stage: image-generate
+    blocking: true
+    action_hint: Verify image route or provider parameters and retry.
+    source_rule: TAI-ERR-001
+  - code: TEST_AI_VIDEO_GENERATE_FAILED
+    stage: video-generate
+    blocking: true
+    action_hint: Verify video route or provider parameters and retry.
+    source_rule: TAI-ERR-001
+  - code: TEST_AI_AUDIO_SYNTHESIZE_FAILED
+    stage: audio-synthesize
+    blocking: true
+    action_hint: Retry TTS synthesis with available voice.
+    source_rule: TAI-ERR-002
+  - code: TEST_AI_AUDIO_TRANSCRIBE_FAILED
+    stage: audio-transcribe
+    blocking: true
+    action_hint: Verify STT route or audio URL and retry.
+    source_rule: TAI-ERR-001
+  - code: TEST_AI_VOICE_CLONE_NOT_AVAILABLE
+    stage: voice-clone
+    blocking: false
+    action_hint: voice.clone SDK surface not yet available; update SDK to enable.
+    source_rule: TAI-ERR-001
+  - code: TEST_AI_VOICE_DESIGN_NOT_AVAILABLE
+    stage: voice-design
+    blocking: false
+    action_hint: voice.design SDK surface not yet available; update SDK to enable.
+    source_rule: TAI-ERR-001

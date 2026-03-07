@@ -17,8 +17,8 @@ import { parseMediaIntent, type ParsedMediaIntent } from './media-intent-parser.
 import { runImageTurn } from './image-turn-runner.js';
 import { runVideoTurn } from './video-turn-runner.js';
 import { isMediaRouteReady } from './media-route.js';
+import { createPersistableVoicePlaybackCacheMeta } from '../../services/voice/playback-source.js';
 
-const LOCAL_CHAT_FALLBACK_TOAST_KEY = 'nimi.local-chat.fallback-toast-shown.v1';
 const FALLBACK_TYPING_MIN_MS = 1_400;
 const FALLBACK_TYPING_MAX_MS = 3_200;
 const FALLBACK_TYPING_PER_CHAR_MS = 22;
@@ -94,19 +94,6 @@ async function animateFallbackStreamingPreview(input: {
     if (emitted < chars.length) {
       await delayMs(stepMs);
     }
-  }
-}
-
-function shouldShowFallbackToastOnce(): boolean {
-  try {
-    if (typeof localStorage === 'undefined') return true;
-    if (localStorage.getItem(LOCAL_CHAT_FALLBACK_TOAST_KEY) === '1') {
-      return false;
-    }
-    localStorage.setItem(LOCAL_CHAT_FALLBACK_TOAST_KEY, '1');
-    return true;
-  } catch {
-    return true;
   }
 }
 
@@ -282,18 +269,6 @@ export async function runLocalChatTurnSend(input: {
     const expectedSource = context.routeBinding?.source
       || context.chatRouteOptions?.selected.source
       || 'local-runtime';
-    const actualSource = prepared.routeSnapshot?.source || expectedSource;
-    const fallbackToTokenApi = expectedSource === 'local-runtime' && actualSource === 'token-api';
-    if (fallbackToTokenApi && shouldShowFallbackToastOnce()) {
-      context.setStatusBanner({
-        kind: 'info',
-        message: 'This turn fell back to Token API. Open AI Runtime to install/start local models.',
-        actionLabel: 'Open AI Runtime',
-        onAction: () => {
-          context.onOpenRuntimeSetup?.();
-        },
-      });
-    }
 
     const latencyMs = Math.round(performance.now() - startedAt);
     const nsfwPolicy = evaluateNsfwMediaPolicy({
@@ -401,15 +376,15 @@ export async function runLocalChatTurnSend(input: {
         const synthResults = await Promise.allSettled(
           voiceDeliveries.map((d) =>
             context.synthesizeVoice!(d.content)
-              .then((r) => ({ id: d.id, audioUri: String(r.audioUri || '').trim() })),
+              .then((r) => ({ id: d.id, playbackMeta: createPersistableVoicePlaybackCacheMeta(r) })),
           ),
         );
         for (const result of synthResults) {
-          if (result.status !== 'fulfilled' || !result.value.audioUri) continue;
+          if (result.status !== 'fulfilled' || !result.value.playbackMeta) continue;
           const delivery = assistantPayload.assistantOutput.deliveries
             .find((d) => d.id === result.value.id);
           if (delivery) {
-            delivery.meta = { ...(delivery.meta || {}), audioUri: result.value.audioUri };
+            delivery.meta = { ...(delivery.meta || {}), ...result.value.playbackMeta };
           }
         }
       }

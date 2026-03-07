@@ -109,3 +109,26 @@ export function resolvePreferredModelForScenario(input: {
   const candidates = resolveModelsForScenario(input);
   return candidates[0] || '';
 }
+
+export function resolveEffectiveModelForScenario(input: {
+  configuredModel?: string;
+  routeSelectedModel?: string;
+  models: string[];
+  modelCapabilities?: Record<string, string[]>;
+  scenario: ExtendedScenario;
+}): string {
+  const candidates = resolveModelsForScenario({
+    models: input.models,
+    modelCapabilities: input.modelCapabilities,
+    scenario: input.scenario,
+  });
+  const normalizedConfiguredModel = String(input.configuredModel || '').trim();
+  if (normalizedConfiguredModel && candidates.includes(normalizedConfiguredModel)) {
+    return normalizedConfiguredModel;
+  }
+  const normalizedRouteSelectedModel = String(input.routeSelectedModel || '').trim();
+  if (normalizedRouteSelectedModel && candidates.includes(normalizedRouteSelectedModel)) {
+    return normalizedRouteSelectedModel;
+  }
+  return candidates[0] || normalizedConfiguredModel || normalizedRouteSelectedModel;
+}

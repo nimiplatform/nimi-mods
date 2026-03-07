@@ -189,8 +189,8 @@ function resolveProviderConfigOrSkip(t: { skip: (msg?: string) => void }): LiveP
     };
   }
 
-  const dashscopeKey = requiredEnv('NIMI_LIVE_ALIBABA_API_KEY');
-  const dashscopeModel = requiredEnv('NIMI_LIVE_ALIBABA_CHAT_MODEL_ID');
+  const dashscopeKey = requiredEnv('NIMI_LIVE_DASHSCOPE_API_KEY');
+  const dashscopeModel = requiredEnv('NIMI_LIVE_DASHSCOPE_MODEL_ID');
   if (dashscopeKey && dashscopeModel) {
     return {
       provider: 'dashscope',

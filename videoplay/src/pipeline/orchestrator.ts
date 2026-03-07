@@ -215,6 +215,75 @@ function actionHintByReasonCode(reasonCode: string): string {
   }
 }
 
+function isPlaceholderUri(value: string): boolean {
+  return value.startsWith('videoplay://');
+}
+
+function createInlineDataUri(mimeType: string, body: string): string {
+  return `data:${mimeType};charset=utf-8,${encodeURIComponent(body)}`;
+}
+
+function createJsonDataUri(value: unknown): string {
+  return createInlineDataUri('application/json', JSON.stringify(value));
+}
+
+function requireMaterializedUri(input: {
+  uri: unknown;
+  reasonCode: VideoPlayReasonCode;
+  stage: string;
+  message: string;
+  details?: Record<string, unknown>;
+}): string {
+  const uri = String(input.uri || '').trim();
+  if (!uri || isPlaceholderUri(uri)) {
+    throw new VideoPlayError({
+      reasonCode: input.reasonCode,
+      actionHint: actionHintByReasonCode(input.reasonCode),
+      stage: input.stage,
+      message: input.message,
+      details: input.details,
+    });
+  }
+  return uri;
+}
+
+function extractFallbackAuditRecord(details: unknown): FallbackAuditRecord | null {
+  if (!details || typeof details !== 'object') {
+    return null;
+  }
+  const candidate = (details as { fallbackAudit?: unknown }).fallbackAudit;
+  if (!candidate || typeof candidate !== 'object') {
+    return null;
+  }
+  const record = candidate as Record<string, unknown>;
+  const traceId = String(record.traceId || '').trim();
+  const stage = String(record.stage || '').trim();
+  const capability = String(record.capability || '').trim();
+  const from = String(record.from || '').trim();
+  const to = String(record.to || '').trim();
+  const reason = String(record.reason || '').trim();
+  if (!traceId || !stage || !capability || from !== 'local-runtime' || to !== 'token-api' || !reason) {
+    return null;
+  }
+  return {
+    traceId,
+    stage: stage as VideoPlayRouteStage,
+    capability: capability as RuntimeCanonicalCapability,
+    from: 'local-runtime',
+    to: 'token-api',
+    reason,
+  };
+}
+
+function formatVttTime(ms: number): string {
+  const totalMs = Math.max(0, Math.floor(ms));
+  const hours = Math.floor(totalMs / 3_600_000);
+  const minutes = Math.floor((totalMs % 3_600_000) / 60_000);
+  const seconds = Math.floor((totalMs % 60_000) / 1_000);
+  const millis = totalMs % 1_000;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
+}
+
 function normalizeSegmentationPolicy(input?: Partial<SegmentationPolicy>): SegmentationPolicy {
   const merged: SegmentationPolicy = {
     ...DEFAULT_SEGMENTATION_POLICY,
@@ -542,8 +611,18 @@ function buildCaptionTrack(storyboard: StoryboardOutput): EditComposeOutput['epi
     });
     cursor += shot.durationMs;
   }
+  const vtt = [
+    'WEBVTT',
+    '',
+    ...lines.flatMap((line, index) => [
+      String(index + 1),
+      `${formatVttTime(line.startMs)} --> ${formatVttTime(line.endMs)}`,
+      line.text,
+      '',
+    ]),
+  ].join('\n');
   return {
-    uri: `videoplay://caption/${storyboard.episodeId}.vtt`,
+    uri: createInlineDataUri('text/vtt', vtt),
     mimeType: 'text/vtt',
     lines,
   };
@@ -642,16 +721,33 @@ export function composeEpisode(input: {
 
   const primaryShotId = timeline[0]?.shotId || '';
   const firstImage = imageByShotId.get(primaryShotId) || imageByShotId.values().next().value;
+  const timelineHash = createHash(JSON.stringify(timeline));
   const output: EditComposeOutput = {
     episodeTimeline: timeline,
     episodeMasterVideo: {
-      uri: input.forceMasterUri || `videoplay://master/${input.episodeId}.mp4`,
-      mimeType: 'video/mp4',
+      uri: String(input.forceMasterUri || '').trim() || createJsonDataUri({
+        kind: 'videoplay.compose-manifest',
+        episodeId: input.episodeId,
+        timeline,
+        timelineHash,
+      }),
+      mimeType: String(input.forceMasterUri || '').trim()
+        ? 'video/mp4'
+        : 'application/vnd.nimiplatform.videoplay.compose-manifest+json',
       durationMs,
-      timelineHash: createHash(JSON.stringify(timeline)),
+      timelineHash,
     },
     episodePoster: {
-      uri: firstImage?.uri || `videoplay://poster/${input.episodeId}.png`,
+      uri: requireMaterializedUri({
+        uri: firstImage?.uri,
+        reasonCode: VIDEOPLAY_REASON.EDIT_COMPOSE_FAILED,
+        stage: 'edit',
+        message: 'VIDEOPLAY_POSTER_URI_REQUIRED',
+        details: {
+          episodeId: input.episodeId,
+          shotId: primaryShotId,
+        },
+      }),
       mimeType: firstImage?.mimeType || 'image/png',
     },
     episodeCaptionTrack: buildCaptionTrack(input.storyboard),
@@ -981,53 +1077,35 @@ export async function invokeWithRouteFallback<T>(
     localReason = error instanceof Error ? error.message : String(error || localReason);
   }
 
-  let tokenHealth: RuntimeRouteHealthResult | null = null;
+  let tokenReason = 'token-api-unavailable';
   try {
-    tokenHealth = await input.checkHealth(input.capability, toRouteBinding('token-api'));
-  } catch {
-    tokenHealth = null;
-  }
-
-  if (!isRouteHealthy(tokenHealth)) {
-    throw new VideoPlayError({
-      reasonCode: VIDEOPLAY_REASON.ROUTE_UNAVAILABLE,
-      actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.ROUTE_UNAVAILABLE),
-      stage: 'route',
-      retryClass: VIDEOPLAY_RETRY_CLASS.RETRYABLE,
-      message: `VIDEOPLAY_BOTH_ROUTES_UNAVAILABLE:${input.stage}`,
-      details: {
-        localReason,
-        fallbackReasonCode: String(tokenHealth?.reasonCode || tokenHealth?.status || 'unknown'),
-      },
-    });
-  }
-
-  try {
-    const result = await input.invoke(toRouteBinding('token-api'));
-    return {
-      result,
-      routeSource: 'token-api',
-      fallbackAudit: {
-        traceId: input.traceId,
-        stage: input.stage,
-        capability: input.capability,
-        from: 'local-runtime',
-        to: 'token-api',
-        reason: localReason,
-      },
-    };
+    const tokenHealth = await input.checkHealth(input.capability, toRouteBinding('token-api'));
+    tokenReason = String(tokenHealth?.reasonCode || tokenHealth?.status || tokenReason);
   } catch (error) {
-    throw new VideoPlayError({
-      reasonCode: VIDEOPLAY_REASON.ROUTE_UNAVAILABLE,
-      actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.ROUTE_UNAVAILABLE),
-      stage: 'route',
-      retryClass: VIDEOPLAY_RETRY_CLASS.RETRYABLE,
-      message: error instanceof Error ? error.message : String(error || 'token-api-error'),
-      details: {
-        localReason,
-      },
-    });
+    tokenReason = error instanceof Error ? error.message : String(error || tokenReason);
   }
+
+  const fallbackAudit: FallbackAuditRecord = {
+    traceId: input.traceId,
+    stage: input.stage,
+    capability: input.capability,
+    from: 'local-runtime',
+    to: 'token-api',
+    reason: localReason,
+  };
+  throw new VideoPlayError({
+    reasonCode: VIDEOPLAY_REASON.ROUTE_UNAVAILABLE,
+    actionHint: actionHintByReasonCode(VIDEOPLAY_REASON.ROUTE_UNAVAILABLE),
+    stage: 'route',
+    retryClass: VIDEOPLAY_RETRY_CLASS.RETRYABLE,
+    message: `VIDEOPLAY_ROUTE_HARD_REJECT:${input.stage}`,
+    details: {
+      localReason,
+      fallbackReasonCode: tokenReason,
+      fallbackAllowed: false,
+      fallbackAudit,
+    },
+  });
 }
 
 function createRunEventFactory(input: {
@@ -2227,27 +2305,30 @@ async function executeStep(input: {
         const imageUrls: string[] = [];
         const maxCandidates = CHARACTER_CASTING_POLICY.maxCandidateImages;
         for (let candidateIndex = 0; candidateIndex < maxCandidates; candidateIndex += 1) {
-          try {
-            const imageResult = await invokeWithRouteFallback({
-              stage: 'character-casting-visual',
-          capability: 'image.generate',
-          traceId: input.traceId,
-          checkHealth: async (capability, binding) => input.deps.aiClient.checkRouteHealth({ capability, binding }),
-              invoke: async (binding) => input.deps.aiClient.generateImage({
-                prompt: `Character portrait: ${description}. Keywords: ${visualKeywords.join(', ')}`,
-                capability: 'image.generate',
-                binding,
-              }),
-            });
-            if (imageResult.fallbackAudit) {
-              input.fallbackAudits.push(imageResult.fallbackAudit);
-            }
-            imageUrls.push(
-              String(imageResult.result.images[0]?.uri || `videoplay://character/${agentId}/candidate-${candidateIndex}.png`),
-            );
-          } catch {
-            imageUrls.push(`videoplay://character/${agentId}/candidate-${candidateIndex}.png`);
+          const imageResult = await invokeWithRouteFallback({
+            stage: 'character-casting-visual',
+            capability: 'image.generate',
+            traceId: input.traceId,
+            checkHealth: async (capability, binding) => input.deps.aiClient.checkRouteHealth({ capability, binding }),
+            invoke: async (binding) => input.deps.aiClient.generateImage({
+              prompt: `Character portrait: ${description}. Keywords: ${visualKeywords.join(', ')}`,
+              capability: 'image.generate',
+              binding,
+            }),
+          });
+          if (imageResult.fallbackAudit) {
+            input.fallbackAudits.push(imageResult.fallbackAudit);
           }
+          imageUrls.push(requireMaterializedUri({
+            uri: imageResult.result.images[0]?.uri,
+            reasonCode: VIDEOPLAY_REASON.CASTING_VISUAL_FAILED,
+            stage: 'character-casting',
+            message: 'VIDEOPLAY_CHARACTER_IMAGE_URI_REQUIRED',
+            details: {
+              agentId,
+              candidateIndex,
+            },
+          }));
         }
 
         characters.push({
@@ -2370,27 +2451,30 @@ async function executeStep(input: {
         const referenceImageUrls: string[] = [];
         const maxSceneImages = SCENE_PLANNING_POLICY.maxCandidateImages;
         for (let candidateIndex = 0; candidateIndex < maxSceneImages; candidateIndex += 1) {
-          try {
-            const imageResult = await invokeWithRouteFallback({
-              stage: 'scene-planning-visual',
-          capability: 'image.generate',
-          traceId: input.traceId,
-          checkHealth: async (capability, binding) => input.deps.aiClient.checkRouteHealth({ capability, binding }),
-              invoke: async (binding) => input.deps.aiClient.generateImage({
-                prompt: `Scene environment: ${environmentDescription}`,
-                capability: 'image.generate',
-                binding,
-              }),
-            });
-            if (imageResult.fallbackAudit) {
-              input.fallbackAudits.push(imageResult.fallbackAudit);
-            }
-            referenceImageUrls.push(
-              String(imageResult.result.images[0]?.uri || `videoplay://scene/${sceneId}/candidate-${candidateIndex}.png`),
-            );
-          } catch {
-            referenceImageUrls.push(`videoplay://scene/${sceneId}/candidate-${candidateIndex}.png`);
+          const imageResult = await invokeWithRouteFallback({
+            stage: 'scene-planning-visual',
+            capability: 'image.generate',
+            traceId: input.traceId,
+            checkHealth: async (capability, binding) => input.deps.aiClient.checkRouteHealth({ capability, binding }),
+            invoke: async (binding) => input.deps.aiClient.generateImage({
+              prompt: `Scene environment: ${environmentDescription}`,
+              capability: 'image.generate',
+              binding,
+            }),
+          });
+          if (imageResult.fallbackAudit) {
+            input.fallbackAudits.push(imageResult.fallbackAudit);
           }
+          referenceImageUrls.push(requireMaterializedUri({
+            uri: imageResult.result.images[0]?.uri,
+            reasonCode: VIDEOPLAY_REASON.SCENE_VISUAL_FAILED,
+            stage: 'scene-planning',
+            message: 'VIDEOPLAY_SCENE_IMAGE_URI_REQUIRED',
+            details: {
+              sceneId,
+              candidateIndex,
+            },
+          }));
         }
 
         scenes.push({
@@ -2955,7 +3039,16 @@ async function executeStep(input: {
                     shotId: storyboardShot.shotId,
                     clipId: storyboardShot.clipId,
                     assetType: 'image',
-                    uri: String(imageResult.result.images[0]?.uri || `videoplay://image/${context.segmentedEpisode.episodeId}/${storyboardShot.shotId}_${ci}.png`),
+                    uri: requireMaterializedUri({
+                      uri: imageResult.result.images[0]?.uri,
+                      reasonCode: VIDEOPLAY_REASON.BATCH_QUEUE_ORCHESTRATION_FAILED,
+                      stage: 'render',
+                      message: 'VIDEOPLAY_RENDER_IMAGE_URI_REQUIRED',
+                      details: {
+                        shotId: storyboardShot.shotId,
+                        candidateIndex: ci,
+                      },
+                    }),
                     mimeType: String(imageResult.result.images[0]?.mimeType || 'image/png'),
                     durationMs: storyboardShot.durationMs,
                     fps: 30,
@@ -3021,7 +3114,15 @@ async function executeStep(input: {
                   shotId: storyboardShot.shotId,
                   clipId: storyboardShot.clipId,
                   assetType: 'video',
-                  uri: String(videoResult.result.videos[0]?.uri || `videoplay://video/${context.segmentedEpisode.episodeId}/${storyboardShot.shotId}.mp4`),
+                  uri: requireMaterializedUri({
+                    uri: videoResult.result.videos[0]?.uri,
+                    reasonCode: VIDEOPLAY_REASON.BATCH_QUEUE_ORCHESTRATION_FAILED,
+                    stage: 'render',
+                    message: 'VIDEOPLAY_RENDER_VIDEO_URI_REQUIRED',
+                    details: {
+                      shotId: storyboardShot.shotId,
+                    },
+                  }),
                   mimeType: String(videoResult.result.videos[0]?.mimeType || 'video/mp4'),
                   durationMs: storyboardShot.durationMs,
                   fps: 30,
@@ -3083,7 +3184,15 @@ async function executeStep(input: {
                 shotId: storyboardShot.shotId,
                 clipId: storyboardShot.clipId,
                 assetType: 'voice-script',
-                uri: `videoplay://voice-script/${context.segmentedEpisode.episodeId}/${storyboardShot.shotId}.json`,
+                uri: createJsonDataUri({
+                  kind: 'videoplay.voice-script',
+                  episodeId: context.segmentedEpisode.episodeId,
+                  shotId: storyboardShot.shotId,
+                  text: plan.voiceLineText,
+                  language: voiceResult.result.profile.language || plan.language,
+                  voiceId: voiceResult.result.profile.voiceId,
+                  providerId: voiceResult.result.profile.providerId || '',
+                }),
                 mimeType: 'application/json',
                 durationMs: voiceDurationMs,
                 fps: 1,
@@ -3105,7 +3214,16 @@ async function executeStep(input: {
                 shotId: storyboardShot.shotId,
                 clipId: storyboardShot.clipId,
                 assetType: 'voice-audio',
-                uri: String(voiceResult.result.speech.audioUri || `videoplay://voice/${context.segmentedEpisode.episodeId}/${storyboardShot.shotId}.mp3`),
+                uri: requireMaterializedUri({
+                  uri: voiceResult.result.speech.audioUri,
+                  reasonCode: VIDEOPLAY_REASON.VOICE_RENDER_FAILED,
+                  stage: 'render',
+                  message: 'VIDEOPLAY_RENDER_VOICE_URI_REQUIRED',
+                  details: {
+                    shotId: storyboardShot.shotId,
+                    voiceAssetId,
+                  },
+                }),
                 mimeType: String(voiceResult.result.speech.mimeType || 'audio/mpeg'),
                 durationMs: voiceDurationMs,
                 fps: 1,
@@ -3126,7 +3244,16 @@ async function executeStep(input: {
                 shotId: storyboardShot.shotId,
                 clipId: storyboardShot.clipId,
                 assetType: 'lip-sync',
-                uri: `videoplay://lip-sync/${context.segmentedEpisode.episodeId}/${storyboardShot.shotId}.json`,
+                uri: createJsonDataUri({
+                  kind: 'videoplay.lip-sync',
+                  episodeId: context.segmentedEpisode.episodeId,
+                  shotId: storyboardShot.shotId,
+                  voiceAssetId,
+                  anchors: buildLipSyncAnchors({
+                    text: plan.voiceLineText,
+                    durationMs: voiceDurationMs,
+                  }),
+                }),
                 mimeType: 'application/json',
                 durationMs: voiceDurationMs,
                 fps: 30,
@@ -3150,6 +3277,12 @@ async function executeStep(input: {
               batchLipSyncGenerated += 1;
               batchSucceeded += 1;
             } catch (error) {
+              const fallbackAudit = extractFallbackAuditRecord(
+                error instanceof VideoPlayError ? error.details : undefined,
+              );
+              if (fallbackAudit) {
+                input.fallbackAudits.push(fallbackAudit);
+              }
               queueItem.status = 'FAILED';
               queueItem.errorMessage = error instanceof Error ? error.message : String(error || '');
               batchFailed += 1;
@@ -3457,7 +3590,11 @@ async function executeStep(input: {
         const bgmRec = audioParsed?.bgmRecommendation as Record<string, unknown> | undefined;
         const bgmTrack: BgmTrack = {
           trackId: createUlid(),
-          uri: String(bgmRec?.uri || `videoplay://bgm/${context.segmentedEpisode.episodeId}.mp3`),
+          uri: String(bgmRec?.uri || '').trim() || createJsonDataUri({
+            kind: 'videoplay.audio-design.bgm-plan',
+            episodeId: context.segmentedEpisode.episodeId,
+            recommendation: bgmRec || null,
+          }),
           durationMs: totalDurationMs,
           fadeInMs: AUDIO_DESIGN_POLICY.defaultFadeInMs,
           fadeOutMs: AUDIO_DESIGN_POLICY.defaultFadeOutMs,
@@ -3470,7 +3607,12 @@ async function executeStep(input: {
           const sfxEntry = entry as Record<string, unknown>;
           return {
             sfxId: createUlid(),
-            uri: String(sfxEntry.uri || `videoplay://sfx/${context.segmentedEpisode.episodeId}/sfx-${sfxIndex}.mp3`),
+            uri: String(sfxEntry.uri || '').trim() || createJsonDataUri({
+              kind: 'videoplay.audio-design.sfx-plan',
+              episodeId: context.segmentedEpisode.episodeId,
+              sfxIndex,
+              plan: sfxEntry,
+            }),
             startMs: Number(sfxEntry.startMs || 0),
             endMs: Number(sfxEntry.endMs || totalDurationMs),
             volume: AUDIO_DESIGN_POLICY.defaultSfxVolume,
@@ -3993,6 +4135,10 @@ export async function runVideoPlayEpisodeProduction(
       remainingBudget -= 1;
     } catch (error) {
       const normalized = toVideoPlayError(error, fallbackForStep(step));
+      const fallbackAudit = extractFallbackAuditRecord(normalized.details);
+      if (fallbackAudit) {
+        fallbackAudits.push(fallbackAudit);
+      }
       if (normalized.reasonCode === VIDEOPLAY_REASON.RUN_CANCELED) {
         status = 'CANCELED';
         break;

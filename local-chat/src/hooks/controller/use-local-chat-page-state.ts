@@ -18,13 +18,16 @@ import { useLocalChatTurnSend } from '../use-local-chat-turn-send.js';
 import { useSpeechPlayback } from '../use-speech-playback.js';
 import { useSpeechTranscribe } from '../use-speech-transcribe.js';
 import { buildAgentVoiceStylePrompt } from '../../services/voice/agent-voice-style.js';
-import { resolveModelsForScenario, resolvePreferredModelForScenario } from '../../services/route/connector-model-capabilities.js';
+import { resolveSupportedVoiceId } from '../../services/voice/voice-selection.js';
+import {
+  resolveEffectiveModelForScenario,
+  resolveModelsForScenario,
+  resolvePreferredModelForScenario,
+} from '../../services/route/connector-model-capabilities.js';
 import {
   extractTtsFailureActionHint,
   extractTtsFailureReasonCode,
-  isRetryableTtsModelFailure,
   isVoiceUnsupportedTtsFailure,
-  selectNextTtsModelCandidate,
 } from '../../services/tts/recovery.js';
 import { ReasonCode } from '@nimiplatform/sdk/types';
 import { createLocalChatAiClient } from '../../runtime-ai-client.js';
@@ -178,26 +181,26 @@ export function useLocalChatPageState() {
 
   const effectiveTtsModel = useMemo(() => {
     const configuredModel = String(speechSettingsState.defaultSettings.ttsModel || '').trim();
-    if (configuredModel) {
-      return configuredModel;
-    }
     const connectorId = String(effectiveTtsConnectorId || '').trim();
     if (!connectorId) {
-      return configuredModel;
+      return configuredModel || String(ttsRouteOptions?.selected?.model || '').trim();
     }
     const candidate = ttsConnectorCandidates.find((item) => item.connector.id === connectorId) || null;
     if (!candidate) {
-      return configuredModel;
+      return configuredModel || String(ttsRouteOptions?.selected?.model || '').trim();
     }
-    const candidateModels = candidate.models;
-    if (candidateModels.length === 0) {
-      return configuredModel;
-    }
-    return candidateModels[0] || configuredModel;
+    return resolveEffectiveModelForScenario({
+      configuredModel,
+      routeSelectedModel: String(ttsRouteOptions?.selected?.model || '').trim(),
+      models: candidate.connector.models || [],
+      modelCapabilities: candidate.connector.modelCapabilities,
+      scenario: 'audio.synthesize',
+    });
   }, [
     speechSettingsState.defaultSettings.ttsModel,
     effectiveTtsConnectorId,
     ttsConnectorCandidates,
+    ttsRouteOptions?.selected?.model,
   ]);
 
   useEffect(() => {
@@ -358,12 +361,56 @@ export function useLocalChatPageState() {
     [runtimeRouteState.chatRouteOptions?.localRuntime.models, sttRouteOptions?.localRuntime.models],
   );
 
+  const resolvePlayableTtsVoiceId = useCallback(async (selectedModel: string): Promise<string> => {
+    const normalizedModel = String(selectedModel || '').trim();
+    const currentVoiceId = String(speechSettingsState.defaultSettings.voiceName || '').trim();
+    const catalogModelResolved = String(speechSettingsState.speechVoiceCatalogMeta.modelResolved || '').trim();
+    let availableVoiceIds = catalogModelResolved === normalizedModel
+      ? speechSettingsState.speechVoices.map((voice) => voice.id)
+      : [];
+
+    if (normalizedModel && availableVoiceIds.length === 0) {
+      const configuredRouteSource = speechSettingsState.defaultSettings.ttsRouteSource;
+      const resolvedRouteSource = ttsRouteOptions?.selected?.source;
+      const explicitRouteSource = configuredRouteSource === 'token-api' || configuredRouteSource === 'local-runtime'
+        ? configuredRouteSource
+        : resolvedRouteSource === 'token-api' || resolvedRouteSource === 'local-runtime'
+          ? resolvedRouteSource
+          : undefined;
+      const refreshedVoices = await speechSettingsState.loadSpeechVoices({
+        routeSource: explicitRouteSource,
+        connectorId: String(effectiveTtsConnectorId || '').trim() || undefined,
+        model: normalizedModel,
+      });
+      availableVoiceIds = refreshedVoices.map((voice) => voice.id);
+    }
+
+    const resolvedVoiceId = resolveSupportedVoiceId({
+      selectedVoiceId: currentVoiceId,
+      availableVoiceIds,
+    });
+    if (resolvedVoiceId && resolvedVoiceId !== currentVoiceId) {
+      speechSettingsState.handleVoiceIdChange(resolvedVoiceId);
+    }
+    return resolvedVoiceId;
+  }, [
+    effectiveTtsConnectorId,
+    speechSettingsState.defaultSettings.ttsRouteSource,
+    speechSettingsState.defaultSettings.voiceName,
+    speechSettingsState.handleVoiceIdChange,
+    speechSettingsState.loadSpeechVoices,
+    speechSettingsState.speechVoiceCatalogMeta.modelResolved,
+    speechSettingsState.speechVoices,
+    ttsRouteOptions?.selected?.source,
+  ]);
+
   const synthesizeVoiceOnce = useCallback(async (text: string, modelOverride?: string) => {
     const voiceStyle = buildAgentVoiceStylePrompt({
       target: targetsState.selectedTarget,
       messageText: text,
     });
     const selectedModel = String(modelOverride || effectiveTtsModel || '').trim();
+    const selectedVoiceId = await resolvePlayableTtsVoiceId(selectedModel);
     const binding = speechSettingsState.defaultSettings.ttsRouteSource === 'token-api' || speechSettingsState.defaultSettings.ttsRouteSource === 'local-runtime'
       ? {
         source: speechSettingsState.defaultSettings.ttsRouteSource,
@@ -371,9 +418,23 @@ export function useLocalChatPageState() {
         model: selectedModel,
       }
       : undefined;
+    logRendererEvent({
+      level: 'debug',
+      area: 'local-chat',
+      message: 'local-chat:voice-synthesize:start',
+      details: {
+        targetId: targetsState.selectedTargetId,
+        worldId: targetsState.selectedTarget?.worldId || null,
+        routeSource: speechSettingsState.defaultSettings.ttsRouteSource,
+        connectorId: String(effectiveTtsConnectorId || '').trim() || null,
+        model: selectedModel || null,
+        voiceId: selectedVoiceId || null,
+        hasStylePrompt: Boolean(voiceStyle.stylePrompt),
+      },
+    });
     const response = await runtimeClient.media.tts.synthesize({
       text,
-      voice: speechSettingsState.defaultSettings.voiceName,
+      voice: selectedVoiceId || undefined,
       audioFormat: DEFAULT_TTS_FORMAT,
       language: voiceStyle.language,
       model: selectedModel || undefined,
@@ -392,6 +453,23 @@ export function useLocalChatPageState() {
       : undefined;
     const mimeType = String(artifact?.mimeType || '').trim()
       || (DEFAULT_TTS_FORMAT === 'mp3' ? 'audio/mpeg' : '');
+    logRendererEvent({
+      level: 'debug',
+      area: 'local-chat',
+      message: 'local-chat:voice-synthesize:done',
+      details: {
+        targetId: targetsState.selectedTargetId,
+        worldId: targetsState.selectedTarget?.worldId || null,
+        routeSource: speechSettingsState.defaultSettings.ttsRouteSource,
+        connectorId: String(effectiveTtsConnectorId || '').trim() || null,
+        model: selectedModel || null,
+        voiceId: selectedVoiceId || null,
+        hasAudioUri: Boolean(audioUri),
+        hasAudioBytes: Boolean(audioBytes && audioBytes.length > 0),
+        mimeType: mimeType || null,
+        artifactCount: response.artifacts.length,
+      },
+    });
     return {
       audioUri: audioUri || undefined,
       audioBytes,
@@ -401,9 +479,9 @@ export function useLocalChatPageState() {
     runtimeClient,
     targetsState.selectedTarget,
     speechSettingsState.defaultSettings.ttsRouteSource,
-    speechSettingsState.defaultSettings.voiceName,
     effectiveTtsConnectorId,
     effectiveTtsModel,
+    resolvePlayableTtsVoiceId,
   ]);
 
   const synthesizeVoice = useCallback(async (text: string) => {
@@ -440,29 +518,32 @@ export function useLocalChatPageState() {
         });
         throw error;
       }
-      if (!isRetryableTtsModelFailure(reasonCode) || !connectorId) {
-        throw error;
-      }
-      const connectorModelCandidates = ttsConnectorCandidates.find(
-        (item) => item.connector.id === connectorId,
-      )?.models || [];
-      const nextModel = selectNextTtsModelCandidate(connectorModelCandidates, currentModel);
-      if (!nextModel || nextModel === currentModel) {
-        throw error;
-      }
-      speechSettingsState.handleTtsModelChange(nextModel);
-      return synthesizeVoiceOnce(text, nextModel);
+      logRendererEvent({
+        level: 'warn',
+        area: 'local-chat',
+        message: 'local-chat:voice-synthesize:failed',
+        details: {
+          targetId: targetsState.selectedTargetId,
+          worldId: targetsState.selectedTarget?.worldId || null,
+          connectorId: connectorId || null,
+          model: currentModel || null,
+          voiceId: speechSettingsState.defaultSettings.voiceName || null,
+          reasonCode: reasonCode || null,
+          actionHint: actionHint || null,
+          error: error instanceof Error ? error.message : String(error || ''),
+          retryableModelFailure: false,
+        },
+      });
+      throw error;
     }
   }, [
     effectiveTtsModel,
     effectiveTtsConnectorId,
     setStatusBanner,
-    ttsConnectorCandidates,
     targetsState.selectedTarget,
     targetsState.selectedTargetId,
     speechSettingsState.defaultSettings.voiceName,
     speechSettingsState.loadSpeechCatalog,
-    speechSettingsState.handleTtsModelChange,
     synthesizeVoiceOnce,
   ]);
 

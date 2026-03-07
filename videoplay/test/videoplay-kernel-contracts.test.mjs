@@ -566,27 +566,31 @@ test('sourceEventIds out-of-baseline fails close in quality gate', () => {
 });
 
 test('route fallback audit fields are complete', async () => {
-  const result = await invokeWithRouteFallback({
-    stage: 'screenplay',
-    capability: 'text.generate',
-    traceId: 'trace-1',
-    checkHealth: async (_capability, binding) => {
-      if (binding?.source === 'local-runtime') {
-        return { status: 'unhealthy', reasonCode: 'RUNTIME_ROUTE_DOWN' };
-      }
-      return { status: 'healthy', reasonCode: 'RUNTIME_ROUTE_HEALTHY' };
+  await assert.rejects(
+    () => invokeWithRouteFallback({
+      stage: 'screenplay',
+      capability: 'text.generate',
+      traceId: 'trace-1',
+      checkHealth: async (_capability, binding) => {
+        if (binding?.source === 'local-runtime') {
+          return { status: 'unhealthy', reasonCode: 'RUNTIME_ROUTE_DOWN' };
+        }
+        return { status: 'healthy', reasonCode: 'RUNTIME_ROUTE_HEALTHY' };
+      },
+      invoke: async () => ({ ok: true }),
+    }),
+    (error) => {
+      assert.equal(error?.reasonCode, VIDEOPLAY_REASON.ROUTE_UNAVAILABLE);
+      assert.equal(error?.details?.fallbackAllowed, false);
+      assert.equal(error?.details?.fallbackAudit?.traceId, 'trace-1');
+      assert.equal(error?.details?.fallbackAudit?.stage, 'screenplay');
+      assert.equal(error?.details?.fallbackAudit?.capability, 'text.generate');
+      assert.equal(error?.details?.fallbackAudit?.from, 'local-runtime');
+      assert.equal(error?.details?.fallbackAudit?.to, 'token-api');
+      assert.ok(String(error?.details?.fallbackAudit?.reason || '').length > 0);
+      return true;
     },
-    invoke: async () => ({ ok: true }),
-  });
-
-  assert.equal(result.routeSource, 'token-api');
-  assert.ok(result.fallbackAudit);
-  assert.equal(result.fallbackAudit.traceId, 'trace-1');
-  assert.equal(result.fallbackAudit.stage, 'screenplay');
-  assert.equal(result.fallbackAudit.capability, 'text.generate');
-  assert.equal(result.fallbackAudit.from, 'local-runtime');
-  assert.equal(result.fallbackAudit.to, 'token-api');
-  assert.ok(result.fallbackAudit.reason.length > 0);
+  );
 });
 
 test('idempotent replay does not duplicate episode write side effects', () => {
@@ -908,19 +912,24 @@ test('voice route fallback is audited in pipeline', async () => {
     },
   });
 
-  const result = await runVideoPlayEpisodeProduction(deps, {
-    projectId: 'project-main',
-    storyId: 'story-main',
-    ingestCursorStart: 'turn-0',
-    sourceMode: 'canonical-story',
-    storyPackage: makeStoryPackage(),
-  });
-
-  const voiceFallback = result.fallbackAudits.find((item) => item.stage === 'asset-render-voice');
-  assert.ok(voiceFallback);
-  assert.equal(voiceFallback.from, 'local-runtime');
-  assert.equal(voiceFallback.to, 'token-api');
-  assert.equal(voiceFallback.capability, 'audio.synthesize');
+  await assert.rejects(
+    () => runVideoPlayEpisodeProduction(deps, {
+      projectId: 'project-main',
+      storyId: 'story-main',
+      ingestCursorStart: 'turn-0',
+      sourceMode: 'canonical-story',
+      storyPackage: makeStoryPackage(),
+    }),
+    (error) => {
+      const checkpoint = error?.details?.checkpoint;
+      const voiceFallback = checkpoint?.fallbackAudits?.find((item) => item.stage === 'asset-render-voice');
+      assert.ok(voiceFallback);
+      assert.equal(voiceFallback.from, 'local-runtime');
+      assert.equal(voiceFallback.to, 'token-api');
+      assert.equal(voiceFallback.capability, 'audio.synthesize');
+      return true;
+    },
+  );
 });
 
 test('release package contains mandatory minimum fields', async () => {
