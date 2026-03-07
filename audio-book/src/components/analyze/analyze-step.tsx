@@ -25,6 +25,16 @@ type AnalyzeStepProps = {
 export function AnalyzeStep(props: AnalyzeStepProps) {
   const { chapters, analysisRunning, progress, characters, segments, ttsRoute, onStart, onCancel } = props;
   const hasResults = characters.length > 0;
+  const selectedChatConnector = ttsRoute.chatConnectors.find((connector) => connector.id === ttsRoute.chatSelection.connectorId) || null;
+  const availableChatModels = selectedChatConnector
+    ? selectedChatConnector.models.filter((model, index, models) => {
+      const normalized = String(model || '').trim();
+      const lower = normalized.toLowerCase();
+      if (!normalized || normalized === 'cloud/default' || lower === 'local-model' || lower.endsWith('/local-model')) return false;
+      if (['tts', 'speech', 'audio', 'voice', 'embedding', 'embed', 'rerank'].some((hint) => lower.includes(hint))) return false;
+      return models.indexOf(model) === index;
+    })
+    : [];
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
@@ -56,6 +66,29 @@ export function AnalyzeStep(props: AnalyzeStepProps) {
                   description: c.vendor ? `(${c.vendor})` : undefined,
                 }))}
                 placeholder="Select provider..."
+              />
+            )}
+          </div>
+
+          <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <label className="mb-1.5 block text-xs font-medium text-gray-600">LLM Model</label>
+            {ttsRoute.loading ? (
+              <p className="text-xs text-gray-400">Loading models...</p>
+            ) : ttsRoute.error ? (
+              <p className="text-xs text-red-500">{ttsRoute.error}</p>
+            ) : !selectedChatConnector ? (
+              <p className="text-xs text-gray-500">Select a provider first.</p>
+            ) : availableChatModels.length === 0 ? (
+              <p className="text-xs text-gray-500">This provider does not expose selectable chat models. Runtime default will be used.</p>
+            ) : (
+              <Select
+                value={ttsRoute.chatSelection.model || availableChatModels[0] || ''}
+                onValueChange={(value) => ttsRoute.selectChatModel(value)}
+                options={availableChatModels.map((model) => ({
+                  value: model,
+                  label: model,
+                }))}
+                placeholder="Select model..."
               />
             )}
           </div>

@@ -4,6 +4,10 @@
 
 import type { CharacterProfile, ScriptSegment } from '../types.js';
 
+const MAX_CONTEXT_CHARACTERS = 24;
+const MAX_TRAITS_PER_CHARACTER = 3;
+const MAX_RECENT_SEGMENT_PREVIEW_CHARS = 60;
+
 /**
  * JSON schema embedded in the prompt for per-chapter analysis output.
  */
@@ -34,40 +38,34 @@ export const ANALYSIS_SCHEMA_LINES: string[] = [
  */
 export function buildAnalysisSystemPrompt(): string {
   return [
-    'You are a script analysis engine for audiobook production.',
-    'Your job is to split narrative text into segments for TTS synthesis and extract character profiles.',
+    'You segment audiobook source text into TTS-ready script units and character records.',
     '',
-    '## Segment Rules',
-    '- Each segment is a minimal TTS synthesis unit.',
-    '- Types: dialogue (character speech), narration (third-person narrative), inner_thought (internal monologue), sound_effect (described sounds).',
-    '- "speaker" for narration segments must be "narrator".',
-    '- "speaker" for dialogue/inner_thought must be the character\'s proper name as it appears in the text.',
-    '- Consecutive dialogue by the same speaker should be merged into one segment.',
-    '- Narrative text between dialogue becomes a narration segment.',
-    '- Inner monologue (e.g. "他想…" / "她心中暗道" style) should be inner_thought type.',
-    '- Ideal segment length: 20-500 characters. Merge if <20, split at natural breaks if >500.',
-    '- Preserve the original language of the text. Never translate.',
-    '- You MUST segment the ENTIRE chapter text. Do NOT skip or summarize any portion.',
+    'Rules:',
+    '- Cover the entire input exactly once. Do not skip, summarize, reorder, or translate.',
+    '- Segment types: dialogue, narration, inner_thought, sound_effect.',
+    '- narration speaker must be "narrator". dialogue and inner_thought speaker must be the proper character name.',
+    '- Merge consecutive lines by the same speaker when they belong to one continuous utterance.',
+    '- Put narrative text between dialogue into narration segments.',
+    '- Use inner_thought for explicit internal monologue such as "他想" / "她心中暗道".',
+    '- Target 20-500 characters per segment. Merge tiny fragments. Split very long text at natural sentence/dialogue boundaries.',
     '',
-    '## Chinese Text Conventions',
-    '- Chinese dialogue is enclosed in \u201c\u201d (full-width quotation marks) or \u300c\u300d.',
-    '- Attribution patterns: \u201cXX\u8bf4\u201d / \u201cXX\u8bf4\u9053\u201d / \u201cXX\u559d\u9053\u201d / \u201cXX\u558a\u9053\u201d / \u201cXX\u95ee\u201d / \u201cXX\u7b54\u201d etc. Identify XX as the speaker.',
-    '- When attribution is implicit (no explicit \u201cXX\u8bf4\u201d), infer the speaker from context (surrounding narration, alternating turns).',
-    '- Crowd speech (\u201c\u4f17\u4eba\u201d / \u201c\u4eba\u7fa4\u201d / collective shouts) can use a group name as speaker.',
+    'Chinese dialogue hints:',
+    '- Dialogue is often enclosed in “…” or 「…」.',
+    '- Patterns like “XX说 / XX问 / XX答 / XX喊道” indicate the speaker.',
+    '- If attribution is omitted, infer speaker from nearby narration or turn-taking.',
+    '- Group speech may use a collective speaker name.',
     '',
-    '## Character Rules',
-    '- Extract ALL characters who speak, are addressed by name, or play a role in this chapter.',
-    '- "isNew" should be true only for characters not present in the accumulated character list.',
-    '- Use consistent naming \u2014 if a character was already identified, use their established name.',
-    '- Do NOT include "narrator" as a character; narrator is a special system-level speaker.',
-    '- Include character traits observed in this chapter (personality, role, relationship).',
+    'Character rules:',
+    '- Extract characters who speak, are named, or clearly matter in this chapter.',
+    '- Reuse established names from prior context when the same character reappears.',
+    '- isNew is true only when the character is not already in prior context.',
+    '- Do not include narrator as a character entry.',
+    '- Keep traits short and concrete.',
     '',
-    '## Output',
-    'CRITICAL: Return ONLY the JSON object. No thinking, no reasoning, no analysis, no explanation.',
-    'Do NOT wrap in markdown code fences. Do NOT prefix with any text.',
-    'Your response must begin with the character { and end with }.',
-    'You MUST produce a comprehensive segment list covering the ENTIRE chapter text.',
-    'A typical chapter of 5000+ characters should produce 20-60 segments.',
+    'Output rules:',
+    '- Return exactly one JSON object and nothing else.',
+    '- Do not use markdown fences.',
+    '- The response must start with { and end with }.',
     'Schema:',
     ...ANALYSIS_SCHEMA_LINES,
   ].join('\n');
@@ -81,20 +79,41 @@ export function buildAccumulatedContext(
   recentSegments: ScriptSegment[],
 ): string {
   const parts: string[] = [];
+  const recentSpeakerNames = new Set(
+    recentSegments
+      .map((segment) => segment.speaker)
+      .filter((speaker) => speaker && speaker !== 'narrator'),
+  );
+  const knownCharacters = [...existingCharacters]
+    .filter((character) => character.name && character.name !== 'narrator')
+    .sort((left, right) => {
+      const recentDelta = Number(recentSpeakerNames.has(right.name)) - Number(recentSpeakerNames.has(left.name));
+      if (recentDelta !== 0) return recentDelta;
+      if (left.segmentCount !== right.segmentCount) return right.segmentCount - left.segmentCount;
+      return left.name.localeCompare(right.name);
+    });
+  const visibleCharacters = knownCharacters.slice(0, MAX_CONTEXT_CHARACTERS);
 
-  if (existingCharacters.length > 0) {
+  if (visibleCharacters.length > 0) {
     parts.push('## Known Characters');
-    for (const ch of existingCharacters) {
-      parts.push(`- ${ch.name} (${ch.gender}, ${ch.ageGroup}, segments: ${ch.segmentCount}, traits: ${ch.traits.join(', ') || 'none'})`);
+    for (const ch of visibleCharacters) {
+      const traits = ch.traits.slice(0, MAX_TRAITS_PER_CHARACTER).join(', ') || 'none';
+      parts.push(`- ${ch.name} (${ch.gender}, ${ch.ageGroup}, segments:${ch.segmentCount}, traits:${traits})`);
+    }
+    if (knownCharacters.length > visibleCharacters.length) {
+      parts.push(`- ${knownCharacters.length - visibleCharacters.length} minor characters omitted for brevity; keep established names if they reappear.`);
     }
   }
 
   if (recentSegments.length > 0) {
     parts.push('');
-    parts.push('## Recent Segments (last few from previous chapter)');
+    parts.push('## Recent Segments');
     for (const seg of recentSegments) {
       const emotionSuffix = seg.emotion ? ` [${seg.emotion}]` : '';
-      parts.push(`- [${seg.type}] ${seg.speaker}: "${seg.text.slice(0, 100)}..."${emotionSuffix}`);
+      const preview = seg.text.length > MAX_RECENT_SEGMENT_PREVIEW_CHARS
+        ? `${seg.text.slice(0, MAX_RECENT_SEGMENT_PREVIEW_CHARS)}...`
+        : seg.text;
+      parts.push(`- [${seg.type}] ${seg.speaker}: "${preview}"${emotionSuffix}`);
     }
   }
 
@@ -123,7 +142,7 @@ export function buildChapterAnalysisPrompt(input: {
   parts.push(input.chapterText);
   parts.push('</chapter_content>');
   parts.push('');
-  parts.push('Segment the ENTIRE chapter text above into TTS segments. Return the JSON object now.');
+  parts.push('Process only the chapter_content above. Return the JSON object now.');
 
   return parts.join('\n');
 }

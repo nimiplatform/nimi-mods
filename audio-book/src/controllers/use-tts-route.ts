@@ -28,6 +28,7 @@ export type TtsRouteState = {
   loading: boolean;
   error: string | null;
   selectChatConnector: (connectorId: string) => void;
+  selectChatModel: (model: string) => void;
   selectTtsConnector: (connectorId: string) => void;
 };
 
@@ -225,6 +226,17 @@ function pickChatModelForConnector(
   return 'cloud/default';
 }
 
+function listChatModelsForConnector(
+  connectors: RuntimeRouteConnectorOption[],
+  connectorId: string,
+): string[] {
+  const matched = connectors.find((item) => item.id === connectorId) || null;
+  if (!matched) return [];
+  return matched.models
+    .map((item) => normalizeModel(item))
+    .filter((item, index, array) => Boolean(item) && isLikelyChatModel(item) && array.indexOf(item) === index);
+}
+
 function inferProviderDefaultTtsModel(connector: RuntimeRouteConnectorOption | null): string {
   if (!connector) return '';
   const signal = `${connector.id} ${connector.label} ${connector.vendor || ''}`.toLowerCase();
@@ -271,30 +283,42 @@ function pickTtsModelForConnector(
   return '';
 }
 
+function hasModelOption(options: string[], model?: string): boolean {
+  const normalized = normalizeModel(model || '');
+  if (!normalized) return false;
+  return options.includes(normalized);
+}
+
 function resolveSelection(
   connectors: RuntimeRouteConnectorOption[],
   fallback: RouteSelectionFallback,
   storageKey: string,
+  modelPicker: (connectors: RuntimeRouteConnectorOption[], connectorId: string, fallbackModel: string) => string,
+  modelOptionsGetter: (connectors: RuntimeRouteConnectorOption[], connectorId: string) => string[],
 ): RouteSelection {
   const persisted = loadPersisted(storageKey);
-  const preferredPersistedModel = persisted.model && !isPlaceholderModel(persisted.model)
-    && !isVoiceDesignTtsModel(persisted.model)
-    ? persisted.model
-    : undefined;
   if (persisted.connectorId && connectors.some((c) => c.id === persisted.connectorId)) {
+    const options = modelOptionsGetter(connectors, persisted.connectorId);
+    const preferredPersistedModel = hasModelOption(options, persisted.model)
+      ? normalizeModel(persisted.model || '')
+      : '';
     const next: RouteSelection = {
       connectorId: persisted.connectorId,
       routeSource: 'token-api',
-      model: preferredPersistedModel || fallback.model || undefined,
+      model: preferredPersistedModel || modelPicker(connectors, persisted.connectorId, fallback.model || ''),
     };
     persist(storageKey, next);
     return next;
   }
   if (fallback.connectorId && connectors.some((c) => c.id === fallback.connectorId)) {
+    const options = modelOptionsGetter(connectors, fallback.connectorId);
+    const nextModel = hasModelOption(options, fallback.model)
+      ? normalizeModel(fallback.model)
+      : modelPicker(connectors, fallback.connectorId, fallback.model || '');
     const next: RouteSelection = {
       connectorId: fallback.connectorId,
       routeSource: 'token-api',
-      model: fallback.model || preferredPersistedModel || undefined,
+      model: nextModel || undefined,
     };
     persist(storageKey, next);
     return next;
@@ -302,12 +326,13 @@ function resolveSelection(
   if (connectors.length > 0) {
     const first = connectors[0]?.id || '';
     if (!first) {
-      return { connectorId: '', routeSource: 'auto', model: fallback.model || preferredPersistedModel || undefined };
+      return { connectorId: '', routeSource: 'auto', model: fallback.model || undefined };
     }
+    const nextModel = modelPicker(connectors, first, fallback.model || '');
     const selection: RouteSelection = {
       connectorId: first,
       routeSource: 'token-api',
-      model: fallback.model || preferredPersistedModel || undefined,
+      model: nextModel || undefined,
     };
     persist(storageKey, selection);
     return selection;
@@ -316,7 +341,7 @@ function resolveSelection(
     const selection: RouteSelection = {
       connectorId: fallback.connectorId,
       routeSource: 'token-api',
-      model: fallback.model || preferredPersistedModel || undefined,
+      model: fallback.model || undefined,
     };
     persist(storageKey, selection);
     return selection;
@@ -401,11 +426,15 @@ export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
           setChatSelection(resolveSelection(nextChatConnectors, {
             connectorId: defaultChatConnectorId,
             model: defaultChatModel,
-          }, STORAGE_KEY_CHAT));
+          }, STORAGE_KEY_CHAT, pickChatModelForConnector, listChatModelsForConnector));
           setTtsSelection(resolveSelection(nextTtsConnectors, {
             connectorId: defaultTtsConnectorId,
             model: defaultTtsModel,
-          }, STORAGE_KEY_TTS));
+          }, STORAGE_KEY_TTS, pickTtsModelForConnector, (items, id) => {
+            const matched = items.find((item) => item.id === id) || null;
+            if (!matched) return [];
+            return matched.models.map((item) => normalizeModel(item)).filter((item, index, array) => Boolean(item) && !isVoiceDesignTtsModel(item) && array.indexOf(item) === index);
+          }));
 
           console.info(LOG_PREFIX, 'init:loaded', {
             chatConnectorsCount: nextChatConnectors.length,
@@ -457,7 +486,7 @@ export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
         setChatSelection(resolveSelection(chatSnapshot.connectors, {
           connectorId: chatSnapshot.selected?.connectorId || '',
           model: defaultChatModel,
-        }, STORAGE_KEY_CHAT));
+        }, STORAGE_KEY_CHAT, pickChatModelForConnector, listChatModelsForConnector));
       }
       if (ttsSnapshot) {
         setTtsConnectors(ttsSnapshot.connectors);
@@ -470,7 +499,11 @@ export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
         setTtsSelection(resolveSelection(ttsSnapshot.connectors, {
           connectorId: defaultTtsConnectorId,
           model: defaultTtsModel,
-        }, STORAGE_KEY_TTS));
+        }, STORAGE_KEY_TTS, pickTtsModelForConnector, (items, id) => {
+          const matched = items.find((item) => item.id === id) || null;
+          if (!matched) return [];
+          return matched.models.map((item) => normalizeModel(item)).filter((item, index, array) => Boolean(item) && !isVoiceDesignTtsModel(item) && array.indexOf(item) === index);
+        }));
       }
       if (chatSnapshot && ttsSnapshot) {
         setError(null);
@@ -532,6 +565,23 @@ export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
     persist(STORAGE_KEY_CHAT, selection);
   }, [chatConnectors, chatSelection.model]);
 
+  const selectChatModel = useCallback((model: string) => {
+    const nextModel = normalizeModel(model);
+    setChatSelection((previous) => {
+      if (!previous.connectorId) return previous;
+      const availableModels = listChatModelsForConnector(chatConnectors, previous.connectorId);
+      const resolvedModel = hasModelOption(availableModels, nextModel)
+        ? nextModel
+        : pickChatModelForConnector(chatConnectors, previous.connectorId, previous.model || '');
+      const next: RouteSelection = {
+        ...previous,
+        model: resolvedModel || undefined,
+      };
+      persist(STORAGE_KEY_CHAT, next);
+      return next;
+    });
+  }, [chatConnectors]);
+
   const selectTtsConnector = useCallback((connectorId: string) => {
     const nextModel = connectorId
       ? pickTtsModelForConnector(ttsConnectors, connectorId, ttsSelection.model || '')
@@ -553,6 +603,7 @@ export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
     loading,
     error,
     selectChatConnector,
+    selectChatModel,
     selectTtsConnector,
-  }), [chatConnectors, ttsConnectors, chatSelection, ttsSelection, loading, error, selectChatConnector, selectTtsConnector]);
+  }), [chatConnectors, ttsConnectors, chatSelection, ttsSelection, loading, error, selectChatConnector, selectChatModel, selectTtsConnector]);
 }

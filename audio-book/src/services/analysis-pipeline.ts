@@ -11,7 +11,7 @@ import type {
   SourceChapter,
 } from '../types.js';
 import {
-  parseAnalysisJsonRecord,
+  parseAnalysisJsonRecordDetailed,
   summarizeModelError,
   buildRepairPrompt,
   buildStrictRepairPrompt,
@@ -27,8 +27,32 @@ import { splitLongSegments } from './segment-post-processor.js';
 
 const VALID_SEGMENT_TYPES = new Set<SegmentType>(['dialogue', 'narration', 'inner_thought', 'sound_effect']);
 const RECENT_SEGMENTS_WINDOW = 3;
-const MAX_CHUNK_CHARS = 1500;
-const CHUNK_RETRY_SIZES = [MAX_CHUNK_CHARS, 1000, 800, 500] as const;
+const MAX_CHUNK_CHARS = 2200;
+const CHUNK_RETRY_SIZES = [MAX_CHUNK_CHARS, 1600, 1200, 800] as const;
+const ANALYSIS_TEMPERATURE = 0.2;
+
+type AnalysisCompletionStage = 'initial' | 'repair' | 'strict_repair';
+
+type AnalysisChapterAttemptResult = {
+  output: AnalysisChapterOutput;
+  retryCount: number;
+  repairCallCount: number;
+  strictRepairUsed: boolean;
+  recoveredOnInitialParse: boolean;
+  completedStage: AnalysisCompletionStage;
+  durationMs: number;
+};
+
+type AnalysisChunkResult = {
+  output: AnalysisChapterOutput;
+  retryCount: number;
+  repairCallCount: number;
+  strictRepairCount: number;
+  recoveredChunkCount: number;
+  chunkCount: number;
+  chunkSize: number;
+  durationMs: number;
+};
 
 /**
  * Estimate output tokens needed for a chapter's analysis JSON.
@@ -183,7 +207,8 @@ async function analyzeChapterInChunks(
   chapterIndex: number,
   totalChapters: number,
   accCtx: string,
-): Promise<{ output: AnalysisChapterOutput; retryCount: number }> {
+): Promise<AnalysisChunkResult> {
+  const chunkPassStartedAt = performance.now();
   const chunkSizes: number[] = [];
   for (const size of CHUNK_RETRY_SIZES) {
     if (!chunkSizes.includes(size)) {
@@ -200,20 +225,27 @@ async function analyzeChapterInChunks(
     const allSegments: AnalysisChapterOutput['segments'] = [];
     const characterMap = new Map<string, AnalysisChapterOutput['characters'][number]>();
     let totalRetries = 0;
+    let repairCallCount = 0;
+    let strictRepairCount = 0;
+    let recoveredChunkCount = 0;
     let runningAccCtx = accCtx;
 
     try {
       for (let ci = 0; ci < chunks.length; ci++) {
-        const { output, retryCount } = await analyzeChapter(
+        const chapterAttempt = await analyzeChapter(
           llm,
           chunks[ci]!,
           chapterIndex,
           totalChapters,
           runningAccCtx + `\n\n(Processing chunk ${ci + 1}/${chunks.length} of this chapter)`,
         );
+        const { output, retryCount } = chapterAttempt;
 
         allSegments.push(...output.segments);
-        totalRetries = Math.max(totalRetries, retryCount);
+        totalRetries += retryCount;
+        repairCallCount += chapterAttempt.repairCallCount;
+        strictRepairCount += chapterAttempt.strictRepairUsed ? 1 : 0;
+        recoveredChunkCount += chapterAttempt.recoveredOnInitialParse ? 1 : 0;
 
         for (const ch of output.characters) {
           const existing = characterMap.get(ch.name);
@@ -250,6 +282,12 @@ async function analyzeChapterInChunks(
           characters: Array.from(characterMap.values()),
         },
         retryCount: totalRetries,
+        repairCallCount,
+        strictRepairCount,
+        recoveredChunkCount,
+        chunkCount: chunks.length,
+        chunkSize,
+        durationMs: Math.round(performance.now() - chunkPassStartedAt),
       };
     } catch (error) {
       lastError = error;
@@ -281,7 +319,8 @@ async function analyzeChapter(
   chapterIndex: number,
   totalChapters: number,
   accCtx: string,
-): Promise<{ output: AnalysisChapterOutput; retryCount: number }> {
+): Promise<AnalysisChapterAttemptResult> {
+  const startedAt = performance.now();
   const systemPrompt = buildAnalysisSystemPrompt();
   const userPrompt = buildChapterAnalysisPrompt({
     chapterText,
@@ -297,14 +336,24 @@ async function analyzeChapter(
   const first = await llm.generateText({
     systemPrompt,
     userPrompt,
+    temperature: ANALYSIS_TEMPERATURE,
     maxTokens,
   });
   try {
-    const output = normalizeChapterOutput(parseAnalysisJsonRecord(first.text));
+    const parsed = parseAnalysisJsonRecordDetailed(first.text);
+    const output = normalizeChapterOutput(parsed.record);
     if (output.segments.length < minExpectedSegments) {
       throw new Error(`VS_TOO_FEW_SEGMENTS: got ${output.segments.length}, expected at least ${minExpectedSegments} for ${chapterText.length}-char chapter`);
     }
-    return { output, retryCount: 0 };
+    return {
+      output,
+      retryCount: 0,
+      repairCallCount: 0,
+      strictRepairUsed: false,
+      recoveredOnInitialParse: parsed.recovered,
+      completedStage: 'initial',
+      durationMs: Math.round(performance.now() - startedAt),
+    };
   } catch (firstError) {
     // Attempt 2: repair prompt (low temp)
     const repairPrompt = buildRepairPrompt({
@@ -322,11 +371,19 @@ async function analyzeChapter(
       maxTokens,
     });
     try {
-      const output2 = normalizeChapterOutput(parseAnalysisJsonRecord(second.text));
+      const output2 = normalizeChapterOutput(parseAnalysisJsonRecordDetailed(second.text).record);
       if (output2.segments.length < minExpectedSegments) {
         throw new Error(`VS_TOO_FEW_SEGMENTS: got ${output2.segments.length}, expected at least ${minExpectedSegments}`);
       }
-      return { output: output2, retryCount: 1 };
+      return {
+        output: output2,
+        retryCount: 1,
+        repairCallCount: 1,
+        strictRepairUsed: false,
+        recoveredOnInitialParse: false,
+        completedStage: 'repair',
+        durationMs: Math.round(performance.now() - startedAt),
+      };
     } catch (secondError) {
       // Attempt 3: strict repair
       const strictPrompt = buildStrictRepairPrompt({
@@ -346,11 +403,19 @@ async function analyzeChapter(
         maxTokens,
       });
       try {
-        const output3 = normalizeChapterOutput(parseAnalysisJsonRecord(third.text));
+        const output3 = normalizeChapterOutput(parseAnalysisJsonRecordDetailed(third.text).record);
         if (output3.segments.length < minExpectedSegments) {
           throw new Error(`VS_TOO_FEW_SEGMENTS: got ${output3.segments.length}, expected at least ${minExpectedSegments}`);
         }
-        return { output: output3, retryCount: 2 };
+        return {
+          output: output3,
+          retryCount: 2,
+          repairCallCount: 2,
+          strictRepairUsed: true,
+          recoveredOnInitialParse: false,
+          completedStage: 'strict_repair',
+          durationMs: Math.round(performance.now() - startedAt),
+        };
       } catch (thirdError) {
         const snippet = (s: string) => s.length > 300 ? s.slice(0, 300) + '...' : s;
         throw new Error(
@@ -376,6 +441,12 @@ export type AnalysisResult = {
     segmentCount: number;
     newCharacters: number;
     retryCount: number;
+    repairCallCount?: number;
+    strictRepairCount?: number;
+    recoveredChunkCount?: number;
+    chunkCount?: number;
+    chunkSize?: number;
+    durationMs?: number;
     error?: string;
   }>;
   lastProcessedChapter: number;
@@ -510,6 +581,7 @@ export async function analyzeAllChapters(
     }
 
     const chapter = chapters[i]!;
+    const chapterStartedAt = performance.now();
 
     // Build accumulated context for this chapter
     const recentSegments = allSegments.slice(-RECENT_SEGMENTS_WINDOW);
@@ -519,13 +591,14 @@ export async function analyzeAllChapters(
     );
 
     try {
-      const { output, retryCount } = await analyzeChapterInChunks(
+      const chapterRun = await analyzeChapterInChunks(
         llm,
         chapter.rawText,
         i,
         chapters.length,
         accCtx,
       );
+      const { output, retryCount } = chapterRun;
 
       const rebased = rebaseChapterSegmentsToSource({
         chapterText: chapter.rawText,
@@ -582,6 +655,12 @@ export async function analyzeAllChapters(
         segmentCount: chapterSegments.length,
         newCharacters: newCharCount,
         retryCount,
+        repairCallCount: chapterRun.repairCallCount,
+        strictRepairCount: chapterRun.strictRepairCount,
+        recoveredChunkCount: chapterRun.recoveredChunkCount,
+        chunkCount: chapterRun.chunkCount,
+        chunkSize: chapterRun.chunkSize,
+        durationMs: Math.round(performance.now() - chapterStartedAt),
       });
       lastProcessedChapter = i;
 
@@ -600,6 +679,9 @@ export async function analyzeAllChapters(
         segmentCount: fallbackSegments.length,
         newCharacters: 0,
         retryCount: 2,
+        repairCallCount: 2,
+        strictRepairCount: 1,
+        durationMs: Math.round(performance.now() - chapterStartedAt),
         error: `analysis_failed_fallback_used: ${summarizeModelError(err)}`,
       });
       // Continue to next chapter — failed chapter falls back to narration segment

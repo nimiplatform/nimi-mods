@@ -365,11 +365,26 @@ function recoverAnalysisRecord(input: string): Record<string, unknown> | null {
 }
 
 export function parseAnalysisJsonRecord(input: string): Record<string, unknown> {
+  return parseAnalysisJsonRecordDetailed(input).record;
+}
+
+export function parseAnalysisJsonRecordDetailed(input: string): {
+  record: Record<string, unknown>;
+  recovered: boolean;
+} {
   try {
-    return parseJsonRecord(input);
+    return {
+      record: parseJsonRecord(input),
+      recovered: false,
+    };
   } catch {
     const recovered = recoverAnalysisRecord(input);
-    if (recovered) return recovered;
+    if (recovered) {
+      return {
+        record: recovered,
+        recovered: true,
+      };
+    }
     throw new Error('VS_JSON_OBJECT_REQUIRED');
   }
 }

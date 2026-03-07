@@ -12,6 +12,13 @@ import { useAudioBookStore } from '../state/audio-book-store.js';
 import { splitTextIntoChapters } from '../services/chapter-splitter.js';
 import { analyzeAllChapters } from '../services/analysis-pipeline.js';
 import type { AnalysisResult } from '../services/analysis-pipeline.js';
+import {
+  buildAnalysisRetrySeed,
+  isBetterAnalysisQuality,
+  measureAnalysisQuality,
+  shouldRetryAnalysisWithDefaultRoute,
+  type AnalysisQuality,
+} from '../services/analysis-quality.js';
 import { classifyAllCharacters } from '../services/character-tier.js';
 import { recommendAllVoices } from '../services/voice-recommender.js';
 import { runSynthesisJob } from '../services/synthesis-scheduler.js';
@@ -23,35 +30,39 @@ import { createLlmClientAdapter } from '../adapters/llm-adapter.js';
 
 const FLOW_LOG_PREFIX = '[audio-book:flow]';
 
-type AnalysisQuality = {
-  totalSegments: number;
-  fallbackSegments: number;
-  errorChapters: number;
-  nonNarratorCharacters: number;
-};
+function summarizeAnalysisDiagnostics(result: AnalysisResult): Record<string, unknown> {
+  const totalDurationMs = result.chapterResults.reduce((sum, item) => sum + (item.durationMs ?? 0), 0);
+  const totalRepairCalls = result.chapterResults.reduce((sum, item) => sum + (item.repairCallCount ?? item.retryCount ?? 0), 0);
+  const strictRepairChapters = result.chapterResults.filter((item) => (item.strictRepairCount ?? 0) > 0).length;
+  const recoveredChapters = result.chapterResults.filter((item) => (item.recoveredChunkCount ?? 0) > 0).length;
+  const chunkedChapters = result.chapterResults.filter((item) => (item.chunkCount ?? 1) > 1).length;
+  const retriedChapters = result.chapterResults.filter((item) => (item.retryCount ?? 0) > 0).length;
+  const slowestChapters = [...result.chapterResults]
+    .sort((left, right) => (right.durationMs ?? 0) - (left.durationMs ?? 0))
+    .slice(0, 3)
+    .map((item) => ({
+      chapter: item.chapterIndex + 1,
+      durationMs: item.durationMs ?? 0,
+      chunkCount: item.chunkCount ?? 1,
+      chunkSize: item.chunkSize ?? 0,
+      repairCallCount: item.repairCallCount ?? item.retryCount ?? 0,
+      strictRepairCount: item.strictRepairCount ?? 0,
+      recoveredChunkCount: item.recoveredChunkCount ?? 0,
+      error: item.error || undefined,
+    }));
 
-function measureAnalysisQuality(result: AnalysisResult): AnalysisQuality {
-  const totalSegments = result.segments.length;
-  const fallbackSegments = result.segments.filter((segment) => segment.id.includes('-fallback-')).length;
-  const errorChapters = result.chapterResults.filter((item) => Boolean(item.error)).length;
-  const nonNarratorCharacters = result.characters.filter((item) => item.name !== 'narrator').length;
-  return { totalSegments, fallbackSegments, errorChapters, nonNarratorCharacters };
-}
-
-function isBetterAnalysisQuality(candidate: AnalysisQuality, baseline: AnalysisQuality): boolean {
-  if (candidate.fallbackSegments !== baseline.fallbackSegments) {
-    return candidate.fallbackSegments < baseline.fallbackSegments;
-  }
-  if (candidate.errorChapters !== baseline.errorChapters) {
-    return candidate.errorChapters < baseline.errorChapters;
-  }
-  if (candidate.nonNarratorCharacters !== baseline.nonNarratorCharacters) {
-    return candidate.nonNarratorCharacters > baseline.nonNarratorCharacters;
-  }
-  if (candidate.totalSegments !== baseline.totalSegments) {
-    return candidate.totalSegments > baseline.totalSegments;
-  }
-  return false;
+  return {
+    totalDurationMs,
+    averageChapterMs: result.chapterResults.length > 0
+      ? Math.round(totalDurationMs / result.chapterResults.length)
+      : 0,
+    totalRepairCalls,
+    retriedChapters,
+    strictRepairChapters,
+    recoveredChapters,
+    chunkedChapters,
+    slowestChapters,
+  };
 }
 
 export function useAudioBookPageController() {
@@ -279,17 +290,35 @@ export function useAudioBookPageController() {
       const runAnalysis = async (
         llmClient: typeof clients.llmClient,
         route: 'selected-chat-route' | 'default-chat-route',
+        seed?: {
+          startFromChapter: number;
+          existingSegments: ScriptSegment[];
+          existingCharacters: typeof store.characters;
+        } | null,
       ): Promise<{ result: AnalysisResult; quality: AnalysisQuality }> => {
-        console.info(FLOW_LOG_PREFIX, 'analyze:run', { route });
+        const startedAt = performance.now();
+        console.info(FLOW_LOG_PREFIX, 'analyze:run', {
+          route,
+          startFromChapter: seed?.startFromChapter ?? 0,
+        });
         const result = await analyzeAllChapters(llmClient, chapters, {
+          startFromChapter: seed?.startFromChapter,
+          existingSegments: seed?.existingSegments,
+          existingCharacters: seed?.existingCharacters,
           onProgress: (p) => {
             if (analysisAbortRef.current) return;
-            ui.setAnalysisProgress(p);
+            ui.setAnalysisProgress({
+              ...p,
+              completedChapters: (seed?.startFromChapter ?? 0) + p.completedChapters,
+              totalChapters: chapters.length,
+            });
           },
         });
         const quality = measureAnalysisQuality(result);
         console.info(FLOW_LOG_PREFIX, 'analyze:result', {
           route,
+          ...summarizeAnalysisDiagnostics(result),
+          wallTimeMs: Math.round(performance.now() - startedAt),
           ...quality,
         });
         return { result, quality };
@@ -303,21 +332,23 @@ export function useAudioBookPageController() {
       }
 
       let chosen = primary;
-      const shouldRetryWithDefaultRoute = primary.quality.errorChapters > 0
-        || primary.quality.fallbackSegments === primary.quality.totalSegments;
+      const shouldRetryWithDefaultRoute = shouldRetryAnalysisWithDefaultRoute(primary.quality);
       if (shouldRetryWithDefaultRoute) {
         const fallbackLlmClient = createLlmClientAdapter(runtimeClient);
-        const secondary = await runAnalysis(fallbackLlmClient, 'default-chat-route');
+        const retrySeed = buildAnalysisRetrySeed(primary.result);
+        const secondary = await runAnalysis(fallbackLlmClient, 'default-chat-route', retrySeed);
         if (isBetterAnalysisQuality(secondary.quality, primary.quality)) {
           chosen = secondary;
           console.info(FLOW_LOG_PREFIX, 'analyze:choose', {
             selectedRoute: 'default-chat-route',
             replaced: 'selected-chat-route',
+            startFromChapter: retrySeed?.startFromChapter ?? 0,
           });
         } else {
           console.info(FLOW_LOG_PREFIX, 'analyze:choose', {
             selectedRoute: 'selected-chat-route',
             keptOver: 'default-chat-route',
+            startFromChapter: retrySeed?.startFromChapter ?? 0,
           });
         }
       }
