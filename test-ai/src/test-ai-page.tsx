@@ -83,6 +83,8 @@ type CapabilityState = RouteState & TestState;
 
 type CapabilityStates = Record<CapabilityId, CapabilityState>;
 
+export type ImageResponseFormatMode = 'auto' | 'base64' | 'url';
+
 // ── Utility ──────────────────────────────────────────────────────────────────
 
 function asString(value: unknown): string {
@@ -97,6 +99,21 @@ function toPrettyJson(value: unknown): string {
   }
 }
 
+/** Strip binary artifact data from a media response before logging to avoid huge strings. */
+function stripArtifacts(response: unknown): unknown {
+  if (response == null || typeof response !== 'object') return response;
+  const r = response as Record<string, unknown>;
+  if (!Array.isArray(r['artifacts'])) return r;
+  return {
+    ...r,
+    artifacts: (r['artifacts'] as unknown[]).map((a) => {
+      if (a == null || typeof a !== 'object') return a;
+      const { data: _d, bytes: _b, ...rest } = a as Record<string, unknown>;
+      return { ...rest, _dataTruncated: true };
+    }),
+  };
+}
+
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = '';
   for (const value of bytes) {
@@ -106,22 +123,52 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 function toArtifactPreviewUri(input: { uri?: string; bytes?: Uint8Array; mimeType?: string }): string {
-  const uri = asString(input.uri);
-  if (uri) return uri;
+  // Prefer bytes → data: URI because file:// URIs are blocked in Tauri webview.
   if (input.bytes && input.bytes.length > 0) {
     const mimeType = asString(input.mimeType) || 'application/octet-stream';
     return `data:${mimeType};base64,${bytesToBase64(input.bytes)}`;
   }
+  const uri = asString(input.uri);
+  if (uri) return uri;
   return '';
+}
+
+function hydrateTokenApiBinding(
+  snapshot: RuntimeRouteOptionsSnapshot | null,
+  binding: RuntimeRouteBinding | null,
+): RuntimeRouteBinding | null {
+  if (!snapshot || !binding || binding.source !== 'token-api') {
+    return binding;
+  }
+  const connector = snapshot.connectors.find((item) => item.id === binding.connectorId) || null;
+  if (!connector) {
+    return binding;
+  }
+  return {
+    ...binding,
+    provider: asString(binding.provider || connector.provider) || undefined,
+  };
 }
 
 function resolveEffectiveBinding(
   snapshot: RuntimeRouteOptionsSnapshot | null,
   binding: RuntimeRouteBinding | null,
 ): RuntimeRouteBinding | null {
-  if (binding) return binding;
+  if (binding) return hydrateTokenApiBinding(snapshot, binding);
   if (!snapshot) return null;
-  return snapshot.selected || snapshot.resolvedDefault || null;
+  return hydrateTokenApiBinding(snapshot, snapshot.selected || snapshot.resolvedDefault || null);
+}
+
+function tokenApiBindingForConnector(
+  connector: RuntimeRouteOptionsSnapshot['connectors'][number],
+  model: string,
+): RuntimeRouteBinding {
+  return {
+    source: 'token-api',
+    connectorId: connector.id,
+    provider: asString(connector.provider) || undefined,
+    model,
+  };
 }
 
 function bindingForSource(
@@ -131,7 +178,7 @@ function bindingForSource(
   if (source === 'token-api') {
     const connector = snapshot?.connectors[0] || null;
     if (!connector) return null;
-    return { source: 'token-api', connectorId: connector.id, model: connector.models[0] || '' };
+    return tokenApiBindingForConnector(connector, connector.models[0] || '');
   }
   const local = snapshot?.localRuntime.models[0] || null;
   if (!local) return null;
@@ -147,10 +194,10 @@ function bindingForConnector(
   if (!connector) return null;
   const currentModel = current?.source === 'token-api' ? current.model : '';
   const model = connector.models.includes(currentModel) ? currentModel : (connector.models[0] || '');
-  return { source: 'token-api', connectorId: connector.id, model };
+  return tokenApiBindingForConnector(connector, model);
 }
 
-function bindingForModel(
+export function bindingForModel(
   snapshot: RuntimeRouteOptionsSnapshot | null,
   model: string,
   current: RuntimeRouteBinding | null,
@@ -160,10 +207,77 @@ function bindingForModel(
   const effective = resolveEffectiveBinding(snapshot, current);
   if (!effective) return null;
   if (effective.source === 'token-api') {
-    return { source: 'token-api', connectorId: effective.connectorId, model: normalizedModel };
+    return {
+      source: 'token-api',
+      connectorId: effective.connectorId,
+      provider: asString(effective.provider) || undefined,
+      model: normalizedModel,
+    };
   }
   const localModel = snapshot?.localRuntime.models.find((item) => item.model === normalizedModel) || null;
   return { source: 'local-runtime', connectorId: '', model: normalizedModel, localModelId: localModel?.localModelId, engine: localModel?.engine };
+}
+
+export function resolveImageResponseFormat(mode: ImageResponseFormatMode): 'base64' | 'url' | undefined {
+  return mode === 'base64' || mode === 'url' ? mode : undefined;
+}
+
+export function buildImageGenerateRequestParams(input: {
+  prompt: string;
+  negativePrompt?: string;
+  n: number;
+  size: string;
+  responseFormatMode: ImageResponseFormatMode;
+  binding?: RuntimeRouteBinding;
+}): {
+  prompt: string;
+  negativePrompt?: string;
+  n: number;
+  size: string;
+  responseFormat?: 'base64' | 'url';
+  binding?: RuntimeRouteBinding;
+} {
+  const responseFormat = resolveImageResponseFormat(input.responseFormatMode);
+  return {
+    prompt: input.prompt,
+    ...(asString(input.negativePrompt) ? { negativePrompt: asString(input.negativePrompt) } : {}),
+    n: Math.max(1, Number(input.n) || 1),
+    size: input.size,
+    ...(responseFormat ? { responseFormat } : {}),
+    ...(input.binding ? { binding: input.binding } : {}),
+  };
+}
+
+export function resolveRouteModelPickerState(
+  snapshot: RuntimeRouteOptionsSnapshot | null,
+  binding: RuntimeRouteBinding | null,
+): {
+  effectiveBinding: RuntimeRouteBinding | null;
+  activeSource: RuntimeRouteSource;
+  activeConnectorId: string;
+  activeModel: string;
+  modelOptions: string[];
+  tokenApiCatalogMissing: boolean;
+  activeModelInOptions: boolean;
+} {
+  const effectiveBinding = resolveEffectiveBinding(snapshot, binding);
+  const activeSource = effectiveBinding?.source || snapshot?.selected?.source || 'local-runtime';
+  const activeConnectorId = effectiveBinding?.connectorId || snapshot?.selected?.connectorId || '';
+  const activeConnector = snapshot?.connectors.find((item) => item.id === activeConnectorId) || null;
+  const activeModel = effectiveBinding?.model || snapshot?.selected?.model || '';
+  const localModels = snapshot?.localRuntime.models || [];
+  const modelOptions = activeSource === 'local-runtime'
+    ? localModels.map((item) => item.model)
+    : (activeConnector?.models || []);
+  return {
+    effectiveBinding,
+    activeSource,
+    activeConnectorId,
+    activeModel,
+    modelOptions,
+    tokenApiCatalogMissing: activeSource === 'token-api' && activeConnectorId.length > 0 && modelOptions.length === 0,
+    activeModelInOptions: modelOptions.includes(activeModel),
+  };
 }
 
 function makeEmptyDiagnostics(): DiagnosticsInfo {
@@ -236,24 +350,29 @@ type RouteBindingEditorProps = {
 };
 
 function RouteBindingEditor(props: RouteBindingEditorProps) {
-  const effectiveBinding = resolveEffectiveBinding(props.snapshot, props.binding);
-  const activeSource = effectiveBinding?.source || props.snapshot?.selected?.source || 'local-runtime';
-  const activeConnectorId = effectiveBinding?.connectorId || props.snapshot?.selected?.connectorId || '';
+  const {
+    effectiveBinding,
+    activeSource,
+    activeConnectorId,
+    activeModel,
+    modelOptions,
+    tokenApiCatalogMissing,
+    activeModelInOptions,
+  } = resolveRouteModelPickerState(props.snapshot, props.binding);
   const activeConnector = props.snapshot?.connectors.find((item) => item.id === activeConnectorId) || null;
-  const activeModel = effectiveBinding?.model || props.snapshot?.selected?.model || '';
-  const localModels = props.snapshot?.localRuntime.models || [];
   const tokenConnectors = props.snapshot?.connectors || [];
-  const modelOptions = activeSource === 'local-runtime'
-    ? localModels.map((item) => item.model)
-    : (activeConnector?.models || []);
   const [modelDraft, setModelDraft] = React.useState(activeModel);
-  const [isEditingModel, setIsEditingModel] = React.useState(false);
-  const datalistId = `test-ai-${props.capabilityId}-models`;
+  const [showManualModelOverride, setShowManualModelOverride] = React.useState(false);
 
   React.useEffect(() => {
-    if (isEditingModel) return;
     setModelDraft(activeModel);
-  }, [activeModel, isEditingModel]);
+  }, [activeModel]);
+
+  React.useEffect(() => {
+    if (tokenApiCatalogMissing || (asString(activeModel) && !activeModelInOptions)) {
+      setShowManualModelOverride(true);
+    }
+  }, [tokenApiCatalogMissing, activeModel, activeModelInOptions]);
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-3">
@@ -315,31 +434,65 @@ function RouteBindingEditor(props: RouteBindingEditorProps) {
         </label>
         <label className="flex flex-col gap-1 text-xs">
           <span className="text-gray-500">Model</span>
+          <select
+            className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
+            value={activeModelInOptions ? activeModel : ''}
+            onChange={(event) => {
+              if (!asString(event.target.value)) return;
+              props.onBindingChange(bindingForModel(props.snapshot, event.target.value, effectiveBinding));
+            }}
+            disabled={!props.snapshot || modelOptions.length === 0}
+          >
+            <option value="">
+              {modelOptions.length === 0
+                ? (activeSource === 'token-api' ? 'Connector catalog missing models' : 'No local models')
+                : 'Select model'}
+            </option>
+            {modelOptions.map((model) => (
+              <option key={model} value={model}>{model}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      {tokenApiCatalogMissing ? (
+        <div className="mt-2 rounded-md bg-amber-50 p-2 text-xs text-amber-700">
+          Connector catalog data is missing models for this capability. Refresh the connector or use a manual override.
+        </div>
+      ) : null}
+      <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+        <span>
+          {activeSource === 'token-api'
+            ? `provider: ${activeConnector?.provider || effectiveBinding?.provider || 'unknown'}`
+            : 'local runtime model catalog'}
+        </span>
+        <button
+          type="button"
+          className="text-blue-600 hover:underline"
+          onClick={() => setShowManualModelOverride((prev) => !prev)}
+        >
+          {showManualModelOverride ? 'Hide manual override' : 'Manual override'}
+        </button>
+      </div>
+      {showManualModelOverride ? (
+        <label className="mt-2 flex flex-col gap-1 text-xs">
+          <span className="text-gray-500">Manual model override</span>
           <input
-            list={datalistId}
             className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
             value={modelDraft}
-            onFocus={() => setIsEditingModel(true)}
             onChange={(event) => {
               const nextValue = event.target.value;
               setModelDraft(nextValue);
               if (!asString(nextValue)) return;
               props.onBindingChange(bindingForModel(props.snapshot, nextValue, effectiveBinding));
             }}
-            onBlur={() => setIsEditingModel(false)}
             disabled={!props.snapshot}
             placeholder="model id"
           />
-          <datalist id={datalistId}>
-            {modelOptions.map((model) => (
-              <option key={model} value={model} />
-            ))}
-          </datalist>
         </label>
-      </div>
+      ) : null}
       <div className="mt-1.5 text-xs text-gray-500">
         {effectiveBinding
-          ? `${effectiveBinding.source} · ${effectiveBinding.connectorId || '—'} · ${effectiveBinding.model || '—'}`
+          ? `${effectiveBinding.source} · ${effectiveBinding.provider || '—'} · ${effectiveBinding.connectorId || '—'} · ${effectiveBinding.model || '—'}`
           : 'runtime default'}
       </div>
     </div>
@@ -402,10 +555,10 @@ function DiagnosticsPanel(props: DiagnosticsPanelProps) {
         </div>
       ) : null}
 
-      {/* Resolved Route */}
+      {/* Route Preview */}
       {route ? (
         <div className="rounded-xl border border-gray-200 bg-white p-3">
-          <div className="mb-1.5 font-semibold text-gray-600">Resolved Route</div>
+          <div className="mb-1.5 font-semibold text-gray-600">Route Preview</div>
           <KVRow label="source" value={route.source} mono highlight="blue" />
           <KVRow label="provider" value={route.provider} mono />
           <KVRow label="model" value={route.model} mono />
@@ -527,15 +680,21 @@ function ErrorBox(props: { message: string }) {
 }
 
 function RawJsonSection(props: { content: string }) {
+  const [copied, setCopied] = React.useState(false);
+  const handleCopy = React.useCallback(() => {
+    void navigator.clipboard.writeText(props.content).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }, [props.content]);
   return (
-    <details className="group">
-      <summary className="cursor-pointer rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-50 list-none flex items-center gap-1">
-        <span className="group-open:hidden">▶</span>
-        <span className="hidden group-open:inline">▼</span>
-        Raw JSON
-      </summary>
-      <pre className="mt-1 max-h-96 overflow-auto rounded-md border border-gray-200 bg-gray-50 p-2 text-xs leading-relaxed">{props.content}</pre>
-    </details>
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="rounded border border-gray-300 bg-white px-3 py-1 text-xs text-gray-500 hover:bg-gray-100 active:bg-gray-200"
+    >
+      {copied ? '✓ Copied' : 'Copy Raw JSON'}
+    </button>
   );
 }
 
@@ -799,6 +958,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
   const [negativePrompt, setNegativePrompt] = React.useState('low quality, blurry');
   const [size, setSize] = React.useState('1024x1024');
   const [n, setN] = React.useState('1');
+  const [responseFormatMode, setResponseFormatMode] = React.useState<ImageResponseFormatMode>('auto');
 
   const handleRun = React.useCallback(async () => {
     if (!asString(prompt)) {
@@ -809,25 +969,18 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
     const t0 = Date.now();
     const binding = resolveEffectiveBinding(state.snapshot, state.binding) || undefined;
     const nNum = Math.max(1, Number(n) || 1);
-    const requestParams: Record<string, unknown> = {
+    const requestParams = buildImageGenerateRequestParams({
       prompt,
-      ...(negativePrompt ? { negativePrompt } : {}),
+      negativePrompt,
       n: nNum,
       size,
-      responseFormat: 'url',
-      ...(binding ? { binding } : {}),
-    };
+      responseFormatMode,
+      binding,
+    });
     let resolved: ModRuntimeResolvedBinding | undefined;
     try {
       resolved = await runtimeClient.route.resolve({ capability: 'image.generate', binding });
-      const result = await runtimeClient.media.image.generate({
-        prompt,
-        negativePrompt: asString(negativePrompt) || undefined,
-        n: nNum,
-        size,
-        responseFormat: 'url',
-        binding,
-      });
+      const result = await runtimeClient.media.image.generate(requestParams);
       const elapsed = Date.now() - t0;
       const uris = result.artifacts
         .map((artifact) => toArtifactPreviewUri({ uri: artifact.uri, bytes: artifact.bytes, mimeType: artifact.mimeType }))
@@ -838,7 +991,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
         busy: false,
         result: 'passed',
         output: uris,
-        rawResponse: toPrettyJson({ request: requestParams, resolved, response: result, previewUris: uris }),
+        rawResponse: toPrettyJson({ request: requestParams, resolved, response: stripArtifacts(result), previewUris: uris }),
         diagnostics: {
           requestParams,
           resolvedRoute: resolved ?? null,
@@ -864,7 +1017,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
         diagnostics: { requestParams, resolvedRoute: resolved ?? null, responseMetadata: { elapsed } },
       }));
     }
-  }, [prompt, negativePrompt, size, n, state.snapshot, state.binding, runtimeClient, onStateChange]);
+  }, [prompt, negativePrompt, size, n, responseFormatMode, state.snapshot, state.binding, runtimeClient, onStateChange]);
 
   const imageUris = (state.output as string[] | null) || [];
 
@@ -915,6 +1068,24 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
           />
         </label>
       </div>
+      <details className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs">
+        <summary className="cursor-pointer font-semibold text-gray-600">Advanced options</summary>
+        <label className="mt-2 flex max-w-xs flex-col gap-1 text-xs">
+          <span className="text-gray-500">Response format</span>
+          <select
+            className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
+            value={responseFormatMode}
+            onChange={(event) => setResponseFormatMode(event.target.value as ImageResponseFormatMode)}
+          >
+            <option value="auto">auto</option>
+            <option value="base64">base64</option>
+            <option value="url">url</option>
+          </select>
+          <span className="text-[11px] text-gray-400">
+            Auto leaves the response format unset so the runtime/provider can pick the native path.
+          </span>
+        </label>
+      </details>
       <RunButton busy={state.busy} label="Run Image Generate" onClick={() => { void handleRun(); }} />
       {state.error ? <ErrorBox message={state.error} /> : null}
       {imageUris.length > 0 ? (
@@ -985,7 +1156,7 @@ function VideoGeneratePanel(props: VideoGeneratePanelProps) {
         busy: false,
         result: 'passed',
         output: result,
-        rawResponse: toPrettyJson({ request: requestParams, resolved, response: result }),
+        rawResponse: toPrettyJson({ request: requestParams, resolved, response: stripArtifacts(result) }),
         diagnostics: {
           requestParams,
           resolvedRoute: resolved ?? null,
@@ -1123,7 +1294,7 @@ function AudioSynthesizePanel(props: AudioSynthesizePanelProps) {
         busy: false,
         result: 'passed',
         output: { audioUri, mimeType: asString(artifact?.mimeType), durationMs: Number(artifact?.durationMs || 0) },
-        rawResponse: toPrettyJson({ request: requestParams, resolved, response: result }),
+        rawResponse: toPrettyJson({ request: requestParams, resolved, response: stripArtifacts(result) }),
         diagnostics: {
           requestParams,
           resolvedRoute: resolved ?? null,
