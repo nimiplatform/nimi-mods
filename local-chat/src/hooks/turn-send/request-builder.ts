@@ -1,18 +1,20 @@
 import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 import {
   buildLocalChatCompiledPrompt,
-  recallLocalChatMemoryForPrompt,
   type LocalChatTarget,
 } from '../../data/index.js';
 import type { LocalChatCompiledPrompt } from '../../prompt/index.js';
-import type { ChatMessage } from '../../types.js';
+import type { LocalChatContextPacket } from '../../state/index.js';
+import { assembleLocalChatContextPacket } from './context-assembler.js';
 
 const MAX_SEGMENT_TOKENS = 2048;
 
 type BuildTurnRequestInput = {
   text: string;
+  viewerId: string;
+  viewerDisplayName: string;
   selectedTarget: LocalChatTarget;
-  messages: ChatMessage[];
+  selectedSessionId: string;
   runtimeMode: 'STORY' | 'SCENE_TURN' | undefined;
   routeBinding: RuntimeRouteBinding | null;
 };
@@ -33,34 +35,13 @@ function normalizeTurnMode(mode: BuildTurnRequestInput['runtimeMode']): 'STORY' 
 
 export async function buildTurnRequestInput(input: BuildTurnRequestInput): Promise<{
   prompt: string;
+  contextPacket: LocalChatContextPacket;
   compiledPrompt: LocalChatCompiledPrompt;
   invokeInput: TurnInvokeInput;
 }> {
-  const history = input.messages
-    .slice(-20)
-    .map((message) => ({
-      role: message.role,
-      content: message.content,
-    }));
-  const memoryRecall = await recallLocalChatMemoryForPrompt({
-    target: input.selectedTarget,
-    userInput: input.text,
-    topK: 10,
-  });
-  const promptTarget: LocalChatTarget = {
-    ...input.selectedTarget,
-    payload: {
-      ...(input.selectedTarget.payload || {}),
-      coreMemory: memoryRecall.coreMemory,
-      e2eMemory: memoryRecall.e2eMemory,
-      memoryRecallSource: memoryRecall.recallSource,
-      memoryEntityId: memoryRecall.entityId,
-    },
-  };
+  const contextPacket = await assembleLocalChatContextPacket(input);
   const compiledPrompt = buildLocalChatCompiledPrompt({
-    target: promptTarget,
-    history,
-    userInput: input.text,
+    contextPacket,
   });
   const prompt = compiledPrompt.prompt;
   const invokeInput: TurnInvokeInput = {
@@ -74,6 +55,7 @@ export async function buildTurnRequestInput(input: BuildTurnRequestInput): Promi
   };
   return {
     prompt,
+    contextPacket,
     compiledPrompt,
     invokeInput,
   };

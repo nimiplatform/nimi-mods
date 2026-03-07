@@ -2,6 +2,16 @@ import { readRuntimeModSettings, writeRuntimeModSettings } from '@nimiplatform/s
 import { LOCAL_CHAT_MOD_ID } from './contracts.js';
 
 export type LocalChatTtsVoice = string;
+export type LocalChatMediaPlannerMode = 'off' | 'explicit-only' | 'high-confidence-auto';
+export type LocalChatVideoAutoPolicy = 'explicit-only' | 'very-high-confidence-auto';
+export const LOCAL_CHAT_TTS_VOICE_OPTIONS = [
+  'alloy',
+  'echo',
+  'fable',
+  'nova',
+  'onyx',
+  'shimmer',
+] as const;
 export type LocalChatBooleanSettingKey =
   | 'enableVoice'
   | 'allowMultiReply'
@@ -15,7 +25,8 @@ export type LocalChatDefaultSettings = {
   allowProactiveContact: boolean;
   autoPlayVoiceReplies: boolean;
   allowNsfwMedia: boolean;
-  mediaTriggerMode: 'marker_only' | 'marker_plus_heuristic';
+  mediaPlannerMode: LocalChatMediaPlannerMode;
+  videoAutoPolicy: LocalChatVideoAutoPolicy;
   segmentationMode: 'adaptive' | 'single';
   voiceName: LocalChatTtsVoice;
   ttsRouteSource: 'auto' | 'local-runtime' | 'token-api';
@@ -38,7 +49,8 @@ export const DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS: LocalChatDefaultSettings = {
   allowProactiveContact: false,
   autoPlayVoiceReplies: false,
   allowNsfwMedia: false,
-  mediaTriggerMode: 'marker_only',
+  mediaPlannerMode: 'high-confidence-auto',
+  videoAutoPolicy: 'very-high-confidence-auto',
   segmentationMode: 'adaptive',
   voiceName: '',
   ttsRouteSource: 'auto',
@@ -66,7 +78,8 @@ export function normalizeLocalChatDefaultSettings(value: unknown): LocalChatDefa
   const normalizedSttRouteSource = String(record.sttRouteSource || '').trim();
   const normalizedImageRouteSource = String(record.imageRouteSource || '').trim();
   const normalizedVideoRouteSource = String(record.videoRouteSource || '').trim();
-  const normalizedMediaTriggerMode = String(record.mediaTriggerMode || '').trim();
+  const normalizedMediaPlannerMode = String(record.mediaPlannerMode || '').trim();
+  const normalizedVideoAutoPolicy = String(record.videoAutoPolicy || '').trim();
   const normalizedSegmentationMode = String(record.segmentationMode || '').trim();
   const ttsRouteSource = normalizedTtsRouteSource === 'local-runtime' || normalizedTtsRouteSource === 'token-api'
     ? normalizedTtsRouteSource
@@ -80,9 +93,15 @@ export function normalizeLocalChatDefaultSettings(value: unknown): LocalChatDefa
   const videoRouteSource = normalizedVideoRouteSource === 'local-runtime' || normalizedVideoRouteSource === 'token-api'
     ? normalizedVideoRouteSource
     : 'auto';
-  const mediaTriggerMode = normalizedMediaTriggerMode === 'marker_plus_heuristic'
-    ? 'marker_plus_heuristic'
-    : 'marker_only';
+  const mediaPlannerMode = normalizedMediaPlannerMode === 'off'
+    || normalizedMediaPlannerMode === 'explicit-only'
+    || normalizedMediaPlannerMode === 'high-confidence-auto'
+    ? normalizedMediaPlannerMode
+    : DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS.mediaPlannerMode;
+  const videoAutoPolicy = normalizedVideoAutoPolicy === 'explicit-only'
+    || normalizedVideoAutoPolicy === 'very-high-confidence-auto'
+    ? normalizedVideoAutoPolicy
+    : DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS.videoAutoPolicy;
   const segmentationMode = normalizedSegmentationMode === 'single'
     ? 'single'
     : 'adaptive';
@@ -100,7 +119,8 @@ export function normalizeLocalChatDefaultSettings(value: unknown): LocalChatDefa
     allowProactiveContact: Boolean(record.allowProactiveContact),
     autoPlayVoiceReplies: Boolean(record.autoPlayVoiceReplies),
     allowNsfwMedia: Boolean(record.allowNsfwMedia),
-    mediaTriggerMode,
+    mediaPlannerMode,
+    videoAutoPolicy,
     segmentationMode,
     voiceName,
     ttsRouteSource,

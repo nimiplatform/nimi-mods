@@ -56,7 +56,7 @@ export function KeyValueObjectEditor(props: KeyValueObjectEditorProps) {
         <span className="text-xs font-medium text-gray-700">{props.label}</span>
         <button
           type="button"
-          className="rounded border border-gray-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-gray-700"
+          className="ui-sync-btn ui-sync-btn-secondary rounded border border-gray-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-gray-700"
           onClick={() => {
             props.onChange({
               ...props.value,
@@ -94,7 +94,7 @@ export function KeyValueObjectEditor(props: KeyValueObjectEditorProps) {
             />
             <button
               type="button"
-              className="rounded border border-red-300 bg-white px-2 text-[11px] font-semibold text-red-700"
+              className="ui-sync-btn rounded border border-red-300 bg-white px-2 text-[11px] font-semibold text-red-700"
               onClick={() => {
                 const nextRows = rows.filter((_, rowIndex) => rowIndex !== index);
                 props.onChange(toObject(nextRows));

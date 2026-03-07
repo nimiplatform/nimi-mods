@@ -56,6 +56,26 @@ cases:
     primary_only: true
     reason_code: null
     source_rule: T-ACC-002
+  - id: TXT-008A-STORY-HIDES-FUTURE
+    description: Player-facing playable story list preserves upstream eventHorizon as canonical target-event metadata and hides FUTURE PRIMARY events by default.
+    expected_ok: true
+    future_hidden_by_default: true
+    reason_code: null
+    source_rule: T-ACC-002
+  - id: TXT-008B-STORY-ENTRY-PRE-EVENT
+    description: Fresh story entry starts before the selected target event even when canonical eventHorizon is PAST or ONGOING; canonical details remain material only.
+    expected_ok: true
+    fresh_entry_mode: PRE_EVENT
+    target_event_material_only: true
+    reason_code: null
+    source_rule: T-ACC-002
+  - id: TXT-008C-STORY-TEASER-SUMMARY
+    description: Player-facing story summary is teaser-only and ends with ellipsis instead of exposing the full canonical target-event detail.
+    expected_ok: true
+    teaser_only_summary: true
+    teaser_has_trailing_ellipsis: true
+    reason_code: null
+    source_rule: T-ACC-002
   - id: TXT-009-STARTUP-PACKAGE-FRESH
     description: Startup package resolves even when narrative latest turn is missing and returns fresh-mode recommendedEntryTurn null.
     expected_ok: true
@@ -90,6 +110,12 @@ cases:
     description: Missing CANON or STORY context blocks startup/send with fail-close semantics.
     expected_ok: false
     reason_code: TEXTPLAY_CONTEXT_MISSING_CRITICAL
+    source_rule: T-ACC-002
+  - id: TXT-014A-CONTEXT-NO-CROSS-STORY-FALLBACK
+    description: SUBJECT and RELATION context resolution may use exact-story or storyless baseline only; context from another story must not be borrowed silently.
+    expected_ok: true
+    cross_story_fallback_forbidden: true
+    reason_code: null
     source_rule: T-ACC-002
   - id: TXT-015-WORLD-FIRST-STORY-SELECTION
     description: Story list is loaded only after account world is selected and is scoped to selected world.

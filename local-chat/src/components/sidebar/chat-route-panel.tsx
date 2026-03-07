@@ -16,7 +16,7 @@ type Props = {
   onRouteSourceChange: (source: RuntimeRouteBinding['source']) => void;
   onRouteConnectorChange: (connectorId: string) => void;
   onRouteModelChange: (model: string) => void;
-  onClearRouteBinding: () => void;
+  onClearRouteOverride: () => void;
 };
 
 const CHEVRON_ICON = (
@@ -41,7 +41,7 @@ export function ChatRoutePanel(props: Props) {
     onRouteSourceChange,
     onRouteConnectorChange,
     onRouteModelChange,
-    onClearRouteBinding,
+    onClearRouteOverride,
   } = props;
   const showEmptyLocalRuntimeCta = activeChatSource === 'local-runtime' && chatModelOptions.length === 0;
 
@@ -56,8 +56,9 @@ export function ChatRoutePanel(props: Props) {
         <span>{t('ChatRoute.title')}</span>
         <span className={`text-gray-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>{CHEVRON_ICON}</span>
       </button>
-      <div className={`grid overflow-hidden transition-all duration-200 ${open ? 'mt-3 grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
-        <div className={`min-h-0 space-y-2 ${open ? 'lc-panel-expand' : ''}`}>
+      {open ? (
+        <div className="mt-3">
+          <div className="min-h-0 space-y-2 lc-panel-expand">
           <p className="text-[11px] text-gray-600">{t('ChatRoute.storedNote')}</p>
           <div className="space-y-2">
             <div>
@@ -121,14 +122,14 @@ export function ChatRoutePanel(props: Props) {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    className="h-7 rounded-md border border-amber-300 bg-white px-2 text-[11px] font-medium text-amber-800"
+                    className="lc-btn lc-btn-warning h-7 px-2 text-[11px] font-medium"
                     onClick={() => setActiveTab('runtime')}
                   >
                     {t('ChatRoute.goInstallModels')}
                   </button>
                   <button
                     type="button"
-                    className="h-7 rounded-md border border-amber-300 bg-white px-2 text-[11px] font-medium text-amber-800"
+                    className="lc-btn lc-btn-warning h-7 px-2 text-[11px] font-medium"
                     onClick={() => onRouteSourceChange('token-api')}
                   >
                     {t('ChatRoute.switchToTokenApi')}
@@ -139,14 +140,15 @@ export function ChatRoutePanel(props: Props) {
 
             <button
               type="button"
-              onClick={onClearRouteBinding}
-              className="h-9 w-full rounded-xl border border-gray-200 bg-white px-2 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+              onClick={onClearRouteOverride}
+              className="lc-btn lc-btn-secondary h-9 w-full px-2 text-xs font-semibold"
             >
               {t('ChatRoute.useRuntimeDefault')}
             </button>
           </div>
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

@@ -15,7 +15,7 @@ export function SourceInputProgressCard(props: { parseJob: WorldStudioParseJobSt
   const visibleProgress = resolveParseJobVisibleProgress(parseJob);
   const processed = resolveParseJobProcessed(parseJob);
   return (
-    <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-2.5">
+    <div className="ui-sync-toolbar mt-3 p-2.5">
       <div className="mb-1 flex items-center justify-between text-[11px] text-gray-600">
         <span>Phase: {parseJob.phase}</span>
         <span>

@@ -84,7 +84,7 @@ export function EventGraphEditor(props: EventGraphEditorProps) {
     onLayoutChange: props.onLayoutChange,
   });
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4">
+    <section className="ui-sync-card ui-sync-card-inset p-4">
       <EventGraphEditorHeader
         title={props.title}
         readonly={props.readonly}

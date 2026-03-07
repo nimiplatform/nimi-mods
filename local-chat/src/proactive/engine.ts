@@ -11,7 +11,6 @@ import {
 import { emitLocalChatProactiveAuditEvent } from './audit.js';
 import {
   generateLocalChatProactiveDecision,
-  summarizeSessionForProactiveDecision,
 } from './decision.js';
 import {
   evaluateLocalChatProactivePolicy,
@@ -23,6 +22,7 @@ import type {
   LocalChatProactiveHeartbeatInput,
 } from './types.js';
 import { ReasonCode } from '@nimiplatform/sdk/types';
+import { assembleLocalChatContextPacket } from '../hooks/turn-send/context-assembler.js';
 
 function toErrorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error || '');
@@ -47,14 +47,22 @@ function createProactiveTurn(message: string, nowMs: number): {
   role: 'assistant';
   kind: 'text';
   content: string;
+  contextText: string;
+  semanticSummary: null;
   timestamp: string;
+  bundleId: string;
+  bundleSeq: number;
 } {
   return {
     id: `turn-${nowMs.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     role: 'assistant',
     kind: 'text',
     content: message,
+    contextText: message,
+    semanticSummary: null,
     timestamp: new Date(nowMs).toISOString(),
+    bundleId: '',
+    bundleSeq: 0,
   };
 }
 
@@ -83,7 +91,7 @@ export async function runLocalChatProactiveHeartbeatCycle(
   if (targets.length === 0) return;
 
   const targetsById = new Map(targets.map((target) => [target.id, target]));
-  const sessions = listAllLocalChatSessions()
+  const sessions = (await listAllLocalChatSessions(context.viewerId || undefined))
     .filter((session) => targetsById.has(session.targetId));
 
   for (const session of sessions) {
@@ -128,10 +136,17 @@ export async function runLocalChatProactiveHeartbeatCycle(
     if (!policy.allowed) continue;
 
     try {
+      const contextPacket = await assembleLocalChatContextPacket({
+        text: '',
+        viewerId: session.viewerId,
+        viewerDisplayName: 'User',
+        selectedTarget: target,
+        selectedSessionId: session.id,
+      });
       const decision = await generateLocalChatProactiveDecision({
         aiClient: input.aiClient,
         target,
-        historySummary: summarizeSessionForProactiveDecision(session),
+        contextPacket,
       });
 
       if (!decision.shouldContact || !decision.message) {
@@ -150,7 +165,7 @@ export async function runLocalChatProactiveHeartbeatCycle(
         continue;
       }
 
-      appendTurnsToSession(session.id, [createProactiveTurn(decision.message, nowMs)]);
+      await appendTurnsToSession(session.id, [createProactiveTurn(decision.message, nowMs)]);
       recordLocalChatProactiveContact({
         targetId: target.id,
         atMs: nowMs,

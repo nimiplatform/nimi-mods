@@ -90,24 +90,33 @@ export async function resolveLocalChatTargetDetail(
       details: { targetId: seed.id, handle: seed.handle },
     });
 
+    if (seed.isAgent) {
+      const worldContext = await resolveWorldContext(seed.worldId);
+      const fastResolved: LocalChatTarget = {
+        ...seed,
+        world: seed.world || worldContext.world,
+        worldview: seed.worldview || worldContext.worldview,
+      };
+      targetDetailCache.set(seed.id, fastResolved);
+      emitLocalChatLog({
+        level: 'info',
+        message: 'local-chat:target-detail:done',
+        flowId,
+        source: 'resolveLocalChatTargetDetail',
+        details: {
+          targetId: seed.id,
+          hasWorld: Boolean(fastResolved.world || fastResolved.worldview),
+          worldId: fastResolved.worldId || null,
+          source: 'seed-fast-path',
+        },
+      });
+      return fastResolved;
+    }
+
     const resolved = await withReadContext(
       context,
       async () => {
         let profile: Record<string, unknown> | null = null;
-
-        if (seed.isAgent) {
-          const denyKey = `id:${seed.id}`;
-          const denyUntil = profileDenyCache.get(denyKey) || 0;
-          if (denyUntil <= Date.now()) {
-            profile = await requireLocalChatCoreQueryBridge()
-              .query(CORE_DATA_API_USER_BY_ID_GET, { userId: seed.id })
-              .then((payload) => asNullableRecord(payload))
-              .catch(() => null);
-            if (!profile) {
-              profileDenyCache.set(denyKey, Date.now() + PROFILE_DENY_CACHE_TTL_MS);
-            }
-          }
-        }
 
         if (!profile && isAgentHandle(seed.handle)) {
           const denyKey = `handle:${seed.handle}`;

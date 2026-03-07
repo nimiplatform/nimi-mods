@@ -6,6 +6,7 @@ import {
 } from '../../services/policy/nsfw-media-policy.js';
 import { resolveMediaRouteConfig, toPinnedRouteBinding } from './media-route.js';
 import type { LocalChatAiClient } from '../../runtime-ai-client.js';
+import type { LocalChatResolvedMediaRoute } from '../../types.js';
 
 export type VideoTurnRunnerResult =
   | {
@@ -91,6 +92,11 @@ export async function runVideoTurn(input: {
   defaultSettings: LocalChatDefaultSettings;
   nsfwPolicy: NsfwMediaPolicy;
   fallbackRouteSource?: 'local-runtime' | 'token-api';
+  resolvedRoute?: LocalChatResolvedMediaRoute;
+  negativePrompt?: string;
+  durationSeconds?: number;
+  aspectRatio?: string;
+  cameraMotion?: string;
 }): Promise<VideoTurnRunnerResult> {
   const normalizedPrompt = String(input.prompt || '').trim();
   if (!normalizedPrompt) {
@@ -125,10 +131,17 @@ export async function runVideoTurn(input: {
   let resolvedRouteSource: 'local-runtime' | 'token-api' = intendedRouteSource;
 
   try {
-    const resolvedRoute = await input.aiClient.resolveRoute({
-      capability: 'video.generate',
-      routeBinding: routeConfig.routeBinding,
-    });
+    const resolvedRoute = input.resolvedRoute
+      ? {
+        source: input.resolvedRoute.source,
+        connectorId: input.resolvedRoute.connectorId || '',
+        model: input.resolvedRoute.model,
+        localModelId: input.resolvedRoute.model,
+      }
+      : await input.aiClient.resolveRoute({
+        capability: 'video.generate',
+        routeBinding: routeConfig.routeBinding,
+      });
     resolvedRouteSource = resolvedRoute.source === 'token-api' ? 'token-api' : 'local-runtime';
     if (!isMediaGenerationAllowed({
       policy: input.nsfwPolicy,
@@ -153,8 +166,14 @@ export async function runVideoTurn(input: {
       routeBinding: pinnedRouteBinding,
       model: pinnedRouteBinding.model || routeConfig.model,
       prompt: normalizedPrompt,
+      negativePrompt: input.negativePrompt,
       mode: 't2v',
       content: [{ type: 'text', text: normalizedPrompt }],
+      options: {
+        ...(typeof input.durationSeconds === 'number' ? { durationSec: input.durationSeconds } : {}),
+        ...(input.aspectRatio ? { ratio: input.aspectRatio } : {}),
+        ...(input.cameraMotion ? { cameraFixed: input.cameraMotion === 'fixed' } : {}),
+      },
     });
     const finalRouteSource = generated.route.source === 'token-api' ? 'token-api' : 'local-runtime';
     const artifact = generated.videos.find((item) => String(item.uri || '').trim());

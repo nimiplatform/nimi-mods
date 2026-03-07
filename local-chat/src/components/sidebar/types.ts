@@ -1,11 +1,13 @@
+import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot, RuntimeRouteSource } from '@nimiplatform/sdk/mod/runtime-route';
 import type {
-  RuntimeCanonicalCapability,
-  RuntimeRouteBinding,
-  RuntimeRouteOptionsSnapshot,
-  RuntimeRouteSource,
-} from '@nimiplatform/sdk/mod/runtime-route';
-import type { LocalChatBooleanSettingKey, LocalChatDefaultSettings, LocalChatPromptTrace, LocalChatTurnAudit } from '../../state/index.js';
-import type { HealthStatus } from '../../types.js';
+  LocalChatBooleanSettingKey,
+  LocalChatDefaultSettings,
+  LocalChatMediaPlannerMode,
+  LocalChatPromptTrace,
+  LocalChatTurnAudit,
+  LocalChatVideoAutoPolicy,
+} from '../../state/index.js';
+import type { HealthStatus, LocalChatResolvedMediaRoute } from '../../types.js';
 
 export type RuntimeStatusSidebarProps = {
   healthStatus: HealthStatus;
@@ -13,11 +15,12 @@ export type RuntimeStatusSidebarProps = {
   chatRouteOptions: RuntimeRouteOptionsSnapshot | null;
   imageRouteOptions: RuntimeRouteOptionsSnapshot | null;
   videoRouteOptions: RuntimeRouteOptionsSnapshot | null;
-  routeBinding: RuntimeRouteBinding | null;
-  speechVoices: Array<{ id: string; name: string }>;
-  voiceCatalogSource?: string;
-  voiceCatalogModelResolved?: string;
-  voiceCatalogVersion?: string;
+  imageResolvedRoute?: LocalChatResolvedMediaRoute | null;
+  videoResolvedRoute?: LocalChatResolvedMediaRoute | null;
+  routeBinding?: RuntimeRouteBinding | null;
+  routeOverride?: RuntimeRouteBinding | null;
+  speechVoices: Array<{ id: string; providerId?: string; name: string }>;
+  selectedSpeechProviderId?: string;
   selectedVoiceId: string;
   ttsRouteSource: 'auto' | 'local-runtime' | 'token-api';
   sttRouteSource: 'auto' | 'local-runtime' | 'token-api';
@@ -29,26 +32,31 @@ export type RuntimeStatusSidebarProps = {
   autoBoundModel: string;
   chatCapabilityMatched: boolean;
   dependencyCapabilities: Array<{
-    capability: RuntimeCanonicalCapability;
+    capability: 'chat' | 'tts' | 'stt' | 'image' | 'video' | 'text.generate' | 'audio.synthesize' | 'audio.transcribe';
     matched: boolean;
     required: boolean;
+    resolved: boolean;
   }>;
   dependencyStatus: 'ready' | 'missing' | 'degraded' | 'unknown';
   dependencyReasonCode?: string;
   dependencyUpdatedAt?: string;
+  isMediaRuntimeSidebarLoading?: boolean;
+  isImageRouteProbeLoading?: boolean;
+  isVideoRouteProbeLoading?: boolean;
   dependencyRepairActions: Array<{
     actionId: string;
     label: string;
     reasonCode: string;
     dependencyId?: string;
-    capability?: RuntimeCanonicalCapability;
+    capability?: string;
   }>;
   latestPromptTrace: LocalChatPromptTrace | null;
   latestTurnAudit: LocalChatTurnAudit | null;
   onRouteSourceChange: (source: RuntimeRouteSource) => void;
   onRouteConnectorChange: (connectorId: string) => void;
   onRouteModelChange: (model: string) => void;
-  onClearRouteBinding: () => void;
+  onClearRouteBinding?: () => void;
+  onClearRouteOverride?: () => void;
   onVoiceIdChange: (voiceId: string) => void;
   ttsConnectorId: string;
   ttsModel: string;
@@ -79,4 +87,11 @@ export type RuntimeStatusSidebarProps = {
   defaultSettings: LocalChatDefaultSettings;
   onDefaultSettingChange: (key: LocalChatBooleanSettingKey, value: boolean) => void;
   onDefaultVoiceNameChange: (value: string) => void;
+  onMediaPlannerModeChange: (value: LocalChatMediaPlannerMode) => void;
+  onVideoAutoPolicyChange: (value: LocalChatVideoAutoPolicy) => void;
+  onRefreshMediaDependencies?: () => void;
+  onSidebarBootstrap?: () => void;
+  onOpenChatPanel?: () => void;
+  onOpenVoicePanel?: () => void;
+  onOpenMediaPanel?: () => void;
 };

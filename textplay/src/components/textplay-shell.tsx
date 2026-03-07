@@ -16,6 +16,7 @@ import type {
   TextplayStartupPackage,
   TextplayWarning,
 } from '../types.js';
+import { TextplayVisualStyles } from './textplay-visual-styles.js';
 
 export type TextplayShellProps = {
   storyId: string;
@@ -415,6 +416,8 @@ function renderOpeningCard(props: TextplayShellProps): React.ReactNode {
     subjectScope.playerBackground,
     subjectScope.background,
     subjectScope.summary,
+    startup.entry.summary,
+    story.materialSummary,
     story.summary,
   ]);
   const currentSituation = [
@@ -425,7 +428,7 @@ function renderOpeningCard(props: TextplayShellProps): React.ReactNode {
     `地点：${sceneLabel}`,
   ].filter((line) => line.trim().length > 0).join('；');
   const backgroundLines = [
-    startup.background.summary || story.summary || '暂无背景信息。',
+    startup.background.summary || story.materialSummary || story.summary || '暂无背景信息。',
     `玩家身份：${props.playerName || '你'}（${props.playerIdentity || playerRole}）`,
     playerBackground ? `玩家背景：${playerBackground}` : '',
     currentSituation ? `当前处境：${currentSituation}` : '',
@@ -486,9 +489,14 @@ function renderStorySummary(story: TextplayStoryDetail | null) {
     <div className="space-y-2 text-xs text-gray-600">
       <div className="flex items-start justify-between gap-2">
         <div className="font-medium leading-5 text-gray-900">{story.title}</div>
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
-          {story.eventHorizon}
-        </span>
+        <div className="flex flex-wrap justify-end gap-1">
+          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+            entry: {story.entryMode}
+          </span>
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+            canon: {story.eventHorizon}
+          </span>
+        </div>
       </div>
       <div className="leading-5 text-gray-600">{story.summary}</div>
       <div className="flex flex-wrap gap-1">
@@ -569,9 +577,10 @@ export function TextplayShell(props: TextplayShellProps) {
   };
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex-row">
-      <aside className="w-full overflow-y-auto border-b border-gray-200 bg-slate-50 p-3 lg:w-80 lg:border-b-0 lg:border-r">
-        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+    <div className="ui-sync-root flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex-row">
+      <TextplayVisualStyles />
+      <aside className="ui-sync-pane ui-sync-pane-side w-full overflow-y-auto border-b border-gray-200 bg-slate-50 p-3 lg:w-80 lg:border-b-0 lg:border-r">
+        <div className="ui-sync-card rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
           <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Current Session</div>
           {props.storyStarted ? (
             <div className="mt-3 space-y-1 text-xs text-slate-700">
@@ -595,7 +604,7 @@ export function TextplayShell(props: TextplayShellProps) {
             <div className="mt-3 grid grid-cols-2 gap-2">
               <button
                 type="button"
-                className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                className="ui-sync-btn ui-sync-btn-primary rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={props.onStartStory}
                 disabled={!props.canStartStory}
               >
@@ -603,7 +612,7 @@ export function TextplayShell(props: TextplayShellProps) {
               </button>
               <button
                 type="button"
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="ui-sync-btn ui-sync-btn-secondary rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={props.onToggleSessionPause}
                 disabled={!props.canTogglePause}
               >
@@ -615,23 +624,23 @@ export function TextplayShell(props: TextplayShellProps) {
 
         <button
           type="button"
-          className="mt-3 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          className="ui-sync-btn ui-sync-btn-secondary mt-3 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
           onClick={onToggleSessionEntry}
         >
           {sessionEntryExpanded ? 'Hide Session Entry' : 'Change Session'}
         </button>
 
         {sessionEntryExpanded ? (
-          <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+          <div className="ui-sync-card ui-sync-card-inset mt-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
             <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Session Entry</div>
 
             <div className="mt-3 grid grid-cols-2 gap-2">
               <button
                 type="button"
-                className={`rounded-lg border px-2 py-1.5 text-xs font-medium ${
+                className={`ui-sync-btn rounded-lg border px-2 py-1.5 text-xs font-medium ${
                   sessionEntryTab === 'continue'
-                    ? 'border-blue-300 bg-blue-50 text-blue-700'
-                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                    ? 'ui-sync-btn-selected border-blue-300 bg-blue-50 text-blue-700'
+                    : 'ui-sync-btn-secondary border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
                 }`}
                 onClick={() => onSelectSessionTab('continue')}
               >
@@ -639,10 +648,10 @@ export function TextplayShell(props: TextplayShellProps) {
               </button>
               <button
                 type="button"
-                className={`rounded-lg border px-2 py-1.5 text-xs font-medium ${
+                className={`ui-sync-btn rounded-lg border px-2 py-1.5 text-xs font-medium ${
                   sessionEntryTab === 'new'
-                    ? 'border-blue-300 bg-blue-50 text-blue-700'
-                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                    ? 'ui-sync-btn-selected border-blue-300 bg-blue-50 text-blue-700'
+                    : 'ui-sync-btn-secondary border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
                 }`}
                 onClick={() => onSelectSessionTab('new')}
               >
@@ -654,7 +663,7 @@ export function TextplayShell(props: TextplayShellProps) {
               <>
                 <div className="mt-3 flex items-center justify-between">
                   <div className="text-xs text-gray-600">History Session</div>
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                  <span className="ui-sync-pill rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
                     history {props.historySessions.length}
                   </span>
                 </div>
@@ -683,7 +692,7 @@ export function TextplayShell(props: TextplayShellProps) {
                 ) : null}
 
                 {selectedHistorySession ? (
-                  <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                  <div className="ui-sync-soft-card mt-3 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 p-2.5">
                     <div className="break-all text-xs font-medium leading-5 text-slate-800">
                       {selectedHistorySession.storyTitle}
                     </div>
@@ -703,12 +712,12 @@ export function TextplayShell(props: TextplayShellProps) {
                   </div>
                 )}
 
-                <button
-                  type="button"
-                  className="mt-3 w-full rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  onClick={onContinueSelectedSession}
-                  disabled={!props.canContinueHistory}
-                >
+                  <button
+                    type="button"
+                    className="ui-sync-btn ui-sync-btn-primary mt-3 w-full rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={onContinueSelectedSession}
+                    disabled={!props.canContinueHistory}
+                  >
                   {props.historyLoading ? 'Loading...' : 'Continue Selected Session'}
                 </button>
               </>
@@ -764,7 +773,7 @@ export function TextplayShell(props: TextplayShellProps) {
                   </div>
                 ) : null}
 
-                <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                <div className="ui-sync-soft-card mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
                   {renderStorySummary(props.selectedStory)}
                 </div>
 
@@ -809,7 +818,7 @@ export function TextplayShell(props: TextplayShellProps) {
                 {!props.storyStarted ? (
                   <button
                     type="button"
-                    className="mt-3 w-full rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="ui-sync-btn ui-sync-btn-primary mt-3 w-full rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
                     onClick={props.onStartStory}
                     disabled={!props.canStartStory}
                   >
@@ -819,7 +828,7 @@ export function TextplayShell(props: TextplayShellProps) {
 
                 <button
                   type="button"
-                  className="mt-3 w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  className="ui-sync-btn ui-sync-btn-secondary mt-3 w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
                   onClick={props.onRefresh}
                 >
                   Refresh
@@ -830,7 +839,7 @@ export function TextplayShell(props: TextplayShellProps) {
         ) : null}
       </aside>
 
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col border-b border-gray-200 lg:border-b-0 lg:border-r">
+      <main className="ui-sync-pane ui-sync-pane-main flex min-h-0 min-w-0 flex-1 flex-col border-b border-gray-200 lg:border-b-0 lg:border-r">
         <div className="border-b border-gray-200 px-3 py-2 text-xs text-gray-500">
           Narrative Timeline ({timelineRecords.length})
         </div>
@@ -970,15 +979,17 @@ export function TextplayShell(props: TextplayShellProps) {
         </div>
 
         <div className="border-t border-gray-200 bg-white p-3">
-          <textarea
-            className="h-24 w-full resize-none rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
-            placeholder={props.inputPlaceholder}
-            value={props.inputText}
-            onFocus={props.onInputFocus}
-            onBlur={props.onInputBlur}
-            onChange={(event) => props.setInputText(event.target.value)}
-            disabled={props.isRunning || !props.storyStarted}
-          />
+          <div className="ui-sync-input-shell p-2">
+            <textarea
+              className="h-24 w-full resize-none rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+              placeholder={props.inputPlaceholder}
+              value={props.inputText}
+              onFocus={props.onInputFocus}
+              onBlur={props.onInputBlur}
+              onChange={(event) => props.setInputText(event.target.value)}
+              disabled={props.isRunning || !props.storyStarted}
+            />
+          </div>
           <div className="mt-2 flex items-center justify-between">
             <div className="text-xs text-gray-500">
               {props.runId ? `Current run: ${props.runId}` : 'No active run'}
@@ -986,7 +997,7 @@ export function TextplayShell(props: TextplayShellProps) {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="ui-sync-btn ui-sync-btn-secondary rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={props.onCancel}
                 disabled={!props.isRunning}
               >
@@ -994,7 +1005,7 @@ export function TextplayShell(props: TextplayShellProps) {
               </button>
               <button
                 type="button"
-                className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="ui-sync-btn ui-sync-btn-primary rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={props.onSend}
                 disabled={!props.canSend}
               >
@@ -1032,8 +1043,8 @@ export function TextplayShell(props: TextplayShellProps) {
         </div>
       </main>
 
-      <aside className="w-full min-h-0 overflow-y-auto bg-slate-50 p-3 lg:w-80">
-        <div className="min-h-0 rounded-[10px] border border-gray-200 bg-white">
+      <aside className="ui-sync-pane ui-sync-pane-right w-full min-h-0 overflow-y-auto bg-slate-50 p-3 lg:w-80">
+        <div className="ui-sync-card min-h-0 rounded-[10px] border border-gray-200 bg-white">
           <section className="px-3 py-3 text-xs">
             {rightPanelSectionHeader({
               title: 'Session Health',

@@ -77,7 +77,7 @@ export function StepConfirm() {
   }, [oasisWorldId, basicInfo, traitResult, dnaSynthesis, selectedInterests, referenceImageUrl, traitOverrides, store]);
 
   return (
-    <div className="mx-auto max-w-lg space-y-4 p-4">
+    <div className="mx-auto my-4 max-w-lg space-y-4 p-4">
       <h2 className="text-lg font-semibold text-gray-900">{t('Confirm.title')}</h2>
 
       {/* Compact persona card */}
@@ -121,14 +121,14 @@ export function StepConfirm() {
       <div className="flex gap-3 pt-2">
         <button
           onClick={() => store.goBack()}
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+          className="ui-sync-btn ui-sync-btn-secondary rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
         >
           {t('Common.back')}
         </button>
         <button
           onClick={handleConfirm}
           disabled={loading || oasisLoading || !oasisWorldId}
-          className="flex-1 rounded-lg bg-[#4ECCA3] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#3DBB92] disabled:opacity-50"
+          className="ui-sync-btn ui-sync-btn-primary flex-1 rounded-lg bg-[#4ECCA3] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#3DBB92] disabled:opacity-50"
         >
           {loading ? t('Confirm.creating') : t('Confirm.createAgent')}
         </button>

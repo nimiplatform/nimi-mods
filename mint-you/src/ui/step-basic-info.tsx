@@ -50,7 +50,7 @@ export function StepBasicInfo() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="mx-auto max-w-lg space-y-6 p-4">
+    <form onSubmit={handleSubmit} className="ui-sync-card ui-sync-card-inset mx-auto my-4 max-w-lg space-y-6 p-6">
       <h2 className="text-lg font-semibold text-gray-900">{t('BasicInfo.title')}</h2>
 
       {/* Display Name */}
@@ -79,10 +79,10 @@ export function StepBasicInfo() {
               key={opt.value}
               type="button"
               onClick={() => setGender(opt.value)}
-              className={`flex-1 rounded-lg border px-3 py-2 text-center text-sm transition-colors ${
+              className={`ui-sync-btn flex-1 rounded-lg border px-3 py-2 text-center text-sm transition-colors ${
                 gender === opt.value
-                  ? 'border-[#4ECCA3] bg-[#4ECCA3]/10 text-[#4ECCA3]'
-                  : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                  ? 'ui-sync-btn-selected border-[#4ECCA3] bg-[#4ECCA3]/10 text-[#4ECCA3]'
+                  : 'ui-sync-btn-secondary border-gray-300 text-gray-600 hover:bg-gray-50'
               }`}
             >
               <span className="mr-1">{opt.icon}</span>
@@ -103,10 +103,10 @@ export function StepBasicInfo() {
               key={opt}
               type="button"
               onClick={() => setAgeRange(opt)}
-              className={`flex-1 rounded-lg border px-3 py-2 text-center text-sm transition-colors ${
+              className={`ui-sync-btn flex-1 rounded-lg border px-3 py-2 text-center text-sm transition-colors ${
                 ageRange === opt
-                  ? 'border-[#4ECCA3] bg-[#4ECCA3]/10 text-[#4ECCA3]'
-                  : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                  ? 'ui-sync-btn-selected border-[#4ECCA3] bg-[#4ECCA3]/10 text-[#4ECCA3]'
+                  : 'ui-sync-btn-secondary border-gray-300 text-gray-600 hover:bg-gray-50'
               }`}
             >
               {opt}
@@ -126,10 +126,10 @@ export function StepBasicInfo() {
               key={opt.value}
               type="button"
               onClick={() => setSocialIntent(opt.value)}
-              className={`rounded-lg border p-3 text-left transition-colors ${
+              className={`ui-sync-btn rounded-lg border p-3 text-left transition-colors ${
                 socialIntent === opt.value
-                  ? 'border-[#4ECCA3] bg-[#4ECCA3]/10'
-                  : 'border-gray-300 hover:bg-gray-50'
+                  ? 'ui-sync-btn-selected border-[#4ECCA3] bg-[#4ECCA3]/10'
+                  : 'ui-sync-btn-secondary border-gray-300 hover:bg-gray-50'
               }`}
             >
               <span className="text-lg">{opt.emoji}</span>
@@ -154,7 +154,7 @@ export function StepBasicInfo() {
       {/* Submit */}
       <button
         type="submit"
-        className="w-full rounded-lg bg-[#4ECCA3] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#3DBB92] disabled:opacity-50"
+        className="ui-sync-btn ui-sync-btn-primary w-full rounded-lg bg-[#4ECCA3] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#3DBB92] disabled:opacity-50"
       >
         {t('BasicInfo.next')}
       </button>

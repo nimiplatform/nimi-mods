@@ -18,7 +18,7 @@ Mint-You uses `runtime.route.list.options` to expose route source / connector / 
 
 ## MY-CAP-004 Agent Creation Boundary
 
-Mint-You creates agents through `data-api.creator.agents.create`. The mod must supply a complete `CreateAgentDto` payload including pre-built `dna` object. Agent `ownershipType` is `WORLD_OWNED`. Agent `wakeStrategy` is `PASSIVE`.
+Mint-You creates agents through `data-api.creator.agents.create`. The mod must supply a complete `CreateAgentDto` payload including pre-built `dna` object. Agent `ownershipType` is `MASTER_OWNED`. Agent `wakeStrategy` is `PASSIVE`.
 Mint-You resolves the target world via `data-api.world.oasis.get`; agent `worldId` is always bound to OASIS.
 
 ## MY-CAP-005 Photo Access Control Boundary

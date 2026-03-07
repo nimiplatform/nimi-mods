@@ -1,6 +1,5 @@
 export type MediaIntentType = 'image' | 'video';
-export type MediaIntentSource = 'marker' | 'heuristic';
-export type MediaTriggerMode = 'marker_only' | 'marker_plus_heuristic';
+export type MediaIntentSource = 'marker';
 
 export type ParsedMediaIntent = {
   id: string;
@@ -30,33 +29,6 @@ function normalizeWhitespace(value: string): string {
     .trim();
 }
 
-function shouldHeuristicGenerateImage(text: string): boolean {
-  const normalized = String(text || '').trim();
-  if (!normalized) return false;
-  const heuristics = [
-    /(?:我来|让我|我给你|帮你)(?:画|生成|做|整)(?:一|1)?(?:张|幅)?(?:图|图片|插画)/i,
-    /(?:给你|帮你)(?:来|做|整|生成)(?:一|1)?(?:张|幅)?(?:图|图片|插画)/i,
-    /(?:i(?:'ll| will)|let me)\s+(?:draw|generate|make|create)\s+(?:you\s+)?(?:an?\s+)?(?:image|picture|illustration)\b/i,
-    /(?:i can)\s+(?:send|make|generate)\s+(?:an?\s+)?(?:image|picture)\b/i,
-  ];
-  return heuristics.some((pattern) => pattern.test(normalized));
-}
-
-function buildHeuristicPrompt(input: {
-  assistantText: string;
-  userText?: string;
-}): string {
-  const assistant = normalizeWhitespace(input.assistantText);
-  const user = normalizeWhitespace(input.userText || '');
-  if (assistant && user) {
-    return `聊天上下文:\n用户: ${user}\n助手: ${assistant}\n请生成一张贴合当前话题和情绪的图片。`;
-  }
-  if (assistant) {
-    return `请根据助手刚才这句话生成一张贴合语境的图片：${assistant}`;
-  }
-  return user ? `请根据用户这句话生成一张贴合语境的图片：${user}` : '';
-}
-
 function buildMarkerFallbackPrompt(input: {
   type: MediaIntentType;
   assistantText: string;
@@ -79,9 +51,7 @@ function buildMarkerFallbackPrompt(input: {
 export function parseMediaIntent(input: {
   text: string;
   userText?: string;
-  triggerMode?: MediaTriggerMode;
 }): MediaIntentParseResult {
-  const triggerMode = input.triggerMode || 'marker_only';
   const sourceText = String(input.text || '');
   const intents: ParsedMediaIntent[] = [];
   const markerFallbackNeeded: Array<{
@@ -156,24 +126,6 @@ export function parseMediaIntent(input: {
       triggerSource: 'marker',
     });
   });
-  if (
-    intents.length === 0
-    && triggerMode === 'marker_plus_heuristic'
-    && shouldHeuristicGenerateImage(cleanedText)
-  ) {
-    const prompt = buildHeuristicPrompt({
-      assistantText: cleanedText,
-      userText: input.userText,
-    });
-    if (prompt) {
-      intents.push({
-        id: createIntentId('image', 0),
-        type: 'image',
-        prompt,
-        triggerSource: 'heuristic',
-      });
-    }
-  }
 
   return {
     cleanedText,

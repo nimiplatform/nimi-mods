@@ -51,12 +51,12 @@ export function StudioStatusCard(props: StudioStatusCardProps) {
   const embedded = Boolean(props.embedded);
   const showTitle = props.showTitle !== false;
   return (
-    <section className={embedded ? '' : 'rounded-xl border border-gray-200 bg-white p-3'}>
+    <section className={embedded ? '' : 'ui-sync-card ui-sync-card-inset p-3'}>
       {showTitle ? <h4 className="text-sm font-semibold text-gray-900">{t('studioStatus.title')}</h4> : null}
       <p className={`${showTitle ? 'mt-1 ' : ''}text-xs text-gray-600`}>{t('studioStatus.mode')}: {props.mode}</p>
 
       {props.activeTask ? (
-        <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5">
+        <div className="ui-sync-toolbar mt-2 px-2 py-1.5">
           <p className="text-xs font-semibold text-gray-800">{props.activeTask.label}</p>
           <p className="mt-1 text-xs text-gray-600">
             {toTaskStatusLabel(props.activeTask.status)} · {Math.max(0, Math.min(100, Math.round(props.activeTask.progress * 100)))}%
@@ -68,7 +68,7 @@ export function StudioStatusCard(props: StudioStatusCardProps) {
             {props.activeTask.canPause && props.onPauseTask ? (
               <button
                 type="button"
-                className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700"
+                className="ui-sync-btn ui-sync-btn-secondary rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700"
                 onClick={() => { props.onPauseTask?.(); }}
               >
                 {t('studioStatus.pause')}
@@ -77,7 +77,7 @@ export function StudioStatusCard(props: StudioStatusCardProps) {
             {props.activeTask.canResume && props.onResumeTask ? (
               <button
                 type="button"
-                className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700"
+                className="ui-sync-btn ui-sync-btn-secondary rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700"
                 onClick={() => { props.onResumeTask?.(); }}
               >
                 {t('studioStatus.resume')}
@@ -86,7 +86,7 @@ export function StudioStatusCard(props: StudioStatusCardProps) {
             {props.activeTask.canCancel && props.onCancelTask ? (
               <button
                 type="button"
-                className="rounded-md border border-red-200 bg-white px-2.5 py-1 text-xs font-semibold text-red-700"
+                className="ui-sync-btn rounded-md border border-red-200 bg-white px-2.5 py-1 text-xs font-semibold text-red-700"
                 onClick={() => { props.onCancelTask?.(); }}
               >
                 {t('studioStatus.cancel')}
@@ -108,7 +108,7 @@ export function StudioStatusCard(props: StudioStatusCardProps) {
         <p className="mt-2 text-xs text-gray-600">{t('studioStatus.noActiveTask')}</p>
       )}
 
-      <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs text-gray-600">
+      <div className="ui-sync-soft-card mt-2 px-2 py-1.5 text-xs text-gray-600">
         <p>{t('studioStatus.events')}: {t('studioStatus.primary')} {props.primaryEventCount} / {t('studioStatus.secondary')} {props.secondaryEventCount}</p>
         <p>{t('studioStatus.missingPrimaryEvidence')}: {props.missingPrimaryEvidenceCount}</p>
         {typeof props.futureEventsCount === 'number' ? (
@@ -117,7 +117,7 @@ export function StudioStatusCard(props: StudioStatusCardProps) {
       </div>
 
       {props.expertMode ? (
-        <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-700">
+        <div className="ui-sync-toolbar mt-2 px-2 py-1.5 text-xs text-slate-700">
           <p>{t('studioStatus.coarseRoute')}: {props.coarseRouteSummary}</p>
           <p>{t('studioStatus.fineRoute')}: {props.fineRouteSummary}</p>
           {props.parsePhase ? (
@@ -142,7 +142,7 @@ export function StudioStatusCard(props: StudioStatusCardProps) {
       ) : null}
 
       {props.recentTasks.length > 0 ? (
-        <details className="mt-2 rounded-md border border-gray-200 bg-white px-2 py-1.5">
+        <details className="ui-sync-code-panel mt-2 px-2 py-1.5">
           <summary className="cursor-pointer text-xs font-semibold text-gray-700">{t('studioStatus.recentTasks')}</summary>
           <div className="mt-2 space-y-1 text-xs text-gray-600">
             {props.recentTasks.slice(0, 5).map((task) => (
@@ -157,16 +157,16 @@ export function StudioStatusCard(props: StudioStatusCardProps) {
       ) : null}
 
       {props.conflictReloadSummary ? (
-        <div className="mt-2 rounded-md border border-sky-200 bg-sky-50 px-2 py-1.5 text-xs text-sky-700">
+        <div className="ui-sync-alert ui-sync-alert-info mt-2 px-2 py-1.5 text-xs text-sky-700">
           <p className="font-semibold">{t('studioStatus.recentReloadSummary')}</p>
           <p className="mt-1">{props.conflictReloadSummary}</p>
         </div>
       ) : null}
       {props.notice ? (
-        <p className="mt-2 rounded-md bg-emerald-50 px-2 py-1 text-xs text-emerald-700">{props.notice}</p>
+        <p className="ui-sync-alert ui-sync-alert-success mt-2 px-2 py-1 text-xs text-emerald-700">{props.notice}</p>
       ) : null}
       {mappedError.summary ? (
-        <div className="mt-2 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700">
+        <div className="ui-sync-alert ui-sync-alert-danger mt-2 px-2 py-1 text-xs text-red-700">
           <p>{mappedError.summary}</p>
           {mappedError.detail ? (
             <details className="mt-1">
@@ -184,7 +184,7 @@ export function StudioStatusCard(props: StudioStatusCardProps) {
           {props.onResetDraft ? (
             <button
               type="button"
-              className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-700"
+              className="ui-sync-btn ui-sync-btn-secondary rounded-md border border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-700"
               onClick={props.onResetDraft}
             >
               {t('studioStatus.resetDraft')}
@@ -193,7 +193,7 @@ export function StudioStatusCard(props: StudioStatusCardProps) {
           {props.onReload ? (
             <button
               type="button"
-              className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-700"
+              className="ui-sync-btn ui-sync-btn-secondary rounded-md border border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-700"
               onClick={props.onReload}
             >
               {t('studioStatus.reload')}

@@ -5,6 +5,7 @@ import {
   sanitizeAssistantReply,
 } from '../../services/view/reply.js';
 import type { TurnInvokeInput } from './request-builder.js';
+import type { LocalChatReplyPacingPlan } from '../../state/index.js';
 import type {
   AssistantPlanSegment,
   LocalChatTurnAiClient,
@@ -25,6 +26,7 @@ export type TextTurnResult = {
   streamDeltaCount: number;
   streamDurationMs: number;
   segmentParseMode: SegmentParseMode;
+  traceId?: string;
 };
 
 export type ReplySegmentationMode = 'adaptive' | 'single';
@@ -35,9 +37,16 @@ type RunTextTurnInput = {
   invokeInput: TurnInvokeInput;
   prompt: string;
   allowMultiReply: boolean;
+  pacingPlan?: LocalChatReplyPacingPlan;
   segmentationMode?: ReplySegmentationMode;
   onStreamDelta?: (delta: string, chunkCount: number) => void;
 };
+
+let streamFallbackLocked = false;
+
+export function resetTextTurnStreamHealthForTests(): void {
+  streamFallbackLocked = false;
+}
 
 type SplitSegmentsResult = {
   segments: string[];
@@ -222,12 +231,70 @@ function buildStreamingPrompt(input: {
   return `${input.prompt}\n\n${lines.join('\n')}`;
 }
 
+function shouldLockStreaming(error: unknown): boolean {
+  const reasonCode = (
+    error
+    && typeof error === 'object'
+    && 'reasonCode' in error
+  ) ? String((error as { reasonCode?: unknown }).reasonCode || '').trim() : '';
+  return reasonCode === 'AI_INPUT_INVALID';
+}
+
+function splitFallbackByPacingPlan(input: {
+  text: string;
+  allowMultiReply: boolean;
+  pacingPlan?: LocalChatReplyPacingPlan;
+  segmentationMode?: ReplySegmentationMode;
+}): SplitSegmentsResult {
+  const normalizedText = normalizeSegmentText(input.text);
+  if (!normalizedText) {
+    return {
+      segments: ['抱歉，我现在没有可用回复。请再试一次。'],
+      parseMode: 'single-message',
+    };
+  }
+  const pacingPlan = input.pacingPlan;
+  if (
+    !input.allowMultiReply
+    || !pacingPlan
+    || pacingPlan.maxSegments <= 1
+    || pacingPlan.mode === 'single'
+  ) {
+    return splitIntoSegments(normalizedText, input.allowMultiReply, input.segmentationMode || 'adaptive');
+  }
+  if (pacingPlan.mode === 'answer-followup') {
+    const sentences = normalizedText
+      .split(/(?<=[。！？!?])/u)
+      .map((segment) => normalizeSegmentText(segment))
+      .filter(Boolean);
+    if (sentences.length >= 2) {
+      const shouldMergeLeadIn = sentences.length >= 3 && countChars(sentences[0] || '') <= 4;
+      const head = shouldMergeLeadIn
+        ? sentences.slice(0, 2).join('')
+        : (sentences[0] || '');
+      const tail = shouldMergeLeadIn
+        ? sentences.slice(2).join(' ').trim()
+        : sentences.slice(1).join(' ').trim();
+      if (head && tail) {
+        return {
+          segments: [head, tail].slice(0, pacingPlan.maxSegments),
+          parseMode: 'double-newline',
+        };
+      }
+    }
+  }
+  return splitIntoSegments(normalizedText, input.allowMultiReply, input.segmentationMode || 'adaptive');
+}
+
 export async function runTextTurn(input: RunTextTurnInput): Promise<TextTurnResult> {
   const prompt = buildStreamingPrompt({
     prompt: input.prompt,
     allowMultiReply: input.allowMultiReply,
     segmentationMode: input.segmentationMode || 'adaptive',
   });
+  const routeBinding = input.invokeInput.routeBinding || (
+    input.invokeInput as TurnInvokeInput & { routeOverride?: TurnInvokeInput['routeBinding'] }
+  ).routeOverride;
 
   let fullText = '';
   let streamDeltaCount = 0;
@@ -235,38 +302,67 @@ export async function runTextTurn(input: RunTextTurnInput): Promise<TextTurnResu
   let streamFailed = false;
   let streamFailureMessage = '';
   const streamStartedAt = performance.now();
-  try {
-    for await (const event of input.aiClient.streamText({
+  if (!streamFallbackLocked) {
+    try {
+      for await (const event of input.aiClient.streamText({
+        capability: input.invokeInput.capability,
+        prompt,
+        maxTokens: input.invokeInput.maxTokens,
+        mode: input.invokeInput.mode,
+        worldId: input.invokeInput.worldId,
+        agentId: input.invokeInput.agentId,
+        routeBinding,
+      })) {
+        if (event.type === 'done') {
+          streamCompleted = true;
+          continue;
+        }
+        if (event.type !== 'text_delta') {
+          continue;
+        }
+        const textDelta = String(event.textDelta || '');
+        if (!textDelta) {
+          continue;
+        }
+        streamDeltaCount += 1;
+        fullText += textDelta;
+        input.onStreamDelta?.(textDelta, streamDeltaCount);
+      }
+    } catch (error) {
+      streamFailed = true;
+      streamFailureMessage = error instanceof Error ? error.message : String(error || '');
+      if (shouldLockStreaming(error)) {
+        streamFallbackLocked = true;
+      }
+    }
+  }
+  if (streamFailed || !fullText.trim() || streamFallbackLocked) {
+    const fallback = await input.aiClient.generateText({
       capability: input.invokeInput.capability,
       prompt,
       maxTokens: input.invokeInput.maxTokens,
       mode: input.invokeInput.mode,
       worldId: input.invokeInput.worldId,
       agentId: input.invokeInput.agentId,
-      routeBinding: input.invokeInput.routeBinding,
-    })) {
-      if (event.type === 'done') {
-        streamCompleted = true;
-        continue;
-      }
-      if (event.type !== 'text_delta') {
-        continue;
-      }
-      const textDelta = String(event.textDelta || '');
-      if (!textDelta) {
-        continue;
-      }
-      streamDeltaCount += 1;
-      fullText += textDelta;
-      input.onStreamDelta?.(textDelta, streamDeltaCount);
-    }
-  } catch (error) {
-    streamFailed = true;
-    streamFailureMessage = error instanceof Error ? error.message : String(error || '');
-  }
-  if (streamFailed || !fullText.trim()) {
-    const detail = streamFailureMessage || 'LOCAL_CHAT_AI_STREAM_EMPTY';
-    throw new Error(detail);
+      routeBinding,
+    });
+    const splitResult = splitFallbackByPacingPlan({
+      text: String(fallback.text || ''),
+      allowMultiReply: input.allowMultiReply,
+      pacingPlan: input.pacingPlan,
+      segmentationMode: input.segmentationMode,
+    });
+    const segments = toAssistantPlanSegments({ segments: splitResult.segments });
+    return {
+      planner: 'stream',
+      segments,
+      firstReply: segments[0]?.content || '',
+      streamCompleted: false,
+      streamDeltaCount,
+      streamDurationMs: Math.max(0, Math.round(performance.now() - streamStartedAt)),
+      segmentParseMode: splitResult.parseMode,
+      traceId: String((fallback as { traceId?: unknown }).traceId || '').trim() || undefined,
+    };
   }
   const streamDurationMs = Math.max(0, Math.round(performance.now() - streamStartedAt));
   const splitResult = splitIntoSegments(
@@ -299,5 +395,6 @@ export async function runTextTurn(input: RunTextTurnInput): Promise<TextTurnResu
     streamDeltaCount,
     streamDurationMs,
     segmentParseMode: splitResult.parseMode,
+    traceId: undefined,
   };
 }

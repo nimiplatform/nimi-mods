@@ -23,7 +23,7 @@ cases:
     prerequisite: user has not confirmed
     source_rule: MY-ACC-002
   - id: MY-005-AGENT-CREATE-SUCCESS
-    description: After confirmation, agent is created with INCUBATING state, worldId bound to OASIS, and WORLD_OWNED ownership.
+    description: After confirmation, agent is created with INCUBATING state, worldId bound to OASIS, and MASTER_OWNED ownership.
     expected_ok: true
     reason_code: null
     source_rule: MY-ACC-002

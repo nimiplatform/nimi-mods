@@ -54,6 +54,20 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
     [state.speechPlaybackState, state.speechSettingsState],
   );
 
+  const handleMediaPlannerModeChange = useCallback(
+    (value: RuntimeStatusSidebarProps['defaultSettings']['mediaPlannerMode']) => {
+      state.speechSettingsState.handleMediaPlannerModeChange(value);
+    },
+    [state.speechSettingsState],
+  );
+
+  const handleVideoAutoPolicyChange = useCallback(
+    (value: RuntimeStatusSidebarProps['defaultSettings']['videoAutoPolicy']) => {
+      state.speechSettingsState.handleVideoAutoPolicyChange(value);
+    },
+    [state.speechSettingsState],
+  );
+
   const handleVoiceContextMenu = useCallback((message: ChatMessage, event: MouseEvent<HTMLButtonElement>) => {
     if (message.kind !== 'voice') return;
     event.preventDefault();
@@ -172,16 +186,23 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
 
       const isVoiceEnabled = Boolean(state.speechSettingsState.defaultSettings.enableVoice);
       const dependencyCapabilities: RuntimeStatusSidebarProps['dependencyCapabilities'] = [
-        { capability: 'text.generate', matched: capabilityMatchedFromSnapshot('text.generate'), required: true },
+        {
+          capability: 'text.generate',
+          matched: capabilityMatchedFromSnapshot('text.generate'),
+          required: true,
+          resolved: true,
+        },
         {
           capability: 'audio.synthesize',
           matched: capabilityMatchedFromSnapshot('audio.synthesize'),
           required: isVoiceEnabled,
+          resolved: true,
         },
         {
           capability: 'audio.transcribe',
           matched: capabilityMatchedFromSnapshot('audio.transcribe'),
           required: isVoiceEnabled,
+          resolved: true,
         },
       ];
       const dependencyRepairActions = (dependencySnapshot?.repairActions || []).filter((action) => {
@@ -250,9 +271,6 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         dependencyRepairActions,
         latestPromptTrace: state.latestPromptTrace,
         latestTurnAudit: state.latestTurnAudit,
-        voiceCatalogSource: state.speechSettingsState.speechVoiceCatalogMeta.voiceCatalogSource || undefined,
-        voiceCatalogModelResolved: state.speechSettingsState.speechVoiceCatalogMeta.modelResolved || undefined,
-        voiceCatalogVersion: state.speechSettingsState.speechVoiceCatalogMeta.voiceCatalogVersion || undefined,
         onRouteSourceChange: state.runtimeRouteState.handleRouteSourceChange,
         onRouteConnectorChange: state.runtimeRouteState.handleRouteConnectorChange,
         onRouteModelChange: state.runtimeRouteState.handleRouteModelChange,
@@ -333,6 +351,24 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         defaultSettings: state.speechSettingsState.defaultSettings,
         onDefaultSettingChange: handleDefaultSettingChange,
         onDefaultVoiceNameChange: handleDefaultVoiceNameChange,
+        onMediaPlannerModeChange: handleMediaPlannerModeChange,
+        onVideoAutoPolicyChange: handleVideoAutoPolicyChange,
+        imageResolvedRoute: null,
+        videoResolvedRoute: null,
+        isMediaRuntimeSidebarLoading: false,
+        isImageRouteProbeLoading: false,
+        isVideoRouteProbeLoading: false,
+        onRefreshMediaDependencies: () => {
+          void state.runtimeRouteState.loadAllRuntimeRouteOptions();
+          void state.refreshDependencySnapshot();
+        },
+        onSidebarBootstrap: () => {
+          void state.runtimeRouteState.loadAllRuntimeRouteOptions();
+          void state.refreshDependencySnapshot();
+        },
+        onOpenChatPanel: () => {},
+        onOpenVoicePanel: () => {},
+        onOpenMediaPanel: () => {},
         onOpenRuntimeSetup: () => {
           state.setActiveTab('runtime');
         },
@@ -350,6 +386,8 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
       handleVoiceIdChange,
       handleDefaultSettingChange,
       handleDefaultVoiceNameChange,
+      handleMediaPlannerModeChange,
+      handleVideoAutoPolicyChange,
     ],
   );
 

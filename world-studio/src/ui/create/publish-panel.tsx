@@ -19,9 +19,9 @@ type PublishPanelProps = {
 function StepBadge(props: { label: string; done: boolean }) {
   return (
     <div
-      className={`rounded-md border px-2 py-1 text-[11px] font-medium ${
+      className={`ui-sync-pill rounded-md border px-2 py-1 text-[11px] font-medium ${
         props.done
-          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+          ? 'ui-sync-status-success border-emerald-200 bg-emerald-50 text-emerald-700'
           : 'border-gray-200 bg-gray-50 text-gray-500'
       }`}
     >
@@ -38,7 +38,7 @@ export function PublishPanel(props: PublishPanelProps) {
   const embedded = Boolean(props.embedded);
   const showTitle = props.showTitle !== false;
   return (
-    <section className={embedded ? '' : 'm-3 rounded-xl border border-gray-200 bg-white p-3'}>
+    <section className={embedded ? '' : 'ui-sync-card ui-sync-card-inset m-3 p-3'}>
       {showTitle ? <h3 className="text-sm font-semibold text-gray-900">Create Actions</h3> : null}
       <p className={`${showTitle ? 'mt-1 ' : ''}text-xs text-gray-500`}>Current Step: {props.step}</p>
 
@@ -49,7 +49,7 @@ export function PublishPanel(props: PublishPanelProps) {
         <StepBadge label="PUBLISH" done={false} />
       </div>
 
-      <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 p-2">
+      <div className="ui-sync-toolbar mt-3 p-2">
         <p className="text-[11px] text-gray-600">
           Parse: {props.parseJob.phase} · {props.parseJob.chunkCompleted}/{props.parseJob.chunkTotal} chunks · failed {props.parseJob.chunkFailed}
         </p>
@@ -64,7 +64,7 @@ export function PublishPanel(props: PublishPanelProps) {
       <div className="mt-3 flex flex-col gap-2">
         <button
           type="button"
-          className="rounded-md bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+          className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
           onClick={props.onSaveDraft}
           disabled={props.working || !props.hasPhase2}
         >
@@ -72,7 +72,7 @@ export function PublishPanel(props: PublishPanelProps) {
         </button>
         <button
           type="button"
-          className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+          className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
           onClick={props.onPublishDraft}
           disabled={props.working || !props.draftId}
         >

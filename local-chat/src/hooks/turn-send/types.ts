@@ -1,4 +1,5 @@
 import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
+import type { ModRuntimeDependencySnapshot } from '@nimiplatform/sdk/mod/runtime';
 import type { Dispatch, SetStateAction } from 'react';
 import type { LocalChatTarget } from '../../data/index.js';
 import type {
@@ -7,7 +8,7 @@ import type {
   LocalChatSession,
   LocalChatTurnAudit,
 } from '../../state/index.js';
-import type { ChatMessage } from '../../types.js';
+import type { ChatMessage, LocalChatResolvedMediaRoute } from '../../types.js';
 import type { LocalChatAiClient, LocalChatAudioPlaybackSource } from '../../runtime-ai-client.js';
 
 export type ChatRouteSnapshot = {
@@ -40,10 +41,19 @@ export type UseLocalChatTurnSendInput = {
   aiClient: LocalChatTurnAiClient;
   inputText: string;
   setInputText: (value: string) => void;
+  viewerId: string;
+  viewerDisplayName: string;
   runtimeMode: 'STORY' | 'SCENE_TURN' | undefined;
   chatRouteOptions: RuntimeRouteOptionsSnapshot | null;
-  routeBinding: RuntimeRouteBinding | null;
+  imageRouteOptions?: RuntimeRouteOptionsSnapshot | null;
+  videoRouteOptions?: RuntimeRouteOptionsSnapshot | null;
+  imageRouteOptionsRevision?: number;
+  videoRouteOptionsRevision?: number;
+  routeBinding?: RuntimeRouteBinding | null;
+  routeOverride?: RuntimeRouteBinding | null;
   routeSnapshot: ChatRouteSnapshot | null;
+  imageResolvedRoute?: LocalChatResolvedMediaRoute | null;
+  videoResolvedRoute?: LocalChatResolvedMediaRoute | null;
   defaultSettings: LocalChatDefaultSettings;
   selectedTarget: LocalChatTarget | null;
   selectedSessionId: string;
@@ -59,6 +69,8 @@ export type UseLocalChatTurnSendInput = {
     actionLabel?: string;
     onAction?: () => void;
   }) => void;
+  imageDependencySnapshot?: ModRuntimeDependencySnapshot | null;
+  videoDependencySnapshot?: ModRuntimeDependencySnapshot | null;
   isTranscribing?: boolean;
   onOpenRuntimeSetup?: () => void;
   synthesizeVoice?: (text: string) => Promise<LocalChatAudioPlaybackSource>;

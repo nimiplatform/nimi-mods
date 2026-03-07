@@ -62,16 +62,25 @@ export function createSessionTurn(input: {
   promptTrace?: LocalChatPromptTrace | null;
   audit?: LocalChatTurnAudit | null;
 }): LocalChatTurn {
+  const kind = input.message.kind === 'voice'
+    || input.message.kind === 'image'
+    || input.message.kind === 'video'
+    ? input.message.kind
+    : 'text';
   return {
     id: input.message.id,
     role: input.message.role,
-    kind: input.message.kind,
+    kind,
     content: input.message.content,
+    contextText: input.message.content,
+    semanticSummary: null,
     media: input.message.media,
     timestamp: input.message.timestamp.toISOString(),
     latencyMs: input.message.latencyMs,
     meta: input.message.meta,
     promptTrace: input.promptTrace || undefined,
     audit: input.audit || undefined,
+    bundleId: '',
+    bundleSeq: 0,
   };
 }

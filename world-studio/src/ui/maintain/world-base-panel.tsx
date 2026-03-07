@@ -19,7 +19,7 @@ export function WorldBasePanel(props: WorldBasePanelProps) {
   const world = props.worldPatch || {};
   const worldPatchText = JSON.stringify(world, null, 2);
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4">
+    <section className="ui-sync-card ui-sync-card-inset p-4">
       <h3 className="text-sm font-semibold text-gray-900">World Base</h3>
       <p className="mt-1 text-xs text-gray-500">Structured editor for core world settings.</p>
 
@@ -59,7 +59,7 @@ export function WorldBasePanel(props: WorldBasePanelProps) {
         />
       </label>
 
-      <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-2.5">
+      <div className="ui-sync-soft-card mt-3 p-2.5">
         <KeyValueObjectEditor
           label="rules"
           value={world.rules && typeof world.rules === 'object' && !Array.isArray(world.rules)
@@ -71,7 +71,7 @@ export function WorldBasePanel(props: WorldBasePanelProps) {
         />
       </div>
 
-      <details className="mt-3 rounded border border-gray-200 bg-gray-50 p-2">
+      <details className="ui-sync-code-panel mt-3 p-2">
         <summary className="cursor-pointer text-xs font-semibold text-gray-700">Raw JSON (Debug)</summary>
         <textarea
           className="mt-2 h-52 w-full rounded-md border border-gray-300 bg-gray-100 p-2 font-mono text-xs text-gray-600"

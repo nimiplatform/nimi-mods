@@ -46,7 +46,7 @@ function makeKnowledgeGraph() {
         id: 'p-1',
         level: 'PRIMARY',
         parentEventId: null,
-        title: '倒计时危机',
+        title: '倒计时危机爆发',
         summary: 'summary',
         cause: 'cause',
         process: 'process',
@@ -77,7 +77,7 @@ function makeKnowledgeGraph() {
       background: 'background',
       motivation: 'motivation',
       relationships: ['常伟思:合作'],
-      keyEvents: ['倒计时危机'],
+      keyEvents: ['倒计时危机爆发'],
     }],
     characterAliasMap: { 汪淼: '汪淼' },
   };
@@ -90,7 +90,7 @@ test('world-studio agent drafts flow persists phase2 drafts and publishes with d
   snapshotRef.current.agentSync.selectedCharacterIds = ['汪淼'];
   snapshotRef.current.knowledgeGraph = makeKnowledgeGraph();
   snapshotRef.current.phase1Artifact = {
-    startTimeOptions: [{ id: 'event:p-1', label: '1. 2004 · 倒计时危机', description: 'summary', weight: 0.8 }],
+    startTimeOptions: [{ id: 'event:p-1', label: '1. 2004 · 倒计时危机爆发', description: '', weight: 0.8 }],
     characterCandidates: [{ name: '汪淼', summary: 'summary', significance: 0.8 }],
     qualityGate: makePassQualityGate(),
     chunkTasks: [],
@@ -107,7 +107,6 @@ test('world-studio agent drafts flow persists phase2 drafts and publishes with d
 
   const taskController = createMockTaskController();
   const batchPayloadRef = { current: null };
-  let lastError = null;
 
   const baseInput = {
     aiClient: {
@@ -243,9 +242,7 @@ test('world-studio agent drafts flow persists phase2 drafts and publishes with d
       },
     },
     setStatusBanner: () => {},
-    setError: (value) => {
-      lastError = value;
-    },
+    setError: () => {},
     setNotice: () => {},
     taskController,
   };
@@ -253,7 +250,7 @@ test('world-studio agent drafts flow persists phase2 drafts and publishes with d
   await runCreatePhase2(baseInput);
 
   const draftKeys = Object.keys(snapshotRef.current.agentSync.draftsByCharacter || {});
-  assert.equal(draftKeys.length > 0, true, String(lastError || 'expected synthesized drafts'));
+  assert.equal(draftKeys.length > 0, true);
   const wDraft = snapshotRef.current.agentSync.draftsByCharacter['汪淼']
     || snapshotRef.current.agentSync.draftsByCharacter[draftKeys[0]];
   assert.equal(wDraft.handle, '~wangmiao');

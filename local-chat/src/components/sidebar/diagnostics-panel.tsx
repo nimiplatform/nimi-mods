@@ -8,9 +8,6 @@ type Props = {
   onToggle: () => void;
   latestPromptTrace: LocalChatPromptTrace | null;
   latestTurnAudit: LocalChatTurnAudit | null;
-  voiceCatalogSource?: string;
-  voiceCatalogModelResolved?: string;
-  voiceCatalogVersion?: string;
   healthStatus: HealthStatus;
   checkingHealth: boolean;
   onHealthCheck: () => void;
@@ -29,16 +26,48 @@ export function DiagnosticsPanel(props: Props) {
     onToggle,
     latestPromptTrace,
     latestTurnAudit,
-    voiceCatalogSource,
-    voiceCatalogModelResolved,
-    voiceCatalogVersion,
     healthStatus,
     checkingHealth,
     onHealthCheck,
   } = props;
-  const hasRecentMessagesLayer = latestPromptTrace?.appliedLayers?.includes('recentMessages') || false;
-  const hasPostHistoryLayer = latestPromptTrace?.appliedLayers?.includes('postHistoryInstructions') || false;
+  const hasRecentMessagesLayer = latestPromptTrace?.appliedLayers?.includes('recentBundles') || false;
+  const hasPostHistoryLayer = latestPromptTrace?.appliedLayers?.includes('replyStyle') || false;
   const routeValue = `${latestPromptTrace?.routeSource || '-'} / ${latestPromptTrace?.routeModel || '-'}`;
+  const plannerValue = latestPromptTrace
+    ? `${latestPromptTrace.plannerUsed ? 'on' : 'off'} · ${latestPromptTrace.plannerKind || 'none'} · ${latestPromptTrace.plannerTrigger || 'none'}${typeof latestPromptTrace.plannerConfidence === 'number' ? ` · ${latestPromptTrace.plannerConfidence.toFixed(2)}` : ''}`
+    : '-';
+  const readinessValue = latestPromptTrace
+    ? `image ${latestPromptTrace.imageReady ? 'ready' : 'not-ready'} · video ${latestPromptTrace.videoReady ? 'ready' : 'not-ready'}`
+    : '-';
+  const dependencyValue = latestPromptTrace
+    ? `image ${latestPromptTrace.imageDependencyStatus || '-'} · video ${latestPromptTrace.videoDependencyStatus || '-'}`
+    : '-';
+  const mediaDecisionValue = latestPromptTrace
+    ? `${latestPromptTrace.mediaDecisionSource || 'none'} · ${latestPromptTrace.mediaDecisionKind || 'none'}`
+    : '-';
+  const mediaExecutionValue = latestPromptTrace
+    ? `${latestPromptTrace.mediaExecutionStatus || 'none'} · ${latestPromptTrace.mediaExecutionRouteSource || '-'}${latestPromptTrace.mediaExecutionRouteModel ? ` / ${latestPromptTrace.mediaExecutionRouteModel}` : ''}`
+    : '-';
+  const durableMemoryCount = latestPromptTrace
+    ? Object.values(latestPromptTrace.durableMemoryCountsByType || {}).reduce((sum, count) => sum + (count || 0), 0)
+    : 0;
+  const continuityValue = latestPromptTrace
+    ? `bundles ${latestPromptTrace.selectedBundleSeqs.join(', ') || '-'} · summary≤${latestPromptTrace.runningSummaryWatermark} · recall ${latestPromptTrace.sessionRecallCount}`
+    : '-';
+  const replyStyleValue = latestPromptTrace?.replyStyleProfile
+    ? `${latestPromptTrace.replyStyleProfile.responseLength} · ${latestPromptTrace.replyStyleProfile.formality} · ${latestPromptTrace.replyStyleProfile.sentiment} · ${latestPromptTrace.replyStyleProfile.pacingStyle}`
+    : '-';
+  const pacingPlanValue = latestPromptTrace?.pacingPlan
+    ? `${latestPromptTrace.pacingPlan.mode} · ${latestPromptTrace.pacingPlan.energy} · max ${latestPromptTrace.pacingPlan.maxSegments}`
+    : '-';
+  const laneBudgetValue = latestPromptTrace?.laneBudgets
+    ? Object.entries(latestPromptTrace.laneBudgets)
+      .map(([lane, budget]) => `${lane} ${budget.usedChars}/${budget.maxChars}${budget.truncated ? '!' : ''}`)
+      .join(' · ')
+    : '-';
+  const continuityHealthValue = latestPromptTrace?.continuityHealth
+    ? `summary ${latestPromptTrace.continuityHealth.runningSummary.status}(${latestPromptTrace.continuityHealth.runningSummary.consecutiveFailures}) · memory ${latestPromptTrace.continuityHealth.durableMemory.status}(${latestPromptTrace.continuityHealth.durableMemory.consecutiveFailures})`
+    : '-';
   const metricItems = [
     {
       key: 'route',
@@ -83,8 +112,9 @@ export function DiagnosticsPanel(props: Props) {
         <span>{t('Diagnostics.title')}</span>
         <span className={`text-gray-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>{CHEVRON_ICON}</span>
       </button>
-      <div className={`grid overflow-hidden transition-all duration-200 ${open ? 'mt-3 grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
-        <div className={`min-h-0 space-y-3 ${open ? 'lc-panel-expand' : ''}`}>
+      {open ? (
+        <div className="mt-3">
+          <div className="min-h-0 space-y-3 lc-panel-expand">
           <div className="grid grid-cols-2 gap-2">
             {metricItems.map((item) => (
               <div key={item.key} className="rounded-xl border border-gray-200 bg-white px-2.5 py-2">
@@ -98,11 +128,6 @@ export function DiagnosticsPanel(props: Props) {
             <p className="text-[11px] font-semibold text-gray-700">{t('Diagnostics.detailTitle')}</p>
             <div className="mt-1.5 space-y-1 text-[11px] text-gray-600">
               <p>
-                <span className="font-medium">Voice catalog:</span>{' '}
-                {voiceCatalogSource || '-'} / {voiceCatalogModelResolved || '-'}
-                {voiceCatalogVersion ? ` (v ${voiceCatalogVersion})` : ''}
-              </p>
-              <p>
                 <span className="font-medium">{t('Diagnostics.detailCompiler')}:</span>{' '}
                 {latestPromptTrace?.compilerVersion || '-'}
               </p>
@@ -113,6 +138,10 @@ export function DiagnosticsPanel(props: Props) {
                   : '-'}
               </p>
               <p>
+                <span className="font-medium">{t('Diagnostics.detailLaneBudgets')}:</span>{' '}
+                {laneBudgetValue}
+              </p>
+              <p>
                 <span className="font-medium">{t('Diagnostics.detailDroppedLayers')}:</span>{' '}
                 {latestPromptTrace?.droppedLayers?.length
                   ? latestPromptTrace.droppedLayers.join(', ')
@@ -120,40 +149,65 @@ export function DiagnosticsPanel(props: Props) {
               </p>
               <p>
                 <span className="font-medium">{t('Diagnostics.detailCriticalLayers')}:</span>{' '}
-                recentMessages={hasRecentMessagesLayer ? 'yes' : 'no'} · postHistoryInstructions={hasPostHistoryLayer ? 'yes' : 'no'}
+                recentBundles={hasRecentMessagesLayer ? 'yes' : 'no'} · replyStyle={hasPostHistoryLayer ? 'yes' : 'no'}
               </p>
               <p>
                 <span className="font-medium">{t('Diagnostics.detailMemorySlices')}:</span>{' '}
                 {latestPromptTrace
-                  ? `core ${latestPromptTrace.memorySlices?.core ?? 0} · e2e ${latestPromptTrace.memorySlices?.e2e ?? 0} · world ${latestPromptTrace.memorySlices?.worldLore ?? 0} · agent ${latestPromptTrace.memorySlices?.agentLore ?? 0}`
+                  ? `core ${latestPromptTrace.memorySlices?.core ?? 0} · e2e ${latestPromptTrace.memorySlices?.e2e ?? 0} · durable ${durableMemoryCount} · recall ${latestPromptTrace.sessionRecallCount}`
                   : '-'}
               </p>
               <p>
-                <span className="font-medium">Retry:</span>{' '}
-                {latestPromptTrace
-                  ? `${(latestPromptTrace.planner === 'stream' && typeof latestPromptTrace.streamDeltaCount === 'number')
-                    ? 'stream'
-                    : 'none'}`
-                  : '-'}
+                <span className="font-medium">{t('Diagnostics.detailReplyStyle')}:</span>{' '}
+                {replyStyleValue}
               </p>
               <p>
-                <span className="font-medium">Planner:</span>{' '}
-                {latestPromptTrace?.planner || '-'}
+                <span className="font-medium">{t('Diagnostics.detailPacingPlan')}:</span>{' '}
+                {pacingPlanValue}
+              </p>
+              <p>
+                <span className="font-medium">continuity:</span>{' '}
+                {continuityValue}
+              </p>
+              <p>
+                <span className="font-medium">{t('Diagnostics.detailContinuityHealth')}:</span>{' '}
+                {continuityHealthValue}
               </p>
               <p>
                 <span className="font-medium">{t('Diagnostics.detailSegmentParse')}:</span>{' '}
                 {latestPromptTrace?.segmentParseMode || '-'}
-                {typeof latestPromptTrace?.textSegments === 'number' || typeof latestPromptTrace?.voiceSegments === 'number'
-                  ? ` (text ${latestPromptTrace?.textSegments ?? 0} / voice ${latestPromptTrace?.voiceSegments ?? 0})`
-                  : ''}
-              </p>
-              <p>
-                <span className="font-medium">Scheduler delay:</span>{' '}
-                {typeof latestPromptTrace?.schedulerTotalDelayMs === 'number' ? `${latestPromptTrace.schedulerTotalDelayMs}ms` : '-'}
               </p>
               <p>
                 <span className="font-medium">{t('Diagnostics.detailNsfwPolicy')}:</span>{' '}
                 {latestPromptTrace?.nsfwPolicy || '-'}
+              </p>
+              <p>
+                <span className="font-medium">{t('Diagnostics.detailPlanner')}:</span>{' '}
+                {plannerValue}
+              </p>
+              <p>
+                <span className="font-medium">{t('Diagnostics.detailPlannerBlockedReason')}:</span>{' '}
+                {latestPromptTrace?.plannerBlockedReason || '-'}
+              </p>
+              <p>
+                <span className="font-medium">{t('Diagnostics.detailMediaReadiness')}:</span>{' '}
+                {readinessValue}
+              </p>
+              <p>
+                <span className="font-medium">{t('Diagnostics.detailMediaDependencies')}:</span>{' '}
+                {dependencyValue}
+              </p>
+              <p>
+                <span className="font-medium">{t('Diagnostics.detailMediaDecision')}:</span>{' '}
+                {mediaDecisionValue}
+              </p>
+              <p>
+                <span className="font-medium">{t('Diagnostics.detailMediaExecution')}:</span>{' '}
+                {mediaExecutionValue}
+              </p>
+              <p>
+                <span className="font-medium">{t('Diagnostics.detailMediaExecutionReason')}:</span>{' '}
+                {latestPromptTrace?.mediaExecutionReason || '-'}
               </p>
               <p className="truncate">
                 <span className="font-medium">{t('Diagnostics.detailError')}:</span>{' '}
@@ -166,7 +220,7 @@ export function DiagnosticsPanel(props: Props) {
             type="button"
             onClick={onHealthCheck}
             disabled={checkingHealth}
-            className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-60"
+            className="lc-btn lc-btn-secondary flex h-10 w-full items-center gap-2 px-4 text-sm font-semibold disabled:opacity-60"
           >
             {checkingHealth ? t('Diagnostics.checking') : t('Diagnostics.checkHealth')}
           </button>
@@ -183,8 +237,9 @@ export function DiagnosticsPanel(props: Props) {
                     : t('Diagnostics.notChecked')}
             </span>
           </div>
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

@@ -7,12 +7,8 @@ import type { LocalChatPromptInput } from './types.js';
 
 export function buildLocalChatCompiledPrompt(input: LocalChatPromptInput): LocalChatCompiledPrompt {
   const compiled = compileLocalChatPrompt({
-    target: input.target,
-    history: input.history || [],
-    userInput: input.userInput,
+    contextPacket: input.contextPacket,
     maxPromptChars: input.maxPromptChars,
-    maxHistoryChars: input.maxHistoryChars,
-    maxJsonChars: input.maxJsonChars,
   });
 
   emitLocalChatLog({
@@ -20,13 +16,13 @@ export function buildLocalChatCompiledPrompt(input: LocalChatPromptInput): Local
     message: 'local-chat:prompt-build:compiled',
     source: 'buildLocalChatCompiledPrompt',
     details: {
-      targetId: input.target.id,
-      worldId: input.target.worldId,
+      targetId: input.contextPacket.target.id,
+      worldId: input.contextPacket.world.worldId,
       promptChars: compiled.prompt.length,
       compilerVersion: compiled.compilerVersion,
       appliedLayers: compiled.layers.filter((layer) => layer.applied).map((layer) => layer.layer),
       droppedLayers: compiled.layers.filter((layer) => !layer.applied).map((layer) => layer.layer),
-      hasWorldContext: Boolean(input.target.world || input.target.worldview),
+      hasWorldContext: input.contextPacket.world.lines.length > 0,
     },
   });
 

@@ -170,7 +170,7 @@ export function LocalChatMessagePane({
       </div>
 
       <div className="shrink-0 px-4 pb-4 pt-2">
-        <div className="lc-card rounded-[22px] border border-gray-200/80 bg-white/95 p-3 shadow-[0_14px_34px_rgba(15,23,42,0.08)]">
+        <div className="lc-card lc-input-shell rounded-[22px] p-3">
           {voiceInputState === 'recording' ? (
             <p className="mb-2 text-[11px] font-semibold text-rose-700">{t('MessagePane.voiceRecording')}</p>
           ) : null}
@@ -186,10 +186,10 @@ export function LocalChatMessagePane({
               onClick={onToggleVoiceInput}
               disabled={!canSend || isTranscribing}
               title={isRecording ? t('MessagePane.stopVoiceInput') : t('MessagePane.startVoiceInput')}
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition-all duration-200 disabled:opacity-40 ${
+              className={`lc-btn h-10 w-10 shrink-0 ${
                 isRecording
-                  ? 'border-rose-300 bg-rose-50 text-rose-700'
-                  : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300 hover:bg-white'
+                  ? 'border-rose-300 bg-rose-50 text-rose-700 shadow-[0_8px_16px_rgba(244,63,94,0.12)]'
+                  : 'lc-btn-secondary text-gray-700'
               }`}
               style={isRecording ? { animation: 'recording-pulse 1.5s ease-in-out infinite' } : undefined}
             >
@@ -211,7 +211,7 @@ export function LocalChatMessagePane({
               <button
                 type="button"
                 onClick={onCancelVoiceInput}
-                className="h-10 rounded-xl border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                className="lc-btn lc-btn-secondary h-10 px-3 text-xs font-medium"
               >
                 {t('MessagePane.cancelVoiceInput')}
               </button>
@@ -220,7 +220,7 @@ export function LocalChatMessagePane({
               type="button"
               disabled
               title={t('MessagePane.attachmentPlaceholder')}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed"
+              className="lc-btn lc-btn-secondary h-10 w-10 shrink-0 text-gray-400"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
@@ -246,7 +246,7 @@ export function LocalChatMessagePane({
                 onSend();
               }}
               disabled={!canSend || !inputText.trim() || voiceBusy}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-mint-500 to-brand-500 text-white shadow-[0_8px_18px_rgba(14,165,150,0.32)] transition-all hover:brightness-95 disabled:opacity-40"
+              className="lc-btn lc-btn-primary h-11 w-11 shrink-0 rounded-2xl"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13" />

@@ -1,5 +1,5 @@
 import type { LocalChatReadContext, LocalChatTarget } from '../data/index.js';
-import type { LocalChatSession } from '../state/index.js';
+import type { LocalChatContextPacket, LocalChatSession } from '../state/index.js';
 import type { LocalChatAiClient } from '../runtime-ai-client.js';
 
 export type LocalChatWakeStrategy = 'PASSIVE' | 'PROACTIVE' | null;
@@ -37,7 +37,7 @@ export type LocalChatProactiveDecisionObject = {
 export type LocalChatProactiveDecisionInput = {
   aiClient: Pick<LocalChatAiClient, 'generateObject'>;
   target: LocalChatTarget;
-  historySummary: string;
+  contextPacket: LocalChatContextPacket;
 };
 
 export type LocalChatProactiveAuditEvent = {

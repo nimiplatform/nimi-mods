@@ -90,12 +90,6 @@ export function useLocalChatPageState() {
   const sessionMenuAnchorRef = useRef<HTMLDivElement>(null);
   const sessionMenuPanelRef = useRef<HTMLDivElement>(null);
 
-  const targetsState = useLocalChatTargets({
-    hookClient,
-    runtimeAgentId: String(runtimeFields.agentId || '').trim(),
-    setStatusBanner,
-  });
-
   const currentUserDisplayName = useMemo(
     () =>
       String(
@@ -105,6 +99,22 @@ export function useLocalChatPageState() {
       ),
     [currentUser],
   );
+  const currentUserId = useMemo(
+    () =>
+      String(
+        (currentUser as Record<string, unknown> | null)?.id
+          || (currentUser as Record<string, unknown> | null)?.userId
+          || (currentUser as Record<string, unknown> | null)?.sub
+          || 'local-chat-viewer',
+      ).trim() || 'local-chat-viewer',
+    [currentUser],
+  );
+  const targetsState = useLocalChatTargets({
+    hookClient,
+    viewerId: currentUserId,
+    runtimeAgentId: String(runtimeFields.agentId || '').trim(),
+    setStatusBanner,
+  });
   const currentUserAvatarUrl = useMemo(() => {
     const raw = (currentUser as Record<string, unknown> | null)?.avatarUrl;
     return typeof raw === 'string' && raw.trim() ? raw : null;
@@ -128,6 +138,7 @@ export function useLocalChatPageState() {
   });
 
   const sessionsState = useLocalChatSessions({
+    viewerId: currentUserId,
     selectedTargetId: targetsState.selectedTargetId,
     selectedTarget: targetsState.selectedTarget,
     targets: targetsState.targets,
@@ -583,9 +594,14 @@ export function useLocalChatPageState() {
     aiClient,
     inputText,
     setInputText,
+    viewerId: currentUserId,
+    viewerDisplayName: currentUserDisplayName,
     runtimeMode: runtimeFields.mode,
     chatRouteOptions: runtimeRouteState.chatRouteOptions,
+    imageRouteOptions: runtimeRouteState.imageRouteOptions,
+    videoRouteOptions: runtimeRouteState.videoRouteOptions,
     routeBinding: runtimeRouteState.routeBinding,
+    routeOverride: runtimeRouteState.routeBinding,
     routeSnapshot: runtimeRouteState.routeSnapshot
       ? {
         source: runtimeRouteState.routeSnapshot.source,

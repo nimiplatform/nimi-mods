@@ -77,7 +77,7 @@ create_agent_dto:
     source_rule: MY-PIPE-005
   - field: ownershipType
     provenance: hard-coded
-    source: WORLD_OWNED
+    source: MASTER_OWNED
     required: true
     source_rule: MY-CAP-004
   - field: referenceImageUrl

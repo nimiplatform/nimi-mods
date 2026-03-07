@@ -10,6 +10,10 @@ import {
   persistLocalChatRouteBinding,
 } from '../services/route/route-override-store.js';
 import { emitLocalChatLog } from '../logging.js';
+import {
+  resolveLocalRuntimeModelsForScenario,
+  resolveModelsForScenario,
+} from '../services/route/connector-model-capabilities.js';
 import type { HealthStatus } from '../types.js';
 import { buildRouteBindingForConnector, buildRouteBindingForModel, buildRouteBindingForSource } from './runtime-route/override-actions.js';
 import { loadRouteOptions, resolveRouteSnapshot, runRouteHealthCheck } from './runtime-route/queries.js';
@@ -22,6 +26,41 @@ type RouteOptionsCapability =
   | 'video.generate'
   | 'audio.synthesize'
   | 'audio.transcribe';
+
+export function hasValidTokenApiChatModelSelection(input: {
+  model: string;
+  models: string[];
+  modelCapabilities?: Record<string, string[]>;
+}): boolean {
+  const model = String(input.model || '').trim();
+  if (!model) {
+    return false;
+  }
+  return resolveModelsForScenario({
+    models: input.models,
+    modelCapabilities: input.modelCapabilities,
+    scenario: 'text.generate',
+  }).includes(model);
+}
+
+export function hasValidLocalRuntimeChatModelSelection(input: {
+  model: string;
+  localModelId?: string;
+  models: Array<{ localModelId?: string; model: string; capabilities?: string[] }>;
+}): boolean {
+  const model = String(input.model || '').trim();
+  const localModelId = String(input.localModelId || '').trim();
+  if (!model && !localModelId) {
+    return false;
+  }
+  return resolveLocalRuntimeModelsForScenario({
+    models: input.models,
+    scenario: 'text.generate',
+  }).some((candidate) => (
+    String(candidate.model || '').trim() === model
+    || String(candidate.localModelId || '').trim() === localModelId
+  ));
+}
 
 export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
   const [healthStatus, setHealthStatus] = useState<HealthStatus>('idle');

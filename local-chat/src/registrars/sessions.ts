@@ -35,14 +35,16 @@ export async function registerLocalChatSessionCapabilities(input: {
     capability: LOCAL_CHAT_DATA_API_SESSIONS_LIST,
     handler: async (query) => {
       const targetId = readStringField(query, 'targetId');
-      return listLocalChatSessions(targetId);
+      const viewerId = readStringField(query, 'viewerId');
+      return await listLocalChatSessions(targetId, viewerId || undefined);
     },
   });
   await hookClient.data.register({
     capability: LOCAL_CHAT_DATA_API_SESSIONS_GET,
     handler: async (query) => {
       const sessionId = readStringField(query, 'sessionId');
-      return getLocalChatSession(sessionId);
+      const viewerId = readStringField(query, 'viewerId');
+      return await getLocalChatSession(sessionId, viewerId || undefined);
     },
   });
   await hookClient.data.register({
@@ -50,25 +52,26 @@ export async function registerLocalChatSessionCapabilities(input: {
     handler: async (query) => {
       const session = readSessionInput(query);
       if (session) {
-        return upsertLocalChatSession(session as LocalChatSession);
+        return await upsertLocalChatSession(session as LocalChatSession);
       }
       const targetId = readStringField(query, 'targetId');
+      const viewerId = readStringField(query, 'viewerId');
       const worldIdRaw = readStringField(query, 'worldId');
       const title = readStringField(query, 'title');
-      return upsertLocalChatSession(createLocalChatSession({
+      return await createLocalChatSession({
         targetId,
+        viewerId: viewerId || 'viewer',
         worldId: worldIdRaw || null,
         title,
-      }));
+      });
     },
   });
   await hookClient.data.register({
     capability: LOCAL_CHAT_DATA_API_SESSIONS_DELETE,
     handler: async (query) => {
       const sessionId = readStringField(query, 'sessionId');
-      deleteLocalChatSession(sessionId);
+      await deleteLocalChatSession(sessionId);
       return { ok: true };
     },
   });
 }
-

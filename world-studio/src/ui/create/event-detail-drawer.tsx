@@ -47,14 +47,14 @@ export function EventDetailDrawer(props: EventDetailDrawerProps) {
   };
 
   return (
-    <aside className="rounded-xl border border-gray-200 bg-white p-3">
+    <aside className="ui-sync-card ui-sync-card-inset p-3">
       <div className="flex items-center justify-between gap-2">
         <h4 className="text-sm font-semibold text-gray-900">
           Event Details
         </h4>
         <button
           type="button"
-          className="rounded border border-red-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-red-700"
+          className="ui-sync-btn rounded border border-red-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-red-700"
           onClick={props.onDelete}
         >
           Delete
@@ -174,7 +174,7 @@ export function EventDetailDrawer(props: EventDetailDrawerProps) {
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <button
             type="button"
-            className="rounded border border-gray-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-gray-700 disabled:opacity-50"
+            className="ui-sync-btn ui-sync-btn-secondary rounded border border-gray-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-gray-700 disabled:opacity-50"
             disabled={!autoEvidenceExcerpt}
             onClick={appendAutoEvidence}
           >
@@ -196,7 +196,7 @@ export function EventDetailDrawer(props: EventDetailDrawerProps) {
         />
       </div>
       {missingEvidence ? (
-        <p className="mt-2 rounded bg-red-50 px-2 py-1 text-[11px] text-red-700">
+        <p className="ui-sync-alert ui-sync-alert-danger mt-2 px-2 py-1 text-[11px] text-red-700">
           Primary events require evidence refs.
         </p>
       ) : null}

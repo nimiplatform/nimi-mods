@@ -121,10 +121,10 @@ export function CreateWorkbench(props: CreateWorkbenchProps) {
               key={item}
               type="button"
               onClick={() => props.onStepChange(item)}
-              className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${
+              className={`ui-sync-btn rounded-md border px-2.5 py-1 text-xs font-semibold ${
                 props.step === item
-                  ? 'border-brand-200 bg-brand-50 text-brand-700'
-                  : 'border-gray-200 bg-white text-gray-500'
+                  ? 'ui-sync-btn-selected border-brand-200 bg-brand-50 text-brand-700'
+                  : 'ui-sync-btn-secondary border-gray-200 bg-white text-gray-500'
               }`}
             >
               {item}
@@ -163,7 +163,7 @@ export function CreateWorkbench(props: CreateWorkbenchProps) {
         ) : null}
 
         {shouldShowPhase1Panel(props.step) ? (
-          <div className="mt-4">
+          <div className="ui-sync-card-inset mt-4">
             <Phase1Panel
               phase1={props.phase1}
               qualityGate={props.qualityGate}
@@ -175,7 +175,7 @@ export function CreateWorkbench(props: CreateWorkbenchProps) {
         ) : null}
 
         {props.step === 'CHECKPOINTS' ? (
-          <div className="mt-4">
+          <div className="ui-sync-card-inset mt-4">
             <CheckpointsPanel
               phase1={props.phase1}
               sourceText={props.sourceText}
@@ -195,7 +195,7 @@ export function CreateWorkbench(props: CreateWorkbenchProps) {
         ) : null}
 
         {shouldShowPhase2Panel(props.step) ? (
-          <div className="mt-4">
+          <div className="ui-sync-card-inset mt-4">
             <Phase2Panel
               phase2={props.phase2}
               assets={props.assets}
@@ -218,7 +218,7 @@ export function CreateWorkbench(props: CreateWorkbenchProps) {
         ) : null}
 
         {shouldShowDraftEditor(props.step) ? (
-          <div className="mt-4">
+          <div className="ui-sync-card-inset mt-4">
             <DraftEditorPanel
               sourceText={props.sourceText}
               worldPatch={props.worldPatch}

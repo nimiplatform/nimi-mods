@@ -28,7 +28,7 @@ type DraftEditorPanelProps = {
 export function DraftEditorPanel(props: DraftEditorPanelProps) {
   return (
     <div className="space-y-4">
-      <section className="rounded-xl border border-gray-200 bg-white p-4">
+      <section className="ui-sync-card ui-sync-card-inset p-4">
         <h3 className="text-sm font-semibold text-gray-900">Draft Editor</h3>
         <p className="mt-1 text-xs text-gray-500">
           Structured editing path. Raw JSON is only shown in debug folds.

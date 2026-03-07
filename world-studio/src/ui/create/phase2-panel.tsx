@@ -23,43 +23,43 @@ type Phase2PanelProps = {
 
 function StatusTag(props: { status: 'idle' | 'queued' | 'running' | 'succeeded' | 'failed' }) {
   const style = props.status === 'succeeded'
-    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+    ? 'ui-sync-status-success border-emerald-200 bg-emerald-50 text-emerald-700'
     : props.status === 'failed'
-      ? 'border-red-200 bg-red-50 text-red-700'
+      ? 'ui-sync-status-danger border-red-200 bg-red-50 text-red-700'
       : props.status === 'running'
-        ? 'border-brand-200 bg-brand-50 text-brand-700'
+        ? 'ui-sync-status-info border-brand-200 bg-brand-50 text-brand-700'
         : 'border-gray-200 bg-gray-50 text-gray-600';
-  return <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${style}`}>{props.status}</span>;
+  return <span className={`ui-sync-pill rounded px-1.5 py-0.5 text-[10px] font-semibold ${style}`}>{props.status}</span>;
 }
 
 export function Phase2Panel(props: Phase2PanelProps) {
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4">
+    <section className="ui-sync-card ui-sync-card-inset p-4">
       <h3 className="text-sm font-semibold text-gray-900">Synthesis Result</h3>
       {!props.phase2 ? (
         <p className="mt-2 text-xs text-gray-500">No synthesis output yet.</p>
       ) : (
         <div className="mt-3 space-y-3">
           <div className="grid gap-2 lg:grid-cols-4">
-            <div className="rounded-md border border-gray-200 p-2">
+            <div className="ui-sync-metric-card p-2">
               <div className="font-medium text-gray-800">World</div>
               <div className="text-xs text-gray-500">name: {String(props.phase2.world?.name || 'Untitled')}</div>
             </div>
-            <div className="rounded-md border border-gray-200 p-2">
+            <div className="ui-sync-metric-card p-2">
               <div className="font-medium text-gray-800">Worldview</div>
               <div className="text-xs text-gray-500">modules: {Object.keys(props.phase2.worldview || {}).length}</div>
             </div>
-            <div className="rounded-md border border-gray-200 p-2">
+            <div className="ui-sync-metric-card p-2">
               <div className="font-medium text-gray-800">Lorebooks</div>
               <div className="text-xs text-gray-500">count: {Array.isArray(props.phase2.worldLorebooks) ? props.phase2.worldLorebooks.length : 0}</div>
             </div>
-            <div className="rounded-md border border-gray-200 p-2">
+            <div className="ui-sync-metric-card p-2">
               <div className="font-medium text-gray-800">Events</div>
               <div className="text-xs text-gray-500">count: {Array.isArray(props.phase2.worldEvents) ? props.phase2.worldEvents.length : 0}</div>
             </div>
           </div>
 
-          <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
+          <div className="ui-sync-toolbar p-3">
             <div className="grid gap-3 lg:grid-cols-2">
               <label className="text-xs text-gray-700">
                 OASIS Time Flow Ratio
@@ -82,7 +82,7 @@ export function Phase2Panel(props: Phase2PanelProps) {
             </div>
           </div>
 
-          <div className="rounded-md border border-gray-200 p-3">
+          <div className="ui-sync-code-panel p-3">
             <div className="mb-1 text-xs font-semibold text-gray-800">Future Historical Events</div>
             <textarea
               className="h-28 w-full rounded-md border border-gray-300 p-2 font-mono text-xs"
@@ -91,14 +91,14 @@ export function Phase2Panel(props: Phase2PanelProps) {
             />
           </div>
 
-          <div className="rounded-md border border-gray-200 p-3">
+          <div className="ui-sync-soft-card p-3">
             <div className="flex items-center justify-between">
               <div className="text-xs font-semibold text-gray-800">World Cover</div>
               <StatusTag status={props.assets.worldCover.status} />
             </div>
             <button
               type="button"
-              className="mt-2 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 disabled:opacity-60"
+              className="ui-sync-btn ui-sync-btn-secondary mt-2 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 disabled:opacity-60"
               onClick={props.onGenerateWorldCover}
               disabled={props.working}
             >
@@ -109,7 +109,7 @@ export function Phase2Panel(props: Phase2PanelProps) {
             ) : null}
           </div>
 
-          <div className="rounded-md border border-gray-200 p-3">
+          <div className="ui-sync-card p-3">
             <div className="text-xs font-semibold text-gray-800">Character Portrait + Agent Sync</div>
             <div className="mt-2 max-h-44 space-y-2 overflow-auto">
               {props.selectedCharacters.length === 0 ? (
@@ -128,7 +128,7 @@ export function Phase2Panel(props: Phase2PanelProps) {
                     relationshipStyle: '',
                   } as WorldStudioAgentDraft);
                 return (
-                  <div key={name} className="rounded-md border border-gray-200 p-2">
+                  <div key={name} className="ui-sync-soft-card p-2">
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0 flex-1 truncate text-xs font-medium text-gray-900">{name}</div>
                       <StatusTag status={portrait.status} />
@@ -136,7 +136,7 @@ export function Phase2Panel(props: Phase2PanelProps) {
                     <div className="mt-2 flex items-center gap-2">
                       <button
                         type="button"
-                        className="rounded-md border border-gray-300 bg-white px-2 py-1 text-[11px] font-semibold text-gray-700 disabled:opacity-60"
+                        className="ui-sync-btn ui-sync-btn-secondary rounded-md border border-gray-300 bg-white px-2 py-1 text-[11px] font-semibold text-gray-700 disabled:opacity-60"
                         onClick={() => props.onGenerateCharacterPortrait(name)}
                         disabled={props.working}
                       >

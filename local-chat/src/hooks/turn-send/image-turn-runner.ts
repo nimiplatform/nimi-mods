@@ -6,6 +6,7 @@ import {
 } from '../../services/policy/nsfw-media-policy.js';
 import { resolveMediaRouteConfig, toPinnedRouteBinding } from './media-route.js';
 import type { LocalChatAiClient } from '../../runtime-ai-client.js';
+import type { LocalChatResolvedMediaRoute } from '../../types.js';
 
 export type ImageTurnRunnerResult =
   | {
@@ -91,6 +92,13 @@ export async function runImageTurn(input: {
   defaultSettings: LocalChatDefaultSettings;
   nsfwPolicy: NsfwMediaPolicy;
   fallbackRouteSource?: 'local-runtime' | 'token-api';
+  resolvedRoute?: LocalChatResolvedMediaRoute;
+  negativePrompt?: string;
+  size?: string;
+  aspectRatio?: string;
+  quality?: string;
+  style?: string;
+  count?: number;
 }): Promise<ImageTurnRunnerResult> {
   const normalizedPrompt = String(input.prompt || '').trim();
   if (!normalizedPrompt) {
@@ -125,10 +133,17 @@ export async function runImageTurn(input: {
   let resolvedRouteSource: 'local-runtime' | 'token-api' = intendedRouteSource;
 
   try {
-    const resolvedRoute = await input.aiClient.resolveRoute({
-      capability: 'image.generate',
-      routeBinding: routeConfig.routeBinding,
-    });
+    const resolvedRoute = input.resolvedRoute
+      ? {
+        source: input.resolvedRoute.source,
+        connectorId: input.resolvedRoute.connectorId || '',
+        model: input.resolvedRoute.model,
+        localModelId: input.resolvedRoute.model,
+      }
+      : await input.aiClient.resolveRoute({
+        capability: 'image.generate',
+        routeBinding: routeConfig.routeBinding,
+      });
     resolvedRouteSource = resolvedRoute.source === 'token-api' ? 'token-api' : 'local-runtime';
     if (!isMediaGenerationAllowed({
       policy: input.nsfwPolicy,
@@ -153,6 +168,14 @@ export async function runImageTurn(input: {
       routeBinding: pinnedRouteBinding,
       model: pinnedRouteBinding.model || routeConfig.model,
       prompt: normalizedPrompt,
+      negativePrompt: input.negativePrompt,
+      extensions: {
+        ...(input.size ? { size: input.size } : {}),
+        ...(input.aspectRatio ? { aspectRatio: input.aspectRatio } : {}),
+        ...(input.quality ? { quality: input.quality } : {}),
+        ...(input.style ? { style: input.style } : {}),
+        ...(typeof input.count === 'number' ? { count: input.count } : {}),
+      },
     });
     const finalRouteSource = generated.route.source === 'token-api' ? 'token-api' : 'local-runtime';
     const artifact = generated.images.find((item) => {

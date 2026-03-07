@@ -56,19 +56,60 @@ Policy decision must be recorded in assistant turn diagnostics/audit metadata ev
 
 Image/video generation must follow an append-only async pipeline:
 
-1. parse explicit media tags first (`[[IMG:...]]`, `[[VID:...]]`)
-2. dispatch text deliveries immediately
-3. enqueue media pending delivery
-4. append finalized media turn after generation/cache finalize
+1. parse explicit user media request first (deterministic parser on current user turn)
+2. run local gate before planner call (`mediaPlannerMode`, cooldown, route readiness, dependency readiness, NSFW policy)
+3. call media planner only when local gate allows automatic media
+4. treat literal `[[IMG:...]]` / `[[VID:...]]` as manual/dev override only, after explicit request and planner path
+5. dispatch text deliveries immediately
+6. append media pending or blocked delivery asynchronously without blocking text finalize
+7. replace pending media with finalized image/video delivery after generation completes
 
 Text turn success must not be blocked by media failure.
 
-## LC-PIPE-010 Media NSFW Gate Pipeline
+## LC-PIPE-010 Media Planner Failure Pipeline
 
-Media execution uses the same three-state policy as diagnostics metadata:
+Media planner failure must silently degrade to text-only:
 
-1. `disabled`: media generation is skipped
-2. `local-runtime-only`: media generation allowed only on local-runtime route source
-3. `allowed`: media generation allowed
+1. JSON parse failure must not fail the text turn
+2. planner timeout must not fail the text turn
+3. planner route / model / runtime errors must not fail the text turn
+4. diagnostics may record planner blocked reason, but UI must not surface technical planner errors to the user
 
-When blocked, the pipeline must emit a non-blocking reason code and keep text deliveries intact.
+## LC-PIPE-011 Context Assemble Pipeline
+
+Send path must assemble a single `ContextPacket` before prompt rendering:
+
+1. `viewerId` must be passed explicitly from page state
+2. target identity must be normalized before prompt rendering
+3. world context must be rendered as short text sections, not raw payload JSON
+4. recent exact history must be selected by bundle, not by flat message count
+5. context packet must include running summary, lexical session recall, and typed durable memory
+
+## LC-PIPE-012 Turn Bundle Persistence Pipeline
+
+Session truth source must persist logical conversation bundles:
+
+1. conversation truth source is `ConversationLedger`, not `sessions.v2`
+2. each user input persists as a `user` bundle
+3. each assistant turn persists as a single `assistant` bundle with ordered segments
+4. assistant `text / voice / image / video` all attach to the same bundle when they belong to the same turn
+5. `pending` media must not enter continuity; `ready / blocked / failed` media must attach back to the assistant bundle
+
+## LC-PIPE-013 Running Summary Pipeline
+
+Running summary is a first-class continuity layer:
+
+1. summary updates only cover bundles that fell out of the recent exact window
+2. summary update must be asynchronous and must not block text finalize
+3. summary failure must silently degrade without failing the turn
+4. summary must track `relationshipState / userFactsEstablished / assistantCommitments / openLoops / sceneState`
+
+## LC-PIPE-014 Durable Memory Write Pipeline
+
+Durable memory must be written by typed local-chat policy:
+
+1. durable memory write must be asynchronous and non-blocking
+2. durable memory types are at least `relationship-state / user-fact / preference / boundary / assistant-commitment / open-loop`
+3. slot-based memory types must use upsert + supersede semantics
+4. `assistant-commitment` and `open-loop` must support active/resolved lifecycle
+5. later turns must read typed durable memory from local-chat storage, not `target.payload.coreMemory/e2eMemory`

@@ -3,7 +3,6 @@ export type {
   LocalChatCoreQueryBridge,
   LocalChatReadContext,
   LocalChatTarget,
-  LocalChatHistoryMessage,
   LocalChatPromptInput,
 } from './types.js';
 export {
@@ -18,7 +17,10 @@ export {
   CORE_DATA_API_AGENT_MEMORY_E2E_LIST,
   CORE_DATA_API_AGENT_MEMORY_STATS_GET,
 } from './core-query-bridge.js';
-export { listLocalChatTargets } from './targets-list-query.js';
+export {
+  deriveLocalChatTargetsFromFriendsPayload,
+  listLocalChatTargets,
+} from './targets-list-query.js';
 export { resolveLocalChatTargetDetail } from './target-detail-query.js';
 export { buildLocalChatCompiledPrompt, buildLocalChatPrompt } from './prompt-builder.js';
 export {

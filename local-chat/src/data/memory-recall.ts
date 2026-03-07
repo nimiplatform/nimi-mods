@@ -1,4 +1,3 @@
-import type { PromptRetrievalTrace } from '../prompt/index.js';
 import { emitLocalChatLog } from '../logging.js';
 import {
   CORE_DATA_API_AGENT_MEMORY_CORE_LIST,
@@ -8,7 +7,7 @@ import {
 } from './core-query-bridge.js';
 import type { LocalChatTarget } from './types.js';
 
-type LocalChatMemoryRecallSource = PromptRetrievalTrace['recallSource'];
+type LocalChatMemoryRecallSource = 'local-index-only' | 'local-index+remote-backfill' | 'remote-only';
 
 export type LocalChatMemoryRecallResult = {
   coreMemory: string[];
@@ -239,6 +238,7 @@ async function queryE2EFallback(input: {
 
 export async function recallLocalChatMemoryForPrompt(input: {
   target: LocalChatTarget;
+  viewerId?: string;
   userInput: string;
   topK?: number;
 }): Promise<LocalChatMemoryRecallResult> {
@@ -247,7 +247,7 @@ export async function recallLocalChatMemoryForPrompt(input: {
     preferredTopK: toPositiveInt(input.topK) || 10,
     queryText,
   });
-  const entityId = resolveEntityIdFromTarget(input.target);
+  const entityId = toNonEmptyString(input.viewerId) || resolveEntityIdFromTarget(input.target);
   const recallQuery = {
     agentId: input.target.id,
     entityId: entityId || undefined,

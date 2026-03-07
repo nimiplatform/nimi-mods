@@ -27,20 +27,22 @@ export function InterviewInput(props: {
 
   return (
     <div className="flex items-end gap-2 border-t border-gray-200 bg-white px-4 py-3">
-      <textarea
-        ref={inputRef}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={handleKeyDown}
-        disabled={disabled}
-        placeholder={t('Interview.inputPlaceholder')}
-        className="max-h-24 min-h-[40px] flex-1 resize-none rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-[#4ECCA3] focus:outline-none focus:ring-1 focus:ring-[#4ECCA3] disabled:bg-gray-50 disabled:text-gray-400"
-        rows={1}
-      />
+      <div className="ui-sync-input-shell flex-1 p-2">
+        <textarea
+          ref={inputRef}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={disabled}
+          placeholder={t('Interview.inputPlaceholder')}
+          className="max-h-24 min-h-[40px] w-full resize-none rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-[#4ECCA3] focus:outline-none focus:ring-1 focus:ring-[#4ECCA3] disabled:bg-gray-50 disabled:text-gray-400"
+          rows={1}
+        />
+      </div>
       <button
         onClick={handleSend}
         disabled={disabled || !text.trim()}
-        className="rounded-xl bg-[#4ECCA3] px-4 py-2 text-sm font-medium text-white hover:bg-[#3DBB92] disabled:opacity-50"
+        className="ui-sync-btn ui-sync-btn-primary rounded-xl bg-[#4ECCA3] px-4 py-2 text-sm font-medium text-white hover:bg-[#3DBB92] disabled:opacity-50"
       >
         {t('Interview.send')}
       </button>

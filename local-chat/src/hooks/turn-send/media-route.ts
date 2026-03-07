@@ -1,8 +1,10 @@
 import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 import type { LocalChatDefaultSettings } from '../../state/index.js';
+import type { LocalChatResolvedMediaRoute } from '../../types.js';
 
 type MediaKind = 'image' | 'video';
 type MediaRouteSource = LocalChatDefaultSettings['imageRouteSource'];
+type MediaRouteCapability = 'image.generate' | 'video.generate';
 
 function normalizeRouteSource(value: string): MediaRouteSource {
   if (value === 'local-runtime' || value === 'token-api') {
@@ -22,6 +24,7 @@ export function resolveMediaRouteConfig(input: {
 }): {
   routeSource: MediaRouteSource;
   routeBinding?: RuntimeRouteBinding;
+  routeOverride?: RuntimeRouteBinding;
   model?: string;
 } {
   const routeSource = normalizeRouteSource(
@@ -51,6 +54,7 @@ export function resolveMediaRouteConfig(input: {
     return {
       routeSource,
       routeBinding: override,
+      routeOverride: override,
       model: model || undefined,
     };
   }
@@ -66,6 +70,7 @@ export function resolveMediaRouteConfig(input: {
     return {
       routeSource,
       routeBinding: override,
+      routeOverride: override,
       model: model || undefined,
     };
   }
@@ -83,6 +88,7 @@ export function resolveMediaRouteConfig(input: {
     return {
       routeSource,
       routeBinding: override,
+      routeOverride: override,
       model: model || undefined,
     };
   }
@@ -96,14 +102,33 @@ export function resolveMediaRouteConfig(input: {
 export function isMediaRouteReady(input: {
   kind: MediaKind;
   settings: LocalChatDefaultSettings;
+  routeOptions?: { selected?: RuntimeRouteBinding | null; resolvedDefault?: RuntimeRouteBinding | null } | null;
+  resolvedRoute?: LocalChatResolvedMediaRoute | null;
+  routeOptionsRevision?: number;
 }): boolean {
+  if (input.resolvedRoute) {
+    const expectedSettingsRevision = buildMediaSettingsRevision({
+      kind: input.kind,
+      settings: input.settings,
+    });
+    const expectedRouteOptionsRevision = Number.isFinite(input.routeOptionsRevision)
+      ? Math.max(0, Math.floor(Number(input.routeOptionsRevision)))
+      : 0;
+    return input.resolvedRoute.settingsRevision === expectedSettingsRevision
+      && input.resolvedRoute.routeOptionsRevision === expectedRouteOptionsRevision;
+  }
   const routeSource = normalizeRouteSource(
     input.kind === 'image'
       ? input.settings.imageRouteSource
       : input.settings.videoRouteSource,
   );
   if (routeSource === 'auto') {
-    return false;
+    return Boolean(resolveMediaRouteFromOptions({
+      kind: input.kind,
+      settings: input.settings,
+      routeOptions: input.routeOptions || null,
+      routeOptionsRevision: input.routeOptionsRevision,
+    }));
   }
   if (routeSource === 'local-runtime') {
     return true;
@@ -114,6 +139,137 @@ export function isMediaRouteReady(input: {
       : input.settings.videoConnectorId,
   );
   return Boolean(connectorId);
+}
+
+function capabilityForKind(kind: MediaKind): MediaRouteCapability {
+  return kind === 'image' ? 'image.generate' : 'video.generate';
+}
+
+function toResolvedMediaRoute(input: {
+  binding: RuntimeRouteBinding;
+  resolvedBy: LocalChatResolvedMediaRoute['resolvedBy'];
+  kind: MediaKind;
+  settings: LocalChatDefaultSettings;
+  routeOptionsRevision?: number;
+  provider?: string;
+}): LocalChatResolvedMediaRoute {
+  return {
+    source: input.binding.source,
+    ...(asTrimmedString(input.binding.connectorId) ? { connectorId: asTrimmedString(input.binding.connectorId) } : {}),
+    model: asTrimmedString(input.binding.model || input.binding.localModelId),
+    ...(asTrimmedString(input.provider) ? { provider: asTrimmedString(input.provider) } : {}),
+    resolvedBy: input.resolvedBy,
+    resolvedAt: new Date().toISOString(),
+    settingsRevision: buildMediaSettingsRevision({
+      kind: input.kind,
+      settings: input.settings,
+    }),
+    routeOptionsRevision: Number.isFinite(input.routeOptionsRevision)
+      ? Math.max(0, Math.floor(Number(input.routeOptionsRevision)))
+      : 0,
+  };
+}
+
+export function buildMediaSettingsRevision(input: {
+  kind: MediaKind;
+  settings: LocalChatDefaultSettings;
+}): string {
+  const routeConfig = resolveMediaRouteConfig({
+    kind: input.kind,
+    settings: input.settings,
+  });
+  return [
+    input.kind,
+    routeConfig.routeSource,
+    asTrimmedString(routeConfig.routeBinding?.connectorId),
+    asTrimmedString(routeConfig.routeBinding?.model || routeConfig.routeBinding?.localModelId),
+  ].join('|');
+}
+
+export function resolveMediaRouteFromOptions(input: {
+  kind: MediaKind;
+  settings: LocalChatDefaultSettings;
+  routeOptions?: { selected?: RuntimeRouteBinding | null; resolvedDefault?: RuntimeRouteBinding | null } | null;
+  routeOptionsRevision?: number;
+}): LocalChatResolvedMediaRoute | null {
+  const routeOptions = input.routeOptions || null;
+  if (!routeOptions) {
+    return null;
+  }
+  const routeConfig = resolveMediaRouteConfig({
+    kind: input.kind,
+    settings: input.settings,
+  });
+  const selected = routeOptions.selected || null;
+  const resolvedDefault = routeOptions.resolvedDefault || null;
+  if (routeConfig.routeSource === 'auto') {
+    if (resolvedDefault) {
+      return toResolvedMediaRoute({
+        binding: resolvedDefault,
+        resolvedBy: 'resolved-default',
+        kind: input.kind,
+        settings: input.settings,
+        routeOptionsRevision: input.routeOptionsRevision,
+      });
+    }
+    if (selected) {
+      return toResolvedMediaRoute({
+        binding: selected,
+        resolvedBy: 'selected',
+        kind: input.kind,
+        settings: input.settings,
+        routeOptionsRevision: input.routeOptionsRevision,
+      });
+    }
+    return null;
+  }
+  if (!routeConfig.routeBinding) {
+    return null;
+  }
+  return toResolvedMediaRoute({
+    binding: routeConfig.routeBinding,
+    resolvedBy: 'selected',
+    kind: input.kind,
+    settings: input.settings,
+    routeOptionsRevision: input.routeOptionsRevision,
+  });
+}
+
+export async function preflightResolveMediaRoute(input: {
+  aiClient: { resolveRoute: (input: { capability: MediaRouteCapability; routeBinding?: RuntimeRouteBinding }) => Promise<{
+    source: string;
+    connectorId: string;
+    model: string;
+    localModelId?: string;
+    provider?: string;
+  }> };
+  kind: MediaKind;
+  settings: LocalChatDefaultSettings;
+  fallbackSource?: 'local-runtime' | 'token-api';
+  routeOptionsRevision?: number;
+}): Promise<LocalChatResolvedMediaRoute | null> {
+  const routeConfig = resolveMediaRouteConfig({
+    kind: input.kind,
+    settings: input.settings,
+    fallbackSource: input.fallbackSource,
+  });
+  const resolved = await input.aiClient.resolveRoute({
+    capability: capabilityForKind(input.kind),
+    routeBinding: routeConfig.routeBinding,
+  });
+  return toResolvedMediaRoute({
+    binding: {
+      source: resolved.source === 'token-api' ? 'token-api' : 'local-runtime',
+      connectorId: asTrimmedString(resolved.connectorId),
+      model: asTrimmedString(resolved.model || resolved.localModelId),
+      ...(asTrimmedString(resolved.localModelId) ? { localModelId: asTrimmedString(resolved.localModelId) } : {}),
+    },
+    resolvedBy: 'preflight',
+    kind: input.kind,
+    settings: input.settings,
+    routeOptionsRevision: input.routeOptionsRevision,
+    provider: resolved.provider,
+  });
 }
 
 export function toPinnedRouteBinding(route: {
@@ -138,5 +294,27 @@ export function toPinnedRouteBinding(route: {
     connectorId: '',
     model,
     ...(localModelId ? { localModelId } : {}),
+  };
+}
+
+export function toPinnedRouteOverride(route: {
+  source: string;
+  connectorId?: string;
+  model?: string;
+  localModelId?: string;
+}): {
+  source: 'local-runtime' | 'token-api';
+  connectorId?: string;
+  model: string;
+  localModelId?: string;
+} {
+  const pinned = toPinnedRouteBinding(route);
+  if (pinned.source === 'token-api') {
+    return pinned;
+  }
+  return {
+    source: 'local-runtime',
+    model: pinned.model,
+    ...(pinned.localModelId ? { localModelId: pinned.localModelId } : {}),
   };
 }

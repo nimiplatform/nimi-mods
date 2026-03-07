@@ -6,9 +6,14 @@ import type { RuntimeStatusSidebarProps } from './types.js';
 
 type Props = {
   open: boolean;
+  loading: boolean;
   onToggle: () => void;
   imageRouteOptions: RuntimeStatusSidebarProps['imageRouteOptions'];
   videoRouteOptions: RuntimeStatusSidebarProps['videoRouteOptions'];
+  imageResolvedRoute: RuntimeStatusSidebarProps['imageResolvedRoute'];
+  videoResolvedRoute: RuntimeStatusSidebarProps['videoResolvedRoute'];
+  isImageRouteProbeLoading: boolean;
+  isVideoRouteProbeLoading: boolean;
   imageRouteSource: RuntimeStatusSidebarProps['imageRouteSource'];
   videoRouteSource: RuntimeStatusSidebarProps['videoRouteSource'];
   imageConnectorId: string;
@@ -59,6 +64,22 @@ function connectorMediaModels(input: {
   });
 }
 
+function formatResolvedRouteLabel(input: {
+  route: RuntimeStatusSidebarProps['imageResolvedRoute'] | RuntimeStatusSidebarProps['videoResolvedRoute'];
+  imageConnectors: RuntimeStatusSidebarProps['imageConnectors'];
+  videoConnectors: RuntimeStatusSidebarProps['videoConnectors'];
+}): string {
+  if (!input.route) return '';
+  if (input.route.source === 'local-runtime') {
+    return String(input.route.model || '').trim() || 'Local Runtime';
+  }
+  const connector = [...input.imageConnectors, ...input.videoConnectors]
+    .find((item) => item.id === input.route?.connectorId) || null;
+  const connectorLabel = String(connector?.label || input.route.connectorId || '').trim();
+  const model = String(input.route.model || '').trim();
+  return [connectorLabel, model].filter(Boolean).join(' · ') || 'Token API';
+}
+
 export function MediaRoutePanel(props: Props) {
   const { t } = useModTranslation('local-chat');
   const imageConnectorModels = useMemo(() => connectorMediaModels({
@@ -91,6 +112,42 @@ export function MediaRoutePanel(props: Props) {
     && !String(props.videoConnectorId || '').trim()
     && !String(props.videoModel || '').trim()
   );
+  const showSkeleton = props.loading
+    && (
+      !props.imageRouteOptions
+      || !props.videoRouteOptions
+      || (props.imageConnectors.length === 0 && props.videoConnectors.length === 0)
+    );
+  const imageResolvedLabel = useMemo(() => formatResolvedRouteLabel({
+    route: props.imageResolvedRoute,
+    imageConnectors: props.imageConnectors,
+    videoConnectors: props.videoConnectors,
+  }), [props.imageConnectors, props.imageResolvedRoute, props.videoConnectors]);
+  const videoResolvedLabel = useMemo(() => formatResolvedRouteLabel({
+    route: props.videoResolvedRoute,
+    imageConnectors: props.imageConnectors,
+    videoConnectors: props.videoConnectors,
+  }), [props.imageConnectors, props.videoConnectors, props.videoResolvedRoute]);
+  const buildRouteStatusText = (input: {
+    routeSource: 'auto' | 'local-runtime' | 'token-api';
+    loading: boolean;
+    resolvedRoute: RuntimeStatusSidebarProps['imageResolvedRoute'] | RuntimeStatusSidebarProps['videoResolvedRoute'];
+    resolvedLabel: string;
+  }): string => {
+    if (input.routeSource !== 'auto') {
+      return `${t('MediaRoute.manualRoutePrefix')}: ${input.routeSource === 'local-runtime' ? t('MediaRoute.localRuntime') : t('MediaRoute.tokenApi')}`;
+    }
+    if (input.loading) {
+      return t('MediaRoute.routeCheckingHint');
+    }
+    if (input.resolvedRoute) {
+      const routeSourceLabel = input.resolvedRoute.source === 'local-runtime'
+        ? t('MediaRoute.localRuntime')
+        : t('MediaRoute.tokenApi');
+      return `${t('MediaRoute.autoResolvedPrefix')}: ${routeSourceLabel}${input.resolvedLabel ? ` · ${input.resolvedLabel}` : ''}`;
+    }
+    return t('MediaRoute.autoUnresolvedHint');
+  };
 
   return (
     <div className="lc-card rounded-2xl p-3 text-xs">
@@ -103,8 +160,27 @@ export function MediaRoutePanel(props: Props) {
         <span>{t('MediaRoute.title')}</span>
         <span className={`text-gray-400 transition-transform duration-200 ${props.open ? 'rotate-180' : ''}`}>{CHEVRON_ICON}</span>
       </button>
-      <div className={`grid overflow-hidden transition-all duration-200 ${props.open ? 'mt-3 grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
-        <div className={`min-h-0 space-y-4 ${props.open ? 'lc-panel-expand' : ''}`}>
+      {props.open ? (
+        <div className="mt-3">
+          <div className="min-h-0 space-y-4 lc-panel-expand">
+          {props.loading ? (
+            <p className="rounded-lg border border-sky-100 bg-sky-50 px-2 py-1.5 text-[11px] text-slate-600">
+              {t('MediaRoute.loadingHint')}
+            </p>
+          ) : null}
+          {showSkeleton ? (
+            <div className="space-y-3">
+              {[0, 1].map((index) => (
+                <div key={`media-route-skeleton-${index}`} className="rounded-xl border border-gray-200 bg-white p-2">
+                  <div className="lc-skeleton-bar mb-2 h-3 w-24 rounded-md" />
+                  <div className="lc-skeleton-bar mb-2 h-8 w-full rounded-lg" />
+                  <div className="lc-skeleton-bar mb-2 h-8 w-full rounded-lg" />
+                  <div className="lc-skeleton-bar h-8 w-full rounded-lg" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <>
           {imageConnectorMissing || videoConnectorMissing ? (
             <p className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-700">
               {t('MediaRoute.connectorRequiredHint')}
@@ -117,6 +193,14 @@ export function MediaRoutePanel(props: Props) {
           ) : null}
           <div className="space-y-2 rounded-xl border border-gray-200 bg-white p-2">
             <p className="text-[11px] font-semibold text-gray-700">{t('MediaRoute.imageTitle')}</p>
+            <p className="rounded-lg border border-gray-100 bg-gray-50 px-2 py-1 text-[11px] text-gray-600">
+              {buildRouteStatusText({
+                routeSource: props.imageRouteSource,
+                loading: props.isImageRouteProbeLoading,
+                resolvedRoute: props.imageResolvedRoute,
+                resolvedLabel: imageResolvedLabel,
+              })}
+            </p>
             <select
               value={props.imageRouteSource}
               onChange={(event) => props.onImageRouteSourceChange(event.target.value as 'auto' | 'local-runtime' | 'token-api')}
@@ -153,6 +237,14 @@ export function MediaRoutePanel(props: Props) {
 
           <div className="space-y-2 rounded-xl border border-gray-200 bg-white p-2">
             <p className="text-[11px] font-semibold text-gray-700">{t('MediaRoute.videoTitle')}</p>
+            <p className="rounded-lg border border-gray-100 bg-gray-50 px-2 py-1 text-[11px] text-gray-600">
+              {buildRouteStatusText({
+                routeSource: props.videoRouteSource,
+                loading: props.isVideoRouteProbeLoading,
+                resolvedRoute: props.videoResolvedRoute,
+                resolvedLabel: videoResolvedLabel,
+              })}
+            </p>
             <select
               value={props.videoRouteSource}
               onChange={(event) => props.onVideoRouteSourceChange(event.target.value as 'auto' | 'local-runtime' | 'token-api')}
@@ -186,8 +278,11 @@ export function MediaRoutePanel(props: Props) {
               ))}
             </datalist>
           </div>
+            </>
+          )}
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

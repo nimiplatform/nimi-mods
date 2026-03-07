@@ -35,7 +35,7 @@ test('textplay prompt includes explicit anti-cliche bans and replacement example
   assert.match(prompt, /瞳孔骤然收缩成一线/);
 });
 
-test('textplay opening prompt enforces pre-event no-spoiler constraints', () => {
+test('textplay opening prompt enforces future-threshold no-spoiler constraints', () => {
   const prompt = buildTextplayPrompt({
     normalized: {
       storyId: 'story-1',
@@ -51,6 +51,7 @@ test('textplay opening prompt enforces pre-event no-spoiler constraints', () => 
       systemPayload: {
         opening: {
           mode: 'story-start',
+          entryEventHorizon: 'FUTURE',
           noSpoiler: true,
           instruction: '禁止剧透并保持事件前态。',
         },
@@ -71,6 +72,48 @@ test('textplay opening prompt enforces pre-event no-spoiler constraints', () => 
   assert.match(prompt, /Opening mode: this is the pre-event threshold/i);
   assert.match(prompt, /with no future spoilers/i);
   assert.match(prompt, /Non-user trigger: focus on world\/NPC-driven development/i);
+});
+
+test('textplay opening prompt adapts constraints for aftermath stories', () => {
+  const prompt = buildTextplayPrompt({
+    normalized: {
+      storyId: 'story-1',
+      turnId: 'turn-start',
+      triggerSource: 'SystemEvent',
+      userMessage: '',
+      playerId: 'player-1',
+      playerName: '韩云',
+      playerIdentity: '灵界散修',
+      sceneSummary: '暴雨后的港口遍地碎木。',
+      agentSummary: '韩立正在清点残留线索。',
+      worldStyleSummary: '仙侠写实风，强调感官与行动反馈。',
+      systemPayload: {
+        opening: {
+          mode: 'story-start',
+          entryMode: 'PRE_EVENT',
+          entryEventHorizon: 'PAST',
+          targetEventMaterialOnly: true,
+          noSpoiler: true,
+          instruction: '从目标事件发生前切入，既有版本仅作素材。',
+        },
+      },
+      pacingContext: { currentTension: 0.5, tensionBand: 'MODERATE' },
+    },
+    visibleEvents: [
+      {
+        eventId: 'evt-1',
+        type: 'scene-beat',
+        visibility: 'public',
+        content: '甲板上残留着被雨水泡开的血迹。',
+        payload: {},
+      },
+    ],
+  });
+
+  assert.match(prompt, /Opening Entry Mode: PRE_EVENT/i);
+  assert.match(prompt, /selected target event has NOT happened yet in this run/i);
+  assert.match(prompt, /reference materials only/i);
+  assert.doesNotMatch(prompt, /entry event already happened/i);
 });
 
 test('textplay HIGH tension band prompt includes short-sentence pacing instruction', () => {

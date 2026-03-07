@@ -3,21 +3,15 @@ import { runLocalChatTurnSend } from './turn-send/send-flow.js';
 import type { TurnDeliveryScheduleHandle } from './turn-send/session-persist.js';
 import type { LocalChatScheduleCancelReason, UseLocalChatTurnSendInput } from './turn-send/types.js';
 
-function buildTurnSendContextKey(input: UseLocalChatTurnSendInput): string {
+export function buildTurnSendContextKey(input: UseLocalChatTurnSendInput): string {
   const targetId = String(input.selectedTarget?.id || '').trim();
   const sessionId = String(input.selectedSessionId || '').trim();
-  const routeBindingSource = String(input.routeBinding?.source || '').trim();
-  const routeBindingConnector = String(input.routeBinding?.connectorId || '').trim();
-  const routeBindingModel = String(input.routeBinding?.model || '').trim();
+  const routeBinding = input.routeBinding || input.routeOverride || null;
+  const routeBindingSource = String(routeBinding?.source || '').trim();
+  const routeBindingConnector = String(routeBinding?.connectorId || '').trim();
+  const routeBindingModel = String(routeBinding?.model || '').trim();
   const routeSnapshotSource = String(input.routeSnapshot?.source || '').trim();
   const routeSnapshotModel = String(input.routeSnapshot?.model || '').trim();
-  const imageRouteSource = String(input.defaultSettings.imageRouteSource || '').trim();
-  const imageConnectorId = String(input.defaultSettings.imageConnectorId || '').trim();
-  const imageModel = String(input.defaultSettings.imageModel || '').trim();
-  const videoRouteSource = String(input.defaultSettings.videoRouteSource || '').trim();
-  const videoConnectorId = String(input.defaultSettings.videoConnectorId || '').trim();
-  const videoModel = String(input.defaultSettings.videoModel || '').trim();
-  const mediaTriggerMode = String(input.defaultSettings.mediaTriggerMode || '').trim();
   const segmentationMode = String(input.defaultSettings.segmentationMode || '').trim();
   const allowNsfwMedia = input.defaultSettings.allowNsfwMedia ? '1' : '0';
   return [
@@ -28,13 +22,6 @@ function buildTurnSendContextKey(input: UseLocalChatTurnSendInput): string {
     routeBindingModel,
     routeSnapshotSource,
     routeSnapshotModel,
-    imageRouteSource,
-    imageConnectorId,
-    imageModel,
-    videoRouteSource,
-    videoConnectorId,
-    videoModel,
-    mediaTriggerMode,
     segmentationMode,
     allowNsfwMedia,
   ].join('|');
@@ -48,15 +35,11 @@ export function useLocalChatTurnSend(input: UseLocalChatTurnSendInput) {
     input.routeBinding?.connectorId,
     input.routeBinding?.model,
     input.routeBinding?.source,
+    input.routeOverride?.connectorId,
+    input.routeOverride?.model,
+    input.routeOverride?.source,
     input.routeSnapshot?.model,
     input.routeSnapshot?.source,
-    input.defaultSettings.imageRouteSource,
-    input.defaultSettings.imageConnectorId,
-    input.defaultSettings.imageModel,
-    input.defaultSettings.videoRouteSource,
-    input.defaultSettings.videoConnectorId,
-    input.defaultSettings.videoModel,
-    input.defaultSettings.mediaTriggerMode,
     input.defaultSettings.segmentationMode,
     input.defaultSettings.allowNsfwMedia,
     input.selectedSessionId,

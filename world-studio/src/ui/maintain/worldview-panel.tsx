@@ -24,7 +24,7 @@ function ModuleEditor(props: {
     ? (props.value as Record<string, unknown>)
     : {};
   return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 p-2.5">
+    <div className="ui-sync-soft-card p-2.5">
       <KeyValueObjectEditor
         label={props.label}
         value={objectValue}
@@ -44,17 +44,17 @@ export function WorldviewPanel(props: WorldviewPanelProps) {
   });
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4">
+    <section className="ui-sync-card ui-sync-card-inset p-4">
       <h3 className="text-sm font-semibold text-gray-900">Worldview</h3>
       <p className="mt-1 text-xs text-gray-500">
         Required modules: `timeModel`, `spaceTopology`, `causality`, `coreSystem`.
       </p>
       {missingModules.length > 0 ? (
-        <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-800">
+        <div className="ui-sync-alert ui-sync-alert-warning mt-2 px-2.5 py-2 text-xs text-amber-800">
           Missing/empty modules: {missingModules.join(', ')}
         </div>
       ) : (
-        <div className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-xs text-emerald-800">
+        <div className="ui-sync-alert ui-sync-alert-success mt-2 px-2.5 py-2 text-xs text-emerald-800">
           All required worldview modules are ready.
         </div>
       )}
@@ -107,7 +107,7 @@ export function WorldviewPanel(props: WorldviewPanelProps) {
         />
       </div>
 
-      <details className="mt-3 rounded border border-gray-200 bg-gray-50 p-2">
+      <details className="ui-sync-code-panel mt-3 p-2">
         <summary className="cursor-pointer text-xs font-semibold text-gray-700">Raw JSON (Debug)</summary>
         <textarea
           className="mt-2 h-52 w-full rounded-md border border-gray-300 bg-gray-100 p-2 font-mono text-xs text-gray-600"

@@ -1,5 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {
+  createLocalChatSession,
+  resetLocalChatConversationLedgerForTests,
+} from '../src/state/index.ts';
 import { persistSuccessfulTurn } from '../src/hooks/turn-send/session-persist.ts';
 
 function createStateStore(initialMessages) {
@@ -14,7 +18,17 @@ function createStateStore(initialMessages) {
   };
 }
 
+test.beforeEach(async () => {
+  await resetLocalChatConversationLedgerForTests();
+});
+
 test('streaming placeholder is replaced by first finalized assistant segment', async () => {
+  const session = await createLocalChatSession({
+    targetId: 'target-1',
+    viewerId: 'viewer.test',
+    worldId: 'world.test',
+    title: 'Stream Lifecycle Fixture',
+  });
   const streamingPlaceholder = {
     id: 'stream-txn-1',
     role: 'assistant',
@@ -28,9 +42,10 @@ test('streaming placeholder is replaced by first finalized assistant segment', a
   };
   const messageStore = createStateStore([streamingPlaceholder]);
 
-  const schedule = persistSuccessfulTurn({
-    sessionId: 'session-does-not-matter-in-node-test',
+  const schedule = await persistSuccessfulTurn({
+    sessionId: session.id,
     targetId: 'target-1',
+    viewerId: session.viewerId,
     turnTxnId: 'txn-1',
     userMessage: {
       id: 'user-1',

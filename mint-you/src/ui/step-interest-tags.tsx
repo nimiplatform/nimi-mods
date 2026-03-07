@@ -30,11 +30,11 @@ export function StepInterestTags() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 p-4">
+    <div className="ui-sync-card ui-sync-card-inset mx-auto my-4 max-w-2xl space-y-6 p-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-gray-900">{t('InterestTags.title')}</h2>
         <span
-          className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+          className={`ui-sync-pill rounded-full px-2.5 py-0.5 text-xs font-medium ${
             canProceed ? 'bg-[#4ECCA3]/10 text-[#4ECCA3]' : 'bg-gray-100 text-gray-500'
           }`}
         >
@@ -55,10 +55,10 @@ export function StepInterestTags() {
                   <button
                     key={tag.id}
                     onClick={() => toggleTag(tag.id)}
-                    className={`rounded-full border px-3 py-1 text-sm transition-colors ${
+                    className={`ui-sync-btn rounded-full border px-3 py-1 text-sm transition-colors ${
                       isSelected
-                        ? 'border-[#4ECCA3] bg-[#4ECCA3] text-white'
-                        : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                        ? 'ui-sync-btn-primary border-[#4ECCA3] bg-[#4ECCA3] text-white'
+                        : 'ui-sync-btn-secondary border-gray-300 text-gray-600 hover:bg-gray-50'
                     } ${!isSelected && selected.length >= MAX_INTEREST_TAGS ? 'cursor-not-allowed opacity-40' : ''}`}
                     disabled={!isSelected && selected.length >= MAX_INTEREST_TAGS}
                   >
@@ -74,14 +74,14 @@ export function StepInterestTags() {
       <div className="flex gap-3 pt-2">
         <button
           onClick={() => store.goBack()}
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+          className="ui-sync-btn ui-sync-btn-secondary rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
         >
           {t('Common.back')}
         </button>
         <button
           onClick={handleNext}
           disabled={!canProceed}
-          className="flex-1 rounded-lg bg-[#4ECCA3] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#3DBB92] disabled:opacity-50"
+          className="ui-sync-btn ui-sync-btn-primary flex-1 rounded-lg bg-[#4ECCA3] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#3DBB92] disabled:opacity-50"
         >
           {t('InterestTags.next')}
         </button>

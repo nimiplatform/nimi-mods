@@ -218,7 +218,7 @@ export function LocalChatHeader({
 
             <button
               type="button"
-              className="mt-3 w-full rounded-lg bg-brand-500 px-3 py-2 text-xs font-medium text-white hover:bg-brand-600"
+              className="lc-btn lc-btn-primary mt-3 w-full px-3 py-2 text-xs font-medium"
               onClick={() => {
                 onOpenSelectedTargetProfile();
                 setAgentIntroOpen(false);
@@ -245,10 +245,12 @@ export function LocalChatHeader({
         />
         <button
           type="button"
-          onClick={() => setIsRuntimeSidebarOpen((previous) => !previous)}
+          onClick={() => {
+            setIsRuntimeSidebarOpen((previous) => !previous);
+          }}
           title={isRuntimeSidebarOpen ? t('Header.hideRuntime') : t('Header.showRuntime')}
           aria-label={isRuntimeSidebarOpen ? t('Header.hideRuntime') : t('Header.showRuntime')}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+          className="lc-btn lc-btn-secondary h-8 w-8 text-gray-700"
         >
           {isRuntimeSidebarOpen ? sidebarHideIcon : sidebarShowIcon}
         </button>

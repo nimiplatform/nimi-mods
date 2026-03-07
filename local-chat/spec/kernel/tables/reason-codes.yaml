@@ -100,10 +100,25 @@ codes:
     blocking: false
     action_hint: stream-segmentation-succeeded
     source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_CONTEXT_ASSEMBLE_OK
+    stage: context-assemble
+    blocking: false
+    action_hint: context-packet-rendered
+    source_rule: LC-ERR-001
   - code: LOCAL_CHAT_STREAM_FINALIZE_OK
-    stage: turns-persist
+    stage: turn-bundle-persist
     blocking: false
     action_hint: streaming-placeholder-finalized
+    source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_RUNNING_SUMMARY_UPDATE_OK
+    stage: running-summary-update
+    blocking: false
+    action_hint: running-summary-refreshed
+    source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_DURABLE_MEMORY_WRITE_OK
+    stage: durable-memory-write
+    blocking: false
+    action_hint: durable-memory-updated
     source_rule: LC-ERR-001
   - code: LOCAL_CHAT_NSFW_POLICY_GUARDRAIL_OK
     stage: assistant-generate
@@ -111,14 +126,39 @@ codes:
     action_hint: nsfw-policy-guardrail-applied
     source_rule: LC-ERR-001
   - code: LOCAL_CHAT_MEDIA_INTENT_PARSE_OK
-    stage: media-intent-parse
+    stage: media-marker-override
     blocking: false
     action_hint: media-intent-detected
     source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_EXPLICIT_MEDIA_REQUEST_PARSE_OK
+    stage: explicit-request-parse
+    blocking: false
+    action_hint: explicit-media-request-detected
+    source_rule: LC-ERR-001
   - code: LOCAL_CHAT_MEDIA_INTENT_INVALID
-    stage: media-intent-parse
+    stage: media-marker-override
     blocking: false
     action_hint: ignore-invalid-media-tag
+    source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_MEDIA_PLANNER_OK
+    stage: media-planner-decision
+    blocking: false
+    action_hint: media-planner-decision-recorded
+    source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_MEDIA_PLANNER_COOLDOWN_BLOCKED
+    stage: media-local-gate
+    blocking: false
+    action_hint: skip-auto-media-during-cooldown
+    source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_MEDIA_DEPENDENCY_NOT_READY
+    stage: media-local-gate
+    blocking: false
+    action_hint: refresh-media-dependencies
+    source_rule: LC-ERR-001
+  - code: LOCAL_CHAT_MEDIA_PLANNER_TIMEOUT
+    stage: media-planner-decision
+    blocking: false
+    action_hint: degrade-to-text-only
     source_rule: LC-ERR-001
   - code: LOCAL_CHAT_MEDIA_NSFW_BLOCKED
     stage: media-nsfw-gate

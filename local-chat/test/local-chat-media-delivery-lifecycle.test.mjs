@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { replacePendingAssistantMessage } from '../src/hooks/turn-send/session-persist.ts';
+import {
+  createLocalChatSession,
+  createLocalChatTurnBundle,
+  resetLocalChatConversationLedgerForTests,
+} from '../src/state/index.ts';
+import { commitAssistantMessage } from '../src/hooks/turn-send/session-persist.ts';
 
 function createStateStore(initialMessages) {
   let messages = [...initialMessages];
@@ -14,7 +19,30 @@ function createStateStore(initialMessages) {
   };
 }
 
-test('media pending message is replaced by finalized image message', () => {
+test.beforeEach(async () => {
+  await resetLocalChatConversationLedgerForTests();
+});
+
+async function createAssistantBundleFixture() {
+  const session = await createLocalChatSession({
+    targetId: 'target-1',
+    viewerId: 'viewer.test',
+    worldId: 'world.test',
+    title: 'Media Delivery Fixture',
+  });
+  const assistantBundle = await createLocalChatTurnBundle({
+    conversationId: session.id,
+    role: 'assistant',
+  });
+  return {
+    sessionId: session.id,
+    viewerId: session.viewerId,
+    assistantBundleId: assistantBundle.id,
+  };
+}
+
+test('commit assistant message replaces pending image message with finalized image', async () => {
+  const fixture = await createAssistantBundleFixture();
   const store = createStateStore([
     {
       id: 'pending-image-1',
@@ -28,10 +56,12 @@ test('media pending message is replaced by finalized image message', () => {
     },
   ]);
 
-  replacePendingAssistantMessage({
-    sessionId: 'session-not-found',
+  await commitAssistantMessage({
+    sessionId: fixture.sessionId,
     targetId: 'target-1',
-    pendingMessageId: 'pending-image-1',
+    viewerId: fixture.viewerId,
+    assistantBundleId: fixture.assistantBundleId,
+    messageId: 'pending-image-1',
     setMessages: (next) => store.set(next),
     setSessions: () => {},
     message: {
@@ -56,7 +86,8 @@ test('media pending message is replaced by finalized image message', () => {
   assert.equal(messages[0]?.meta?.mediaStatus, 'ready');
 });
 
-test('video pending message is replaced by finalized video message', () => {
+test('commit assistant message replaces pending video message with finalized video', async () => {
+  const fixture = await createAssistantBundleFixture();
   const store = createStateStore([
     {
       id: 'pending-video-1',
@@ -70,10 +101,12 @@ test('video pending message is replaced by finalized video message', () => {
     },
   ]);
 
-  replacePendingAssistantMessage({
-    sessionId: 'session-not-found',
+  await commitAssistantMessage({
+    sessionId: fixture.sessionId,
     targetId: 'target-1',
-    pendingMessageId: 'pending-video-1',
+    viewerId: fixture.viewerId,
+    assistantBundleId: fixture.assistantBundleId,
+    messageId: 'pending-video-1',
     setMessages: (next) => store.set(next),
     setSessions: () => {},
     message: {
@@ -98,13 +131,16 @@ test('video pending message is replaced by finalized video message', () => {
   assert.equal(messages[0]?.meta?.mediaStatus, 'ready');
 });
 
-test('replace pending appends finalized message when pending id does not exist', () => {
+test('commit assistant message appends finalized message when target id does not exist', async () => {
+  const fixture = await createAssistantBundleFixture();
   const store = createStateStore([]);
 
-  replacePendingAssistantMessage({
-    sessionId: 'session-not-found',
+  await commitAssistantMessage({
+    sessionId: fixture.sessionId,
     targetId: 'target-1',
-    pendingMessageId: 'missing-pending-id',
+    viewerId: fixture.viewerId,
+    assistantBundleId: fixture.assistantBundleId,
+    messageId: 'missing-pending-id',
     setMessages: (next) => store.set(next),
     setSessions: () => {},
     message: {

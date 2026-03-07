@@ -62,7 +62,7 @@ cases:
     test_reference: local-chat-nsfw-policy.test.mjs
     source_rule: LC-ACC-002
   - id: LC-011-MEDIA-INTENT-PARSER
-    description: Media intent parser supports explicit tags and image heuristic fallback.
+    description: Media intent parser supports explicit tags, escaped markers, malformed marker fallback, and marker-only cleanup.
     expected_ok: true
     reason_code: LOCAL_CHAT_MEDIA_INTENT_PARSE_OK
     test_reference: local-chat-media-intent-parser.test.mjs
@@ -84,41 +84,53 @@ cases:
     expected_ok: true
     reason_code: LOCAL_CHAT_MEDIA_CACHE_WRITE_OK
     source_rule: LC-ACC-002
-  - id: LC-015-VOICE-STRICT-OFF-TEXT-ONLY
-    description: When enableVoice is false, assistant auto segments remain text and voice delivery is not scheduled.
+  - id: LC-015-EXPLICIT-MEDIA-REQUEST-PARSER
+    description: Explicit media request parser recognizes Chinese/English requests, negation, and video priority.
     expected_ok: true
-    reason_code: LOCAL_CHAT_VOICE_DISABLED_TEXT_ONLY
-    test_reference: local-chat-voice-disabled.test.mjs
+    reason_code: LOCAL_CHAT_EXPLICIT_MEDIA_REQUEST_PARSE_OK
+    test_reference: local-chat-explicit-media-request-parser.test.mjs
     source_rule: LC-ACC-002
-  - id: LC-016-STT-STRICT-OFF-FAIL-CLOSE
-    description: When enableVoice is false, voice input fails before recording or transcribe flow starts.
+  - id: LC-016-MEDIA-PLANNER-AUTO-OR-DEGRADE
+    description: Media planner returns structured auto decisions and silently degrades on invalid planner output.
     expected_ok: true
-    reason_code: LOCAL_CHAT_STT_VOICE_DISABLED
-    test_reference: local-chat-voice-disabled.test.mjs
+    reason_code: LOCAL_CHAT_MEDIA_PLANNER_OK
+    test_reference: local-chat-media-planner.test.mjs
     source_rule: LC-ACC-002
-  - id: LC-017-VOICE-CATALOG-MODEL-SCOPED
-    description: Voice selection is scoped only by current route binding and resolved model, without provider filtering.
+  - id: LC-017-MEDIA-PLANNER-COOLDOWN-GATE
+    description: Automatic media planner is skipped when recent media cooldown or pending media gate is active.
     expected_ok: true
-    reason_code: LOCAL_CHAT_VOICE_MODEL_SCOPED_OK
-    test_reference: local-chat-voice-dropdown.e2e.test.ts
+    reason_code: LOCAL_CHAT_MEDIA_PLANNER_COOLDOWN_BLOCKED
+    test_reference: local-chat-media-trigger-planner.e2e.test.ts
     source_rule: LC-ACC-002
-  - id: LC-018-TTS-BYTES-PLAYBACK
-    description: Bytes-only TTS artifacts create a playable Blob URL and do not raise LOCAL_CHAT_TTS_PLAYBACK_FAILED.
+  - id: LC-018-MEDIA-DEPENDENCY-CACHE-GATE
+    description: Stale or not-ready media dependency cache prevents automatic media execution until refreshed ready.
     expected_ok: true
-    reason_code: LOCAL_CHAT_TTS_BYTES_PLAYBACK_OK
-    test_reference: local-chat-voice-playback.test.ts
+    reason_code: LOCAL_CHAT_MEDIA_DEPENDENCY_NOT_READY
+    test_reference: local-chat-media-trigger-planner.e2e.test.ts
     source_rule: LC-ACC-002
-  - id: LC-019-SPEECH-CATALOG-STRICT-OFF
-    description: When enableVoice is false, Local-Chat does not query preset voices or require TTS/STT dependencies.
+  - id: LC-019-MEDIA-PLANNER-TIMEOUT-DEGRADE
+    description: Media planner timeout degrades to text-only and records non-blocking diagnostics.
     expected_ok: true
-    reason_code: LOCAL_CHAT_VOICE_CATALOG_SKIPPED_WHEN_DISABLED
-    test_reference: local-chat-voice-disabled.test.mjs
+    reason_code: LOCAL_CHAT_MEDIA_PLANNER_TIMEOUT
+    test_reference: local-chat-media-trigger-planner.e2e.test.ts
     source_rule: LC-ACC-002
-  - id: LC-020-DEPENDENCY-SNAPSHOT-CANONICAL-CAPABILITY
-    description: Local-Chat consumes dependency snapshot repair actions through runtime canonical capability tokens instead of legacy chat/tts/stt aliases.
+  - id: LC-020-CONTEXT-BUNDLE-PROJECTION
+    description: Conversation ledger projects user/assistant bundles into UI messages while preserving media semantic continuity.
     expected_ok: true
-    reason_code: LOCAL_CHAT_DEPENDENCY_CAPABILITY_CANONICAL
-    test_reference: local-chat-dependency-capability.test.ts
+    reason_code: LOCAL_CHAT_CONTEXT_ASSEMBLE_OK
+    test_reference: local-chat-continuity-ledger.test.mjs
+    source_rule: LC-ACC-002
+  - id: LC-021-RUNNING-SUMMARY-NONBLOCKING
+    description: Running summary updates only after bundle persistence and never blocks text turn finalize.
+    expected_ok: true
+    reason_code: LOCAL_CHAT_RUNNING_SUMMARY_UPDATE_OK
+    test_reference: local-chat-continuity-ledger.test.mjs
+    source_rule: LC-ACC-002
+  - id: LC-022-DURABLE-MEMORY-WRITE
+    description: Typed durable memory writes user facts, relationship state, commitments, and open loops back into local-chat storage.
+    expected_ok: true
+    reason_code: LOCAL_CHAT_DURABLE_MEMORY_WRITE_OK
+    test_reference: local-chat-continuity-ledger.test.mjs
     source_rule: LC-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:local-chat-kernel-docs

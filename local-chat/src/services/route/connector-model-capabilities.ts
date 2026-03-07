@@ -1,10 +1,31 @@
-import type { RuntimeCanonicalCapability } from '@nimiplatform/sdk/mod/runtime-route';
 import { filterModelsForScenario, filterModelsForSpeechSynthesis } from '@nimiplatform/sdk/mod/model-options';
 
-type ExtendedScenario = RuntimeCanonicalCapability;
+type LegacyScenario = 'chat' | 'tts' | 'stt';
+type LegacyExtendedScenario = LegacyScenario | 'image' | 'video';
+type CanonicalScenario =
+  | 'text.generate'
+  | 'audio.synthesize'
+  | 'audio.transcribe'
+  | 'image.generate'
+  | 'video.generate';
+export type ExtendedScenario = LegacyExtendedScenario | CanonicalScenario;
+type LocalRuntimeModelLike = {
+  localModelId?: string;
+  model: string;
+  capabilities?: string[];
+};
 
-function dedupeModelIds(models: string[]): string[] {
+export function dedupeModelIds(models: string[]): string[] {
   return Array.from(new Set(models.map((model) => String(model || '').trim()).filter(Boolean)));
+}
+
+function normalizeScenario(scenario: ExtendedScenario): LegacyExtendedScenario {
+  if (scenario === 'text.generate') return 'chat';
+  if (scenario === 'audio.synthesize') return 'tts';
+  if (scenario === 'audio.transcribe') return 'stt';
+  if (scenario === 'image.generate') return 'image';
+  if (scenario === 'video.generate') return 'video';
+  return scenario;
 }
 
 function normalizeCapabilities(capabilities: string[]): string[] {
@@ -32,47 +53,66 @@ function capabilitiesForModel(
 }
 
 function matchesScenarioByCapability(capabilities: string[], scenario: ExtendedScenario): boolean {
+  const normalizedScenario = normalizeScenario(scenario);
   const normalized = normalizeCapabilities(capabilities);
   if (normalized.length === 0) return false;
   const hasAny = (...tokens: string[]) => tokens.some((token) => normalized.includes(token));
-  if (scenario === 'audio.synthesize') {
+  if (normalizedScenario === 'chat') {
+    return hasAny(
+      'chat',
+      'text',
+      'completion',
+      'llm.text.generate',
+      'llm.text.stream',
+      'text.generate',
+    );
+  }
+  if (normalizedScenario === 'tts') {
     return hasAny(
       'tts',
       'audio.synthesize',
       'speech.synthesize',
+      'llm.speech.synthesize',
     );
   }
-  if (scenario === 'audio.transcribe') {
+  if (normalizedScenario === 'stt') {
     return hasAny(
       'stt',
       'audio.transcribe',
       'speech.transcribe',
+      'llm.speech.transcribe',
     );
   }
-  if (scenario === 'image.generate') {
+  if (normalizedScenario === 'image') {
     return hasAny(
       'image',
       't2i',
       'i2i',
+      'llm.image.generate',
       'image.generate',
     );
   }
   return hasAny(
     'video',
     't2v',
+    'llm.video.generate',
     'video.generate',
     'text.video',
   );
 }
 
 function filterModelsByHeuristic(models: string[], scenario: ExtendedScenario): string[] {
-  if (scenario === 'audio.synthesize') {
+  const normalizedScenario = normalizeScenario(scenario);
+  if (normalizedScenario === 'chat') {
+    return filterModelsForScenario(models, 'chat');
+  }
+  if (normalizedScenario === 'tts') {
     return filterModelsForSpeechSynthesis(models);
   }
-  if (scenario === 'audio.transcribe') {
+  if (normalizedScenario === 'stt') {
     return filterModelsForScenario(models, 'stt');
   }
-  if (scenario === 'image.generate') {
+  if (normalizedScenario === 'image') {
     return filterModelsForScenario(models, 'image');
   }
   return filterModelsForScenario(models, 'video');
@@ -117,18 +157,77 @@ export function resolveEffectiveModelForScenario(input: {
   modelCapabilities?: Record<string, string[]>;
   scenario: ExtendedScenario;
 }): string {
-  const candidates = resolveModelsForScenario({
-    models: input.models,
-    modelCapabilities: input.modelCapabilities,
-    scenario: input.scenario,
-  });
-  const normalizedConfiguredModel = String(input.configuredModel || '').trim();
-  if (normalizedConfiguredModel && candidates.includes(normalizedConfiguredModel)) {
-    return normalizedConfiguredModel;
+  const configuredModel = String(input.configuredModel || '').trim();
+  const routeSelectedModel = String(input.routeSelectedModel || '').trim();
+  const candidates = resolveModelsForScenario(input);
+  if (configuredModel && candidates.includes(configuredModel)) {
+    return configuredModel;
   }
-  const normalizedRouteSelectedModel = String(input.routeSelectedModel || '').trim();
-  if (normalizedRouteSelectedModel && candidates.includes(normalizedRouteSelectedModel)) {
-    return normalizedRouteSelectedModel;
+  if (routeSelectedModel && candidates.includes(routeSelectedModel)) {
+    return routeSelectedModel;
   }
-  return candidates[0] || normalizedConfiguredModel || normalizedRouteSelectedModel;
+  if (candidates[0]) {
+    return candidates[0];
+  }
+  if (configuredModel) {
+    return configuredModel;
+  }
+  return routeSelectedModel;
+}
+
+function dedupeLocalRuntimeModels<T extends LocalRuntimeModelLike>(models: T[]): T[] {
+  const seen = new Set<string>();
+  const deduped: T[] = [];
+  for (const model of models) {
+    const localModelId = String(model.localModelId || '').trim();
+    const modelId = String(model.model || '').trim();
+    const dedupeKey = (localModelId || modelId).toLowerCase();
+    if (!dedupeKey || seen.has(dedupeKey)) {
+      continue;
+    }
+    seen.add(dedupeKey);
+    deduped.push(model);
+  }
+  return deduped;
+}
+
+function matchesLocalRuntimeModelByHeuristic(
+  model: LocalRuntimeModelLike,
+  scenario: ExtendedScenario,
+): boolean {
+  const candidates = filterModelsByHeuristic(
+    [String(model.model || '').trim(), String(model.localModelId || '').trim()].filter(Boolean),
+    scenario,
+  );
+  return candidates.length > 0;
+}
+
+export function resolveLocalRuntimeModelsForScenario<T extends LocalRuntimeModelLike>(input: {
+  models: T[];
+  scenario: ExtendedScenario;
+}): T[] {
+  const allModels = dedupeLocalRuntimeModels(input.models);
+  if (allModels.length === 0) {
+    return [];
+  }
+  const matchedByCapabilities = allModels.filter((model) => (
+    matchesScenarioByCapability(model.capabilities || [], input.scenario)
+  ));
+  if (matchedByCapabilities.length > 0) {
+    return matchedByCapabilities;
+  }
+  const matchedByHeuristic = allModels.filter((model) => (
+    matchesLocalRuntimeModelByHeuristic(model, input.scenario)
+  ));
+  if (matchedByHeuristic.length > 0) {
+    return matchedByHeuristic;
+  }
+  return allModels;
+}
+
+export function resolvePreferredLocalRuntimeModelForScenario<T extends LocalRuntimeModelLike>(input: {
+  models: T[];
+  scenario: ExtendedScenario;
+}): T | null {
+  return resolveLocalRuntimeModelsForScenario(input)[0] || null;
 }

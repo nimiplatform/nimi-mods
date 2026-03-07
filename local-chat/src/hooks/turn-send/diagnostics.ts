@@ -1,7 +1,7 @@
 import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
 import type { LocalChatCompiledPrompt, PromptLayerId } from '../../prompt/index.js';
 import type { LocalChatTarget } from '../../data/index.js';
-import type { LocalChatPromptTrace, LocalChatTurnAudit } from '../../state/index.js';
+import type { LocalChatContextPacket, LocalChatPromptTrace, LocalChatTurnAudit } from '../../state/index.js';
 import type { SegmentParseMode } from './types.js';
 
 type RouteSnapshot = {
@@ -11,6 +11,7 @@ type RouteSnapshot = {
 
 type BuildPromptTraceInput = {
   compiledPrompt: LocalChatCompiledPrompt;
+  contextPacket: LocalChatContextPacket;
   routeSnapshot: RouteSnapshot | null;
   routeBinding: RuntimeRouteBinding | null;
   chatRouteOptions: RuntimeRouteOptionsSnapshot | null;
@@ -23,6 +24,21 @@ type BuildPromptTraceInput = {
   streamDurationMs: number;
   segmentParseMode: SegmentParseMode;
   nsfwPolicy: 'disabled' | 'local-runtime-only' | 'allowed';
+  plannerUsed: boolean;
+  plannerKind: 'none' | 'image' | 'video';
+  plannerTrigger: 'user-explicit' | 'assistant-offer' | 'scene-enhancement' | 'none' | 'marker-override';
+  plannerConfidence: number | null;
+  plannerBlockedReason: string | null;
+  imageReady: boolean;
+  videoReady: boolean;
+  imageDependencyStatus: 'ready' | 'missing' | 'degraded' | 'unknown' | null;
+  videoDependencyStatus: 'ready' | 'missing' | 'degraded' | 'unknown' | null;
+  mediaDecisionSource: 'tag' | 'explicit' | 'planner' | 'none';
+  mediaDecisionKind: 'none' | 'image' | 'video';
+  mediaExecutionStatus: 'none' | 'blocked' | 'pending' | 'ready' | 'failed';
+  mediaExecutionRouteSource: 'local-runtime' | 'token-api' | null;
+  mediaExecutionRouteModel: string | null;
+  mediaExecutionReason: string | null;
 };
 
 function extractLayerIds(input: {
@@ -46,6 +62,7 @@ export function buildPromptTrace(input: BuildPromptTraceInput): LocalChatPromptT
 
   return {
     id: `trace-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    conversationId: input.contextPacket.conversationId,
     routeSource: input.routeSnapshot?.source
       || (input.routeBinding?.source || input.chatRouteOptions?.selected.source || 'unknown'),
     routeModel: input.routeSnapshot?.model
@@ -54,11 +71,14 @@ export function buildPromptTrace(input: BuildPromptTraceInput): LocalChatPromptT
     layerOrder: [...input.compiledPrompt.layerOrder],
     appliedLayers,
     droppedLayers,
+    laneChars: input.compiledPrompt.laneChars,
+    truncationByLane: input.compiledPrompt.truncationByLane,
+    laneBudgets: input.compiledPrompt.budget.laneBudgets,
     memorySlices: {
-      core: input.compiledPrompt.retrieval.coreCount,
-      e2e: input.compiledPrompt.retrieval.e2eCount,
-      worldLore: input.compiledPrompt.retrieval.worldLoreCount,
-      agentLore: input.compiledPrompt.retrieval.agentLoreCount,
+      core: input.contextPacket.platformWarmStart?.core.length || 0,
+      e2e: input.contextPacket.platformWarmStart?.e2e.length || 0,
+      worldLore: input.compiledPrompt.retrieval.worldContextCount,
+      agentLore: input.compiledPrompt.retrieval.recentBundleCount,
     },
     budget: {
       maxChars: input.compiledPrompt.budget.maxChars,
@@ -66,6 +86,9 @@ export function buildPromptTrace(input: BuildPromptTraceInput): LocalChatPromptT
       truncated: input.compiledPrompt.budget.truncatedLayers.length > 0,
     },
     compilerVersion: input.compiledPrompt.compilerVersion,
+    replyStyleProfile: input.contextPacket.target.replyStyleProfile,
+    pacingPlan: input.contextPacket.pacingPlan,
+    continuityHealth: input.contextPacket.diagnostics.continuityHealth,
     planner: input.planner,
     planSegments: input.planSegments,
     voiceSegments: input.voiceSegments,
@@ -75,6 +98,25 @@ export function buildPromptTrace(input: BuildPromptTraceInput): LocalChatPromptT
     streamDurationMs: input.streamDurationMs,
     segmentParseMode: input.segmentParseMode,
     nsfwPolicy: input.nsfwPolicy,
+    plannerUsed: input.plannerUsed,
+    plannerKind: input.plannerKind,
+    plannerTrigger: input.plannerTrigger,
+    plannerConfidence: input.plannerConfidence,
+    plannerBlockedReason: input.plannerBlockedReason,
+    imageReady: input.imageReady,
+    videoReady: input.videoReady,
+    imageDependencyStatus: input.imageDependencyStatus,
+    videoDependencyStatus: input.videoDependencyStatus,
+    mediaDecisionSource: input.mediaDecisionSource,
+    mediaDecisionKind: input.mediaDecisionKind,
+    mediaExecutionStatus: input.mediaExecutionStatus,
+    mediaExecutionRouteSource: input.mediaExecutionRouteSource,
+    mediaExecutionRouteModel: input.mediaExecutionRouteModel,
+    mediaExecutionReason: input.mediaExecutionReason,
+    selectedBundleSeqs: [...input.contextPacket.diagnostics.selectedBundleSeqs],
+    runningSummaryWatermark: input.contextPacket.diagnostics.runningSummaryWatermark,
+    durableMemoryCountsByType: input.contextPacket.diagnostics.durableMemoryCountsByType,
+    sessionRecallCount: input.contextPacket.diagnostics.sessionRecallCount,
     createdAt: new Date().toISOString(),
   };
 }

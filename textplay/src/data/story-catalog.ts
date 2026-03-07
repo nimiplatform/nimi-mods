@@ -84,6 +84,10 @@ function toEventHorizon(value: unknown): 'PAST' | 'ONGOING' | 'FUTURE' {
   return 'PAST';
 }
 
+function buildStoryEntryMode(): 'PRE_EVENT' {
+  return 'PRE_EVENT';
+}
+
 function pickPrimaryAgentId(input: {
   runtimeAgentId?: string;
   characterRefs: string[];
@@ -109,7 +113,7 @@ function scoreLorebook(input: {
   detail: TextplayStoryDetail;
 }): number {
   const title = toText(input.detail.title);
-  const summary = toText(input.detail.summary);
+  const summary = toText(input.detail.materialSummary) || toText(input.detail.summary);
   const tokens = unique([...tokenize(title), ...tokenize(summary)]);
 
   const loreKey = toText(input.lorebook.key).toLowerCase();
@@ -135,7 +139,7 @@ function scoreScene(input: {
 }): number {
   const tokens = unique([
     ...tokenize(toText(input.detail.title)),
-    ...tokenize(toText(input.detail.summary)),
+    ...tokenize(toText(input.detail.materialSummary) || toText(input.detail.summary)),
     ...input.detail.locationRefs.map((item) => item.toLowerCase()),
   ]);
   const sceneId = toText(input.scene.id).toLowerCase();
@@ -151,7 +155,25 @@ function scoreScene(input: {
   return score;
 }
 
-function buildPreEventSummary(event: TextplayWorldEventRow): string {
+function buildStorySummary(
+  event: TextplayWorldEventRow,
+): string {
+  const teaserParts = unique([
+    toText(event.cause),
+    toText(event.process),
+    toText(event.summary),
+  ]).filter(Boolean).slice(0, 2);
+  const teaser = teaserParts.join('；');
+  if (!teaser) {
+    return '风暴将至，更多细节将在开场中展开……';
+  }
+  return `${teaser}……`;
+}
+
+function buildStoryMaterialSummary(
+  event: TextplayWorldEventRow,
+  horizon: TextplayStorySummary['eventHorizon'],
+): string {
   const title = toText(event.title) || toText(event.id) || '关键事件';
   const cause = toText(event.cause);
   const process = toText(event.process);
@@ -159,17 +181,17 @@ function buildPreEventSummary(event: TextplayWorldEventRow): string {
   const timeRef = toText(event.timeRef);
 
   const lines = [
-    `目标事件：${title}（尚未发生）`,
+    `目标事件：${title}`,
     cause ? `导火索：${cause}` : '',
-    process ? `已知态势：${process}` : '',
-    timeRef ? `当前时点：${timeRef}` : '',
-    (!cause && !process && summary) ? `背景线索：${summary}` : '',
+    process ? `关键局势：${process}` : '',
+    summary ? `原剧情素材：${summary}` : '',
+    timeRef ? `时间锚点：${timeRef}` : '',
+    `玩家入口：从该事件发生前的临界阶段切入（canonical horizon=${horizon} 仅作素材参考）。`,
   ].filter((item): item is string => Boolean(item));
 
-  if (lines.length === 0) {
-    return '目标事件即将发生，你正处于事件爆发前的关键窗口。';
-  }
-  return lines.join('；');
+  return lines.length > 0
+    ? lines.join('；')
+    : `目标事件：${title}；玩家入口：从该事件发生前的临界阶段切入（canonical horizon=${horizon} 仅作素材参考）。`;
 }
 
 function extractMemoryText(value: unknown): string {
@@ -230,19 +252,21 @@ function toStorySummary(input: {
   });
 
   const horizon = toEventHorizon(input.event.eventHorizon);
-  const playableHorizon: TextplayStorySummary['eventHorizon'] = horizon === 'PAST' ? 'FUTURE' : horizon;
+  const playable = horizon !== 'FUTURE';
 
   return {
     storyId: toStoryId(worldId, eventId),
     worldId,
     entryEventId: eventId,
     title: toText(input.event.title) || eventId,
-    summary: buildPreEventSummary(input.event),
+    summary: buildStorySummary(input.event),
+    materialSummary: buildStoryMaterialSummary(input.event, horizon),
     primaryAgentId,
     participants: unique(primaryAgentId ? [primaryAgentId, ...participants] : participants),
-    eventHorizon: playableHorizon,
+    eventHorizon: horizon,
+    entryMode: buildStoryEntryMode(),
     updatedAt: toIsoOrNow(input.event.updatedAt || input.event.createdAt),
-    playable: true,
+    playable,
     agentBindingMissing: !primaryAgentId,
   };
 }
@@ -266,7 +290,7 @@ function toStoryDetail(input: {
 function buildBackgroundSummary(detail: TextplayStoryDetail, sceneDescription: string): string {
   const lines = [
     detail.title,
-    detail.summary,
+    detail.materialSummary,
     detail.cause && `背景起因: ${detail.cause}`,
     detail.process && `已知局势: ${detail.process}`,
     detail.timeRef && `时间锚点: ${detail.timeRef}`,
@@ -483,21 +507,40 @@ function pickContextRow(input: {
   if (candidates.length === 0) {
     return null;
   }
+  const hasExactStoryMatch = (row: TextplayWorldNarrativeContextRow): boolean => toText(row.storyId) === input.storyId;
+  const isStorylessBaseline = (row: TextplayWorldNarrativeContextRow): boolean => !toText(row.storyId);
+  const pickStoryScopedContext = (
+    rows: TextplayWorldNarrativeContextRow[],
+  ): TextplayWorldNarrativeContextRow | null => (
+    rows.find((row) => hasExactStoryMatch(row))
+    || rows.find((row) => isStorylessBaseline(row))
+    || null
+  );
   if (input.scope === 'STORY') {
-    return candidates.find((row) => toText(row.storyId) === input.storyId) || candidates[0] || null;
+    return candidates.find((row) => hasExactStoryMatch(row)) || null;
   }
   if (input.scope === 'SUBJECT') {
-    return candidates.find((row) => toText(row.subjectId) === input.primaryAgentId) || candidates[0] || null;
+    if (!isEntityId(input.primaryAgentId)) {
+      return null;
+    }
+    return pickStoryScopedContext(
+      candidates.filter((row) => toText(row.subjectId) === input.primaryAgentId),
+    );
   }
   if (input.scope === 'RELATION') {
-    return candidates.find((row) => {
-      const subjectId = toText(row.subjectId);
-      const targetSubjectId = toText(row.targetSubjectId);
-      return (
-        (subjectId === input.primaryAgentId && targetSubjectId === input.playerId)
-        || (subjectId === input.playerId && targetSubjectId === input.primaryAgentId)
-      );
-    }) || candidates[0] || null;
+    if (!isEntityId(input.primaryAgentId) || !isEntityId(input.playerId)) {
+      return null;
+    }
+    return pickStoryScopedContext(
+      candidates.filter((row) => {
+        const subjectId = toText(row.subjectId);
+        const targetSubjectId = toText(row.targetSubjectId);
+        return (
+          (subjectId === input.primaryAgentId && targetSubjectId === input.playerId)
+          || (subjectId === input.playerId && targetSubjectId === input.primaryAgentId)
+        );
+      }),
+    );
   }
   return candidates[0] || null;
 }
@@ -520,13 +563,36 @@ function resolvePrimaryAgentId(input: {
   const castPolicy = (storySetting.castPolicy || {}) as Record<string, unknown>;
   const mandatorySubjectIds = toStringList(castPolicy.mandatorySubjectIds);
   const optionalSubjectIds = toStringList(castPolicy.optionalSubjectIds);
+  const exactStoryId = input.detail.storyId;
+  const storyParticipantHints = unique([
+    ...input.detail.participants,
+    ...input.detail.characterRefs,
+    ...mandatorySubjectIds,
+    ...optionalSubjectIds,
+  ]).filter((candidate) => candidate !== input.playerId);
+  const allowGlobalCandidate = (candidate: string): boolean => (
+    storyParticipantHints.length === 0 || storyParticipantHints.includes(candidate)
+  );
 
-  const subjectAgentIds = input.contexts
-    .filter((row) => row.scope === 'SUBJECT' && toText(row.subjectType).toUpperCase() === 'AGENT')
+  const storySubjectAgentIds = input.contexts
+    .filter((row) => row.scope === 'SUBJECT' && toText(row.storyId) === exactStoryId)
+    .filter((row) => toText(row.subjectType).toUpperCase() === 'AGENT')
     .map((row) => toText(row.subjectId));
 
-  const relationAgentIds = input.contexts
-    .filter((row) => row.scope === 'RELATION')
+  const storyRelationAgentIds = input.contexts
+    .filter((row) => row.scope === 'RELATION' && toText(row.storyId) === exactStoryId)
+    .flatMap((row) => [
+      toText(row.subjectType).toUpperCase() === 'AGENT' ? toText(row.subjectId) : '',
+      toText(row.targetSubjectType).toUpperCase() === 'AGENT' ? toText(row.targetSubjectId) : '',
+    ]);
+
+  const globalSubjectAgentIds = input.contexts
+    .filter((row) => row.scope === 'SUBJECT' && !toText(row.storyId))
+    .filter((row) => toText(row.subjectType).toUpperCase() === 'AGENT')
+    .map((row) => toText(row.subjectId));
+
+  const globalRelationAgentIds = input.contexts
+    .filter((row) => row.scope === 'RELATION' && !toText(row.storyId))
     .flatMap((row) => [
       toText(row.subjectType).toUpperCase() === 'AGENT' ? toText(row.subjectId) : '',
       toText(row.targetSubjectType).toUpperCase() === 'AGENT' ? toText(row.targetSubjectId) : '',
@@ -535,8 +601,10 @@ function resolvePrimaryAgentId(input: {
   const fallback = unique([
     ...mandatorySubjectIds,
     ...optionalSubjectIds,
-    ...subjectAgentIds,
-    ...relationAgentIds,
+    ...storySubjectAgentIds,
+    ...storyRelationAgentIds,
+    ...globalSubjectAgentIds.filter((candidate) => allowGlobalCandidate(candidate)),
+    ...globalRelationAgentIds.filter((candidate) => allowGlobalCandidate(candidate)),
   ]).find((candidate) => isEntityId(candidate) && candidate !== input.playerId);
 
   return fallback || '';
@@ -555,11 +623,13 @@ export async function listPlayableStories(input: {
     hookClient: input.hookClient,
     worldId,
   });
-  return sortPrimaryEvents(events).map((event) => toStorySummary({
-    worldId,
-    event,
-    runtimeAgentId: input.runtimeAgentId,
-  }));
+  return sortPrimaryEvents(events)
+    .map((event) => toStorySummary({
+      worldId,
+      event,
+      runtimeAgentId: input.runtimeAgentId,
+    }))
+    .filter((story) => story.playable);
 }
 
 export async function getPlayableStoryDetail(input: {
@@ -587,6 +657,9 @@ export async function getPlayableStoryDetail(input: {
     event,
     runtimeAgentId: input.runtimeAgentId,
   });
+  if (!summary.playable) {
+    return null;
+  }
   return toStoryDetail({
     summary,
     event,
@@ -747,12 +820,18 @@ export async function loadStoryStartupPackage(input: {
     relation: Boolean(relationRow),
     scene: Boolean(selectedScene),
   };
+  const startupContextRows = unique([
+    canonRow ? toText(canonRow.id) : '',
+    storyRow ? toText(storyRow.id) : '',
+    subjectRow ? toText(subjectRow.id) : '',
+    relationRow ? toText(relationRow.id) : '',
+  ]).map((id) => contexts.find((row) => toText(row.id) === id)).filter((row): row is TextplayWorldNarrativeContextRow => Boolean(row));
 
   const snapshotVersionSeed = JSON.stringify({
     entryEventId: detail.entryEventId,
     lorebookIds: scoredLorebooks.map((item) => item.id),
     sceneIds: scoredScenes.map((item) => item.id),
-    contextIds: contexts.map((item) => item.id),
+    contextIds: startupContextRows.map((item) => item.id),
     recallSource: toText(memoryRecall.recallSource),
     primaryAgentId: resolvedPrimaryAgentId,
   });
@@ -780,7 +859,7 @@ export async function loadStoryStartupPackage(input: {
     entryEventId: detail.entryEventId,
     entry: {
       title: detail.title,
-      summary: detail.summary,
+      summary: detail.materialSummary,
       cause: detail.cause,
       process: detail.process,
       result: detail.result,
@@ -804,7 +883,7 @@ export async function loadStoryStartupPackage(input: {
       lorebooks: scoredLorebooks,
       memories,
       scenes: scoredScenes,
-      contexts: contexts.map((row) => ({
+      contexts: startupContextRows.map((row) => ({
         id: toText(row.id),
         scope: row.scope,
         scopeKey: toText(row.scopeKey),

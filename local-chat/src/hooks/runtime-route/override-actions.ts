@@ -1,5 +1,6 @@
 import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot, RuntimeRouteSource } from '@nimiplatform/sdk/mod/runtime-route';
 import { pickChatModelForConnector } from '../../services/route/route-override-store.js';
+import { resolveLocalRuntimeModelsForScenario } from '../../services/route/connector-model-capabilities.js';
 
 export function buildRouteBindingForSource(input: {
   source: RuntimeRouteSource;
@@ -59,8 +60,29 @@ export function buildRouteBindingForModel(input: {
     connectorId: '',
     model: '',
   };
+  if (base.source === 'local-runtime') {
+    const matchedLocalModel = resolveLocalRuntimeModelsForScenario({
+      models: input.options?.localRuntime.models || [],
+      scenario: 'chat',
+    }).find((candidate) => (
+      String(candidate.model || '').trim() === String(input.model || '').trim()
+      || String(candidate.localModelId || '').trim() === String(input.model || '').trim()
+    )) || null;
+    return {
+      source: 'local-runtime',
+      connectorId: '',
+      model: input.model,
+      ...(matchedLocalModel?.localModelId ? { localModelId: matchedLocalModel.localModelId } : {}),
+      ...(matchedLocalModel?.engine ? { engine: matchedLocalModel.engine } : {}),
+    };
+  }
   return {
-    ...base,
+    source: 'token-api',
+    connectorId: base.connectorId,
     model: input.model,
+    localModelId: undefined,
+    engine: undefined,
   };
 }
+
+export const buildRouteOverrideForModel = buildRouteBindingForModel;

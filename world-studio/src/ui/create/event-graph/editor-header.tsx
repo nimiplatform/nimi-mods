@@ -34,14 +34,14 @@ export function EventGraphEditorHeader(props: EventGraphEditorHeaderProps) {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="rounded border border-gray-300 bg-white px-2 py-1 text-xs font-semibold text-gray-700"
+              className="ui-sync-btn ui-sync-btn-secondary rounded border border-gray-300 bg-white px-2 py-1 text-xs font-semibold text-gray-700"
               onClick={props.onAddPrimary}
             >
               Add Primary Event
             </button>
             <button
               type="button"
-              className="rounded border border-gray-300 bg-white px-2 py-1 text-xs font-semibold text-gray-700 disabled:opacity-50"
+              className="ui-sync-btn ui-sync-btn-secondary rounded border border-gray-300 bg-white px-2 py-1 text-xs font-semibold text-gray-700 disabled:opacity-50"
               disabled={!props.canAddSecondary}
               onClick={props.onAddSecondary}
             >
@@ -51,32 +51,32 @@ export function EventGraphEditorHeader(props: EventGraphEditorHeaderProps) {
         ) : null}
       </div>
       <div className="mt-2 grid gap-2 sm:grid-cols-4">
-        <div className="rounded-md border border-gray-200 bg-gray-50 px-2.5 py-2">
+        <div className="ui-sync-metric-card px-2.5 py-2">
           <p className="text-[11px] uppercase tracking-wide text-gray-500">PRIMARY</p>
           <p className="mt-1 text-sm font-semibold text-gray-900">{props.primaryCount}</p>
         </div>
-        <div className="rounded-md border border-gray-200 bg-gray-50 px-2.5 py-2">
+        <div className="ui-sync-metric-card px-2.5 py-2">
           <p className="text-[11px] uppercase tracking-wide text-gray-500">SECONDARY</p>
           <p className="mt-1 text-sm font-semibold text-gray-900">{props.secondaryCount}</p>
         </div>
-        <div className="rounded-md border border-gray-200 bg-gray-50 px-2.5 py-2">
+        <div className="ui-sync-metric-card px-2.5 py-2">
           <p className="text-[11px] uppercase tracking-wide text-gray-500">PRIMARY MISSING EVIDENCE</p>
           <p className={`mt-1 text-sm font-semibold ${props.missingEvidencePrimaryCount > 0 ? 'text-red-700' : 'text-emerald-700'}`}>
             {props.missingEvidencePrimaryCount}
           </p>
         </div>
-        <div className="rounded-md border border-gray-200 bg-gray-50 px-2.5 py-2">
+        <div className="ui-sync-metric-card px-2.5 py-2">
           <p className="text-[11px] uppercase tracking-wide text-gray-500">SELECTED</p>
           <p className="mt-1 truncate text-sm font-semibold text-gray-900">{props.selectedTitle || '-'}</p>
         </div>
       </div>
       {!props.readonly ? (
-        <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 p-2.5">
+        <div className="ui-sync-toolbar mt-3 p-2.5">
           <p className="text-xs font-semibold text-gray-700">Batch Repair</p>
           <div className="mt-2 flex flex-wrap gap-2">
             <button
               type="button"
-              className="rounded border border-gray-300 bg-white px-2 py-1 text-[11px] font-semibold text-gray-700 disabled:opacity-50"
+              className="ui-sync-btn ui-sync-btn-secondary rounded border border-gray-300 bg-white px-2 py-1 text-[11px] font-semibold text-gray-700 disabled:opacity-50"
               onClick={props.onApplyEvidenceTemplate}
               disabled={props.missingEvidencePrimaryCount === 0}
             >
@@ -84,7 +84,7 @@ export function EventGraphEditorHeader(props: EventGraphEditorHeaderProps) {
             </button>
             <button
               type="button"
-              className="rounded border border-gray-300 bg-white px-2 py-1 text-[11px] font-semibold text-gray-700 disabled:opacity-50"
+              className="ui-sync-btn ui-sync-btn-secondary rounded border border-gray-300 bg-white px-2 py-1 text-[11px] font-semibold text-gray-700 disabled:opacity-50"
               onClick={props.onRepairSecondaryParents}
               disabled={!props.canRepairSecondaryParents}
             >
@@ -92,7 +92,7 @@ export function EventGraphEditorHeader(props: EventGraphEditorHeaderProps) {
             </button>
             <button
               type="button"
-              className="rounded border border-gray-300 bg-white px-2 py-1 text-[11px] font-semibold text-gray-700 disabled:opacity-50"
+              className="ui-sync-btn ui-sync-btn-secondary rounded border border-gray-300 bg-white px-2 py-1 text-[11px] font-semibold text-gray-700 disabled:opacity-50"
               onClick={props.onPruneInvalidDependencies}
               disabled={!props.canPruneInvalidDependencies}
             >
@@ -102,10 +102,10 @@ export function EventGraphEditorHeader(props: EventGraphEditorHeaderProps) {
         </div>
       ) : null}
       <div
-        className={`mt-3 rounded-md border p-2.5 ${
+        className={`ui-sync-alert mt-3 p-2.5 ${
           props.diagnosticsHasIssues
-            ? 'border-amber-200 bg-amber-50'
-            : 'border-emerald-200 bg-emerald-50'
+            ? 'ui-sync-alert-warning border-amber-200 bg-amber-50'
+            : 'ui-sync-alert-success border-emerald-200 bg-emerald-50'
         }`}
       >
         <p

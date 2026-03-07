@@ -165,7 +165,7 @@ export type CreateAgentDto = {
   dnaPrimary: DnaPrimaryType;
   dnaSecondary: DnaSecondaryTrait[];
   worldId: string;
-  ownershipType: 'WORLD_OWNED';
+  ownershipType: 'MASTER_OWNED';
   wakeStrategy: 'PASSIVE';
   dna: AgentDna;
   description?: string;

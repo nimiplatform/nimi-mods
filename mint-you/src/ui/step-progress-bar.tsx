@@ -42,7 +42,7 @@ export function StepProgressBar({ currentStep }: StepProgressBarProps) {
   const currentVisibleIdx = getVisibleIndex(currentStep);
 
   return (
-    <div className="flex items-center gap-1 px-4 py-3">
+    <div className="ui-sync-card mx-4 mt-4 flex items-center gap-1 px-4 py-3">
       {VISIBLE_STEPS.map((step, idx) => {
         const isCompleted = idx < currentVisibleIdx;
         const isCurrent = idx === currentVisibleIdx;
@@ -60,7 +60,7 @@ export function StepProgressBar({ currentStep }: StepProgressBarProps) {
                   isCompleted
                     ? 'bg-[#4ECCA3] text-white'
                     : isCurrent
-                      ? 'border-2 border-[#4ECCA3] text-[#4ECCA3]'
+                      ? 'ui-sync-btn-selected border-2 border-[#4ECCA3] text-[#4ECCA3]'
                       : 'border border-gray-300 text-gray-400'
                 }`}
               >

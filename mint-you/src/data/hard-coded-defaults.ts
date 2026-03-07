@@ -18,7 +18,7 @@ export const HARDCODED_APPEARANCE = {
 } as const;
 
 export const HARDCODED_AGENT = {
-  ownershipType: 'WORLD_OWNED' as const,
+  ownershipType: 'MASTER_OWNED' as const,
   wakeStrategy: 'PASSIVE' as const,
   agentLorebooks: [] as never[],
   alternateGreetings: [] as never[],

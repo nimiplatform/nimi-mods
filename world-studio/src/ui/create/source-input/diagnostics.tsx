@@ -134,7 +134,7 @@ export function SourceInputDiagnostics(props: SourceInputDiagnosticsProps) {
   return (
     <>
       {recoveredChunkCount > 0 ? (
-        <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-2.5">
+        <div className="ui-sync-alert ui-sync-alert-success mt-3 p-2.5">
           <p className="text-[11px] font-semibold text-emerald-700">
             Heuristic fallback recovered {recoveredChunkCount} chunks (latest run)
           </p>
@@ -149,7 +149,7 @@ export function SourceInputDiagnostics(props: SourceInputDiagnosticsProps) {
       ) : null}
 
       {retriedTerminalTasks.length > 0 ? (
-        <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50 p-2.5">
+        <div className="ui-sync-alert ui-sync-alert-info mt-3 p-2.5">
           <p className="text-[11px] font-semibold text-sky-700">
             Retry result: retried {retriedTerminalTasks.length} chunks · recovered {retriedSuccessCount} · still failed {retriedFailedCount} · success rate {retriedSuccessRate}%
           </p>
@@ -157,13 +157,13 @@ export function SourceInputDiagnostics(props: SourceInputDiagnosticsProps) {
       ) : null}
 
       {failedTasks.length > 0 ? (
-        <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-2.5">
+        <div className="ui-sync-alert ui-sync-alert-danger mt-3 p-2.5">
           <div className="flex items-center justify-between gap-2">
             <p className="text-[11px] font-semibold text-red-700">Chunk Diagnostics (Terminal Failure)</p>
             <div className="flex items-center gap-1">
               <button
                 type="button"
-                className="rounded border border-red-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-red-700"
+                className="ui-sync-btn rounded border border-red-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-red-700"
                 onClick={() => {
                   if (typeof navigator !== 'undefined' && navigator.clipboard) {
                     void navigator.clipboard.writeText(diagnosticsReport);
@@ -175,7 +175,7 @@ export function SourceInputDiagnostics(props: SourceInputDiagnosticsProps) {
               {props.retryErrorCode ? (
                 <button
                   type="button"
-                  className="rounded border border-red-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-red-700"
+                  className="ui-sync-btn rounded border border-red-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-red-700"
                   onClick={() => props.onClearRetryErrorCode?.()}
                 >
                   Clear Error-Code Filter
@@ -189,14 +189,14 @@ export function SourceInputDiagnostics(props: SourceInputDiagnosticsProps) {
             </p>
           ) : null}
           {topFailureCode ? (
-            <div className="mt-1 rounded border border-red-200 bg-white p-2">
+            <div className="ui-sync-card mt-1 p-2">
               <p className="text-[11px] font-semibold text-red-700">
                 Suggested retry target: {topFailureCode} ({topFailureCount})
               </p>
               <p className="mt-0.5 text-[11px] text-red-700">{topFailureAction}</p>
               <button
                 type="button"
-                className="mt-1 rounded border border-red-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-red-700 disabled:opacity-60"
+                className="ui-sync-btn mt-1 rounded border border-red-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-red-700 disabled:opacity-60"
                 disabled={props.working || !props.onRunFailedChunksByErrorCode}
                 onClick={() => props.onRunFailedChunksByErrorCode?.(topFailureCode)}
               >
@@ -210,9 +210,9 @@ export function SourceInputDiagnostics(props: SourceInputDiagnosticsProps) {
                 <button
                   key={`diag-code-${code}`}
                   type="button"
-                  className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                  className={`ui-sync-pill rounded px-1.5 py-0.5 text-[10px] font-semibold ${
                     props.retryErrorCode === code
-                      ? 'border border-red-400 bg-red-200 text-red-800'
+                      ? 'ui-sync-status-danger border border-red-400 bg-red-200 text-red-800'
                       : 'bg-red-100 text-red-700'
                   }`}
                   onClick={() => props.onRunFailedChunksByErrorCode?.(code)}

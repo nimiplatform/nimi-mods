@@ -2,7 +2,6 @@ import { createLocalChatFlowId, emitLocalChatLog } from '../logging.js';
 import { asRecord } from '@nimiplatform/sdk/mod/utils';
 import {
   CORE_DATA_API_FRIENDS_WITH_DETAILS_LIST,
-  CORE_DATA_API_USER_BY_ID_GET,
   requireLocalChatCoreQueryBridge,
 } from './core-query-bridge.js';
 import {
@@ -36,21 +35,6 @@ function inferAgentFlag(source: Record<string, unknown>): boolean | null {
   const handle = asString(source.handle);
   if (isAgentHandle(handle)) return true;
   return null;
-}
-
-function mergeSourceWithProfile(
-  source: Record<string, unknown>,
-  profile: Record<string, unknown> | null,
-): Record<string, unknown> {
-  if (!profile) return source;
-  return {
-    ...source,
-    ...profile,
-    agent: profile.agent ?? source.agent,
-    agentMetadata: profile.agent ?? source.agentMetadata,
-    agentProfile: profile.agentProfile ?? source.agentProfile,
-    worldId: profile.worldId ?? source.worldId,
-  };
 }
 
 function readAgentWorldId(friend: Record<string, unknown>): string | null {
@@ -98,31 +82,21 @@ function toBaseTargetFromFriend(friend: Record<string, unknown>): LocalChatTarge
   };
 }
 
-async function resolveAgentTargetFromFriend(friend: Record<string, unknown>): Promise<LocalChatTarget | null> {
-  const friendId = asString(friend.id);
-  if (!friendId) return null;
-  const initialAgentFlag = inferAgentFlag(friend);
-  if (initialAgentFlag === true) {
-    return toBaseTargetFromFriend(friend);
-  }
+export function deriveLocalChatTargetsFromFriendsPayload(payload: unknown): LocalChatTarget[] {
+  const record = asRecord(payload);
+  const friends = Array.isArray(record.items)
+    ? record.items
+    : [];
 
-  let resolvedProfile: Record<string, unknown> | null = null;
-  try {
-    const payload = await requireLocalChatCoreQueryBridge().query(
-      CORE_DATA_API_USER_BY_ID_GET,
-      { userId: friendId },
-    );
-    resolvedProfile = asRecord(payload);
-  } catch {
-    resolvedProfile = null;
-  }
-  if (!resolvedProfile || Object.keys(resolvedProfile).length === 0) {
-    return null;
-  }
-  if (inferAgentFlag(resolvedProfile) !== true) {
-    return null;
-  }
-  return toBaseTargetFromFriend(mergeSourceWithProfile(friend, resolvedProfile));
+  return friends
+    .map((friend) => {
+      const friendRecord = asRecord(friend);
+      return inferAgentFlag(friendRecord) === true
+        ? toBaseTargetFromFriend(friendRecord)
+        : null;
+    })
+    .filter((item): item is LocalChatTarget => Boolean(item))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName, 'en'));
 }
 
 export async function listLocalChatTargets(context: LocalChatReadContext): Promise<LocalChatTarget[]> {
@@ -150,17 +124,7 @@ export async function listLocalChatTargets(context: LocalChatReadContext): Promi
             CORE_DATA_API_FRIENDS_WITH_DETAILS_LIST,
             {},
           );
-          const record = asRecord(payload);
-          const friends = Array.isArray(record.items)
-            ? record.items
-            : [];
-
-          const targets = await Promise.all(
-            friends.map(async (friend) => resolveAgentTargetFromFriend(asRecord(friend))),
-          );
-          return targets
-            .filter((item): item is LocalChatTarget => Boolean(item))
-            .sort((a, b) => a.displayName.localeCompare(b.displayName, 'en'));
+          return deriveLocalChatTargetsFromFriendsPayload(payload);
         },
         {
           flowId,

@@ -412,7 +412,13 @@ export function TypingBubble({ agentAvatarUrl, agentName }: { agentAvatarUrl: st
   const { t } = useModTranslation('local-chat');
   const agentInitial = (String(agentName || 'A').trim().charAt(0) || 'A').toUpperCase();
   return (
-    <div className="flex gap-2" style={{ animation: 'chat-slide-up 0.24s cubic-bezier(0.2, 0.7, 0.2, 1) both' }}>
+    <div
+      className="flex gap-2"
+      style={{ animation: 'chat-slide-up 0.24s cubic-bezier(0.2, 0.7, 0.2, 1) both' }}
+      role="status"
+      aria-live="polite"
+      aria-label={t('ChatBubble.agentPending')}
+    >
       {agentAvatarUrl ? (
         <img src={agentAvatarUrl} alt={agentName || t('ChatBubble.roleAgent')} className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-black/5" />
       ) : (
@@ -421,18 +427,29 @@ export function TypingBubble({ agentAvatarUrl, agentName }: { agentAvatarUrl: st
         </div>
       )}
       <div className="max-w-[70%]">
-        <div className="flex items-center gap-1.5 rounded-2xl border border-gray-200 bg-white px-4 py-3">
-          {[0, 1, 2].map((i) => (
-            <span
-              key={`dot-${i}`}
-              className="inline-block h-2 w-2 rounded-full bg-mint-400"
-              style={{ animation: `typing-dot-bounce 1.4s ease-in-out ${i * 0.2}s infinite` }}
-            />
-          ))}
+        <div className="lc-typing-bubble px-4 py-3">
+          <div className="lc-typing-row flex items-center gap-2">
+            <span className="lc-typing-label text-[13px] font-medium italic tracking-[0.01em]">
+              {t('ChatBubble.agentPending')}
+            </span>
+            <span className="lc-typing-caret" aria-hidden />
+          </div>
+          <div className="lc-typing-row mt-2 flex items-center gap-2.5">
+            <div className="flex items-center gap-1.5" aria-hidden>
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={`dot-${i}`}
+                  className="lc-typing-dot inline-block h-2.5 w-2.5 rounded-full"
+                  style={{ animation: `typing-dot-bounce 1.4s ease-in-out ${i * 0.18}s infinite` }}
+                />
+              ))}
+            </div>
+            <div className="lc-typing-trail" aria-hidden>
+              <span />
+              <span />
+            </div>
+          </div>
         </div>
-        <p className="mt-1 text-[10px] text-left text-gray-400">
-          {t('ChatBubble.agentPending')}
-        </p>
       </div>
     </div>
   );

@@ -230,14 +230,14 @@ export function StepInterview() {
   );
 
   return (
-    <div className="mx-auto flex h-full max-w-lg flex-col">
+    <div className="ui-sync-card mx-auto my-4 flex h-full max-w-lg flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">{t('Interview.title')}</h2>
           <p className="text-xs text-gray-500">{t('Interview.subtitle')}</p>
         </div>
-        <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">
+        <span className="ui-sync-pill rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">
           {progressPercent}%
         </span>
       </div>
@@ -270,7 +270,7 @@ export function StepInterview() {
           <p className="text-xs text-red-600">{error.message}</p>
           <button
             onClick={handleRetry}
-            className="mt-1.5 rounded-md bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
+            className="ui-sync-btn mt-1.5 rounded-md bg-red-100 px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-200"
           >
             {t('Interview.retry')}
           </button>
@@ -285,7 +285,7 @@ export function StepInterview() {
           )}
           <button
             onClick={handleContinue}
-            className="w-full rounded-lg bg-[#4ECCA3] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#3DBB92]"
+            className="ui-sync-btn ui-sync-btn-primary w-full rounded-lg bg-[#4ECCA3] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#3DBB92]"
           >
             {t('Interview.continue')}
           </button>
@@ -307,7 +307,7 @@ export function StepInterview() {
             <button
               onClick={handleEndInterview}
               disabled={!canEnd || isThinking || isTyping}
-              className="rounded-lg border border-[#4ECCA3] px-4 py-1.5 text-xs font-medium text-[#4ECCA3] hover:bg-[#4ECCA3]/10 disabled:border-gray-300 disabled:text-gray-400 disabled:hover:bg-transparent"
+              className="ui-sync-btn ui-sync-btn-selected rounded-lg border border-[#4ECCA3] px-4 py-1.5 text-xs font-medium text-[#4ECCA3] hover:bg-[#4ECCA3]/10 disabled:border-gray-300 disabled:text-gray-400 disabled:hover:bg-transparent"
             >
               {t('Interview.endAndGenerate')}
             </button>

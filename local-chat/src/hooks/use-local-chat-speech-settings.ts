@@ -5,6 +5,8 @@ import type { ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import {
   type LocalChatBooleanSettingKey,
   type LocalChatDefaultSettings,
+  type LocalChatMediaPlannerMode,
+  type LocalChatVideoAutoPolicy,
   DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
   normalizeLocalChatDefaultSettings,
 } from '../state/index.js';
@@ -269,6 +271,20 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
     }));
   }, [updateSettings]);
 
+  const handleMediaPlannerModeChange = useCallback((value: LocalChatMediaPlannerMode) => {
+    updateSettings((previous) => ({
+      ...previous,
+      mediaPlannerMode: value,
+    }));
+  }, [updateSettings]);
+
+  const handleVideoAutoPolicyChange = useCallback((value: LocalChatVideoAutoPolicy) => {
+    updateSettings((previous) => ({
+      ...previous,
+      videoAutoPolicy: value,
+    }));
+  }, [updateSettings]);
+
   const handleTtsRouteSourceChange = useCallback((value: 'auto' | 'local-runtime' | 'token-api') => {
     updateSettings((previous) => ({
       ...previous,
@@ -362,6 +378,8 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
     handleVoiceIdChange,
     handleDefaultSettingChange,
     handleDefaultVoiceNameChange,
+    handleMediaPlannerModeChange,
+    handleVideoAutoPolicyChange,
     handleTtsRouteSourceChange,
     handleTtsConnectorChange,
     handleTtsModelChange,
