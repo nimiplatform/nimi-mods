@@ -518,13 +518,24 @@ export async function runLocalChatTurnSend(input: {
       schedule.done.catch(() => undefined),
       mediaCompletion,
     ]).then(async () => {
-      await runLocalChatContinuityMaintenance({
+      const continuityHealth = await runLocalChatContinuityMaintenance({
         aiClient: context.aiClient,
         routeOverride: prepared.routeOverride,
         conversationId: sessionId,
         viewerId: context.viewerId,
         target: selectedTarget,
       });
+      if (!continuityHealth) {
+        return;
+      }
+      assistantPayload.promptTrace = {
+        ...assistantPayload.promptTrace,
+        continuityHealth,
+      };
+      if (input.getCurrentContextKey() === input.sendContextKey) {
+        context.setLatestPromptTrace(assistantPayload.promptTrace);
+      }
+      await persistPromptTracePatch();
     }).catch(() => undefined);
 
     logTurnSendDone({

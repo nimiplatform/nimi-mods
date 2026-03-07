@@ -60,6 +60,7 @@ const DEFAULT_TTS_FORMAT = 'mp3';
 const DEPENDENCY_SNAPSHOT_TTL_MS = 15_000;
 const MEDIA_DEPENDENCY_TTL_MS = 30_000;
 const RUNTIME_SIDEBAR_WARMUP_DELAY_MS = 700;
+const MEDIA_RUNTIME_PREFLIGHT_DELAY_MS = 1_300;
 type MediaDependencyCapability = 'image' | 'video';
 type MediaDependencyRouteSource = 'local-runtime' | 'token-api' | undefined;
 
@@ -766,6 +767,32 @@ export function useLocalChatPageState() {
     runtimeRouteState.loadVideoRuntimeRouteOptions,
     runtimeRouteState.videoRouteOptions,
     videoDependencySnapshot,
+  ]);
+
+  useEffect(() => {
+    if (isRuntimeSidebarOpen) {
+      return;
+    }
+    if (!targetsState.selectedTargetId) {
+      return;
+    }
+    const warmTimer = window.setTimeout(() => {
+      void runMediaRuntimeSidebarLoad({
+        forceRouteProbe: (
+          speechSettingsState.defaultSettings.imageRouteSource === 'auto'
+          || speechSettingsState.defaultSettings.videoRouteSource === 'auto'
+        ),
+      });
+    }, MEDIA_RUNTIME_PREFLIGHT_DELAY_MS);
+    return () => {
+      window.clearTimeout(warmTimer);
+    };
+  }, [
+    isRuntimeSidebarOpen,
+    runMediaRuntimeSidebarLoad,
+    speechSettingsState.defaultSettings.imageRouteSource,
+    speechSettingsState.defaultSettings.videoRouteSource,
+    targetsState.selectedTargetId,
   ]);
 
   useEffect(() => {

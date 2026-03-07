@@ -1,4 +1,8 @@
-import type { LocalChatContextLaneId, LocalChatContextPacket } from '../state/ledger-types.js';
+import type {
+  LocalChatContextLaneId,
+  LocalChatContextPacket,
+  LocalChatPromptLaneBudget,
+} from '../state/ledger-types.js';
 
 export type PromptLayerId =
   | 'platformSafety'
@@ -24,6 +28,7 @@ export type PromptBudgetTrace = {
   maxChars: number;
   usedChars: number;
   truncatedLayers: PromptLayerId[];
+  laneBudgets: Partial<Record<LocalChatContextLaneId, LocalChatPromptLaneBudget>>;
 };
 
 export type PromptRetrievalTrace = {
@@ -41,7 +46,7 @@ export type LocalChatCompiledPrompt = {
   truncationByLane: Partial<Record<LocalChatContextLaneId, boolean>>;
   budget: PromptBudgetTrace;
   retrieval: PromptRetrievalTrace;
-  compilerVersion: 'v4';
+  compilerVersion: 'v5';
 };
 
 export type LocalChatPromptCompileInput = {

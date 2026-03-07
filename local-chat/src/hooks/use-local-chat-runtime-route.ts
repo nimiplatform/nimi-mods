@@ -13,8 +13,61 @@ import type { HealthStatus } from '../types.js';
 import { buildRouteOverrideForConnector, buildRouteOverrideForModel, buildRouteOverrideForSource } from './runtime-route/override-actions.js';
 import { loadRouteOptions, resolveRouteSnapshot, runRouteHealthCheck } from './runtime-route/queries.js';
 import type { ChatRouteSnapshot, UseLocalChatRuntimeRouteInput } from './runtime-route/types.js';
+import {
+  resolveLocalRuntimeModelsForScenario,
+  resolveModelsForScenario,
+  resolvePreferredLocalRuntimeModelForScenario,
+  resolvePreferredModelForScenario,
+} from '../services/route/connector-model-capabilities.js';
 
 type RouteCapability = 'chat' | 'image' | 'video' | 'tts' | 'stt';
+
+function normalizeRouteModelId(value: string | null | undefined): string {
+  return String(value || '').trim().toLowerCase();
+}
+
+export function hasValidTokenApiChatModelSelection(input: {
+  model: string | null | undefined;
+  models: string[];
+  modelCapabilities?: Record<string, string[]>;
+}): boolean {
+  const selectedModel = normalizeRouteModelId(input.model);
+  if (!selectedModel) {
+    return false;
+  }
+  return resolveModelsForScenario({
+    models: input.models,
+    modelCapabilities: input.modelCapabilities,
+    scenario: 'chat',
+  }).some((candidate) => normalizeRouteModelId(candidate) === selectedModel);
+}
+
+export function hasValidLocalRuntimeChatModelSelection<T extends {
+  localModelId?: string;
+  model: string;
+  capabilities?: string[];
+}>(input: {
+  model: string | null | undefined;
+  localModelId: string | null | undefined;
+  models: T[];
+}): boolean {
+  const selectedModel = normalizeRouteModelId(input.model);
+  const selectedLocalModelId = normalizeRouteModelId(input.localModelId);
+  if (!selectedModel && !selectedLocalModelId) {
+    return false;
+  }
+  return resolveLocalRuntimeModelsForScenario({
+    models: input.models,
+    scenario: 'chat',
+  }).some((candidate) => {
+    const candidateModel = normalizeRouteModelId(candidate.model);
+    const candidateLocalModelId = normalizeRouteModelId(candidate.localModelId);
+    return (
+      (selectedModel && candidateModel === selectedModel)
+      || (selectedLocalModelId && candidateLocalModelId === selectedLocalModelId)
+    );
+  });
+}
 
 export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
   const [healthStatus, setHealthStatus] = useState<HealthStatus>('idle');
@@ -198,7 +251,50 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
   }, [routeOverride]);
 
   useEffect(() => {
-    if (!routeOverride || routeOverride.source !== 'token-api') {
+    if (!routeOverride) {
+      return;
+    }
+    if (routeOverride.source === 'local-runtime') {
+      const localModels = chatRouteOptions?.localRuntime.models || [];
+      if (localModels.length === 0) {
+        return;
+      }
+      if (hasValidLocalRuntimeChatModelSelection({
+        model: routeOverride.model,
+        localModelId: routeOverride.localModelId,
+        models: localModels,
+      })) {
+        return;
+      }
+      const preferredLocalModel = resolvePreferredLocalRuntimeModelForScenario({
+        models: localModels,
+        scenario: 'chat',
+      });
+      if (!preferredLocalModel) {
+        return;
+      }
+      setRouteOverride((previous) => {
+        if (!previous || previous.source !== 'local-runtime') {
+          return previous;
+        }
+        const nextLocalModelId = String(preferredLocalModel.localModelId || '').trim() || undefined;
+        const nextModel = String(preferredLocalModel.model || '').trim();
+        const nextEngine = String((preferredLocalModel as { engine?: string }).engine || '').trim() || undefined;
+        if (
+          previous.model === nextModel
+          && String(previous.localModelId || '') === String(nextLocalModelId || '')
+          && String(previous.engine || '') === String(nextEngine || '')
+        ) {
+          return previous;
+        }
+        return {
+          source: 'local-runtime',
+          connectorId: '',
+          model: nextModel,
+          ...(nextLocalModelId ? { localModelId: nextLocalModelId } : {}),
+          ...(nextEngine ? { engine: nextEngine } : {}),
+        };
+      });
       return;
     }
     const connectors = chatRouteOptions?.connectors || [];
@@ -207,39 +303,53 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
     }
     const matched = connectors.find((item) => item.id === routeOverride.connectorId) || null;
     if (matched) {
-      if (matched.models.length === 0) {
+      if (hasValidTokenApiChatModelSelection({
+        model: routeOverride.model,
+        models: matched.models || [],
+        modelCapabilities: matched.modelCapabilities,
+      })) {
         return;
       }
-      if (routeOverride.model && matched.models.includes(routeOverride.model)) {
-        return;
-      }
-      const fallbackModel = matched.models[0] || '';
-      if (!fallbackModel || fallbackModel === routeOverride.model) {
-        return;
-      }
-      setRouteOverride((previous) => {
-        if (!previous || previous.source !== 'token-api') {
-          return previous;
-        }
-        if (previous.connectorId !== matched.id) {
-          return previous;
-        }
-        if (previous.model === fallbackModel) {
-          return previous;
-        }
-        return {
-          source: 'token-api',
-          connectorId: matched.id,
-          model: fallbackModel,
-        };
+      const preferredModel = resolvePreferredModelForScenario({
+        models: matched.models || [],
+        modelCapabilities: matched.modelCapabilities,
+        scenario: 'chat',
       });
-      return;
+      if (preferredModel) {
+        setRouteOverride((previous) => {
+          if (!previous || previous.source !== 'token-api') {
+            return previous;
+          }
+          if (previous.connectorId !== matched.id) {
+            return previous;
+          }
+          if (previous.model === preferredModel) {
+            return previous;
+          }
+          return {
+            source: 'token-api',
+            connectorId: matched.id,
+            model: preferredModel,
+          };
+        });
+        return;
+      }
     }
-    const fallbackConnector = connectors[0] || null;
+    const fallbackConnector = connectors.find((connector) => (
+      Boolean(resolvePreferredModelForScenario({
+        models: connector.models || [],
+        modelCapabilities: connector.modelCapabilities,
+        scenario: 'chat',
+      }))
+    )) || connectors[0] || null;
     if (!fallbackConnector) {
       return;
     }
-    const fallbackModel = fallbackConnector.models[0] || '';
+    const fallbackModel = resolvePreferredModelForScenario({
+      models: fallbackConnector.models || [],
+      modelCapabilities: fallbackConnector.modelCapabilities,
+      scenario: 'chat',
+    }) || fallbackConnector.models[0] || '';
     setRouteOverride((previous) => {
       if (!previous || previous.source !== 'token-api') {
         return previous;

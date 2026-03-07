@@ -13,9 +13,14 @@ import {
 } from '../src/state/index.ts';
 import {
   CORE_DATA_API_AGENT_MEMORY_RECALL_FOR_ENTITY,
+  buildLocalChatCompiledPrompt,
   configureLocalChatCoreQueryBridge,
 } from '../src/data/index.ts';
-import { runLocalChatContinuityMaintenance } from '../src/hooks/turn-send/continuity-maintenance.ts';
+import {
+  getLocalChatContinuityHealth,
+  resetLocalChatContinuityHealthForTests,
+  runLocalChatContinuityMaintenance,
+} from '../src/hooks/turn-send/continuity-maintenance.ts';
 import { assembleLocalChatContextPacket } from '../src/hooks/turn-send/context-assembler.ts';
 
 function createTarget() {
@@ -39,6 +44,7 @@ function createTarget() {
 
 test.afterEach(() => {
   configureLocalChatCoreQueryBridge(null);
+  resetLocalChatContinuityHealthForTests();
 });
 
 test('conversation ledger projects assistant media continuity from bundles', async () => {
@@ -206,7 +212,7 @@ test('continuity maintenance writes running summary and durable memory', async (
     },
   };
 
-  await runLocalChatContinuityMaintenance({
+  const continuityHealth = await runLocalChatContinuityMaintenance({
     aiClient,
     routeOverride: null,
     conversationId: session.id,
@@ -227,6 +233,14 @@ test('continuity maintenance writes running summary and durable memory', async (
   assert.ok(durableMemory.some((entry) => entry.type === 'user-fact' && entry.slotKey === 'weather-aesthetic'));
   assert.ok(durableMemory.some((entry) => entry.type === 'assistant-commitment' && entry.slotKey === 'rainy-night-list'));
   assert.ok(durableMemory.some((entry) => entry.type === 'open-loop' && entry.slotKey === 'send-rainy-night-list'));
+  assert.equal(continuityHealth?.runningSummary.status, 'healthy');
+  assert.equal(continuityHealth?.durableMemory.status, 'healthy');
+  assert.equal(continuityHealth?.runningSummary.consecutiveFailures, 0);
+  assert.equal(continuityHealth?.durableMemory.consecutiveFailures, 0);
+  assert.equal(typeof continuityHealth?.runningSummary.lastDurationMs, 'number');
+  assert.equal(typeof continuityHealth?.durableMemory.lastDurationMs, 'number');
+  const persistedHealth = getLocalChatContinuityHealth(session.id);
+  assert.deepEqual(persistedHealth, continuityHealth);
 });
 
 test('cold-start context packet injects platform warm-start without seeding local durable memory', async () => {
@@ -266,6 +280,77 @@ test('cold-start context packet injects platform warm-start without seeding loca
     viewerId: 'viewer.test',
   });
   assert.equal(durableMemory.length, 0);
+});
+
+test('context packet derives reply style, pacing plan, and prompt lane budgets from agent profile', async () => {
+  await resetLocalChatConversationLedgerForTests();
+  const target = {
+    ...createTarget(),
+    handle: '~zi-ling',
+    displayName: '紫灵',
+    agentProfile: {
+      dnaPrimary: 'ROMANTIC',
+      dnaSecondary: ['GENTLE'],
+      postHistoryInstructions: '多用亲密、像微信朋友一样的语气接住对方情绪。',
+      exampleDialogue: '想我就直说呀。我先抱一下你，再陪你慢慢聊。',
+      dna: {
+        communication: {
+          responseLength: 'short',
+          formality: 'casual',
+          sentiment: 'positive',
+        },
+        personality: {
+          relationshipMode: 'romantic',
+        },
+      },
+    },
+  };
+  const session = await createLocalChatSession({
+    targetId: target.id,
+    viewerId: 'viewer.test',
+    worldId: target.worldId,
+    title: target.displayName,
+  });
+
+  const packet = await assembleLocalChatContextPacket({
+    text: '你好',
+    viewerId: 'viewer.test',
+    viewerDisplayName: 'Tester',
+    selectedTarget: target,
+    selectedSessionId: session.id,
+  });
+
+  assert.equal(packet.target.replyStyleProfile.responseLength, 'short');
+  assert.equal(packet.target.replyStyleProfile.relationshipMode, 'romantic');
+  assert.equal(packet.target.replyStyleProfile.followupStyle, 'eager');
+  assert.equal(packet.target.replyStyleProfile.warmth, 'intimate');
+  assert.equal(packet.pacingPlan.mode, 'burst-2');
+  assert.equal(packet.pacingPlan.maxSegments, 2);
+
+  const compiled = buildLocalChatCompiledPrompt({
+    contextPacket: {
+      ...packet,
+      sessionRecall: [{
+        id: 'recall-heavy',
+        text: '雨夜霓虹'.repeat(500),
+        sourceKind: 'running-summary',
+        sourceBundleSeq: null,
+      }],
+      recentBundles: [{
+        id: 'bundle-heavy',
+        seq: 1,
+        role: 'assistant',
+        lines: ['电影感夜景'.repeat(500)],
+      }],
+    },
+    maxPromptChars: 3_600,
+  });
+
+  assert.equal(compiled.compilerVersion, 'v5');
+  assert.ok(compiled.budget.laneBudgets.identity?.maxChars > 0);
+  assert.ok(compiled.budget.laneBudgets.userInput?.maxChars > 0);
+  assert.equal(compiled.budget.laneBudgets.recentBundles?.truncated, true);
+  assert.equal(compiled.truncationByLane.recentBundles, true);
 });
 
 test('session listing isolates conversations by viewer id', async () => {

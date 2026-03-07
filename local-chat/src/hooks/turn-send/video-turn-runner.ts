@@ -93,7 +93,10 @@ export async function runVideoTurn(input: {
   nsfwPolicy: NsfwMediaPolicy;
   fallbackRouteSource?: 'local-runtime' | 'token-api';
   resolvedRoute?: LocalChatResolvedMediaRoute | null;
+  negativePrompt?: string;
   durationSeconds?: number;
+  aspectRatio?: string;
+  cameraMotion?: string;
 }): Promise<VideoTurnRunnerResult> {
   const normalizedPrompt = String(input.prompt || '').trim();
   if (!normalizedPrompt) {
@@ -156,8 +159,17 @@ export async function runVideoTurn(input: {
       routeOverride: pinnedRouteOverride,
       model: pinnedRouteOverride.model || routeConfig.model,
       prompt: normalizedPrompt,
+      ...(String(input.negativePrompt || '').trim()
+        ? { negativePrompt: String(input.negativePrompt || '').trim() }
+        : {}),
       ...(Number.isFinite(input.durationSeconds) && Number(input.durationSeconds) > 0
         ? { durationSeconds: Math.max(1, Math.floor(Number(input.durationSeconds))) }
+        : {}),
+      ...(String(input.aspectRatio || '').trim()
+        ? { aspectRatio: String(input.aspectRatio || '').trim() }
+        : {}),
+      ...(String(input.cameraMotion || '').trim()
+        ? { cameraMotion: String(input.cameraMotion || '').trim() }
         : {}),
     });
     const finalRouteSource = generated.route.source === 'token-api' ? 'token-api' : 'local-runtime';

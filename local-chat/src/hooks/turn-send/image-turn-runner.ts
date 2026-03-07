@@ -93,7 +93,11 @@ export async function runImageTurn(input: {
   nsfwPolicy: NsfwMediaPolicy;
   fallbackRouteSource?: 'local-runtime' | 'token-api';
   resolvedRoute?: LocalChatResolvedMediaRoute | null;
+  negativePrompt?: string;
   size?: string;
+  aspectRatio?: string;
+  quality?: string;
+  style?: string;
   count?: number;
 }): Promise<ImageTurnRunnerResult> {
   const normalizedPrompt = String(input.prompt || '').trim();
@@ -157,7 +161,15 @@ export async function runImageTurn(input: {
       routeOverride: pinnedRouteOverride,
       model: pinnedRouteOverride.model || routeConfig.model,
       prompt: normalizedPrompt,
+      ...(String(input.negativePrompt || '').trim()
+        ? { negativePrompt: String(input.negativePrompt || '').trim() }
+        : {}),
       ...(String(input.size || '').trim() ? { size: String(input.size || '').trim() } : {}),
+      ...(String(input.aspectRatio || '').trim()
+        ? { aspectRatio: String(input.aspectRatio || '').trim() }
+        : {}),
+      ...(String(input.quality || '').trim() ? { quality: String(input.quality || '').trim() } : {}),
+      ...(String(input.style || '').trim() ? { style: String(input.style || '').trim() } : {}),
       ...(Number.isFinite(input.count) && Number(input.count) > 0 ? { n: Math.max(1, Math.floor(Number(input.count))) } : {}),
     });
     const finalRouteSource = generated.route.source === 'token-api' ? 'token-api' : 'local-runtime';

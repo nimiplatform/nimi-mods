@@ -181,8 +181,12 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
       nsfwPolicy: input.nsfwPolicy,
       fallbackRouteSource: input.fallbackRouteSource,
       resolvedRoute,
-      size: prepared.spec.requestedSize,
-      count: prepared.spec.requestedCount,
+      negativePrompt: prepared.compiled.runtimePayload.negativePrompt,
+      size: prepared.compiled.runtimePayload.size,
+      aspectRatio: prepared.compiled.runtimePayload.aspectRatio,
+      quality: prepared.compiled.runtimePayload.quality,
+      style: prepared.compiled.runtimePayload.style,
+      count: prepared.compiled.runtimePayload.n,
     });
     if (input.getCurrentContextKey() !== input.sendContextKey) {
       input.setMessages((prev) => prev.filter((message) => message.id !== intent.pendingMessageId));
@@ -326,15 +330,18 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
     });
   }
 
-  const result = await runVideoTurn({
-    aiClient: input.aiClient,
-    prompt: prepared.compiled.runtimePayload.prompt,
-    defaultSettings: input.defaultSettings,
-    nsfwPolicy: input.nsfwPolicy,
-    fallbackRouteSource: input.fallbackRouteSource,
-    resolvedRoute,
-    durationSeconds: prepared.spec.requestedDurationSeconds,
-  });
+    const result = await runVideoTurn({
+      aiClient: input.aiClient,
+      prompt: prepared.compiled.runtimePayload.prompt,
+      defaultSettings: input.defaultSettings,
+      nsfwPolicy: input.nsfwPolicy,
+      fallbackRouteSource: input.fallbackRouteSource,
+      resolvedRoute,
+      negativePrompt: prepared.compiled.runtimePayload.negativePrompt,
+      durationSeconds: prepared.compiled.runtimePayload.durationSeconds,
+      aspectRatio: prepared.compiled.runtimePayload.aspectRatio,
+      cameraMotion: prepared.compiled.runtimePayload.cameraMotion,
+    });
   if (input.getCurrentContextKey() !== input.sendContextKey) {
     input.setMessages((prev) => prev.filter((message) => message.id !== intent.pendingMessageId));
     return null;

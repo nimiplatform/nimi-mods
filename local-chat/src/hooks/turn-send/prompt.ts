@@ -45,6 +45,7 @@ export async function prepareLocalChatTurn(input: {
     invokeInput,
     prompt,
     allowMultiReply: input.allowMultiReply,
+    pacingPlan: contextPacket.pacingPlan,
     segmentationMode: input.segmentationMode,
     onStreamDelta: input.onStreamDelta,
   });

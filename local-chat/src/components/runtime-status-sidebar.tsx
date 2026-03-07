@@ -7,6 +7,10 @@ import {
   type RuntimeRouteBinding,
 } from '@nimiplatform/sdk/mod/runtime-route';
 import { dedupeModelIds } from '../services/index.js';
+import {
+  resolveLocalRuntimeModelsForScenario,
+  resolveModelsForScenario,
+} from '../services/route/connector-model-capabilities.js';
 import { DefaultSettingsPanel } from './sidebar/default-settings-panel.js';
 import { ChatRoutePanel } from './sidebar/chat-route-panel.js';
 import { VoicePanel } from './sidebar/voice-panel.js';
@@ -126,9 +130,24 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
   const activeChatConnector = chatRouteOptions?.connectors.find((connector) => connector.id === activeChatConnectorId)
     || chatRouteOptions?.connectors[0]
     || null;
-  const chatModelOptionsRaw = activeChatSource === 'local-runtime'
-    ? (chatRouteOptions?.localRuntime.models.map((model) => model.model) || [])
-    : (activeChatConnector?.models || []);
+  const chatModelOptionsRaw = useMemo(() => {
+    if (activeChatSource === 'local-runtime') {
+      return resolveLocalRuntimeModelsForScenario({
+        models: chatRouteOptions?.localRuntime.models || [],
+        scenario: 'chat',
+      }).map((model) => model.model);
+    }
+    return resolveModelsForScenario({
+      models: activeChatConnector?.models || [],
+      modelCapabilities: activeChatConnector?.modelCapabilities,
+      scenario: 'chat',
+    });
+  }, [
+    activeChatConnector?.modelCapabilities,
+    activeChatConnector?.models,
+    activeChatSource,
+    chatRouteOptions?.localRuntime.models,
+  ]);
   const chatModelOptions = useMemo(
     () => dedupeModelIds(chatModelOptionsRaw),
     [chatModelOptionsRaw],

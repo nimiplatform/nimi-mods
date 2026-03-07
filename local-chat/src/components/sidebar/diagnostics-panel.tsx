@@ -54,6 +54,20 @@ export function DiagnosticsPanel(props: Props) {
   const continuityValue = latestPromptTrace
     ? `bundles ${latestPromptTrace.selectedBundleSeqs.join(', ') || '-'} · summary≤${latestPromptTrace.runningSummaryWatermark} · recall ${latestPromptTrace.sessionRecallCount}`
     : '-';
+  const replyStyleValue = latestPromptTrace?.replyStyleProfile
+    ? `${latestPromptTrace.replyStyleProfile.responseLength} · ${latestPromptTrace.replyStyleProfile.formality} · ${latestPromptTrace.replyStyleProfile.sentiment} · ${latestPromptTrace.replyStyleProfile.pacingStyle}`
+    : '-';
+  const pacingPlanValue = latestPromptTrace?.pacingPlan
+    ? `${latestPromptTrace.pacingPlan.mode} · ${latestPromptTrace.pacingPlan.energy} · max ${latestPromptTrace.pacingPlan.maxSegments}`
+    : '-';
+  const laneBudgetValue = latestPromptTrace?.laneBudgets
+    ? Object.entries(latestPromptTrace.laneBudgets)
+      .map(([lane, budget]) => `${lane} ${budget.usedChars}/${budget.maxChars}${budget.truncated ? '!' : ''}`)
+      .join(' · ')
+    : '-';
+  const continuityHealthValue = latestPromptTrace?.continuityHealth
+    ? `summary ${latestPromptTrace.continuityHealth.runningSummary.status}(${latestPromptTrace.continuityHealth.runningSummary.consecutiveFailures}) · memory ${latestPromptTrace.continuityHealth.durableMemory.status}(${latestPromptTrace.continuityHealth.durableMemory.consecutiveFailures})`
+    : '-';
   const metricItems = [
     {
       key: 'route',
@@ -124,6 +138,10 @@ export function DiagnosticsPanel(props: Props) {
                   : '-'}
               </p>
               <p>
+                <span className="font-medium">{t('Diagnostics.detailLaneBudgets')}:</span>{' '}
+                {laneBudgetValue}
+              </p>
+              <p>
                 <span className="font-medium">{t('Diagnostics.detailDroppedLayers')}:</span>{' '}
                 {latestPromptTrace?.droppedLayers?.length
                   ? latestPromptTrace.droppedLayers.join(', ')
@@ -140,8 +158,20 @@ export function DiagnosticsPanel(props: Props) {
                   : '-'}
               </p>
               <p>
+                <span className="font-medium">{t('Diagnostics.detailReplyStyle')}:</span>{' '}
+                {replyStyleValue}
+              </p>
+              <p>
+                <span className="font-medium">{t('Diagnostics.detailPacingPlan')}:</span>{' '}
+                {pacingPlanValue}
+              </p>
+              <p>
                 <span className="font-medium">continuity:</span>{' '}
                 {continuityValue}
+              </p>
+              <p>
+                <span className="font-medium">{t('Diagnostics.detailContinuityHealth')}:</span>{' '}
+                {continuityHealthValue}
               </p>
               <p>
                 <span className="font-medium">{t('Diagnostics.detailSegmentParse')}:</span>{' '}

@@ -41,9 +41,14 @@ export type LocalChatCompiledMediaExecution = {
   runtimePayload: {
     prompt: string;
     model?: string;
+    negativePrompt?: string;
     size?: string;
+    aspectRatio?: string;
+    quality?: string;
+    style?: string;
     n?: number;
     durationSeconds?: number;
+    cameraMotion?: string;
   };
   compilerRevision: string;
 };

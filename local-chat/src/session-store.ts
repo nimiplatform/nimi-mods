@@ -21,6 +21,8 @@ import type {
 import { createUlid } from './utils/ulid.js';
 
 export type {
+  LocalChatContinuityHealth,
+  LocalChatContinuityStageHealth,
   LocalChatContextLaneId,
   LocalChatContextPacket,
   LocalChatContextTrace,
@@ -29,7 +31,10 @@ export type {
   LocalChatMemoryStatus,
   LocalChatMemoryType,
   LocalChatPlatformWarmStartMemory,
+  LocalChatPromptLaneBudget,
   LocalChatPromptTrace,
+  LocalChatReplyPacingPlan,
+  LocalChatReplyStyleProfile,
   LocalChatRunningSummary,
   LocalChatSession,
   LocalChatSessionRecallDoc,

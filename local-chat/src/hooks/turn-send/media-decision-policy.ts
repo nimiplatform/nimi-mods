@@ -88,6 +88,10 @@ const AUTO_MEDIA_TURN_COOLDOWN = 6;
 const AUTO_MEDIA_TIME_COOLDOWN_MS = 10 * 60 * 1_000;
 const AUTO_VIDEO_TURN_COOLDOWN = 20;
 const AUTO_VIDEO_TIME_COOLDOWN_MS = 30 * 60 * 1_000;
+const ASSISTANT_OFFER_SIGNAL_RE = /\b(?:i(?:'ll| will)|let me|want me to|i can|here(?:'s| is)|sending)\b|(?:给你看|发你看|发给你|给你发|拍给你|给你拍|我给你看|我发你|我拍给你|给你来一张|给你来段|我这就发|我这就给你)/i;
+const VISUAL_SCENE_SIGNAL_RE = /\b(?:frame|portrait|photo|image|light|lighting|color|dress|street|rain|beach|room|window|night|sunset|cinematic|close-up|wide shot|selfie)\b|(?:画面|镜头|样子|神情|表情|穿着|光影|灯光|夜色|海边|房间|窗边|雨夜|照片|图片|身影|背影|颜色|氛围|构图|电影感|特写|远景|自拍)/i;
+const VIDEO_MOTION_SIGNAL_RE = /\b(?:walk|turn(?:\s+around)?|move|moving|spin|dance|approach|reach|camera|tracking|follow|pan|zoom|motion|sequence|clip|blink|glance|smile|nod|loop)\b|(?:走|转身|移动|舞动|迈步|靠近|抬手|镜头|跟拍|推进|拉远|动态|片段|过程|眨眼|回眸|微笑|点头|短循环)/i;
+const GENERIC_MEDIA_DESCRIPTOR_RE = /^(?:当前对话中的主体|贴合当前对话语境|自然、精致、贴合陪伴式对话|贴合当前交流氛围|自然|普通问候场景|generic greeting|scene fits image|visual scene)$/i;
 
 export function normalizeMediaDependencyStatus(snapshot: AiRuntimeDependencySnapshot | null): MediaDependencyStatus {
   if (!snapshot) return 'unknown';
@@ -213,6 +217,61 @@ function isStructuredAssistantReply(text: string): boolean {
     || normalized.startsWith('[')
     || normalized.includes('```')
     || /^(?:\d+\.\s|-\s|\*\s)/m.test(normalized);
+}
+
+function joinMediaSignalText(values: Array<string | undefined | null>): string {
+  return values
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
+function hasAssistantOfferSignal(assistantText: string): boolean {
+  return ASSISTANT_OFFER_SIGNAL_RE.test(String(assistantText || '').trim());
+}
+
+function hasVisualSceneSignal(input: {
+  userText: string;
+  assistantText: string;
+  decision: MediaPlannerDecision;
+}): boolean {
+  const joined = joinMediaSignalText([
+    input.userText,
+    input.assistantText,
+    input.decision.subject,
+    input.decision.scene,
+    input.decision.styleIntent,
+    input.decision.hints?.composition,
+  ]);
+  if (!joined) return false;
+  if (VISUAL_SCENE_SIGNAL_RE.test(joined)) {
+    return true;
+  }
+  return [
+    input.decision.subject,
+    input.decision.scene,
+    input.decision.styleIntent,
+    input.assistantText,
+    input.userText,
+  ]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .filter((value) => !GENERIC_MEDIA_DESCRIPTOR_RE.test(value))
+    .some((value) => value.length >= 18);
+}
+
+function hasVideoMotionSignal(input: {
+  userText: string;
+  assistantText: string;
+  decision: MediaPlannerDecision;
+}): boolean {
+  return VIDEO_MOTION_SIGNAL_RE.test(joinMediaSignalText([
+    input.userText,
+    input.assistantText,
+    input.decision.scene,
+    input.decision.reason,
+    input.decision.hints?.composition,
+  ]));
 }
 
 function buildMediaGateBlockedMessage(input: {
@@ -738,6 +797,32 @@ export async function decideMediaExecution(input: DecideMediaExecutionInput): Pr
           : VIDEO_AUTO_CONFIDENCE_THRESHOLD;
         const plannerBlockedReason = (() => {
           if (decision.confidence < confidenceThreshold) return 'planner-confidence-too-low';
+          if (
+            preparedResult.intent.type === 'video'
+            && !hasVideoMotionSignal({
+              userText: input.userText,
+              assistantText: input.assistantText,
+              decision,
+            })
+          ) {
+            return 'video-motion-signal-missing';
+          }
+          if (
+            decision.trigger === 'assistant-offer'
+            && !hasAssistantOfferSignal(input.assistantText)
+          ) {
+            return 'assistant-offer-signal-missing';
+          }
+          if (
+            decision.trigger === 'scene-enhancement'
+            && !hasVisualSceneSignal({
+              userText: input.userText,
+              assistantText: input.assistantText,
+              decision,
+            })
+          ) {
+            return 'scene-signal-too-weak';
+          }
           if (preparedResult.intent.type === 'video' && recentMedia.autoVideoCooling) return 'video-cooldown-active';
           const gate = evaluateIntentGate({
             intent: preparedResult.intent,

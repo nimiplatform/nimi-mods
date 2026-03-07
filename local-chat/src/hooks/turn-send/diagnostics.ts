@@ -73,6 +73,7 @@ export function buildPromptTrace(input: BuildPromptTraceInput): LocalChatPromptT
     droppedLayers,
     laneChars: input.compiledPrompt.laneChars,
     truncationByLane: input.compiledPrompt.truncationByLane,
+    laneBudgets: input.compiledPrompt.budget.laneBudgets,
     memorySlices: {
       core: input.contextPacket.platformWarmStart?.core.length || 0,
       e2e: input.contextPacket.platformWarmStart?.e2e.length || 0,
@@ -85,6 +86,9 @@ export function buildPromptTrace(input: BuildPromptTraceInput): LocalChatPromptT
       truncated: input.compiledPrompt.budget.truncatedLayers.length > 0,
     },
     compilerVersion: input.compiledPrompt.compilerVersion,
+    replyStyleProfile: input.contextPacket.target.replyStyleProfile,
+    pacingPlan: input.contextPacket.pacingPlan,
+    continuityHealth: input.contextPacket.diagnostics.continuityHealth,
     planner: input.planner,
     planSegments: input.planSegments,
     voiceSegments: input.voiceSegments,

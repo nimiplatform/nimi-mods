@@ -19,6 +19,44 @@ export type LocalChatContextLaneId =
   | 'userInput'
   | 'replyStyle';
 
+export type LocalChatReplyStyleProfile = {
+  responseLength: 'short' | 'medium' | 'long';
+  formality: 'casual' | 'formal' | 'slang';
+  sentiment: 'positive' | 'neutral' | 'cynical';
+  relationshipMode: string;
+  pacingStyle: 'reserved' | 'balanced' | 'bursty';
+  followupStyle: 'rare' | 'situational' | 'eager';
+  warmth: 'cool' | 'warm' | 'intimate';
+  signals: string[];
+};
+
+export type LocalChatReplyPacingPlan = {
+  mode: 'single' | 'burst-2' | 'answer-followup' | 'burst-3';
+  maxSegments: 1 | 2 | 3;
+  energy: 'low' | 'medium' | 'high';
+  reason: string;
+};
+
+export type LocalChatContinuityStageHealth = {
+  status: 'idle' | 'healthy' | 'degraded';
+  consecutiveFailures: number;
+  lastAttemptAt: string | null;
+  lastSuccessAt: string | null;
+  lastDurationMs: number | null;
+  lastErrorCode: string | null;
+};
+
+export type LocalChatContinuityHealth = {
+  runningSummary: LocalChatContinuityStageHealth;
+  durableMemory: LocalChatContinuityStageHealth;
+};
+
+export type LocalChatPromptLaneBudget = {
+  maxChars: number;
+  usedChars: number;
+  truncated: boolean;
+};
+
 export type LocalChatMemoryType =
   | 'relationship-state'
   | 'user-fact'
@@ -51,7 +89,8 @@ export type LocalChatContextTrace = {
     usedChars: number;
     truncated: boolean;
   };
-  compilerVersion: 'v1' | 'v2' | 'v3' | 'v4';
+  laneBudgets: Partial<Record<LocalChatContextLaneId, LocalChatPromptLaneBudget>>;
+  compilerVersion: 'v1' | 'v2' | 'v3' | 'v4' | 'v5';
   planner?: 'stream';
   planSegments?: number;
   voiceSegments?: number;
@@ -60,6 +99,9 @@ export type LocalChatContextTrace = {
   streamDeltaCount?: number;
   streamDurationMs?: number;
   segmentParseMode?: 'explicit-delimiter' | 'double-newline' | 'single-message';
+  replyStyleProfile?: LocalChatReplyStyleProfile;
+  pacingPlan?: LocalChatReplyPacingPlan;
+  continuityHealth?: LocalChatContinuityHealth | null;
   nsfwPolicy?: 'disabled' | 'local-runtime-only' | 'allowed';
   plannerUsed?: boolean;
   plannerKind?: 'none' | 'image' | 'video';
@@ -228,6 +270,7 @@ export type LocalChatContextPacket = {
     identityLines: string[];
     rulesLines: string[];
     replyStyleLines: string[];
+    replyStyleProfile: LocalChatReplyStyleProfile;
   };
   world: {
     worldId: string | null;
@@ -248,11 +291,13 @@ export type LocalChatContextPacket = {
     role: 'user' | 'assistant';
     lines: string[];
   }>;
+  pacingPlan: LocalChatReplyPacingPlan;
   userInput: string;
   diagnostics: {
     selectedBundleSeqs: number[];
     runningSummaryWatermark: number;
     sessionRecallCount: number;
     durableMemoryCountsByType: Partial<Record<LocalChatMemoryType, number>>;
+    continuityHealth: LocalChatContinuityHealth | null;
   };
 };

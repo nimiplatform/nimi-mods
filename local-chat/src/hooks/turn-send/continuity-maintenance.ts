@@ -5,6 +5,8 @@ import {
   getLocalChatRunningSummary,
   listLocalChatDurableMemoryEntries,
   listLocalChatTurnBundles,
+  type LocalChatContinuityHealth,
+  type LocalChatContinuityStageHealth,
   type LocalChatDurableMemoryEntry,
   type LocalChatMemoryType,
   type LocalChatRunningSummary,
@@ -18,6 +20,7 @@ import type { LocalChatTurnAiClient } from './types.js';
 const CONTINUITY_TIMEOUT_MS = 1_500;
 const RECENT_EXACT_WINDOW = 8;
 const SUMMARY_ASSISTANT_INTERVAL = 4;
+const continuityHealthByConversation = new Map<string, LocalChatContinuityHealth>();
 
 const summarySchema = z.object({
   relationshipState: z.array(z.string().min(1).max(240)).max(6).default([]),
@@ -43,6 +46,71 @@ const memoryWriterSchema = z.object({
   assistantCommitments: z.array(memoryCandidateSchema).max(6).default([]),
   openLoops: z.array(memoryCandidateSchema).max(6).default([]),
 });
+
+function createIdleContinuityStage(): LocalChatContinuityStageHealth {
+  return {
+    status: 'idle',
+    consecutiveFailures: 0,
+    lastAttemptAt: null,
+    lastSuccessAt: null,
+    lastDurationMs: null,
+    lastErrorCode: null,
+  };
+}
+
+function cloneContinuityStage(stage?: LocalChatContinuityStageHealth | null): LocalChatContinuityStageHealth {
+  if (!stage) return createIdleContinuityStage();
+  return {
+    status: stage.status,
+    consecutiveFailures: stage.consecutiveFailures,
+    lastAttemptAt: stage.lastAttemptAt,
+    lastSuccessAt: stage.lastSuccessAt,
+    lastDurationMs: stage.lastDurationMs,
+    lastErrorCode: stage.lastErrorCode,
+  };
+}
+
+function cloneContinuityHealth(input?: LocalChatContinuityHealth | null): LocalChatContinuityHealth {
+  return {
+    runningSummary: cloneContinuityStage(input?.runningSummary),
+    durableMemory: cloneContinuityStage(input?.durableMemory),
+  };
+}
+
+function readContinuityHealth(conversationId: string): LocalChatContinuityHealth {
+  return cloneContinuityHealth(continuityHealthByConversation.get(conversationId));
+}
+
+function writeContinuityHealthStage(input: {
+  conversationId: string;
+  stage: keyof LocalChatContinuityHealth;
+  durationMs: number;
+  success: boolean;
+  errorCode?: string | null;
+}): void {
+  const current = readContinuityHealth(input.conversationId);
+  continuityHealthByConversation.set(input.conversationId, {
+    ...current,
+    [input.stage]: {
+      ...current[input.stage],
+      status: input.success ? 'healthy' : 'degraded',
+      consecutiveFailures: input.success ? 0 : current[input.stage].consecutiveFailures + 1,
+      lastAttemptAt: new Date().toISOString(),
+      lastSuccessAt: input.success ? new Date().toISOString() : current[input.stage].lastSuccessAt,
+      lastDurationMs: input.durationMs,
+      lastErrorCode: input.success ? null : String(input.errorCode || 'LOCAL_CHAT_CONTINUITY_FAILED'),
+    },
+  });
+}
+
+export function getLocalChatContinuityHealth(conversationId: string): LocalChatContinuityHealth | null {
+  const snapshot = continuityHealthByConversation.get(conversationId);
+  return snapshot ? cloneContinuityHealth(snapshot) : null;
+}
+
+export function resetLocalChatContinuityHealthForTests(): void {
+  continuityHealthByConversation.clear();
+}
 
 function visibleSegments(bundle: LocalChatTurnBundle): LocalChatTurnBundle['segments'] {
   return bundle.segments.filter((segment) => Boolean(segment.contextText || segment.semanticSummary || segment.content));
@@ -328,6 +396,7 @@ async function refreshRunningSummary(input: {
   conversationId: string;
   bundles: LocalChatTurnBundle[];
 }): Promise<LocalChatRunningSummary | null> {
+  const startedAt = performance.now();
   const currentSummary = await getLocalChatRunningSummary(input.conversationId);
   const refresh = shouldRefreshRunningSummary(input.bundles, currentSummary);
   if (!refresh.shouldRun || refresh.evictedBundles.length === 0) {
@@ -352,9 +421,16 @@ async function refreshRunningSummary(input: {
     }));
     const parsed = summarySchema.safeParse(result.object);
     if (!parsed.success) {
+      writeContinuityHealthStage({
+        conversationId: input.conversationId,
+        stage: 'runningSummary',
+        durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
+        success: false,
+        errorCode: 'LOCAL_CHAT_RUNNING_SUMMARY_SCHEMA_INVALID',
+      });
       return currentSummary;
     }
-    return await upsertLocalChatRunningSummary({
+    const nextSummary = await upsertLocalChatRunningSummary({
       conversationId: input.conversationId,
       relationshipState: parsed.data.relationshipState,
       userFactsEstablished: parsed.data.userFactsEstablished,
@@ -364,7 +440,21 @@ async function refreshRunningSummary(input: {
       updatedAt: new Date().toISOString(),
       lastSummarizedBundleSeq: refresh.nextWatermark,
     });
-  } catch {
+    writeContinuityHealthStage({
+      conversationId: input.conversationId,
+      stage: 'runningSummary',
+      durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
+      success: true,
+    });
+    return nextSummary;
+  } catch (error) {
+    writeContinuityHealthStage({
+      conversationId: input.conversationId,
+      stage: 'runningSummary',
+      durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
+      success: false,
+      errorCode: error instanceof Error ? error.message : 'LOCAL_CHAT_RUNNING_SUMMARY_REFRESH_FAILED',
+    });
     return currentSummary;
   }
 }
@@ -378,6 +468,7 @@ async function writeDurableMemory(input: {
   bundles: LocalChatTurnBundle[];
   runningSummary: LocalChatRunningSummary | null;
 }): Promise<void> {
+  const startedAt = performance.now();
   const visible = visibleBundles(input.bundles);
   const latestAssistantBundle = [...visible].reverse().find((bundle) => bundle.role === 'assistant') || null;
   if (!latestAssistantBundle) return;
@@ -409,7 +500,16 @@ async function writeDurableMemory(input: {
       parse: parseMemoryObject,
     }));
     const parsed = memoryWriterSchema.safeParse(result.object);
-    if (!parsed.success) return;
+    if (!parsed.success) {
+      writeContinuityHealthStage({
+        conversationId: input.conversationId,
+        stage: 'durableMemory',
+        durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
+        success: false,
+        errorCode: 'LOCAL_CHAT_DURABLE_MEMORY_SCHEMA_INVALID',
+      });
+      return;
+    }
     const sourceBundleSeqs = [latestAssistantBundle.seq, recentUserBundle?.seq || 0].filter((value) => value > 0);
     const pendingWrites: LocalChatDurableMemoryEntry[] = [];
     (Object.keys(parsed.data) as Array<keyof typeof parsed.data>).forEach((group) => {
@@ -435,10 +535,31 @@ async function writeDurableMemory(input: {
         pendingWrites.push(...groupWrites);
       });
     });
-    if (pendingWrites.length === 0) return;
+    if (pendingWrites.length === 0) {
+      writeContinuityHealthStage({
+        conversationId: input.conversationId,
+        stage: 'durableMemory',
+        durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
+        success: true,
+      });
+      return;
+    }
     await upsertLocalChatDurableMemoryEntries(pendingWrites);
-  } catch {
+    writeContinuityHealthStage({
+      conversationId: input.conversationId,
+      stage: 'durableMemory',
+      durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
+      success: true,
+    });
+  } catch (error) {
     // Silent degrade by design.
+    writeContinuityHealthStage({
+      conversationId: input.conversationId,
+      stage: 'durableMemory',
+      durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
+      success: false,
+      errorCode: error instanceof Error ? error.message : 'LOCAL_CHAT_DURABLE_MEMORY_WRITE_FAILED',
+    });
   }
 }
 
@@ -448,9 +569,9 @@ export async function runLocalChatContinuityMaintenance(input: {
   conversationId: string;
   viewerId: string;
   target: LocalChatTarget;
-}): Promise<void> {
+}): Promise<LocalChatContinuityHealth | null> {
   const bundles = await listLocalChatTurnBundles(input.conversationId);
-  if (bundles.length === 0) return;
+  if (bundles.length === 0) return getLocalChatContinuityHealth(input.conversationId);
   const runningSummary = await refreshRunningSummary({
     aiClient: input.aiClient,
     routeOverride: input.routeOverride,
@@ -467,4 +588,5 @@ export async function runLocalChatContinuityMaintenance(input: {
     bundles,
     runningSummary,
   });
+  return getLocalChatContinuityHealth(input.conversationId);
 }

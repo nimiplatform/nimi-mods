@@ -5,10 +5,14 @@ import {
   lexicalRecallLocalChatSession,
   listLocalChatDurableMemoryEntries,
   listLocalChatExactHistoryBundles,
+  type LocalChatContinuityHealth,
   type LocalChatContextPacket,
   type LocalChatDurableMemoryEntry,
+  type LocalChatReplyPacingPlan,
+  type LocalChatReplyStyleProfile,
   type LocalChatTurnBundle,
 } from '../../state/index.js';
+import { getLocalChatContinuityHealth } from './continuity-maintenance.js';
 
 export type AssembleLocalChatContextPacketInput = {
   text: string;
@@ -52,6 +56,182 @@ function lexicalScore(haystack: string, query: string): number {
   return hits / tokens.length;
 }
 
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function readNestedRecord(record: unknown, path: string[]): Record<string, unknown> {
+  let current = asRecord(record);
+  for (const key of path) {
+    current = asRecord(current[key]);
+  }
+  return current;
+}
+
+function normalizeResponseLength(value: unknown): LocalChatReplyStyleProfile['responseLength'] {
+  const normalized = asString(value).toLowerCase();
+  if (normalized === 'short' || normalized === 'long') return normalized;
+  return 'medium';
+}
+
+function normalizeFormality(value: unknown): LocalChatReplyStyleProfile['formality'] {
+  const normalized = asString(value).toLowerCase();
+  if (normalized === 'formal' || normalized === 'slang') return normalized;
+  return 'casual';
+}
+
+function normalizeSentiment(value: unknown): LocalChatReplyStyleProfile['sentiment'] {
+  const normalized = asString(value).toLowerCase();
+  if (normalized === 'positive' || normalized === 'cynical') return normalized;
+  return 'neutral';
+}
+
+function compactLines(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+function deriveReplyStyleProfile(target: LocalChatTarget): LocalChatReplyStyleProfile {
+  const profile = asRecord(target.agentProfile);
+  const metadata = asRecord(target.agentMetadata);
+  const dna = readNestedRecord(profile, ['dna']);
+  const dnaCommunication = readNestedRecord(dna, ['communication']);
+  const dnaPersonality = readNestedRecord(dna, ['personality']);
+  const postHistoryInstructions = compactLines(asString(profile.postHistoryInstructions || metadata.postHistoryInstructions));
+  const exampleDialogue = compactLines(asString(profile.exampleDialogue || metadata.exampleDialogue));
+  const dnaPrimary = asString(profile.dnaPrimary || metadata.dnaPrimary);
+  const dnaSecondary = [
+    ...asArray(profile.dnaSecondary),
+    ...asArray(metadata.dnaSecondary),
+  ].map((item) => asString(item).toUpperCase()).filter(Boolean);
+  const relationshipMode = asString(dnaPersonality.relationshipMode || profile.relationshipMode || metadata.relationshipMode) || 'friendly';
+  const responseLength = normalizeResponseLength(
+    dnaCommunication.responseLength
+    || profile.responseLength
+    || metadata.responseLength
+    || (exampleDialogue.length > 260 ? 'long' : exampleDialogue.length > 120 ? 'medium' : 'short'),
+  );
+  const formality = normalizeFormality(
+    dnaCommunication.formality
+    || profile.formality
+    || metadata.formality
+    || (/\bformal\b|正式|克制/u.test(postHistoryInstructions) ? 'formal' : 'casual'),
+  );
+  const sentiment = normalizeSentiment(
+    dnaCommunication.sentiment
+    || profile.sentiment
+    || metadata.sentiment
+    || (/\bcynical\b|冷淡|讽刺|阴阳怪气/u.test(postHistoryInstructions) ? 'cynical' : 'neutral'),
+  );
+  const normalizedRelationshipMode = relationshipMode.toLowerCase();
+  const intimateRelationship = /(romantic|intimate|flirty|lover|partner|close|亲密|暧昧|恋人|伴侣)/u.test(normalizedRelationshipMode);
+  const warmRelationship = intimateRelationship || /(friendly|gentle|warm|supportive|陪伴|温柔|朋友|治愈)/u.test(normalizedRelationshipMode);
+  const warmSignal = warmRelationship || dnaSecondary.includes('GENTLE') || dnaSecondary.includes('ROMANTIC');
+  const energeticSignal = dnaSecondary.includes('PLAYFUL') || dnaSecondary.includes('CHAOTIC') || dnaSecondary.includes('BOLD');
+  const reservedSignal = formality === 'formal' || sentiment === 'cynical' || dnaPrimary === 'INTELLECTUAL' || dnaSecondary.includes('TSUNDERE');
+  const pacingStyle: LocalChatReplyStyleProfile['pacingStyle'] = reservedSignal
+    ? 'reserved'
+    : energeticSignal || (responseLength === 'short' && warmSignal)
+      ? 'bursty'
+      : 'balanced';
+  const followupStyle: LocalChatReplyStyleProfile['followupStyle'] = reservedSignal
+    ? 'rare'
+    : intimateRelationship || warmSignal || responseLength === 'long'
+      ? 'eager'
+      : 'situational';
+  const warmth: LocalChatReplyStyleProfile['warmth'] = intimateRelationship
+    ? 'intimate'
+    : sentiment === 'cynical'
+      ? 'cool'
+      : warmSignal
+        ? 'warm'
+        : 'cool';
+  const signals = [
+    dnaPrimary ? `dnaPrimary:${dnaPrimary}` : '',
+    dnaSecondary.length > 0 ? `dnaSecondary:${dnaSecondary.join('/')}` : '',
+    relationshipMode ? `relationship:${relationshipMode}` : '',
+    postHistoryInstructions ? 'postHistoryInstructions' : '',
+    exampleDialogue ? 'exampleDialogue' : '',
+  ].filter(Boolean);
+
+  return {
+    responseLength,
+    formality,
+    sentiment,
+    relationshipMode,
+    pacingStyle,
+    followupStyle,
+    warmth,
+    signals,
+  };
+}
+
+const GREETING_RE = /^(?:hi|hello|hey|yo|你好|嗨|哈喽|在吗|早安|晚安|想你了|在不在|喂)[\s!,.?？！，。~]*$/iu;
+const QUESTION_RE = /[?？]|为什么|怎么|如何|能不能|可不可以|是什么|什么意思|怎样|要不要/u;
+const EMOTIONAL_RE = /难过|好累|很累|烦|崩溃|想哭|孤单|害怕|抱抱|安慰|委屈|想你/u;
+const EXCITED_RE = /(?:[!！]{2,}|哈哈|hh+|lol|好耶|太好了|天啊|卧槽|真的耶|笑死)/iu;
+
+function derivePacingPlan(input: {
+  text: string;
+  profile: LocalChatReplyStyleProfile;
+}): LocalChatReplyPacingPlan {
+  const text = compactLines(input.text);
+  const normalized = text.toLowerCase();
+  const isGreeting = GREETING_RE.test(text);
+  const isQuestion = QUESTION_RE.test(text);
+  const isEmotional = EMOTIONAL_RE.test(text);
+  const isExcited = EXCITED_RE.test(text);
+  const intimate = input.profile.warmth === 'intimate';
+  const energetic = input.profile.pacingStyle === 'bursty';
+  const eagerFollowup = input.profile.followupStyle === 'eager';
+
+  if (isEmotional || (isQuestion && eagerFollowup && input.profile.responseLength !== 'short')) {
+    return {
+      mode: 'answer-followup',
+      maxSegments: 2,
+      energy: isEmotional ? 'low' : 'medium',
+      reason: isEmotional ? 'comfort-needs-soft-followup' : 'question-needs-main-answer-and-followup',
+    };
+  }
+  if (isExcited && energetic) {
+    return {
+      mode: input.profile.responseLength === 'short' ? 'burst-3' : 'burst-2',
+      maxSegments: input.profile.responseLength === 'short' ? 3 : 2,
+      energy: 'high',
+      reason: 'high-energy-turn',
+    };
+  }
+  if (isGreeting && (intimate || eagerFollowup || energetic)) {
+    return {
+      mode: 'burst-2',
+      maxSegments: 2,
+      energy: intimate ? 'medium' : 'high',
+      reason: 'greeting-turn-with-warmth',
+    };
+  }
+  if (input.profile.pacingStyle === 'reserved' || input.profile.formality === 'formal') {
+    return {
+      mode: 'single',
+      maxSegments: 1,
+      energy: 'low',
+      reason: 'reserved-style',
+    };
+  }
+  if (isQuestion && input.profile.followupStyle !== 'rare' && normalized.length <= 48) {
+    return {
+      mode: 'answer-followup',
+      maxSegments: 2,
+      energy: 'medium',
+      reason: 'short-question-followup',
+    };
+  }
+  return {
+    mode: energetic && input.profile.responseLength === 'short' ? 'burst-2' : 'single',
+    maxSegments: energetic && input.profile.responseLength === 'short' ? 2 : 1,
+    energy: energetic ? 'medium' : 'low',
+    reason: energetic && input.profile.responseLength === 'short' ? 'bursty-short-style' : 'default-single',
+  };
+}
+
 function summarizeWorld(target: LocalChatTarget): string[] {
   const world = asRecord(target.world);
   const worldview = asRecord(target.worldview);
@@ -73,9 +253,11 @@ function summarizeIdentity(target: LocalChatTarget): {
   identityLines: string[];
   rulesLines: string[];
   replyStyleLines: string[];
+  replyStyleProfile: LocalChatReplyStyleProfile;
 } {
   const profile = asRecord(target.agentProfile);
   const metadata = asRecord(target.agentMetadata);
+  const replyStyleProfile = deriveReplyStyleProfile(target);
   const rules = [
     ...asStringArray(profile.rules),
     ...asStringArray(metadata.rules),
@@ -94,9 +276,11 @@ function summarizeIdentity(target: LocalChatTarget): {
     rulesLines: rules,
     replyStyleLines: [
       postHistoryInstructions,
+      `建议节奏：${replyStyleProfile.pacingStyle}；补句倾向：${replyStyleProfile.followupStyle}；关系模式：${replyStyleProfile.relationshipMode}。`,
       '保持自然、像朋友发微信一样交流。',
       '需要分条时最多 3 条，节奏可以变化。',
     ].filter(Boolean),
+    replyStyleProfile,
   };
 }
 
@@ -195,6 +379,11 @@ export async function assembleLocalChatContextPacket(input: AssembleLocalChatCon
 
   const selectedDurableMemory = selectDurableMemory(durableMemory, input.text);
   const identity = summarizeIdentity(input.selectedTarget);
+  const pacingPlan = derivePacingPlan({
+    text: input.text,
+    profile: identity.replyStyleProfile,
+  });
+  const continuityHealth = getLocalChatContinuityHealth(input.selectedSessionId);
 
   return {
     conversationId: input.selectedSessionId,
@@ -210,6 +399,7 @@ export async function assembleLocalChatContextPacket(input: AssembleLocalChatCon
       identityLines: identity.identityLines,
       rulesLines: identity.rulesLines,
       replyStyleLines: identity.replyStyleLines,
+      replyStyleProfile: identity.replyStyleProfile,
     },
     world: {
       worldId: input.selectedTarget.worldId,
@@ -230,12 +420,14 @@ export async function assembleLocalChatContextPacket(input: AssembleLocalChatCon
       role: bundle.role,
       lines: recentBundleLines(bundle),
     })),
+    pacingPlan,
     userInput: input.text,
     diagnostics: {
       selectedBundleSeqs: recentBundles.map((bundle) => bundle.seq),
       runningSummaryWatermark: runningSummary?.lastSummarizedBundleSeq || 0,
       sessionRecallCount: recallDocs.length,
       durableMemoryCountsByType: countDurableMemoryByType(selectedDurableMemory),
+      continuityHealth,
     },
   };
 }

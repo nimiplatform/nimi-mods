@@ -10,7 +10,7 @@ import type {
   LocalChatResolvedMediaRoute,
 } from '../../types.js';
 
-export const LOCAL_CHAT_MEDIA_COMPILER_REVISION = 'media-compiler.2026-03-06';
+export const LOCAL_CHAT_MEDIA_COMPILER_REVISION = 'media-compiler.2026-03-07.runtime-payload-v2';
 
 export type MediaIntent = {
   kind: LocalChatMediaKind;
@@ -52,9 +52,13 @@ type CanonicalExecution = {
   compilerRevision: string;
   compiledPromptText: string;
   kind: LocalChatMediaGenerationSpec['kind'];
+  negativePrompt?: string;
   requestedSize?: string;
+  requestedAspectRatio?: string;
+  requestedStyle?: string;
   requestedCount?: number;
   requestedDurationSeconds?: number;
+  requestedCameraMotion?: string;
   routeSource: LocalChatResolvedMediaRoute['source'];
   connectorId?: string;
   model?: string;
@@ -133,11 +137,176 @@ function summarizeHints(hints: LocalChatMediaHints | undefined): string[] {
   return lines;
 }
 
+const SQUARE_IMAGE_CUE_RE = /(?:avatar|profile|selfie|icon|头像|大头照|自拍|证件照)/i;
+const LANDSCAPE_IMAGE_CUE_RE = /(?:landscape|wide(?:\s+shot)?|panorama|wallpaper|establishing\s+shot|horizon|横构图|横向|全景|远景|宽幅|壁纸|海边|街景|天际线)/i;
+const PORTRAIT_IMAGE_CUE_RE = /(?:portrait|close-?up|half-?body|full-?body|vertical|fashion\s+shot|竖构图|纵向|人像|特写|半身|全身|站姿|近景)/i;
+const LONG_VIDEO_CUE_RE = /(?:walk|turn(?:\s+around)?|spin|dance|approach|reach|camera|tracking|follow|pan|zoom|sequence|转身|走向|走到|走过|迈步|舞动|抬手|镜头|跟拍|推进|拉远|片段|过程)/i;
+const SHORT_VIDEO_CUE_RE = /(?:blink|glance|smile|nod|breath|loop|idle|一瞬|眨眼|回眸|微笑|点头|轻轻一笑|短循环|轻晃)/i;
+const TRACKING_VIDEO_CUE_RE = /(?:tracking|follow|跟拍|追拍|跟随|随着)/i;
+const PAN_VIDEO_CUE_RE = /(?:pan|横摇|扫过|摇镜)/i;
+const PUSH_IN_VIDEO_CUE_RE = /(?:push(?:\s|-)?in|zoom(?:\s|-)?in|推进|拉近|逼近)/i;
+const ORBIT_VIDEO_CUE_RE = /(?:orbit|circle(?:\s+around)?|环绕|绕着)/i;
+const CINEMATIC_STYLE_CUE_RE = /(?:cinematic|电影感|胶片|film(?:ic)?)/i;
+const PHOTOREAL_STYLE_CUE_RE = /(?:photoreal|realistic|写实|自然写实)/i;
+const ILLUSTRATION_STYLE_CUE_RE = /(?:illustration|anime|插画|二次元|绘本)/i;
+
+function collectMediaIntentDescriptors(input: {
+  subject: string;
+  scene: string;
+  styleIntent: string;
+  mood: string;
+  hints?: LocalChatMediaHints;
+}): string {
+  return [
+    normalizeOptionalString(input.subject),
+    normalizeOptionalString(input.scene),
+    normalizeOptionalString(input.styleIntent),
+    normalizeOptionalString(input.mood),
+    normalizeOptionalString(input.hints?.composition),
+    ...(normalizeSortedStringList(input.hints?.negativeCues) || []),
+    ...(normalizeSortedStringList(input.hints?.continuityRefs) || []),
+  ].filter(Boolean).join('\n');
+}
+
+function inferRequestedImageSize(input: {
+  subject: string;
+  scene: string;
+  styleIntent: string;
+  mood: string;
+  hints?: LocalChatMediaHints;
+}): string | undefined {
+  const descriptors = collectMediaIntentDescriptors(input);
+  if (!descriptors) return undefined;
+  if (SQUARE_IMAGE_CUE_RE.test(descriptors)) {
+    return '1024x1024';
+  }
+  if (LANDSCAPE_IMAGE_CUE_RE.test(descriptors)) {
+    return '1536x1024';
+  }
+  if (PORTRAIT_IMAGE_CUE_RE.test(descriptors)) {
+    return '1024x1536';
+  }
+  return undefined;
+}
+
+function inferRequestedVideoDurationSeconds(input: {
+  subject: string;
+  scene: string;
+  styleIntent: string;
+  mood: string;
+  hints?: LocalChatMediaHints;
+}): number {
+  const descriptors = collectMediaIntentDescriptors(input);
+  if (LONG_VIDEO_CUE_RE.test(descriptors)) {
+    return 6;
+  }
+  if (SHORT_VIDEO_CUE_RE.test(descriptors)) {
+    return 4;
+  }
+  return 5;
+}
+
+function gcd(left: number, right: number): number {
+  let a = Math.abs(left);
+  let b = Math.abs(right);
+  while (b > 0) {
+    const next = a % b;
+    a = b;
+    b = next;
+  }
+  return a || 1;
+}
+
+function inferAspectRatioFromSize(size: string | undefined): string | undefined {
+  const normalized = normalizeOptionalString(size);
+  if (!normalized) return undefined;
+  const matched = normalized.match(/^(\d{2,5})x(\d{2,5})$/i);
+  if (!matched) return undefined;
+  const width = Number(matched[1]);
+  const height = Number(matched[2]);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return undefined;
+  }
+  const divisor = gcd(width, height);
+  return `${Math.round(width / divisor)}:${Math.round(height / divisor)}`;
+}
+
+function buildNegativePrompt(hints: LocalChatMediaHints | undefined): string | undefined {
+  const negativeCues = normalizeSortedStringList(hints?.negativeCues);
+  if (!negativeCues || negativeCues.length === 0) {
+    return undefined;
+  }
+  return negativeCues.join(', ');
+}
+
+function inferImageStyle(styleIntent: string): string | undefined {
+  const normalized = normalizeOptionalString(styleIntent);
+  if (!normalized) return undefined;
+  if (CINEMATIC_STYLE_CUE_RE.test(normalized)) {
+    return 'cinematic';
+  }
+  if (PHOTOREAL_STYLE_CUE_RE.test(normalized)) {
+    return 'photorealistic';
+  }
+  if (ILLUSTRATION_STYLE_CUE_RE.test(normalized)) {
+    return 'illustration';
+  }
+  return undefined;
+}
+
+function inferVideoAspectRatio(input: {
+  subject: string;
+  scene: string;
+  styleIntent: string;
+  mood: string;
+  hints?: LocalChatMediaHints;
+}): string | undefined {
+  const descriptors = collectMediaIntentDescriptors(input);
+  if (!descriptors) return undefined;
+  if (PORTRAIT_IMAGE_CUE_RE.test(descriptors) || SQUARE_IMAGE_CUE_RE.test(descriptors)) {
+    return '9:16';
+  }
+  if (LANDSCAPE_IMAGE_CUE_RE.test(descriptors) || LONG_VIDEO_CUE_RE.test(descriptors)) {
+    return '16:9';
+  }
+  return undefined;
+}
+
+function inferCameraMotion(input: {
+  subject: string;
+  scene: string;
+  styleIntent: string;
+  mood: string;
+  hints?: LocalChatMediaHints;
+}): string | undefined {
+  const descriptors = collectMediaIntentDescriptors(input);
+  if (!descriptors) return undefined;
+  if (TRACKING_VIDEO_CUE_RE.test(descriptors)) {
+    return 'tracking';
+  }
+  if (PAN_VIDEO_CUE_RE.test(descriptors)) {
+    return 'pan';
+  }
+  if (PUSH_IN_VIDEO_CUE_RE.test(descriptors)) {
+    return 'push-in';
+  }
+  if (ORBIT_VIDEO_CUE_RE.test(descriptors)) {
+    return 'orbit';
+  }
+  return undefined;
+}
+
 export function buildMediaGenerationSpec(input: {
   intent: MediaIntent;
   targetId: string;
   worldId?: string | null;
 }): LocalChatMediaGenerationSpec {
+  const requestedSize = input.intent.kind === 'image'
+    ? inferRequestedImageSize(input.intent)
+    : undefined;
+  const requestedDurationSeconds = input.intent.kind === 'video'
+    ? inferRequestedVideoDurationSeconds(input.intent)
+    : undefined;
   return {
     kind: input.intent.kind,
     intentSource: input.intent.intentSource,
@@ -150,8 +319,9 @@ export function buildMediaGenerationSpec(input: {
     scene: normalizeOptionalString(input.intent.scene) || '贴合当前对话语境',
     styleIntent: normalizeOptionalString(input.intent.styleIntent) || '自然、精致、贴合陪伴式对话',
     mood: normalizeOptionalString(input.intent.mood) || '贴合当前交流氛围',
+    ...(requestedSize ? { requestedSize } : {}),
     ...(input.intent.kind === 'image' ? { requestedCount: 1 } : {}),
-    ...(input.intent.kind === 'video' ? { requestedDurationSeconds: 5 } : {}),
+    ...(input.intent.kind === 'video' ? { requestedDurationSeconds } : {}),
     ...(input.intent.hints ? { hints: input.intent.hints } : {}),
   };
 }
@@ -170,13 +340,23 @@ export function compileMediaExecution(
     ...summarizeHints(spec.hints),
   ].filter(Boolean);
   const compiledPromptText = lines.join('\n').trim();
+  const negativePrompt = buildNegativePrompt(spec.hints);
+  const imageAspectRatio = inferAspectRatioFromSize(spec.requestedSize);
+  const imageStyle = inferImageStyle(spec.styleIntent);
+  const videoAspectRatio = inferVideoAspectRatio(spec);
+  const videoCameraMotion = inferCameraMotion(spec);
   return {
     compiledPromptText,
     runtimePayload: {
       prompt: compiledPromptText,
+      ...(negativePrompt ? { negativePrompt } : {}),
       ...(spec.kind === 'image' && spec.requestedSize ? { size: spec.requestedSize } : {}),
+      ...(spec.kind === 'image' && imageAspectRatio ? { aspectRatio: imageAspectRatio } : {}),
+      ...(spec.kind === 'image' && imageStyle ? { style: imageStyle } : {}),
       ...(spec.kind === 'image' && spec.requestedCount ? { n: spec.requestedCount } : {}),
       ...(spec.kind === 'video' && spec.requestedDurationSeconds ? { durationSeconds: spec.requestedDurationSeconds } : {}),
+      ...(spec.kind === 'video' && videoAspectRatio ? { aspectRatio: videoAspectRatio } : {}),
+      ...(spec.kind === 'video' && videoCameraMotion ? { cameraMotion: videoCameraMotion } : {}),
     },
     compilerRevision: LOCAL_CHAT_MEDIA_COMPILER_REVISION,
   };
@@ -227,10 +407,22 @@ function toCanonicalExecution(input: {
     compilerRevision: normalizeOptionalString(input.compiled.compilerRevision) || LOCAL_CHAT_MEDIA_COMPILER_REVISION,
     compiledPromptText: normalizeOptionalString(input.compiled.compiledPromptText) || '',
     kind: input.spec.kind,
+    ...(normalizeOptionalString(input.compiled.runtimePayload.negativePrompt)
+      ? { negativePrompt: normalizeOptionalString(input.compiled.runtimePayload.negativePrompt)! }
+      : {}),
     ...(normalizeOptionalString(input.spec.requestedSize) ? { requestedSize: normalizeOptionalString(input.spec.requestedSize)! } : {}),
+    ...(normalizeOptionalString(input.compiled.runtimePayload.aspectRatio)
+      ? { requestedAspectRatio: normalizeOptionalString(input.compiled.runtimePayload.aspectRatio)! }
+      : {}),
+    ...(normalizeOptionalString(input.compiled.runtimePayload.style)
+      ? { requestedStyle: normalizeOptionalString(input.compiled.runtimePayload.style)! }
+      : {}),
     ...(normalizeOptionalNumber(input.spec.requestedCount) ? { requestedCount: normalizeOptionalNumber(input.spec.requestedCount)! } : {}),
     ...(normalizeOptionalNumber(input.spec.requestedDurationSeconds)
       ? { requestedDurationSeconds: normalizeOptionalNumber(input.spec.requestedDurationSeconds)! }
+      : {}),
+    ...(normalizeOptionalString(input.compiled.runtimePayload.cameraMotion)
+      ? { requestedCameraMotion: normalizeOptionalString(input.compiled.runtimePayload.cameraMotion)! }
       : {}),
     routeSource: input.resolvedRoute.source,
     ...(normalizeOptionalString(input.resolvedRoute.connectorId) ? { connectorId: normalizeIdLike(input.resolvedRoute.connectorId || '') } : {}),
