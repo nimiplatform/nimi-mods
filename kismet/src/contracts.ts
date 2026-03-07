@@ -13,16 +13,26 @@ export const KISMET_CAPABILITIES = [
 ] as const;
 
 export const KISMET_PERMISSIONS = [...KISMET_CAPABILITIES] as const;
+export const KISMET_RUNTIME_TEXT_CAPABILITY = 'text.generate' as const;
 
 export const KISMET_AUDIT = {
-  INPUT_SUBMITTED: 'kismet.input.submitted',
+  BIRTH_INPUT_DERIVED: 'kismet.birth-input.derived',
+  PROFILE_CONFIRMED: 'kismet.profile.confirmed',
+  LOCAL_PROFILE_SAVED: 'kismet.local-profile.saved',
+  LOCAL_PROFILE_REMOVED: 'kismet.local-profile.removed',
   PROMPT_COPIED: 'kismet.prompt.copied',
   IMPORT_STARTED: 'kismet.import.started',
   IMPORT_FAILED: 'kismet.import.failed',
   IMPORT_SUCCEEDED: 'kismet.import.succeeded',
-  AI_GENERATE_STARTED: 'kismet.ai.generate.started',
-  AI_GENERATE_FAILED: 'kismet.ai.generate.failed',
-  AI_GENERATE_SUCCEEDED: 'kismet.ai.generate.succeeded',
+  NATAL_GENERATE_STARTED: 'kismet.natal.generate.started',
+  NATAL_GENERATE_FAILED: 'kismet.natal.generate.failed',
+  NATAL_GENERATE_SUCCEEDED: 'kismet.natal.generate.succeeded',
+  DAILY_GENERATE_STARTED: 'kismet.daily.generate.started',
+  DAILY_GENERATE_FAILED: 'kismet.daily.generate.failed',
+  DAILY_GENERATE_SUCCEEDED: 'kismet.daily.generate.succeeded',
+  COMPATIBILITY_GENERATE_STARTED: 'kismet.compatibility.generate.started',
+  COMPATIBILITY_GENERATE_FAILED: 'kismet.compatibility.generate.failed',
+  COMPATIBILITY_GENERATE_SUCCEEDED: 'kismet.compatibility.generate.succeeded',
   FALLBACK_TO_IMPORT: 'kismet.fallback.to-import-mode',
   EXPORT_JSON: 'kismet.export.json',
   EXPORT_PDF: 'kismet.export.pdf',
@@ -31,6 +41,12 @@ export const KISMET_AUDIT = {
 
 export const KISMET_REASON = {
   INPUT_INVALID: 'KISMET_INPUT_INVALID',
+  BIRTH_PLACE_UNRESOLVED: 'KISMET_BIRTH_PLACE_UNRESOLVED',
+  CANONICAL_PROFILE_INVALID: 'KISMET_CANONICAL_PROFILE_INVALID',
+  DAILY_CONTEXT_INVALID: 'KISMET_DAILY_CONTEXT_INVALID',
+  COMPATIBILITY_INPUT_INVALID: 'KISMET_COMPATIBILITY_INPUT_INVALID',
+  LOCAL_PROFILE_CONSENT_REQUIRED: 'KISMET_LOCAL_PROFILE_CONSENT_REQUIRED',
+  LOCAL_PROFILE_NOT_FOUND: 'KISMET_LOCAL_PROFILE_NOT_FOUND',
   RESULT_SCHEMA_INVALID: 'KISMET_RESULT_SCHEMA_INVALID',
   RESULT_POINTS_INVALID: 'KISMET_RESULT_POINTS_INVALID',
   ROUTE_UNAVAILABLE: 'KISMET_ROUTE_UNAVAILABLE',
@@ -49,5 +65,11 @@ export const ANALYSIS_DIMENSIONS = [
   'family',
   'crypto',
 ] as const;
+
+export const TAB_LABELS = {
+  'natal-profile': '命盘分析',
+  'daily-fortune': '今日运势',
+  compatibility: '命理匹配',
+} as const;
 
 export type AnalysisDimensionKey = (typeof ANALYSIS_DIMENSIONS)[number];

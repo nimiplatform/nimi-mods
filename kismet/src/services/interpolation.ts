@@ -1,4 +1,4 @@
-import type { AiKeyNode, ChartDataPoint } from '../types.js';
+import type { ChartDataPoint, KismetAiKeyNode } from '../types.js';
 
 const TIAN_GAN = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'] as const;
 const DI_ZHI = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'] as const;
@@ -13,59 +13,38 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
+function lerp(left: number, right: number, amount: number): number {
+  return left + (right - left) * amount;
 }
 
-/** Deterministic hash-based pseudo-random for reproducibility */
 function seededRandom(seed: number): number {
-  let x = Math.sin(seed * 9301 + 49297) * 233280;
-  x = x - Math.floor(x);
-  return x;
+  let value = Math.sin(seed * 9301 + 49297) * 233280;
+  value -= Math.floor(value);
+  return value;
 }
 
-function findDaYun(age: number, nodes: AiKeyNode[]): string {
-  for (let i = nodes.length - 1; i >= 0; i--) {
-    if (age >= nodes[i]!.age) return nodes[i]!.daYun;
+function findActiveNode(age: number, nodes: KismetAiKeyNode[]): KismetAiKeyNode {
+  for (let index = nodes.length - 1; index >= 0; index -= 1) {
+    if (age >= nodes[index]!.age) {
+      return nodes[index]!;
+    }
   }
-  return nodes[0]!.daYun;
+  return nodes[0]!;
 }
 
-function findTag(age: number, nodes: AiKeyNode[]): string {
-  for (let i = nodes.length - 1; i >= 0; i--) {
-    if (age >= nodes[i]!.age) return nodes[i]!.tag;
-  }
-  return nodes[0]!.tag;
-}
-
-export function interpolateKeyNodes(keyNodes: AiKeyNode[], birthYear: number): ChartDataPoint[] {
-  const sorted = [...keyNodes].sort((a, b) => a.age - b.age);
+export function interpolateKeyNodes(keyNodes: KismetAiKeyNode[], birthYear: number): ChartDataPoint[] {
+  const sorted = [...keyNodes].sort((left, right) => left.age - right.age);
   const points: ChartDataPoint[] = [];
 
-  for (let age = 1; age <= 100; age++) {
+  for (let age = 1; age <= 100; age += 1) {
     const year = birthYear + age - 1;
-    const ganZhi = yearToGanZhi(year);
-    const daYun = findDaYun(age, sorted);
-    const tag = findTag(age, sorted);
-
-    // Find surrounding key nodes
-    let prevNode = sorted[0]!;
-    let nextNode = sorted[sorted.length - 1]!;
-    for (let i = 0; i < sorted.length - 1; i++) {
-      if (age >= sorted[i]!.age && age <= sorted[i + 1]!.age) {
-        prevNode = sorted[i]!;
-        nextNode = sorted[i + 1]!;
-        break;
-      }
-    }
-
-    // If exactly on a key node, use its values directly
-    const exactNode = sorted.find((n) => n.age === age);
+    const activeNode = findActiveNode(age, sorted);
+    const exactNode = sorted.find((node) => node.age === age);
     if (exactNode) {
       points.push({
         age,
         year,
-        ganZhi,
+        ganZhi: yearToGanZhi(year),
         daYun: exactNode.daYun,
         open: Math.round(exactNode.open),
         close: Math.round(exactNode.close),
@@ -77,40 +56,38 @@ export function interpolateKeyNodes(keyNodes: AiKeyNode[], birthYear: number): C
       continue;
     }
 
-    // Interpolation factor
-    const span = nextNode.age - prevNode.age;
-    const t = span > 0 ? (age - prevNode.age) / span : 0;
+    let previousNode = sorted[0]!;
+    let nextNode = sorted[sorted.length - 1]!;
+    for (let index = 0; index < sorted.length - 1; index += 1) {
+      if (age >= sorted[index]!.age && age <= sorted[index + 1]!.age) {
+        previousNode = sorted[index]!;
+        nextNode = sorted[index + 1]!;
+        break;
+      }
+    }
 
-    // Base score from linear interpolation
-    const baseScore = lerp(prevNode.score, nextNode.score, t);
-
-    // Add deterministic noise for natural variation
+    const span = Math.max(1, nextNode.age - previousNode.age);
+    const amount = (age - previousNode.age) / span;
+    const baseScore = lerp(previousNode.score, nextNode.score, amount);
     const noise = (seededRandom(age * 137 + birthYear) - 0.5) * 8;
     const score = clamp(Math.round(baseScore + noise), 0, 100);
-
-    // Generate OHLC from score with variation
-    const r1 = seededRandom(age * 251 + birthYear + 1);
-    const r2 = seededRandom(age * 373 + birthYear + 2);
-    const amplitude = clamp(Math.abs(nextNode.score - prevNode.score) * 0.15 + 3, 2, 12);
-
-    const open = clamp(Math.round(score + (r1 - 0.5) * amplitude), 0, 100);
-    const close = clamp(Math.round(score + (r2 - 0.5) * amplitude), 0, 100);
+    const amplitude = clamp(Math.abs(nextNode.score - previousNode.score) * 0.15 + 3, 2, 12);
+    const open = clamp(Math.round(score + (seededRandom(age * 251 + birthYear) - 0.5) * amplitude), 0, 100);
+    const close = clamp(Math.round(score + (seededRandom(age * 373 + birthYear) - 0.5) * amplitude), 0, 100);
     const highBase = Math.max(open, close);
     const lowBase = Math.min(open, close);
-    const high = clamp(Math.round(highBase + seededRandom(age * 491 + birthYear) * amplitude * 0.5), highBase, 100);
-    const low = clamp(Math.round(lowBase - seededRandom(age * 617 + birthYear) * amplitude * 0.5), 0, lowBase);
 
     points.push({
       age,
       year,
-      ganZhi,
-      daYun,
+      ganZhi: yearToGanZhi(year),
+      daYun: activeNode.daYun,
       open,
       close,
-      high,
-      low,
+      high: clamp(Math.round(highBase + seededRandom(age * 491 + birthYear) * amplitude * 0.5), highBase, 100),
+      low: clamp(Math.round(lowBase - seededRandom(age * 617 + birthYear) * amplitude * 0.5), 0, lowBase),
       score,
-      reason: tag,
+      reason: activeNode.tag,
     });
   }
 

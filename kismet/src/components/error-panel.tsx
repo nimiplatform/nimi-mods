@@ -11,26 +11,57 @@ export function ErrorPanel({ error, onRetry, onSwitchMode }: ErrorPanelProps) {
   const { t } = useTranslation('kismet');
 
   return (
-    <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-      <h3 className="mb-2 text-sm font-semibold text-red-800">
+    <div style={{ background: 'rgba(166,56,46,0.08)', border: '1px solid rgba(166,56,46,0.3)', padding: 20 }}>
+      <h3 className="ks-serif mb-3 text-sm" style={{ color: '#A6382E', fontWeight: 600 }}>
         {t('ErrorPanel.title')}
       </h3>
-      <div className="space-y-2 text-sm text-red-700">
+      <div className="space-y-2 text-sm" style={{ color: '#E8E3D7' }}>
         <div>
-          <span className="font-medium">{t('ErrorPanel.reasonCode')}: </span>
-          <code className="rounded bg-red-100 px-1 py-0.5 text-xs">{error.reasonCode}</code>
+          <span style={{ color: '#8C857B' }}>{t('ErrorPanel.reasonCode')}: </span>
+          <code className="text-xs" style={{ background: 'rgba(166,56,46,0.15)', padding: '1px 4px', color: '#A6382E' }}>{error.reasonCode}</code>
         </div>
-        <p>{error.message}</p>
+        {error.upstreamReasonCode && (
+          <div>
+            <span style={{ color: '#8C857B' }}>{t('ErrorPanel.upstreamReasonCode')}: </span>
+            <code className="text-xs" style={{ background: 'rgba(166,56,46,0.15)', padding: '1px 4px', color: '#A6382E' }}>{error.upstreamReasonCode}</code>
+          </div>
+        )}
+        {error.traceId && (
+          <div>
+            <span style={{ color: '#8C857B' }}>{t('ErrorPanel.traceId')}: </span>
+            <code className="text-xs" style={{ background: 'rgba(0,0,0,0.2)', padding: '1px 4px' }}>{error.traceId}</code>
+          </div>
+        )}
+        <p style={{ color: '#E8E3D7' }}>{error.message}</p>
+        {error.diagnosticPreview && (
+          <div>
+            <span style={{ color: '#8C857B' }}>{t('ErrorPanel.preview')}: </span>
+            <code className="break-all text-xs" style={{ background: 'rgba(0,0,0,0.2)', padding: '1px 4px' }}>{error.diagnosticPreview}</code>
+          </div>
+        )}
+        {typeof error.diagnosticLength === 'number' && (
+          <div>
+            <span style={{ color: '#8C857B' }}>{t('ErrorPanel.rawLength')}: </span>
+            <code className="text-xs" style={{ background: 'rgba(0,0,0,0.2)', padding: '1px 4px' }}>{error.diagnosticLength}</code>
+          </div>
+        )}
+        {error.diagnosticTailPreview && error.diagnosticTailPreview !== error.diagnosticPreview && (
+          <div>
+            <span style={{ color: '#8C857B' }}>{t('ErrorPanel.tailPreview')}: </span>
+            <code className="break-all text-xs" style={{ background: 'rgba(0,0,0,0.2)', padding: '1px 4px' }}>{error.diagnosticTailPreview}</code>
+          </div>
+        )}
         <div>
-          <span className="font-medium">{t('ErrorPanel.hint')}: </span>
+          <span style={{ color: '#8C857B' }}>{t('ErrorPanel.hint')}: </span>
           {error.actionHint}
         </div>
       </div>
-      <div className="mt-3 flex gap-2">
+      <div className="mt-4 flex gap-3">
         {onRetry && (
           <button
             onClick={onRetry}
-            className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+            className="ks-serif text-xs"
+            style={{ background: '#A6382E', border: 'none', color: '#E8E3D7', padding: '6px 16px', cursor: 'pointer' }}
           >
             {t('ErrorPanel.retry')}
           </button>
@@ -38,7 +69,8 @@ export function ErrorPanel({ error, onRetry, onSwitchMode }: ErrorPanelProps) {
         {onSwitchMode && (
           <button
             onClick={onSwitchMode}
-            className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
+            className="ks-serif text-xs"
+            style={{ background: 'transparent', border: '1px solid #A6382E', color: '#A6382E', padding: '6px 16px', cursor: 'pointer' }}
           >
             {t('ErrorPanel.switchMode')}
           </button>

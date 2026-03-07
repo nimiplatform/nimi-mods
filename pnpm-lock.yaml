@@ -121,7 +121,8 @@ importers:
   mint-you: {}
 
   narrative-engine: {}
-  test-chat-tts: {}
+
+  test-ai: {}
 
   textplay:
     devDependencies:

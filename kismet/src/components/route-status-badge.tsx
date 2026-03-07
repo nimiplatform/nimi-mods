@@ -9,9 +9,9 @@ export function RouteStatusBadge({ source }: RouteStatusBadgeProps) {
   const { t } = useTranslation('kismet');
 
   const colorMap: Record<RouteSourceDisplay, string> = {
-    'local-runtime': 'bg-green-100 text-green-800 border-green-200',
-    'token-api': 'bg-blue-100 text-blue-800 border-blue-200',
-    unavailable: 'bg-gray-100 text-gray-500 border-gray-200',
+    'local-runtime': '#526B5D',
+    'token-api': '#3A4B59',
+    unavailable: '#8C857B',
   };
 
   const labelMap: Record<RouteSourceDisplay, string> = {
@@ -21,8 +21,15 @@ export function RouteStatusBadge({ source }: RouteStatusBadgeProps) {
   };
 
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${colorMap[source]}`}>
-      <span className="text-[10px]">{t('RouteStatus.routeSource')}:</span>
+    <span
+      className="inline-flex items-center gap-1.5 text-xs"
+      style={{
+        border: `1px solid ${colorMap[source]}`,
+        color: colorMap[source],
+        padding: '3px 10px',
+      }}
+    >
+      <span style={{ fontSize: '0.7rem', color: '#8C857B' }}>{t('RouteStatus.routeSource')}:</span>
       {labelMap[source]}
     </span>
   );

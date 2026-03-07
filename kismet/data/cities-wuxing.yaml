@@ -1,0 +1,1153 @@
+version: 1
+description: Curated city Wu Xing registry for Kismet mod city affinity scoring
+cities:
+  # ── China (~12) ──────────────────────────────────────────────────────
+
+  - city: Beijing
+    city_zh: 北京
+    country: China
+    country_zh: 中国
+    lat: 39.90
+    lng: 116.40
+    timezone: Asia/Shanghai
+    primary_element: earth
+    secondary_element: metal
+    element_rationale: 地处华北平原，为千年帝都中枢，厚土承载皇城根基，兼有西北金气汇聚。
+
+  - city: Shanghai
+    city_zh: 上海
+    country: China
+    country_zh: 中国
+    lat: 31.23
+    lng: 121.47
+    timezone: Asia/Shanghai
+    primary_element: water
+    secondary_element: wood
+    element_rationale: 位于长江入海口，水网纵横通江达海，东方沿海气候温润，草木繁茂。
+
+  - city: Guangzhou
+    city_zh: 广州
+    country: China
+    country_zh: 中国
+    lat: 23.13
+    lng: 113.26
+    timezone: Asia/Shanghai
+    primary_element: fire
+    secondary_element: wood
+    element_rationale: 地处南方亚热带，气候炎热潮湿，四季花开不断，火气旺盛且草木丰茂。
+
+  - city: Shenzhen
+    city_zh: 深圳
+    country: China
+    country_zh: 中国
+    lat: 22.54
+    lng: 114.06
+    timezone: Asia/Shanghai
+    primary_element: metal
+    secondary_element: fire
+    element_rationale: 现代科技与制造业之都，金属工业气息浓厚，南方炎热气候带有火性。
+
+  - city: Chengdu
+    city_zh: 成都
+    country: China
+    country_zh: 中国
+    lat: 30.57
+    lng: 104.07
+    timezone: Asia/Shanghai
+    primary_element: earth
+    secondary_element: water
+    element_rationale: 坐落成都平原腹地，沃野千里土气深厚，都江堰水利泽润天府之国。
+
+  - city: Hangzhou
+    city_zh: 杭州
+    country: China
+    country_zh: 中国
+    lat: 30.27
+    lng: 120.15
+    timezone: Asia/Shanghai
+    primary_element: wood
+    secondary_element: water
+    element_rationale: 东南沿海丘陵地带，西湖碧波映翠山，林木葱郁水气充盈。
+
+  - city: Kunming
+    city_zh: 昆明
+    country: China
+    country_zh: 中国
+    lat: 25.04
+    lng: 102.68
+    timezone: Asia/Shanghai
+    primary_element: wood
+    secondary_element: fire
+    element_rationale: 春城四季如春，植被繁盛生机勃勃，地处西南高原阳光充沛带有火性。
+
+  - city: Harbin
+    city_zh: 哈尔滨
+    country: China
+    country_zh: 中国
+    lat: 45.75
+    lng: 126.65
+    timezone: Asia/Shanghai
+    primary_element: water
+    secondary_element: metal
+    element_rationale: 位于中国最北，冬季严寒冰雪覆盖，松花江贯城而过，水气极盛兼有寒金之气。
+
+  - city: Xi'an
+    city_zh: 西安
+    country: China
+    country_zh: 中国
+    lat: 34.26
+    lng: 108.94
+    timezone: Asia/Shanghai
+    primary_element: metal
+    secondary_element: earth
+    element_rationale: 地处西北关中平原，古丝路起点，西方金气汇聚，黄土高原厚土为基。
+
+  - city: Chongqing
+    city_zh: 重庆
+    country: China
+    country_zh: 中国
+    lat: 29.56
+    lng: 106.55
+    timezone: Asia/Shanghai
+    primary_element: fire
+    secondary_element: water
+    element_rationale: 火炉之城夏季酷暑，两江交汇水势浩荡，火水并济。
+
+  - city: Lhasa
+    city_zh: 拉萨
+    country: China
+    country_zh: 中国
+    lat: 29.65
+    lng: 91.17
+    timezone: Asia/Shanghai
+    primary_element: metal
+    secondary_element: earth
+    element_rationale: 雪域高原日照强烈，矿藏丰富金气凝聚，高原大地厚土连绵。
+
+  - city: Taipei
+    city_zh: 台北
+    country: Taiwan
+    country_zh: 台湾
+    lat: 25.03
+    lng: 121.57
+    timezone: Asia/Taipei
+    primary_element: wood
+    secondary_element: water
+    element_rationale: 岛屿东方海隅，亚热带气候温润多雨，山林环抱绿意盎然。
+
+  # ── Asia (~8) ────────────────────────────────────────────────────────
+
+  - city: Tokyo
+    city_zh: 东京
+    country: Japan
+    country_zh: 日本
+    lat: 35.68
+    lng: 139.69
+    timezone: Asia/Tokyo
+    primary_element: wood
+    secondary_element: water
+    element_rationale: 东方岛国海洋性气候，四季分明樱花烂漫，太平洋水气浸润。
+
+  - city: Seoul
+    city_zh: 首尔
+    country: South Korea
+    country_zh: 韩国
+    lat: 37.57
+    lng: 126.98
+    timezone: Asia/Seoul
+    primary_element: metal
+    secondary_element: water
+    element_rationale: 半岛中枢科技与工业发达，汉江穿城而过，金属气息与水气并存。
+
+  - city: Singapore
+    city_zh: 新加坡
+    country: Singapore
+    country_zh: 新加坡
+    lat: 1.35
+    lng: 103.82
+    timezone: Asia/Singapore
+    primary_element: water
+    secondary_element: fire
+    element_rationale: 赤道海岛城邦，四面环海水气极盛，热带高温终年炎热兼有火性。
+
+  - city: Bangkok
+    city_zh: 曼谷
+    country: Thailand
+    country_zh: 泰国
+    lat: 13.76
+    lng: 100.50
+    timezone: Asia/Bangkok
+    primary_element: fire
+    secondary_element: water
+    element_rationale: 热带季风气候终年高温，湄南河水系发达，火气炽盛而水润其间。
+
+  - city: Mumbai
+    city_zh: 孟买
+    country: India
+    country_zh: 印度
+    lat: 19.08
+    lng: 72.88
+    timezone: Asia/Kolkata
+    primary_element: fire
+    secondary_element: water
+    element_rationale: 热带沿海城市气候炎热，阿拉伯海环抱，季风带来丰沛水气。
+
+  - city: Dubai
+    city_zh: 迪拜
+    country: United Arab Emirates
+    country_zh: 阿联酋
+    lat: 25.20
+    lng: 55.27
+    timezone: Asia/Dubai
+    primary_element: fire
+    secondary_element: metal
+    element_rationale: 沙漠之城终年酷暑，黄金贸易与石油经济带来浓重金气。
+
+  - city: Jakarta
+    city_zh: 雅加达
+    country: Indonesia
+    country_zh: 印度尼西亚
+    lat: -6.21
+    lng: 106.85
+    timezone: Asia/Jakarta
+    primary_element: water
+    secondary_element: wood
+    element_rationale: 热带海岛首都，雨季丰沛水患频繁，热带雨林植被茂密。
+
+  - city: Kuala Lumpur
+    city_zh: 吉隆坡
+    country: Malaysia
+    country_zh: 马来西亚
+    lat: 3.14
+    lng: 101.69
+    timezone: Asia/Kuala_Lumpur
+    primary_element: wood
+    secondary_element: water
+    element_rationale: 热带雨林腹地，植被终年常绿，降水充沛水气丰盈。
+
+  # ── Europe (~8) ──────────────────────────────────────────────────────
+
+  - city: London
+    city_zh: 伦敦
+    country: United Kingdom
+    country_zh: 英国
+    lat: 51.51
+    lng: -0.13
+    timezone: Europe/London
+    primary_element: water
+    secondary_element: metal
+    element_rationale: 泰晤士河穿城而过，终年阴雨水气弥漫，金融之都金气凝聚。
+
+  - city: Paris
+    city_zh: 巴黎
+    country: France
+    country_zh: 法国
+    lat: 48.86
+    lng: 2.35
+    timezone: Europe/Paris
+    primary_element: earth
+    secondary_element: wood
+    element_rationale: 塞纳河畔平原之都，法兰西文化厚土滋养，林荫大道绿意盎然。
+
+  - city: Berlin
+    city_zh: 柏林
+    country: Germany
+    country_zh: 德国
+    lat: 52.52
+    lng: 13.41
+    timezone: Europe/Berlin
+    primary_element: metal
+    secondary_element: water
+    element_rationale: 北德平原重工业之城，精密制造金气浓厚，北方高纬寒水之气。
+
+  - city: Rome
+    city_zh: 罗马
+    country: Italy
+    country_zh: 意大利
+    lat: 41.90
+    lng: 12.50
+    timezone: Europe/Rome
+    primary_element: fire
+    secondary_element: earth
+    element_rationale: 地中海气候夏季炎热，千年古城历史积淀深厚，文明厚土承载火热南欧。
+
+  - city: Madrid
+    city_zh: 马德里
+    country: Spain
+    country_zh: 西班牙
+    lat: 40.42
+    lng: -3.70
+    timezone: Europe/Madrid
+    primary_element: fire
+    secondary_element: earth
+    element_rationale: 伊比利亚高原中心，夏季干燥酷热，内陆地势高旷土气深厚。
+
+  - city: Amsterdam
+    city_zh: 阿姆斯特丹
+    country: Netherlands
+    country_zh: 荷兰
+    lat: 52.37
+    lng: 4.90
+    timezone: Europe/Amsterdam
+    primary_element: water
+    secondary_element: earth
+    element_rationale: 低洼之国运河纵横，围海造田水土共生，水气为主兼有厚土。
+
+  - city: Zurich
+    city_zh: 苏黎世
+    country: Switzerland
+    country_zh: 瑞士
+    lat: 47.38
+    lng: 8.54
+    timezone: Europe/Zurich
+    primary_element: metal
+    secondary_element: water
+    element_rationale: 阿尔卑斯山麓金融中心，精密钟表与银行业金气凝聚，湖泊冰川水源丰沛。
+
+  - city: Stockholm
+    city_zh: 斯德哥尔摩
+    country: Sweden
+    country_zh: 瑞典
+    lat: 59.33
+    lng: 18.07
+    timezone: Europe/Stockholm
+    primary_element: water
+    secondary_element: wood
+    element_rationale: 北欧高纬度城市，群岛环抱波罗的海水气充沛，森林覆盖广袤木气丰盈。
+
+  # ── Americas (~8) ────────────────────────────────────────────────────
+
+  - city: New York
+    city_zh: 纽约
+    country: United States
+    country_zh: 美国
+    lat: 40.71
+    lng: -74.01
+    timezone: America/New_York
+    primary_element: metal
+    secondary_element: water
+    element_rationale: 钢铁丛林与金融之都，大西洋沿岸水气充盈，金属摩天楼林立。
+
+  - city: Los Angeles
+    city_zh: 洛杉矶
+    country: United States
+    country_zh: 美国
+    lat: 34.05
+    lng: -118.24
+    timezone: America/Los_Angeles
+    primary_element: fire
+    secondary_element: earth
+    element_rationale: 阳光之城终年少雨，沙漠气候炎热干燥，好莱坞光影如火。
+
+  - city: San Francisco
+    city_zh: 旧金山
+    country: United States
+    country_zh: 美国
+    lat: 37.77
+    lng: -122.42
+    timezone: America/Los_Angeles
+    primary_element: water
+    secondary_element: metal
+    element_rationale: 三面环海雾气弥漫，金门大桥横跨海湾，科技金属之气与海水交融。
+
+  - city: Toronto
+    city_zh: 多伦多
+    country: Canada
+    country_zh: 加拿大
+    lat: 43.65
+    lng: -79.38
+    timezone: America/Toronto
+    primary_element: water
+    secondary_element: wood
+    element_rationale: 安大略湖畔冬季严寒，北方水气凝重，周边森林广袤木气充沛。
+
+  - city: São Paulo
+    city_zh: 圣保罗
+    country: Brazil
+    country_zh: 巴西
+    lat: -23.55
+    lng: -46.63
+    timezone: America/Sao_Paulo
+    primary_element: wood
+    secondary_element: earth
+    element_rationale: 南美热带高原城市，大西洋雨林环绕生机盎然，高原红土厚实。
+
+  - city: Mexico City
+    city_zh: 墨西哥城
+    country: Mexico
+    country_zh: 墨西哥
+    lat: 19.43
+    lng: -99.13
+    timezone: America/Mexico_City
+    primary_element: earth
+    secondary_element: fire
+    element_rationale: 高原盆地古阿兹特克文明之基，火山环绕土气深厚，低纬度阳光炽烈。
+
+  - city: Buenos Aires
+    city_zh: 布宜诺斯艾利斯
+    country: Argentina
+    country_zh: 阿根廷
+    lat: -34.60
+    lng: -58.38
+    timezone: America/Argentina/Buenos_Aires
+    primary_element: earth
+    secondary_element: water
+    element_rationale: 潘帕斯草原门户，广袤牧场沃土滋养，拉普拉塔河入海口水气丰沛。
+
+  - city: Vancouver
+    city_zh: 温哥华
+    country: Canada
+    country_zh: 加拿大
+    lat: 49.28
+    lng: -123.12
+    timezone: America/Vancouver
+    primary_element: water
+    secondary_element: wood
+    element_rationale: 太平洋沿岸终年多雨，北方温带雨林苍翠，海洋水气与林木共荣。
+
+  # ── Oceania (~3) ─────────────────────────────────────────────────────
+
+  - city: Sydney
+    city_zh: 悉尼
+    country: Australia
+    country_zh: 澳大利亚
+    lat: -33.87
+    lng: 151.21
+    timezone: Australia/Sydney
+    primary_element: water
+    secondary_element: fire
+    element_rationale: 太平洋海港城市碧波环抱，南半球阳光充沛气候温暖带有火性。
+
+  - city: Melbourne
+    city_zh: 墨尔本
+    country: Australia
+    country_zh: 澳大利亚
+    lat: -37.81
+    lng: 144.96
+    timezone: Australia/Melbourne
+    primary_element: wood
+    secondary_element: water
+    element_rationale: 南方花园城市植被丰茂，亚拉河穿城而过，公园绿地遍布。
+
+  - city: Auckland
+    city_zh: 奥克兰
+    country: New Zealand
+    country_zh: 新西兰
+    lat: -36.85
+    lng: 174.76
+    timezone: Pacific/Auckland
+    primary_element: water
+    secondary_element: wood
+    element_rationale: 双港环抱的帆船之都，海洋性气候湿润多雨，岛屿森林郁郁葱葱。
+
+  # ── Africa (~3) ──────────────────────────────────────────────────────
+
+  - city: Cairo
+    city_zh: 开罗
+    country: Egypt
+    country_zh: 埃及
+    lat: 30.04
+    lng: 31.24
+    timezone: Africa/Cairo
+    primary_element: fire
+    secondary_element: earth
+    element_rationale: 撒哈拉沙漠之畔酷暑难耐，尼罗河三角洲冲积土壤肥沃，火土交融。
+
+  - city: Cape Town
+    city_zh: 开普敦
+    country: South Africa
+    country_zh: 南非
+    lat: -33.93
+    lng: 18.42
+    timezone: Africa/Johannesburg
+    primary_element: water
+    secondary_element: wood
+    element_rationale: 好望角两洋交汇，地中海气候温润，桌山植被丰富水木相生。
+
+  - city: Nairobi
+    city_zh: 内罗毕
+    country: Kenya
+    country_zh: 肯尼亚
+    lat: -1.29
+    lng: 36.82
+    timezone: Africa/Nairobi
+    primary_element: earth
+    secondary_element: wood
+    element_rationale: 东非高原中枢，大地辽阔草原广袤，赤道附近植被茂盛木气充沛。
+
+  # ── Middle East (~2) ─────────────────────────────────────────────────
+
+  - city: Istanbul
+    city_zh: 伊斯坦布尔
+    country: Turkey
+    country_zh: 土耳其
+    lat: 41.01
+    lng: 28.98
+    timezone: Europe/Istanbul
+    primary_element: water
+    secondary_element: earth
+    element_rationale: 博斯普鲁斯海峡两洋通衢，海水环绕水气充盈，千年古都文化厚土深沉。
+
+  - city: Tel Aviv
+    city_zh: 特拉维夫
+    country: Israel
+    country_zh: 以色列
+    lat: 32.09
+    lng: 34.77
+    timezone: Asia/Jerusalem
+    primary_element: fire
+    secondary_element: water
+    element_rationale: 地中海东岸阳光炽烈，夏季干燥炎热火性十足，海滨城市水气润泽。
+
+  # ── China Expansion (~24) ───────────────────────────────────────────
+
+  - city: Tianjin
+    city_zh: 天津
+    country: China
+    country_zh: 中国
+    lat: 39.12
+    lng: 117.20
+    timezone: Asia/Shanghai
+    primary_element: earth
+    secondary_element: water
+    element_rationale: 海河入海之门，港埠商贸与平原腹地相接，厚土承载而水路通达。
+
+  - city: Nanjing
+    city_zh: 南京
+    country: China
+    country_zh: 中国
+    lat: 32.06
+    lng: 118.80
+    timezone: Asia/Shanghai
+    primary_element: water
+    secondary_element: wood
+    element_rationale: 长江穿境钟山拱卫，江南水气与丘陵林木共生，文脉深厚而流动性强。
+
+  - city: Suzhou
+    city_zh: 苏州
+    country: China
+    country_zh: 中国
+    lat: 31.30
+    lng: 120.58
+    timezone: Asia/Shanghai
+    primary_element: water
+    secondary_element: wood
+    element_rationale: 江南水乡河港交织，园林草木繁密，水木之气柔润而绵长。
+
+  - city: Wuhan
+    city_zh: 武汉
+    country: China
+    country_zh: 中国
+    lat: 30.59
+    lng: 114.30
+    timezone: Asia/Shanghai
+    primary_element: water
+    secondary_element: fire
+    element_rationale: 长江汉水交汇成势，夏季湿热蒸腾，水火并见而气机强劲。
+
+  - city: Changsha
+    city_zh: 长沙
+    country: China
+    country_zh: 中国
+    lat: 28.23
+    lng: 112.94
+    timezone: Asia/Shanghai
+    primary_element: fire
+    secondary_element: wood
+    element_rationale: 湖湘盆地暑热明显，山水环抱植被繁茂，木火相生而活力充沛。
+
+  - city: Zhengzhou
+    city_zh: 郑州
+    country: China
+    country_zh: 中国
+    lat: 34.75
+    lng: 113.62
+    timezone: Asia/Shanghai
+    primary_element: earth
+    secondary_element: fire
+    element_rationale: 中原腹地四通八达，沃土厚积且夏热显著，土中有火。
+
+  - city: Jinan
+    city_zh: 济南
+    country: China
+    country_zh: 中国
+    lat: 36.65
+    lng: 117.12
+    timezone: Asia/Shanghai
+    primary_element: earth
+    secondary_element: water
+    element_rationale: 泉城地脉厚重，群泉汇涌滋养城郭，土水相济而气场稳定。
+
+  - city: Qingdao
+    city_zh: 青岛
+    country: China
+    country_zh: 中国
+    lat: 36.07
+    lng: 120.38
+    timezone: Asia/Shanghai
+    primary_element: water
+    secondary_element: metal
+    element_rationale: 黄海之滨海风劲健，港口工业与航运并重，水气中见金性。
+
+  - city: Xiamen
+    city_zh: 厦门
+    country: China
+    country_zh: 中国
+    lat: 24.48
+    lng: 118.09
+    timezone: Asia/Shanghai
+    primary_element: water
+    secondary_element: fire
+    element_rationale: 岛港海湾潮汐活跃，闽南日照充沛，水势灵动中带火气。
+
+  - city: Fuzhou
+    city_zh: 福州
+    country: China
+    country_zh: 中国
+    lat: 26.08
+    lng: 119.30
+    timezone: Asia/Shanghai
+    primary_element: wood
+    secondary_element: water
+    element_rationale: 东南山海交错，湿润温热植被旺盛，闽江入海水木相涵。
+
+  - city: Nanning
+    city_zh: 南宁
+    country: China
+    country_zh: 中国
+    lat: 22.82
+    lng: 108.32
+    timezone: Asia/Shanghai
+    primary_element: wood
+    secondary_element: fire
+    element_rationale: 华南丘陵雨热同期，草木生发旺盛，南方火气与木气俱强。
+
+  - city: Haikou
+    city_zh: 海口
+    country: China
+    country_zh: 中国
+    lat: 20.03
+    lng: 110.35
+    timezone: Asia/Shanghai
+    primary_element: water
+    secondary_element: fire
+    element_rationale: 海岛门户四面临海，热带气候终年温热，水火并见而舒展。
+
+  - city: Shenyang
+    city_zh: 沈阳
+    country: China
+    country_zh: 中国
+    lat: 41.80
+    lng: 123.43
+    timezone: Asia/Shanghai
+    primary_element: metal
+    secondary_element: earth
+    element_rationale: 东北老工业基地金性浓厚，北方平原与寒土相托，金土成势。
+
+  - city: Changchun
+    city_zh: 长春
+    country: China
+    country_zh: 中国
+    lat: 43.82
+    lng: 125.32
+    timezone: Asia/Shanghai
+    primary_element: wood
+    secondary_element: earth
+    element_rationale: 黑土地广袤丰厚，森林草原资源充足，木土相依而气场平稳。
+
+  - city: Hohhot
+    city_zh: 呼和浩特
+    country: China
+    country_zh: 中国
+    lat: 40.82
+    lng: 111.65
+    timezone: Asia/Shanghai
+    primary_element: earth
+    secondary_element: metal
+    element_rationale: 塞外高原广袤开阔，草原厚土与干冷风势并存，土中藏金。
+
+  - city: Urumqi
+    city_zh: 乌鲁木齐
+    country: China
+    country_zh: 中国
+    lat: 43.82
+    lng: 87.62
+    timezone: Asia/Shanghai
+    primary_element: metal
+    secondary_element: earth
+    element_rationale: 西域内陆盆地干燥寒烈，矿藏资源丰厚，金土之性鲜明。
+
+  - city: Lanzhou
+    city_zh: 兰州
+    country: China
+    country_zh: 中国
+    lat: 36.06
+    lng: 103.83
+    timezone: Asia/Shanghai
+    primary_element: earth
+    secondary_element: water
+    element_rationale: 黄河穿城而过，陇中山谷厚土深沉，土中有水而气脉连贯。
+
+  - city: Yinchuan
+    city_zh: 银川
+    country: China
+    country_zh: 中国
+    lat: 38.47
+    lng: 106.27
+    timezone: Asia/Shanghai
+    primary_element: metal
+    secondary_element: earth
+    element_rationale: 塞上江南灌区沃野与干爽边地并存，金气外显而土性稳固。
+
+  - city: Taiyuan
+    city_zh: 太原
+    country: China
+    country_zh: 中国
+    lat: 37.87
+    lng: 112.55
+    timezone: Asia/Shanghai
+    primary_element: earth
+    secondary_element: metal
+    element_rationale: 黄土高原与煤铁资源交汇，厚土为基而金性内敛。
+
+  - city: Guiyang
+    city_zh: 贵阳
+    country: China
+    country_zh: 中国
+    lat: 26.65
+    lng: 106.63
+    timezone: Asia/Shanghai
+    primary_element: earth
+    secondary_element: wood
+    element_rationale: 喀斯特山地重叠，大地湿润而林木丰盛，土木相依。
+
+  - city: Nanchang
+    city_zh: 南昌
+    country: China
+    country_zh: 中国
+    lat: 28.68
+    lng: 115.85
+    timezone: Asia/Shanghai
+    primary_element: wood
+    secondary_element: water
+    element_rationale: 鄱阳湖水网滋养赣地，草木生长旺盛，水木相涵而气机柔顺。
+
+  - city: Hefei
+    city_zh: 合肥
+    country: China
+    country_zh: 中国
+    lat: 31.82
+    lng: 117.23
+    timezone: Asia/Shanghai
+    primary_element: wood
+    secondary_element: earth
+    element_rationale: 江淮之间平原沃土与湖荡交织，木气生发而土性托底。
+
+  - city: Shijiazhuang
+    city_zh: 石家庄
+    country: China
+    country_zh: 中国
+    lat: 38.04
+    lng: 114.51
+    timezone: Asia/Shanghai
+    primary_element: earth
+    secondary_element: metal
+    element_rationale: 华北平原腹地厚土承载，北方干爽与工业气息并重，土金兼具。
+
+  - city: Ningbo
+    city_zh: 宁波
+    country: China
+    country_zh: 中国
+    lat: 29.87
+    lng: 121.55
+    timezone: Asia/Shanghai
+    primary_element: water
+    secondary_element: wood
+    element_rationale: 东海港埠潮汐活跃，江南丘陵林木相伴，水木流通而富生机。
+
+  - city: Dalian
+    city_zh: 大连
+    country: China
+    country_zh: 中国
+    lat: 38.91
+    lng: 121.61
+    timezone: Asia/Shanghai
+    primary_element: water
+    secondary_element: metal
+    element_rationale: 渤黄海交汇港湾开阔，海风劲利兼具工业港口之金性。
+
+  - city: Hong Kong
+    city_zh: 香港
+    country: China
+    country_zh: 中国
+    lat: 22.32
+    lng: 114.17
+    timezone: Asia/Hong_Kong
+    primary_element: water
+    secondary_element: fire
+    element_rationale: 海港岛链层叠水势灵动，金融贸易与南方热气相叠，水火俱旺。
+
+  - city: Macau
+    city_zh: 澳门
+    country: China
+    country_zh: 中国
+    lat: 22.20
+    lng: 113.54
+    timezone: Asia/Macau
+    primary_element: water
+    secondary_element: fire
+    element_rationale: 海湾小城潮水环抱，岭南热气与滨海水气交融，流动性强。
+
+  # ── Global Expansion (~24) ──────────────────────────────────────────
+
+  - city: Osaka
+    city_zh: 大阪
+    country: Japan
+    country_zh: 日本
+    lat: 34.69
+    lng: 135.50
+    timezone: Asia/Tokyo
+    primary_element: water
+    secondary_element: metal
+    element_rationale: 濑户内海湾港埠商贸密集，水路繁盛并带有重工业与商业金气。
+
+  - city: Kyoto
+    city_zh: 京都
+    country: Japan
+    country_zh: 日本
+    lat: 35.01
+    lng: 135.77
+    timezone: Asia/Tokyo
+    primary_element: wood
+    secondary_element: water
+    element_rationale: 山城盆地四季分明，古寺林木繁茂，鸭川流经使水木相宜。
+
+  - city: Delhi
+    city_zh: 德里
+    country: India
+    country_zh: 印度
+    lat: 28.61
+    lng: 77.21
+    timezone: Asia/Kolkata
+    primary_element: fire
+    secondary_element: earth
+    element_rationale: 北印度平原暑热强烈，古都厚土沉积深厚，火土并立。
+
+  - city: Bengaluru
+    city_zh: 班加罗尔
+    country: India
+    country_zh: 印度
+    lat: 12.97
+    lng: 77.59
+    timezone: Asia/Kolkata
+    primary_element: fire
+    secondary_element: wood
+    element_rationale: 高原科技之都日照稳定，花园城市绿意葱茏，木火共振。
+
+  - city: Manila
+    city_zh: 马尼拉
+    country: Philippines
+    country_zh: 菲律宾
+    lat: 14.60
+    lng: 120.98
+    timezone: Asia/Manila
+    primary_element: water
+    secondary_element: fire
+    element_rationale: 群岛海湾门户水势充沛，热带季风与高温带来明显火性。
+
+  - city: Hanoi
+    city_zh: 河内
+    country: Vietnam
+    country_zh: 越南
+    lat: 21.03
+    lng: 105.85
+    timezone: Asia/Ho_Chi_Minh
+    primary_element: wood
+    secondary_element: water
+    element_rationale: 红河平原湿润温热，林木与水网并盛，气机柔中有生。
+
+  - city: Ho Chi Minh City
+    city_zh: 胡志明市
+    country: Vietnam
+    country_zh: 越南
+    lat: 10.78
+    lng: 106.70
+    timezone: Asia/Ho_Chi_Minh
+    primary_element: water
+    secondary_element: fire
+    element_rationale: 湄公河三角洲商港繁忙，热带高温与河海水汽同时旺盛。
+
+  - city: Phnom Penh
+    city_zh: 金边
+    country: Cambodia
+    country_zh: 柬埔寨
+    lat: 11.56
+    lng: 104.93
+    timezone: Asia/Phnom_Penh
+    primary_element: water
+    secondary_element: fire
+    element_rationale: 大河汇流低地平原水系密集，热带热力明显，水火互见。
+
+  - city: Riyadh
+    city_zh: 利雅得
+    country: Saudi Arabia
+    country_zh: 沙特阿拉伯
+    lat: 24.71
+    lng: 46.67
+    timezone: Asia/Riyadh
+    primary_element: fire
+    secondary_element: earth
+    element_rationale: 内陆高温少雨，沙漠厚土包裹城市核心，火土显著。
+
+  - city: Doha
+    city_zh: 多哈
+    country: Qatar
+    country_zh: 卡塔尔
+    lat: 25.29
+    lng: 51.53
+    timezone: Asia/Qatar
+    primary_element: fire
+    secondary_element: water
+    element_rationale: 海湾之滨酷热炽烈，滨海水气与沙地热浪并存。
+
+  - city: Abu Dhabi
+    city_zh: 阿布扎比
+    country: United Arab Emirates
+    country_zh: 阿联酋
+    lat: 24.45
+    lng: 54.38
+    timezone: Asia/Dubai
+    primary_element: fire
+    secondary_element: water
+    element_rationale: 海湾岛城受烈日与海风双重影响，火性外显而水气润泽。
+
+  - city: Athens
+    city_zh: 雅典
+    country: Greece
+    country_zh: 希腊
+    lat: 37.98
+    lng: 23.72
+    timezone: Europe/Athens
+    primary_element: fire
+    secondary_element: earth
+    element_rationale: 地中海日照强烈，山地与古城厚土叠加，火土并存。
+
+  - city: Vienna
+    city_zh: 维也纳
+    country: Austria
+    country_zh: 奥地利
+    lat: 48.21
+    lng: 16.37
+    timezone: Europe/Vienna
+    primary_element: metal
+    secondary_element: water
+    element_rationale: 多瑙河沿岸秩序严整，欧陆中枢金性凝练而水气流通。
+
+  - city: Prague
+    city_zh: 布拉格
+    country: Czech Republic
+    country_zh: 捷克
+    lat: 50.08
+    lng: 14.44
+    timezone: Europe/Prague
+    primary_element: metal
+    secondary_element: earth
+    element_rationale: 中欧古都石城厚重，山地气候偏寒，金土之性稳定。
+
+  - city: Brussels
+    city_zh: 布鲁塞尔
+    country: Belgium
+    country_zh: 比利时
+    lat: 50.85
+    lng: 4.35
+    timezone: Europe/Brussels
+    primary_element: metal
+    secondary_element: water
+    element_rationale: 欧洲枢纽秩序分明，平原河谷水汽适中，金水并见。
+
+  - city: Copenhagen
+    city_zh: 哥本哈根
+    country: Denmark
+    country_zh: 丹麦
+    lat: 55.68
+    lng: 12.57
+    timezone: Europe/Copenhagen
+    primary_element: water
+    secondary_element: metal
+    element_rationale: 北海与波罗的海交接，寒凉海风与港湾秩序形成金水格局。
+
+  - city: Dublin
+    city_zh: 都柏林
+    country: Ireland
+    country_zh: 爱尔兰
+    lat: 53.35
+    lng: -6.26
+    timezone: Europe/Dublin
+    primary_element: water
+    secondary_element: wood
+    element_rationale: 海洋性气候湿润多雨，河海相接且绿地广布，水木相亲。
+
+  - city: Lisbon
+    city_zh: 里斯本
+    country: Portugal
+    country_zh: 葡萄牙
+    lat: 38.72
+    lng: -9.14
+    timezone: Europe/Lisbon
+    primary_element: water
+    secondary_element: fire
+    element_rationale: 大西洋海风与伊比利亚日照并存，水火并见而节奏开阔。
+
+  - city: Chicago
+    city_zh: 芝加哥
+    country: United States
+    country_zh: 美国
+    lat: 41.88
+    lng: -87.63
+    timezone: America/Chicago
+    primary_element: metal
+    secondary_element: water
+    element_rationale: 五大湖畔工业金融重镇，寒风劲利而水气充盈，金水鲜明。
+
+  - city: Boston
+    city_zh: 波士顿
+    country: United States
+    country_zh: 美国
+    lat: 42.36
+    lng: -71.06
+    timezone: America/New_York
+    primary_element: water
+    secondary_element: metal
+    element_rationale: 大西洋沿岸学术港城，海风与秩序感并重，水中带金。
+
+  - city: Seattle
+    city_zh: 西雅图
+    country: United States
+    country_zh: 美国
+    lat: 47.61
+    lng: -122.33
+    timezone: America/Los_Angeles
+    primary_element: water
+    secondary_element: wood
+    element_rationale: 太平洋西北终年湿润，针叶林与海湾共生，水木之性浓厚。
+
+  - city: Miami
+    city_zh: 迈阿密
+    country: United States
+    country_zh: 美国
+    lat: 25.76
+    lng: -80.19
+    timezone: America/New_York
+    primary_element: water
+    secondary_element: fire
+    element_rationale: 热带海滨阳光炽盛，海水与湿热交织，水火同旺。
+
+  - city: Washington
+    city_zh: 华盛顿
+    country: United States
+    country_zh: 美国
+    lat: 38.90
+    lng: -77.04
+    timezone: America/New_York
+    primary_element: earth
+    secondary_element: metal
+    element_rationale: 政治中枢秩序厚重，河湾平原承载城市结构，土金兼备。
+
+  - city: Montreal
+    city_zh: 蒙特利尔
+    country: Canada
+    country_zh: 加拿大
+    lat: 45.50
+    lng: -73.57
+    timezone: America/Toronto
+    primary_element: water
+    secondary_element: metal
+    element_rationale: 圣劳伦斯河流经寒地都会，法系城市秩序感强，金水相映。
+
+  - city: Rio de Janeiro
+    city_zh: 里约热内卢
+    country: Brazil
+    country_zh: 巴西
+    lat: -22.91
+    lng: -43.17
+    timezone: America/Sao_Paulo
+    primary_element: water
+    secondary_element: fire
+    element_rationale: 海湾山海格局鲜明，热带阳光与海洋水气同样旺盛。
+
+  - city: Santiago
+    city_zh: 圣地亚哥
+    country: Chile
+    country_zh: 智利
+    lat: -33.45
+    lng: -70.66
+    timezone: America/Santiago
+    primary_element: earth
+    secondary_element: metal
+    element_rationale: 安第斯山麓盆地厚土稳固，干爽气候与矿业金气相随。
+
+  - city: Lima
+    city_zh: 利马
+    country: Peru
+    country_zh: 秘鲁
+    lat: -12.05
+    lng: -77.04
+    timezone: America/Lima
+    primary_element: water
+    secondary_element: earth
+    element_rationale: 太平洋岸沙漠海岸并置，海雾水气与厚土结构相互嵌合。
+
+  - city: Bogota
+    city_zh: 波哥大
+    country: Colombia
+    country_zh: 哥伦比亚
+    lat: 4.71
+    lng: -74.07
+    timezone: America/Bogota
+    primary_element: earth
+    secondary_element: wood
+    element_rationale: 安第斯高原台地厚实，赤道附近植被繁茂，土木相依。
+
+  - city: Johannesburg
+    city_zh: 约翰内斯堡
+    country: South Africa
+    country_zh: 南非
+    lat: -26.20
+    lng: 28.04
+    timezone: Africa/Johannesburg
+    primary_element: metal
+    secondary_element: earth
+    element_rationale: 高原矿业之都金气凝聚，内陆大地厚重稳健，金土并强。
+
+  - city: Casablanca
+    city_zh: 卡萨布兰卡
+    country: Morocco
+    country_zh: 摩洛哥
+    lat: 33.57
+    lng: -7.59
+    timezone: Africa/Casablanca
+    primary_element: water
+    secondary_element: earth
+    element_rationale: 大西洋海港水气外放，北非厚土与白城肌理托底，水土并存。
+
+  - city: Brisbane
+    city_zh: 布里斯班
+    country: Australia
+    country_zh: 澳大利亚
+    lat: -27.47
+    lng: 153.03
+    timezone: Australia/Brisbane
+    primary_element: water
+    secondary_element: wood
+    element_rationale: 亚热带河港湿润温暖，海风与绿地相伴，水木流畅。
+
+  - city: Perth
+    city_zh: 珀斯
+    country: Australia
+    country_zh: 澳大利亚
+    lat: -31.95
+    lng: 115.86
+    timezone: Australia/Perth
+    primary_element: metal
+    secondary_element: water
+    element_rationale: 西澳海港兼具矿业金气，印度洋海风润泽，金水并行。

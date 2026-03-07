@@ -1,73 +1,173 @@
 import { create } from 'zustand';
 import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
-import type { KismetInput, KismetResult, KismetError, KismetMode, RouteSourceDisplay } from '../types.js';
+import type {
+  KismetAiRawResponse,
+  GeneratedPromptPackage,
+  KismetBirthInputV2,
+  KismetCanonicalProfile,
+  KismetCompatibilityResult,
+  KismetDailyFortuneResult,
+  KismetError,
+  KismetFeatureTab,
+  KismetLocalShareProfile,
+  KismetNatalAnalysisResult,
+  RouteSourceDisplay,
+} from '../types.js';
 
 type KismetStore = {
-  // Input
-  input: Partial<KismetInput>;
-  setInput: (input: Partial<KismetInput>) => void;
-  resetInput: () => void;
+  activeTab: KismetFeatureTab;
+  setActiveTab: (tab: KismetFeatureTab) => void;
 
-  // Mode
-  mode: KismetMode;
-  setMode: (mode: KismetMode) => void;
+  birthInput: Partial<KismetBirthInputV2>;
+  setBirthInput: (input: Partial<KismetBirthInputV2>) => void;
+  resetBirthInput: () => void;
 
-  // Loading
+  comparisonInput: Partial<KismetBirthInputV2>;
+  setComparisonInput: (input: Partial<KismetBirthInputV2>) => void;
+  resetComparisonInput: () => void;
+
+  draftProfile: KismetCanonicalProfile | null;
+  setDraftProfile: (profile: KismetCanonicalProfile | null) => void;
+  confirmedProfile: KismetCanonicalProfile | null;
+  setConfirmedProfile: (profile: KismetCanonicalProfile | null) => void;
+
+  natalResult: KismetNatalAnalysisResult | null;
+  setNatalResult: (result: KismetNatalAnalysisResult | null) => void;
+  dailyResult: KismetDailyFortuneResult | null;
+  setDailyResult: (result: KismetDailyFortuneResult | null) => void;
+  compatibilityResult: KismetCompatibilityResult | null;
+  setCompatibilityResult: (result: KismetCompatibilityResult | null) => void;
+
+  savedProfiles: KismetLocalShareProfile[];
+  setSavedProfiles: (profiles: KismetLocalShareProfile[]) => void;
+  selectedSavedProfileId: string | null;
+  setSelectedSavedProfileId: (profileId: string | null) => void;
+
   loading: boolean;
   setLoading: (loading: boolean) => void;
-
-  // Result
-  result: KismetResult | null;
-  setResult: (result: KismetResult | null) => void;
-
-  // Error
   error: KismetError | null;
   setError: (error: KismetError | null) => void;
 
-  // Prompts (for prompt-import fallback)
-  generatedPrompts: { systemPrompt: string; userPrompt: string } | null;
-  setGeneratedPrompts: (prompts: { systemPrompt: string; userPrompt: string } | null) => void;
+  generatedPrompt: GeneratedPromptPackage | null;
+  setGeneratedPrompt: (prompt: GeneratedPromptPackage | null) => void;
 
-  // Route
+  lastAiRawResponse: KismetAiRawResponse | null;
+  setLastAiRawResponse: (response: KismetAiRawResponse | null) => void;
+
   routeSource: RouteSourceDisplay;
   setRouteSource: (source: RouteSourceDisplay) => void;
-  routeBinding: RuntimeRouteBinding | null;
-  setRouteBinding: (binding: RuntimeRouteBinding | null) => void;
+  routeOverride: RuntimeRouteBinding | null;
+  setRouteOverride: (override: RuntimeRouteBinding | null) => void;
   chatRouteOptions: RuntimeRouteOptionsSnapshot | null;
-  setChatRouteOptions: (options: RuntimeRouteOptionsSnapshot | null) => void;
+  setChatRouteOptions: (options: RuntimeRouteOptionsSnapshot | null | ((prev: RuntimeRouteOptionsSnapshot | null) => RuntimeRouteOptionsSnapshot | null)) => void;
 
-  // Reset all
-  reset: () => void;
+  resetTransientState: () => void;
+};
+
+const initialBirthInput: Partial<KismetBirthInputV2> = {
+  gender: 'male',
+  timezone: 'Asia/Shanghai',
+  consent: {
+    allowCityAffinityUse: true,
+    allowLocalProfileMatchUse: false,
+    allowLocalProfilePersist: false,
+  },
 };
 
 const initialState = {
-  input: {} as Partial<KismetInput>,
-  mode: 'runtime-ai' as KismetMode,
+  activeTab: 'natal-profile' as KismetFeatureTab,
+  birthInput: initialBirthInput,
+  comparisonInput: {
+    gender: 'female',
+    timezone: 'Asia/Shanghai',
+    consent: {
+      allowCityAffinityUse: false,
+      allowLocalProfileMatchUse: false,
+      allowLocalProfilePersist: false,
+    },
+  } as Partial<KismetBirthInputV2>,
+  draftProfile: null as KismetCanonicalProfile | null,
+  confirmedProfile: null as KismetCanonicalProfile | null,
+  natalResult: null as KismetNatalAnalysisResult | null,
+  dailyResult: null as KismetDailyFortuneResult | null,
+  compatibilityResult: null as KismetCompatibilityResult | null,
+  savedProfiles: [] as KismetLocalShareProfile[],
+  selectedSavedProfileId: null as string | null,
   loading: false,
-  result: null as KismetResult | null,
   error: null as KismetError | null,
-  generatedPrompts: null as { systemPrompt: string; userPrompt: string } | null,
+  generatedPrompt: null as GeneratedPromptPackage | null,
+  lastAiRawResponse: null as KismetAiRawResponse | null,
   routeSource: 'unavailable' as RouteSourceDisplay,
-  routeBinding: null as RuntimeRouteBinding | null,
+  routeOverride: null as RuntimeRouteBinding | null,
   chatRouteOptions: null as RuntimeRouteOptionsSnapshot | null,
 };
 
 export const useKismetStore = create<KismetStore>((set) => ({
   ...initialState,
 
-  setInput: (input) => set((state) => ({
-    input: { ...state.input, ...input },
-  })),
-  resetInput: () => set({ input: {} }),
+  setActiveTab: (activeTab) => set({ activeTab }),
+  setBirthInput: (input) => set((state) => {
+    const nextConsent = {
+      allowCityAffinityUse: input.consent?.allowCityAffinityUse ?? state.birthInput.consent?.allowCityAffinityUse ?? true,
+      allowLocalProfileMatchUse: input.consent?.allowLocalProfileMatchUse ?? state.birthInput.consent?.allowLocalProfileMatchUse ?? false,
+      allowLocalProfilePersist: input.consent?.allowLocalProfilePersist ?? state.birthInput.consent?.allowLocalProfilePersist ?? false,
+    };
+    return {
+      birthInput: {
+        ...state.birthInput,
+        ...input,
+        consent: nextConsent,
+      },
+    };
+  }),
+  resetBirthInput: () => set({ birthInput: initialBirthInput }),
 
-  setMode: (mode) => set({ mode }),
+  setComparisonInput: (input) => set((state) => {
+    const nextConsent = {
+      allowCityAffinityUse: input.consent?.allowCityAffinityUse ?? state.comparisonInput.consent?.allowCityAffinityUse ?? false,
+      allowLocalProfileMatchUse: input.consent?.allowLocalProfileMatchUse ?? state.comparisonInput.consent?.allowLocalProfileMatchUse ?? false,
+      allowLocalProfilePersist: input.consent?.allowLocalProfilePersist ?? state.comparisonInput.consent?.allowLocalProfilePersist ?? false,
+    };
+    return {
+      comparisonInput: {
+        ...state.comparisonInput,
+        ...input,
+        consent: nextConsent,
+      },
+    };
+  }),
+  resetComparisonInput: () => set({ comparisonInput: initialState.comparisonInput }),
+
+  setDraftProfile: (draftProfile) => set({ draftProfile }),
+  setConfirmedProfile: (confirmedProfile) => set({ confirmedProfile }),
+  setNatalResult: (natalResult) => set({ natalResult, error: null }),
+  setDailyResult: (dailyResult) => set({ dailyResult, error: null }),
+  setCompatibilityResult: (compatibilityResult) => set({ compatibilityResult, error: null }),
+
+  setSavedProfiles: (savedProfiles) => set({ savedProfiles }),
+  setSelectedSavedProfileId: (selectedSavedProfileId) => set({ selectedSavedProfileId }),
+
   setLoading: (loading) => set({ loading }),
-  setResult: (result) => set({ result, error: null }),
-  setError: (error) => set({ error, result: null }),
-  setGeneratedPrompts: (generatedPrompts) => set({ generatedPrompts }),
-  setRouteSource: (routeSource) => set({ routeSource }),
-  setRouteBinding: (routeBinding) => set({ routeBinding }),
-  setChatRouteOptions: (chatRouteOptions) => set({ chatRouteOptions }),
+  setError: (error) => set({ error }),
+  setGeneratedPrompt: (generatedPrompt) => set({ generatedPrompt }),
+  setLastAiRawResponse: (lastAiRawResponse) => set({ lastAiRawResponse }),
 
-  reset: () => set(initialState),
+  setRouteSource: (routeSource) => set({ routeSource }),
+  setRouteOverride: (routeOverride) => set({ routeOverride }),
+  setChatRouteOptions: (chatRouteOptions) => set((state) => ({
+    chatRouteOptions: typeof chatRouteOptions === 'function'
+      ? chatRouteOptions(state.chatRouteOptions)
+      : chatRouteOptions,
+  })),
+
+  resetTransientState: () => set({
+    draftProfile: null,
+    confirmedProfile: null,
+    natalResult: null,
+    dailyResult: null,
+    compatibilityResult: null,
+    error: null,
+    generatedPrompt: null,
+    lastAiRawResponse: null,
+  }),
 }));

@@ -17,39 +17,44 @@ export function KlineChart({ data }: KlineChartProps) {
 
     const chart = createChart(containerRef.current, {
       layout: {
-        background: { color: '#ffffff' },
-        textColor: '#333',
+        background: { color: '#181615' },
+        textColor: '#8C857B',
+        fontFamily: "'Noto Serif SC', serif",
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: '#f0f0f0' },
-        horzLines: { color: '#f0f0f0' },
+        vertLines: { visible: false },
+        horzLines: { visible: false },
       },
       width: containerRef.current.clientWidth,
-      height: 400,
+      height: 350,
       timeScale: {
-        borderColor: '#e0e0e0',
+        borderColor: '#8A7254',
         timeVisible: false,
+        tickMarkFormatter: (time: unknown) => `${time as number}岁`,
       },
       rightPriceScale: {
-        borderColor: '#e0e0e0',
+        visible: false,
+      },
+      crosshair: {
+        vertLine: { color: '#8A7254', style: 2 },
+        horzLine: { color: '#8A7254', style: 2 },
       },
     });
 
     chartRef.current = chart;
 
     const series = chart.addSeries(CandlestickSeries, {
-      upColor: '#22c55e',
-      downColor: '#ef4444',
-      borderUpColor: '#16a34a',
-      borderDownColor: '#dc2626',
-      wickUpColor: '#16a34a',
-      wickDownColor: '#dc2626',
+      upColor: '#A6382E',
+      downColor: '#526B5D',
+      borderUpColor: '#A6382E',
+      borderDownColor: '#526B5D',
+      wickUpColor: '#A6382E',
+      wickDownColor: '#526B5D',
     });
 
     seriesRef.current = series;
 
-    // Map ChartDataPoint[] to candlestick data
     const candleData = data.map((p) => ({
       time: p.age as unknown as import('lightweight-charts').Time,
       open: p.open,
@@ -61,7 +66,6 @@ export function KlineChart({ data }: KlineChartProps) {
     series.setData(candleData);
     chart.timeScale().fitContent();
 
-    // Tooltip on crosshair move
     chart.subscribeCrosshairMove((param) => {
       if (!tooltipRef.current) return;
 
@@ -79,12 +83,12 @@ export function KlineChart({ data }: KlineChartProps) {
 
       tooltipRef.current.style.display = 'block';
       tooltipRef.current.innerHTML = `
-        <div class="text-xs space-y-0.5">
-          <div class="font-semibold">${point.age}岁 · ${point.year}年</div>
-          <div>${point.ganZhi} · ${point.daYun}</div>
-          <div>O:${point.open} C:${point.close} H:${point.high} L:${point.low}</div>
-          <div>综合: ${point.score}</div>
-          <div class="text-gray-600">${point.reason}</div>
+        <div style="font-family:'Noto Serif SC',serif;font-size:12px;line-height:1.6;">
+          <div style="font-weight:600;color:#8A7254;">${point.age}岁 · ${point.year}年</div>
+          <div style="color:#8C857B;">${point.ganZhi} · ${point.daYun}</div>
+          <div style="color:#8C857B;">O:${point.open} C:${point.close} H:${point.high} L:${point.low}</div>
+          <div style="color:#8A7254;">综合: ${point.score}</div>
+          <div style="color:#8C857B;">${point.reason}</div>
         </div>
       `;
 
@@ -94,7 +98,6 @@ export function KlineChart({ data }: KlineChartProps) {
       tooltipRef.current.style.top = `${y + 16}px`;
     });
 
-    // Resize observer
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
         chart.applyOptions({ width: entry.contentRect.width });
@@ -114,8 +117,14 @@ export function KlineChart({ data }: KlineChartProps) {
     <div className="relative" ref={containerRef}>
       <div
         ref={tooltipRef}
-        className="pointer-events-none absolute z-10 hidden rounded-lg border border-gray-200 bg-white p-2 shadow-lg"
-        style={{ display: 'none' }}
+        className="pointer-events-none absolute z-10 hidden"
+        style={{
+          display: 'none',
+          background: 'rgba(24,22,21,0.9)',
+          border: '1px solid #8A7254',
+          padding: 10,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+        }}
       />
     </div>
   );

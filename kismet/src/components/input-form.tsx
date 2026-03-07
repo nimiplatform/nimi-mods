@@ -1,117 +1,172 @@
 import { useTranslation } from 'react-i18next';
-import { useKismetStore } from '../state/kismet-store.js';
-import type { Gender } from '../types.js';
+import type { KismetBirthInputV2 } from '../types.js';
+import { normalizeDateValue, normalizeTimeValue } from '../utils/normalize-birth-fields.js';
 
 type InputFormProps = {
+  title: string;
+  value: Partial<KismetBirthInputV2>;
+  onChange: (input: Partial<KismetBirthInputV2>) => void;
   onSubmit: () => void;
+  submitLabel: string;
   disabled?: boolean;
+  showConsent?: boolean;
 };
 
-export function InputForm({ onSubmit, disabled }: InputFormProps) {
+export function InputForm({
+  title,
+  value,
+  onChange,
+  onSubmit,
+  submitLabel,
+  disabled,
+  showConsent = true,
+}: InputFormProps) {
   const { t } = useTranslation('kismet');
-  const { input, setInput, loading } = useKismetStore();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit();
-  };
+  function updateConsent<K extends keyof NonNullable<KismetBirthInputV2['consent']>>(key: K, checked: boolean) {
+    onChange({
+      consent: {
+        allowCityAffinityUse: value.consent?.allowCityAffinityUse ?? true,
+        allowLocalProfileMatchUse: value.consent?.allowLocalProfileMatchUse ?? false,
+        allowLocalProfilePersist: value.consent?.allowLocalProfilePersist ?? false,
+        [key]: checked,
+      },
+    });
+  }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="mb-1 block text-xs font-medium text-gray-700">{t('InputForm.nameLabel')}</label>
-        <input
-          type="text"
-          value={input.name || ''}
-          onChange={(e) => setInput({ name: e.target.value })}
-          placeholder={t('InputForm.namePlaceholder')}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-          disabled={disabled}
-        />
+    <div>
+      <div className="mb-5">
+        <h3 className="ks-serif text-sm" style={{ color: '#8A7254', fontWeight: 600, letterSpacing: 1 }}>{title}</h3>
+        <p className="mt-1 text-xs" style={{ color: '#8C857B' }}>{t('InputForm.subtitle')}</p>
       </div>
 
-      <div>
-        <label className="mb-1 block text-xs font-medium text-gray-700">{t('InputForm.genderLabel')}</label>
-        <div className="flex gap-3">
-          {(['Male', 'Female'] as Gender[]).map((g) => (
-            <label key={g} className="flex items-center gap-1.5 text-sm">
-              <input
-                type="radio"
-                name="gender"
-                value={g}
-                checked={input.gender === g}
-                onChange={() => setInput({ gender: g })}
-                disabled={disabled}
-                className="text-indigo-600"
-              />
-              {g === 'Male' ? t('InputForm.genderMale') : t('InputForm.genderFemale')}
-            </label>
-          ))}
+      <div className="space-y-5">
+        <div>
+          <label className="mb-2 block text-xs" style={{ color: '#8C857B', letterSpacing: 1 }}>{t('InputForm.nameLabel')}</label>
+          <input
+            type="text"
+            value={value.name || ''}
+            onChange={(e) => onChange({ name: e.target.value })}
+            className="ks-input"
+            placeholder={t('InputForm.namePlaceholder')}
+            disabled={disabled}
+          />
         </div>
-      </div>
 
-      <div>
-        <label className="mb-1 block text-xs font-medium text-gray-700">{t('InputForm.birthYearLabel')}</label>
-        <input
-          type="number"
-          value={input.birthYear || ''}
-          onChange={(e) => setInput({ birthYear: Number(e.target.value) })}
-          placeholder={t('InputForm.birthYearPlaceholder')}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-          disabled={disabled}
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        {(['yearPillar', 'monthPillar', 'dayPillar', 'hourPillar'] as const).map((key) => (
-          <div key={key}>
-            <label className="mb-1 block text-xs font-medium text-gray-700">
-              {t(`InputForm.${key}Label`)}
-            </label>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="mb-2 block text-xs" style={{ color: '#8C857B', letterSpacing: 1 }}>{t('InputForm.genderLabel')}</label>
+            <select
+              value={value.gender || 'male'}
+              onChange={(e) => onChange({ gender: e.target.value as KismetBirthInputV2['gender'] })}
+              className="ks-input"
+              style={{ appearance: 'none' }}
+              disabled={disabled}
+            >
+              <option value="male" style={{ background: '#181615' }}>{t('InputForm.genderMale')}</option>
+              <option value="female" style={{ background: '#181615' }}>{t('InputForm.genderFemale')}</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-2 block text-xs" style={{ color: '#8C857B', letterSpacing: 1 }}>{t('InputForm.timezoneLabel')}</label>
             <input
               type="text"
-              value={(input[key] as string) || ''}
-              onChange={(e) => setInput({ [key]: e.target.value })}
-              placeholder={t('InputForm.pillarPlaceholder')}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              value={value.timezone || 'Asia/Shanghai'}
+              onChange={(e) => onChange({ timezone: e.target.value })}
+              className="ks-input"
+              placeholder="Asia/Shanghai"
               disabled={disabled}
             />
           </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">{t('InputForm.startAgeLabel')}</label>
-          <input
-            type="number"
-            value={input.startAge || ''}
-            onChange={(e) => setInput({ startAge: Number(e.target.value) })}
-            placeholder={t('InputForm.startAgePlaceholder')}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            disabled={disabled}
-          />
         </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="mb-2 block text-xs" style={{ color: '#8C857B', letterSpacing: 1 }}>{t('InputForm.birthDateLabel')}</label>
+            <input
+              type="text"
+              value={value.birthDate || ''}
+              onChange={(e) => onChange({ birthDate: e.target.value })}
+              onBlur={(e) => onChange({ birthDate: normalizeDateValue(e.target.value) })}
+              className="ks-input"
+              placeholder="1995-03-09"
+              inputMode="numeric"
+              disabled={disabled}
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-xs" style={{ color: '#8C857B', letterSpacing: 1 }}>{t('InputForm.birthTimeLabel')}</label>
+            <input
+              type="text"
+              value={value.birthTime || ''}
+              onChange={(e) => onChange({ birthTime: e.target.value })}
+              onBlur={(e) => onChange({ birthTime: normalizeTimeValue(e.target.value) })}
+              className="ks-input"
+              placeholder="16:30"
+              inputMode="numeric"
+              disabled={disabled}
+            />
+          </div>
+        </div>
+
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-700">{t('InputForm.firstDaYunLabel')}</label>
+          <label className="mb-2 block text-xs" style={{ color: '#8C857B', letterSpacing: 1 }}>{t('InputForm.birthPlaceLabel')}</label>
           <input
             type="text"
-            value={input.firstDaYun || ''}
-            onChange={(e) => setInput({ firstDaYun: e.target.value })}
-            placeholder={t('InputForm.firstDaYunPlaceholder')}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            value={value.birthPlaceLabel || ''}
+            onChange={(e) => onChange({ birthPlaceLabel: e.target.value })}
+            className="ks-input"
+            placeholder={t('InputForm.birthPlacePlaceholder')}
             disabled={disabled}
           />
         </div>
-      </div>
 
-      <button
-        type="submit"
-        disabled={disabled || loading}
-        className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {loading ? t('InputForm.analyzing') : t('InputForm.submitButton')}
-      </button>
-    </form>
+        {showConsent && (
+          <div style={{ background: 'rgba(138,114,84,0.05)', border: '1px solid rgba(138,114,84,0.2)', padding: 15 }}>
+            <div className="ks-serif mb-3 text-xs" style={{ color: '#8A7254' }}>{t('InputForm.consentTitle')}</div>
+            <div className="space-y-2.5 text-xs" style={{ color: '#8C857B' }}>
+              <label className="flex cursor-pointer items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  checked={value.consent?.allowCityAffinityUse ?? true}
+                  onChange={(e) => updateConsent('allowCityAffinityUse', e.target.checked)}
+                  disabled={disabled}
+                  className="mt-0.5"
+                  style={{ accentColor: '#A6382E' }}
+                />
+                <span>{t('InputForm.allowCityAffinityUse')}</span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  checked={value.consent?.allowLocalProfilePersist ?? false}
+                  onChange={(e) => updateConsent('allowLocalProfilePersist', e.target.checked)}
+                  disabled={disabled}
+                  className="mt-0.5"
+                  style={{ accentColor: '#A6382E' }}
+                />
+                <span>{t('InputForm.allowLocalProfilePersist')}</span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  checked={value.consent?.allowLocalProfileMatchUse ?? false}
+                  onChange={(e) => updateConsent('allowLocalProfileMatchUse', e.target.checked)}
+                  disabled={disabled}
+                  className="mt-0.5"
+                  style={{ accentColor: '#A6382E' }}
+                />
+                <span>{t('InputForm.allowLocalProfileMatchUse')}</span>
+              </label>
+            </div>
+          </div>
+        )}
+
+        <button type="button" onClick={onSubmit} disabled={disabled} className="ks-btn-seal">
+          {submitLabel}
+        </button>
+      </div>
+    </div>
   );
 }
