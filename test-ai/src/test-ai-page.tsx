@@ -2,9 +2,6 @@ import React from 'react';
 import {
   buildLocalImageWorkflowExtensions,
 } from '@nimiplatform/sdk/mod/runtime';
-import {
-  parseRuntimeRouteOptions,
-} from '@nimiplatform/sdk/mod/runtime-route';
 import type {
   LocalImageWorkflowComponentSelection,
   ModRuntimeClient,
@@ -12,6 +9,9 @@ import type {
   ModRuntimeLocalArtifactRecord,
   ModRuntimeResolvedBinding,
 } from '@nimiplatform/sdk/mod/runtime';
+import {
+  parseRuntimeRouteOptions,
+} from '@nimiplatform/sdk/mod/runtime-route';
 import type {
   RuntimeCanonicalCapability,
   RuntimeRouteBinding,
@@ -129,6 +129,11 @@ type ImageWorkflowDraftState = {
   rawProfileOverridesText: string;
   vaeModel: string;
   llmModel: string;
+  clipLModel: string;
+  clipGModel: string;
+  controlnetModel: string;
+  loraModel: string;
+  auxiliaryModel: string;
   componentDrafts: ImageWorkflowComponentDraft[];
 };
 
@@ -142,11 +147,41 @@ const COMMON_IMAGE_WORKFLOW_SLOTS = [
   'aux_path',
 ] as const;
 
-type CompanionArtifactSelectionsInput = {
-  vaeModel: string;
-  llmModel: string;
+type ImageWorkflowPresetSelectionKey =
+  | 'vaeModel'
+  | 'llmModel'
+  | 'clipLModel'
+  | 'clipGModel'
+  | 'controlnetModel'
+  | 'loraModel'
+  | 'auxiliaryModel';
+
+type ImageWorkflowCompanionTier = 'core' | 'extended';
+
+type ImageWorkflowPresetSelection = {
+  key: ImageWorkflowPresetSelectionKey;
+  slot: typeof COMMON_IMAGE_WORKFLOW_SLOTS[number];
+  label: string;
+  kind: ModRuntimeLocalArtifactKind;
+  tier: ImageWorkflowCompanionTier;
+};
+
+const IMAGE_WORKFLOW_PRESET_SELECTIONS: ImageWorkflowPresetSelection[] = [
+  { key: 'vaeModel', slot: 'vae_path', label: 'VAE model', kind: 'vae', tier: 'core' },
+  { key: 'llmModel', slot: 'llm_path', label: 'LLM model', kind: 'llm', tier: 'core' },
+  { key: 'clipLModel', slot: 'clip_l_path', label: 'CLIP-L model', kind: 'clip', tier: 'extended' },
+  { key: 'clipGModel', slot: 'clip_g_path', label: 'CLIP-G model', kind: 'clip', tier: 'extended' },
+  { key: 'controlnetModel', slot: 'controlnet_path', label: 'ControlNet model', kind: 'controlnet', tier: 'extended' },
+  { key: 'loraModel', slot: 'lora_path', label: 'LoRA model', kind: 'lora', tier: 'extended' },
+  { key: 'auxiliaryModel', slot: 'aux_path', label: 'Auxiliary model', kind: 'auxiliary', tier: 'extended' },
+];
+
+type CompanionArtifactSelectionsInput = Record<ImageWorkflowPresetSelectionKey, string> & {
   components: Array<Pick<ImageWorkflowComponentDraft, 'slot' | 'localArtifactId'>>;
 };
+
+export const LOCALAI_IMAGE_COMPONENTS_REQUIRED_ERROR =
+  'LocalAI image workflow requires explicit companion artifacts. Select one or more layered companion presets, or add workflow components first. If you are not sure what to pick, install or verify the companion artifacts in desktop first.';
 
 function routeCapabilityFor(capabilityId: CapabilityId): RuntimeCanonicalCapability | null {
   const capability = CAPABILITIES.find((item) => item.id === capabilityId)?.routeCapability || null;
@@ -180,6 +215,11 @@ function createInitialImageWorkflowDraftState(): ImageWorkflowDraftState {
     rawProfileOverridesText: '',
     vaeModel: '',
     llmModel: '',
+    clipLModel: '',
+    clipGModel: '',
+    controlnetModel: '',
+    loraModel: '',
+    auxiliaryModel: '',
     componentDrafts: [],
   };
 }
@@ -437,7 +477,7 @@ function resolveEffectiveBinding(
   return hydrateTokenApiBinding(snapshot, fallback);
 }
 
-function tokenApiBindingForConnector(
+function cloudBindingForConnector(
   connector: RuntimeRouteOptionsSnapshot['connectors'][number],
   model: string,
 ): RuntimeRouteBinding {
@@ -456,7 +496,7 @@ function bindingForSource(
   if (source === 'cloud') {
     const connector = snapshot?.connectors[0] || null;
     if (!connector) return null;
-    return tokenApiBindingForConnector(connector, connector.models[0] || '');
+    return cloudBindingForConnector(connector, connector.models[0] || '');
   }
   const local = snapshot?.local?.models[0] || null;
   if (!local) return null;
@@ -472,7 +512,7 @@ function bindingForConnector(
   if (!connector) return null;
   const currentModel = current?.source === 'cloud' ? current.model : '';
   const model = connector.models.includes(currentModel) ? currentModel : (connector.models[0] || '');
-  return tokenApiBindingForConnector(connector, model);
+  return cloudBindingForConnector(connector, model);
 }
 
 export function bindingForModel(
@@ -539,6 +579,16 @@ function artifactDisplayLabel(artifact: ModRuntimeLocalArtifactRecord): string {
   return `${artifact.artifactId} [${artifact.kind}]`;
 }
 
+function artifactsForPresetKind(
+  artifacts: ModRuntimeLocalArtifactRecord[],
+  kind: ModRuntimeLocalArtifactKind,
+): ModRuntimeLocalArtifactRecord[] {
+  return artifacts
+    .filter(isSelectableLocalArtifact)
+    .filter((artifact) => artifact.kind === kind)
+    .sort((left, right) => `${left.kind}:${left.artifactId}`.localeCompare(`${right.kind}:${right.artifactId}`));
+}
+
 function artifactsForWorkflowSlot(
   artifacts: ModRuntimeLocalArtifactRecord[],
   slot: string,
@@ -570,13 +620,11 @@ export function buildImageWorkflowComponentSelections(
   input: CompanionArtifactSelectionsInput,
 ): LocalImageWorkflowComponentSelection[] {
   const selections = new Map<string, string>();
-  const vaeModel = asString(input.vaeModel);
-  const llmModel = asString(input.llmModel);
-  if (vaeModel) {
-    selections.set('vae_path', vaeModel);
-  }
-  if (llmModel) {
-    selections.set('llm_path', llmModel);
+  for (const preset of IMAGE_WORKFLOW_PRESET_SELECTIONS) {
+    const localArtifactId = asString(input[preset.key]);
+    if (localArtifactId) {
+      selections.set(preset.slot, localArtifactId);
+    }
   }
   for (const component of buildImageWorkflowComponents(input.components)) {
     if (!selections.has(component.slot)) {
@@ -589,14 +637,26 @@ export function buildImageWorkflowComponentSelections(
   }));
 }
 
-function selectDefaultArtifactIdForKind(
-  artifacts: ModRuntimeLocalArtifactRecord[],
-  kind: ModRuntimeLocalArtifactKind,
-): string {
-  return artifacts
-    .filter(isSelectableLocalArtifact)
-    .filter((artifact) => artifact.kind === kind)
-    .sort((left, right) => left.artifactId.localeCompare(right.artifactId))[0]?.localArtifactId || '';
+export function buildLocalAIImageWorkflowExtensionsForRequest(input: CompanionArtifactSelectionsInput & {
+  profileOverrides: Record<string, unknown>;
+}): {
+  extensions?: Record<string, unknown>;
+  error: string | null;
+} {
+  const components = buildImageWorkflowComponentSelections(input);
+  if (components.length === 0) {
+    return {
+      extensions: undefined,
+      error: LOCALAI_IMAGE_COMPONENTS_REQUIRED_ERROR,
+    };
+  }
+  return {
+    extensions: buildLocalImageWorkflowExtensions({
+      components,
+      profileOverrides: input.profileOverrides,
+    }),
+    error: null,
+  };
 }
 
 export function buildImageWorkflowProfileOverrides(input: ImageWorkflowProfileOverridesInput): {
@@ -722,7 +782,7 @@ export function resolveRouteModelPickerState(
   activeConnectorId: string;
   activeModel: string;
   modelOptions: string[];
-  tokenApiCatalogMissing: boolean;
+  cloudCatalogMissing: boolean;
   activeModelInOptions: boolean;
 } {
   const effectiveBinding = resolveEffectiveBinding(snapshot, binding);
@@ -742,7 +802,7 @@ export function resolveRouteModelPickerState(
     activeConnectorId,
     activeModel,
     modelOptions,
-    tokenApiCatalogMissing: activeSource === 'cloud' && activeConnectorId.length > 0 && modelOptions.length === 0,
+    cloudCatalogMissing: activeSource === 'cloud' && activeConnectorId.length > 0 && modelOptions.length === 0,
     activeModelInOptions: modelOptions.includes(activeModel),
   };
 }
@@ -845,7 +905,7 @@ function RouteBindingEditor(props: RouteBindingEditorProps) {
     activeConnectorId,
     activeModel,
     modelOptions,
-    tokenApiCatalogMissing,
+    cloudCatalogMissing,
     activeModelInOptions,
   } = resolveRouteModelPickerState(props.snapshot, props.binding);
   const activeConnector = props.snapshot?.connectors.find((item) => item.id === activeConnectorId) || null;
@@ -858,10 +918,10 @@ function RouteBindingEditor(props: RouteBindingEditorProps) {
   }, [activeModel]);
 
   React.useEffect(() => {
-    if (tokenApiCatalogMissing || (asString(activeModel) && !activeModelInOptions)) {
+    if (cloudCatalogMissing || (asString(activeModel) && !activeModelInOptions)) {
       setShowManualModelOverride(true);
     }
-  }, [tokenApiCatalogMissing, activeModel, activeModelInOptions]);
+  }, [cloudCatalogMissing, activeModel, activeModelInOptions]);
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-3">
@@ -943,7 +1003,7 @@ function RouteBindingEditor(props: RouteBindingEditorProps) {
           </select>
         </label>
       </div>
-      {tokenApiCatalogMissing ? (
+      {cloudCatalogMissing ? (
         <div className="mt-2 rounded-md bg-amber-50 p-2 text-xs text-amber-700">
           Connector catalog data is missing models for this capability. Refresh the connector or use a manual override.
         </div>
@@ -1502,6 +1562,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
       ? (effectiveBinding?.engine || effectiveBinding?.provider)
       : '',
   );
+  const isLocalAIImageWorkflow = isLocalRuntimeWorkflow && localEngine.toLowerCase() === 'localai';
   const updateDraft = React.useCallback((
     updater: Partial<ImageWorkflowDraftState> | ((prev: ImageWorkflowDraftState) => ImageWorkflowDraftState),
   ) => {
@@ -1514,7 +1575,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
   }, [onDraftChange]);
 
   React.useEffect(() => {
-    if (!isLocalRuntimeWorkflow) {
+    if (!isLocalAIImageWorkflow) {
       setArtifacts([]);
       setArtifactLoading(false);
       setArtifactError('');
@@ -1538,26 +1599,45 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
     return () => {
       cancelled = true;
     };
-  }, [runtimeClient, isLocalRuntimeWorkflow, localEngine]);
+  }, [runtimeClient, isLocalAIImageWorkflow, localEngine]);
 
   React.useEffect(() => {
-    if (!isLocalRuntimeWorkflow || artifacts.length === 0) {
+    if (!isLocalAIImageWorkflow) {
       return;
     }
-    const selectableArtifacts = artifacts.filter(isSelectableLocalArtifact);
-    const nextVaeModel = draft.vaeModel && selectableArtifacts.some((artifact) => artifact.localArtifactId === draft.vaeModel)
-      ? draft.vaeModel
-      : selectDefaultArtifactIdForKind(selectableArtifacts, 'vae');
-    const nextLlmModel = draft.llmModel && selectableArtifacts.some((artifact) => artifact.localArtifactId === draft.llmModel)
-      ? draft.llmModel
-      : selectDefaultArtifactIdForKind(selectableArtifacts, 'llm');
-    if (nextVaeModel !== draft.vaeModel || nextLlmModel !== draft.llmModel) {
-      updateDraft({
-        vaeModel: nextVaeModel,
-        llmModel: nextLlmModel,
-      });
+    const selectableArtifactIds = new Set(
+      artifacts
+        .filter(isSelectableLocalArtifact)
+        .map((artifact) => artifact.localArtifactId),
+    );
+    const nextPresetSelections = Object.fromEntries(
+      IMAGE_WORKFLOW_PRESET_SELECTIONS.map((preset) => {
+        const current = draft[preset.key];
+        return [
+          preset.key,
+          current && selectableArtifactIds.has(current) ? current : '',
+        ];
+      }),
+    ) as Record<ImageWorkflowPresetSelectionKey, string>;
+    const nextComponentDrafts = draft.componentDrafts.map((component) => (
+      component.localArtifactId && !selectableArtifactIds.has(component.localArtifactId)
+        ? { ...component, localArtifactId: '' }
+        : component
+    ));
+    const presetSelectionsChanged = IMAGE_WORKFLOW_PRESET_SELECTIONS.some((preset) => (
+      nextPresetSelections[preset.key] !== draft[preset.key]
+    ));
+    const componentDraftsChanged = nextComponentDrafts.some((component, index) => (
+      component.localArtifactId !== draft.componentDrafts[index]?.localArtifactId
+    ));
+    if (presetSelectionsChanged || componentDraftsChanged) {
+      updateDraft((prev) => ({
+        ...prev,
+        ...nextPresetSelections,
+        componentDrafts: nextComponentDrafts,
+      }));
     }
-  }, [artifacts, draft.llmModel, draft.vaeModel, isLocalRuntimeWorkflow, updateDraft]);
+  }, [artifacts, draft, isLocalAIImageWorkflow, updateDraft]);
 
   const handleComponentChange = React.useCallback((
     componentId: string,
@@ -1612,16 +1692,24 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
     }
     const binding = effectiveBinding || undefined;
     const nNum = Math.max(1, Number(draft.n) || 1);
-    const extensions = isLocalRuntimeWorkflow
-      ? buildLocalImageWorkflowExtensions({
-        components: buildImageWorkflowComponentSelections({
-          vaeModel: draft.vaeModel,
-          llmModel: draft.llmModel,
-          components: draft.componentDrafts,
-        }),
+    let extensions: Record<string, unknown> | undefined;
+    if (isLocalAIImageWorkflow) {
+      const localWorkflow = buildLocalAIImageWorkflowExtensionsForRequest({
+        vaeModel: draft.vaeModel,
+        llmModel: draft.llmModel,
+        clipLModel: draft.clipLModel,
+        clipGModel: draft.clipGModel,
+        controlnetModel: draft.controlnetModel,
+        loraModel: draft.loraModel,
+        auxiliaryModel: draft.auxiliaryModel,
+        components: draft.componentDrafts,
         profileOverrides: profileOverridesResult.overrides,
-      })
-      : undefined;
+      });
+      if (localWorkflow.error) {
+        return { error: localWorkflow.error };
+      }
+      extensions = localWorkflow.extensions;
+    }
     return {
       error: '',
       binding,
@@ -1637,7 +1725,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
         binding,
       }),
     };
-  }, [draft, effectiveBinding, isLocalRuntimeWorkflow]);
+  }, [draft, effectiveBinding, isLocalAIImageWorkflow]);
 
   const finalizeAsyncImageJob = React.useCallback(async (input: {
     jobId: string;
@@ -1927,13 +2015,25 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
   }, [onStateChange, runtimeClient.media.jobs, watchJobId]);
 
   const imageUris = (state.output as string[] | null) || [];
-  const vaeArtifacts = React.useMemo(
-    () => artifactsForWorkflowSlot(artifacts, 'vae_path'),
-    [artifacts],
+  const companionPresetArtifacts = React.useMemo(() => (
+    Object.fromEntries(
+      IMAGE_WORKFLOW_PRESET_SELECTIONS.map((preset) => [
+        preset.key,
+        artifactsForPresetKind(artifacts, preset.kind),
+      ]),
+    ) as Record<ImageWorkflowPresetSelectionKey, ModRuntimeLocalArtifactRecord[]>
+  ), [artifacts]);
+  const hasKnownCompanionArtifacts = React.useMemo(
+    () => IMAGE_WORKFLOW_PRESET_SELECTIONS.some((preset) => companionPresetArtifacts[preset.key].length > 0),
+    [companionPresetArtifacts],
   );
-  const llmArtifacts = React.useMemo(
-    () => artifactsForWorkflowSlot(artifacts, 'llm_path'),
-    [artifacts],
+  const coreCompanionPresets = React.useMemo(
+    () => IMAGE_WORKFLOW_PRESET_SELECTIONS.filter((preset) => preset.tier === 'core'),
+    [],
+  );
+  const extendedCompanionPresets = React.useMemo(
+    () => IMAGE_WORKFLOW_PRESET_SELECTIONS.filter((preset) => preset.tier === 'extended'),
+    [],
   );
 
   return (
@@ -1983,12 +2083,12 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
           />
         </label>
       </div>
-      {isLocalRuntimeWorkflow ? (
+      {isLocalAIImageWorkflow ? (
         <div className="rounded-xl border border-gray-200 bg-white p-3">
           <div className="mb-2">
             <div className="text-xs font-semibold text-gray-700">Companion models</div>
             <div className="text-[11px] text-gray-500">
-              LocalAI image workflows like Z-Image usually require a `VAE model` and an `LLM model`. Runtime will inject their real file paths as `vae_path` and `llm_path`.
+              Test-AI exposes the full LocalAI companion surface in layers. Start with the core presets, then add extended companions when your model family needs them.
             </div>
           </div>
           {artifactLoading ? (
@@ -1999,43 +2099,65 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
           {artifactError ? (
             <div className="rounded-md bg-red-50 p-2 text-[11px] text-red-700">{artifactError}</div>
           ) : null}
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-            <label className="flex flex-col gap-1 text-xs">
-              <span className="text-gray-500">VAE model</span>
-              <select
-                className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
-                value={draft.vaeModel}
-                onChange={(event) => updateDraft({ vaeModel: event.target.value })}
-                disabled={artifactLoading || vaeArtifacts.length === 0}
-              >
-                <option value="">-- optional --</option>
-                {vaeArtifacts.map((artifact) => (
-                  <option key={artifact.localArtifactId} value={artifact.localArtifactId}>
-                    {artifactDisplayLabel(artifact)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs">
-              <span className="text-gray-500">LLM model</span>
-              <select
-                className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
-                value={draft.llmModel}
-                onChange={(event) => updateDraft({ llmModel: event.target.value })}
-                disabled={artifactLoading || llmArtifacts.length === 0}
-              >
-                <option value="">-- optional --</option>
-                {llmArtifacts.map((artifact) => (
-                  <option key={artifact.localArtifactId} value={artifact.localArtifactId}>
-                    {artifactDisplayLabel(artifact)}
-                  </option>
-                ))}
-              </select>
-            </label>
+          <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+            <div className="mb-2">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-600">Layer 1: Core companions</div>
+              <div className="text-[11px] text-gray-500">
+                Common LocalAI image workflows often start here.
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              {coreCompanionPresets.map((preset) => (
+                <label key={preset.key} className="flex flex-col gap-1 text-xs">
+                  <span className="text-gray-500">{preset.label}</span>
+                  <select
+                    className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
+                    value={draft[preset.key]}
+                    onChange={(event) => updateDraft({ [preset.key]: event.target.value } as Partial<ImageWorkflowDraftState>)}
+                    disabled={artifactLoading || companionPresetArtifacts[preset.key].length === 0}
+                  >
+                    <option value="">-- optional --</option>
+                    {companionPresetArtifacts[preset.key].map((artifact) => (
+                      <option key={artifact.localArtifactId} value={artifact.localArtifactId}>
+                        {artifactDisplayLabel(artifact)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </div>
           </div>
-          {!artifactLoading && !artifactError && vaeArtifacts.length === 0 && llmArtifacts.length === 0 ? (
+          <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
+            <div className="mb-2">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-600">Layer 2: Extended companions</div>
+              <div className="text-[11px] text-gray-500">
+                Use these when the selected LocalAI image workflow depends on CLIP, ControlNet, LoRA, or auxiliary assets.
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {extendedCompanionPresets.map((preset) => (
+                <label key={preset.key} className="flex flex-col gap-1 text-xs">
+                  <span className="text-gray-500">{preset.label}</span>
+                  <select
+                    className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
+                    value={draft[preset.key]}
+                    onChange={(event) => updateDraft({ [preset.key]: event.target.value } as Partial<ImageWorkflowDraftState>)}
+                    disabled={artifactLoading || companionPresetArtifacts[preset.key].length === 0}
+                  >
+                    <option value="">-- optional --</option>
+                    {companionPresetArtifacts[preset.key].map((artifact) => (
+                      <option key={artifact.localArtifactId} value={artifact.localArtifactId}>
+                        {artifactDisplayLabel(artifact)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </div>
+          </div>
+          {!artifactLoading && !artifactError && !hasKnownCompanionArtifacts ? (
             <div className="mt-2 rounded-md bg-amber-50 p-2 text-[11px] text-amber-700">
-              No local VAE or LLM artifacts are installed for this runtime yet. Import them in desktop model center first.
+              No known LocalAI companion artifacts are installed for this runtime yet. Import VAE, LLM, CLIP, ControlNet, LoRA, or auxiliary assets in desktop model center first.
             </div>
           ) : null}
         </div>
@@ -2083,13 +2205,13 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
             </span>
           </label>
         </div>
-        {isLocalRuntimeWorkflow ? (
+        {isLocalAIImageWorkflow ? (
           <div className="mt-3 rounded-lg border border-gray-200 bg-white p-3">
             <div className="flex items-center justify-between gap-2">
               <div>
                 <div className="font-semibold text-gray-700">Local workflow</div>
                 <div className="text-[11px] text-gray-500">
-                  Use explicit `VAE model` / `LLM model` above for common Z-Image slots. Add extra companion artifacts here only for custom slots like `clip`, `controlnet`, or `lora`.
+                  Layer 3 is the fully open test surface. Use it for non-standard slot names or to exercise workflow shapes beyond the preset companion layers above.
                 </div>
               </div>
               <button

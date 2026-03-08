@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  LOCALAI_IMAGE_COMPONENTS_REQUIRED_ERROR,
   bindingForModel,
   buildAsyncImageJobOutcome,
+  buildLocalAIImageWorkflowExtensionsForRequest,
   buildImageWorkflowProfileOverrides,
   buildImageWorkflowComponentSelections,
   buildImageGenerateRequestParams,
@@ -69,6 +71,11 @@ test('image workflow component selections prioritize explicit vae/llm models and
   const components = buildImageWorkflowComponentSelections({
     vaeModel: 'artifact-vae',
     llmModel: 'artifact-llm',
+    clipLModel: '',
+    clipGModel: '',
+    controlnetModel: '',
+    loraModel: '',
+    auxiliaryModel: '',
     components: [
       { slot: 'vae_path', localArtifactId: 'artifact-vae-duplicate' },
       { slot: 'controlnet_path', localArtifactId: 'artifact-controlnet' },
@@ -80,6 +87,77 @@ test('image workflow component selections prioritize explicit vae/llm models and
     { slot: 'llm_path', localArtifactId: 'artifact-llm' },
     { slot: 'controlnet_path', localArtifactId: 'artifact-controlnet' },
   ]);
+});
+
+test('image workflow component selections include layered extended companions in stable order', () => {
+  const components = buildImageWorkflowComponentSelections({
+    vaeModel: 'artifact-vae',
+    llmModel: 'artifact-llm',
+    clipLModel: 'artifact-clip-l',
+    clipGModel: 'artifact-clip-g',
+    controlnetModel: 'artifact-controlnet',
+    loraModel: 'artifact-lora',
+    auxiliaryModel: 'artifact-aux',
+    components: [
+      { slot: 'controlnet_path', localArtifactId: 'artifact-controlnet-duplicate' },
+      { slot: 'custom_path', localArtifactId: 'artifact-custom' },
+    ],
+  });
+
+  assert.deepEqual(components, [
+    { slot: 'vae_path', localArtifactId: 'artifact-vae' },
+    { slot: 'llm_path', localArtifactId: 'artifact-llm' },
+    { slot: 'clip_l_path', localArtifactId: 'artifact-clip-l' },
+    { slot: 'clip_g_path', localArtifactId: 'artifact-clip-g' },
+    { slot: 'controlnet_path', localArtifactId: 'artifact-controlnet' },
+    { slot: 'lora_path', localArtifactId: 'artifact-lora' },
+    { slot: 'aux_path', localArtifactId: 'artifact-aux' },
+    { slot: 'custom_path', localArtifactId: 'artifact-custom' },
+  ]);
+});
+
+test('localai image workflow extensions require explicit companion selections', () => {
+  const result = buildLocalAIImageWorkflowExtensionsForRequest({
+    vaeModel: '',
+    llmModel: '',
+    clipLModel: '',
+    clipGModel: '',
+    controlnetModel: '',
+    loraModel: '',
+    auxiliaryModel: '',
+    components: [],
+    profileOverrides: { step: 25 },
+  });
+
+  assert.equal(result.extensions, undefined);
+  assert.equal(result.error, LOCALAI_IMAGE_COMPONENTS_REQUIRED_ERROR);
+});
+
+test('localai image workflow extensions keep explicit components and profile overrides', () => {
+  const result = buildLocalAIImageWorkflowExtensionsForRequest({
+    vaeModel: 'artifact-vae',
+    llmModel: 'artifact-llm',
+    clipLModel: '',
+    clipGModel: 'artifact-clip-g',
+    controlnetModel: '',
+    loraModel: '',
+    auxiliaryModel: '',
+    components: [
+      { slot: 'controlnet_path', localArtifactId: 'artifact-controlnet' },
+    ],
+    profileOverrides: { step: 25, options: ['diffusion_model'] },
+  });
+
+  assert.equal(result.error, null);
+  assert.deepEqual(result.extensions, {
+    components: [
+      { slot: 'vae_path', localArtifactId: 'artifact-vae' },
+      { slot: 'llm_path', localArtifactId: 'artifact-llm' },
+      { slot: 'clip_g_path', localArtifactId: 'artifact-clip-g' },
+      { slot: 'controlnet_path', localArtifactId: 'artifact-controlnet' },
+    ],
+    profile_overrides: { step: 25, options: ['diffusion_model'] },
+  });
 });
 
 test('image workflow profile overrides merge structured fields with raw json', () => {
@@ -137,7 +215,7 @@ test('route model picker exposes connector catalog models for dashscope image ge
 
   const state = resolveRouteModelPickerState(snapshot, null);
 
-  assert.equal(state.tokenApiCatalogMissing, false);
+  assert.equal(state.cloudCatalogMissing, false);
   assert.deepEqual(state.modelOptions, [
     'qwen-image-2.0-pro',
     'qwen-image-2.0',
