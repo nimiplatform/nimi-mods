@@ -3,6 +3,8 @@ import test from 'node:test';
 
 import {
   bindingForModel,
+  buildImageWorkflowProfileOverrides,
+  buildImageWorkflowComponentSelections,
   buildImageGenerateRequestParams,
   resolveRouteModelPickerState,
 } from '../src/test-ai-page.tsx';
@@ -35,6 +37,71 @@ test('image generate request keeps explicit url override', () => {
   });
 
   assert.equal(request.responseFormat, 'url');
+});
+
+test('image generate request forwards seed and workflow extensions', () => {
+  const request = buildImageGenerateRequestParams({
+    prompt: 'draw a cat',
+    n: 1,
+    size: '1024x1024',
+    seed: '42',
+    responseFormatMode: 'auto',
+    extensions: {
+      components: [{ slot: 'vae_path', localArtifactId: 'local_vae_01' }],
+      profile_overrides: { step: 25, options: ['diffusion_model'] },
+    },
+  });
+
+  assert.equal(request.seed, 42);
+  assert.deepEqual(request.extensions, {
+    components: [{ slot: 'vae_path', localArtifactId: 'local_vae_01' }],
+    profile_overrides: { step: 25, options: ['diffusion_model'] },
+  });
+});
+
+test('image workflow component selections prioritize explicit vae/llm models and dedupe generic rows', () => {
+  const components = buildImageWorkflowComponentSelections({
+    vaeModel: 'artifact-vae',
+    llmModel: 'artifact-llm',
+    components: [
+      { slot: 'vae_path', localArtifactId: 'artifact-vae-duplicate' },
+      { slot: 'controlnet_path', localArtifactId: 'artifact-controlnet' },
+    ],
+  });
+
+  assert.deepEqual(components, [
+    { slot: 'vae_path', localArtifactId: 'artifact-vae' },
+    { slot: 'llm_path', localArtifactId: 'artifact-llm' },
+    { slot: 'controlnet_path', localArtifactId: 'artifact-controlnet' },
+  ]);
+});
+
+test('image workflow profile overrides merge structured fields with raw json', () => {
+  const result = buildImageWorkflowProfileOverrides({
+    rawJsonText: '{"scheduler":"karras","clip_skip":2}',
+    step: '25',
+    cfgScale: '1.5',
+    sampler: 'euler',
+    optionsText: 'diffusion_model\noffload_params_to_cpu:true',
+  });
+
+  assert.equal(result.error, null);
+  assert.deepEqual(result.overrides, {
+    scheduler: 'karras',
+    clip_skip: 2,
+    step: 25,
+    cfg_scale: 1.5,
+    sampler: 'euler',
+    options: ['diffusion_model', 'offload_params_to_cpu:true'],
+  });
+});
+
+test('image workflow profile overrides rejects non-object raw json', () => {
+  const result = buildImageWorkflowProfileOverrides({
+    rawJsonText: '[]',
+  });
+
+  assert.equal(result.error, 'Raw profile_overrides JSON must be an object.');
 });
 
 test('route model picker exposes connector catalog models for dashscope image generation', () => {

@@ -1,6 +1,12 @@
 import React from 'react';
+import {
+  buildLocalImageWorkflowExtensions,
+} from '@nimiplatform/sdk/mod/runtime';
 import type {
+  LocalImageWorkflowComponentSelection,
   ModRuntimeClient,
+  ModRuntimeLocalArtifactKind,
+  ModRuntimeLocalArtifactRecord,
   ModRuntimeResolvedBinding,
 } from '@nimiplatform/sdk/mod/runtime';
 import type {
@@ -85,6 +91,37 @@ type CapabilityState = RouteState & TestState;
 type CapabilityStates = Record<CapabilityId, CapabilityState>;
 
 export type ImageResponseFormatMode = 'auto' | 'base64' | 'url';
+
+type ImageWorkflowComponentDraft = {
+  id: string;
+  slot: string;
+  localArtifactId: string;
+};
+
+type ImageWorkflowProfileOverridesInput = {
+  step?: string;
+  cfgScale?: string;
+  sampler?: string;
+  scheduler?: string;
+  optionsText?: string;
+  rawJsonText?: string;
+};
+
+const COMMON_IMAGE_WORKFLOW_SLOTS = [
+  'vae_path',
+  'llm_path',
+  'clip_l_path',
+  'clip_g_path',
+  'controlnet_path',
+  'lora_path',
+  'aux_path',
+] as const;
+
+type CompanionArtifactSelectionsInput = {
+  vaeModel: string;
+  llmModel: string;
+  components: Array<Pick<ImageWorkflowComponentDraft, 'slot' | 'localArtifactId'>>;
+};
 
 // ── Utility ──────────────────────────────────────────────────────────────────
 
@@ -308,28 +345,191 @@ export function resolveImageResponseFormat(mode: ImageResponseFormatMode): 'base
   return mode === 'base64' || mode === 'url' ? mode : undefined;
 }
 
+function inferArtifactKindForSlot(slot: string): ModRuntimeLocalArtifactKind | undefined {
+  const normalized = asString(slot).toLowerCase();
+  if (!normalized) return undefined;
+  if (normalized.includes('vae')) return 'vae';
+  if (normalized.includes('llm')) return 'llm';
+  if (normalized.includes('clip')) return 'clip';
+  if (normalized.includes('controlnet')) return 'controlnet';
+  if (normalized.includes('lora')) return 'lora';
+  if (normalized.includes('aux')) return 'auxiliary';
+  return undefined;
+}
+
+function isSelectableLocalArtifact(artifact: ModRuntimeLocalArtifactRecord): boolean {
+  return artifact.status === 'installed' || artifact.status === 'active';
+}
+
+function artifactDisplayLabel(artifact: ModRuntimeLocalArtifactRecord): string {
+  return `${artifact.artifactId} [${artifact.kind}]`;
+}
+
+function artifactsForWorkflowSlot(
+  artifacts: ModRuntimeLocalArtifactRecord[],
+  slot: string,
+): ModRuntimeLocalArtifactRecord[] {
+  const selectableArtifacts = artifacts.filter(isSelectableLocalArtifact);
+  const preferredKind = inferArtifactKindForSlot(slot);
+  const sorted = [...selectableArtifacts].sort((left, right) => (
+    `${left.kind}:${left.artifactId}`.localeCompare(`${right.kind}:${right.artifactId}`)
+  ));
+  if (!preferredKind) {
+    return sorted;
+  }
+  const matches = sorted.filter((artifact) => artifact.kind === preferredKind);
+  return matches.length > 0 ? matches : sorted;
+}
+
+function buildImageWorkflowComponents(
+  components: Array<Pick<ImageWorkflowComponentDraft, 'slot' | 'localArtifactId'>>,
+): LocalImageWorkflowComponentSelection[] {
+  return components
+    .map((component) => ({
+      slot: asString(component.slot),
+      localArtifactId: asString(component.localArtifactId),
+    }))
+    .filter((component) => component.slot && component.localArtifactId);
+}
+
+export function buildImageWorkflowComponentSelections(
+  input: CompanionArtifactSelectionsInput,
+): LocalImageWorkflowComponentSelection[] {
+  const selections = new Map<string, string>();
+  const vaeModel = asString(input.vaeModel);
+  const llmModel = asString(input.llmModel);
+  if (vaeModel) {
+    selections.set('vae_path', vaeModel);
+  }
+  if (llmModel) {
+    selections.set('llm_path', llmModel);
+  }
+  for (const component of buildImageWorkflowComponents(input.components)) {
+    if (!selections.has(component.slot)) {
+      selections.set(component.slot, component.localArtifactId);
+    }
+  }
+  return Array.from(selections.entries()).map(([slot, localArtifactId]) => ({
+    slot,
+    localArtifactId,
+  }));
+}
+
+function selectDefaultArtifactIdForKind(
+  artifacts: ModRuntimeLocalArtifactRecord[],
+  kind: ModRuntimeLocalArtifactKind,
+): string {
+  return artifacts
+    .filter(isSelectableLocalArtifact)
+    .filter((artifact) => artifact.kind === kind)
+    .sort((left, right) => left.artifactId.localeCompare(right.artifactId))[0]?.localArtifactId || '';
+}
+
+export function buildImageWorkflowProfileOverrides(input: ImageWorkflowProfileOverridesInput): {
+  overrides: Record<string, unknown>;
+  error: string | null;
+} {
+  const rawJsonText = asString(input.rawJsonText);
+  let overrides: Record<string, unknown> = {};
+  if (rawJsonText) {
+    try {
+      const parsed = JSON.parse(rawJsonText) as unknown;
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return {
+          overrides: {},
+          error: 'Raw profile_overrides JSON must be an object.',
+        };
+      }
+      overrides = parsed as Record<string, unknown>;
+    } catch (error) {
+      return {
+        overrides: {},
+        error: error instanceof Error
+          ? `Invalid profile_overrides JSON: ${error.message}`
+          : 'Invalid profile_overrides JSON.',
+      };
+    }
+  }
+
+  const applyNumericField = (
+    key: 'step' | 'cfg_scale',
+    rawValue: string | undefined,
+    label: string,
+  ): string | null => {
+    const normalized = asString(rawValue);
+    if (!normalized) return null;
+    const value = Number(normalized);
+    if (!Number.isFinite(value)) {
+      return `${label} must be a valid number.`;
+    }
+    overrides[key] = value;
+    return null;
+  };
+
+  const stepError = applyNumericField('step', input.step, 'Step');
+  if (stepError) {
+    return { overrides: {}, error: stepError };
+  }
+  const cfgScaleError = applyNumericField('cfg_scale', input.cfgScale, 'CFG scale');
+  if (cfgScaleError) {
+    return { overrides: {}, error: cfgScaleError };
+  }
+
+  const sampler = asString(input.sampler);
+  if (sampler) {
+    overrides['sampler'] = sampler;
+  }
+  const scheduler = asString(input.scheduler);
+  if (scheduler) {
+    overrides['scheduler'] = scheduler;
+  }
+  const options = String(input.optionsText || '')
+    .split(/\r?\n/g)
+    .map((line) => asString(line))
+    .filter(Boolean);
+  if (options.length > 0) {
+    overrides['options'] = options;
+  }
+
+  return {
+    overrides,
+    error: null,
+  };
+}
+
 export function buildImageGenerateRequestParams(input: {
   prompt: string;
   negativePrompt?: string;
   n: number;
   size: string;
+  seed?: string;
   responseFormatMode: ImageResponseFormatMode;
+  extensions?: Record<string, unknown>;
   binding?: RuntimeRouteBinding;
 }): {
   prompt: string;
   negativePrompt?: string;
   n: number;
   size: string;
+  seed?: number;
   responseFormat?: 'base64' | 'url';
+  extensions?: Record<string, unknown>;
   binding?: RuntimeRouteBinding;
 } {
   const responseFormat = resolveImageResponseFormat(input.responseFormatMode);
+  const seedText = asString(input.seed);
+  const seed = seedText ? Number(seedText) : undefined;
+  const extensions = input.extensions && Object.keys(input.extensions).length > 0
+    ? input.extensions
+    : undefined;
   return {
     prompt: input.prompt,
     ...(asString(input.negativePrompt) ? { negativePrompt: asString(input.negativePrompt) } : {}),
     n: Math.max(1, Number(input.n) || 1),
     size: input.size,
+    ...(Number.isFinite(seed) ? { seed } : {}),
     ...(responseFormat ? { responseFormat } : {}),
+    ...(extensions ? { extensions } : {}),
     ...(input.binding ? { binding: input.binding } : {}),
   };
 }
@@ -1076,23 +1276,145 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
   const [negativePrompt, setNegativePrompt] = React.useState('low quality, blurry');
   const [size, setSize] = React.useState('1024x1024');
   const [n, setN] = React.useState('1');
+  const [seed, setSeed] = React.useState('');
   const [responseFormatMode, setResponseFormatMode] = React.useState<ImageResponseFormatMode>('auto');
+  const [step, setStep] = React.useState('25');
+  const [cfgScale, setCfgScale] = React.useState('');
+  const [sampler, setSampler] = React.useState('');
+  const [scheduler, setScheduler] = React.useState('');
+  const [optionsText, setOptionsText] = React.useState('');
+  const [rawProfileOverridesText, setRawProfileOverridesText] = React.useState('');
+  const [vaeModel, setVaeModel] = React.useState('');
+  const [llmModel, setLlmModel] = React.useState('');
+  const [componentDrafts, setComponentDrafts] = React.useState<ImageWorkflowComponentDraft[]>([]);
+  const [artifacts, setArtifacts] = React.useState<ModRuntimeLocalArtifactRecord[]>([]);
+  const [artifactLoading, setArtifactLoading] = React.useState(false);
+  const [artifactError, setArtifactError] = React.useState('');
+  const nextComponentIdRef = React.useRef(2);
+  const effectiveBinding = React.useMemo(
+    () => resolveEffectiveBinding(state.snapshot, state.binding),
+    [state.snapshot, state.binding],
+  );
+  const isLocalRuntimeWorkflow = effectiveBinding?.source === 'local-runtime';
+  const localRuntimeEngine = asString(
+    isLocalRuntimeWorkflow
+      ? (effectiveBinding?.engine || effectiveBinding?.provider)
+      : '',
+  );
+
+  React.useEffect(() => {
+    if (!isLocalRuntimeWorkflow) {
+      setArtifacts([]);
+      setArtifactLoading(false);
+      setArtifactError('');
+      return;
+    }
+    let cancelled = false;
+    setArtifactLoading(true);
+    setArtifactError('');
+    void runtimeClient.localRuntime.listArtifacts(
+      localRuntimeEngine ? { engine: localRuntimeEngine } : undefined,
+    ).then((rows) => {
+      if (cancelled) return;
+      setArtifacts(rows);
+      setArtifactLoading(false);
+    }).catch((error) => {
+      if (cancelled) return;
+      setArtifacts([]);
+      setArtifactLoading(false);
+      setArtifactError(error instanceof Error ? error.message : String(error || 'Failed to load local artifacts.'));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [runtimeClient, isLocalRuntimeWorkflow, localRuntimeEngine]);
+
+  React.useEffect(() => {
+    if (!isLocalRuntimeWorkflow || artifacts.length === 0) {
+      return;
+    }
+    const selectableArtifacts = artifacts.filter(isSelectableLocalArtifact);
+    setVaeModel((current) => {
+      if (current && selectableArtifacts.some((artifact) => artifact.localArtifactId === current)) {
+        return current;
+      }
+      return selectDefaultArtifactIdForKind(selectableArtifacts, 'vae');
+    });
+    setLlmModel((current) => {
+      if (current && selectableArtifacts.some((artifact) => artifact.localArtifactId === current)) {
+        return current;
+      }
+      return selectDefaultArtifactIdForKind(selectableArtifacts, 'llm');
+    });
+  }, [artifacts, isLocalRuntimeWorkflow]);
+
+  const handleComponentChange = React.useCallback((
+    componentId: string,
+    key: 'slot' | 'localArtifactId',
+    value: string,
+  ) => {
+    setComponentDrafts((prev) => prev.map((component) => (
+      component.id === componentId
+        ? { ...component, [key]: value }
+        : component
+    )));
+  }, []);
+
+  const handleAddComponent = React.useCallback(() => {
+    setComponentDrafts((prev) => [
+      ...prev,
+      {
+        id: `component-${nextComponentIdRef.current++}`,
+        slot: '',
+        localArtifactId: '',
+      },
+    ]);
+  }, []);
+
+  const handleRemoveComponent = React.useCallback((componentId: string) => {
+    setComponentDrafts((prev) => prev.filter((component) => component.id !== componentId));
+  }, []);
 
   const handleRun = React.useCallback(async () => {
     if (!asString(prompt)) {
       onStateChange((prev) => ({ ...prev, error: 'Prompt is empty.' }));
       return;
     }
+    const profileOverridesResult = buildImageWorkflowProfileOverrides({
+      step,
+      cfgScale,
+      sampler,
+      scheduler,
+      optionsText,
+      rawJsonText: rawProfileOverridesText,
+    });
+    const profileOverridesError = profileOverridesResult.error;
+    if (profileOverridesError) {
+      onStateChange((prev) => ({ ...prev, error: profileOverridesError }));
+      return;
+    }
     onStateChange((prev) => ({ ...prev, busy: true, error: '', diagnostics: makeEmptyDiagnostics() }));
     const t0 = Date.now();
-    const binding = resolveEffectiveBinding(state.snapshot, state.binding) || undefined;
+    const binding = effectiveBinding || undefined;
     const nNum = Math.max(1, Number(n) || 1);
+    const extensions = isLocalRuntimeWorkflow
+      ? buildLocalImageWorkflowExtensions({
+        components: buildImageWorkflowComponentSelections({
+          vaeModel,
+          llmModel,
+          components: componentDrafts,
+        }),
+        profileOverrides: profileOverridesResult.overrides,
+      })
+      : undefined;
     const requestParams = buildImageGenerateRequestParams({
       prompt,
       negativePrompt,
       n: nNum,
       size,
+      seed,
       responseFormatMode,
+      extensions,
       binding,
     });
     let resolved: ModRuntimeResolvedBinding | undefined;
@@ -1135,9 +1457,37 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
         diagnostics: { requestParams, resolvedRoute: resolved ?? null, responseMetadata: { elapsed } },
       }));
     }
-  }, [prompt, negativePrompt, size, n, responseFormatMode, state.snapshot, state.binding, runtimeClient, onStateChange]);
+  }, [
+    prompt,
+    negativePrompt,
+    size,
+    n,
+    seed,
+    responseFormatMode,
+    step,
+    cfgScale,
+    sampler,
+    scheduler,
+    optionsText,
+    rawProfileOverridesText,
+    effectiveBinding,
+    isLocalRuntimeWorkflow,
+    vaeModel,
+    llmModel,
+    componentDrafts,
+    runtimeClient,
+    onStateChange,
+  ]);
 
   const imageUris = (state.output as string[] | null) || [];
+  const vaeArtifacts = React.useMemo(
+    () => artifactsForWorkflowSlot(artifacts, 'vae_path'),
+    [artifacts],
+  );
+  const llmArtifacts = React.useMemo(
+    () => artifactsForWorkflowSlot(artifacts, 'llm_path'),
+    [artifacts],
+  );
 
   return (
     <div className="flex flex-col gap-3">
@@ -1186,23 +1536,250 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
           />
         </label>
       </div>
+      {isLocalRuntimeWorkflow ? (
+        <div className="rounded-xl border border-gray-200 bg-white p-3">
+          <div className="mb-2">
+            <div className="text-xs font-semibold text-gray-700">Companion models</div>
+            <div className="text-[11px] text-gray-500">
+              LocalAI image workflows like Z-Image usually require a `VAE model` and an `LLM model`. Runtime will inject their real file paths as `vae_path` and `llm_path`.
+            </div>
+          </div>
+          {artifactLoading ? (
+            <div className="rounded-md bg-blue-50 p-2 text-[11px] text-blue-700">
+              Loading installed local artifacts...
+            </div>
+          ) : null}
+          {artifactError ? (
+            <div className="rounded-md bg-red-50 p-2 text-[11px] text-red-700">{artifactError}</div>
+          ) : null}
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="text-gray-500">VAE model</span>
+              <select
+                className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
+                value={vaeModel}
+                onChange={(event) => setVaeModel(event.target.value)}
+                disabled={artifactLoading || vaeArtifacts.length === 0}
+              >
+                <option value="">-- optional --</option>
+                {vaeArtifacts.map((artifact) => (
+                  <option key={artifact.localArtifactId} value={artifact.localArtifactId}>
+                    {artifactDisplayLabel(artifact)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs">
+              <span className="text-gray-500">LLM model</span>
+              <select
+                className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
+                value={llmModel}
+                onChange={(event) => setLlmModel(event.target.value)}
+                disabled={artifactLoading || llmArtifacts.length === 0}
+              >
+                <option value="">-- optional --</option>
+                {llmArtifacts.map((artifact) => (
+                  <option key={artifact.localArtifactId} value={artifact.localArtifactId}>
+                    {artifactDisplayLabel(artifact)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {!artifactLoading && !artifactError && vaeArtifacts.length === 0 && llmArtifacts.length === 0 ? (
+            <div className="mt-2 rounded-md bg-amber-50 p-2 text-[11px] text-amber-700">
+              No local VAE or LLM artifacts are installed for this runtime yet. Import them in desktop model center first.
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       <details className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs">
         <summary className="cursor-pointer font-semibold text-gray-600">Advanced options</summary>
-        <label className="mt-2 flex max-w-xs flex-col gap-1 text-xs">
-          <span className="text-gray-500">Response format</span>
-          <select
-            className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
-            value={responseFormatMode}
-            onChange={(event) => setResponseFormatMode(event.target.value as ImageResponseFormatMode)}
-          >
-            <option value="auto">auto</option>
-            <option value="base64">base64</option>
-            <option value="url">url</option>
-          </select>
-          <span className="text-[11px] text-gray-400">
-            Auto leaves the response format unset so the runtime/provider can pick the native path.
-          </span>
-        </label>
+        <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
+          <label className="flex max-w-xs flex-col gap-1 text-xs">
+            <span className="text-gray-500">Response format</span>
+            <select
+              className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
+              value={responseFormatMode}
+              onChange={(event) => setResponseFormatMode(event.target.value as ImageResponseFormatMode)}
+            >
+              <option value="auto">auto</option>
+              <option value="base64">base64</option>
+              <option value="url">url</option>
+            </select>
+            <span className="text-[11px] text-gray-400">
+              Auto leaves the response format unset so the runtime/provider can pick the native path.
+            </span>
+          </label>
+          <label className="flex max-w-xs flex-col gap-1 text-xs">
+            <span className="text-gray-500">Seed</span>
+            <input
+              className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
+              value={seed}
+              onChange={(event) => setSeed(event.target.value)}
+              placeholder="optional"
+            />
+            <span className="text-[11px] text-gray-400">
+              Seed stays on the standard image request. Workflow profile overrides stay in the LocalAI extension payload.
+            </span>
+          </label>
+        </div>
+        {isLocalRuntimeWorkflow ? (
+          <div className="mt-3 rounded-lg border border-gray-200 bg-white p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <div className="font-semibold text-gray-700">Local workflow</div>
+                <div className="text-[11px] text-gray-500">
+                  Use explicit `VAE model` / `LLM model` above for common Z-Image slots. Add extra companion artifacts here only for custom slots like `clip`, `controlnet`, or `lora`.
+                </div>
+              </div>
+              <button
+                type="button"
+                className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs"
+                onClick={handleAddComponent}
+              >
+                Add component
+              </button>
+            </div>
+            <datalist id="test-ai-image-workflow-slots">
+              {COMMON_IMAGE_WORKFLOW_SLOTS.map((slot) => (
+                <option key={slot} value={slot} />
+              ))}
+            </datalist>
+            {artifactLoading ? (
+              <div className="mt-2 rounded-md bg-blue-50 p-2 text-[11px] text-blue-700">
+                Loading installed local artifacts...
+              </div>
+            ) : null}
+            {artifactError ? (
+              <div className="mt-2 rounded-md bg-red-50 p-2 text-[11px] text-red-700">{artifactError}</div>
+            ) : null}
+            {!artifactLoading && !artifactError && artifacts.length === 0 ? (
+              <div className="mt-2 rounded-md bg-amber-50 p-2 text-[11px] text-amber-700">
+                No companion artifacts are installed for the selected local runtime yet. Download/import VAE or LLM assets in desktop first, then select them here.
+              </div>
+            ) : null}
+            <div className="mt-3 flex flex-col gap-2">
+              {componentDrafts.length === 0 ? (
+                <div className="rounded-md bg-gray-50 p-2 text-[11px] text-gray-500">
+                  No extra workflow components configured.
+                </div>
+              ) : null}
+              {componentDrafts.map((component) => {
+                const selectedArtifact = artifacts.find((artifact) => artifact.localArtifactId === component.localArtifactId) || null;
+                const artifactChoices = (() => {
+                  const choices = artifactsForWorkflowSlot(artifacts, component.slot);
+                  if (selectedArtifact && !choices.some((artifact) => artifact.localArtifactId === selectedArtifact.localArtifactId)) {
+                    return [selectedArtifact, ...choices];
+                  }
+                  return choices;
+                })();
+                return (
+                  <div key={component.id} className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                    <label className="flex flex-col gap-1 text-xs">
+                      <span className="text-gray-500">Slot</span>
+                      <input
+                        className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
+                        value={component.slot}
+                        onChange={(event) => handleComponentChange(component.id, 'slot', event.target.value)}
+                        list="test-ai-image-workflow-slots"
+                        placeholder="vae_path / llm_path / ..."
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-xs">
+                      <span className="text-gray-500">Artifact</span>
+                      <select
+                        className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
+                        value={component.localArtifactId}
+                        onChange={(event) => handleComponentChange(component.id, 'localArtifactId', event.target.value)}
+                        disabled={artifactLoading || artifactChoices.length === 0}
+                      >
+                        <option value="">-- optional --</option>
+                        {artifactChoices.map((artifact) => (
+                          <option key={artifact.localArtifactId} value={artifact.localArtifactId}>
+                            {artifactDisplayLabel(artifact)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className="flex items-end">
+                      <button
+                        type="button"
+                        className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs"
+                        onClick={() => handleRemoveComponent(component.id)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+              <label className="flex flex-col gap-1 text-xs">
+                <span className="text-gray-500">Steps</span>
+                <input
+                  className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
+                  value={step}
+                  onChange={(event) => setStep(event.target.value)}
+                  placeholder="25"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs">
+                <span className="text-gray-500">CFG scale</span>
+                <input
+                  className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
+                  value={cfgScale}
+                  onChange={(event) => setCfgScale(event.target.value)}
+                  placeholder="optional"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs">
+                <span className="text-gray-500">Sampler</span>
+                <input
+                  className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
+                  value={sampler}
+                  onChange={(event) => setSampler(event.target.value)}
+                  placeholder="euler / dpmpp2m / ..."
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs">
+                <span className="text-gray-500">Scheduler</span>
+                <input
+                  className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
+                  value={scheduler}
+                  onChange={(event) => setScheduler(event.target.value)}
+                  placeholder="optional"
+                />
+              </label>
+            </div>
+            <label className="mt-3 flex flex-col gap-1 text-xs">
+              <span className="text-gray-500">Options (one per line)</span>
+              <textarea
+                className="h-20 resize-y rounded-md border border-gray-300 bg-white p-2 font-mono text-xs"
+                value={optionsText}
+                onChange={(event) => setOptionsText(event.target.value)}
+                placeholder={'diffusion_model\noffload_params_to_cpu:true'}
+              />
+            </label>
+            <label className="mt-3 flex flex-col gap-1 text-xs">
+              <span className="text-gray-500">Raw profile_overrides JSON</span>
+              <textarea
+                className="h-24 resize-y rounded-md border border-gray-300 bg-white p-2 font-mono text-xs"
+                value={rawProfileOverridesText}
+                onChange={(event) => setRawProfileOverridesText(event.target.value)}
+                placeholder={'{"clip_skip": 2}'}
+              />
+              <span className="text-[11px] text-gray-400">
+                Runtime rejects path overrides like `*_path` and `parameters.model`; choose those via the component rows above instead.
+              </span>
+            </label>
+          </div>
+        ) : (
+          <div className="mt-3 rounded-md bg-blue-50 p-2 text-[11px] text-blue-700">
+            Local workflow controls apply only when the route source is `local-runtime`. When using `token-api`, the request only sends the standard image fields.
+          </div>
+        )}
       </details>
       <RunButton busy={state.busy} label="Run Image Generate" onClick={() => { void handleRun(); }} />
       {state.error ? <ErrorBox message={state.error} /> : null}

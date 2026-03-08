@@ -16,6 +16,7 @@ export const TEST_AI_CAPABILITIES = [
   'runtime.media.voice.design',
   'runtime.route.list.options',
   'runtime.route.resolve',
+  'runtime.local.artifacts.list',
   'ui.register.ui-extension.app.sidebar.mods',
   'ui.register.ui-extension.app.content.routes',
 ] as const;

@@ -58,6 +58,9 @@ function createSdkRuntimeContext() {
         status: 'healthy',
       }),
     },
+    localRuntime: {
+      listArtifacts: async () => [],
+    },
     ai: {
       text: {
         generate: async () => {
@@ -172,7 +175,7 @@ function installModSdkHost(runtimeHost: Record<string, unknown>): () => void {
   };
 }
 
-test('test-ai runtime mod registers all 13 capabilities', async () => {
+test('test-ai runtime mod registers all 14 capabilities', async () => {
   const { sdkRuntimeContext, runtimeHost, uiRegistrations } = createSdkRuntimeContext();
   const restoreHost = installModSdkHost(runtimeHost);
   const mod = createTestAiRuntimeMod();
@@ -189,11 +192,12 @@ test('test-ai runtime mod registers all 13 capabilities', async () => {
     assert.ok(mod.capabilities.includes('runtime.media.voice.design'), 'missing runtime.media.voice.design');
     assert.ok(mod.capabilities.includes('runtime.route.list.options'), 'missing runtime.route.list.options');
     assert.ok(mod.capabilities.includes('runtime.route.resolve'), 'missing runtime.route.resolve');
+    assert.ok(mod.capabilities.includes('runtime.local.artifacts.list'), 'missing runtime.local.artifacts.list');
     assert.ok(mod.capabilities.includes('ui.register.ui-extension.app.sidebar.mods'), 'missing sidebar slot');
     assert.ok(mod.capabilities.includes('ui.register.ui-extension.app.content.routes'), 'missing routes slot');
 
     assert.equal(mod.capabilities.some((capability) => capability.startsWith('llm.')), false, 'must not contain legacy llm.* prefix');
-    assert.equal(mod.capabilities.length, 13, 'expected exactly 13 capabilities');
+    assert.equal(mod.capabilities.length, 14, 'expected exactly 14 capabilities');
 
     await mod.setup({ sdkRuntimeContext } as never);
 
@@ -237,6 +241,7 @@ test('test-ai runtime client exposes embed, stt, video api surfaces', async () =
     assert.equal(typeof client.media.tts.synthesize, 'function', 'media.tts.synthesize must be a function');
     assert.equal(typeof client.media.tts.listVoices, 'function', 'media.tts.listVoices must be a function');
     assert.equal(typeof client.media.image.generate, 'function', 'media.image.generate must be a function');
+    assert.equal(typeof client.localRuntime.listArtifacts, 'function', 'localRuntime.listArtifacts must be a function');
   } finally {
     restoreHost();
   }
