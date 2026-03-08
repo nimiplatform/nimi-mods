@@ -14,3 +14,8 @@ Capability registry in `tables/capabilities.yaml` is authoritative. All 19 capab
 
 Mod scope is diagnostics and smoke validation for all 8 AI capabilities: text generation, text embedding,
 image generation, video generation, audio synthesis, audio transcription, voice cloning, and voice design.
+
+For LocalAI image diagnostics, Test-AI is expected to maximize testability instead of optimizing for a single business workflow:
+
+- layered preset companion selectors cover `vae`, `llm`, `clip`, `controlnet`, `lora`, and `auxiliary`
+- custom slot rows remain available for non-standard LocalAI workflow layouts

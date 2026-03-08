@@ -29,24 +29,30 @@ image_generate_chain:
   - step: image-input-normalize
     order: 1
     source_rule: TAI-PIPE-003
-  - step: image-generate
+  - step: localai-companion-validate
     order: 2
     source_rule: TAI-PIPE-003
-  - step: render-image-preview
+  - step: image-generate
     order: 3
+    source_rule: TAI-PIPE-003
+  - step: render-image-preview
+    order: 4
     source_rule: TAI-PIPE-003
 image_create_job_chain:
   - step: image-input-normalize
     order: 1
     source_rule: TAI-PIPE-003
-  - step: image-job-submit
+  - step: localai-companion-validate
     order: 2
     source_rule: TAI-PIPE-003
-  - step: image-job-subscribe
+  - step: image-job-submit
     order: 3
     source_rule: TAI-PIPE-003
-  - step: render-image-preview
+  - step: image-job-subscribe
     order: 4
+    source_rule: TAI-PIPE-003
+  - step: render-image-preview
+    order: 5
     source_rule: TAI-PIPE-003
 video_generate_chain:
   - step: video-input-normalize
