@@ -7,6 +7,7 @@ import { resolveModelsForScenario } from '../../services/route/connector-model-c
 type Props = {
   open: boolean;
   onToggle: () => void;
+  embedded?: boolean;
   enableVoice: boolean;
   selectedVoiceId: string;
   ttsRouteSource: 'auto' | 'local-runtime' | 'token-api';
@@ -121,23 +122,11 @@ export function VoicePanel(props: Props) {
     [speechVoices],
   );
 
-  return (
-    <div className="lc-card rounded-2xl p-3 text-xs">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        className="flex h-7 w-full items-center justify-between text-left text-[13px] font-semibold text-gray-700"
-      >
-        <span>{t('VoicePanel.title')}</span>
-        <span className={`text-gray-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>{CHEVRON_ICON}</span>
-      </button>
-      {open ? (
-        <div className="mt-3">
-          <div className="min-h-0 lc-panel-expand">
-          <p className="text-[11px] text-gray-600">
-            {enableVoice ? t('VoicePanel.enabledNote') : t('VoicePanel.disabledNote')}
-          </p>
+  const content = (
+    <div className="min-h-0 lc-panel-expand">
+      <p className="text-[11px] text-gray-600">
+        {enableVoice ? t('VoicePanel.enabledNote') : t('VoicePanel.disabledNote')}
+      </p>
           <div className="mt-3 space-y-2">
             {/* ── TTS Section ── */}
             <div>
@@ -346,9 +335,25 @@ export function VoicePanel(props: Props) {
               </div>
             ) : null}
           </div>
-          </div>
-        </div>
-      ) : null}
+    </div>
+  );
+
+  if (props.embedded) {
+    return <div className="text-xs">{content}</div>;
+  }
+
+  return (
+    <div className="lc-card rounded-2xl p-3 text-xs">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="flex h-7 w-full items-center justify-between text-left text-[13px] font-semibold text-gray-700"
+      >
+        <span>{t('VoicePanel.title')}</span>
+        <span className={`text-gray-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>{CHEVRON_ICON}</span>
+      </button>
+      {open ? <div className="mt-3">{content}</div> : null}
     </div>
   );
 }

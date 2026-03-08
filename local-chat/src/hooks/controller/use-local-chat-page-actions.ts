@@ -6,7 +6,12 @@ import type { ChatMessage } from '../../types.js';
 import type { useLocalChatPageState } from './use-local-chat-page-state.js';
 import type { RuntimeStatusSidebarProps } from '../../components/sidebar/types.js';
 import { ReasonCode } from '@nimiplatform/sdk/types';
-import { resolveModelsForScenario } from '../../services/route/connector-model-capabilities.js';
+import {
+  findLocalRuntimeModelForBinding,
+  hasReadyLocalRuntimeModelForScenario,
+  isLocalRuntimeModelReady,
+  resolveModelsForScenario,
+} from '../../services/route/connector-model-capabilities.js';
 
 type LocalChatPageState = ReturnType<typeof useLocalChatPageState>;
 
@@ -54,16 +59,23 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
     [state.speechPlaybackState, state.speechSettingsState],
   );
 
-  const handleMediaPlannerModeChange = useCallback(
-    (value: RuntimeStatusSidebarProps['defaultSettings']['mediaPlannerMode']) => {
-      state.speechSettingsState.handleMediaPlannerModeChange(value);
+  const handleMediaAutonomyChange = useCallback(
+    (value: 'off' | 'explicit-only' | 'natural') => {
+      state.speechSettingsState.handleMediaAutonomyChange(value);
     },
     [state.speechSettingsState],
   );
 
-  const handleVideoAutoPolicyChange = useCallback(
-    (value: RuntimeStatusSidebarProps['defaultSettings']['videoAutoPolicy']) => {
-      state.speechSettingsState.handleVideoAutoPolicyChange(value);
+  const handleVoiceConversationModeChange = useCallback(
+    (value: 'off' | 'suggested' | 'on') => {
+      state.speechSettingsState.handleVoiceConversationModeChange(value);
+    },
+    [state.speechSettingsState],
+  );
+
+  const handleVisualComfortLevelChange = useCallback(
+    (value: 'text-only' | 'soft-visuals' | 'natural-visuals') => {
+      state.speechSettingsState.handleVisualComfortLevelChange(value);
     },
     [state.speechSettingsState],
   );
@@ -128,13 +140,13 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
       const localChatRuntimeModels = state.runtimeRouteState.chatRouteOptions?.localRuntime.models || [];
       const localTtsRuntimeModels = state.runtimeRouteState.ttsRouteOptions?.localRuntime.models || localChatRuntimeModels;
       const localSttRuntimeModels = state.runtimeRouteState.sttRouteOptions?.localRuntime.models || localChatRuntimeModels;
-      const localTtsRouteAvailable = localTtsRuntimeModels.some((model) => {
-        const capabilities = Array.isArray(model.capabilities) ? model.capabilities : [];
-        return capabilities.includes('audio.synthesize');
+      const localTtsRouteAvailable = hasReadyLocalRuntimeModelForScenario({
+        models: localTtsRuntimeModels,
+        scenario: 'audio.synthesize',
       });
-      const localSttRouteAvailable = localSttRuntimeModels.some((model) => {
-        const capabilities = Array.isArray(model.capabilities) ? model.capabilities : [];
-        return capabilities.includes('audio.transcribe');
+      const localSttRouteAvailable = hasReadyLocalRuntimeModelForScenario({
+        models: localSttRuntimeModels,
+        scenario: 'audio.transcribe',
       });
 
       const chatCapabilityMatched = (() => {
@@ -145,13 +157,47 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         }
         const selected = state.runtimeRouteState.routeBinding || state.runtimeRouteState.chatRouteOptions?.selected || null;
         if (!selected || selected.source !== 'local-runtime') return true;
-        const localModel = localChatRuntimeModels.find((model) => {
-          const byId = String(model.localModelId || '').trim() === String(selected.localModelId || '').trim();
-          const byModel = String(model.model || '').trim() === String(selected.model || '').trim();
-          return byId || byModel;
+        const localModel = findLocalRuntimeModelForBinding({
+          models: localChatRuntimeModels,
+          binding: {
+            model: selected.model,
+            localModelId: selected.localModelId,
+            goRuntimeLocalModelId: selected.goRuntimeLocalModelId,
+          },
         });
+        if (!isLocalRuntimeModelReady(localModel)) {
+          return false;
+        }
         const capabilities = Array.isArray(localModel?.capabilities) ? localModel?.capabilities : [];
         return capabilities.includes('text.generate');
+      })();
+
+      const chatRouteReady = (() => {
+        const resolvedSnapshot = state.runtimeRouteState.routeSnapshot;
+        if (resolvedSnapshot?.source === 'token-api') {
+          return true;
+        }
+        const selectedBinding = state.runtimeRouteState.routeBinding
+          || state.runtimeRouteState.chatRouteOptions?.selected
+          || null;
+        if (selectedBinding?.source === 'token-api') {
+          return true;
+        }
+        const localModel = findLocalRuntimeModelForBinding({
+          models: localChatRuntimeModels,
+          binding: {
+            model: resolvedSnapshot?.model || selectedBinding?.model,
+            localModelId: resolvedSnapshot?.localModelId || selectedBinding?.localModelId,
+            goRuntimeLocalModelId: resolvedSnapshot?.goRuntimeLocalModelId || selectedBinding?.goRuntimeLocalModelId,
+          },
+        });
+        if (localModel) {
+          return isLocalRuntimeModelReady(localModel);
+        }
+        if (resolvedSnapshot?.source === 'local-runtime' && resolvedSnapshot.goRuntimeStatus) {
+          return String(resolvedSnapshot.goRuntimeStatus).trim().toLowerCase() === 'active';
+        }
+        return false;
       })();
 
       const isLocalSnapshotFailure = autoBoundSource === 'token-api'
@@ -252,6 +298,7 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         chatRouteOptions: state.runtimeRouteState.chatRouteOptions,
         imageRouteOptions: state.runtimeRouteState.imageRouteOptions,
         videoRouteOptions: state.runtimeRouteState.videoRouteOptions,
+        routeSnapshot: state.runtimeRouteState.routeSnapshot,
         routeBinding: state.runtimeRouteState.routeBinding,
         speechVoices: state.speechSettingsState.speechVoices,
         selectedVoiceId: state.speechSettingsState.defaultSettings.voiceName,
@@ -261,8 +308,10 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         videoRouteSource: state.speechSettingsState.defaultSettings.videoRouteSource,
         localTtsRouteAvailable,
         localSttRouteAvailable,
+        enableVoice: state.speechSettingsState.productSettings.enableVoice,
         autoBoundSource,
         autoBoundModel: state.runtimeRouteState.chatRouteOptions?.resolvedDefault?.model || '',
+        chatRouteReady,
         chatCapabilityMatched,
         dependencyCapabilities,
         dependencyStatus,
@@ -348,11 +397,7 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         onVideoRouteSourceChange: state.speechSettingsState.handleVideoRouteSourceChange,
         onVideoConnectorChange: state.speechSettingsState.handleVideoConnectorChange,
         onVideoModelChange: state.speechSettingsState.handleVideoModelChange,
-        defaultSettings: state.speechSettingsState.defaultSettings,
-        onDefaultSettingChange: handleDefaultSettingChange,
-        onDefaultVoiceNameChange: handleDefaultVoiceNameChange,
-        onMediaPlannerModeChange: handleMediaPlannerModeChange,
-        onVideoAutoPolicyChange: handleVideoAutoPolicyChange,
+        inspectSettings: state.speechSettingsState.inspectSettings,
         imageResolvedRoute: null,
         videoResolvedRoute: null,
         isMediaRuntimeSidebarLoading: false,
@@ -383,15 +428,11 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
       state.latestPromptTrace,
       state.latestTurnAudit,
       state.dependencySnapshot,
+      state.runtimeRouteState.routeSnapshot,
       handleVoiceIdChange,
-      handleDefaultSettingChange,
-      handleDefaultVoiceNameChange,
-      handleMediaPlannerModeChange,
-      handleVideoAutoPolicyChange,
     ],
   );
 
-  const modelLabel = state.runtimeRouteState.routeSnapshot?.model || '-';
   const canSend = Boolean(state.targetsState.selectedTarget)
     && !state.turnSendState.isSending
     && state.speechTranscribeState.voiceInputState !== 'transcribing';
@@ -400,6 +441,9 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
     handleVoiceIdChange,
     handleDefaultSettingChange,
     handleDefaultVoiceNameChange,
+    handleMediaAutonomyChange,
+    handleVoiceConversationModeChange,
+    handleVisualComfortLevelChange,
     handleVoiceContextMenu,
     handleToggleVoiceTranscript,
     handleSendAndFocus,
@@ -407,7 +451,6 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
     runtimeSidebarProps,
     handleToggleVoiceInput,
     handleCancelVoiceInput,
-    modelLabel,
     canSend,
   };
 }

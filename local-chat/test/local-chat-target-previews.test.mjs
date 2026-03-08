@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  appendSegmentToLocalChatBundle,
+  appendBeatToLocalChatTurn,
   createLocalChatSession,
-  createLocalChatTurnBundle,
+  createLocalChatTurnRecord,
   listLocalChatTargetPreviews,
   resetLocalChatConversationLedgerForTests,
 } from '../src/state/index.ts';
@@ -16,13 +16,13 @@ test('local-chat target previews project latest visible segment per target witho
     viewerId: 'viewer.test',
     title: 'Alpha',
   });
-  const alphaBundle = await createLocalChatTurnBundle({
+  const alphaTurn = await createLocalChatTurnRecord({
     conversationId: alpha.id,
     role: 'assistant',
   });
-  await appendSegmentToLocalChatBundle({
+  await appendBeatToLocalChatTurn({
     conversationId: alpha.id,
-    bundleId: alphaBundle.id,
+    turnId: alphaTurn.id,
     role: 'assistant',
     kind: 'text',
     content: '第一条本地消息',
@@ -35,13 +35,13 @@ test('local-chat target previews project latest visible segment per target witho
     viewerId: 'viewer.test',
     title: 'Beta',
   });
-  const betaBundle = await createLocalChatTurnBundle({
+  const betaTurn = await createLocalChatTurnRecord({
     conversationId: beta.id,
     role: 'assistant',
   });
-  await appendSegmentToLocalChatBundle({
+  await appendBeatToLocalChatTurn({
     conversationId: beta.id,
-    bundleId: betaBundle.id,
+    turnId: betaTurn.id,
     role: 'assistant',
     kind: 'image',
     content: '',
@@ -54,13 +54,13 @@ test('local-chat target previews project latest visible segment per target witho
     viewerId: 'viewer.other',
     title: 'Other Viewer',
   });
-  const ignoredBundle = await createLocalChatTurnBundle({
+  const ignoredTurn = await createLocalChatTurnRecord({
     conversationId: ignored.id,
     role: 'assistant',
   });
-  await appendSegmentToLocalChatBundle({
+  await appendBeatToLocalChatTurn({
     conversationId: ignored.id,
-    bundleId: ignoredBundle.id,
+    turnId: ignoredTurn.id,
     role: 'assistant',
     kind: 'text',
     content: '不应该混进当前 viewer 的 preview',

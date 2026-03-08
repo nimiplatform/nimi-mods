@@ -9,6 +9,7 @@ import {
   isPromptLikelyNsfw,
 } from '../../services/policy/nsfw-media-policy.js';
 import type { LocalChatTurnAiClient } from './types.js';
+import type { ResolvedExperiencePolicy } from './resolved-experience-policy.js';
 import { parseExplicitMediaRequest } from './explicit-media-request-parser.js';
 import { planMediaTurn, type MediaPlannerDecision } from './media-planner.js';
 import {
@@ -63,6 +64,7 @@ export type DecideMediaExecutionInput = {
   turnTxnId: string;
   routeBinding: RuntimeRouteBinding | null;
   defaultSettings: LocalChatDefaultSettings;
+  resolvedPolicy: ResolvedExperiencePolicy;
   userText: string;
   assistantText: string;
   target: LocalChatTarget;
@@ -613,7 +615,7 @@ export async function decideMediaExecution(input: DecideMediaExecutionInput): Pr
     resolvedRoute: videoResolvedRoute,
     routeOptionsRevision: input.videoRouteOptionsRevision,
   });
-  if (!imageRouteReady && input.defaultSettings.imageRouteSource === 'auto') {
+  if (!imageRouteReady) {
     const resolved = await resolveAuthorityMediaRoute({
       aiClient: input.aiClient,
       kind: 'image',
@@ -628,7 +630,7 @@ export async function decideMediaExecution(input: DecideMediaExecutionInput): Pr
       imageRouteReady = true;
     }
   }
-  if (!videoRouteReady && input.defaultSettings.videoRouteSource === 'auto') {
+  if (!videoRouteReady) {
     const resolved = await resolveAuthorityMediaRoute({
       aiClient: input.aiClient,
       kind: 'video',
@@ -723,13 +725,12 @@ export async function decideMediaExecution(input: DecideMediaExecutionInput): Pr
     });
   }
 
-  const plannerMode = input.defaultSettings.mediaPlannerMode;
-  const videoAutoPolicy = input.defaultSettings.videoAutoPolicy;
-  const canAutoImage = imageRouteReady && imageDependencyReady;
-  const canAutoVideo = videoRouteReady && videoDependencyReady && videoAutoPolicy !== 'explicit-only';
+  const mediaAutonomy = input.resolvedPolicy.mediaPolicy.autonomy;
+  const canAutoImage = input.resolvedPolicy.mediaPolicy.allowVisualAuto && imageRouteReady && imageDependencyReady;
+  const canAutoVideo = input.resolvedPolicy.mediaPolicy.allowVisualAuto && videoRouteReady && videoDependencyReady;
   const plannerLocalBlockReason = (() => {
-    if (plannerMode === 'off') return 'planner-disabled';
-    if (plannerMode === 'explicit-only') return 'explicit-only-mode';
+    if (mediaAutonomy === 'off') return 'planner-disabled';
+    if (mediaAutonomy === 'explicit-only') return 'explicit-only-mode';
     if (recentMedia.hasPendingMedia) return 'pending-media-active';
     if (recentMedia.autoMediaCooling) return 'media-cooldown-active';
     if (isStructuredAssistantReply(input.assistantText)) return 'structured-reply';

@@ -12,29 +12,35 @@ text_turn_chain:
   - step: input-received
     order: 1
     source_rule: LC-PIPE-001
-  - step: context-assemble
+  - step: turn-mode-resolve
     order: 2
-    source_rule: LC-PIPE-011
-  - step: prompt-render
+    source_rule: LC-PIPE-001
+  - step: context-compile
     order: 3
-    source_rule: LC-PIPE-001
-  - step: route-resolve
+    source_rule: LC-PIPE-011
+  - step: first-beat-react
     order: 4
-    source_rule: LC-PIPE-001
-  - step: assistant-generate
+    source_rule: LC-PIPE-006
+  - step: turn-compose
     order: 5
-    source_rule: LC-PIPE-001
-  - step: turn-bundle-persist
+    source_rule: LC-PIPE-006
+  - step: modality-orchestrate
     order: 6
-    source_rule: LC-PIPE-012
-  - step: running-summary-update
+    source_rule: LC-PIPE-009
+  - step: turn-bundle-persist
     order: 7
-    source_rule: LC-PIPE-013
-  - step: durable-memory-write
+    source_rule: LC-PIPE-012
+  - step: interaction-snapshot-compile
     order: 8
+    source_rule: LC-PIPE-013
+  - step: relation-memory-compile
+    order: 9
+    source_rule: LC-PIPE-014
+  - step: recall-index-refresh
+    order: 10
     source_rule: LC-PIPE-014
   - step: context-trace-emit
-    order: 9
+    order: 11
     source_rule: LC-PIPE-004
 media_turn_chain:
   - step: explicit-request-parse
@@ -68,10 +74,10 @@ speech_turn_chain:
   - step: speech-input
     order: 1
     source_rule: LC-PIPE-003
-  - step: route-resolve
+  - step: speech-route-resolve
     order: 2
     source_rule: LC-PIPE-003
-  - step: speech-synthesize-or-transcribe
+  - step: speech-stream-or-synthesize
     order: 3
     source_rule: LC-PIPE-003
   - step: diagnostics-persist
@@ -87,14 +93,26 @@ proactive_turn_chain:
   - step: policy-evaluate
     order: 3
     source_rule: LC-PIPE-005
-  - step: decision-generate
+  - step: checkin-turn-mode
     order: 4
     source_rule: LC-PIPE-005
-  - step: proactive-turn-persist
+  - step: first-beat-react
     order: 5
     source_rule: LC-PIPE-005
-  - step: proactive-audit-persist
+  - step: turn-compose
     order: 6
+    source_rule: LC-PIPE-005
+  - step: modality-orchestrate
+    order: 7
+    source_rule: LC-PIPE-005
+  - step: proactive-turn-persist
+    order: 8
+    source_rule: LC-PIPE-005
+  - step: interaction-state-compile
+    order: 9
+    source_rule: LC-PIPE-005
+  - step: proactive-audit-persist
+    order: 10
     source_rule: LC-PIPE-005
 route_scope_policy:
   override_scope: local-chat-only

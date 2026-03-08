@@ -3,12 +3,15 @@ import type { ModRuntimeDependencySnapshot } from '@nimiplatform/sdk/mod/runtime
 import type { Dispatch, SetStateAction } from 'react';
 import type { LocalChatTarget } from '../../data/index.js';
 import type {
+  InteractionBeat,
+  InteractionTurnPlan,
   LocalChatDefaultSettings,
+  VoiceConversationMode,
   LocalChatPromptTrace,
   LocalChatSession,
   LocalChatTurnAudit,
 } from '../../state/index.js';
-import type { ChatMessage, LocalChatResolvedMediaRoute } from '../../types.js';
+import type { ChatMessage, LocalChatResolvedMediaRoute, LocalChatTurnMode } from '../../types.js';
 import type { LocalChatAiClient, LocalChatAudioPlaybackSource } from '../../runtime-ai-client.js';
 
 export type ChatRouteSnapshot = {
@@ -30,6 +33,12 @@ export type AssistantPlanSegment = {
   channel: AssistantPlanChannel;
   intent: AssistantPlanIntent;
   reason?: string;
+};
+
+export type InteractionDeliveryBeat = InteractionBeat & {
+  kind: 'text' | 'voice' | 'image' | 'video';
+  media?: ChatMessage['media'];
+  meta?: ChatMessage['meta'];
 };
 
 export type LocalChatTurnAiClient = Pick<
@@ -54,6 +63,8 @@ export type UseLocalChatTurnSendInput = {
   imageResolvedRoute?: LocalChatResolvedMediaRoute | null;
   videoResolvedRoute?: LocalChatResolvedMediaRoute | null;
   defaultSettings: LocalChatDefaultSettings;
+  voiceConversationMode?: VoiceConversationMode;
+  setVoiceConversationMode?: (mode: VoiceConversationMode) => void;
   selectedTarget: LocalChatTarget | null;
   selectedSessionId: string;
   messages: ChatMessage[];

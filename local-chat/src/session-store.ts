@@ -6,72 +6,91 @@ import type {
   LocalChatMediaGenerationSpec,
 } from './types.js';
 import type {
-  LocalChatContextTrace,
-  LocalChatConversationRecord,
-  LocalChatDurableMemoryEntry,
-  LocalChatPromptTrace,
-  LocalChatRunningSummary,
-  LocalChatSession,
-  LocalChatSessionRecallDoc,
-  LocalChatTurn,
-  LocalChatTurnAudit,
-  LocalChatTurnBundle,
-  LocalChatTurnSegment,
-} from './state/ledger-types.js';
-import { createUlid } from './utils/ulid.js';
-
-export type {
-  LocalChatContinuityHealth,
-  LocalChatContinuityStageHealth,
+  DerivedInteractionProfile,
+  InteractionBeat,
+  InteractionRecallDoc,
+  InteractionSnapshot,
+  InteractionTurnPlan,
   LocalChatContextLaneId,
+  LocalChatContextRecentTurn,
   LocalChatContextPacket,
   LocalChatContextTrace,
   LocalChatConversationRecord,
-  LocalChatDurableMemoryEntry,
-  LocalChatMemoryStatus,
-  LocalChatMemoryType,
   LocalChatPlatformWarmStartMemory,
   LocalChatPromptLaneBudget,
   LocalChatPromptTrace,
   LocalChatReplyPacingPlan,
   LocalChatReplyStyleProfile,
-  LocalChatRunningSummary,
+  LocalChatStoredBeat,
+  LocalChatMediaAssetRecord,
   LocalChatSession,
-  LocalChatSessionRecallDoc,
   LocalChatTurn,
   LocalChatTurnAudit,
-  LocalChatTurnBundle,
-  LocalChatTurnSegment,
+  LocalChatTurnRecord,
+  LocalChatTurnWithBeats,
+  RelationMemorySlot,
+  VoiceConversationMode,
+} from './state/ledger-types.js';
+import { createUlid } from './utils/ulid.js';
+
+export type {
+  DerivedInteractionProfile,
+  InteractionBeat,
+  InteractionRecallDoc,
+  InteractionSnapshot,
+  InteractionTurnPlan,
+  LocalChatContextLaneId,
+  LocalChatContextRecentTurn,
+  LocalChatContextPacket,
+  LocalChatContextTrace,
+  LocalChatConversationRecord,
+  LocalChatPlatformWarmStartMemory,
+  LocalChatPromptLaneBudget,
+  LocalChatPromptTrace,
+  LocalChatReplyPacingPlan,
+  LocalChatReplyStyleProfile,
+  LocalChatStoredBeat,
+  LocalChatMediaAssetRecord,
+  LocalChatSession,
+  LocalChatTurn,
+  LocalChatTurnAudit,
+  LocalChatTurnRecord,
+  LocalChatTurnWithBeats,
+  RelationMemorySlot,
+  VoiceConversationMode,
 } from './state/ledger-types.js';
 
-const LOCAL_CHAT_LEDGER_DB_NAME = 'nimi.local-chat.ledger.v1';
-const LOCAL_CHAT_LEDGER_DB_VERSION = 2;
+const LOCAL_CHAT_LEDGER_DB_NAME = 'nimi.local-chat.ledger.v3';
+const LOCAL_CHAT_LEDGER_DB_VERSION = 1;
 const LOCAL_CHAT_SESSION_UPDATED_EVENT = 'local-chat:session-updated';
 const LEGACY_LOCAL_CHAT_SESSION_STORE_KEY = 'nimi.local-chat.sessions.v2';
 const STORE_CONVERSATIONS = 'conversations';
-const STORE_BUNDLES = 'bundles';
-const STORE_RUNNING_SUMMARIES = 'runningSummaries';
-const STORE_DURABLE_MEMORY = 'durableMemory';
-const STORE_SESSION_RECALL_DOCS = 'sessionRecallDocs';
-const STORE_MEDIA_CACHE = 'mediaCache';
-const EXACT_HISTORY_BUNDLE_LIMIT = 8;
+const STORE_TURNS = 'turns';
+const STORE_BEATS = 'beats';
+const STORE_MEDIA_ASSETS = 'mediaAssets';
+const STORE_INTERACTION_SNAPSHOTS = 'interactionSnapshots';
+const STORE_RELATION_MEMORY_SLOTS = 'relationMemorySlots';
+const STORE_RECALL_INDEX = 'recallIndex';
+const EXACT_HISTORY_TURN_LIMIT = 8;
 
 type StoreName =
   | typeof STORE_CONVERSATIONS
-  | typeof STORE_BUNDLES
-  | typeof STORE_RUNNING_SUMMARIES
-  | typeof STORE_DURABLE_MEMORY
-  | typeof STORE_SESSION_RECALL_DOCS
-  | typeof STORE_MEDIA_CACHE;
+  | typeof STORE_TURNS
+  | typeof STORE_BEATS
+  | typeof STORE_MEDIA_ASSETS
+  | typeof STORE_INTERACTION_SNAPSHOTS
+  | typeof STORE_RELATION_MEMORY_SLOTS
+  | typeof STORE_RECALL_INDEX;
 
 type LedgerCache = {
   hydrated: boolean;
   conversationsById: Map<string, LocalChatConversationRecord>;
-  bundlesById: Map<string, LocalChatTurnBundle>;
-  runningSummariesByConversationId: Map<string, LocalChatRunningSummary>;
-  durableMemoryById: Map<string, LocalChatDurableMemoryEntry>;
-  sessionRecallDocsById: Map<string, LocalChatSessionRecallDoc>;
-  mediaCacheByExecutionKey: Map<string, LocalChatCachedMediaAsset>;
+  turnsById: Map<string, LocalChatTurnRecord>;
+  beatsById: Map<string, LocalChatStoredBeat>;
+  mediaAssetsById: Map<string, LocalChatMediaAssetRecord>;
+  interactionSnapshotsByConversationId: Map<string, InteractionSnapshot>;
+  relationMemorySlotsById: Map<string, RelationMemorySlot>;
+  recallIndexById: Map<string, InteractionRecallDoc>;
 };
 
 type LedgerMutation = {
@@ -98,30 +117,34 @@ type UpsertConversationInput = Partial<LocalChatConversationRecord> & {
   viewerId: string;
 };
 
-type BundleInsertInput = {
+type TurnRecordInsertInput = {
   conversationId: string;
   role: 'user' | 'assistant';
   turnTxnId?: string | null;
-  bundleId?: string;
+  turnId?: string;
   seq?: number;
+  createdAt?: string;
+  beatCount?: number;
 };
 
-type SegmentInsertInput = {
+type BeatInsertInput = {
   conversationId: string;
-  bundleId: string;
+  turnId: string;
   role: 'user' | 'assistant';
-  kind: LocalChatTurnSegment['kind'];
+  kind: LocalChatStoredBeat['kind'];
   content: string;
   contextText: string;
   semanticSummary?: string | null;
-  media?: LocalChatTurnSegment['media'];
+  media?: LocalChatStoredBeat['media'];
   timestamp?: string;
   latencyMs?: number;
   meta?: ChatMessageMeta;
   promptTrace?: LocalChatPromptTrace | null;
   audit?: LocalChatTurnAudit | null;
-  deliveryStatus?: LocalChatTurnSegment['deliveryStatus'];
-  segmentId?: string;
+  deliveryStatus?: LocalChatStoredBeat['deliveryStatus'];
+  beatId?: string;
+  beatIndex?: number;
+  beatCount?: number;
   mediaSpec?: LocalChatMediaGenerationSpec;
   mediaShadow?: LocalChatMediaArtifactShadow;
 };
@@ -134,11 +157,12 @@ function emptyLedgerCache(): LedgerCache {
   return {
     hydrated: false,
     conversationsById: new Map(),
-    bundlesById: new Map(),
-    runningSummariesByConversationId: new Map(),
-    durableMemoryById: new Map(),
-    sessionRecallDocsById: new Map(),
-    mediaCacheByExecutionKey: new Map(),
+    turnsById: new Map(),
+    beatsById: new Map(),
+    mediaAssetsById: new Map(),
+    interactionSnapshotsByConversationId: new Map(),
+    relationMemorySlotsById: new Map(),
+    recallIndexById: new Map(),
   };
 }
 
@@ -169,10 +193,8 @@ function trimString(value: unknown): string {
   return String(value || '').trim();
 }
 
-function matchesViewerId(recordViewerId: string, viewerId?: string): boolean {
-  const normalizedViewerId = trimString(viewerId);
-  if (!normalizedViewerId) return true;
-  return trimString(recordViewerId) === normalizedViewerId;
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
 }
 
 function asIsoString(value: unknown, fallback: string): string {
@@ -180,18 +202,32 @@ function asIsoString(value: unknown, fallback: string): string {
   return normalized || fallback;
 }
 
-function normalizeSegmentKind(value: unknown): LocalChatTurnSegment['kind'] {
+function matchesViewerId(recordViewerId: string, viewerId?: string): boolean {
+  const normalizedViewerId = trimString(viewerId);
+  if (!normalizedViewerId) return true;
+  return trimString(recordViewerId) === normalizedViewerId;
+}
+
+function compareIsoTimestamp(left: string | null | undefined, right: string | null | undefined): number {
+  const leftMs = Date.parse(String(left || ''));
+  const rightMs = Date.parse(String(right || ''));
+  const normalizedLeft = Number.isFinite(leftMs) ? leftMs : 0;
+  const normalizedRight = Number.isFinite(rightMs) ? rightMs : 0;
+  return normalizedLeft - normalizedRight;
+}
+
+function normalizeBeatKind(value: unknown): LocalChatStoredBeat['kind'] {
   return value === 'voice' || value === 'image' || value === 'video' ? value : 'text';
 }
 
-function normalizeDeliveryStatus(value: unknown): LocalChatTurnSegment['deliveryStatus'] {
-  return value === 'blocked' || value === 'failed' ? value : 'ready';
+function normalizeDeliveryStatus(value: unknown): LocalChatStoredBeat['deliveryStatus'] {
+  return value === 'pending' || value === 'blocked' || value === 'failed' ? value : 'ready';
 }
 
-function normalizeSegmentMedia(value: unknown): LocalChatTurnSegment['media'] {
+function normalizeBeatMedia(value: unknown): LocalChatStoredBeat['media'] {
   if (!value || typeof value !== 'object') return undefined;
   const media = value as Record<string, unknown>;
-  const normalized: LocalChatTurnSegment['media'] = {};
+  const normalized: LocalChatStoredBeat['media'] = {};
   const uri = trimString(media.uri);
   const mimeType = trimString(media.mimeType);
   const previewUri = trimString(media.previewUri);
@@ -247,6 +283,20 @@ function normalizeCachedMediaAsset(value: unknown): LocalChatCachedMediaAsset | 
   };
 }
 
+function normalizeMediaAssetRecord(value: unknown): LocalChatMediaAssetRecord | null {
+  if (!value || typeof value !== 'object') return null;
+  const record = value as Record<string, unknown>;
+  const cached = normalizeCachedMediaAsset(record);
+  if (!cached) return null;
+  return {
+    ...cached,
+    id: trimString(record.id) || `media_${createUlid()}`,
+    conversationId: trimString(record.conversationId) || null,
+    turnId: trimString(record.turnId) || null,
+    beatId: trimString(record.beatId) || null,
+  };
+}
+
 function normalizeTurnAudit(value: unknown): LocalChatTurnAudit | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const record = value as Record<string, unknown>;
@@ -257,6 +307,93 @@ function normalizeTurnAudit(value: unknown): LocalChatTurnAudit | undefined {
     latencyMs: Number(record.latencyMs) || 0,
     error: trimString(record.error) || null,
     createdAt: asIsoString(record.createdAt, nowIso()),
+  };
+}
+
+function normalizeInteractionSnapshot(value: unknown): InteractionSnapshot | null {
+  if (!value || typeof value !== 'object') return null;
+  const record = value as Record<string, unknown>;
+  const conversationId = trimString(record.conversationId);
+  if (!conversationId) return null;
+  const updatedAt = asIsoString(record.updatedAt, nowIso());
+  const relationshipStateRaw = trimString(record.relationshipState);
+  const relationshipState: InteractionSnapshot['relationshipState'] = relationshipStateRaw === 'friendly'
+    || relationshipStateRaw === 'warm'
+    || relationshipStateRaw === 'intimate'
+    ? relationshipStateRaw
+    : 'new';
+  const emotionalTemperatureRaw = trimString(record.emotionalTemperature);
+  const emotionalTemperature: InteractionSnapshot['emotionalTemperature'] = emotionalTemperatureRaw === 'steady'
+    || emotionalTemperatureRaw === 'warm'
+    || emotionalTemperatureRaw === 'heated'
+    ? emotionalTemperatureRaw
+    : 'low';
+  return {
+    conversationId,
+    relationshipState,
+    activeScene: asArray(record.activeScene).map(trimString).filter(Boolean),
+    emotionalTemperature,
+    assistantCommitments: asArray(record.assistantCommitments).map(trimString).filter(Boolean),
+    userPrefs: asArray(record.userPrefs).map(trimString).filter(Boolean),
+    openLoops: asArray(record.openLoops).map(trimString).filter(Boolean),
+    topicThreads: asArray(record.topicThreads).map(trimString).filter(Boolean),
+    lastResolvedTurnId: trimString(record.lastResolvedTurnId) || null,
+    updatedAt,
+  };
+}
+
+function normalizeRelationMemorySlot(value: unknown): RelationMemorySlot | null {
+  if (!value || typeof value !== 'object') return null;
+  const record = value as Record<string, unknown>;
+  const id = trimString(record.id);
+  const targetId = trimString(record.targetId);
+  const viewerId = trimString(record.viewerId);
+  const slotType = trimString(record.slotType) as RelationMemorySlot['slotType'];
+  const key = trimString(record.key);
+  const normalizedSlotType = slotType === 'boundary'
+    || slotType === 'rapport'
+    || slotType === 'promise'
+    || slotType === 'recurringCue'
+    || slotType === 'taboo'
+    ? slotType
+    : 'preference';
+  if (!id || !targetId || !viewerId || !key) return null;
+  return {
+    id,
+    targetId,
+    viewerId,
+    slotType: normalizedSlotType,
+    key,
+    value: trimString(record.value),
+    confidence: Number.isFinite(Number(record.confidence)) ? Number(record.confidence) : 0,
+    portability: record.portability === 'portable' || record.portability === 'blocked'
+      ? record.portability
+      : 'local-only',
+    sensitivity: record.sensitivity === 'safe' || record.sensitivity === 'intimate'
+      ? record.sensitivity
+      : 'personal',
+    userOverride: record.userOverride === 'never-sync' || record.userOverride === 'force-portable'
+      ? record.userOverride
+      : 'inherit',
+    updatedAt: asIsoString(record.updatedAt, nowIso()),
+  };
+}
+
+function normalizeInteractionRecallDoc(value: unknown): InteractionRecallDoc | null {
+  if (!value || typeof value !== 'object') return null;
+  const record = value as Record<string, unknown>;
+  const id = trimString(record.id);
+  const conversationId = trimString(record.conversationId);
+  const text = trimString(record.text);
+  if (!id || !conversationId || !text) return null;
+  const createdAt = asIsoString(record.createdAt, nowIso());
+  return {
+    id,
+    conversationId,
+    sourceTurnId: trimString(record.sourceTurnId) || null,
+    text,
+    createdAt,
+    updatedAt: asIsoString(record.updatedAt, createdAt),
   };
 }
 
@@ -276,55 +413,53 @@ function normalizeConversationRecord(value: unknown): LocalChatConversationRecor
     title: trimString(record.title) || 'Session',
     createdAt,
     updatedAt: asIsoString(record.updatedAt, createdAt),
-    lastBundleSeq: Number(record.lastBundleSeq) > 0 ? Math.floor(Number(record.lastBundleSeq)) : 0,
+    lastTurnSeq: Number(record.lastTurnSeq) > 0 ? Math.floor(Number(record.lastTurnSeq)) : 0,
   };
 }
 
-function normalizeBundleRecord(value: unknown): LocalChatTurnBundle | null {
+function normalizeTurnRecord(value: unknown): LocalChatTurnRecord | null {
   if (!value || typeof value !== 'object') return null;
   const record = value as Record<string, unknown>;
   const id = trimString(record.id);
   const conversationId = trimString(record.conversationId);
   if (!id || !conversationId) return null;
-  const role = record.role === 'assistant' ? 'assistant' : 'user';
   const createdAt = asIsoString(record.createdAt, nowIso());
-  const segments = Array.isArray(record.segments)
-    ? record.segments
-      .map((segment) => normalizeSegmentRecord(segment))
-      .filter((segment): segment is LocalChatTurnSegment => Boolean(segment))
-    : [];
   return {
     id,
     conversationId,
     seq: Number(record.seq) > 0 ? Math.floor(Number(record.seq)) : 0,
-    role,
+    role: record.role === 'assistant' ? 'assistant' : 'user',
     turnTxnId: trimString(record.turnTxnId) || null,
     createdAt,
     updatedAt: asIsoString(record.updatedAt, createdAt),
-    segments,
+    beatCount: Number(record.beatCount) > 0 ? Math.floor(Number(record.beatCount)) : 0,
   };
 }
 
-function normalizeSegmentRecord(value: unknown): LocalChatTurnSegment | null {
+function normalizeBeatRecord(value: unknown): LocalChatStoredBeat | null {
   if (!value || typeof value !== 'object') return null;
   const record = value as Record<string, unknown>;
   const id = trimString(record.id);
-  const bundleId = trimString(record.bundleId);
-  if (!id || !bundleId) return null;
-  const role = record.role === 'assistant' ? 'assistant' : 'user';
+  const turnId = trimString(record.turnId);
+  const conversationId = trimString(record.conversationId);
+  if (!id || !turnId || !conversationId) return null;
   const timestamp = asIsoString(record.timestamp, nowIso());
   return {
     id,
-    bundleId,
-    role,
-    kind: normalizeSegmentKind(record.kind),
+    turnId,
+    turnSeq: Number(record.turnSeq) > 0 ? Math.floor(Number(record.turnSeq)) : 0,
+    conversationId,
+    role: record.role === 'assistant' ? 'assistant' : 'user',
+    beatIndex: Number(record.beatIndex) >= 0 ? Math.floor(Number(record.beatIndex)) : 0,
+    beatCount: Number(record.beatCount) > 0 ? Math.floor(Number(record.beatCount)) : 1,
+    kind: normalizeBeatKind(record.kind),
     deliveryStatus: normalizeDeliveryStatus(record.deliveryStatus),
     content: String(record.content || ''),
     contextText: String(record.contextText || record.content || ''),
     semanticSummary: trimString(record.semanticSummary) || null,
     mediaSpec: normalizeMediaSpec(record.mediaSpec),
     mediaShadow: normalizeMediaShadow(record.mediaShadow),
-    media: normalizeSegmentMedia(record.media),
+    media: normalizeBeatMedia(record.media),
     timestamp,
     latencyMs: Number.isFinite(Number(record.latencyMs)) ? Number(record.latencyMs) : undefined,
     meta: record.meta && typeof record.meta === 'object' ? record.meta as ChatMessageMeta : undefined,
@@ -333,146 +468,132 @@ function normalizeSegmentRecord(value: unknown): LocalChatTurnSegment | null {
   };
 }
 
-function normalizeRunningSummary(value: unknown): LocalChatRunningSummary | null {
-  if (!value || typeof value !== 'object') return null;
-  const record = value as Record<string, unknown>;
-  const conversationId = trimString(record.conversationId);
-  if (!conversationId) return null;
+function cloneConversation(record: LocalChatConversationRecord): LocalChatConversationRecord {
   return {
-    conversationId,
-    relationshipState: normalizeTextList(record.relationshipState),
-    userFactsEstablished: normalizeTextList(record.userFactsEstablished),
-    assistantCommitments: normalizeTextList(record.assistantCommitments),
-    openLoops: normalizeTextList(record.openLoops),
-    sceneState: normalizeTextList(record.sceneState),
-    updatedAt: asIsoString(record.updatedAt, nowIso()),
-    lastSummarizedBundleSeq: Number(record.lastSummarizedBundleSeq) > 0
-      ? Math.floor(Number(record.lastSummarizedBundleSeq))
-      : 0,
+    ...record,
   };
 }
 
-function normalizeSessionRecallDoc(value: unknown): LocalChatSessionRecallDoc | null {
-  if (!value || typeof value !== 'object') return null;
-  const record = value as Record<string, unknown>;
-  const id = trimString(record.id);
-  const conversationId = trimString(record.conversationId);
-  if (!id || !conversationId) return null;
-  const createdAt = asIsoString(record.createdAt, nowIso());
+function cloneTurnRecord(record: LocalChatTurnRecord): LocalChatTurnRecord {
   return {
-    id,
-    conversationId,
-    sourceKind: record.sourceKind === 'running-summary' ? 'running-summary' : 'bundle',
-    sourceBundleSeq: Number.isFinite(Number(record.sourceBundleSeq))
-      ? Math.floor(Number(record.sourceBundleSeq))
-      : null,
-    text: String(record.text || ''),
-    createdAt,
-    updatedAt: asIsoString(record.updatedAt, createdAt),
+    ...record,
   };
 }
 
-function normalizeTextList(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => trimString(item))
-    .filter(Boolean);
-}
-
-function normalizeDurableMemoryEntry(value: unknown): LocalChatDurableMemoryEntry | null {
-  if (!value || typeof value !== 'object') return null;
-  const record = value as Record<string, unknown>;
-  const id = trimString(record.id);
-  const targetId = trimString(record.targetId);
-  const viewerId = trimString(record.viewerId);
-  const type = trimString(record.type) as LocalChatDurableMemoryEntry['type'];
-  if (!id || !targetId || !viewerId || !type) return null;
-  const createdAt = asIsoString(record.createdAt, nowIso());
-  const subjectRaw = trimString(record.subject);
-  const subject = subjectRaw === 'viewer' || subjectRaw === 'agent' ? subjectRaw : 'relationship';
-  const statusRaw = trimString(record.status);
-  const status = statusRaw === 'resolved' || statusRaw === 'superseded' ? statusRaw : 'active';
+function cloneStoredBeat(record: LocalChatStoredBeat): LocalChatStoredBeat {
   return {
-    id,
-    targetId,
-    viewerId,
-    type,
-    subject,
-    slotKey: trimString(record.slotKey) || type,
-    content: String(record.content || ''),
-    confidence: Math.max(0, Math.min(1, Number(record.confidence) || 0)),
-    importance: Math.max(0, Math.min(1, Number(record.importance) || 0)),
-    status,
-    sourceBundleSeqs: Array.isArray(record.sourceBundleSeqs)
-      ? record.sourceBundleSeqs.map((item) => Math.floor(Number(item))).filter((item) => Number.isFinite(item) && item > 0)
-      : [],
-    supersedesIds: Array.isArray(record.supersedesIds)
-      ? record.supersedesIds.map((item) => trimString(item)).filter(Boolean)
-      : [],
-    createdAt,
-    updatedAt: asIsoString(record.updatedAt, createdAt),
+    ...record,
+    ...(record.media ? { media: { ...record.media } } : {}),
+    ...(record.meta ? { meta: { ...record.meta } } : {}),
   };
 }
 
-function sortBundles(bundles: LocalChatTurnBundle[]): LocalChatTurnBundle[] {
-  return [...bundles].sort((left, right) => (
+function cloneInteractionSnapshot(record: InteractionSnapshot): InteractionSnapshot {
+  return {
+    ...record,
+    activeScene: [...record.activeScene],
+    assistantCommitments: [...record.assistantCommitments],
+    userPrefs: [...record.userPrefs],
+    openLoops: [...record.openLoops],
+    topicThreads: [...record.topicThreads],
+  };
+}
+
+function cloneRelationMemorySlot(record: RelationMemorySlot): RelationMemorySlot {
+  return {
+    ...record,
+  };
+}
+
+function cloneInteractionRecallDoc(record: InteractionRecallDoc): InteractionRecallDoc {
+  return {
+    ...record,
+  };
+}
+
+function cloneMediaAssetRecord(record: LocalChatMediaAssetRecord): LocalChatMediaAssetRecord {
+  return {
+    ...record,
+  };
+}
+
+function sortTurnRecords(records: LocalChatTurnRecord[]): LocalChatTurnRecord[] {
+  return [...records].sort((left, right) => (
     left.seq - right.seq
     || left.createdAt.localeCompare(right.createdAt)
     || left.id.localeCompare(right.id)
   ));
 }
 
-function bundlesForConversation(conversationId: string): LocalChatTurnBundle[] {
-  return sortBundles(
-    [...ledgerCache.bundlesById.values()].filter((bundle) => bundle.conversationId === conversationId),
-  );
-}
-
-function visibleSegments(bundle: LocalChatTurnBundle): LocalChatTurnSegment[] {
-  return (bundle.segments || []).filter((segment) => (
-    Boolean(segment)
-    && segment.kind !== undefined
-    && segment.deliveryStatus !== undefined
+function sortStoredBeats(records: LocalChatStoredBeat[]): LocalChatStoredBeat[] {
+  return [...records].sort((left, right) => (
+    left.turnSeq - right.turnSeq
+    || left.beatIndex - right.beatIndex
+    || left.timestamp.localeCompare(right.timestamp)
+    || left.id.localeCompare(right.id)
   ));
 }
 
-function latestVisibleSegment(bundle: LocalChatTurnBundle): LocalChatTurnSegment | null {
-  for (let index = bundle.segments.length - 1; index >= 0; index -= 1) {
-    const segment = bundle.segments[index];
-    if (!segment) continue;
-    if (segment.kind === undefined || segment.deliveryStatus === undefined) {
-      continue;
-    }
-    return segment;
-  }
-  return null;
+function turnsForConversation(conversationId: string): LocalChatTurnRecord[] {
+  return sortTurnRecords(
+    [...ledgerCache.turnsById.values()].filter((turn) => turn.conversationId === conversationId),
+  );
 }
 
-function projectSegmentToTurn(bundle: LocalChatTurnBundle, segment: LocalChatTurnSegment): LocalChatTurn {
+function beatsForTurn(turnId: string): LocalChatStoredBeat[] {
+  return sortStoredBeats(
+    [...ledgerCache.beatsById.values()].filter((beat) => beat.turnId === turnId),
+  );
+}
+
+function mediaAssetsForConversation(conversationId: string): LocalChatMediaAssetRecord[] {
+  return [...ledgerCache.mediaAssetsById.values()]
+    .filter((asset) => asset.conversationId === conversationId)
+    .sort((left, right) => (
+      compareIsoTimestamp(right.lastHitAt, left.lastHitAt)
+      || compareIsoTimestamp(right.createdAt, left.createdAt)
+      || left.id.localeCompare(right.id)
+    ));
+}
+
+function buildTurnWithBeats(turn: LocalChatTurnRecord): LocalChatTurnWithBeats {
+  const beats = beatsForTurn(turn.id);
   return {
-    id: segment.id,
-    role: segment.role,
-    kind: segment.kind,
-    content: segment.content,
-    contextText: segment.contextText,
-    semanticSummary: segment.semanticSummary,
-    mediaSpec: segment.mediaSpec,
-    mediaShadow: segment.mediaShadow,
-    media: segment.media,
-    timestamp: segment.timestamp,
-    latencyMs: segment.latencyMs,
-    meta: segment.meta,
-    promptTrace: segment.promptTrace,
-    audit: segment.audit,
-    bundleId: bundle.id,
-    bundleSeq: bundle.seq,
+    ...cloneTurnRecord(turn),
+    beats: beats.map((beat) => cloneStoredBeat(beat)),
+  };
+}
+
+function projectBeatToTurn(turn: LocalChatTurnRecord, beat: LocalChatStoredBeat): LocalChatTurn {
+  return {
+    id: beat.id,
+    turnId: turn.id,
+    turnSeq: turn.seq,
+    beatIndex: beat.beatIndex,
+    beatCount: Math.max(turn.beatCount, beat.beatCount, beat.beatIndex + 1),
+    role: beat.role,
+    kind: beat.kind,
+    content: beat.content,
+    contextText: beat.contextText,
+    semanticSummary: beat.semanticSummary,
+    mediaSpec: beat.mediaSpec,
+    mediaShadow: beat.mediaShadow,
+    media: beat.media,
+    timestamp: beat.timestamp,
+    latencyMs: beat.latencyMs,
+    meta: beat.meta,
+    promptTrace: beat.promptTrace,
+    audit: beat.audit,
   };
 }
 
 function projectConversationToSession(record: LocalChatConversationRecord): LocalChatSession {
-  const bundles = bundlesForConversation(record.id);
-  const turns = bundles.flatMap((bundle) => visibleSegments(bundle).map((segment) => projectSegmentToTurn(bundle, segment)));
-  const visibleBundleCount = bundles.filter((bundle) => visibleSegments(bundle).length > 0).length;
+  const groupedTurns = turnsForConversation(record.id)
+    .map((turn) => buildTurnWithBeats(turn))
+    .filter((turn) => turn.beats.length > 0);
+  const turns = groupedTurns.flatMap((turn) => (
+    turn.beats.map((beat) => projectBeatToTurn(turn, beat))
+  ));
   return {
     id: record.id,
     targetId: record.targetId,
@@ -480,7 +601,7 @@ function projectConversationToSession(record: LocalChatConversationRecord): Loca
     worldId: record.worldId,
     title: record.title,
     turns,
-    bundleCount: visibleBundleCount,
+    turnCount: groupedTurns.length,
     messageCount: turns.length,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
@@ -519,30 +640,34 @@ async function openLedgerDatabase(): Promise<IDBDatabase | null> {
         store.createIndex('byTargetId', 'targetId', { unique: false });
         store.createIndex('byTargetUpdatedAt', ['targetId', 'updatedAt'], { unique: false });
       }
-      if (!database.objectStoreNames.contains(STORE_BUNDLES)) {
-        const store = database.createObjectStore(STORE_BUNDLES, { keyPath: 'id' });
+      if (!database.objectStoreNames.contains(STORE_TURNS)) {
+        const store = database.createObjectStore(STORE_TURNS, { keyPath: 'id' });
         store.createIndex('byConversationId', 'conversationId', { unique: false });
         store.createIndex('byConversationSeq', ['conversationId', 'seq'], { unique: false });
       }
-      if (!database.objectStoreNames.contains(STORE_RUNNING_SUMMARIES)) {
-        database.createObjectStore(STORE_RUNNING_SUMMARIES, { keyPath: 'conversationId' });
-      }
-      if (!database.objectStoreNames.contains(STORE_DURABLE_MEMORY)) {
-        const store = database.createObjectStore(STORE_DURABLE_MEMORY, { keyPath: 'id' });
-        store.createIndex('byTargetId', 'targetId', { unique: false });
-        store.createIndex('byViewerId', 'viewerId', { unique: false });
-        store.createIndex('byType', 'type', { unique: false });
-        store.createIndex('bySlotKey', 'slotKey', { unique: false });
-        store.createIndex('byStatus', 'status', { unique: false });
-      }
-      if (!database.objectStoreNames.contains(STORE_SESSION_RECALL_DOCS)) {
-        const store = database.createObjectStore(STORE_SESSION_RECALL_DOCS, { keyPath: 'id' });
+      if (!database.objectStoreNames.contains(STORE_BEATS)) {
+        const store = database.createObjectStore(STORE_BEATS, { keyPath: 'id' });
         store.createIndex('byConversationId', 'conversationId', { unique: false });
+        store.createIndex('byTurnId', 'turnId', { unique: false });
+        store.createIndex('byConversationTurnBeat', ['conversationId', 'turnSeq', 'beatIndex'], { unique: false });
       }
-      if (!database.objectStoreNames.contains(STORE_MEDIA_CACHE)) {
-        const store = database.createObjectStore(STORE_MEDIA_CACHE, { keyPath: 'executionCacheKey' });
-        store.createIndex('bySpecHash', 'specHash', { unique: false });
-        store.createIndex('byCreatedAt', 'createdAt', { unique: false });
+      if (!database.objectStoreNames.contains(STORE_MEDIA_ASSETS)) {
+        const store = database.createObjectStore(STORE_MEDIA_ASSETS, { keyPath: 'id' });
+        store.createIndex('byConversationId', 'conversationId', { unique: false });
+        store.createIndex('byTurnId', 'turnId', { unique: false });
+        store.createIndex('byBeatId', 'beatId', { unique: false });
+        store.createIndex('byExecutionCacheKey', 'executionCacheKey', { unique: false });
+      }
+      if (!database.objectStoreNames.contains(STORE_INTERACTION_SNAPSHOTS)) {
+        database.createObjectStore(STORE_INTERACTION_SNAPSHOTS, { keyPath: 'conversationId' });
+      }
+      if (!database.objectStoreNames.contains(STORE_RELATION_MEMORY_SLOTS)) {
+        const store = database.createObjectStore(STORE_RELATION_MEMORY_SLOTS, { keyPath: 'id' });
+        store.createIndex('byTargetViewer', ['targetId', 'viewerId'], { unique: false });
+      }
+      if (!database.objectStoreNames.contains(STORE_RECALL_INDEX)) {
+        const store = database.createObjectStore(STORE_RECALL_INDEX, { keyPath: 'id' });
+        store.createIndex('byConversationId', 'conversationId', { unique: false });
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -560,32 +685,24 @@ async function loadAllFromIndexedDb(): Promise<void> {
   const transaction = database.transaction(
     [
       STORE_CONVERSATIONS,
-      STORE_BUNDLES,
-      STORE_RUNNING_SUMMARIES,
-      STORE_DURABLE_MEMORY,
-      STORE_SESSION_RECALL_DOCS,
-      STORE_MEDIA_CACHE,
+      STORE_TURNS,
+      STORE_BEATS,
+      STORE_MEDIA_ASSETS,
+      STORE_INTERACTION_SNAPSHOTS,
+      STORE_RELATION_MEMORY_SLOTS,
+      STORE_RECALL_INDEX,
     ],
     'readonly',
   );
-  const conversations = await requestToPromise(
-    transaction.objectStore(STORE_CONVERSATIONS).getAll(),
-  );
-  const bundles = await requestToPromise(
-    transaction.objectStore(STORE_BUNDLES).getAll(),
-  );
-  const summaries = await requestToPromise(
-    transaction.objectStore(STORE_RUNNING_SUMMARIES).getAll(),
-  );
-  const durableMemory = await requestToPromise(
-    transaction.objectStore(STORE_DURABLE_MEMORY).getAll(),
-  );
-  const sessionRecallDocs = await requestToPromise(
-    transaction.objectStore(STORE_SESSION_RECALL_DOCS).getAll(),
-  );
-  const mediaCache = await requestToPromise(
-    transaction.objectStore(STORE_MEDIA_CACHE).getAll(),
-  );
+  const [conversations, turns, beats, mediaAssets, interactionSnapshots, relationMemorySlots, recallIndex] = await Promise.all([
+    requestToPromise(transaction.objectStore(STORE_CONVERSATIONS).getAll()),
+    requestToPromise(transaction.objectStore(STORE_TURNS).getAll()),
+    requestToPromise(transaction.objectStore(STORE_BEATS).getAll()),
+    requestToPromise(transaction.objectStore(STORE_MEDIA_ASSETS).getAll()),
+    requestToPromise(transaction.objectStore(STORE_INTERACTION_SNAPSHOTS).getAll()),
+    requestToPromise(transaction.objectStore(STORE_RELATION_MEMORY_SLOTS).getAll()),
+    requestToPromise(transaction.objectStore(STORE_RECALL_INDEX).getAll()),
+  ]);
   await transactionDone(transaction);
 
   ledgerCache = emptyLedgerCache();
@@ -595,35 +712,41 @@ async function loadAllFromIndexedDb(): Promise<void> {
     .forEach((item) => {
       ledgerCache.conversationsById.set(item.id, item);
     });
-  bundles
-    .map((item) => normalizeBundleRecord(item))
-    .filter((item): item is LocalChatTurnBundle => Boolean(item))
+  turns
+    .map((item) => normalizeTurnRecord(item))
+    .filter((item): item is LocalChatTurnRecord => Boolean(item))
     .forEach((item) => {
-      ledgerCache.bundlesById.set(item.id, item);
+      ledgerCache.turnsById.set(item.id, item);
     });
-  summaries
-    .map((item) => normalizeRunningSummary(item))
-    .filter((item): item is LocalChatRunningSummary => Boolean(item))
+  beats
+    .map((item) => normalizeBeatRecord(item))
+    .filter((item): item is LocalChatStoredBeat => Boolean(item))
     .forEach((item) => {
-      ledgerCache.runningSummariesByConversationId.set(item.conversationId, item);
+      ledgerCache.beatsById.set(item.id, item);
     });
-  durableMemory
-    .map((item) => normalizeDurableMemoryEntry(item))
-    .filter((item): item is LocalChatDurableMemoryEntry => Boolean(item))
+  mediaAssets
+    .map((item) => normalizeMediaAssetRecord(item))
+    .filter((item): item is LocalChatMediaAssetRecord => Boolean(item))
     .forEach((item) => {
-      ledgerCache.durableMemoryById.set(item.id, item);
+      ledgerCache.mediaAssetsById.set(item.id, item);
     });
-  sessionRecallDocs
-    .map((item) => normalizeSessionRecallDoc(item))
-    .filter((item): item is LocalChatSessionRecallDoc => Boolean(item))
+  interactionSnapshots
+    .map((item) => normalizeInteractionSnapshot(item))
+    .filter((item): item is InteractionSnapshot => Boolean(item))
     .forEach((item) => {
-      ledgerCache.sessionRecallDocsById.set(item.id, item);
+      ledgerCache.interactionSnapshotsByConversationId.set(item.conversationId, item);
     });
-  mediaCache
-    .map((item) => normalizeCachedMediaAsset(item))
-    .filter((item): item is LocalChatCachedMediaAsset => Boolean(item))
+  relationMemorySlots
+    .map((item) => normalizeRelationMemorySlot(item))
+    .filter((item): item is RelationMemorySlot => Boolean(item))
     .forEach((item) => {
-      ledgerCache.mediaCacheByExecutionKey.set(item.executionCacheKey, item);
+      ledgerCache.relationMemorySlotsById.set(item.id, item);
+    });
+  recallIndex
+    .map((item) => normalizeInteractionRecallDoc(item))
+    .filter((item): item is InteractionRecallDoc => Boolean(item))
+    .forEach((item) => {
+      ledgerCache.recallIndexById.set(item.id, item);
     });
   ledgerCache.hydrated = true;
 }
@@ -638,10 +761,9 @@ async function ensureLedgerHydrated(): Promise<void> {
     }
   }
   if (hydratePromise) return hydratePromise;
-  hydratePromise = loadAllFromIndexedDb()
-    .finally(() => {
-      hydratePromise = null;
-    });
+  hydratePromise = loadAllFromIndexedDb().finally(() => {
+    hydratePromise = null;
+  });
   return hydratePromise;
 }
 
@@ -679,97 +801,22 @@ async function persistMutation(mutation: LedgerMutation): Promise<void> {
   await transactionDone(transaction);
 }
 
-function cloneConversation(record: LocalChatConversationRecord): LocalChatConversationRecord {
-  return {
-    ...record,
-  };
-}
-
-function cloneBundle(record: LocalChatTurnBundle): LocalChatTurnBundle {
-  return {
-    ...record,
-    segments: [...record.segments],
-  };
-}
-
-function cloneSummary(record: LocalChatRunningSummary): LocalChatRunningSummary {
-  return {
-    ...record,
-    relationshipState: [...record.relationshipState],
-    userFactsEstablished: [...record.userFactsEstablished],
-    assistantCommitments: [...record.assistantCommitments],
-    openLoops: [...record.openLoops],
-    sceneState: [...record.sceneState],
-  };
-}
-
-function cloneDurableMemory(record: LocalChatDurableMemoryEntry): LocalChatDurableMemoryEntry {
-  return {
-    ...record,
-    sourceBundleSeqs: [...record.sourceBundleSeqs],
-    supersedesIds: [...record.supersedesIds],
-  };
-}
-
-function rebuildRecallDocsForConversation(conversationId: string): LocalChatSessionRecallDoc[] {
-  const docs = [...ledgerCache.sessionRecallDocsById.values()].filter((doc) => doc.conversationId === conversationId);
-  return docs.sort((left, right) => (
-    right.updatedAt.localeCompare(left.updatedAt)
-    || left.id.localeCompare(right.id)
-  ));
-}
-
-function buildBundleRecallDoc(bundle: LocalChatTurnBundle): LocalChatSessionRecallDoc | null {
-  const segments = visibleSegments(bundle);
-  const text = segments
-    .map((segment) => [segment.contextText, segment.semanticSummary || ''].filter(Boolean).join(' '))
-    .join('\n')
-    .trim();
-  if (!text) return null;
-  return {
-    id: `recall_${bundle.id}`,
-    conversationId: bundle.conversationId,
-    sourceKind: 'bundle',
-    sourceBundleSeq: bundle.seq,
-    text,
-    createdAt: bundle.createdAt,
-    updatedAt: bundle.updatedAt,
-  };
-}
-
-function buildSummaryRecallDoc(summary: LocalChatRunningSummary): LocalChatSessionRecallDoc | null {
-  const text = [
-    ...summary.relationshipState,
-    ...summary.userFactsEstablished,
-    ...summary.assistantCommitments,
-    ...summary.openLoops,
-    ...summary.sceneState,
-  ].join('\n').trim();
-  if (!text) return null;
-  return {
-    id: `summary_${summary.conversationId}`,
-    conversationId: summary.conversationId,
-    sourceKind: 'running-summary',
-    sourceBundleSeq: summary.lastSummarizedBundleSeq,
-    text,
-    createdAt: summary.updatedAt,
-    updatedAt: summary.updatedAt,
-  };
-}
-
-async function upsertRecallDoc(doc: LocalChatSessionRecallDoc | null): Promise<void> {
-  if (!doc) return;
-  ledgerCache.sessionRecallDocsById.set(doc.id, doc);
-  await persistMutation({
-    puts: {
-      [STORE_SESSION_RECALL_DOCS]: [doc],
-    },
-  });
-}
-
-function createProjectionTurnFromMessage(message: ChatMessage, promptTrace?: LocalChatPromptTrace | null, audit?: LocalChatTurnAudit | null): LocalChatTurn {
+function createProjectionTurnFromMessage(
+  message: ChatMessage,
+  promptTrace?: LocalChatPromptTrace | null,
+  audit?: LocalChatTurnAudit | null,
+): LocalChatTurn {
+  const metaTurnId = trimString(message.meta?.turnId);
+  const beatIndex = Number.isFinite(message.meta?.beatIndex) ? Math.max(0, Number(message.meta?.beatIndex)) : 0;
+  const beatCount = Number.isFinite(message.meta?.beatCount) && Number(message.meta?.beatCount) > 0
+    ? Math.floor(Number(message.meta?.beatCount))
+    : 1;
   return {
     id: message.id,
+    turnId: metaTurnId || message.id,
+    turnSeq: 0,
+    beatIndex,
+    beatCount,
     role: message.role,
     kind: message.kind === 'voice' || message.kind === 'image' || message.kind === 'video'
       ? message.kind
@@ -785,8 +832,6 @@ function createProjectionTurnFromMessage(message: ChatMessage, promptTrace?: Loc
     meta: message.meta,
     promptTrace: promptTrace || undefined,
     audit: audit || undefined,
-    bundleId: '',
-    bundleSeq: 0,
   };
 }
 
@@ -815,14 +860,6 @@ function lexicalScore(haystack: string, query: string): number {
   return hits / tokens.length;
 }
 
-function compareIsoTimestamp(left: string | null | undefined, right: string | null | undefined): number {
-  const leftMs = Date.parse(String(left || ''));
-  const rightMs = Date.parse(String(right || ''));
-  const normalizedLeft = Number.isFinite(leftMs) ? leftMs : 0;
-  const normalizedRight = Number.isFinite(rightMs) ? rightMs : 0;
-  return normalizedLeft - normalizedRight;
-}
-
 export function getLocalChatSessionUpdatedEventName(): string {
   return LOCAL_CHAT_SESSION_UPDATED_EVENT;
 }
@@ -832,15 +869,24 @@ export async function resetLocalChatConversationLedgerForTests(): Promise<void> 
   const database = await openLedgerDatabase();
   if (!database) return;
   const transaction = database.transaction(
-    [STORE_CONVERSATIONS, STORE_BUNDLES, STORE_RUNNING_SUMMARIES, STORE_DURABLE_MEMORY, STORE_SESSION_RECALL_DOCS, STORE_MEDIA_CACHE],
+    [
+      STORE_CONVERSATIONS,
+      STORE_TURNS,
+      STORE_BEATS,
+      STORE_MEDIA_ASSETS,
+      STORE_INTERACTION_SNAPSHOTS,
+      STORE_RELATION_MEMORY_SLOTS,
+      STORE_RECALL_INDEX,
+    ],
     'readwrite',
   );
   transaction.objectStore(STORE_CONVERSATIONS).clear();
-  transaction.objectStore(STORE_BUNDLES).clear();
-  transaction.objectStore(STORE_RUNNING_SUMMARIES).clear();
-  transaction.objectStore(STORE_DURABLE_MEMORY).clear();
-  transaction.objectStore(STORE_SESSION_RECALL_DOCS).clear();
-  transaction.objectStore(STORE_MEDIA_CACHE).clear();
+  transaction.objectStore(STORE_TURNS).clear();
+  transaction.objectStore(STORE_BEATS).clear();
+  transaction.objectStore(STORE_MEDIA_ASSETS).clear();
+  transaction.objectStore(STORE_INTERACTION_SNAPSHOTS).clear();
+  transaction.objectStore(STORE_RELATION_MEMORY_SLOTS).clear();
+  transaction.objectStore(STORE_RECALL_INDEX).clear();
   await transactionDone(transaction);
 }
 
@@ -859,60 +905,22 @@ export async function listLocalChatSessions(targetId: string, viewerId?: string)
 
 export async function listLocalChatTargetPreviews(viewerId?: string): Promise<LocalChatTargetPreview[]> {
   await ensureLedgerHydrated();
-  const conversations = [...ledgerCache.conversationsById.values()]
-    .filter((conversation) => matchesViewerId(conversation.viewerId, viewerId));
-  if (conversations.length === 0) {
-    return [];
-  }
-
-  const conversationIds = new Set(conversations.map((conversation) => conversation.id));
-  const latestByConversationId = new Map<string, {
-    latestLocalMessage: string | null;
-    latestLocalMessageAt: string | null;
-    bundleSeq: number;
-  }>();
-
-  for (const bundle of ledgerCache.bundlesById.values()) {
-    if (!conversationIds.has(bundle.conversationId)) {
-      continue;
-    }
-    const segment = latestVisibleSegment(bundle);
-    if (!segment) {
-      continue;
-    }
-    const candidateAt = trimString(segment.timestamp) || trimString(bundle.updatedAt) || null;
-    const candidateMessage = trimString(segment.content) || trimString(segment.contextText) || null;
-    const previous = latestByConversationId.get(bundle.conversationId);
-    if (
-      !previous
-      || compareIsoTimestamp(previous.latestLocalMessageAt, candidateAt) < 0
-      || (
-        compareIsoTimestamp(previous.latestLocalMessageAt, candidateAt) === 0
-        && bundle.seq > previous.bundleSeq
-      )
-    ) {
-      latestByConversationId.set(bundle.conversationId, {
-        latestLocalMessage: candidateMessage,
-        latestLocalMessageAt: candidateAt,
-        bundleSeq: bundle.seq,
-      });
-    }
-  }
-
+  const previews = (await listAllLocalChatSessions(viewerId))
+    .map((session) => {
+      const latestTurn = session.turns[session.turns.length - 1];
+      return {
+        targetId: session.targetId,
+        latestLocalMessage: latestTurn?.contextText || latestTurn?.content || null,
+        latestLocalMessageAt: latestTurn?.timestamp || session.updatedAt || null,
+      };
+    });
   const latestByTargetId = new Map<string, LocalChatTargetPreview>();
-  for (const conversation of conversations) {
-    const preview = latestByConversationId.get(conversation.id);
-    const candidate: LocalChatTargetPreview = {
-      targetId: conversation.targetId,
-      latestLocalMessage: preview?.latestLocalMessage || null,
-      latestLocalMessageAt: preview?.latestLocalMessageAt || conversation.updatedAt || null,
-    };
-    const previous = latestByTargetId.get(conversation.targetId);
-    if (!previous || compareIsoTimestamp(previous.latestLocalMessageAt, candidate.latestLocalMessageAt) < 0) {
-      latestByTargetId.set(conversation.targetId, candidate);
+  for (const preview of previews) {
+    const previous = latestByTargetId.get(preview.targetId);
+    if (!previous || compareIsoTimestamp(previous.latestLocalMessageAt, preview.latestLocalMessageAt) < 0) {
+      latestByTargetId.set(preview.targetId, preview);
     }
   }
-
   return [...latestByTargetId.values()].sort((left, right) => (
     compareIsoTimestamp(right.latestLocalMessageAt, left.latestLocalMessageAt)
     || left.targetId.localeCompare(right.targetId)
@@ -941,18 +949,19 @@ export async function getLocalChatConversationRecord(sessionId: string, viewerId
   return cloneConversation(conversation);
 }
 
-export async function listLocalChatTurnBundles(conversationId: string, viewerId?: string): Promise<LocalChatTurnBundle[]> {
+export async function listLocalChatTurnRecords(conversationId: string, viewerId?: string): Promise<LocalChatTurnWithBeats[]> {
   await ensureLedgerHydrated();
   const conversation = ledgerCache.conversationsById.get(trimString(conversationId));
   if (!conversation || !matchesViewerId(conversation.viewerId, viewerId)) return [];
-  return bundlesForConversation(trimString(conversationId)).map((bundle) => cloneBundle(bundle));
+  return turnsForConversation(conversation.id).map((turn) => buildTurnWithBeats(turn));
 }
 
-export async function listLocalChatExactHistoryBundles(conversationId: string, viewerId?: string): Promise<LocalChatTurnBundle[]> {
-  const bundles = await listLocalChatTurnBundles(conversationId, viewerId);
-  return bundles
-    .filter((bundle) => visibleSegments(bundle).length > 0)
-    .slice(-EXACT_HISTORY_BUNDLE_LIMIT);
+export async function listLocalChatExactHistoryTurns(conversationId: string, viewerId?: string): Promise<LocalChatTurn[]> {
+  const turns = await listLocalChatTurnRecords(conversationId, viewerId);
+  return turns
+    .filter((turn) => turn.beats.length > 0)
+    .slice(-EXACT_HISTORY_TURN_LIMIT)
+    .flatMap((turn) => turn.beats.map((beat) => projectBeatToTurn(turn, beat)));
 }
 
 export async function createLocalChatSession(input: CreateConversationInput): Promise<LocalChatSession> {
@@ -966,7 +975,7 @@ export async function createLocalChatSession(input: CreateConversationInput): Pr
     title: trimString(input.title) || 'Session',
     createdAt,
     updatedAt: createdAt,
-    lastBundleSeq: 0,
+    lastTurnSeq: 0,
   };
   ledgerCache.conversationsById.set(conversation.id, conversation);
   await persistMutation({
@@ -993,7 +1002,7 @@ export async function upsertLocalChatSession(session: UpsertConversationInput | 
     title: trimString(session.title) || existing?.title || 'Session',
     createdAt,
     updatedAt: nowIso(),
-    lastBundleSeq: existing?.lastBundleSeq || 0,
+    lastTurnSeq: existing?.lastTurnSeq || 0,
   };
   ledgerCache.conversationsById.set(next.id, next);
   await persistMutation({
@@ -1012,33 +1021,33 @@ export async function deleteLocalChatSession(sessionId: string): Promise<void> {
   await ensureLedgerHydrated();
   const conversation = ledgerCache.conversationsById.get(trimString(sessionId));
   if (!conversation) return;
-  const durableMemoryIds = [...ledgerCache.durableMemoryById.values()]
-    .filter((entry) => entry.targetId === conversation.targetId && entry.viewerId === conversation.viewerId)
-    .map((entry) => entry.id);
   ledgerCache.conversationsById.delete(conversation.id);
-  const bundleIds = [...ledgerCache.bundlesById.values()]
-    .filter((bundle) => bundle.conversationId === conversation.id)
-    .map((bundle) => bundle.id);
-  for (const bundleId of bundleIds) {
-    ledgerCache.bundlesById.delete(bundleId);
-    ledgerCache.sessionRecallDocsById.delete(`recall_${bundleId}`);
-  }
-  ledgerCache.runningSummariesByConversationId.delete(conversation.id);
-  for (const durableMemoryId of durableMemoryIds) {
-    ledgerCache.durableMemoryById.delete(durableMemoryId);
-  }
-  for (const [id, doc] of ledgerCache.sessionRecallDocsById.entries()) {
-    if (doc.conversationId === conversation.id) {
-      ledgerCache.sessionRecallDocsById.delete(id);
-    }
-  }
+
+  const turnIds = turnsForConversation(conversation.id).map((turn) => turn.id);
+  const beatIds = [...ledgerCache.beatsById.values()]
+    .filter((beat) => beat.conversationId === conversation.id)
+    .map((beat) => beat.id);
+  const mediaAssetIds = [...ledgerCache.mediaAssetsById.values()]
+    .filter((asset) => asset.conversationId === conversation.id)
+    .map((asset) => asset.id);
+  const recallIndexIds = [...ledgerCache.recallIndexById.values()]
+    .filter((doc) => doc.conversationId === conversation.id)
+    .map((doc) => doc.id);
+
+  turnIds.forEach((turnId) => ledgerCache.turnsById.delete(turnId));
+  beatIds.forEach((beatId) => ledgerCache.beatsById.delete(beatId));
+  mediaAssetIds.forEach((assetId) => ledgerCache.mediaAssetsById.delete(assetId));
+  ledgerCache.interactionSnapshotsByConversationId.delete(conversation.id);
+  recallIndexIds.forEach((docId) => ledgerCache.recallIndexById.delete(docId));
+
   await persistMutation({
     deletes: {
       [STORE_CONVERSATIONS]: [conversation.id],
-      [STORE_BUNDLES]: bundleIds,
-      [STORE_RUNNING_SUMMARIES]: [conversation.id],
-      [STORE_SESSION_RECALL_DOCS]: [`summary_${conversation.id}`, ...bundleIds.map((bundleId) => `recall_${bundleId}`)],
-      [STORE_DURABLE_MEMORY]: durableMemoryIds,
+      [STORE_TURNS]: turnIds,
+      [STORE_BEATS]: beatIds,
+      [STORE_MEDIA_ASSETS]: mediaAssetIds,
+      [STORE_INTERACTION_SNAPSHOTS]: [conversation.id],
+      [STORE_RECALL_INDEX]: recallIndexIds,
     },
   });
   emitSessionUpdated({
@@ -1047,165 +1056,175 @@ export async function deleteLocalChatSession(sessionId: string): Promise<void> {
   });
 }
 
-export async function createLocalChatTurnBundle(input: BundleInsertInput): Promise<LocalChatTurnBundle> {
+export async function createLocalChatTurnRecord(input: TurnRecordInsertInput): Promise<LocalChatTurnRecord> {
   await ensureLedgerHydrated();
   const conversation = ledgerCache.conversationsById.get(trimString(input.conversationId));
   if (!conversation) {
     throw new Error('LOCAL_CHAT_CONVERSATION_NOT_FOUND');
   }
-  const createdAt = nowIso();
-  const nextSeq = Number.isFinite(input.seq) && Number(input.seq) > 0
+  const createdAt = asIsoString(input.createdAt, nowIso());
+  const seq = Number.isFinite(input.seq) && Number(input.seq) > 0
     ? Math.floor(Number(input.seq))
-    : conversation.lastBundleSeq + 1;
-  const bundle: LocalChatTurnBundle = {
-    id: trimString(input.bundleId) || `bundle_${createUlid()}`,
+    : conversation.lastTurnSeq + 1;
+  const turn: LocalChatTurnRecord = {
+    id: trimString(input.turnId) || `turn_${createUlid()}`,
     conversationId: conversation.id,
-    seq: nextSeq,
+    seq,
     role: input.role,
     turnTxnId: trimString(input.turnTxnId) || null,
     createdAt,
     updatedAt: createdAt,
-    segments: [],
+    beatCount: Number.isFinite(input.beatCount) && Number(input.beatCount) > 0
+      ? Math.floor(Number(input.beatCount))
+      : 0,
   };
-  ledgerCache.bundlesById.set(bundle.id, bundle);
-  ledgerCache.conversationsById.set(conversation.id, {
-    ...conversation,
-    lastBundleSeq: Math.max(conversation.lastBundleSeq, bundle.seq),
-    updatedAt: createdAt,
-  });
-  await persistMutation({
-    puts: {
-      [STORE_BUNDLES]: [bundle],
-      [STORE_CONVERSATIONS]: [ledgerCache.conversationsById.get(conversation.id)!],
-    },
-  });
-  emitSessionUpdated({
-    targetId: conversation.targetId,
-    sessionId: conversation.id,
-  });
-  return cloneBundle(bundle);
-}
-
-export async function appendSegmentToLocalChatBundle(input: SegmentInsertInput): Promise<LocalChatTurnSegment> {
-  await ensureLedgerHydrated();
-  const conversation = ledgerCache.conversationsById.get(trimString(input.conversationId));
-  const bundle = ledgerCache.bundlesById.get(trimString(input.bundleId));
-  if (!conversation || !bundle || bundle.conversationId !== conversation.id) {
-    throw new Error('LOCAL_CHAT_BUNDLE_NOT_FOUND');
-  }
-  const timestamp = asIsoString(input.timestamp, nowIso());
-  const segment: LocalChatTurnSegment = {
-    id: trimString(input.segmentId) || `seg_${createUlid()}`,
-    bundleId: bundle.id,
-    role: input.role,
-    kind: input.kind,
-    deliveryStatus: input.deliveryStatus || 'ready',
-    content: String(input.content || ''),
-    contextText: String(input.contextText || input.content || ''),
-    semanticSummary: trimString(input.semanticSummary) || null,
-    mediaSpec: input.mediaSpec,
-    mediaShadow: input.mediaShadow,
-    media: input.media,
-    timestamp,
-    latencyMs: input.latencyMs,
-    meta: input.meta,
-    promptTrace: input.promptTrace || undefined,
-    audit: input.audit || undefined,
-  };
-  const nextBundle: LocalChatTurnBundle = {
-    ...bundle,
-    updatedAt: timestamp,
-    segments: [...bundle.segments, segment],
-  };
+  ledgerCache.turnsById.set(turn.id, turn);
   const nextConversation: LocalChatConversationRecord = {
     ...conversation,
-    updatedAt: timestamp,
+    lastTurnSeq: Math.max(conversation.lastTurnSeq, turn.seq),
+    updatedAt: createdAt,
   };
-  ledgerCache.bundlesById.set(nextBundle.id, nextBundle);
   ledgerCache.conversationsById.set(nextConversation.id, nextConversation);
-  const recallDoc = buildBundleRecallDoc(nextBundle);
-  if (recallDoc) {
-    ledgerCache.sessionRecallDocsById.set(recallDoc.id, recallDoc);
-  }
   await persistMutation({
     puts: {
-      [STORE_BUNDLES]: [nextBundle],
+      [STORE_TURNS]: [turn],
       [STORE_CONVERSATIONS]: [nextConversation],
-      ...(recallDoc ? { [STORE_SESSION_RECALL_DOCS]: [recallDoc] } : {}),
     },
   });
   emitSessionUpdated({
     targetId: nextConversation.targetId,
     sessionId: nextConversation.id,
   });
-  return segment;
+  return cloneTurnRecord(turn);
 }
 
-export async function patchLocalChatSegmentArtifacts(input: {
+export async function appendBeatToLocalChatTurn(input: BeatInsertInput): Promise<LocalChatStoredBeat> {
+  await ensureLedgerHydrated();
+  const conversation = ledgerCache.conversationsById.get(trimString(input.conversationId));
+  const turn = ledgerCache.turnsById.get(trimString(input.turnId));
+  if (!conversation || !turn || turn.conversationId !== conversation.id) {
+    throw new Error('LOCAL_CHAT_TURN_NOT_FOUND');
+  }
+  const beatId = trimString(input.beatId) || `beat_${createUlid()}`;
+  const existingBeat = ledgerCache.beatsById.get(beatId);
+  if (existingBeat && existingBeat.turnId !== turn.id) {
+    throw new Error('LOCAL_CHAT_BEAT_TURN_MISMATCH');
+  }
+  const timestamp = asIsoString(input.timestamp, nowIso());
+  const priorBeats = beatsForTurn(turn.id);
+  const beatIndex = Number.isFinite(input.beatIndex) && Number(input.beatIndex) >= 0
+    ? Math.floor(Number(input.beatIndex))
+    : existingBeat?.beatIndex ?? priorBeats.length;
+  const explicitBeatCount = Number.isFinite(input.beatCount) && Number(input.beatCount) > 0
+    ? Math.floor(Number(input.beatCount))
+    : 0;
+  const beatCount = Math.max(
+    explicitBeatCount,
+    existingBeat?.beatCount || 0,
+    turn.beatCount,
+    beatIndex + 1,
+  ) || 1;
+
+  const beat: LocalChatStoredBeat = {
+    id: beatId,
+    turnId: turn.id,
+    turnSeq: turn.seq,
+    conversationId: conversation.id,
+    role: input.role,
+    beatIndex,
+    beatCount,
+    kind: input.kind,
+    deliveryStatus: input.deliveryStatus || existingBeat?.deliveryStatus || 'ready',
+    content: String(input.content || ''),
+    contextText: String(input.contextText || input.content || ''),
+    semanticSummary: trimString(input.semanticSummary) || null,
+    mediaSpec: input.mediaSpec === undefined ? existingBeat?.mediaSpec : input.mediaSpec,
+    mediaShadow: input.mediaShadow === undefined ? existingBeat?.mediaShadow : input.mediaShadow,
+    media: input.media === undefined ? existingBeat?.media : input.media,
+    timestamp,
+    latencyMs: input.latencyMs === undefined ? existingBeat?.latencyMs : input.latencyMs,
+    meta: input.meta === undefined ? existingBeat?.meta : input.meta,
+    promptTrace: input.promptTrace === undefined ? existingBeat?.promptTrace : (input.promptTrace || undefined),
+    audit: input.audit === undefined ? existingBeat?.audit : (input.audit || undefined),
+  };
+
+  const nextTurn: LocalChatTurnRecord = {
+    ...turn,
+    updatedAt: timestamp,
+    beatCount: Math.max(turn.beatCount, beatCount),
+  };
+  const nextConversation: LocalChatConversationRecord = {
+    ...conversation,
+    updatedAt: timestamp,
+    lastTurnSeq: Math.max(conversation.lastTurnSeq, turn.seq),
+  };
+
+  ledgerCache.beatsById.set(beat.id, beat);
+  ledgerCache.turnsById.set(nextTurn.id, nextTurn);
+  ledgerCache.conversationsById.set(nextConversation.id, nextConversation);
+  await persistMutation({
+    puts: {
+      [STORE_BEATS]: [beat],
+      [STORE_TURNS]: [nextTurn],
+      [STORE_CONVERSATIONS]: [nextConversation],
+    },
+  });
+  emitSessionUpdated({
+    targetId: nextConversation.targetId,
+    sessionId: nextConversation.id,
+  });
+  return cloneStoredBeat(beat);
+}
+
+export async function patchLocalChatBeatArtifacts(input: {
   sessionId: string;
-  segmentId: string;
+  beatId: string;
   promptTrace?: LocalChatPromptTrace | null;
   audit?: LocalChatTurnAudit | null;
   contextText?: string;
   semanticSummary?: string | null;
-  deliveryStatus?: LocalChatTurnSegment['deliveryStatus'];
-  media?: LocalChatTurnSegment['media'];
+  deliveryStatus?: LocalChatStoredBeat['deliveryStatus'];
+  media?: LocalChatStoredBeat['media'];
   meta?: ChatMessageMeta;
+  mediaSpec?: LocalChatMediaGenerationSpec;
+  mediaShadow?: LocalChatMediaArtifactShadow;
 }): Promise<LocalChatSession | null> {
   await ensureLedgerHydrated();
   const conversation = ledgerCache.conversationsById.get(trimString(input.sessionId));
-  if (!conversation) return null;
-  let nextBundle: LocalChatTurnBundle | null = null;
-  for (const bundle of bundlesForConversation(conversation.id)) {
-    const index = bundle.segments.findIndex((segment) => segment.id === trimString(input.segmentId));
-    if (index < 0) continue;
-    const currentSegment = bundle.segments[index]!;
-    const updatedSegment: LocalChatTurnSegment = {
-      ...currentSegment,
-      promptTrace: input.promptTrace === undefined ? currentSegment.promptTrace : (input.promptTrace || undefined),
-      audit: input.audit === undefined ? currentSegment.audit : (input.audit || undefined),
-      contextText: input.contextText === undefined ? currentSegment.contextText : input.contextText,
-      semanticSummary: input.semanticSummary === undefined ? currentSegment.semanticSummary : (input.semanticSummary || null),
-      deliveryStatus: input.deliveryStatus || currentSegment.deliveryStatus,
-      mediaSpec: input.meta?.mediaSpec === undefined ? currentSegment.mediaSpec : input.meta.mediaSpec,
-      mediaShadow: input.meta?.mediaShadow === undefined ? currentSegment.mediaShadow : input.meta.mediaShadow,
-      media: input.media === undefined ? currentSegment.media : input.media,
-      meta: input.meta === undefined ? currentSegment.meta : input.meta,
-    };
-    const segments = [...bundle.segments];
-    segments[index] = updatedSegment;
-    nextBundle = {
-      ...bundle,
-      updatedAt: nowIso(),
-      segments,
-    };
-    ledgerCache.bundlesById.set(nextBundle.id, nextBundle);
-    const recallDoc = buildBundleRecallDoc(nextBundle);
-    if (recallDoc) {
-      ledgerCache.sessionRecallDocsById.set(recallDoc.id, recallDoc);
-      await persistMutation({
-        puts: {
-          [STORE_BUNDLES]: [nextBundle],
-          [STORE_SESSION_RECALL_DOCS]: [recallDoc],
-        },
-      });
-    } else {
-      await persistMutation({
-        puts: {
-          [STORE_BUNDLES]: [nextBundle],
-        },
-      });
-    }
-    break;
-  }
-  if (!nextBundle) return null;
-  const nextConversation = {
-    ...conversation,
-    updatedAt: nextBundle.updatedAt,
+  const beat = ledgerCache.beatsById.get(trimString(input.beatId));
+  if (!conversation || !beat || beat.conversationId !== conversation.id) return null;
+  const nextBeat: LocalChatStoredBeat = {
+    ...beat,
+    promptTrace: input.promptTrace === undefined ? beat.promptTrace : (input.promptTrace || undefined),
+    audit: input.audit === undefined ? beat.audit : (input.audit || undefined),
+    contextText: input.contextText === undefined ? beat.contextText : input.contextText,
+    semanticSummary: input.semanticSummary === undefined ? beat.semanticSummary : (input.semanticSummary || null),
+    deliveryStatus: input.deliveryStatus || beat.deliveryStatus,
+    mediaSpec: input.mediaSpec === undefined ? beat.mediaSpec : input.mediaSpec,
+    mediaShadow: input.mediaShadow === undefined ? beat.mediaShadow : input.mediaShadow,
+    media: input.media === undefined ? beat.media : input.media,
+    meta: input.meta === undefined ? beat.meta : input.meta,
   };
+  const turn = ledgerCache.turnsById.get(beat.turnId);
+  const timestamp = nowIso();
+  const nextTurn = turn ? {
+    ...turn,
+    updatedAt: timestamp,
+  } : null;
+  const nextConversation: LocalChatConversationRecord = {
+    ...conversation,
+    updatedAt: timestamp,
+  };
+
+  ledgerCache.beatsById.set(nextBeat.id, nextBeat);
+  if (nextTurn) {
+    ledgerCache.turnsById.set(nextTurn.id, nextTurn);
+  }
   ledgerCache.conversationsById.set(nextConversation.id, nextConversation);
   await persistMutation({
     puts: {
+      [STORE_BEATS]: [nextBeat],
+      ...(nextTurn ? { [STORE_TURNS]: [nextTurn] } : {}),
       [STORE_CONVERSATIONS]: [nextConversation],
     },
   });
@@ -1220,31 +1239,67 @@ export async function appendTurnsToSession(sessionId: string, turns: LocalChatTu
   await ensureLedgerHydrated();
   const conversation = ledgerCache.conversationsById.get(trimString(sessionId));
   if (!conversation) return null;
-  let currentConversation = conversation;
+  const grouped = new Map<string, LocalChatTurn[]>();
   for (const turn of turns) {
-    const bundle = await createLocalChatTurnBundle({
+    const key = trimString(turn.turnId) || trimString(turn.id);
+    const bucket = grouped.get(key);
+    if (bucket) {
+      bucket.push(turn);
+    } else {
+      grouped.set(key, [turn]);
+    }
+  }
+  let currentConversation = conversation;
+  for (const group of [...grouped.values()].sort((left, right) => {
+    const leftSeq = left[0]?.turnSeq || 0;
+    const rightSeq = right[0]?.turnSeq || 0;
+    return leftSeq - rightSeq || String(left[0]?.timestamp || '').localeCompare(String(right[0]?.timestamp || ''));
+  })) {
+    const lead = group[0];
+    if (!lead) continue;
+    const turnRecord = await createLocalChatTurnRecord({
       conversationId: currentConversation.id,
-      role: turn.role,
+      role: lead.role,
+      turnTxnId: null,
+      turnId: lead.turnId || lead.id,
+      seq: lead.turnSeq > 0 ? lead.turnSeq : undefined,
+      createdAt: lead.timestamp,
+      beatCount: Math.max(...group.map((item) => item.beatCount || 1), 1),
     });
-    await appendSegmentToLocalChatBundle({
-      conversationId: currentConversation.id,
-      bundleId: bundle.id,
-      role: turn.role,
-      kind: turn.kind,
-      content: turn.content,
-      contextText: turn.contextText || turn.content,
-      semanticSummary: turn.semanticSummary || null,
-      mediaSpec: turn.mediaSpec,
-      mediaShadow: turn.mediaShadow,
-      media: turn.media,
-      timestamp: turn.timestamp,
-      latencyMs: turn.latencyMs,
-      meta: turn.meta,
-      promptTrace: turn.promptTrace || null,
-      audit: turn.audit || null,
-      deliveryStatus: 'ready',
-      segmentId: turn.id,
-    });
+    const orderedBeats = [...group].sort((left, right) => (
+      left.beatIndex - right.beatIndex
+      || left.timestamp.localeCompare(right.timestamp)
+      || left.id.localeCompare(right.id)
+    ));
+    for (const beat of orderedBeats) {
+      await appendBeatToLocalChatTurn({
+        conversationId: currentConversation.id,
+        turnId: turnRecord.id,
+        role: beat.role,
+        kind: beat.kind,
+        content: beat.content,
+        contextText: beat.contextText || beat.content,
+        semanticSummary: beat.semanticSummary || null,
+        mediaSpec: beat.mediaSpec,
+        mediaShadow: beat.mediaShadow,
+        media: beat.media,
+        timestamp: beat.timestamp,
+        latencyMs: beat.latencyMs,
+        meta: beat.meta,
+        promptTrace: beat.promptTrace || null,
+        audit: beat.audit || null,
+        deliveryStatus: beat.meta?.mediaStatus === 'pending'
+          ? 'pending'
+          : beat.meta?.mediaStatus === 'failed'
+            ? 'failed'
+            : beat.meta?.mediaStatus === 'blocked'
+              ? 'blocked'
+              : 'ready',
+        beatId: beat.id,
+        beatIndex: beat.beatIndex,
+        beatCount: beat.beatCount,
+      });
+    }
     currentConversation = ledgerCache.conversationsById.get(currentConversation.id)!;
   }
   return projectConversationToSession(currentConversation);
@@ -1256,18 +1311,73 @@ export async function updateLocalChatTurnArtifacts(input: {
   promptTrace?: LocalChatPromptTrace | null;
   audit?: LocalChatTurnAudit | null;
 }): Promise<LocalChatSession | null> {
-  return patchLocalChatSegmentArtifacts({
+  return patchLocalChatBeatArtifacts({
     sessionId: input.sessionId,
-    segmentId: input.turnId,
+    beatId: input.turnId,
     promptTrace: input.promptTrace,
     audit: input.audit,
   });
 }
 
+export async function listLocalChatMediaAssets(input: {
+  conversationId?: string;
+  turnId?: string;
+  beatId?: string;
+} = {}): Promise<LocalChatMediaAssetRecord[]> {
+  await ensureLedgerHydrated();
+  return [...ledgerCache.mediaAssetsById.values()]
+    .filter((asset) => (
+      (!input.conversationId || asset.conversationId === trimString(input.conversationId))
+      && (!input.turnId || asset.turnId === trimString(input.turnId))
+      && (!input.beatId || asset.beatId === trimString(input.beatId))
+    ))
+    .sort((left, right) => (
+      compareIsoTimestamp(right.lastHitAt, left.lastHitAt)
+      || compareIsoTimestamp(right.createdAt, left.createdAt)
+      || left.id.localeCompare(right.id)
+    ))
+    .map((asset) => cloneMediaAssetRecord(asset));
+}
+
+export async function upsertLocalChatMediaAssetRecord(asset: LocalChatMediaAssetRecord): Promise<LocalChatMediaAssetRecord> {
+  await ensureLedgerHydrated();
+  const normalized = normalizeMediaAssetRecord(asset);
+  if (!normalized) {
+    throw new Error('LOCAL_CHAT_MEDIA_ASSET_INVALID');
+  }
+  ledgerCache.mediaAssetsById.set(normalized.id, normalized);
+  await persistMutation({
+    puts: {
+      [STORE_MEDIA_ASSETS]: [normalized],
+    },
+  });
+  return cloneMediaAssetRecord(normalized);
+}
+
 export async function getLocalChatCachedMediaAsset(executionCacheKey: string): Promise<LocalChatCachedMediaAsset | null> {
   await ensureLedgerHydrated();
-  const cached = ledgerCache.mediaCacheByExecutionKey.get(trimString(executionCacheKey));
-  return cached ? { ...cached } : null;
+  const normalizedKey = trimString(executionCacheKey);
+  if (!normalizedKey) return null;
+  const record = [...ledgerCache.mediaAssetsById.values()]
+    .filter((asset) => asset.executionCacheKey === normalizedKey)
+    .sort((left, right) => (
+      compareIsoTimestamp(right.lastHitAt, left.lastHitAt)
+      || compareIsoTimestamp(right.createdAt, left.createdAt)
+      || left.id.localeCompare(right.id)
+    ))[0];
+  if (!record) return null;
+  return {
+    executionCacheKey: record.executionCacheKey,
+    specHash: record.specHash,
+    kind: record.kind,
+    renderUri: record.renderUri,
+    mimeType: record.mimeType,
+    routeSource: record.routeSource,
+    ...(record.connectorId ? { connectorId: record.connectorId } : {}),
+    ...(record.model ? { model: record.model } : {}),
+    createdAt: record.createdAt,
+    lastHitAt: record.lastHitAt,
+  };
 }
 
 export async function putLocalChatCachedMediaAsset(asset: LocalChatCachedMediaAsset): Promise<LocalChatCachedMediaAsset> {
@@ -1276,126 +1386,186 @@ export async function putLocalChatCachedMediaAsset(asset: LocalChatCachedMediaAs
   if (!normalized) {
     throw new Error('LOCAL_CHAT_MEDIA_CACHE_INVALID_ASSET');
   }
-  ledgerCache.mediaCacheByExecutionKey.set(normalized.executionCacheKey, normalized);
+  const record: LocalChatMediaAssetRecord = {
+    ...normalized,
+    id: `media_${createUlid()}`,
+    conversationId: null,
+    turnId: null,
+    beatId: null,
+  };
+  ledgerCache.mediaAssetsById.set(record.id, record);
   await persistMutation({
     puts: {
-      [STORE_MEDIA_CACHE]: [normalized],
+      [STORE_MEDIA_ASSETS]: [record],
     },
   });
   return { ...normalized };
 }
 
-export async function getLocalChatRunningSummary(conversationId: string): Promise<LocalChatRunningSummary | null> {
+export async function getLocalChatInteractionSnapshot(conversationId: string): Promise<InteractionSnapshot | null> {
   await ensureLedgerHydrated();
-  const summary = ledgerCache.runningSummariesByConversationId.get(trimString(conversationId));
-  return summary ? cloneSummary(summary) : null;
+  const snapshot = ledgerCache.interactionSnapshotsByConversationId.get(trimString(conversationId));
+  return snapshot ? cloneInteractionSnapshot(snapshot) : null;
 }
 
-export async function upsertLocalChatRunningSummary(summary: LocalChatRunningSummary): Promise<LocalChatRunningSummary> {
+export async function upsertLocalChatInteractionSnapshot(snapshot: InteractionSnapshot): Promise<InteractionSnapshot> {
   await ensureLedgerHydrated();
-  const normalized = normalizeRunningSummary(summary) || {
-    ...summary,
-    updatedAt: summary.updatedAt || nowIso(),
+  const normalized = normalizeInteractionSnapshot(snapshot) || {
+    ...snapshot,
+    updatedAt: snapshot.updatedAt || nowIso(),
   };
-  ledgerCache.runningSummariesByConversationId.set(normalized.conversationId, normalized);
-  const recallDoc = buildSummaryRecallDoc(normalized);
-  if (recallDoc) {
-    ledgerCache.sessionRecallDocsById.set(recallDoc.id, recallDoc);
-  }
+  ledgerCache.interactionSnapshotsByConversationId.set(normalized.conversationId, normalized);
   await persistMutation({
     puts: {
-      [STORE_RUNNING_SUMMARIES]: [normalized],
-      ...(recallDoc ? { [STORE_SESSION_RECALL_DOCS]: [recallDoc] } : {}),
+      [STORE_INTERACTION_SNAPSHOTS]: [normalized],
     },
   });
-  return cloneSummary(normalized);
+  return cloneInteractionSnapshot(normalized);
 }
 
-export async function listLocalChatSessionRecallDocs(conversationId: string): Promise<LocalChatSessionRecallDoc[]> {
+export async function listLocalChatRelationMemorySlots(input: {
+  targetId: string;
+  viewerId: string;
+}): Promise<RelationMemorySlot[]> {
   await ensureLedgerHydrated();
-  return rebuildRecallDocsForConversation(trimString(conversationId)).map((doc) => ({
-    ...doc,
-  }));
+  return [...ledgerCache.relationMemorySlotsById.values()]
+    .filter((entry) => (
+      entry.targetId === trimString(input.targetId)
+      && entry.viewerId === trimString(input.viewerId)
+    ))
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+    .map((entry) => cloneRelationMemorySlot(entry));
 }
 
-export async function replaceLocalChatSessionRecallDocs(input: {
+export async function replaceLocalChatRelationMemorySlots(input: {
+  targetId: string;
+  viewerId: string;
+  entries: RelationMemorySlot[];
+}): Promise<void> {
+  await ensureLedgerHydrated();
+  const targetId = trimString(input.targetId);
+  const viewerId = trimString(input.viewerId);
+  const deleted: string[] = [];
+  const preservedOverrideById = new Map<string, RelationMemorySlot['userOverride']>();
+  for (const [id, slot] of ledgerCache.relationMemorySlotsById.entries()) {
+    if (slot.targetId !== targetId || slot.viewerId !== viewerId) continue;
+    preservedOverrideById.set(slot.id, slot.userOverride);
+    ledgerCache.relationMemorySlotsById.delete(id);
+    deleted.push(id);
+  }
+  const normalized = input.entries
+    .map((entry) => normalizeRelationMemorySlot(entry))
+    .filter((entry): entry is RelationMemorySlot => Boolean(entry));
+  normalized.forEach((entry) => {
+    const preservedOverride = preservedOverrideById.get(entry.id);
+    const nextEntry = preservedOverride && entry.userOverride === 'inherit'
+      ? {
+        ...entry,
+        userOverride: preservedOverride,
+      }
+      : entry;
+    ledgerCache.relationMemorySlotsById.set(nextEntry.id, nextEntry);
+  });
+  await persistMutation({
+    puts: {
+      [STORE_RELATION_MEMORY_SLOTS]: normalized.map((entry) => {
+        const preservedOverride = preservedOverrideById.get(entry.id);
+        return preservedOverride && entry.userOverride === 'inherit'
+          ? {
+            ...entry,
+            userOverride: preservedOverride,
+          }
+          : entry;
+      }),
+    },
+    deletes: {
+      [STORE_RELATION_MEMORY_SLOTS]: deleted,
+    },
+  });
+}
+
+export async function updateLocalChatRelationMemorySlot(input: {
+  id: string;
+  targetId: string;
+  viewerId: string;
+  updater: (previous: RelationMemorySlot) => RelationMemorySlot;
+}): Promise<RelationMemorySlot | null> {
+  await ensureLedgerHydrated();
+  const existing = ledgerCache.relationMemorySlotsById.get(trimString(input.id));
+  if (!existing) {
+    return null;
+  }
+  if (existing.targetId !== trimString(input.targetId) || existing.viewerId !== trimString(input.viewerId)) {
+    return null;
+  }
+  const next = normalizeRelationMemorySlot(input.updater(cloneRelationMemorySlot(existing)));
+  if (!next) {
+    return null;
+  }
+  ledgerCache.relationMemorySlotsById.set(next.id, next);
+  await persistMutation({
+    puts: {
+      [STORE_RELATION_MEMORY_SLOTS]: [next],
+    },
+  });
+  return cloneRelationMemorySlot(next);
+}
+
+export async function deleteLocalChatRelationMemorySlot(input: {
+  id: string;
+  targetId: string;
+  viewerId: string;
+}): Promise<void> {
+  await ensureLedgerHydrated();
+  const existing = ledgerCache.relationMemorySlotsById.get(trimString(input.id));
+  if (!existing) {
+    return;
+  }
+  if (existing.targetId !== trimString(input.targetId) || existing.viewerId !== trimString(input.viewerId)) {
+    return;
+  }
+  ledgerCache.relationMemorySlotsById.delete(existing.id);
+  await persistMutation({
+    deletes: {
+      [STORE_RELATION_MEMORY_SLOTS]: [existing.id],
+    },
+  });
+}
+
+export async function listLocalChatRecallIndex(conversationId: string): Promise<InteractionRecallDoc[]> {
+  await ensureLedgerHydrated();
+  return [...ledgerCache.recallIndexById.values()]
+    .filter((doc) => doc.conversationId === trimString(conversationId))
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+    .map((doc) => cloneInteractionRecallDoc(doc));
+}
+
+export async function replaceLocalChatRecallIndex(input: {
   conversationId: string;
-  docs: LocalChatSessionRecallDoc[];
+  docs: InteractionRecallDoc[];
 }): Promise<void> {
   await ensureLedgerHydrated();
   const conversationId = trimString(input.conversationId);
   const deleted: string[] = [];
-  for (const [id, doc] of ledgerCache.sessionRecallDocsById.entries()) {
+  for (const [id, doc] of ledgerCache.recallIndexById.entries()) {
     if (doc.conversationId !== conversationId) continue;
-    ledgerCache.sessionRecallDocsById.delete(id);
+    ledgerCache.recallIndexById.delete(id);
     deleted.push(id);
   }
   const normalized = input.docs
-    .map((doc) => normalizeSessionRecallDoc(doc))
-    .filter((doc): doc is LocalChatSessionRecallDoc => Boolean(doc));
+    .map((doc) => normalizeInteractionRecallDoc(doc))
+    .filter((doc): doc is InteractionRecallDoc => Boolean(doc));
   normalized.forEach((doc) => {
-    ledgerCache.sessionRecallDocsById.set(doc.id, doc);
+    ledgerCache.recallIndexById.set(doc.id, doc);
   });
   await persistMutation({
     puts: {
-      [STORE_SESSION_RECALL_DOCS]: normalized,
+      [STORE_RECALL_INDEX]: normalized,
     },
     deletes: {
-      [STORE_SESSION_RECALL_DOCS]: deleted,
+      [STORE_RECALL_INDEX]: deleted,
     },
   });
-}
-
-export async function listLocalChatDurableMemoryEntries(input: {
-  targetId: string;
-  viewerId: string;
-  includeResolved?: boolean;
-}): Promise<LocalChatDurableMemoryEntry[]> {
-  await ensureLedgerHydrated();
-  return [...ledgerCache.durableMemoryById.values()]
-    .filter((entry) => (
-      entry.targetId === trimString(input.targetId)
-      && entry.viewerId === trimString(input.viewerId)
-      && (input.includeResolved ? true : entry.status === 'active')
-    ))
-    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-    .map((entry) => cloneDurableMemory(entry));
-}
-
-export async function upsertLocalChatDurableMemoryEntries(entries: LocalChatDurableMemoryEntry[]): Promise<LocalChatDurableMemoryEntry[]> {
-  await ensureLedgerHydrated();
-  const normalized = entries
-    .map((entry) => normalizeDurableMemoryEntry(entry))
-    .filter((entry): entry is LocalChatDurableMemoryEntry => Boolean(entry));
-  normalized.forEach((entry) => {
-    ledgerCache.durableMemoryById.set(entry.id, entry);
-  });
-  await persistMutation({
-    puts: {
-      [STORE_DURABLE_MEMORY]: normalized,
-    },
-  });
-  return normalized.map((entry) => cloneDurableMemory(entry));
-}
-
-export async function lexicalRecallLocalChatSession(input: {
-  conversationId: string;
-  query: string;
-  topK?: number;
-}): Promise<LocalChatSessionRecallDoc[]> {
-  const docs = await listLocalChatSessionRecallDocs(input.conversationId);
-  const topK = Number.isFinite(input.topK) && Number(input.topK) > 0 ? Math.floor(Number(input.topK)) : 6;
-  return docs
-    .map((doc) => ({
-      doc,
-      score: lexicalScore(doc.text, input.query),
-    }))
-    .filter((item) => item.score > 0)
-    .sort((left, right) => right.score - left.score || right.doc.updatedAt.localeCompare(left.doc.updatedAt))
-    .slice(0, topK)
-    .map((item) => ({
-      ...item.doc,
-    }));
 }
 
 export async function getLatestLocalChatArtifacts(sessionId: string, viewerId?: string): Promise<{
@@ -1414,10 +1584,32 @@ export function createSessionTurn(input: {
   promptTrace?: LocalChatPromptTrace | null;
   audit?: LocalChatTurnAudit | null;
 }): LocalChatTurn {
-  const projected = createProjectionTurnFromMessage(input.message, input.promptTrace, input.audit);
-  return {
-    ...projected,
-    bundleId: '',
-    bundleSeq: 0,
-  };
+  return createProjectionTurnFromMessage(input.message, input.promptTrace, input.audit);
+}
+
+export async function searchLocalChatRecallIndex(input: {
+  conversationId: string;
+  query: string;
+  limit?: number;
+}): Promise<InteractionRecallDoc[]> {
+  const docs = await listLocalChatRecallIndex(input.conversationId);
+  const query = trimString(input.query);
+  if (!query) return docs.slice(0, input.limit || 8);
+  return docs
+    .map((doc) => ({
+      doc,
+      score: lexicalScore(doc.text, query),
+    }))
+    .filter((item) => item.score > 0)
+    .sort((left, right) => (
+      right.score - left.score
+      || right.doc.updatedAt.localeCompare(left.doc.updatedAt)
+    ))
+    .slice(0, input.limit || 8)
+    .map((item) => item.doc);
+}
+
+export async function listLocalChatConversationMediaAssets(conversationId: string): Promise<LocalChatMediaAssetRecord[]> {
+  await ensureLedgerHydrated();
+  return mediaAssetsForConversation(trimString(conversationId)).map((asset) => cloneMediaAssetRecord(asset));
 }

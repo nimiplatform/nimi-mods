@@ -38,13 +38,13 @@ cases:
     test_reference: local-chat-proactive-policy.test.mjs
     source_rule: LC-ACC-002
   - id: LC-008-STREAM-SEGMENT-PARSER
-    description: Stream parser uses explicit delimiter first, then double-newline fallback, and caps to 4 segments.
+    description: Legacy text fallback still uses explicit delimiter first, then double-newline fallback, and caps to 4 segments.
     expected_ok: true
     reason_code: LOCAL_CHAT_STREAM_SEGMENT_PARSE_OK
     test_reference: local-chat-stream-segment-parser.test.mjs
     source_rule: LC-ACC-002
   - id: LC-009-STREAM-LIFECYCLE-FINALIZE
-    description: Streaming placeholder is replaced by first finalized assistant message, and streaming kind is not persisted.
+    description: Successful turn path delivers first finalized beat directly; any fallback streaming placeholder must still be replaced and never persist.
     expected_ok: true
     reason_code: LOCAL_CHAT_STREAM_FINALIZE_OK
     test_reference: local-chat-turn-stream-lifecycle.test.mjs
@@ -109,22 +109,52 @@ cases:
     test_reference: local-chat-media-trigger-planner.e2e.test.ts
     source_rule: LC-ACC-002
   - id: LC-020-CONTEXT-BUNDLE-PROJECTION
-    description: Conversation ledger projects user/assistant bundles into UI messages while preserving media semantic continuity.
+    description: Context compiler derives interaction profile, turn pacing, and bundle-scoped prompt lanes while preserving media semantic continuity.
     expected_ok: true
     reason_code: LOCAL_CHAT_CONTEXT_ASSEMBLE_OK
-    test_reference: local-chat-continuity-ledger.test.mjs
+    test_reference: local-chat-context-assembler.test.ts
     source_rule: LC-ACC-002
   - id: LC-021-RUNNING-SUMMARY-NONBLOCKING
-    description: Running summary updates only after bundle persistence and never blocks text turn finalize.
+    description: Interaction snapshot compilation runs after delivery and does not block first-beat persistence.
     expected_ok: true
-    reason_code: LOCAL_CHAT_RUNNING_SUMMARY_UPDATE_OK
-    test_reference: local-chat-continuity-ledger.test.mjs
+    reason_code: null
+    test_reference: local-chat-interaction-state-compiler.test.ts
     source_rule: LC-ACC-002
   - id: LC-022-DURABLE-MEMORY-WRITE
-    description: Typed durable memory writes user facts, relationship state, commitments, and open loops back into local-chat storage.
+    description: Relation memory slots and recall index are compiled from exact turns/beats and written back into local-chat storage.
     expected_ok: true
-    reason_code: LOCAL_CHAT_DURABLE_MEMORY_WRITE_OK
-    test_reference: local-chat-continuity-ledger.test.mjs
+    reason_code: null
+    test_reference: local-chat-interaction-state-compiler.test.ts
+    source_rule: LC-ACC-002
+  - id: LC-023-TURN-MODE-GUARD
+    description: Neutral and emotional turns must not escalate to intimate based only on persona flirt affinity; explicit intimate cues still may.
+    expected_ok: true
+    reason_code: null
+    test_reference: local-chat-interaction-regression.test.ts
+    source_rule: LC-ACC-002
+  - id: LC-024-VOICE-DEFAULT-AUTOPRIME-GUARD
+    description: Voice default auto-prime applies only to untouched fresh settings and never overrides stored explicit voice-off preference.
+    expected_ok: true
+    reason_code: null
+    test_reference: local-chat-voice-defaults-policy.test.ts
+    source_rule: LC-ACC-002
+  - id: LC-025-MULTI-TURN-CONTINUITY-PERSISTENCE
+    description: Multi-turn send-flow preserves preference/promise continuity through later neutral turns and feeds it back into next-turn context assembly.
+    expected_ok: true
+    reason_code: null
+    test_reference: local-chat-continuity-persistence.e2e.test.ts
+    source_rule: LC-ACC-002
+  - id: LC-026-MEMORY-OVERRIDE-PRESERVED
+    description: User-managed relation-memory override survives later automatic slot regeneration when slot identity is stable.
+    expected_ok: true
+    reason_code: null
+    test_reference: local-chat-continuity-persistence.e2e.test.ts
+    source_rule: LC-ACC-002
+  - id: LC-027-PROACTIVE-CONTINUITY-PARITY
+    description: Proactive heartbeat persists assistant turn, prompt trace, snapshot, and relation memory through the shared continuity chain.
+    expected_ok: true
+    reason_code: LOCAL_CHAT_PROACTIVE_ALLOWED
+    test_reference: local-chat-proactive-heartbeat.e2e.test.ts
     source_rule: LC-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:local-chat-kernel-docs

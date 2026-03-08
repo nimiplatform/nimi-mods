@@ -25,6 +25,35 @@ type UseLocalChatTargetsInput = {
 };
 
 const LOCAL_PREVIEW_MAX_LENGTH = 96;
+const LOCAL_CHAT_LAST_TARGET_STORAGE_KEY = 'nimi.local-chat.last-target.v1';
+
+function readPersistedTargetId(viewerId: string): string {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return '';
+  }
+  try {
+    const raw = window.localStorage.getItem(`${LOCAL_CHAT_LAST_TARGET_STORAGE_KEY}:${viewerId}`);
+    return String(raw || '').trim();
+  } catch {
+    return '';
+  }
+}
+
+function writePersistedTargetId(viewerId: string, targetId: string): void {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return;
+  }
+  const storageKey = `${LOCAL_CHAT_LAST_TARGET_STORAGE_KEY}:${viewerId}`;
+  try {
+    if (targetId) {
+      window.localStorage.setItem(storageKey, targetId);
+      return;
+    }
+    window.localStorage.removeItem(storageKey);
+  } catch {
+    // Ignore storage write failures; selection still lives in memory.
+  }
+}
 
 function toTimestamp(value: string | null | undefined): number {
   if (!value) return 0;
@@ -91,6 +120,14 @@ export function useLocalChatTargets(input: UseLocalChatTargetsInput) {
   useEffect(() => {
     targetsRef.current = targets;
   }, [targets]);
+
+  useEffect(() => {
+    const targetId = String(selectedTargetId || '').trim();
+    if (!targetId) {
+      return;
+    }
+    writePersistedTargetId(input.viewerId, targetId);
+  }, [input.viewerId, selectedTargetId]);
 
   const selectedTargetBase = useMemo(
     () => targets.find((target) => target.id === selectedTargetId) || null,
@@ -225,11 +262,7 @@ export function useLocalChatTargets(input: UseLocalChatTargetsInput) {
           if (previous && baseTargets.some((item) => item.id === previous)) {
             return previous;
           }
-          if (baseTargets.length === 0) {
-            return '';
-          }
-          const preferred = baseTargets.find((item) => item.id === input.runtimeAgentId) || baseTargets[0];
-          return preferred?.id || '';
+          return '';
         });
         logRendererEvent({
           level: 'info',
@@ -263,7 +296,7 @@ export function useLocalChatTargets(input: UseLocalChatTargetsInput) {
     })();
     loadTargetsInFlightRef.current = task;
     return task;
-  }, [input.hookClient.data, input.runtimeAgentId, input.setStatusBanner, schedulePreviewSync]);
+  }, [input.hookClient.data, input.setStatusBanner, schedulePreviewSync]);
 
   useEffect(() => {
     if (autoLoadStartedRef.current) return;

@@ -254,3 +254,22 @@ test('selected voice is normalized to the canonical model-scoped voice id case',
     'arthur',
   );
 });
+
+test('gender guard biases automatic voice selection when no manual voice is pinned', () => {
+  assert.equal(
+    resolveSupportedVoiceId({
+      availableVoiceIds: ['alloy', 'shimmer', 'onyx'],
+      genderGuard: 'female',
+      voiceAffinity: 'high',
+    }),
+    'shimmer',
+  );
+  assert.equal(
+    resolveSupportedVoiceId({
+      availableVoiceIds: ['alloy', 'shimmer', 'onyx'],
+      genderGuard: 'male',
+      voiceAffinity: 'high',
+    }),
+    'onyx',
+  );
+});

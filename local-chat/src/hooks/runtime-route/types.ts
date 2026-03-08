@@ -7,6 +7,9 @@ export type ChatRouteSnapshot = {
   model: string;
   endpoint: string;
   connectorId: string;
+  localModelId?: string;
+  goRuntimeLocalModelId?: string;
+  goRuntimeStatus?: string;
 };
 
 export type UseLocalChatRuntimeRouteInput = {

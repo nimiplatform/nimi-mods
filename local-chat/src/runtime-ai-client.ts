@@ -1,4 +1,4 @@
-import type { ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
+import type { ModRuntimeClient, ModRuntimeResolvedBinding } from '@nimiplatform/sdk/mod/runtime';
 import type { RuntimeCanonicalCapability, RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 
 export type LocalChatAiRouteInput = {
@@ -10,6 +10,7 @@ export type LocalChatAiTextRequest = LocalChatAiRouteInput & {
   prompt: string;
   systemPrompt?: string;
   maxTokens?: number;
+  timeoutMs?: number;
   temperature?: number;
   mode?: 'STORY' | 'SCENE_TURN';
   worldId?: string;
@@ -57,16 +58,19 @@ export type LocalChatAiTranscribeRequest = LocalChatAiRouteInput & {
   language?: string;
 };
 
+export type LocalChatAiSpeechRequest = LocalChatAiRouteInput & {
+  text: string;
+  voice?: string;
+  audioFormat?: string;
+  language?: string;
+  model?: string;
+  extensions?: Record<string, unknown>;
+  timeoutMs?: number;
+  preferStream?: boolean;
+};
+
 export type LocalChatAiClient = {
-  resolveRoute(input?: LocalChatAiRouteInput): Promise<{
-    source: string;
-    provider: string;
-    model: string;
-    connectorId: string;
-    localProviderEndpoint?: string;
-    localOpenAiEndpoint?: string;
-    localModelId?: string;
-  }>;
+  resolveRoute(input?: LocalChatAiRouteInput): Promise<ModRuntimeResolvedBinding>;
   checkRouteHealth(input?: LocalChatAiRouteInput): Promise<unknown>;
   generateText(input: LocalChatAiTextRequest): Promise<{
     text: string;
@@ -99,6 +103,14 @@ export type LocalChatAiClient = {
     text: string;
     traceId: string;
     route: Awaited<ReturnType<LocalChatAiClient['resolveRoute']>>;
+  }>;
+  synthesizeSpeech(input: LocalChatAiSpeechRequest): Promise<{
+    audioUri?: string;
+    audioBytes?: Uint8Array;
+    mimeType?: string;
+    traceId: string;
+    route: Awaited<ReturnType<LocalChatAiClient['resolveRoute']>>;
+    usedStream: boolean;
   }>;
 };
 
@@ -158,6 +170,20 @@ function encodeBase64(bytes: Uint8Array): string {
   throw new Error('LOCAL_CHAT_AI_ARTIFACT_BASE64_UNAVAILABLE');
 }
 
+function concatBytes(parts: Uint8Array[]): Uint8Array {
+  if (parts.length === 0) {
+    return new Uint8Array();
+  }
+  const total = parts.reduce((sum, chunk) => sum + chunk.length, 0);
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of parts) {
+    merged.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return merged;
+}
+
 export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalChatAiClient {
   const resolveRoute: LocalChatAiClient['resolveRoute'] = async (input) => {
     const binding = input?.routeBinding;
@@ -184,6 +210,7 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
         input: input.prompt,
         system: input.systemPrompt,
         maxTokens: input.maxTokens,
+        timeoutMs: input.timeoutMs,
         temperature: input.temperature,
         model: route.model || undefined,
         binding: input.routeBinding,
@@ -202,6 +229,7 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
         input: input.prompt,
         system: input.systemPrompt,
         maxTokens: input.maxTokens,
+        timeoutMs: input.timeoutMs,
         temperature: input.temperature,
         binding: input.routeBinding,
       });
@@ -220,7 +248,9 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
         input: input.prompt,
         system: input.systemPrompt,
         maxTokens: input.maxTokens,
+        timeoutMs: input.timeoutMs,
         temperature: input.temperature,
+        signal: input.abortSignal,
         binding: input.routeBinding,
       });
       for await (const event of response.stream) {
@@ -233,6 +263,10 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
         }
         if (event.type === 'finish') {
           yield { type: 'done' };
+          continue;
+        }
+        if (event.type === 'error') {
+          throw event.error;
         }
       }
     },
@@ -293,6 +327,73 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
         text: String(response.text || ''),
         traceId: String(response.trace?.traceId || '').trim(),
         route,
+      };
+    },
+    synthesizeSpeech: async (input) => {
+      const route = await resolveRoute({
+        ...input,
+        capability: input.capability || 'audio.synthesize',
+      });
+      const request = {
+        text: input.text,
+        voice: input.voice,
+        audioFormat: input.audioFormat,
+        language: input.language,
+        model: input.model || route.model || undefined,
+        binding: input.routeBinding || input.routeOverride,
+        extensions: input.extensions,
+        timeoutMs: input.timeoutMs,
+      };
+
+      if (input.preferStream !== false) {
+        try {
+          const stream = await runtimeClient.media.tts.stream(request);
+          const chunks: Uint8Array[] = [];
+          let mimeType = '';
+          let traceId = '';
+          for await (const chunk of stream) {
+            if (chunk.chunk instanceof Uint8Array && chunk.chunk.length > 0) {
+              chunks.push(chunk.chunk);
+            }
+            if (!mimeType && String(chunk.mimeType || '').trim()) {
+              mimeType = String(chunk.mimeType || '').trim();
+            }
+            if (!traceId && String(chunk.traceId || '').trim()) {
+              traceId = String(chunk.traceId || '').trim();
+            }
+          }
+          const audioBytes = concatBytes(chunks);
+          if (audioBytes.length > 0) {
+            return {
+              audioBytes,
+              mimeType: mimeType || undefined,
+              traceId,
+              route,
+              usedStream: true,
+            };
+          }
+        } catch {
+          // Fallback to unary synthesize below.
+        }
+      }
+
+      const response = await runtimeClient.media.tts.synthesize(request);
+      const artifact = response.artifacts.find((item) => {
+        return Boolean(String(item.uri || '').trim())
+          || (item.bytes instanceof Uint8Array && item.bytes.length > 0);
+      }) || null;
+      const audioUri = String(artifact?.uri || '').trim();
+      const audioBytes = artifact?.bytes instanceof Uint8Array && artifact.bytes.length > 0
+        ? artifact.bytes
+        : undefined;
+      const mimeType = String(artifact?.mimeType || '').trim();
+      return {
+        audioUri: audioUri || undefined,
+        audioBytes,
+        mimeType: mimeType || undefined,
+        traceId: String(response.trace?.traceId || '').trim(),
+        route,
+        usedStream: false,
       };
     },
   };

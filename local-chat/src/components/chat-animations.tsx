@@ -30,6 +30,14 @@ const KEYFRAMES = `
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
+@keyframes chat-drift-in {
+  from { opacity: 0; transform: translate3d(-8px, 18px, 0) scale(0.985); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes chat-scale-in {
+  from { opacity: 0; transform: translateY(18px) scale(0.92); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
 @keyframes pane-fade-up {
   from { opacity: 0; transform: translateY(14px) scale(0.985); }
   to { opacity: 1; transform: translateY(0) scale(1); }
@@ -100,6 +108,32 @@ const KEYFRAMES = `
 @keyframes lc-shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+@keyframes lc-bubble-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+@keyframes lc-preview-float {
+  0%, 100% {
+    transform: translate(-50%, 0);
+  }
+  50% {
+    transform: translate(-50%, -6px);
+  }
+}
+@keyframes lc-bubble-ring-pulse {
+  0%, 100% {
+    opacity: 0.44;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.04);
+  }
 }
 .local-chat-root .lc-pane-stage {
   animation: pane-fade-up var(--lc-pane-enter-dur) cubic-bezier(0.2, 0.7, 0.2, 1) both;
@@ -202,6 +236,10 @@ const KEYFRAMES = `
 .local-chat-root .lc-target-card-active {
   box-shadow: 0 16px 28px rgba(16, 185, 129, 0.14);
 }
+.local-chat-root .lc-bubble-ring {
+  animation: lc-bubble-ring-pulse 2.4s ease-in-out infinite;
+  will-change: transform, opacity;
+}
 .local-chat-root .lc-input-shell {
   border: 1px solid rgba(203, 213, 225, 0.82);
   background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.96) 100%);
@@ -223,6 +261,13 @@ const KEYFRAMES = `
   background: linear-gradient(90deg, rgba(226, 232, 240, 0.88) 0%, rgba(241, 245, 249, 0.98) 50%, rgba(226, 232, 240, 0.88) 100%);
   background-size: 200% 100%;
   animation: lc-shimmer 1.4s linear infinite;
+}
+.local-chat-root .lc-media-skeleton {
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.78), rgba(255,255,255,0.18)),
+    linear-gradient(90deg, rgba(226, 232, 240, 0.82) 0%, rgba(241, 245, 249, 0.98) 50%, rgba(226, 232, 240, 0.82) 100%);
+  background-size: 100% 100%, 200% 100%;
+  animation: lc-shimmer 1.5s linear infinite;
 }
 .local-chat-root .lc-skeleton-pill {
   border-radius: 9999px;

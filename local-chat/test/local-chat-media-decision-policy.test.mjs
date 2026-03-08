@@ -3,6 +3,43 @@ import assert from 'node:assert/strict';
 import { DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS } from '../src/state/index.ts';
 import { decideMediaExecution } from '../src/hooks/turn-send/media-decision-policy.ts';
 
+function createResolvedPolicy(settings = DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS, overrides = {}) {
+  return {
+    deliveryPolicy: {
+      style: settings.deliveryStyle,
+      allowMultiReply: settings.deliveryStyle === 'natural',
+    },
+    voicePolicy: {
+      enabled: settings.enableVoice,
+      conversationMode: settings.voiceConversationMode,
+      autoPlayReplies: settings.autoPlayVoiceReplies,
+      selectedVoiceId: settings.voiceName || null,
+      selectionMode: settings.voiceName ? 'manual' : 'auto',
+    },
+    mediaPolicy: {
+      autonomy: settings.mediaAutonomy,
+      visualComfortLevel: settings.visualComfortLevel,
+      routeSource: 'local-runtime',
+      nsfwPolicy: 'disabled',
+      allowVisualAuto: settings.mediaAutonomy === 'natural' && settings.visualComfortLevel !== 'text-only',
+      allowAutoVisualHighRisk: false,
+      ...(overrides.mediaPolicy || {}),
+    },
+    contentBoundary: {
+      relationshipBoundaryPreset: settings.relationshipBoundaryPreset,
+      visualComfortLevel: settings.visualComfortLevel,
+      routeSource: 'local-runtime',
+      relationshipState: 'new',
+      ...(overrides.contentBoundary || {}),
+    },
+    inspectFlags: {
+      diagnosticsVisible: true,
+      runtimeInspectorVisible: false,
+      ...(overrides.inspectFlags || {}),
+    },
+  };
+}
+
 function createTarget() {
   return {
     id: 'agent.media-policy',
@@ -50,6 +87,14 @@ test('media decision policy blocks explicit image request when dependency is not
       ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
       imageRouteSource: 'local-runtime',
     },
+    resolvedPolicy: createResolvedPolicy({
+      ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
+      imageRouteSource: 'local-runtime',
+    }, {
+      mediaPolicy: {
+        routeSource: 'local-runtime',
+      },
+    }),
     userText: '给我来张图',
     assistantText: '当然。',
     target: createTarget(),
@@ -79,7 +124,10 @@ test('media decision policy returns planner execution decision when auto gate pa
           trigger: 'scene-enhancement',
           confidence: 0.9,
           prompt: '电影感夜雨街头人像',
-          reason: 'scene fits image',
+          reason: 'rainy neon street portrait with clear visual detail',
+          subject: '站在霓虹雨夜街头、被灯光和雨水一起包住的她',
+          scene: '霓虹灯映着潮湿街道和玻璃反光的雨夜街边场景',
+          styleIntent: '电影感近景特写，强调灯光、雨丝、侧脸和氛围细节',
           nsfwIntent: 'none',
         },
         traceId: 'trace-media-policy',
@@ -95,8 +143,16 @@ test('media decision policy returns planner execution decision when auto gate pa
       ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
       imageRouteSource: 'local-runtime',
     },
-    userText: '刚刚那个画面像电影一样。',
-    assistantText: '这个氛围确实很有画面感。',
+    resolvedPolicy: createResolvedPolicy({
+      ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
+      imageRouteSource: 'local-runtime',
+    }, {
+      mediaPolicy: {
+        routeSource: 'local-runtime',
+      },
+    }),
+    userText: '刚刚那个霓虹雨夜、潮湿街道、玻璃反光和侧脸特写的画面像电影一样。',
+    assistantText: '我正靠在被霓虹灯照亮的窗边，雨水顺着玻璃往下滑，灯光把轮廓和神情都压得很有电影感。',
     target: createTarget(),
     worldId: 'world.policy',
     messages: [],
@@ -136,6 +192,14 @@ test('media decision policy resolves auto image route via preflight for explicit
       ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
       imageRouteSource: 'auto',
     },
+    resolvedPolicy: createResolvedPolicy({
+      ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
+      imageRouteSource: 'auto',
+    }, {
+      mediaPolicy: {
+        routeSource: 'local-runtime',
+      },
+    }),
     userText: '给我来一张图',
     assistantText: '当然。',
     target: createTarget(),

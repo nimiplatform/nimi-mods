@@ -12,8 +12,11 @@ export function buildTurnSendContextKey(input: UseLocalChatTurnSendInput): strin
   const routeBindingModel = String(routeBinding?.model || '').trim();
   const routeSnapshotSource = String(input.routeSnapshot?.source || '').trim();
   const routeSnapshotModel = String(input.routeSnapshot?.model || '').trim();
-  const segmentationMode = String(input.defaultSettings.segmentationMode || '').trim();
-  const allowNsfwMedia = input.defaultSettings.allowNsfwMedia ? '1' : '0';
+  const deliveryStyle = String(input.defaultSettings.deliveryStyle || '').trim();
+  const mediaAutonomy = String(input.defaultSettings.mediaAutonomy || '').trim();
+  const voiceConversationMode = String(input.voiceConversationMode || input.defaultSettings.voiceConversationMode || '').trim();
+  const relationshipBoundaryPreset = String(input.defaultSettings.relationshipBoundaryPreset || '').trim();
+  const visualComfortLevel = String(input.defaultSettings.visualComfortLevel || '').trim();
   return [
     targetId,
     sessionId,
@@ -22,8 +25,11 @@ export function buildTurnSendContextKey(input: UseLocalChatTurnSendInput): strin
     routeBindingModel,
     routeSnapshotSource,
     routeSnapshotModel,
-    segmentationMode,
-    allowNsfwMedia,
+    deliveryStyle,
+    mediaAutonomy,
+    voiceConversationMode,
+    relationshipBoundaryPreset,
+    visualComfortLevel,
   ].join('|');
 }
 
@@ -37,8 +43,12 @@ export function useLocalChatTurnSend(input: UseLocalChatTurnSendInput) {
     input.routeBinding?.source,
     input.routeSnapshot?.model,
     input.routeSnapshot?.source,
-    input.defaultSettings.segmentationMode,
-    input.defaultSettings.allowNsfwMedia,
+    input.defaultSettings.deliveryStyle,
+    input.defaultSettings.mediaAutonomy,
+    input.defaultSettings.voiceConversationMode,
+    input.defaultSettings.relationshipBoundaryPreset,
+    input.defaultSettings.visualComfortLevel,
+    input.voiceConversationMode,
     input.selectedSessionId,
     input.selectedTarget?.id,
   ]);

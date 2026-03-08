@@ -13,10 +13,27 @@ type LocalRuntimeModelLike = {
   localModelId?: string;
   model: string;
   capabilities?: string[];
+  status?: string;
+  goRuntimeLocalModelId?: string;
+  goRuntimeStatus?: string;
+};
+
+type LocalRuntimeModelMatchInput = {
+  model?: string;
+  localModelId?: string;
+  goRuntimeLocalModelId?: string;
 };
 
 export function dedupeModelIds(models: string[]): string[] {
   return Array.from(new Set(models.map((model) => String(model || '').trim()).filter(Boolean)));
+}
+
+function normalizeStatus(value: unknown): string {
+  return String(value || '').trim().toLowerCase();
+}
+
+function normalizeLocalRuntimeLookup(value: unknown): string {
+  return String(value || '').trim().toLowerCase();
 }
 
 function normalizeScenario(scenario: ExtendedScenario): LegacyExtendedScenario {
@@ -196,11 +213,64 @@ function matchesLocalRuntimeModelByHeuristic(
   return candidates.length > 0;
 }
 
+export function isLocalRuntimeModelReady(
+  model: Pick<LocalRuntimeModelLike, 'status' | 'goRuntimeStatus'> | null | undefined,
+): boolean {
+  if (!model) {
+    return false;
+  }
+  const runtimeStatus = normalizeStatus(model.status);
+  const goRuntimeStatus = normalizeStatus(model.goRuntimeStatus);
+  if (runtimeStatus && runtimeStatus !== 'active') {
+    return false;
+  }
+  if (goRuntimeStatus && goRuntimeStatus !== 'active') {
+    return false;
+  }
+  return true;
+}
+
+export function findLocalRuntimeModelForBinding<T extends LocalRuntimeModelLike>(input: {
+  models: T[];
+  binding: LocalRuntimeModelMatchInput;
+}): T | null {
+  const localModelId = normalizeLocalRuntimeLookup(input.binding.localModelId);
+  const goRuntimeLocalModelId = normalizeLocalRuntimeLookup(input.binding.goRuntimeLocalModelId);
+  const model = normalizeLocalRuntimeLookup(input.binding.model);
+
+  if (localModelId) {
+    const byLocalModelId = input.models.find((candidate) => (
+      normalizeLocalRuntimeLookup(candidate.localModelId) === localModelId
+    ));
+    if (byLocalModelId) {
+      return byLocalModelId;
+    }
+  }
+
+  if (goRuntimeLocalModelId) {
+    const byGoRuntimeLocalModelId = input.models.find((candidate) => (
+      normalizeLocalRuntimeLookup(candidate.goRuntimeLocalModelId) === goRuntimeLocalModelId
+    ));
+    if (byGoRuntimeLocalModelId) {
+      return byGoRuntimeLocalModelId;
+    }
+  }
+
+  if (!model) {
+    return null;
+  }
+
+  return input.models.find((candidate) => (
+    normalizeLocalRuntimeLookup(candidate.model) === model
+    || normalizeLocalRuntimeLookup(candidate.localModelId) === model
+  )) || null;
+}
+
 export function resolveLocalRuntimeModelsForScenario<T extends LocalRuntimeModelLike>(input: {
   models: T[];
   scenario: ExtendedScenario;
 }): T[] {
-  const allModels = dedupeLocalRuntimeModels(input.models);
+  const allModels = dedupeLocalRuntimeModels(input.models).filter((model) => isLocalRuntimeModelReady(model));
   if (allModels.length === 0) {
     return [];
   }
@@ -224,4 +294,11 @@ export function resolvePreferredLocalRuntimeModelForScenario<T extends LocalRunt
   scenario: ExtendedScenario;
 }): T | null {
   return resolveLocalRuntimeModelsForScenario(input)[0] || null;
+}
+
+export function hasReadyLocalRuntimeModelForScenario<T extends LocalRuntimeModelLike>(input: {
+  models: T[];
+  scenario: ExtendedScenario;
+}): boolean {
+  return resolveLocalRuntimeModelsForScenario(input).length > 0;
 }

@@ -4,11 +4,17 @@ import { useRuntimeModSettings } from '@nimiplatform/sdk/mod/settings';
 import type { ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import {
   type LocalChatBooleanSettingKey,
-  type LocalChatDefaultSettings,
-  type LocalChatMediaPlannerMode,
-  type LocalChatVideoAutoPolicy,
-  DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
-  normalizeLocalChatDefaultSettings,
+  type LocalChatDeliveryStyle,
+  type LocalChatInspectSettings,
+  type LocalChatMediaAutonomy,
+  type LocalChatProductSettings,
+  type LocalChatRelationshipBoundaryPreset,
+  type LocalChatSettings,
+  type LocalChatVisualComfortLevel,
+  type LocalChatVoiceConversationMode,
+  DEFAULT_LOCAL_CHAT_SETTINGS,
+  mergeLocalChatSettings,
+  normalizeLocalChatSettings,
 } from '../state/index.js';
 import { LOCAL_CHAT_MOD_ID } from '../contracts.js';
 
@@ -65,31 +71,48 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
   );
   const latestVoiceRequestRef = useRef(0);
   const {
-    settings: defaultSettings,
+    settings,
     updateSettings,
-  } = useRuntimeModSettings<LocalChatDefaultSettings>({
+  } = useRuntimeModSettings<LocalChatSettings>({
     modId: LOCAL_CHAT_MOD_ID,
-    defaults: DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
-    normalize: normalizeLocalChatDefaultSettings,
+    defaults: DEFAULT_LOCAL_CHAT_SETTINGS,
+    normalize: normalizeLocalChatSettings,
   });
+  const productSettings = settings.product;
+  const inspectSettings = settings.inspect;
+  const defaultSettings = mergeLocalChatSettings(settings);
+
+  const updateProductSettings = useCallback((updater: (previous: LocalChatProductSettings) => LocalChatProductSettings) => {
+    updateSettings((previous) => ({
+      ...previous,
+      product: updater(previous.product),
+    }));
+  }, [updateSettings]);
+
+  const updateInspectSettings = useCallback((updater: (previous: LocalChatInspectSettings) => LocalChatInspectSettings) => {
+    updateSettings((previous) => ({
+      ...previous,
+      inspect: updater(previous.inspect),
+    }));
+  }, [updateSettings]);
 
   const buildVoiceInput = useCallback((override?: VoiceQueryOverride) => {
-    const routeSource = (override?.routeSource || defaultSettings.ttsRouteSource);
-    const connectorId = String(override?.connectorId || defaultSettings.ttsConnectorId || '').trim();
-    const model = String(override?.model || defaultSettings.ttsModel || '').trim();
+    const routeSource = (override?.routeSource || inspectSettings.ttsRouteSource);
+    const connectorId = String(override?.connectorId || inspectSettings.ttsConnectorId || '').trim();
+    const model = String(override?.model || inspectSettings.ttsModel || '').trim();
     return {
       routeSource,
       connectorId: connectorId || undefined,
       model: model || undefined,
     };
   }, [
-    defaultSettings.ttsRouteSource,
-    defaultSettings.ttsConnectorId,
-    defaultSettings.ttsModel,
+    inspectSettings.ttsRouteSource,
+    inspectSettings.ttsConnectorId,
+    inspectSettings.ttsModel,
   ]);
 
   const loadSpeechVoices = useCallback(async (override?: VoiceQueryOverride) => {
-    if (!defaultSettings.enableVoice) {
+    if (!productSettings.enableVoice) {
       setSpeechVoices([]);
       setSpeechVoiceCatalogMeta(createEmptySpeechVoiceCatalogMeta());
       return [];
@@ -158,18 +181,18 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
       return [];
     }
   }, [
-    defaultSettings.enableVoice,
+    productSettings.enableVoice,
     input.runtimeClient,
     buildVoiceInput,
   ]);
 
   useEffect(() => {
-    if (defaultSettings.enableVoice) {
+    if (productSettings.enableVoice) {
       return;
     }
     setSpeechVoices([]);
     setSpeechVoiceCatalogMeta(createEmptySpeechVoiceCatalogMeta());
-  }, [defaultSettings.enableVoice]);
+  }, [productSettings.enableVoice]);
 
   const loadSpeechCatalog = useCallback(async () => {
     try {
@@ -188,14 +211,14 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
   }, [loadSpeechVoices]);
 
   useEffect(() => {
-    if (!defaultSettings.enableVoice) {
+    if (!productSettings.enableVoice) {
       return undefined;
     }
     void loadSpeechCatalog();
-  }, [defaultSettings.enableVoice, loadSpeechCatalog]);
+  }, [productSettings.enableVoice, loadSpeechCatalog]);
 
   useEffect(() => {
-    if (!defaultSettings.enableVoice) {
+    if (!productSettings.enableVoice) {
       return undefined;
     }
     let cancelled = false;
@@ -206,15 +229,15 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
       cancelled = true;
     };
   }, [
-    defaultSettings.enableVoice,
+    productSettings.enableVoice,
     loadSpeechVoices,
-    defaultSettings.ttsRouteSource,
-    defaultSettings.ttsConnectorId,
-    defaultSettings.ttsModel,
+    inspectSettings.ttsRouteSource,
+    inspectSettings.ttsConnectorId,
+    inspectSettings.ttsModel,
   ]);
 
   useEffect(() => {
-    if (!defaultSettings.enableVoice) {
+    if (!productSettings.enableVoice) {
       return undefined;
     }
     if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') {
@@ -227,159 +250,193 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
     return () => {
       window.removeEventListener(MODEL_CATALOG_UPDATED_EVENT, onCatalogUpdated as EventListener);
     };
-  }, [defaultSettings.enableVoice, loadSpeechVoices]);
+  }, [productSettings.enableVoice, loadSpeechVoices]);
 
-  // Auto-select first voice when voice list changes and current selection is not in the list
+  // Keep manual inspect voice in sync with the currently available catalog.
   useEffect(() => {
-    if (!defaultSettings.enableVoice) {
+    if (!productSettings.enableVoice) {
       return;
     }
-    const currentVoice = defaultSettings.voiceName;
+    const currentVoice = inspectSettings.voiceName;
     if (speechVoices.length === 0) {
       return;
     }
     const exists = speechVoices.some((v) => v.id === currentVoice);
     if (!exists) {
-      updateSettings((previous) => ({
+      updateInspectSettings((previous) => ({
         ...previous,
         voiceName: speechVoices[0]?.id ?? '',
       }));
     }
-  }, [speechVoices, defaultSettings.voiceName, updateSettings]);
+  }, [speechVoices, productSettings.enableVoice, inspectSettings.voiceName, updateInspectSettings]);
 
   const handleVoiceIdChange = useCallback((voiceId: string) => {
-    updateSettings((previous) => ({
+    updateInspectSettings((previous) => ({
       ...previous,
       voiceName: voiceId,
     }));
-  }, [updateSettings]);
+  }, [updateInspectSettings]);
 
   const handleDefaultSettingChange = useCallback((
     key: LocalChatBooleanSettingKey,
     value: boolean,
   ) => {
-    updateSettings((previous) => ({
+    updateProductSettings((previous) => ({
       ...previous,
       [key]: value,
     }));
-  }, [updateSettings]);
+  }, [updateProductSettings]);
+
+  const handleDeliveryStyleChange = useCallback((value: LocalChatDeliveryStyle) => {
+    updateProductSettings((previous) => ({
+      ...previous,
+      deliveryStyle: value,
+    }));
+  }, [updateProductSettings]);
+
+  const handleMediaAutonomyChange = useCallback((value: LocalChatMediaAutonomy) => {
+    updateProductSettings((previous) => ({
+      ...previous,
+      mediaAutonomy: value,
+    }));
+  }, [updateProductSettings]);
+
+  const handleVoiceConversationModeChange = useCallback((value: LocalChatVoiceConversationMode) => {
+    updateProductSettings((previous) => ({
+      ...previous,
+      voiceConversationMode: value,
+    }));
+  }, [updateProductSettings]);
+
+  const handleRelationshipBoundaryPresetChange = useCallback((value: LocalChatRelationshipBoundaryPreset) => {
+    updateProductSettings((previous) => ({
+      ...previous,
+      relationshipBoundaryPreset: value,
+    }));
+  }, [updateProductSettings]);
+
+  const handleVisualComfortLevelChange = useCallback((value: LocalChatVisualComfortLevel) => {
+    updateProductSettings((previous) => ({
+      ...previous,
+      visualComfortLevel: value,
+    }));
+  }, [updateProductSettings]);
 
   const handleDefaultVoiceNameChange = useCallback((value: string) => {
-    updateSettings((previous) => ({
+    updateInspectSettings((previous) => ({
       ...previous,
       voiceName: value,
     }));
-  }, [updateSettings]);
-
-  const handleMediaPlannerModeChange = useCallback((value: LocalChatMediaPlannerMode) => {
-    updateSettings((previous) => ({
-      ...previous,
-      mediaPlannerMode: value,
-    }));
-  }, [updateSettings]);
-
-  const handleVideoAutoPolicyChange = useCallback((value: LocalChatVideoAutoPolicy) => {
-    updateSettings((previous) => ({
-      ...previous,
-      videoAutoPolicy: value,
-    }));
-  }, [updateSettings]);
+  }, [updateInspectSettings]);
 
   const handleTtsRouteSourceChange = useCallback((value: 'auto' | 'local-runtime' | 'token-api') => {
-    updateSettings((previous) => ({
+    updateInspectSettings((previous) => ({
       ...previous,
       ttsRouteSource: value,
     }));
-  }, [updateSettings]);
+  }, [updateInspectSettings]);
 
   const handleTtsConnectorChange = useCallback((value: string) => {
-    updateSettings((previous) => ({
+    updateInspectSettings((previous) => ({
       ...previous,
       ttsConnectorId: value,
     }));
-  }, [updateSettings]);
+  }, [updateInspectSettings]);
 
   const handleTtsModelChange = useCallback((value: string) => {
-    updateSettings((previous) => ({
+    updateInspectSettings((previous) => ({
       ...previous,
       ttsModel: value,
     }));
-  }, [updateSettings]);
+  }, [updateInspectSettings]);
 
   const handleSttRouteSourceChange = useCallback((value: 'auto' | 'local-runtime' | 'token-api') => {
-    updateSettings((previous) => ({
+    updateInspectSettings((previous) => ({
       ...previous,
       sttRouteSource: value,
     }));
-  }, [updateSettings]);
+  }, [updateInspectSettings]);
 
   const handleSttConnectorChange = useCallback((value: string) => {
-    updateSettings((previous) => ({
+    updateInspectSettings((previous) => ({
       ...previous,
       sttConnectorId: value,
     }));
-  }, [updateSettings]);
+  }, [updateInspectSettings]);
 
   const handleSttModelChange = useCallback((value: string) => {
-    updateSettings((previous) => ({
+    updateInspectSettings((previous) => ({
       ...previous,
       sttModel: value,
     }));
-  }, [updateSettings]);
+  }, [updateInspectSettings]);
 
   const handleImageRouteSourceChange = useCallback((value: 'auto' | 'local-runtime' | 'token-api') => {
-    updateSettings((previous) => ({
+    updateInspectSettings((previous) => ({
       ...previous,
       imageRouteSource: value,
     }));
-  }, [updateSettings]);
+  }, [updateInspectSettings]);
 
   const handleImageConnectorChange = useCallback((value: string) => {
-    updateSettings((previous) => ({
+    updateInspectSettings((previous) => ({
       ...previous,
       imageConnectorId: value,
     }));
-  }, [updateSettings]);
+  }, [updateInspectSettings]);
 
   const handleImageModelChange = useCallback((value: string) => {
-    updateSettings((previous) => ({
+    updateInspectSettings((previous) => ({
       ...previous,
       imageModel: value,
     }));
-  }, [updateSettings]);
+  }, [updateInspectSettings]);
 
   const handleVideoRouteSourceChange = useCallback((value: 'auto' | 'local-runtime' | 'token-api') => {
-    updateSettings((previous) => ({
+    updateInspectSettings((previous) => ({
       ...previous,
       videoRouteSource: value,
     }));
-  }, [updateSettings]);
+  }, [updateInspectSettings]);
 
   const handleVideoConnectorChange = useCallback((value: string) => {
-    updateSettings((previous) => ({
+    updateInspectSettings((previous) => ({
       ...previous,
       videoConnectorId: value,
     }));
-  }, [updateSettings]);
+  }, [updateInspectSettings]);
 
   const handleVideoModelChange = useCallback((value: string) => {
-    updateSettings((previous) => ({
+    updateInspectSettings((previous) => ({
       ...previous,
       videoModel: value,
     }));
-  }, [updateSettings]);
+  }, [updateInspectSettings]);
+
+  const handleInspectFlagChange = useCallback((key: 'diagnosticsVisible' | 'runtimeInspectorVisible', value: boolean) => {
+    updateInspectSettings((previous) => ({
+      ...previous,
+      [key]: value,
+    }));
+  }, [updateInspectSettings]);
 
   return {
     speechVoices,
     speechVoiceCatalogMeta,
+    settings,
     defaultSettings,
+    productSettings,
+    inspectSettings,
     loadSpeechCatalog,
     loadSpeechVoices,
     handleVoiceIdChange,
     handleDefaultSettingChange,
+    handleDeliveryStyleChange,
+    handleMediaAutonomyChange,
+    handleVoiceConversationModeChange,
+    handleRelationshipBoundaryPresetChange,
+    handleVisualComfortLevelChange,
     handleDefaultVoiceNameChange,
-    handleMediaPlannerModeChange,
-    handleVideoAutoPolicyChange,
     handleTtsRouteSourceChange,
     handleTtsConnectorChange,
     handleTtsModelChange,
@@ -392,5 +449,8 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
     handleVideoRouteSourceChange,
     handleVideoConnectorChange,
     handleVideoModelChange,
+    handleInspectFlagChange,
+    updateProductSettings,
+    updateInspectSettings,
   };
 }

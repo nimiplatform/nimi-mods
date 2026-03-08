@@ -2,8 +2,11 @@ import { readRuntimeModSettings, writeRuntimeModSettings } from '@nimiplatform/s
 import { LOCAL_CHAT_MOD_ID } from './contracts.js';
 
 export type LocalChatTtsVoice = string;
-export type LocalChatMediaPlannerMode = 'off' | 'explicit-only' | 'high-confidence-auto';
-export type LocalChatVideoAutoPolicy = 'explicit-only' | 'very-high-confidence-auto';
+export type LocalChatDeliveryStyle = 'natural' | 'compact';
+export type LocalChatMediaAutonomy = 'off' | 'explicit-only' | 'natural';
+export type LocalChatVoiceConversationMode = 'off' | 'suggested' | 'on';
+export type LocalChatRelationshipBoundaryPreset = 'reserved' | 'balanced' | 'close';
+export type LocalChatVisualComfortLevel = 'text-only' | 'soft-visuals' | 'natural-visuals';
 export const LOCAL_CHAT_TTS_VOICE_OPTIONS = [
   'alloy',
   'echo',
@@ -14,21 +17,24 @@ export const LOCAL_CHAT_TTS_VOICE_OPTIONS = [
 ] as const;
 export type LocalChatBooleanSettingKey =
   | 'enableVoice'
-  | 'allowMultiReply'
   | 'allowProactiveContact'
-  | 'autoPlayVoiceReplies'
-  | 'allowNsfwMedia';
+  | 'autoPlayVoiceReplies';
 
-export type LocalChatDefaultSettings = {
+export type LocalChatProductSettings = {
+  deliveryStyle: LocalChatDeliveryStyle;
+  mediaAutonomy: LocalChatMediaAutonomy;
+  voiceConversationMode: LocalChatVoiceConversationMode;
+  relationshipBoundaryPreset: LocalChatRelationshipBoundaryPreset;
+  visualComfortLevel: LocalChatVisualComfortLevel;
   enableVoice: boolean;
-  allowMultiReply: boolean;
   allowProactiveContact: boolean;
   autoPlayVoiceReplies: boolean;
-  allowNsfwMedia: boolean;
-  mediaPlannerMode: LocalChatMediaPlannerMode;
-  videoAutoPolicy: LocalChatVideoAutoPolicy;
-  segmentationMode: 'adaptive' | 'single';
+};
+
+export type LocalChatInspectSettings = {
   voiceName: LocalChatTtsVoice;
+  diagnosticsVisible: boolean;
+  runtimeInspectorVisible: boolean;
   ttsRouteSource: 'auto' | 'local-runtime' | 'token-api';
   ttsConnectorId: string;
   ttsModel: string;
@@ -43,16 +49,29 @@ export type LocalChatDefaultSettings = {
   videoModel: string;
 };
 
-export const DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS: LocalChatDefaultSettings = {
+export type LocalChatSettings = {
+  product: LocalChatProductSettings;
+  inspect: LocalChatInspectSettings;
+};
+
+// Internal merged view for existing execution paths that still consume a flat settings shape.
+export type LocalChatDefaultSettings = LocalChatProductSettings & LocalChatInspectSettings;
+
+export const DEFAULT_LOCAL_CHAT_PRODUCT_SETTINGS: LocalChatProductSettings = {
+  deliveryStyle: 'natural',
+  mediaAutonomy: 'natural',
+  voiceConversationMode: 'off',
+  relationshipBoundaryPreset: 'balanced',
+  visualComfortLevel: 'soft-visuals',
   enableVoice: false,
-  allowMultiReply: false,
-  allowProactiveContact: false,
+  allowProactiveContact: true,
   autoPlayVoiceReplies: false,
-  allowNsfwMedia: false,
-  mediaPlannerMode: 'high-confidence-auto',
-  videoAutoPolicy: 'very-high-confidence-auto',
-  segmentationMode: 'adaptive',
+};
+
+export const DEFAULT_LOCAL_CHAT_INSPECT_SETTINGS: LocalChatInspectSettings = {
   voiceName: '',
+  diagnosticsVisible: true,
+  runtimeInspectorVisible: false,
   ttsRouteSource: 'auto',
   ttsConnectorId: '',
   ttsModel: '',
@@ -67,20 +86,61 @@ export const DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS: LocalChatDefaultSettings = {
   videoModel: '',
 };
 
-export function normalizeLocalChatDefaultSettings(value: unknown): LocalChatDefaultSettings {
+export const DEFAULT_LOCAL_CHAT_SETTINGS: LocalChatSettings = {
+  product: { ...DEFAULT_LOCAL_CHAT_PRODUCT_SETTINGS },
+  inspect: { ...DEFAULT_LOCAL_CHAT_INSPECT_SETTINGS },
+};
+
+export const DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS: LocalChatDefaultSettings = {
+  ...DEFAULT_LOCAL_CHAT_PRODUCT_SETTINGS,
+  ...DEFAULT_LOCAL_CHAT_INSPECT_SETTINGS,
+};
+
+export function normalizeLocalChatProductSettings(value: unknown): LocalChatProductSettings {
   if (!value || typeof value !== 'object') {
-    return { ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS };
+    return { ...DEFAULT_LOCAL_CHAT_PRODUCT_SETTINGS };
+  }
+  const record = value as Record<string, unknown>;
+  const normalizedMediaAutonomy = String(record.mediaAutonomy || '').trim();
+  const normalizedVoiceConversationMode = String(record.voiceConversationMode || '').trim();
+  const deliveryStyle: 'natural' = 'natural';
+  const mediaAutonomy = normalizedMediaAutonomy === 'off'
+    || normalizedMediaAutonomy === 'explicit-only'
+    ? normalizedMediaAutonomy
+    : 'natural';
+  const voiceConversationMode = normalizedVoiceConversationMode === 'suggested'
+    || normalizedVoiceConversationMode === 'on'
+    ? normalizedVoiceConversationMode
+    : 'off';
+  const relationshipBoundaryPreset: 'balanced' = 'balanced';
+  const normalizedVisualComfort = String(record.visualComfortLevel || '').trim();
+  const visualComfortLevel = normalizedVisualComfort === 'text-only'
+    || normalizedVisualComfort === 'natural-visuals'
+    ? normalizedVisualComfort
+    : 'soft-visuals';
+  return {
+    deliveryStyle,
+    mediaAutonomy,
+    voiceConversationMode,
+    relationshipBoundaryPreset,
+    visualComfortLevel,
+    enableVoice: Boolean(record.enableVoice),
+    allowProactiveContact: Boolean(record.allowProactiveContact),
+    autoPlayVoiceReplies: Boolean(record.autoPlayVoiceReplies),
+  };
+}
+
+export function normalizeLocalChatInspectSettings(value: unknown): LocalChatInspectSettings {
+  if (!value || typeof value !== 'object') {
+    return { ...DEFAULT_LOCAL_CHAT_INSPECT_SETTINGS };
   }
   const record = value as Record<string, unknown>;
   const normalizedVoiceName = String(record.voiceName || '').trim();
-  const voiceName = normalizedVoiceName || DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS.voiceName;
+  const voiceName = normalizedVoiceName || DEFAULT_LOCAL_CHAT_INSPECT_SETTINGS.voiceName;
   const normalizedTtsRouteSource = String(record.ttsRouteSource || '').trim();
   const normalizedSttRouteSource = String(record.sttRouteSource || '').trim();
   const normalizedImageRouteSource = String(record.imageRouteSource || '').trim();
   const normalizedVideoRouteSource = String(record.videoRouteSource || '').trim();
-  const normalizedMediaPlannerMode = String(record.mediaPlannerMode || '').trim();
-  const normalizedVideoAutoPolicy = String(record.videoAutoPolicy || '').trim();
-  const normalizedSegmentationMode = String(record.segmentationMode || '').trim();
   const ttsRouteSource = normalizedTtsRouteSource === 'local-runtime' || normalizedTtsRouteSource === 'token-api'
     ? normalizedTtsRouteSource
     : 'auto';
@@ -93,18 +153,6 @@ export function normalizeLocalChatDefaultSettings(value: unknown): LocalChatDefa
   const videoRouteSource = normalizedVideoRouteSource === 'local-runtime' || normalizedVideoRouteSource === 'token-api'
     ? normalizedVideoRouteSource
     : 'auto';
-  const mediaPlannerMode = normalizedMediaPlannerMode === 'off'
-    || normalizedMediaPlannerMode === 'explicit-only'
-    || normalizedMediaPlannerMode === 'high-confidence-auto'
-    ? normalizedMediaPlannerMode
-    : DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS.mediaPlannerMode;
-  const videoAutoPolicy = normalizedVideoAutoPolicy === 'explicit-only'
-    || normalizedVideoAutoPolicy === 'very-high-confidence-auto'
-    ? normalizedVideoAutoPolicy
-    : DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS.videoAutoPolicy;
-  const segmentationMode = normalizedSegmentationMode === 'single'
-    ? 'single'
-    : 'adaptive';
   const ttsConnectorId = String(record.ttsConnectorId || '').trim();
   const ttsModel = String(record.ttsModel || '').trim();
   const sttConnectorId = String(record.sttConnectorId || '').trim();
@@ -114,15 +162,9 @@ export function normalizeLocalChatDefaultSettings(value: unknown): LocalChatDefa
   const videoConnectorId = String(record.videoConnectorId || '').trim();
   const videoModel = String(record.videoModel || '').trim();
   return {
-    enableVoice: Boolean(record.enableVoice),
-    allowMultiReply: Boolean(record.allowMultiReply),
-    allowProactiveContact: Boolean(record.allowProactiveContact),
-    autoPlayVoiceReplies: Boolean(record.autoPlayVoiceReplies),
-    allowNsfwMedia: Boolean(record.allowNsfwMedia),
-    mediaPlannerMode,
-    videoAutoPolicy,
-    segmentationMode,
     voiceName,
+    diagnosticsVisible: record.diagnosticsVisible !== false,
+    runtimeInspectorVisible: Boolean(record.runtimeInspectorVisible),
     ttsRouteSource,
     ttsConnectorId,
     ttsModel,
@@ -138,14 +180,50 @@ export function normalizeLocalChatDefaultSettings(value: unknown): LocalChatDefa
   };
 }
 
-export function loadLocalChatDefaultSettings(): LocalChatDefaultSettings {
+export function normalizeLocalChatSettings(value: unknown): LocalChatSettings {
+  if (!value || typeof value !== 'object') {
+    return {
+      product: { ...DEFAULT_LOCAL_CHAT_PRODUCT_SETTINGS },
+      inspect: { ...DEFAULT_LOCAL_CHAT_INSPECT_SETTINGS },
+    };
+  }
+  const record = value as Record<string, unknown>;
+  return {
+    product: normalizeLocalChatProductSettings(record.product),
+    inspect: normalizeLocalChatInspectSettings(record.inspect),
+  };
+}
+
+export function mergeLocalChatSettings(settings: LocalChatSettings): LocalChatDefaultSettings {
+  return {
+    ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
+    ...settings.product,
+    ...settings.inspect,
+  };
+}
+
+export function loadLocalChatSettings(): LocalChatSettings {
   const runtimeSettings = readRuntimeModSettings(LOCAL_CHAT_MOD_ID);
   if (Object.keys(runtimeSettings).length > 0) {
-    return normalizeLocalChatDefaultSettings(runtimeSettings);
+    return normalizeLocalChatSettings(runtimeSettings);
   }
-  return { ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS };
+  return {
+    product: { ...DEFAULT_LOCAL_CHAT_PRODUCT_SETTINGS },
+    inspect: { ...DEFAULT_LOCAL_CHAT_INSPECT_SETTINGS },
+  };
+}
+
+export function loadLocalChatDefaultSettings(): LocalChatDefaultSettings {
+  return mergeLocalChatSettings(loadLocalChatSettings());
+}
+
+export function persistLocalChatSettings(settings: LocalChatSettings): void {
+  writeRuntimeModSettings(LOCAL_CHAT_MOD_ID, settings as Record<string, unknown>);
 }
 
 export function persistLocalChatDefaultSettings(settings: LocalChatDefaultSettings): void {
-  writeRuntimeModSettings(LOCAL_CHAT_MOD_ID, settings as Record<string, unknown>);
+  persistLocalChatSettings({
+    product: normalizeLocalChatProductSettings(settings),
+    inspect: normalizeLocalChatInspectSettings(settings),
+  });
 }

@@ -70,13 +70,49 @@ function createDecisionSettings(fixture) {
   };
 }
 
+function createResolvedPolicy(settings, fixture) {
+  return {
+    deliveryPolicy: {
+      style: settings.deliveryStyle,
+      allowMultiReply: settings.deliveryStyle === 'natural',
+    },
+    voicePolicy: {
+      enabled: settings.enableVoice,
+      conversationMode: settings.voiceConversationMode,
+      autoPlayReplies: settings.autoPlayVoiceReplies,
+      selectedVoiceId: settings.voiceName || null,
+      selectionMode: settings.voiceName ? 'manual' : 'auto',
+    },
+    mediaPolicy: {
+      autonomy: settings.mediaAutonomy,
+      visualComfortLevel: settings.visualComfortLevel,
+      routeSource: fixture.routeSource === 'token-api' ? 'token-api' : 'local-runtime',
+      nsfwPolicy: fixture.nsfwPolicy || 'disabled',
+      allowVisualAuto: settings.mediaAutonomy === 'natural' && settings.visualComfortLevel !== 'text-only',
+      allowAutoVisualHighRisk: false,
+    },
+    contentBoundary: {
+      relationshipBoundaryPreset: settings.relationshipBoundaryPreset,
+      visualComfortLevel: settings.visualComfortLevel,
+      routeSource: fixture.routeSource === 'token-api' ? 'token-api' : 'local-runtime',
+      relationshipState: 'new',
+    },
+    inspectFlags: {
+      diagnosticsVisible: true,
+      runtimeInspectorVisible: false,
+    },
+  };
+}
+
 for (const fixture of mediaDecisionRegressionCases) {
   test(`media regression: ${fixture.name}`, async () => {
+    const settings = createDecisionSettings(fixture);
     const result = await decideMediaExecution({
       aiClient: createDecisionAiClient(fixture),
       turnTxnId: `txn-${fixture.name.replace(/\s+/g, '-').toLowerCase()}`,
       routeBinding: null,
-      defaultSettings: createDecisionSettings(fixture),
+      defaultSettings: settings,
+      resolvedPolicy: createResolvedPolicy(settings, fixture),
       userText: fixture.userText,
       assistantText: fixture.assistantText,
       target: createMediaDecisionTarget(),

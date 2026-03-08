@@ -1,12 +1,13 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { ChatMessage, ChatMessageKind } from '../../types.js';
 import {
-  appendSegmentToLocalChatBundle,
+  appendBeatToLocalChatTurn,
   appendTurnsToSession,
-  createLocalChatTurnBundle,
+  createLocalChatTurnRecord,
   listLocalChatSessions,
   type LocalChatPromptTrace,
   type LocalChatSession,
+  type LocalChatTurn,
   type LocalChatTurnAudit,
 } from '../../state/index.js';
 import { createSessionTurn } from '../../services/view/messages.js';
@@ -18,9 +19,20 @@ type PersistedAssistantMessageKind = Exclude<ChatMessageKind, 'streaming' | 'ima
 
 export type TurnDeliveryScheduleHandle = {
   turnTxnId: string;
-  assistantBundleId: string;
+  assistantTurnId: string;
   done: Promise<void>;
   cancel: (reason: LocalChatScheduleCancelReason) => void;
+};
+
+export type ScheduledAssistantDelivery = {
+  id: string;
+  delayMs: number;
+  run: (input: {
+    assistantTurnId: string;
+    index: number;
+    deliveredCount: number;
+    signal: AbortSignal;
+  }) => Promise<void>;
 };
 
 function normalizeSegmentDelayMs(value: number, index: number): number {
@@ -89,25 +101,16 @@ function toPersistedKind(kind: ChatMessageKind): PersistedAssistantMessageKind {
   return kind === 'voice' || kind === 'image' || kind === 'video' ? kind : 'text';
 }
 
-export async function persistSuccessfulTurn(input: {
+export async function scheduleAssistantTurnDeliveries(input: {
   sessionId: string;
   targetId: string;
   viewerId: string;
   turnTxnId: string;
-  userMessage: ChatMessage;
-  assistantDeliveries: Array<{
-    id: string;
-    kind: PersistedAssistantMessageKind;
-    content: string;
-    media?: ChatMessage['media'];
-    delayMs: number;
-    meta: ChatMessage['meta'];
-  }>;
-  latencyMs: number;
-  promptTrace: LocalChatPromptTrace;
-  turnAudit: LocalChatTurnAudit;
-  replaceFirstMessageId?: string;
-  setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
+  assistantTurnId: string;
+  userTurns?: LocalChatTurn[];
+  assistantRole?: 'assistant';
+  assistantBeatCount?: number;
+  deliveries: ScheduledAssistantDelivery[];
   setSessions: (sessions: LocalChatSession[]) => void;
   onScheduleCancelled?: (input: {
     turnTxnId: string;
@@ -116,17 +119,21 @@ export async function persistSuccessfulTurn(input: {
     pendingCount: number;
   }) => void;
 }): Promise<TurnDeliveryScheduleHandle> {
-  await appendTurnsToSession(input.sessionId, [createSessionTurn({ message: input.userMessage })]);
-  await refreshSessions({
-    targetId: input.targetId,
-    viewerId: input.viewerId,
-    setSessions: input.setSessions,
-  });
+  if (input.userTurns?.length) {
+    await appendTurnsToSession(input.sessionId, input.userTurns);
+    await refreshSessions({
+      targetId: input.targetId,
+      viewerId: input.viewerId,
+      setSessions: input.setSessions,
+    });
+  }
 
-  const assistantBundle = await createLocalChatTurnBundle({
+  await createLocalChatTurnRecord({
     conversationId: input.sessionId,
-    role: 'assistant',
+    role: input.assistantRole || 'assistant',
     turnTxnId: input.turnTxnId,
+    turnId: input.assistantTurnId,
+    beatCount: input.assistantBeatCount || input.deliveries.length,
   });
 
   const abortController = new AbortController();
@@ -140,9 +147,9 @@ export async function persistSuccessfulTurn(input: {
   };
 
   const done = (async () => {
-    for (let index = 0; index < input.assistantDeliveries.length; index += 1) {
+    for (let index = 0; index < input.deliveries.length; index += 1) {
       if (cancelReason) break;
-      const delivery = input.assistantDeliveries[index];
+      const delivery = input.deliveries[index];
       if (!delivery) continue;
       const delayMs = normalizeSegmentDelayMs(delivery.delayMs, index);
       try {
@@ -151,56 +158,11 @@ export async function persistSuccessfulTurn(input: {
         break;
       }
       if (cancelReason) break;
-      const message: ChatMessage = {
-        id: delivery.id,
-        role: 'assistant',
-        kind: delivery.kind,
-        content: delivery.content,
-        media: delivery.media,
-        timestamp: new Date(),
-        latencyMs: index === 0 ? input.latencyMs : undefined,
-        meta: {
-          ...(delivery.meta || {}),
-          scheduledDelayMs: delayMs,
-        },
-      };
-      input.setMessages((prev) => {
-        if (index === 0 && input.replaceFirstMessageId) {
-          let replaced = false;
-          const next = prev.map((item) => {
-            if (item.id === input.replaceFirstMessageId) {
-              replaced = true;
-              return message;
-            }
-            return item;
-          });
-          return replaced ? next : [...prev, message];
-        }
-        return [...prev, message];
-      });
-      await appendSegmentToLocalChatBundle({
-        conversationId: input.sessionId,
-        bundleId: assistantBundle.id,
-        role: 'assistant',
-        kind: delivery.kind,
-        content: message.content,
-        contextText: buildSegmentContextText(message),
-        semanticSummary: buildSegmentSemanticSummary(message),
-        mediaSpec: message.meta?.mediaSpec,
-        mediaShadow: message.meta?.mediaShadow,
-        media: message.media,
-        timestamp: message.timestamp.toISOString(),
-        latencyMs: message.latencyMs,
-        meta: message.meta,
-        promptTrace: index === 0 ? input.promptTrace : null,
-        audit: index === 0 ? input.turnAudit : null,
-        deliveryStatus: 'ready',
-        segmentId: message.id,
-      });
-      await refreshSessions({
-        targetId: input.targetId,
-        viewerId: input.viewerId,
-        setSessions: input.setSessions,
+      await delivery.run({
+        assistantTurnId: input.assistantTurnId,
+        index,
+        deliveredCount,
+        signal: abortController.signal,
       });
       deliveredCount += 1;
     }
@@ -210,13 +172,13 @@ export async function persistSuccessfulTurn(input: {
       turnTxnId: input.turnTxnId,
       reason: cancelReason,
       deliveredCount,
-      pendingCount: Math.max(0, input.assistantDeliveries.length - deliveredCount),
+      pendingCount: Math.max(0, input.deliveries.length - deliveredCount),
     });
   })();
 
   return {
     turnTxnId: input.turnTxnId,
-    assistantBundleId: assistantBundle.id,
+    assistantTurnId: input.assistantTurnId,
     done,
     cancel,
   };
@@ -248,7 +210,7 @@ export async function commitAssistantMessage(input: {
   sessionId: string;
   targetId: string;
   viewerId: string;
-  assistantBundleId: string;
+  assistantTurnId: string;
   messageId: string;
   message: ChatMessage;
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
@@ -271,9 +233,9 @@ export async function commitAssistantMessage(input: {
     });
     return replaced ? next : [...prev, input.message];
   });
-  await appendSegmentToLocalChatBundle({
+  await appendBeatToLocalChatTurn({
     conversationId: input.sessionId,
-    bundleId: input.assistantBundleId,
+    turnId: input.assistantTurnId,
     role: 'assistant',
     kind: toPersistedKind(input.message.kind),
     content: input.message.content,
@@ -287,12 +249,20 @@ export async function commitAssistantMessage(input: {
     meta: input.message.meta,
     promptTrace: input.promptTrace || null,
     audit: input.turnAudit || null,
-    deliveryStatus: input.message.meta?.mediaStatus === 'failed'
-      ? 'failed'
-      : input.message.meta?.mediaStatus === 'blocked'
-        ? 'blocked'
-        : 'ready',
-    segmentId: input.message.id,
+    deliveryStatus: input.message.meta?.mediaStatus === 'pending'
+      ? 'pending'
+      : input.message.meta?.mediaStatus === 'failed'
+        ? 'failed'
+        : input.message.meta?.mediaStatus === 'blocked'
+          ? 'blocked'
+          : 'ready',
+    beatId: input.message.id,
+    beatIndex: Number.isFinite(input.message.meta?.beatIndex)
+      ? Math.max(0, Number(input.message.meta?.beatIndex))
+      : 0,
+    beatCount: Number.isFinite(input.message.meta?.beatCount) && Number(input.message.meta?.beatCount) > 0
+      ? Math.floor(Number(input.message.meta?.beatCount))
+      : 1,
   });
   await refreshSessions({
     targetId: input.targetId,
@@ -305,7 +275,7 @@ export async function replacePendingAssistantMessage(input: {
   sessionId: string;
   targetId: string;
   viewerId: string;
-  assistantBundleId: string;
+  assistantTurnId: string;
   pendingMessageId: string;
   message: ChatMessage;
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
@@ -317,7 +287,7 @@ export async function replacePendingAssistantMessage(input: {
     sessionId: input.sessionId,
     targetId: input.targetId,
     viewerId: input.viewerId,
-    assistantBundleId: input.assistantBundleId,
+    assistantTurnId: input.assistantTurnId,
     messageId: input.pendingMessageId,
     message: input.message,
     setMessages: input.setMessages,

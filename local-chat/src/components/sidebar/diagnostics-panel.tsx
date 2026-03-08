@@ -30,8 +30,8 @@ export function DiagnosticsPanel(props: Props) {
     checkingHealth,
     onHealthCheck,
   } = props;
-  const hasRecentMessagesLayer = latestPromptTrace?.appliedLayers?.includes('recentBundles') || false;
-  const hasPostHistoryLayer = latestPromptTrace?.appliedLayers?.includes('replyStyle') || false;
+  const hasRecentMessagesLayer = latestPromptTrace?.appliedLayers?.includes('recentTurns') || false;
+  const hasInteractionProfileLayer = latestPromptTrace?.appliedLayers?.includes('interactionProfile') || false;
   const routeValue = `${latestPromptTrace?.routeSource || '-'} / ${latestPromptTrace?.routeModel || '-'}`;
   const plannerValue = latestPromptTrace
     ? `${latestPromptTrace.plannerUsed ? 'on' : 'off'} · ${latestPromptTrace.plannerKind || 'none'} · ${latestPromptTrace.plannerTrigger || 'none'}${typeof latestPromptTrace.plannerConfidence === 'number' ? ` · ${latestPromptTrace.plannerConfidence.toFixed(2)}` : ''}`
@@ -48,14 +48,11 @@ export function DiagnosticsPanel(props: Props) {
   const mediaExecutionValue = latestPromptTrace
     ? `${latestPromptTrace.mediaExecutionStatus || 'none'} · ${latestPromptTrace.mediaExecutionRouteSource || '-'}${latestPromptTrace.mediaExecutionRouteModel ? ` / ${latestPromptTrace.mediaExecutionRouteModel}` : ''}`
     : '-';
-  const durableMemoryCount = latestPromptTrace
-    ? Object.values(latestPromptTrace.durableMemoryCountsByType || {}).reduce((sum, count) => sum + (count || 0), 0)
-    : 0;
   const continuityValue = latestPromptTrace
-    ? `bundles ${latestPromptTrace.selectedBundleSeqs.join(', ') || '-'} · summary≤${latestPromptTrace.runningSummaryWatermark} · recall ${latestPromptTrace.sessionRecallCount}`
+    ? `turns ${latestPromptTrace.selectedTurnSeqs.join(', ') || '-'} · recall ${latestPromptTrace.sessionRecallCount}`
     : '-';
-  const replyStyleValue = latestPromptTrace?.replyStyleProfile
-    ? `${latestPromptTrace.replyStyleProfile.responseLength} · ${latestPromptTrace.replyStyleProfile.formality} · ${latestPromptTrace.replyStyleProfile.sentiment} · ${latestPromptTrace.replyStyleProfile.pacingStyle}`
+  const replyStyleValue = latestPromptTrace?.interactionProfile
+    ? `${latestPromptTrace.interactionProfile.expression.responseLength} · ${latestPromptTrace.interactionProfile.expression.formality} · ${latestPromptTrace.interactionProfile.expression.sentiment} · ${latestPromptTrace.interactionProfile.expression.pacingBias}`
     : '-';
   const pacingPlanValue = latestPromptTrace?.pacingPlan
     ? `${latestPromptTrace.pacingPlan.mode} · ${latestPromptTrace.pacingPlan.energy} · max ${latestPromptTrace.pacingPlan.maxSegments}`
@@ -64,9 +61,6 @@ export function DiagnosticsPanel(props: Props) {
     ? Object.entries(latestPromptTrace.laneBudgets)
       .map(([lane, budget]) => `${lane} ${budget.usedChars}/${budget.maxChars}${budget.truncated ? '!' : ''}`)
       .join(' · ')
-    : '-';
-  const continuityHealthValue = latestPromptTrace?.continuityHealth
-    ? `summary ${latestPromptTrace.continuityHealth.runningSummary.status}(${latestPromptTrace.continuityHealth.runningSummary.consecutiveFailures}) · memory ${latestPromptTrace.continuityHealth.durableMemory.status}(${latestPromptTrace.continuityHealth.durableMemory.consecutiveFailures})`
     : '-';
   const metricItems = [
     {
@@ -149,12 +143,12 @@ export function DiagnosticsPanel(props: Props) {
               </p>
               <p>
                 <span className="font-medium">{t('Diagnostics.detailCriticalLayers')}:</span>{' '}
-                recentBundles={hasRecentMessagesLayer ? 'yes' : 'no'} · replyStyle={hasPostHistoryLayer ? 'yes' : 'no'}
+                recentTurns={hasRecentMessagesLayer ? 'yes' : 'no'} · interactionProfile={hasInteractionProfileLayer ? 'yes' : 'no'}
               </p>
               <p>
                 <span className="font-medium">{t('Diagnostics.detailMemorySlices')}:</span>{' '}
                 {latestPromptTrace
-                  ? `core ${latestPromptTrace.memorySlices?.core ?? 0} · e2e ${latestPromptTrace.memorySlices?.e2e ?? 0} · durable ${durableMemoryCount} · recall ${latestPromptTrace.sessionRecallCount}`
+                  ? `core ${latestPromptTrace.memorySlices?.core ?? 0} · e2e ${latestPromptTrace.memorySlices?.e2e ?? 0} · recall ${latestPromptTrace.sessionRecallCount}`
                   : '-'}
               </p>
               <p>
@@ -168,10 +162,6 @@ export function DiagnosticsPanel(props: Props) {
               <p>
                 <span className="font-medium">continuity:</span>{' '}
                 {continuityValue}
-              </p>
-              <p>
-                <span className="font-medium">{t('Diagnostics.detailContinuityHealth')}:</span>{' '}
-                {continuityHealthValue}
               </p>
               <p>
                 <span className="font-medium">{t('Diagnostics.detailSegmentParse')}:</span>{' '}

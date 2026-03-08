@@ -11,12 +11,18 @@ import {
   resolveLocalRuntimeModelsForScenario,
   resolveModelsForScenario,
 } from '../services/route/connector-model-capabilities.js';
-import { DefaultSettingsPanel } from './sidebar/default-settings-panel.js';
 import { ChatRoutePanel } from './sidebar/chat-route-panel.js';
 import { VoicePanel } from './sidebar/voice-panel.js';
 import { DiagnosticsPanel } from './sidebar/diagnostics-panel.js';
 import { MediaRoutePanel } from './sidebar/media-route-panel.js';
 import type { RuntimeStatusSidebarProps } from './sidebar/types.js';
+import {
+  bindingsEqual,
+  formatRouteBindingLabel,
+  formatRouteSnapshotLabel,
+  hasPendingChatModelChange,
+  sourceLabel,
+} from './sidebar/runtime-status-state.js';
 
 const ICON_SHIELD = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -30,23 +36,6 @@ export function resolveVisibleSpeechVoices(input: {
   speechVoices: RuntimeSpeechVoice[];
 }): RuntimeSpeechVoice[] {
   return input.speechVoices;
-}
-
-function sourceLabel(source: RuntimeRouteBinding['source'] | 'mixed' | 'unknown'): string {
-  if (source === 'token-api') return 'Token API';
-  if (source === 'local-runtime') return 'Local Runtime';
-  if (source === 'mixed') return 'Mixed';
-  return 'Unknown';
-}
-
-function bindingsEqual(a: RuntimeRouteBinding | null, b: RuntimeRouteBinding | null): boolean {
-  if (!a || !b) return false;
-  return (
-    a.source === b.source
-    && String(a.connectorId || '') === String(b.connectorId || '')
-    && String(a.model || '') === String(b.model || '')
-    && String(a.localModelId || '') === String(b.localModelId || '')
-  );
 }
 
 export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
@@ -71,6 +60,7 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     dependencyRepairActions,
     latestPromptTrace,
     latestTurnAudit,
+    routeSnapshot,
     onRouteSourceChange,
     onRouteConnectorChange,
     onRouteModelChange,
@@ -80,11 +70,8 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     onSttRouteSourceChange,
     onHealthCheck,
     onOpenRuntimeSetup,
-    defaultSettings,
-    onDefaultSettingChange,
-    onDefaultVoiceNameChange,
-    onMediaPlannerModeChange,
-    onVideoAutoPolicyChange,
+    inspectSettings,
+    enableVoice,
   } = props;
   const routeBinding = props.routeBinding || null;
   const onClearRouteBinding = props.onClearRouteBinding || (() => {});
@@ -143,7 +130,7 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     [chatModelOptionsRaw],
   );
 
-  const [openPanel, setOpenPanel] = useState<'defaults' | 'chat' | 'media' | 'voice' | 'diagnostics' | null>(null);
+  const [openPanel, setOpenPanel] = useState<'chat' | 'media' | 'voice' | 'diagnostics' | null>(null);
   const [chatModelQuery, setChatModelQuery] = useState(effectiveChatBinding?.model || '');
   const didBootstrapRef = useRef(false);
   const filteredChatModelOptions = useMemo(
@@ -169,7 +156,7 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     onSidebarBootstrap();
   }, [onSidebarBootstrap]);
 
-  const togglePanel = (panel: 'defaults' | 'chat' | 'media' | 'voice' | 'diagnostics') => {
+  const togglePanel = (panel: 'chat' | 'media' | 'voice' | 'diagnostics') => {
     setOpenPanel((previous) => (previous === panel ? null : panel));
   };
 
@@ -200,24 +187,22 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
   const visibleDependencyCapabilities = dependencyCapabilities;
   const showMediaDependencyPending = isMediaRuntimeSidebarLoading;
   const resolvedDefaultBinding = chatRouteOptions?.resolvedDefault || chatRouteOptions?.selected || null;
-  const formatRouteBindingLabel = useMemo(() => (
-    (binding: RuntimeRouteBinding | null): string => {
-      if (!binding) return '-';
-      const routeSourceLabel = sourceLabel(binding.source);
-      if (binding.source === 'token-api') {
-        const connector = chatRouteOptions?.connectors.find((item) => item.id === binding.connectorId) || null;
-        const connectorLabel = String(connector?.label || binding.connectorId || '').trim() || '-';
-        const model = String(binding.model || '').trim() || '-';
-        return `${routeSourceLabel} · ${connectorLabel} · ${model}`;
-      }
-      const model = String(binding.model || binding.localModelId || '').trim() || '-';
-      return `${routeSourceLabel} · ${model}`;
-    }
-  ), [chatRouteOptions?.connectors]);
+  const connectors = chatRouteOptions?.connectors || [];
   const defaultRouteLabel = resolvedDefaultBinding
-    ? formatRouteBindingLabel(resolvedDefaultBinding)
+    ? formatRouteBindingLabel({
+      binding: resolvedDefaultBinding,
+      connectors,
+    })
     : `${sourceLabel(autoBoundSource)}${autoBoundModel ? ` · ${autoBoundModel}` : ''}`;
-  const effectiveRouteLabel = formatRouteBindingLabel(effectiveChatBinding);
+  const effectiveRouteLabel = formatRouteSnapshotLabel({
+    snapshot: routeSnapshot || null,
+    fallbackBinding: effectiveChatBinding,
+    connectors,
+  });
+  const hasPendingModelInput = hasPendingChatModelChange({
+    activeModel: effectiveChatBinding?.model || routeSnapshot?.model || '',
+    query: chatModelQuery,
+  });
   const overrideApplied = Boolean(
     routeBinding
     && effectiveChatBinding
@@ -244,6 +229,21 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
   const visibleDependencyReasonCode = showMediaDependencyPending && hasOnlyMediaFailures
     ? undefined
     : dependencyReasonCode;
+  const dependencyUpdatedTimeLabel = useMemo(() => {
+    const raw = String(dependencyUpdatedAt || '').trim();
+    if (!raw) {
+      return '';
+    }
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) {
+      return '';
+    }
+    try {
+      return parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return '';
+    }
+  }, [dependencyUpdatedAt]);
 
   return (
     <aside className="flex h-full min-h-0 w-80 shrink-0 flex-col overflow-y-auto border-l border-[var(--lc-border)] bg-[#f4f8f9]">
@@ -265,6 +265,9 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
           <p className="mt-1 text-[11px] text-gray-600">
             <span className="font-semibold text-gray-700">{t('RuntimeSidebar.effectiveRouteLabel')}:</span> {effectiveRouteLabel}
           </p>
+          {hasPendingModelInput ? (
+            <p className="mt-1 text-[11px] text-amber-700">{t('RuntimeSidebar.pendingRouteHint')}</p>
+          ) : null}
           <div className="mt-2 flex flex-wrap gap-1.5">
             <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600">
               {overrideApplied ? t('RuntimeSidebar.overrideBadge') : t('RuntimeSidebar.followsDefaultBadge')}
@@ -298,9 +301,9 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
               {failedCapabilityLabels.join(', ')} {t('RuntimeSidebar.capabilityMissing')}
             </p>
           ) : null}
-          {dependencyUpdatedAt ? (
+          {dependencyUpdatedTimeLabel ? (
             <p className="mt-2 text-[10px] text-gray-500">
-              {t('RuntimeSidebar.dependencyUpdatedAt')}: {new Date(dependencyUpdatedAt).toLocaleTimeString()}
+              {t('RuntimeSidebar.dependencyUpdatedAt')}: {dependencyUpdatedTimeLabel}
             </p>
           ) : null}
           <button
@@ -337,22 +340,12 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
           ) : null}
         </div>
 
-        <DefaultSettingsPanel
-          open={openPanel === 'defaults'}
-          onToggle={() => togglePanel('defaults')}
-          defaultSettings={defaultSettings}
-          speechVoices={speechVoices}
-          onDefaultSettingChange={onDefaultSettingChange}
-          onDefaultVoiceNameChange={onDefaultVoiceNameChange}
-          onMediaPlannerModeChange={onMediaPlannerModeChange}
-          onVideoAutoPolicyChange={onVideoAutoPolicyChange}
-        />
-
         <ChatRoutePanel
           open={openPanel === 'chat'}
           onToggle={() => togglePanel('chat')}
           activeChatSource={activeChatSource}
           activeChatConnectorId={activeChatConnectorId}
+          activeChatModel={effectiveChatBinding?.model || ''}
           chatRouteOptions={chatRouteOptions}
           chatModelQuery={chatModelQuery}
           setChatModelQuery={setChatModelQuery}
@@ -367,7 +360,7 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
         <VoicePanel
           open={openPanel === 'voice'}
           onToggle={() => togglePanel('voice')}
-          enableVoice={defaultSettings.enableVoice}
+          enableVoice={enableVoice}
           selectedVoiceId={selectedVoiceId}
           ttsRouteSource={ttsRouteSource}
           ttsConnectorId={props.ttsConnectorId}
@@ -415,15 +408,17 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
           onVideoModelChange={props.onVideoModelChange}
         />
 
-        <DiagnosticsPanel
-          open={openPanel === 'diagnostics'}
-          onToggle={() => togglePanel('diagnostics')}
-          latestPromptTrace={latestPromptTrace}
-          latestTurnAudit={latestTurnAudit}
-          healthStatus={healthStatus}
-          checkingHealth={checkingHealth}
-          onHealthCheck={onHealthCheck}
-        />
+        {inspectSettings.diagnosticsVisible ? (
+          <DiagnosticsPanel
+            open={openPanel === 'diagnostics'}
+            onToggle={() => togglePanel('diagnostics')}
+            latestPromptTrace={latestPromptTrace}
+            latestTurnAudit={latestTurnAudit}
+            healthStatus={healthStatus}
+            checkingHealth={checkingHealth}
+            onHealthCheck={onHealthCheck}
+          />
+        ) : null}
       </div>
     </aside>
   );

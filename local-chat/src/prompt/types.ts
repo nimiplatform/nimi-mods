@@ -8,13 +8,14 @@ export type PromptLayerId =
   | 'platformSafety'
   | 'identity'
   | 'world'
+  | 'turnMode'
+  | 'interactionProfile'
+  | 'interactionState'
+  | 'relationMemory'
   | 'platformWarmStart'
-  | 'durableMemory'
-  | 'runningSummary'
   | 'sessionRecall'
-  | 'recentBundles'
-  | 'userInput'
-  | 'replyStyle';
+  | 'recentTurns'
+  | 'userInput';
 
 export type PromptLayerTrace = {
   layer: PromptLayerId;
@@ -35,7 +36,7 @@ export type PromptRetrievalTrace = {
   durableMemoryCount: number;
   sessionRecallCount: number;
   worldContextCount: number;
-  recentBundleCount: number;
+  recentTurnCount: number;
 };
 
 export type LocalChatCompiledPrompt = {
@@ -46,7 +47,7 @@ export type LocalChatCompiledPrompt = {
   truncationByLane: Partial<Record<LocalChatContextLaneId, boolean>>;
   budget: PromptBudgetTrace;
   retrieval: PromptRetrievalTrace;
-  compilerVersion: 'v5';
+  compilerVersion: 'v6';
 };
 
 export type LocalChatPromptCompileInput = {

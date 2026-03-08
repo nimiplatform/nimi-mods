@@ -6,38 +6,42 @@ import {
   isPromptLikelyNsfw,
 } from '../src/services/policy/nsfw-media-policy.ts';
 
-test('nsfw policy defaults to disabled when setting is false', () => {
+test('nsfw policy keeps token-api on safe boundary by default', () => {
   assert.equal(
     evaluateNsfwMediaPolicy({
-      allowNsfwMedia: false,
       routeSource: 'local-runtime',
+      relationshipBoundaryPreset: 'balanced',
+      visualComfortLevel: 'soft-visuals',
     }),
     'disabled',
   );
   assert.equal(
     evaluateNsfwMediaPolicy({
-      allowNsfwMedia: false,
       routeSource: 'token-api',
-    }),
-    'disabled',
-  );
-});
-
-test('nsfw policy is local-runtime-only when enabled but route is not local runtime', () => {
-  assert.equal(
-    evaluateNsfwMediaPolicy({
-      allowNsfwMedia: true,
-      routeSource: 'token-api',
+      relationshipBoundaryPreset: 'close',
+      visualComfortLevel: 'natural-visuals',
     }),
     'local-runtime-only',
   );
 });
 
-test('nsfw policy is allowed only when enabled on local runtime', () => {
+test('nsfw policy is local-runtime-only on token-api even for close natural visuals', () => {
   assert.equal(
     evaluateNsfwMediaPolicy({
-      allowNsfwMedia: true,
+      routeSource: 'token-api',
+      relationshipBoundaryPreset: 'close',
+      visualComfortLevel: 'natural-visuals',
+    }),
+    'local-runtime-only',
+  );
+});
+
+test('nsfw policy is allowed only for local runtime with close natural visuals', () => {
+  assert.equal(
+    evaluateNsfwMediaPolicy({
       routeSource: 'local-runtime',
+      relationshipBoundaryPreset: 'close',
+      visualComfortLevel: 'natural-visuals',
     }),
     'allowed',
   );

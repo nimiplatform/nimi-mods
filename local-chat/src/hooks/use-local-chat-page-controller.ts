@@ -26,6 +26,7 @@ export function useLocalChatPageController(): LocalChatShellProps {
     selectedTarget: state.targetsState.selectedTarget,
     selectedTargetAvatarUrl: state.selectedTargetAvatarUrl,
     selectedTargetInitial: state.selectedTargetInitial,
+    selectedTargetInteractionProfile: state.selectedTargetInteractionProfile,
     onOpenSelectedTargetProfile: () => {
       const target = state.targetsState.selectedTarget;
       if (!target?.id) {
@@ -40,8 +41,8 @@ export function useLocalChatPageController(): LocalChatShellProps {
       state.navigateToProfile(preferredIdentifier, isAgent ? 'agent-detail' : 'profile');
     },
     loadingTargetDetail: state.targetsState.loadingTargetDetail,
-    modelLabel: actions.modelLabel,
     sessions: state.sessionsState.sessions,
+    loadingSessions: state.sessionsState.loadingSessions,
     selectedSessionId: state.sessionsState.selectedSessionId,
     onCreateSession: state.sessionsState.handleCreateSession,
     onSelectSession: state.sessionsState.setSelectedSessionId,
@@ -67,10 +68,28 @@ export function useLocalChatPageController(): LocalChatShellProps {
     inputRef: state.inputRef,
     inputText: state.inputText,
     setInputText: state.setInputText,
+    productSettings: state.speechSettingsState.productSettings,
+    activeInteractionSnapshot: state.activeInteractionSnapshot,
+    activeRelationMemorySlots: state.activeRelationMemorySlots,
+    memorySyncStatus: state.memorySyncStatus,
+    onToggleProductSetting: actions.handleDefaultSettingChange,
+    onDefaultMediaAutonomyChange: actions.handleMediaAutonomyChange,
+    onDefaultVoiceConversationModeChange: actions.handleVoiceConversationModeChange,
+    onVisualComfortLevelChange: actions.handleVisualComfortLevelChange,
+    onMemoryOverrideChange: (slotId, override) => {
+      void state.updateRelationMemorySlotOverride(slotId, override);
+    },
+    onDeleteMemorySlot: (slotId) => {
+      void state.deleteRelationMemorySlot(slotId);
+    },
+    hasConversationHistory: state.sessionsState.sessions.some((session) => session.turnCount > 0),
     onInputKeyDown: actions.handleKeyDown,
     voiceInputState: state.speechTranscribeState.voiceInputState,
     onToggleVoiceInput: actions.handleToggleVoiceInput,
     onCancelVoiceInput: actions.handleCancelVoiceInput,
+    enableVoice: state.speechSettingsState.defaultSettings.enableVoice,
+    voiceConversationMode: state.activeVoiceConversationMode,
+    onVoiceConversationModeChange: state.setVoiceConversationMode,
     onSend: () => {
       void actions.handleSendAndFocus();
     },

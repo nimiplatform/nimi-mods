@@ -32,6 +32,10 @@
 - `LC-DOM-018`: Voice catalog resolution is binding-and-model scoped; Local-Chat MUST NOT maintain a second provider-level voice truth.
 - `LC-DOM-019`: TTS playback accepts either artifact `uri` or bytes-backed audio payload; bytes-only success is not a playback failure.
 - `LC-DOM-023`: Mod-facing dependency snapshots consumed by Local-Chat MUST expose runtime canonical capability tokens, not legacy short aliases.
+- `LC-DOM-024`: `interactionProfile` is derived locally from `agentProfile.dna + agentMetadata + world/worldview`; Local-Chat MUST NOT require a closed-source realm projection for this layer.
+- `LC-DOM-025`: User-facing assistant delivery is beat-first: first beat lands as a finalized message, later beats are scheduled by delivery director, and streaming placeholders are fallback-only.
+- `LC-DOM-026`: `voiceConversationMode` is session-scoped; `enableVoice` is a capability gate, not a guarantee that every reply becomes voice.
+- `LC-DOM-027`: Image/video/voice are natural response modalities selected by orchestration policy, not fixed output modes driven only by settings toggles.
 
 ## 3. No Over-Design Guard
 

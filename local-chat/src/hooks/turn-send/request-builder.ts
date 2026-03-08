@@ -4,7 +4,7 @@ import {
   type LocalChatTarget,
 } from '../../data/index.js';
 import type { LocalChatCompiledPrompt } from '../../prompt/index.js';
-import type { LocalChatContextPacket } from '../../state/index.js';
+import type { LocalChatContextPacket, LocalChatTurnMode, VoiceConversationMode } from '../../state/index.js';
 import { assembleLocalChatContextPacket } from './context-assembler.js';
 
 const MAX_SEGMENT_TOKENS = 2048;
@@ -17,6 +17,9 @@ type BuildTurnRequestInput = {
   selectedSessionId: string;
   runtimeMode: 'STORY' | 'SCENE_TURN' | undefined;
   routeBinding: RuntimeRouteBinding | null;
+  allowMultiReply: boolean;
+  turnMode?: LocalChatTurnMode;
+  voiceConversationMode?: VoiceConversationMode;
 };
 
 export type TurnInvokeInput = {

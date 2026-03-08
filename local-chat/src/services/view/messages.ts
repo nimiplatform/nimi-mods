@@ -67,8 +67,19 @@ export function createSessionTurn(input: {
     || input.message.kind === 'video'
     ? input.message.kind
     : 'text';
+  const turnId = String(input.message.meta?.turnId || input.message.id);
+  const beatIndex = Number.isFinite(input.message.meta?.beatIndex)
+    ? Math.max(0, Number(input.message.meta?.beatIndex))
+    : 0;
+  const beatCount = Number.isFinite(input.message.meta?.beatCount) && Number(input.message.meta?.beatCount) > 0
+    ? Math.floor(Number(input.message.meta?.beatCount))
+    : 1;
   return {
     id: input.message.id,
+    turnId,
+    turnSeq: 0,
+    beatIndex,
+    beatCount,
     role: input.message.role,
     kind,
     content: input.message.content,
@@ -80,7 +91,5 @@ export function createSessionTurn(input: {
     meta: input.message.meta,
     promptTrace: input.promptTrace || undefined,
     audit: input.audit || undefined,
-    bundleId: '',
-    bundleSeq: 0,
   };
 }

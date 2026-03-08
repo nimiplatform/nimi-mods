@@ -22,15 +22,20 @@ const NSFW_PROMPT_PATTERNS: RegExp[] = [
 ];
 
 export function evaluateNsfwMediaPolicy(input: {
-  allowNsfwMedia: boolean;
   routeSource: string;
+  relationshipBoundaryPreset?: 'reserved' | 'balanced' | 'close';
+  visualComfortLevel?: 'text-only' | 'soft-visuals' | 'natural-visuals';
 }): NsfwMediaPolicy {
-  if (!input.allowNsfwMedia) {
-    return 'disabled';
+  if (input.routeSource === 'token-api') {
+    return 'local-runtime-only';
   }
-  return input.routeSource === 'local-runtime'
-    ? 'allowed'
-    : 'local-runtime-only';
+  if (
+    input.visualComfortLevel === 'natural-visuals'
+    && input.relationshipBoundaryPreset === 'close'
+  ) {
+    return 'allowed';
+  }
+  return 'disabled';
 }
 
 export function isNsfwMediaAllowed(policy: NsfwMediaPolicy): boolean {

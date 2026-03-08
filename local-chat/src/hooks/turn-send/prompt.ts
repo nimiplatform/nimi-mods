@@ -38,6 +38,7 @@ export async function prepareLocalChatTurn(input: {
     selectedSessionId: input.selectedSessionId,
     runtimeMode: input.runtimeMode,
     routeBinding: input.routeBinding,
+    allowMultiReply: input.allowMultiReply,
   });
   const textTurn = await runTextTurn({
     flowId: input.flowId,

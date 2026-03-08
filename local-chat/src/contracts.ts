@@ -26,6 +26,7 @@ export const LOCAL_CHAT_CAPABILITIES = [
   'runtime.media.image.generate',
   'runtime.media.video.generate',
   'runtime.media.tts.list.voices',
+  'runtime.media.tts.stream',
   'runtime.media.tts.synthesize',
   'runtime.media.stt.transcribe',
   'runtime.route.list.options',

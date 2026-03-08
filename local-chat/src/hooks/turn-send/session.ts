@@ -17,7 +17,6 @@ export async function ensureWorkingSession(input: {
       targetId: input.selectedTarget.id,
       viewerId: input.viewerId,
       target: input.selectedTarget,
-      allowProactiveContact: false,
     });
     input.setSelectedSessionId(workingSession.id);
   }

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createLocalChatSession,
-  createLocalChatTurnBundle,
+  createLocalChatTurnRecord,
   resetLocalChatConversationLedgerForTests,
 } from '../src/state/index.ts';
 import { commitAssistantMessage } from '../src/hooks/turn-send/session-persist.ts';
@@ -30,14 +30,15 @@ async function createAssistantBundleFixture() {
     worldId: 'world.test',
     title: 'Media Delivery Fixture',
   });
-  const assistantBundle = await createLocalChatTurnBundle({
+  const assistantTurn = await createLocalChatTurnRecord({
     conversationId: session.id,
     role: 'assistant',
+    turnId: 'turn-assistant-fixture',
   });
   return {
     sessionId: session.id,
     viewerId: session.viewerId,
-    assistantBundleId: assistantBundle.id,
+    assistantTurnId: assistantTurn.id,
   };
 }
 
@@ -60,7 +61,7 @@ test('commit assistant message replaces pending image message with finalized ima
     sessionId: fixture.sessionId,
     targetId: 'target-1',
     viewerId: fixture.viewerId,
-    assistantBundleId: fixture.assistantBundleId,
+    assistantTurnId: fixture.assistantTurnId,
     messageId: 'pending-image-1',
     setMessages: (next) => store.set(next),
     setSessions: () => {},
@@ -105,7 +106,7 @@ test('commit assistant message replaces pending video message with finalized vid
     sessionId: fixture.sessionId,
     targetId: 'target-1',
     viewerId: fixture.viewerId,
-    assistantBundleId: fixture.assistantBundleId,
+    assistantTurnId: fixture.assistantTurnId,
     messageId: 'pending-video-1',
     setMessages: (next) => store.set(next),
     setSessions: () => {},
@@ -139,7 +140,7 @@ test('commit assistant message appends finalized message when target id does not
     sessionId: fixture.sessionId,
     targetId: 'target-1',
     viewerId: fixture.viewerId,
-    assistantBundleId: fixture.assistantBundleId,
+    assistantTurnId: fixture.assistantTurnId,
     messageId: 'missing-pending-id',
     setMessages: (next) => store.set(next),
     setSessions: () => {},

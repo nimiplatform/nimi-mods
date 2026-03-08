@@ -2,12 +2,14 @@ import React from 'react';
 import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import { useAppStore } from '@nimiplatform/sdk/mod/ui';
 import { normalizeRuntimeRouteSource, type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
+import { resolveCommittedChatModelQuery } from '../../hooks/runtime-route/override-actions.js';
 
 type Props = {
   open: boolean;
   onToggle: () => void;
   activeChatSource: RuntimeRouteBinding['source'];
   activeChatConnectorId: string;
+  activeChatModel: string;
   chatRouteOptions: RuntimeRouteOptionsSnapshot | null;
   chatModelQuery: string;
   setChatModelQuery: (value: string) => void;
@@ -33,6 +35,7 @@ export function ChatRoutePanel(props: Props) {
     onToggle,
     activeChatSource,
     activeChatConnectorId,
+    activeChatModel,
     chatRouteOptions,
     chatModelQuery,
     setChatModelQuery,
@@ -43,7 +46,20 @@ export function ChatRoutePanel(props: Props) {
     onRouteModelChange,
     onClearRouteBinding,
   } = props;
+  const hasPendingModelChange = String(chatModelQuery || '').trim() !== String(activeChatModel || '').trim();
   const showEmptyLocalRuntimeCta = activeChatSource === 'local-runtime' && chatModelOptions.length === 0;
+  const commitChatModelQuery = (query: string) => {
+    const resolved = resolveCommittedChatModelQuery({
+      source: activeChatSource,
+      query,
+      activeModel: activeChatModel,
+      availableModels: chatModelOptions,
+    });
+    setChatModelQuery(resolved.nextQuery);
+    if (resolved.nextModel) {
+      onRouteModelChange(resolved.nextModel);
+    }
+  };
 
   return (
     <div className="lc-card rounded-2xl p-3 text-xs">
@@ -96,18 +112,34 @@ export function ChatRoutePanel(props: Props) {
                 onChange={(event) => {
                   const nextValue = event.target.value;
                   setChatModelQuery(nextValue);
-                  if (chatModelOptions.includes(nextValue)) {
-                    onRouteModelChange(nextValue);
+                  if (chatModelOptions.includes(nextValue.trim())) {
+                    onRouteModelChange(nextValue.trim());
+                  }
+                }}
+                onBlur={(event) => {
+                  commitChatModelQuery(event.target.value);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    commitChatModelQuery(chatModelQuery);
                   }
                 }}
                 placeholder={t('ChatRoute.modelPlaceholder')}
-                className="h-8 w-full rounded-xl border border-gray-200 bg-white px-2 text-xs text-gray-900 outline-none transition-colors focus:border-mint-500 focus:ring-1 focus:ring-mint-500"
+                className={`h-8 w-full rounded-xl bg-white px-2 text-xs text-gray-900 outline-none transition-colors focus:ring-1 ${
+                  hasPendingModelChange
+                    ? 'border border-amber-300 focus:border-amber-400 focus:ring-amber-200'
+                    : 'border border-gray-200 focus:border-mint-500 focus:ring-mint-500'
+                }`}
               />
               <datalist id="local-chat-chat-model-list">
                 {filteredChatModelOptions.map((model) => (
                   <option key={`route-model-${model}`} value={model} />
                 ))}
               </datalist>
+              {hasPendingModelChange ? (
+                <p className="mt-1 text-[11px] text-amber-700">{t('ChatRoute.pendingModelHint')}</p>
+              ) : null}
               {chatModelOptions.length === 0 ? (
                 <p className="mt-1 text-[11px] text-amber-700">{t('ChatRoute.noModels')}</p>
               ) : null}

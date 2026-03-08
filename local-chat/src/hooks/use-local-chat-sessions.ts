@@ -19,7 +19,6 @@ type UseLocalChatSessionsInput = {
   selectedTargetId: string;
   selectedTarget: LocalChatTarget | null;
   targets: LocalChatTarget[];
-  allowProactiveContact: boolean;
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   setLatestPromptTrace: (trace: LocalChatPromptTrace | null) => void;
   setLatestTurnAudit: (audit: LocalChatTurnAudit | null) => void;
@@ -44,6 +43,7 @@ async function applySessionArtifacts(input: {
 export function useLocalChatSessions(input: UseLocalChatSessionsInput) {
   const [sessions, setSessions] = useState<LocalChatSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState('');
+  const [loadingSessions, setLoadingSessions] = useState(false);
 
   const applySessionToView = useCallback(async (session: LocalChatSession | null) => {
     input.setMessages(toChatMessagesFromSession(session));
@@ -60,6 +60,7 @@ export function useLocalChatSessions(input: UseLocalChatSessionsInput) {
     if (!input.selectedTargetId) {
       setSessions([]);
       setSelectedSessionId('');
+      setLoadingSessions(false);
       input.setMessages([]);
       input.setLatestPromptTrace(null);
       input.setLatestTurnAudit(null);
@@ -68,6 +69,12 @@ export function useLocalChatSessions(input: UseLocalChatSessionsInput) {
       };
     }
     void (async () => {
+      setLoadingSessions(true);
+      setSessions([]);
+      setSelectedSessionId('');
+      input.setMessages([]);
+      input.setLatestPromptTrace(null);
+      input.setLatestTurnAudit(null);
       const target = input.targets.find((item) => item.id === input.selectedTargetId) || null;
       const found = await listLocalChatSessions(input.selectedTargetId, input.viewerId);
       if (cancelled) return;
@@ -76,14 +83,10 @@ export function useLocalChatSessions(input: UseLocalChatSessionsInput) {
           targetId: input.selectedTargetId,
           viewerId: input.viewerId,
           target,
-          allowProactiveContact: input.allowProactiveContact,
         });
         if (cancelled) return;
         setSessions([created]);
         setSelectedSessionId(created.id);
-        input.setMessages(toChatMessagesFromSession(created));
-        input.setLatestPromptTrace(null);
-        input.setLatestTurnAudit(null);
         return;
       }
       setSessions(found);
@@ -98,7 +101,6 @@ export function useLocalChatSessions(input: UseLocalChatSessionsInput) {
       cancelled = true;
     };
   }, [
-    input.allowProactiveContact,
     input.selectedTargetId,
     input.targets,
     input.viewerId,
@@ -113,19 +115,34 @@ export function useLocalChatSessions(input: UseLocalChatSessionsInput) {
       input.setMessages([]);
       input.setLatestPromptTrace(null);
       input.setLatestTurnAudit(null);
+      if (!input.selectedTargetId) {
+        setLoadingSessions(false);
+      }
       return () => {
         cancelled = true;
       };
     }
     void (async () => {
+      setLoadingSessions(true);
       const session = await getLocalChatSession(selectedSessionId, input.viewerId);
       if (cancelled) return;
       await applySessionToView(session);
+      if (!cancelled) {
+        setLoadingSessions(false);
+      }
     })();
     return () => {
       cancelled = true;
     };
-  }, [applySessionToView, input.setLatestPromptTrace, input.setLatestTurnAudit, input.setMessages, input.viewerId, selectedSessionId]);
+  }, [
+    applySessionToView,
+    input.selectedTargetId,
+    input.setLatestPromptTrace,
+    input.setLatestTurnAudit,
+    input.setMessages,
+    input.viewerId,
+    selectedSessionId,
+  ]);
 
   useEffect(() => {
     if (!input.selectedTargetId) return undefined;
@@ -169,7 +186,6 @@ export function useLocalChatSessions(input: UseLocalChatSessionsInput) {
         targetId: input.selectedTargetId,
         viewerId: input.viewerId,
         target,
-        allowProactiveContact: input.allowProactiveContact,
       });
       const nextSessions = await listLocalChatSessions(input.selectedTargetId, input.viewerId);
       setSessions(nextSessions);
@@ -179,7 +195,6 @@ export function useLocalChatSessions(input: UseLocalChatSessionsInput) {
       input.setLatestTurnAudit(null);
     })();
   }, [
-    input.allowProactiveContact,
     input.selectedTarget,
     input.selectedTargetId,
     input.targets,
@@ -202,7 +217,6 @@ export function useLocalChatSessions(input: UseLocalChatSessionsInput) {
           targetId: input.selectedTargetId,
           viewerId: input.viewerId,
           target,
-          allowProactiveContact: input.allowProactiveContact,
         });
         setSessions([created]);
         setSelectedSessionId(created.id);
@@ -217,7 +231,6 @@ export function useLocalChatSessions(input: UseLocalChatSessionsInput) {
       }
     })();
   }, [
-    input.allowProactiveContact,
     input.selectedTarget,
     input.selectedTargetId,
     input.targets,
@@ -229,6 +242,7 @@ export function useLocalChatSessions(input: UseLocalChatSessionsInput) {
   ]);
 
   return {
+    loadingSessions,
     sessions,
     setSessions,
     selectedSessionId,

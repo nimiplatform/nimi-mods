@@ -32,13 +32,15 @@ function createBaseInput(): UseLocalChatTurnSendInput {
     imageResolvedRoute: null,
     videoResolvedRoute: null,
     defaultSettings: {
+      deliveryStyle: 'natural',
+      mediaAutonomy: 'natural',
+      voiceConversationMode: 'off',
+      relationshipBoundaryPreset: 'balanced',
+      visualComfortLevel: 'soft-visuals',
       enableVoice: false,
       voiceName: 'alloy',
-      allowMultiReply: true,
       allowProactiveContact: false,
       autoPlayVoiceReplies: false,
-      allowNsfwMedia: false,
-      segmentationMode: 'adaptive',
       ttsRouteSource: 'auto',
       ttsConnectorId: '',
       ttsModel: '',
@@ -51,8 +53,6 @@ function createBaseInput(): UseLocalChatTurnSendInput {
       videoRouteSource: 'auto',
       videoConnectorId: '',
       videoModel: '',
-      mediaPlannerMode: 'high-confidence-auto',
-      videoAutoPolicy: 'explicit-only',
     },
     selectedTarget: {
       id: 'target-1',
@@ -125,7 +125,6 @@ test('turn send context key stays stable across background route and dependency 
     defaultSettings: {
       ...base.defaultSettings,
       imageModel: 'image-model-a',
-      mediaPlannerMode: 'explicit-only',
     },
   });
 

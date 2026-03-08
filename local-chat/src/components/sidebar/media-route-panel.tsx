@@ -1,13 +1,17 @@
 import React, { useMemo } from 'react';
 import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import { dedupeModelIds } from '../../services/index.js';
-import { resolveModelsForScenario } from '../../services/route/connector-model-capabilities.js';
+import {
+  resolveLocalRuntimeModelsForScenario,
+  resolveModelsForScenario,
+} from '../../services/route/connector-model-capabilities.js';
 import type { RuntimeStatusSidebarProps } from './types.js';
 
 type Props = {
   open: boolean;
   loading: boolean;
   onToggle: () => void;
+  embedded?: boolean;
   imageRouteOptions: RuntimeStatusSidebarProps['imageRouteOptions'];
   videoRouteOptions: RuntimeStatusSidebarProps['videoRouteOptions'];
   imageResolvedRoute: RuntimeStatusSidebarProps['imageResolvedRoute'];
@@ -40,11 +44,10 @@ function localRuntimeMediaModels(
   options: RuntimeStatusSidebarProps['imageRouteOptions'] | RuntimeStatusSidebarProps['videoRouteOptions'],
   scenario: 'image.generate' | 'video.generate',
 ): string[] {
-  const models = (options?.localRuntime.models || [])
-    .filter((item) => {
-      const capabilities = Array.isArray(item.capabilities) ? item.capabilities : [];
-      return capabilities.includes(scenario);
-    })
+  const models = resolveLocalRuntimeModelsForScenario({
+    models: options?.localRuntime.models || [],
+    scenario,
+  })
     .map((item) => String(item.model || item.localModelId || '').trim())
     .filter(Boolean);
   return dedupeModelIds(models);
@@ -55,7 +58,8 @@ function connectorMediaModels(input: {
   connectorId: string;
   scenario: 'image.generate' | 'video.generate';
 }): string[] {
-  const connector = input.connectors.find((item) => item.id === input.connectorId) || null;
+  const connectors = Array.isArray(input.connectors) ? input.connectors : [];
+  const connector = connectors.find((item) => item.id === input.connectorId) || null;
   if (!connector) return [];
   return resolveModelsForScenario({
     models: connector.models || [],
@@ -69,14 +73,18 @@ function formatResolvedRouteLabel(input: {
   imageConnectors: RuntimeStatusSidebarProps['imageConnectors'];
   videoConnectors: RuntimeStatusSidebarProps['videoConnectors'];
 }): string {
-  if (!input.route) return '';
-  if (input.route.source === 'local-runtime') {
-    return String(input.route.model || '').trim() || 'Local Runtime';
+  const route = input.route;
+  if (!route) return '';
+  if (route.source === 'local-runtime') {
+    return String(route.model || '').trim() || 'Local Runtime';
   }
-  const connector = [...input.imageConnectors, ...input.videoConnectors]
-    .find((item) => item.id === input.route?.connectorId) || null;
-  const connectorLabel = String(connector?.label || input.route.connectorId || '').trim();
-  const model = String(input.route.model || '').trim();
+  const allConnectors = [
+    ...(Array.isArray(input.imageConnectors) ? input.imageConnectors : []),
+    ...(Array.isArray(input.videoConnectors) ? input.videoConnectors : []),
+  ];
+  const connector = allConnectors.find((item) => item.id === route.connectorId) || null;
+  const connectorLabel = String(connector?.label || route.connectorId || '').trim();
+  const model = String(route.model || '').trim();
   return [connectorLabel, model].filter(Boolean).join(' · ') || 'Token API';
 }
 
@@ -149,20 +157,8 @@ export function MediaRoutePanel(props: Props) {
     return t('MediaRoute.autoUnresolvedHint');
   };
 
-  return (
-    <div className="lc-card rounded-2xl p-3 text-xs">
-      <button
-        type="button"
-        onClick={props.onToggle}
-        aria-expanded={props.open}
-        className="flex h-7 w-full items-center justify-between text-left text-[13px] font-semibold text-gray-700"
-      >
-        <span>{t('MediaRoute.title')}</span>
-        <span className={`text-gray-400 transition-transform duration-200 ${props.open ? 'rotate-180' : ''}`}>{CHEVRON_ICON}</span>
-      </button>
-      {props.open ? (
-        <div className="mt-3">
-          <div className="min-h-0 space-y-4 lc-panel-expand">
+  const content = (
+        <div className="min-h-0 space-y-4 lc-panel-expand">
           {props.loading ? (
             <p className="rounded-lg border border-sky-100 bg-sky-50 px-2 py-1.5 text-[11px] text-slate-600">
               {t('MediaRoute.loadingHint')}
@@ -281,8 +277,24 @@ export function MediaRoutePanel(props: Props) {
             </>
           )}
           </div>
-        </div>
-      ) : null}
+  );
+
+  if (props.embedded) {
+    return <div className="text-xs">{content}</div>;
+  }
+
+  return (
+    <div className="lc-card rounded-2xl p-3 text-xs">
+      <button
+        type="button"
+        onClick={props.onToggle}
+        aria-expanded={props.open}
+        className="flex h-7 w-full items-center justify-between text-left text-[13px] font-semibold text-gray-700"
+      >
+        <span>{t('MediaRoute.title')}</span>
+        <span className={`text-gray-400 transition-transform duration-200 ${props.open ? 'rotate-180' : ''}`}>{CHEVRON_ICON}</span>
+      </button>
+      {props.open ? <div className="mt-3">{content}</div> : null}
     </div>
   );
 }

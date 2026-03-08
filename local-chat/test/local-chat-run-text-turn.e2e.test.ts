@@ -102,9 +102,11 @@ test('local-chat runTextTurn e2e: stream path returns normalized segments withou
     resetTextTurnStreamHealthForTests();
     let generateTextCalled = 0;
     const streamedChunks: string[] = [];
+    const streamInputs: Array<Record<string, unknown>> = [];
     const aiClient: TestAiClient = {
       resolveRoute: async () => createRoute(),
-      streamText: async function* () {
+      streamText: async function* (input) {
+        streamInputs.push(input);
         for await (const event of streamFromDeltas([
           '当然可以，',
           '我建议你先把目标拆成今天能完成的一小步。',
@@ -140,6 +142,8 @@ test('local-chat runTextTurn e2e: stream path returns normalized segments withou
     assert.equal(result.firstReply, result.segments[0]?.content);
     assert.equal(generateTextCalled, 0);
     assert.equal(streamedChunks.length >= 2, true);
+    assert.equal(typeof streamInputs[0]?.timeoutMs, 'number');
+    assert.equal(Number(streamInputs[0]?.timeoutMs) > 0, true);
   });
 });
 
@@ -147,11 +151,13 @@ test('local-chat runTextTurn e2e: stream failure falls back to generateText', as
   await withNoopModSdkHost(async () => {
     resetTextTurnStreamHealthForTests();
     let generateTextCalled = 0;
+    const generateInputs: Array<Record<string, unknown>> = [];
     const aiClient: TestAiClient = {
       resolveRoute: async () => createRoute(),
       streamText: () => failingStream('AI_PROVIDER_TIMEOUT'),
-      generateText: async () => {
+      generateText: async (input) => {
         generateTextCalled += 1;
+        generateInputs.push(input);
         return {
           text: '我建议你先从最小可执行动作开始，然后观察结果再迭代。',
           promptTraceId: 'prompt-trace-fallback-1',
@@ -170,6 +176,8 @@ test('local-chat runTextTurn e2e: stream failure falls back to generateText', as
     assert.equal(result.segments[0]?.content, '我建议你先从最小可执行动作开始，然后观察结果再迭代。');
     assert.equal(result.firstReply, '我建议你先从最小可执行动作开始，然后观察结果再迭代。');
     assert.equal(generateTextCalled, 1);
+    assert.equal(typeof generateInputs[0]?.timeoutMs, 'number');
+    assert.equal(Number(generateInputs[0]?.timeoutMs) > 0, true);
   });
 });
 
@@ -263,6 +271,41 @@ test('local-chat runTextTurn e2e: pacing plan can split single-message fallback 
       },
     });
 
+    assert.equal(result.segments.length, 2);
+    assert.equal(result.segmentParseMode, 'double-newline');
+    assert.match(result.segments[0]?.content || '', /你先把今天最重要的一步做完/);
+    assert.match(result.segments[1]?.content || '', /我帮你继续拆/);
+  });
+});
+
+test('local-chat runTextTurn e2e: pacing plan can split streamed single-message output into multiple replies', async () => {
+  await withNoopModSdkHost(async () => {
+    resetTextTurnStreamHealthForTests();
+    const aiClient: TestAiClient = {
+      resolveRoute: async () => createRoute(),
+      streamText: () => streamFromDeltas([
+        '可以。你先把今天最重要的一步做完。做完再回来告诉我，我帮你继续拆。',
+      ]),
+      generateText: async () => ({
+        text: 'should-not-be-used',
+        promptTraceId: 'prompt-trace-unused-stream-pacing',
+        traceId: 'trace-unused-stream-pacing',
+        route: createRoute(),
+      }),
+    };
+
+    const result = await runTextTurn({
+      ...createBaseInput(aiClient),
+      allowMultiReply: true,
+      pacingPlan: {
+        mode: 'answer-followup',
+        maxSegments: 2,
+        energy: 'medium',
+        reason: 'test-stream-answer-followup',
+      },
+    });
+
+    assert.equal(result.streamCompleted, true);
     assert.equal(result.segments.length, 2);
     assert.equal(result.segmentParseMode, 'double-newline');
     assert.match(result.segments[0]?.content || '', /你先把今天最重要的一步做完/);

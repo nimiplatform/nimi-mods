@@ -1,18 +1,19 @@
-import type { LocalChatTarget, LocalChatMemoryRecallResult } from '../../data/index.js';
+import type { LocalChatMemoryRecallResult, LocalChatTarget } from '../../data/index.js';
 import { recallLocalChatMemoryForPrompt } from '../../data/index.js';
 import {
-  getLocalChatRunningSummary,
-  lexicalRecallLocalChatSession,
-  listLocalChatDurableMemoryEntries,
-  listLocalChatExactHistoryBundles,
-  type LocalChatContinuityHealth,
+  getLocalChatInteractionSnapshot,
+  listLocalChatExactHistoryTurns,
+  listLocalChatRecallIndex,
+  listLocalChatRelationMemorySlots,
+  type DerivedInteractionProfile,
+  type LocalChatContextRecentTurn,
   type LocalChatContextPacket,
-  type LocalChatDurableMemoryEntry,
   type LocalChatReplyPacingPlan,
-  type LocalChatReplyStyleProfile,
-  type LocalChatTurnBundle,
+  type LocalChatTurn,
+  type LocalChatTurnMode,
+  type VoiceConversationMode,
 } from '../../state/index.js';
-import { getLocalChatContinuityHealth } from './continuity-maintenance.js';
+import { deriveInteractionProfile } from './interaction-profile.js';
 
 export type AssembleLocalChatContextPacketInput = {
   text: string;
@@ -20,6 +21,9 @@ export type AssembleLocalChatContextPacketInput = {
   viewerDisplayName: string;
   selectedTarget: LocalChatTarget;
   selectedSessionId: string;
+  allowMultiReply?: boolean;
+  turnMode?: LocalChatTurnMode;
+  voiceConversationMode?: VoiceConversationMode;
 };
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -34,9 +38,7 @@ function asString(value: unknown): string {
 
 function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => String(item || '').trim())
-    .filter(Boolean);
+  return value.map((item) => String(item || '').trim()).filter(Boolean);
 }
 
 function lexicalScore(haystack: string, query: string): number {
@@ -56,179 +58,88 @@ function lexicalScore(haystack: string, query: string): number {
   return hits / tokens.length;
 }
 
-function asArray(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [];
-}
-
-function readNestedRecord(record: unknown, path: string[]): Record<string, unknown> {
-  let current = asRecord(record);
-  for (const key of path) {
-    current = asRecord(current[key]);
-  }
-  return current;
-}
-
-function normalizeResponseLength(value: unknown): LocalChatReplyStyleProfile['responseLength'] {
-  const normalized = asString(value).toLowerCase();
-  if (normalized === 'short' || normalized === 'long') return normalized;
-  return 'medium';
-}
-
-function normalizeFormality(value: unknown): LocalChatReplyStyleProfile['formality'] {
-  const normalized = asString(value).toLowerCase();
-  if (normalized === 'formal' || normalized === 'slang') return normalized;
-  return 'casual';
-}
-
-function normalizeSentiment(value: unknown): LocalChatReplyStyleProfile['sentiment'] {
-  const normalized = asString(value).toLowerCase();
-  if (normalized === 'positive' || normalized === 'cynical') return normalized;
-  return 'neutral';
-}
-
-function compactLines(value: string): string {
-  return value.replace(/\s+/g, ' ').trim();
-}
-
-function deriveReplyStyleProfile(target: LocalChatTarget): LocalChatReplyStyleProfile {
-  const profile = asRecord(target.agentProfile);
-  const metadata = asRecord(target.agentMetadata);
-  const dna = readNestedRecord(profile, ['dna']);
-  const dnaCommunication = readNestedRecord(dna, ['communication']);
-  const dnaPersonality = readNestedRecord(dna, ['personality']);
-  const postHistoryInstructions = compactLines(asString(profile.postHistoryInstructions || metadata.postHistoryInstructions));
-  const exampleDialogue = compactLines(asString(profile.exampleDialogue || metadata.exampleDialogue));
-  const dnaPrimary = asString(profile.dnaPrimary || metadata.dnaPrimary);
-  const dnaSecondary = [
-    ...asArray(profile.dnaSecondary),
-    ...asArray(metadata.dnaSecondary),
-  ].map((item) => asString(item).toUpperCase()).filter(Boolean);
-  const relationshipMode = asString(dnaPersonality.relationshipMode || profile.relationshipMode || metadata.relationshipMode) || 'friendly';
-  const responseLength = normalizeResponseLength(
-    dnaCommunication.responseLength
-    || profile.responseLength
-    || metadata.responseLength
-    || (exampleDialogue.length > 260 ? 'long' : exampleDialogue.length > 120 ? 'medium' : 'short'),
-  );
-  const formality = normalizeFormality(
-    dnaCommunication.formality
-    || profile.formality
-    || metadata.formality
-    || (/\bformal\b|正式|克制/u.test(postHistoryInstructions) ? 'formal' : 'casual'),
-  );
-  const sentiment = normalizeSentiment(
-    dnaCommunication.sentiment
-    || profile.sentiment
-    || metadata.sentiment
-    || (/\bcynical\b|冷淡|讽刺|阴阳怪气/u.test(postHistoryInstructions) ? 'cynical' : 'neutral'),
-  );
-  const normalizedRelationshipMode = relationshipMode.toLowerCase();
-  const intimateRelationship = /(romantic|intimate|flirty|lover|partner|close|亲密|暧昧|恋人|伴侣)/u.test(normalizedRelationshipMode);
-  const warmRelationship = intimateRelationship || /(friendly|gentle|warm|supportive|陪伴|温柔|朋友|治愈)/u.test(normalizedRelationshipMode);
-  const warmSignal = warmRelationship || dnaSecondary.includes('GENTLE') || dnaSecondary.includes('ROMANTIC');
-  const energeticSignal = dnaSecondary.includes('PLAYFUL') || dnaSecondary.includes('CHAOTIC') || dnaSecondary.includes('BOLD');
-  const reservedSignal = formality === 'formal' || sentiment === 'cynical' || dnaPrimary === 'INTELLECTUAL' || dnaSecondary.includes('TSUNDERE');
-  const pacingStyle: LocalChatReplyStyleProfile['pacingStyle'] = reservedSignal
-    ? 'reserved'
-    : energeticSignal || (responseLength === 'short' && warmSignal)
-      ? 'bursty'
-      : 'balanced';
-  const followupStyle: LocalChatReplyStyleProfile['followupStyle'] = reservedSignal
-    ? 'rare'
-    : intimateRelationship || warmSignal || responseLength === 'long'
-      ? 'eager'
-      : 'situational';
-  const warmth: LocalChatReplyStyleProfile['warmth'] = intimateRelationship
-    ? 'intimate'
-    : sentiment === 'cynical'
-      ? 'cool'
-      : warmSignal
-        ? 'warm'
-        : 'cool';
-  const signals = [
-    dnaPrimary ? `dnaPrimary:${dnaPrimary}` : '',
-    dnaSecondary.length > 0 ? `dnaSecondary:${dnaSecondary.join('/')}` : '',
-    relationshipMode ? `relationship:${relationshipMode}` : '',
-    postHistoryInstructions ? 'postHistoryInstructions' : '',
-    exampleDialogue ? 'exampleDialogue' : '',
-  ].filter(Boolean);
-
-  return {
-    responseLength,
-    formality,
-    sentiment,
-    relationshipMode,
-    pacingStyle,
-    followupStyle,
-    warmth,
-    signals,
-  };
-}
-
 const GREETING_RE = /^(?:hi|hello|hey|yo|你好|嗨|哈喽|在吗|早安|晚安|想你了|在不在|喂)[\s!,.?？！，。~]*$/iu;
 const QUESTION_RE = /[?？]|为什么|怎么|如何|能不能|可不可以|是什么|什么意思|怎样|要不要/u;
 const EMOTIONAL_RE = /难过|好累|很累|烦|崩溃|想哭|孤单|害怕|抱抱|安慰|委屈|想你/u;
 const EXCITED_RE = /(?:[!！]{2,}|哈哈|hh+|lol|好耶|太好了|天啊|卧槽|真的耶|笑死)/iu;
 
-function derivePacingPlan(input: {
+export function derivePacingPlan(input: {
   text: string;
-  profile: LocalChatReplyStyleProfile;
+  interactionProfile: DerivedInteractionProfile;
+  allowMultiReply: boolean;
+  turnMode?: LocalChatTurnMode;
 }): LocalChatReplyPacingPlan {
-  const text = compactLines(input.text);
-  const normalized = text.toLowerCase();
+  const text = String(input.text || '').replace(/\s+/g, ' ').trim();
   const isGreeting = GREETING_RE.test(text);
   const isQuestion = QUESTION_RE.test(text);
   const isEmotional = EMOTIONAL_RE.test(text);
   const isExcited = EXCITED_RE.test(text);
-  const intimate = input.profile.warmth === 'intimate';
-  const energetic = input.profile.pacingStyle === 'bursty';
-  const eagerFollowup = input.profile.followupStyle === 'eager';
+  const profile = input.interactionProfile;
+  const energetic = profile.expression.pacingBias === 'bursty';
+  const intimate = profile.relationship.warmth === 'intimate';
+  const gentle = profile.relationship.warmth === 'warm';
 
-  if (isEmotional || (isQuestion && eagerFollowup && input.profile.responseLength !== 'short')) {
-    return {
-      mode: 'answer-followup',
-      maxSegments: 2,
-      energy: isEmotional ? 'low' : 'medium',
-      reason: isEmotional ? 'comfort-needs-soft-followup' : 'question-needs-main-answer-and-followup',
-    };
-  }
-  if (isExcited && energetic) {
-    return {
-      mode: input.profile.responseLength === 'short' ? 'burst-3' : 'burst-2',
-      maxSegments: input.profile.responseLength === 'short' ? 3 : 2,
-      energy: 'high',
-      reason: 'high-energy-turn',
-    };
-  }
-  if (isGreeting && (intimate || eagerFollowup || energetic)) {
-    return {
-      mode: 'burst-2',
-      maxSegments: 2,
-      energy: intimate ? 'medium' : 'high',
-      reason: 'greeting-turn-with-warmth',
-    };
-  }
-  if (input.profile.pacingStyle === 'reserved' || input.profile.formality === 'formal') {
-    return {
-      mode: 'single',
-      maxSegments: 1,
-      energy: 'low',
-      reason: 'reserved-style',
-    };
-  }
-  if (isQuestion && input.profile.followupStyle !== 'rare' && normalized.length <= 48) {
+  if (input.turnMode === 'explicit-media') {
     return {
       mode: 'answer-followup',
       maxSegments: 2,
       energy: 'medium',
-      reason: 'short-question-followup',
+      reason: 'explicit-media-needs-setup-and-delivery',
+    };
+  }
+  if (input.turnMode === 'information') {
+    return {
+      mode: isQuestion && input.allowMultiReply ? 'answer-followup' : 'single',
+      maxSegments: isQuestion && input.allowMultiReply ? 2 : 1,
+      energy: 'low',
+      reason: 'information-prefers-compact',
+    };
+  }
+  if (isEmotional) {
+    return {
+      mode: 'answer-followup',
+      maxSegments: 2,
+      energy: 'low',
+      reason: 'emotional-needs-soft-followup',
+    };
+  }
+  if (isExcited && energetic) {
+    return {
+      mode: 'burst-3',
+      maxSegments: 3,
+      energy: 'high',
+      reason: 'playful-high-energy',
+    };
+  }
+  if (isGreeting && (intimate || gentle || energetic)) {
+    return {
+      mode: 'burst-2',
+      maxSegments: 2,
+      energy: gentle ? 'medium' : 'high',
+      reason: 'greeting-needs-two-beats',
+    };
+  }
+  if (intimate) {
+    return {
+      mode: 'burst-3',
+      maxSegments: 3,
+      energy: 'medium',
+      reason: 'intimate-scene-escalation',
+    };
+  }
+  if (input.allowMultiReply && (gentle || energetic || isQuestion)) {
+    return {
+      mode: isQuestion ? 'answer-followup' : 'burst-2',
+      maxSegments: 2,
+      energy: energetic ? 'medium' : 'low',
+      reason: 'natural-delivery-style',
     };
   }
   return {
-    mode: energetic && input.profile.responseLength === 'short' ? 'burst-2' : 'single',
-    maxSegments: energetic && input.profile.responseLength === 'short' ? 2 : 1,
+    mode: 'single',
+    maxSegments: 1,
     energy: energetic ? 'medium' : 'low',
-    reason: energetic && input.profile.responseLength === 'short' ? 'bursty-short-style' : 'default-single',
+    reason: 'default-single',
   };
 }
 
@@ -249,20 +160,18 @@ function summarizeWorld(target: LocalChatTarget): string[] {
   ].filter(Boolean);
 }
 
-function summarizeIdentity(target: LocalChatTarget): {
+function summarizeIdentity(target: LocalChatTarget, interactionProfile: DerivedInteractionProfile): {
   identityLines: string[];
   rulesLines: string[];
   replyStyleLines: string[];
-  replyStyleProfile: LocalChatReplyStyleProfile;
+  interactionProfileLines: string[];
 } {
   const profile = asRecord(target.agentProfile);
   const metadata = asRecord(target.agentMetadata);
-  const replyStyleProfile = deriveReplyStyleProfile(target);
   const rules = [
     ...asStringArray(profile.rules),
     ...asStringArray(metadata.rules),
   ].slice(0, 8);
-  const postHistoryInstructions = asString(profile.postHistoryInstructions || metadata.postHistoryInstructions);
   const systemPromptBase = asString(profile.systemPromptBase || metadata.systemPromptBase);
   const persona = asString(profile.persona || asRecord(profile.dna).persona || metadata.persona);
   return {
@@ -275,67 +184,56 @@ function summarizeIdentity(target: LocalChatTarget): {
     ].filter(Boolean),
     rulesLines: rules,
     replyStyleLines: [
-      postHistoryInstructions,
-      `建议节奏：${replyStyleProfile.pacingStyle}；补句倾向：${replyStyleProfile.followupStyle}；关系模式：${replyStyleProfile.relationshipMode}。`,
-      '保持自然、像朋友发微信一样交流。',
-      '需要分条时最多 3 条，节奏可以变化。',
-    ].filter(Boolean),
-    replyStyleProfile,
+      `默认距离：${interactionProfile.relationship.defaultDistance}；温度：${interactionProfile.relationship.warmth}。`,
+      `首拍风格：${interactionProfile.expression.firstBeatStyle}；信息回复：${interactionProfile.expression.infoAnswerStyle}。`,
+      '保持像真人聊天一样的停顿、短句和递进，不要一次说尽。',
+    ],
+    interactionProfileLines: [
+      `expression=${interactionProfile.expression.responseLength}/${interactionProfile.expression.formality}/${interactionProfile.expression.sentiment}/${interactionProfile.expression.pacingBias}`,
+      `relationship=${interactionProfile.relationship.defaultDistance}/${interactionProfile.relationship.warmth}/${interactionProfile.relationship.flirtAffinity}`,
+      `voice=${interactionProfile.voice.voiceAffinity}/${interactionProfile.voice.genderGuard}/${interactionProfile.voice.language || 'auto'}`,
+      `visual=${interactionProfile.visual.imageAffinity}/${interactionProfile.visual.videoAffinity}/${interactionProfile.visual.nsfwLevel || 'safe'}`,
+    ],
   };
 }
 
-function recentBundleLines(bundle: LocalChatTurnBundle): string[] {
-  return bundle.segments
-    .map((segment) => {
-      const summary = String(segment.semanticSummary || '').trim();
-      const contextText = String(segment.contextText || '').trim();
-      return summary && summary !== contextText
-        ? `${contextText} (${summary})`
-        : contextText;
-    })
-    .filter(Boolean);
+function buildRecentTurns(turns: LocalChatTurn[]): LocalChatContextRecentTurn[] {
+  const grouped = new Map<string, LocalChatContextRecentTurn>();
+  for (const turn of turns) {
+    const key = `${turn.turnId}:${turn.turnSeq}`;
+    const lineSource = String(turn.semanticSummary || '').trim();
+    const contextText = String(turn.contextText || '').trim();
+    const line = lineSource && lineSource !== contextText
+      ? `${contextText} (${lineSource})`
+      : contextText;
+    const existing = grouped.get(key);
+    if (existing) {
+      if (line) existing.lines.push(line);
+      continue;
+    }
+    grouped.set(key, {
+      id: turn.turnId,
+      seq: turn.turnSeq,
+      role: turn.role,
+      lines: line ? [line] : [],
+    });
+  }
+  return [...grouped.values()].sort((left, right) => left.seq - right.seq);
 }
 
-function selectDurableMemory(entries: LocalChatDurableMemoryEntry[], query: string): LocalChatDurableMemoryEntry[] {
-  const alwaysOnTypes = new Set(['relationship-state', 'boundary', 'assistant-commitment', 'open-loop']);
-  const alwaysOn = entries
-    .filter((entry) => alwaysOnTypes.has(entry.type))
-    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-    .slice(0, 8);
-  const alwaysOnIds = new Set(alwaysOn.map((entry) => entry.id));
-  const scored = entries
-    .filter((entry) => !alwaysOnIds.has(entry.id))
+function selectRelationMemorySlots(
+  slots: LocalChatContextPacket['relationMemorySlots'],
+  query: string,
+): LocalChatContextPacket['relationMemorySlots'] {
+  const entries = slots || [];
+  return [...entries]
     .map((entry) => ({
       entry,
-      score: lexicalScore(entry.content, query),
+      score: lexicalScore(`${entry.key} ${entry.value}`, query) + entry.confidence,
     }))
-    .filter((item) => item.score > 0)
-    .sort((left, right) => (
-      right.score - left.score
-      || right.entry.importance - left.entry.importance
-      || right.entry.updatedAt.localeCompare(left.entry.updatedAt)
-    ))
-    .slice(0, 6)
+    .sort((left, right) => right.score - left.score || right.entry.updatedAt.localeCompare(left.entry.updatedAt))
+    .slice(0, 8)
     .map((item) => item.entry);
-  return [...alwaysOn, ...scored];
-}
-
-function countDurableMemoryByType(entries: LocalChatDurableMemoryEntry[]): LocalChatContextPacket['diagnostics']['durableMemoryCountsByType'] {
-  const counts: LocalChatContextPacket['diagnostics']['durableMemoryCountsByType'] = {};
-  for (const entry of entries) {
-    counts[entry.type] = (counts[entry.type] || 0) + 1;
-  }
-  return counts;
-}
-
-function shouldReadPlatformWarmStart(input: {
-  recentBundles: LocalChatTurnBundle[];
-  runningSummary: LocalChatContextPacket['runningSummary'];
-  durableMemory: LocalChatDurableMemoryEntry[];
-}): boolean {
-  return !input.runningSummary
-    && input.durableMemory.length === 0
-    && input.recentBundles.length <= 1;
 }
 
 function toWarmStartMemory(result: LocalChatMemoryRecallResult | null): LocalChatContextPacket['platformWarmStart'] {
@@ -350,25 +248,19 @@ function toWarmStartMemory(result: LocalChatMemoryRecallResult | null): LocalCha
 }
 
 export async function assembleLocalChatContextPacket(input: AssembleLocalChatContextPacketInput): Promise<LocalChatContextPacket> {
-  const [recentBundles, runningSummary, recallDocs, durableMemory] = await Promise.all([
-    listLocalChatExactHistoryBundles(input.selectedSessionId, input.viewerId),
-    getLocalChatRunningSummary(input.selectedSessionId),
-    lexicalRecallLocalChatSession({
-      conversationId: input.selectedSessionId,
-      query: input.text,
-      topK: 6,
-    }),
-    listLocalChatDurableMemoryEntries({
+  const [recentTurnsRaw, interactionSnapshot, relationMemorySlots, recallIndex] = await Promise.all([
+    listLocalChatExactHistoryTurns(input.selectedSessionId, input.viewerId),
+    getLocalChatInteractionSnapshot(input.selectedSessionId),
+    listLocalChatRelationMemorySlots({
       targetId: input.selectedTarget.id,
       viewerId: input.viewerId,
     }),
+    listLocalChatRecallIndex(input.selectedSessionId),
   ]);
 
-  const warmStart = shouldReadPlatformWarmStart({
-    recentBundles,
-    runningSummary,
-    durableMemory,
-  })
+  const interactionProfile = deriveInteractionProfile(input.selectedTarget);
+  const recentTurns = buildRecentTurns(recentTurnsRaw);
+  const warmStart = !interactionSnapshot && recentTurns.length <= 1
     ? await recallLocalChatMemoryForPrompt({
       target: input.selectedTarget,
       viewerId: input.viewerId,
@@ -376,14 +268,14 @@ export async function assembleLocalChatContextPacket(input: AssembleLocalChatCon
       topK: 6,
     }).catch(() => null)
     : null;
-
-  const selectedDurableMemory = selectDurableMemory(durableMemory, input.text);
-  const identity = summarizeIdentity(input.selectedTarget);
+  const identity = summarizeIdentity(input.selectedTarget, interactionProfile);
   const pacingPlan = derivePacingPlan({
     text: input.text,
-    profile: identity.replyStyleProfile,
+    interactionProfile,
+    allowMultiReply: Boolean(input.allowMultiReply),
+    turnMode: input.turnMode,
   });
-  const continuityHealth = getLocalChatContinuityHealth(input.selectedSessionId);
+  const selectedRelationMemory = selectRelationMemorySlots(relationMemorySlots, input.text);
 
   return {
     conversationId: input.selectedSessionId,
@@ -399,35 +291,31 @@ export async function assembleLocalChatContextPacket(input: AssembleLocalChatCon
       identityLines: identity.identityLines,
       rulesLines: identity.rulesLines,
       replyStyleLines: identity.replyStyleLines,
-      replyStyleProfile: identity.replyStyleProfile,
+      interactionProfileLines: identity.interactionProfileLines,
+      interactionProfile,
     },
     world: {
       worldId: input.selectedTarget.worldId,
       lines: summarizeWorld(input.selectedTarget),
     },
     platformWarmStart: toWarmStartMemory(warmStart),
-    runningSummary,
-    durableMemory: selectedDurableMemory,
-    sessionRecall: recallDocs.map((doc) => ({
+    sessionRecall: recallIndex.map((doc) => ({
       id: doc.id,
       text: doc.text,
-      sourceKind: doc.sourceKind,
-      sourceBundleSeq: doc.sourceBundleSeq,
+      sourceKind: doc.sourceTurnId ? 'turn' : 'recall-index',
+      sourceTurnId: doc.sourceTurnId,
     })),
-    recentBundles: recentBundles.map((bundle) => ({
-      id: bundle.id,
-      seq: bundle.seq,
-      role: bundle.role,
-      lines: recentBundleLines(bundle),
-    })),
+    recentTurns,
+    interactionSnapshot,
+    relationMemorySlots: selectedRelationMemory,
+    recallIndex,
+    turnMode: input.turnMode,
+    voiceConversationMode: input.voiceConversationMode,
     pacingPlan,
     userInput: input.text,
     diagnostics: {
-      selectedBundleSeqs: recentBundles.map((bundle) => bundle.seq),
-      runningSummaryWatermark: runningSummary?.lastSummarizedBundleSeq || 0,
-      sessionRecallCount: recallDocs.length,
-      durableMemoryCountsByType: countDurableMemoryByType(selectedDurableMemory),
-      continuityHealth,
+      selectedTurnSeqs: recentTurns.map((turn) => turn.seq),
+      sessionRecallCount: recallIndex.length,
     },
   };
 }

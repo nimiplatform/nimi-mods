@@ -1,13 +1,11 @@
 import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot, RuntimeRouteSource } from '@nimiplatform/sdk/mod/runtime-route';
 import type {
-  LocalChatBooleanSettingKey,
-  LocalChatDefaultSettings,
-  LocalChatMediaPlannerMode,
+  LocalChatInspectSettings,
   LocalChatPromptTrace,
   LocalChatTurnAudit,
-  LocalChatVideoAutoPolicy,
 } from '../../state/index.js';
 import type { HealthStatus, LocalChatResolvedMediaRoute } from '../../types.js';
+import type { ChatRouteSnapshot } from '../../hooks/runtime-route/types.js';
 
 export type RuntimeStatusSidebarProps = {
   healthStatus: HealthStatus;
@@ -17,6 +15,7 @@ export type RuntimeStatusSidebarProps = {
   videoRouteOptions: RuntimeRouteOptionsSnapshot | null;
   imageResolvedRoute?: LocalChatResolvedMediaRoute | null;
   videoResolvedRoute?: LocalChatResolvedMediaRoute | null;
+  routeSnapshot?: ChatRouteSnapshot | null;
   routeBinding?: RuntimeRouteBinding | null;
   speechVoices: Array<{ id: string; providerId?: string; name: string }>;
   selectedSpeechProviderId?: string;
@@ -27,8 +26,10 @@ export type RuntimeStatusSidebarProps = {
   videoRouteSource: 'auto' | 'local-runtime' | 'token-api';
   localTtsRouteAvailable: boolean;
   localSttRouteAvailable: boolean;
+  enableVoice: boolean;
   autoBoundSource: RuntimeRouteSource | 'mixed' | 'unknown';
   autoBoundModel: string;
+  chatRouteReady: boolean;
   chatCapabilityMatched: boolean;
   dependencyCapabilities: Array<{
     capability: 'chat' | 'tts' | 'stt' | 'image' | 'video' | 'text.generate' | 'audio.synthesize' | 'audio.transcribe';
@@ -82,11 +83,7 @@ export type RuntimeStatusSidebarProps = {
   onVideoModelChange: (model: string) => void;
   onHealthCheck: () => void;
   onOpenRuntimeSetup: () => void;
-  defaultSettings: LocalChatDefaultSettings;
-  onDefaultSettingChange: (key: LocalChatBooleanSettingKey, value: boolean) => void;
-  onDefaultVoiceNameChange: (value: string) => void;
-  onMediaPlannerModeChange: (value: LocalChatMediaPlannerMode) => void;
-  onVideoAutoPolicyChange: (value: LocalChatVideoAutoPolicy) => void;
+  inspectSettings: LocalChatInspectSettings;
   onRefreshMediaDependencies?: () => void;
   onSidebarBootstrap?: () => void;
   onOpenChatPanel?: () => void;

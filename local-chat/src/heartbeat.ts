@@ -24,7 +24,10 @@ function emitProactiveSchedulerError(error: unknown): void {
 }
 
 export async function runLocalChatProactiveHeartbeatOnce(input: {
-  aiClient: Pick<LocalChatAiClient, 'generateObject'>;
+  aiClient: Pick<
+    LocalChatAiClient,
+    'generateText' | 'generateObject' | 'streamText' | 'generateImage' | 'generateVideo' | 'resolveRoute'
+  >;
   getReadContext: () => LocalChatReadContext;
   nowMs?: () => number;
   onAuditEvent?: (event: LocalChatProactiveAuditEvent) => void;
@@ -39,7 +42,10 @@ export function stopLocalChatProactiveHeartbeat(): void {
 }
 
 export function startLocalChatProactiveHeartbeat(input: {
-  aiClient: Pick<LocalChatAiClient, 'generateObject'>;
+  aiClient: Pick<
+    LocalChatAiClient,
+    'generateText' | 'generateObject' | 'streamText' | 'generateImage' | 'generateVideo' | 'resolveRoute'
+  >;
   getReadContext: () => LocalChatReadContext;
 }): void {
   stopLocalChatProactiveHeartbeat();

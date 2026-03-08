@@ -1,8 +1,10 @@
 import type { PromptLayerId } from '../prompt/types.js';
 import type {
+  LocalChatBeatModality,
   ChatMessageKind,
   ChatMessageMedia,
   ChatMessageMeta,
+  LocalChatTurnMode,
   LocalChatCachedMediaAsset,
   LocalChatMediaArtifactShadow,
   LocalChatMediaGenerationSpec,
@@ -12,12 +14,58 @@ export type LocalChatContextLaneId =
   | 'identity'
   | 'world'
   | 'platformWarmStart'
-  | 'durableMemory'
-  | 'runningSummary'
   | 'sessionRecall'
-  | 'recentBundles'
+  | 'recentTurns'
   | 'userInput'
-  | 'replyStyle';
+  | 'interactionProfile'
+  | 'interactionState'
+  | 'relationMemory'
+  | 'turnMode';
+
+export type VoiceConversationMode = 'off' | 'suggested' | 'on';
+
+export type DerivedInteractionProfile = {
+  expression: {
+    responseLength: 'short' | 'medium' | 'long';
+    formality: 'casual' | 'formal' | 'slang';
+    sentiment: 'positive' | 'neutral' | 'cynical';
+    pacingBias: 'reserved' | 'balanced' | 'bursty';
+    firstBeatStyle: 'gentle' | 'playful' | 'direct' | 'intimate' | 'grounded';
+    infoAnswerStyle: 'concise' | 'balanced' | 'guided';
+  };
+  relationship: {
+    defaultDistance: 'formal' | 'friendly' | 'warm' | 'intimate';
+    warmth: 'cool' | 'warm' | 'intimate';
+    flirtAffinity: 'none' | 'light' | 'high';
+    proactiveStyle: 'quiet' | 'gentle' | 'playful';
+    intimacyGuard: 'strict' | 'balanced' | 'open';
+  };
+  voice: {
+    voiceId: string | null;
+    language: string | null;
+    genderGuard: 'male' | 'female' | 'neutral' | 'unspecified';
+    speedRange: 'slow' | 'balanced' | 'fast';
+    pitchRange: 'low' | 'mid' | 'bright';
+    emotionEnabled: boolean;
+    voiceAffinity: 'low' | 'medium' | 'high';
+  };
+  visual: {
+    artStyle: string | null;
+    fashionStyle: string | null;
+    personaCue: string | null;
+    nsfwLevel: string | null;
+    imageAffinity: 'low' | 'medium' | 'high';
+    videoAffinity: 'low' | 'medium' | 'high';
+  };
+  modalityTraits: {
+    textBias: 'low' | 'medium' | 'high';
+    voiceBias: 'low' | 'medium' | 'high';
+    imageBias: 'low' | 'medium' | 'high';
+    videoBias: 'low' | 'medium' | 'high';
+    latencyTolerance: 'low' | 'medium' | 'high';
+  };
+  signals: string[];
+};
 
 export type LocalChatReplyStyleProfile = {
   responseLength: 'short' | 'medium' | 'long';
@@ -37,18 +85,82 @@ export type LocalChatReplyPacingPlan = {
   reason: string;
 };
 
-export type LocalChatContinuityStageHealth = {
-  status: 'idle' | 'healthy' | 'degraded';
-  consecutiveFailures: number;
-  lastAttemptAt: string | null;
-  lastSuccessAt: string | null;
-  lastDurationMs: number | null;
-  lastErrorCode: string | null;
+export type InteractionBeatAssetRequest = {
+  kind: 'image' | 'video';
+  prompt: string;
+  confidence: number;
+  nsfwIntent: 'none' | 'suggested';
 };
 
-export type LocalChatContinuityHealth = {
-  runningSummary: LocalChatContinuityStageHealth;
-  durableMemory: LocalChatContinuityStageHealth;
+export type InteractionBeat = {
+  beatId: string;
+  turnId: string;
+  beatIndex: number;
+  beatCount: number;
+  intent: 'answer' | 'clarify' | 'checkin' | 'comfort' | 'tease' | 'invite' | 'media';
+  relationMove: string;
+  sceneMove: string;
+  modality: LocalChatBeatModality;
+  text: string;
+  pauseMs: number;
+  assetRequest?: InteractionBeatAssetRequest;
+  cancellationScope: 'turn' | 'tail';
+  autoPlayVoice?: boolean;
+};
+
+export type InteractionTurnPlan = {
+  planId: string;
+  turnId: string;
+  turnMode: LocalChatTurnMode;
+  firstBeatLocked: boolean;
+  planFirstBeatText: string;
+  beats: InteractionBeat[];
+  fallbackPolicy: 'legacy-stream-text';
+  expiresAt: string;
+};
+
+export type InteractionSnapshot = {
+  conversationId: string;
+  relationshipState: 'new' | 'friendly' | 'warm' | 'intimate';
+  activeScene: string[];
+  emotionalTemperature: 'low' | 'steady' | 'warm' | 'heated';
+  assistantCommitments: string[];
+  userPrefs: string[];
+  openLoops: string[];
+  topicThreads: string[];
+  lastResolvedTurnId: string | null;
+  updatedAt: string;
+};
+
+export type RelationMemorySlotType =
+  | 'preference'
+  | 'boundary'
+  | 'rapport'
+  | 'promise'
+  | 'recurringCue'
+  | 'taboo';
+
+export type RelationMemorySlot = {
+  id: string;
+  targetId: string;
+  viewerId: string;
+  slotType: RelationMemorySlotType;
+  key: string;
+  value: string;
+  confidence: number;
+  portability: 'portable' | 'local-only' | 'blocked';
+  sensitivity: 'safe' | 'personal' | 'intimate';
+  userOverride: 'inherit' | 'never-sync' | 'force-portable';
+  updatedAt: string;
+};
+
+export type InteractionRecallDoc = {
+  id: string;
+  conversationId: string;
+  sourceTurnId: string | null;
+  text: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type LocalChatPromptLaneBudget = {
@@ -56,16 +168,6 @@ export type LocalChatPromptLaneBudget = {
   usedChars: number;
   truncated: boolean;
 };
-
-export type LocalChatMemoryType =
-  | 'relationship-state'
-  | 'user-fact'
-  | 'preference'
-  | 'boundary'
-  | 'assistant-commitment'
-  | 'open-loop';
-
-export type LocalChatMemoryStatus = 'active' | 'resolved' | 'superseded';
 
 export type LocalChatContextTrace = {
   id: string;
@@ -90,8 +192,11 @@ export type LocalChatContextTrace = {
     truncated: boolean;
   };
   laneBudgets: Partial<Record<LocalChatContextLaneId, LocalChatPromptLaneBudget>>;
-  compilerVersion: 'v1' | 'v2' | 'v3' | 'v4' | 'v5';
+  compilerVersion: 'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6';
   planner?: 'stream';
+  turnMode?: LocalChatTurnMode;
+  interactionProfile?: DerivedInteractionProfile;
+  voiceConversationMode?: VoiceConversationMode;
   planSegments?: number;
   voiceSegments?: number;
   textSegments?: number;
@@ -99,9 +204,7 @@ export type LocalChatContextTrace = {
   streamDeltaCount?: number;
   streamDurationMs?: number;
   segmentParseMode?: 'explicit-delimiter' | 'double-newline' | 'single-message';
-  replyStyleProfile?: LocalChatReplyStyleProfile;
   pacingPlan?: LocalChatReplyPacingPlan;
-  continuityHealth?: LocalChatContinuityHealth | null;
   nsfwPolicy?: 'disabled' | 'local-runtime-only' | 'allowed';
   plannerUsed?: boolean;
   plannerKind?: 'none' | 'image' | 'video';
@@ -118,9 +221,7 @@ export type LocalChatContextTrace = {
   mediaExecutionRouteSource?: 'local-runtime' | 'token-api' | null;
   mediaExecutionRouteModel?: string | null;
   mediaExecutionReason?: string | null;
-  selectedBundleSeqs: number[];
-  runningSummaryWatermark: number;
-  durableMemoryCountsByType: Partial<Record<LocalChatMemoryType, number>>;
+  selectedTurnSeqs: number[];
   sessionRecallCount: number;
   createdAt: string;
 };
@@ -136,12 +237,16 @@ export type LocalChatTurnAudit = {
   createdAt: string;
 };
 
-export type LocalChatTurnSegment = {
+export type LocalChatStoredBeat = {
   id: string;
-  bundleId: string;
+  turnId: string;
+  turnSeq: number;
+  conversationId: string;
   role: 'user' | 'assistant';
+  beatIndex: number;
+  beatCount: number;
   kind: Exclude<ChatMessageKind, 'streaming' | 'image-pending' | 'video-pending'>;
-  deliveryStatus: 'ready' | 'blocked' | 'failed';
+  deliveryStatus: 'pending' | 'ready' | 'blocked' | 'failed';
   content: string;
   contextText: string;
   semanticSummary: string | null;
@@ -155,7 +260,7 @@ export type LocalChatTurnSegment = {
   audit?: LocalChatTurnAudit;
 };
 
-export type LocalChatTurnBundle = {
+export type LocalChatTurnRecord = {
   id: string;
   conversationId: string;
   seq: number;
@@ -163,7 +268,11 @@ export type LocalChatTurnBundle = {
   turnTxnId: string | null;
   createdAt: string;
   updatedAt: string;
-  segments: LocalChatTurnSegment[];
+  beatCount: number;
+};
+
+export type LocalChatTurnWithBeats = LocalChatTurnRecord & {
+  beats: LocalChatStoredBeat[];
 };
 
 export type LocalChatConversationRecord = {
@@ -174,47 +283,14 @@ export type LocalChatConversationRecord = {
   title: string;
   createdAt: string;
   updatedAt: string;
-  lastBundleSeq: number;
+  lastTurnSeq: number;
 };
 
-export type LocalChatMediaCacheEntry = LocalChatCachedMediaAsset;
-
-export type LocalChatRunningSummary = {
-  conversationId: string;
-  relationshipState: string[];
-  userFactsEstablished: string[];
-  assistantCommitments: string[];
-  openLoops: string[];
-  sceneState: string[];
-  updatedAt: string;
-  lastSummarizedBundleSeq: number;
-};
-
-export type LocalChatSessionRecallDoc = {
+export type LocalChatMediaAssetRecord = LocalChatCachedMediaAsset & {
   id: string;
-  conversationId: string;
-  sourceKind: 'bundle' | 'running-summary';
-  sourceBundleSeq: number | null;
-  text: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type LocalChatDurableMemoryEntry = {
-  id: string;
-  targetId: string;
-  viewerId: string;
-  type: LocalChatMemoryType;
-  subject: 'viewer' | 'agent' | 'relationship';
-  slotKey: string;
-  content: string;
-  confidence: number;
-  importance: number;
-  status: LocalChatMemoryStatus;
-  sourceBundleSeqs: number[];
-  supersedesIds: string[];
-  createdAt: string;
-  updatedAt: string;
+  conversationId: string | null;
+  turnId: string | null;
+  beatId: string | null;
 };
 
 export type LocalChatPlatformWarmStartMemory = {
@@ -226,6 +302,10 @@ export type LocalChatPlatformWarmStartMemory = {
 
 export type LocalChatTurn = {
   id: string;
+  turnId: string;
+  turnSeq: number;
+  beatIndex: number;
+  beatCount: number;
   role: 'user' | 'assistant';
   kind: Exclude<ChatMessageKind, 'streaming' | 'image-pending' | 'video-pending'>;
   content: string;
@@ -239,8 +319,6 @@ export type LocalChatTurn = {
   meta?: ChatMessageMeta;
   promptTrace?: LocalChatContextTrace;
   audit?: LocalChatTurnAudit;
-  bundleId: string;
-  bundleSeq: number;
 };
 
 export type LocalChatSession = {
@@ -250,10 +328,17 @@ export type LocalChatSession = {
   worldId: string | null;
   title: string;
   turns: LocalChatTurn[];
-  bundleCount: number;
+  turnCount: number;
   messageCount: number;
   createdAt: string;
   updatedAt: string;
+};
+
+export type LocalChatContextRecentTurn = {
+  id: string;
+  seq: number;
+  role: 'user' | 'assistant';
+  lines: string[];
 };
 
 export type LocalChatContextPacket = {
@@ -270,34 +355,30 @@ export type LocalChatContextPacket = {
     identityLines: string[];
     rulesLines: string[];
     replyStyleLines: string[];
-    replyStyleProfile: LocalChatReplyStyleProfile;
+    interactionProfileLines?: string[];
+    interactionProfile: DerivedInteractionProfile;
   };
   world: {
     worldId: string | null;
     lines: string[];
   };
   platformWarmStart: LocalChatPlatformWarmStartMemory | null;
-  runningSummary: LocalChatRunningSummary | null;
-  durableMemory: LocalChatDurableMemoryEntry[];
   sessionRecall: Array<{
     id: string;
     text: string;
-    sourceKind: 'bundle' | 'running-summary';
-    sourceBundleSeq: number | null;
+    sourceKind: 'turn' | 'recall-index';
+    sourceTurnId: string | null;
   }>;
-  recentBundles: Array<{
-    id: string;
-    seq: number;
-    role: 'user' | 'assistant';
-    lines: string[];
-  }>;
+  recentTurns: LocalChatContextRecentTurn[];
+  interactionSnapshot?: InteractionSnapshot | null;
+  relationMemorySlots?: RelationMemorySlot[];
+  recallIndex?: InteractionRecallDoc[];
+  turnMode?: LocalChatTurnMode;
+  voiceConversationMode?: VoiceConversationMode;
   pacingPlan: LocalChatReplyPacingPlan;
   userInput: string;
   diagnostics: {
-    selectedBundleSeqs: number[];
-    runningSummaryWatermark: number;
+    selectedTurnSeqs: number[];
     sessionRecallCount: number;
-    durableMemoryCountsByType: Partial<Record<LocalChatMemoryType, number>>;
-    continuityHealth: LocalChatContinuityHealth | null;
   };
 };

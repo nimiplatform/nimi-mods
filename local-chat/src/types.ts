@@ -11,6 +11,15 @@ export type LocalChatResolvedMediaRouteSource = LocalChatMediaRouteSource;
 export type LocalChatResolvedMediaRouteResolvedBy = 'resolved-default' | 'selected' | 'preflight';
 export type LocalChatMediaCacheStatus = 'none' | 'hit' | 'miss';
 export type LocalChatMediaArtifactStatus = 'ready' | 'blocked' | 'failed';
+export type LocalChatBeatModality = 'text' | 'voice' | 'image' | 'video';
+export type LocalChatTurnMode =
+  | 'information'
+  | 'emotional'
+  | 'playful'
+  | 'intimate'
+  | 'checkin'
+  | 'explicit-media'
+  | 'explicit-voice';
 
 export type LocalChatMediaHints = {
   composition?: string;
@@ -57,6 +66,9 @@ export type LocalChatResolvedMediaRoute = {
   source: LocalChatResolvedMediaRouteSource;
   connectorId?: string;
   model: string;
+  localModelId?: string;
+  goRuntimeLocalModelId?: string;
+  goRuntimeStatus?: string;
   provider?: string;
   resolvedBy: LocalChatResolvedMediaRouteResolvedBy;
   resolvedAt: string;
@@ -91,6 +103,17 @@ export type LocalChatCachedMediaAsset = {
 };
 
 export type ChatMessageMeta = {
+  interactionPlanId?: string;
+  turnId?: string;
+  beatId?: string;
+  beatIndex?: number;
+  beatCount?: number;
+  beatModality?: LocalChatBeatModality;
+  pauseMs?: number;
+  relationMove?: string;
+  sceneMove?: string;
+  turnMode?: LocalChatTurnMode;
+  voiceConversationMode?: 'off' | 'suggested' | 'on';
   autoPlayVoice?: boolean;
   planId?: string;
   segmentId?: string;

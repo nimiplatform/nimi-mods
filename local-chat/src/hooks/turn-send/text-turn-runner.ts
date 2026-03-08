@@ -17,6 +17,8 @@ const MAX_SEGMENT_CHARS = 420;
 const SHORT_REPLY_MERGE_THRESHOLD = 50;
 const EXPLICIT_SEGMENT_RE = /\n{2,}\[\[SEG\]\]\n{2,}/;
 const DOUBLE_NEWLINE_RE = /\n{2,}/;
+const LOCAL_CHAT_TEXT_STREAM_TIMEOUT_MS = 20_000;
+const LOCAL_CHAT_TEXT_FALLBACK_TIMEOUT_MS = 20_000;
 
 export type TextTurnResult = {
   planner: 'stream';
@@ -166,6 +168,50 @@ function splitByDoubleNewlineOutsideCodeBlocks(text: string): string[] {
   return segments;
 }
 
+function splitIntoSentences(text: string): string[] {
+  return text
+    .split(/(?<=[。！？!?])/u)
+    .map((segment) => normalizeSegmentText(segment))
+    .filter(Boolean);
+}
+
+function splitBySentencePacing(input: {
+  text: string;
+  pacingPlan: LocalChatReplyPacingPlan;
+}): string[] | null {
+  const sentences = splitIntoSentences(input.text);
+  if (sentences.length < 2) {
+    return null;
+  }
+  if (input.pacingPlan.mode === 'answer-followup') {
+    const shouldMergeLeadIn = sentences.length >= 3 && countChars(sentences[0] || '') <= 4;
+    const head = shouldMergeLeadIn
+      ? sentences.slice(0, 2).join('')
+      : (sentences[0] || '');
+    const tail = shouldMergeLeadIn
+      ? sentences.slice(2).join(' ').trim()
+      : sentences.slice(1).join(' ').trim();
+    return head && tail
+      ? [head, tail].slice(0, input.pacingPlan.maxSegments)
+      : null;
+  }
+  if (input.pacingPlan.mode === 'burst-3' && sentences.length >= 3) {
+    return [
+      sentences[0] || '',
+      sentences[1] || '',
+      sentences.slice(2).join(' ').trim(),
+    ]
+      .map((segment) => normalizeSegmentText(segment))
+      .filter(Boolean)
+      .slice(0, input.pacingPlan.maxSegments);
+  }
+  const head = sentences[0] || '';
+  const tail = sentences.slice(1).join(' ').trim();
+  return head && tail
+    ? [head, tail].slice(0, input.pacingPlan.maxSegments)
+    : null;
+}
+
 function countChars(input: string): number {
   return [...String(input || '')].length;
 }
@@ -240,7 +286,7 @@ function shouldLockStreaming(error: unknown): boolean {
   return reasonCode === 'AI_INPUT_INVALID';
 }
 
-function splitFallbackByPacingPlan(input: {
+function splitByPacingPlan(input: {
   text: string;
   allowMultiReply: boolean;
   pacingPlan?: LocalChatReplyPacingPlan;
@@ -262,28 +308,26 @@ function splitFallbackByPacingPlan(input: {
   ) {
     return splitIntoSegments(normalizedText, input.allowMultiReply, input.segmentationMode || 'adaptive');
   }
-  if (pacingPlan.mode === 'answer-followup') {
-    const sentences = normalizedText
-      .split(/(?<=[。！？!?])/u)
-      .map((segment) => normalizeSegmentText(segment))
-      .filter(Boolean);
-    if (sentences.length >= 2) {
-      const shouldMergeLeadIn = sentences.length >= 3 && countChars(sentences[0] || '') <= 4;
-      const head = shouldMergeLeadIn
-        ? sentences.slice(0, 2).join('')
-        : (sentences[0] || '');
-      const tail = shouldMergeLeadIn
-        ? sentences.slice(2).join(' ').trim()
-        : sentences.slice(1).join(' ').trim();
-      if (head && tail) {
-        return {
-          segments: [head, tail].slice(0, pacingPlan.maxSegments),
-          parseMode: 'double-newline',
-        };
-      }
-    }
+  const pacedSegments = splitBySentencePacing({
+    text: normalizedText,
+    pacingPlan,
+  });
+  if (pacedSegments && pacedSegments.length > 1) {
+    return {
+      segments: pacedSegments,
+      parseMode: 'double-newline',
+    };
   }
   return splitIntoSegments(normalizedText, input.allowMultiReply, input.segmentationMode || 'adaptive');
+}
+
+export function splitReplyByPacingPlan(input: {
+  text: string;
+  allowMultiReply: boolean;
+  pacingPlan?: LocalChatReplyPacingPlan;
+  segmentationMode?: ReplySegmentationMode;
+}): SplitSegmentsResult {
+  return splitByPacingPlan(input);
 }
 
 export async function runTextTurn(input: RunTextTurnInput): Promise<TextTurnResult> {
@@ -306,6 +350,7 @@ export async function runTextTurn(input: RunTextTurnInput): Promise<TextTurnResu
         capability: input.invokeInput.capability,
         prompt,
         maxTokens: input.invokeInput.maxTokens,
+        timeoutMs: LOCAL_CHAT_TEXT_STREAM_TIMEOUT_MS,
         mode: input.invokeInput.mode,
         worldId: input.invokeInput.worldId,
         agentId: input.invokeInput.agentId,
@@ -339,12 +384,13 @@ export async function runTextTurn(input: RunTextTurnInput): Promise<TextTurnResu
       capability: input.invokeInput.capability,
       prompt,
       maxTokens: input.invokeInput.maxTokens,
+      timeoutMs: LOCAL_CHAT_TEXT_FALLBACK_TIMEOUT_MS,
       mode: input.invokeInput.mode,
       worldId: input.invokeInput.worldId,
       agentId: input.invokeInput.agentId,
       routeBinding,
     });
-    const splitResult = splitFallbackByPacingPlan({
+    const splitResult = splitByPacingPlan({
       text: String(fallback.text || ''),
       allowMultiReply: input.allowMultiReply,
       pacingPlan: input.pacingPlan,
@@ -363,11 +409,12 @@ export async function runTextTurn(input: RunTextTurnInput): Promise<TextTurnResu
     };
   }
   const streamDurationMs = Math.max(0, Math.round(performance.now() - streamStartedAt));
-  const splitResult = splitIntoSegments(
-    fullText,
-    input.allowMultiReply,
-    input.segmentationMode || 'adaptive',
-  );
+  const splitResult = splitByPacingPlan({
+    text: fullText,
+    allowMultiReply: input.allowMultiReply,
+    pacingPlan: input.pacingPlan,
+    segmentationMode: input.segmentationMode,
+  });
   const segments = toAssistantPlanSegments({ segments: splitResult.segments });
 
   logRendererEvent({

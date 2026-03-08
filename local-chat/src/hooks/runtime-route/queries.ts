@@ -80,6 +80,9 @@ export async function resolveRouteSnapshot(input: {
         ? (resolved.localProviderEndpoint || '-')
         : (resolved.localOpenAiEndpoint || '-'),
       connectorId: resolved.connectorId,
+      localModelId: resolved.localModelId || undefined,
+      goRuntimeLocalModelId: resolved.goRuntimeLocalModelId || undefined,
+      goRuntimeStatus: resolved.goRuntimeStatus || undefined,
     });
   } catch (error) {
     input.setRouteSnapshot(null);

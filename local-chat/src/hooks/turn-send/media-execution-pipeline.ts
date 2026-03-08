@@ -9,6 +9,7 @@ import type {
 import {
   getLocalChatCachedMediaAsset,
   putLocalChatCachedMediaAsset,
+  upsertLocalChatMediaAssetRecord,
 } from '../../state/index.js';
 import type { MediaExecutionDecision, MediaPromptTracePatch, MediaRouteSource } from './media-decision-types.js';
 import { runImageTurn } from './image-turn-runner.js';
@@ -35,7 +36,7 @@ export type ExecuteMediaDecisionInput = {
   sessionId: string;
   targetId: string;
   viewerId: string;
-  assistantBundleId: string;
+  assistantTurnId: string;
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   setSessions: (sessions: LocalChatSession[]) => void;
   promptTrace?: LocalChatPromptTrace | null;
@@ -69,6 +70,37 @@ function createExecutionTracePatch(input: {
 }
 
 export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Promise<Partial<MediaPromptTracePatch> | null> {
+  async function recordDeliveredMediaAsset(asset: {
+    beatId: string;
+    executionCacheKey: string;
+    specHash: string;
+    kind: 'image' | 'video';
+    renderUri: string;
+    mimeType: string;
+    routeSource: MediaRouteSource;
+    connectorId?: string;
+    model?: string;
+    createdAt: string;
+    lastHitAt: string;
+  }): Promise<void> {
+    await upsertLocalChatMediaAssetRecord({
+      id: `media_${asset.beatId}`,
+      executionCacheKey: asset.executionCacheKey,
+      specHash: asset.specHash,
+      kind: asset.kind,
+      renderUri: asset.renderUri,
+      mimeType: asset.mimeType,
+      routeSource: asset.routeSource,
+      ...(asset.connectorId ? { connectorId: asset.connectorId } : {}),
+      ...(asset.model ? { model: asset.model } : {}),
+      createdAt: asset.createdAt,
+      lastHitAt: asset.lastHitAt,
+      conversationId: input.sessionId,
+      turnId: input.assistantTurnId,
+      beatId: asset.beatId,
+    });
+  }
+
   if (input.decision.kind === 'none') {
     return null;
   }
@@ -86,7 +118,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
       sessionId: input.sessionId,
       targetId: input.targetId,
       viewerId: input.viewerId,
-      assistantBundleId: input.assistantBundleId,
+      assistantTurnId: input.assistantTurnId,
       messageId: input.decision.intent.pendingMessageId,
       setMessages: input.setMessages,
       setSessions: input.setSessions,
@@ -135,7 +167,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
       sessionId: input.sessionId,
       targetId: input.targetId,
       viewerId: input.viewerId,
-      assistantBundleId: input.assistantBundleId,
+      assistantTurnId: input.assistantTurnId,
       messageId: intent.pendingMessageId,
       setMessages: input.setMessages,
       setSessions: input.setSessions,
@@ -154,6 +186,19 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
         executionCacheKey,
         nsfwPolicy: input.nsfwPolicy,
       }),
+    });
+    await recordDeliveredMediaAsset({
+      beatId: intent.pendingMessageId,
+      executionCacheKey,
+      specHash: prepared.specHash,
+      kind: prepared.spec.kind,
+      renderUri: cached.renderUri,
+      mimeType: cached.mimeType,
+      routeSource: cached.routeSource,
+      connectorId: cached.connectorId,
+      model: cached.model || resolvedRoute.model,
+      createdAt: cached.createdAt,
+      lastHitAt: new Date().toISOString(),
     });
     return createExecutionTracePatch({
       status: 'ready',
@@ -217,7 +262,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
         sessionId: input.sessionId,
         targetId: input.targetId,
         viewerId: input.viewerId,
-        assistantBundleId: input.assistantBundleId,
+        assistantTurnId: input.assistantTurnId,
         messageId: intent.pendingMessageId,
         setMessages: input.setMessages,
         setSessions: input.setSessions,
@@ -233,9 +278,22 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
           resolvedRoute,
           shadow,
           cacheStatus: 'miss',
-          executionCacheKey,
-          nsfwPolicy: input.nsfwPolicy,
-        }),
+        executionCacheKey,
+        nsfwPolicy: input.nsfwPolicy,
+      }),
+    });
+      await recordDeliveredMediaAsset({
+        beatId: intent.pendingMessageId,
+        executionCacheKey,
+        specHash: prepared.specHash,
+        kind: 'image',
+        renderUri: result.uri,
+        mimeType: result.mimeType,
+        routeSource: result.routeSource,
+        connectorId: resolvedRoute.connectorId,
+        model: result.routeModel || resolvedRoute.model,
+        createdAt,
+        lastHitAt: createdAt,
       });
       return createExecutionTracePatch({
         status: 'ready',
@@ -261,7 +319,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
         sessionId: input.sessionId,
         targetId: input.targetId,
         viewerId: input.viewerId,
-        assistantBundleId: input.assistantBundleId,
+        assistantTurnId: input.assistantTurnId,
         messageId: intent.pendingMessageId,
         setMessages: input.setMessages,
         setSessions: input.setSessions,
@@ -301,7 +359,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
       sessionId: input.sessionId,
       targetId: input.targetId,
       viewerId: input.viewerId,
-      assistantBundleId: input.assistantBundleId,
+      assistantTurnId: input.assistantTurnId,
       messageId: intent.pendingMessageId,
       setMessages: input.setMessages,
       setSessions: input.setSessions,
@@ -371,7 +429,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
       sessionId: input.sessionId,
       targetId: input.targetId,
       viewerId: input.viewerId,
-      assistantBundleId: input.assistantBundleId,
+      assistantTurnId: input.assistantTurnId,
       messageId: intent.pendingMessageId,
       setMessages: input.setMessages,
       setSessions: input.setSessions,
@@ -390,6 +448,19 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
         executionCacheKey,
         nsfwPolicy: input.nsfwPolicy,
       }),
+    });
+    await recordDeliveredMediaAsset({
+      beatId: intent.pendingMessageId,
+      executionCacheKey,
+      specHash: prepared.specHash,
+      kind: 'video',
+      renderUri: result.uri,
+      mimeType: result.mimeType,
+      routeSource: result.routeSource,
+      connectorId: resolvedRoute.connectorId,
+      model: result.routeModel || resolvedRoute.model,
+      createdAt,
+      lastHitAt: createdAt,
     });
     return createExecutionTracePatch({
       status: 'ready',
@@ -415,7 +486,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
       sessionId: input.sessionId,
       targetId: input.targetId,
       viewerId: input.viewerId,
-      assistantBundleId: input.assistantBundleId,
+      assistantTurnId: input.assistantTurnId,
       messageId: intent.pendingMessageId,
       setMessages: input.setMessages,
       setSessions: input.setSessions,
@@ -455,7 +526,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
     sessionId: input.sessionId,
     targetId: input.targetId,
     viewerId: input.viewerId,
-    assistantBundleId: input.assistantBundleId,
+    assistantTurnId: input.assistantTurnId,
     messageId: intent.pendingMessageId,
     setMessages: input.setMessages,
     setSessions: input.setSessions,

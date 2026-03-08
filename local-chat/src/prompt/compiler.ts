@@ -14,50 +14,54 @@ const LAYER_ORDER: PromptLayerId[] = [
   'platformSafety',
   'identity',
   'world',
+  'turnMode',
+  'interactionProfile',
+  'interactionState',
+  'relationMemory',
   'platformWarmStart',
-  'durableMemory',
-  'runningSummary',
   'sessionRecall',
-  'recentBundles',
+  'recentTurns',
   'userInput',
-  'replyStyle',
 ];
 
 const LAYER_TITLES: Record<PromptLayerId, string> = {
   platformSafety: 'Platform Safety',
   identity: 'Identity',
   world: 'World',
+  turnMode: 'Turn Mode',
+  interactionProfile: 'Interaction Profile',
+  interactionState: 'Interaction State',
+  relationMemory: 'Relation Memory',
   platformWarmStart: 'Platform Warm Start',
-  durableMemory: 'Durable Memory',
-  runningSummary: 'Running Summary',
   sessionRecall: 'Session Recall',
-  recentBundles: 'Recent Exact Bundles',
+  recentTurns: 'Recent Exact Turns',
   userInput: 'User Input',
-  replyStyle: 'Reply Style',
 };
 
 const LAYER_TO_LANE: Partial<Record<PromptLayerId, LocalChatContextLaneId>> = {
   identity: 'identity',
   world: 'world',
+  turnMode: 'turnMode',
+  interactionProfile: 'interactionProfile',
+  interactionState: 'interactionState',
+  relationMemory: 'relationMemory',
   platformWarmStart: 'platformWarmStart',
-  durableMemory: 'durableMemory',
-  runningSummary: 'runningSummary',
   sessionRecall: 'sessionRecall',
-  recentBundles: 'recentBundles',
+  recentTurns: 'recentTurns',
   userInput: 'userInput',
-  replyStyle: 'replyStyle',
 };
 
 const LANE_ORDER: LocalChatContextLaneId[] = [
   'identity',
   'world',
+  'turnMode',
+  'interactionProfile',
+  'interactionState',
+  'relationMemory',
   'platformWarmStart',
-  'durableMemory',
-  'runningSummary',
   'sessionRecall',
-  'recentBundles',
+  'recentTurns',
   'userInput',
-  'replyStyle',
 ];
 
 const LANE_BUDGET_CONFIG: Record<LocalChatContextLaneId, {
@@ -67,35 +71,38 @@ const LANE_BUDGET_CONFIG: Record<LocalChatContextLaneId, {
 }> = {
   identity: { share: 0.1, minChars: 900, maxChars: 2_400 },
   world: { share: 0.08, minChars: 400, maxChars: 1_900 },
+  turnMode: { share: 0.04, minChars: 180, maxChars: 600 },
+  interactionProfile: { share: 0.1, minChars: 600, maxChars: 2_000 },
+  interactionState: { share: 0.12, minChars: 700, maxChars: 2_400 },
+  relationMemory: { share: 0.12, minChars: 700, maxChars: 2_400 },
   platformWarmStart: { share: 0.08, minChars: 400, maxChars: 1_900 },
-  durableMemory: { share: 0.14, minChars: 1_100, maxChars: 3_400 },
-  runningSummary: { share: 0.16, minChars: 1_200, maxChars: 3_900 },
   sessionRecall: { share: 0.12, minChars: 600, maxChars: 3_000 },
-  recentBundles: { share: 0.2, minChars: 1_000, maxChars: 5_200 },
+  recentTurns: { share: 0.2, minChars: 1_000, maxChars: 5_200 },
   userInput: { share: 0.06, minChars: 280, maxChars: 1_500 },
-  replyStyle: { share: 0.06, minChars: 520, maxChars: 1_500 },
 };
 
 const REDUCTION_ORDER: LocalChatContextLaneId[] = [
-  'recentBundles',
+  'recentTurns',
   'sessionRecall',
+  'relationMemory',
+  'interactionState',
   'world',
   'platformWarmStart',
-  'durableMemory',
-  'runningSummary',
-  'replyStyle',
+  'interactionProfile',
+  'turnMode',
   'identity',
   'userInput',
 ];
 
 const EXPANSION_ORDER: LocalChatContextLaneId[] = [
-  'recentBundles',
-  'runningSummary',
-  'durableMemory',
+  'recentTurns',
+  'interactionState',
+  'relationMemory',
   'sessionRecall',
   'world',
   'platformWarmStart',
-  'replyStyle',
+  'interactionProfile',
+  'turnMode',
   'identity',
   'userInput',
 ];
@@ -113,28 +120,16 @@ function joinLines(title: string, lines: string[]): string {
   return [`${title}:`, ...filtered.map((line) => `- ${line}`)].join('\n');
 }
 
-function renderRecentBundles(input: LocalChatPromptCompileInput['contextPacket']['recentBundles']): string {
+function renderRecentTurns(input: LocalChatPromptCompileInput['contextPacket']['recentTurns']): string {
   if (!input.length) return '';
   const lines: string[] = ['最近精确回合（按时间顺序，只用于 continuity，不要逐条复述）:'];
-  for (const bundle of input) {
-    lines.push(`${bundle.role === 'assistant' ? 'Assistant' : 'User'} #${bundle.seq}`);
-    bundle.lines.forEach((line) => {
+  for (const turn of input) {
+    lines.push(`${turn.role === 'assistant' ? 'Assistant' : 'User'} #${turn.seq}`);
+    turn.lines.forEach((line: string) => {
       lines.push(`- ${line}`);
     });
   }
   return lines.join('\n');
-}
-
-function renderRunningSummary(input: LocalChatPromptCompileInput['contextPacket']['runningSummary']): string {
-  if (!input) return '';
-  const chunks = [
-    joinLines('关系状态', input.relationshipState),
-    joinLines('已确认的用户事实', input.userFactsEstablished),
-    joinLines('助手承诺', input.assistantCommitments),
-    joinLines('未完成事项', input.openLoops),
-    joinLines('场景状态', input.sceneState),
-  ].filter(Boolean);
-  return chunks.join('\n\n');
 }
 
 function renderPlatformWarmStart(input: LocalChatPromptCompileInput['contextPacket']['platformWarmStart']): string {
@@ -146,35 +141,16 @@ function renderPlatformWarmStart(input: LocalChatPromptCompileInput['contextPack
   return lines.join('\n');
 }
 
-function renderDurableMemory(input: LocalChatPromptCompileInput['contextPacket']['durableMemory']): string {
-  if (!input.length) return '';
-  return input
-    .map((entry) => `[${entry.type}] ${entry.content}`)
-    .join('\n');
-}
-
 function renderSessionRecall(input: LocalChatPromptCompileInput['contextPacket']['sessionRecall']): string {
   if (!input.length) return '';
   return input
     .map((item) => {
-      const source = item.sourceKind === 'running-summary'
-        ? 'summary'
-        : `bundle#${item.sourceBundleSeq ?? '-'}`;
+      const source = item.sourceKind === 'recall-index'
+        ? 'recall-index'
+        : `turn#${item.sourceTurnId ?? '-'}`;
       return `[${source}] ${item.text}`;
     })
     .join('\n');
-}
-
-function formatReplyStyleProfile(input: LocalChatPromptCompileInput['contextPacket']['target']['replyStyleProfile']): string {
-  return joinLines('回复风格画像', [
-    `responseLength=${input.responseLength}`,
-    `formality=${input.formality}`,
-    `sentiment=${input.sentiment}`,
-    `relationshipMode=${input.relationshipMode}`,
-    `pacingStyle=${input.pacingStyle}`,
-    `followupStyle=${input.followupStyle}`,
-    `warmth=${input.warmth}`,
-  ]);
 }
 
 function formatPacingPlan(input: LocalChatPromptCompileInput['contextPacket']['pacingPlan']): string {
@@ -209,6 +185,66 @@ function buildPacingInstructions(input: LocalChatPromptCompileInput['contextPack
   }
 }
 
+function describeExpression(profile: LocalChatPromptCompileInput['contextPacket']['target']['interactionProfile']): string[] {
+  const expr = profile.expression;
+  const rel = profile.relationship;
+  const lines: string[] = [];
+  const lengthMap: Record<string, string> = {
+    short: '偏短句，不要写长段落',
+    medium: '适中长度，自然展开',
+    long: '可以展开说，但不要啰嗦',
+  };
+  const formalityMap: Record<string, string> = {
+    casual: '口语化，像朋友发消息',
+    neutral: '自然语气，不过分正式也不过分随意',
+    formal: '略正式，但保持亲和',
+  };
+  const warmthMap: Record<string, string> = {
+    distant: '保持礼貌距离',
+    warm: '温暖友善，有关心感',
+    intimate: '亲密自然，像很熟的人',
+  };
+  lines.push(lengthMap[expr.responseLength] || lengthMap.medium!);
+  lines.push(formalityMap[expr.formality] || formalityMap.neutral!);
+  lines.push(warmthMap[rel.warmth] || warmthMap.warm!);
+  if (expr.sentiment === 'playful') lines.push('语气偏活泼俏皮');
+  if (expr.sentiment === 'gentle') lines.push('语气偏温柔体贴');
+  if (rel.flirtAffinity === 'high') lines.push('可以带一点暧昧和撩拨');
+  if (expr.pacingBias === 'bursty') lines.push('喜欢连发短消息，节奏快');
+  return lines;
+}
+
+function renderInteractionProfile(input: LocalChatPromptCompileInput['contextPacket']): string {
+  const profile = input.target.interactionProfile;
+  const naturalLines = describeExpression(profile);
+  return joinLines('交流画像', [
+    ...naturalLines,
+    ...((input.target.interactionProfileLines || []).slice(0, 4)),
+  ]);
+}
+
+function renderInteractionState(input: LocalChatPromptCompileInput['contextPacket']): string {
+  const snapshot = input.interactionSnapshot;
+  if (!snapshot) return '';
+  return [
+    joinLines('关系状态', [snapshot.relationshipState]),
+    joinLines('场景', snapshot.activeScene),
+    joinLines('情绪温度', [snapshot.emotionalTemperature]),
+    joinLines('助手承诺', snapshot.assistantCommitments),
+    joinLines('用户偏好', snapshot.userPrefs),
+    joinLines('未完成事项', snapshot.openLoops),
+    joinLines('话题线程', snapshot.topicThreads),
+  ].filter(Boolean).join('\n\n');
+}
+
+function renderRelationMemory(input: LocalChatPromptCompileInput['contextPacket']): string {
+  const slots = input.relationMemorySlots || [];
+  if (slots.length === 0) return '';
+  return slots
+    .map((slot) => `[${slot.slotType}] ${slot.key}: ${slot.value}`)
+    .join('\n');
+}
+
 function buildLayerContent(input: LocalChatPromptCompileInput): Record<PromptLayerId, string> {
   const packet = input.contextPacket;
   return {
@@ -220,33 +256,30 @@ function buildLayerContent(input: LocalChatPromptCompileInput): Record<PromptLay
     identity: [
       joinLines('角色身份', packet.target.identityLines),
       joinLines('角色规则', packet.target.rulesLines),
+      joinLines('交流风格', packet.target.replyStyleLines),
     ].filter(Boolean).join('\n\n'),
     world: joinLines('世界上下文', packet.world.lines),
+    turnMode: joinLines('当前交流模式', [
+      `turnMode=${packet.turnMode || 'information'}`,
+      `voiceConversationMode=${packet.voiceConversationMode || 'off'}`,
+      `pacing=${packet.pacingPlan.mode}/${packet.pacingPlan.energy}`,
+      ...buildPacingInstructions(packet.pacingPlan),
+    ]),
+    interactionProfile: renderInteractionProfile(packet),
+    interactionState: renderInteractionState(packet)
+      ? `最近交流状态（优先保持一致性，不要逐条复述）:\n${renderInteractionState(packet)}`
+      : '',
+    relationMemory: renderRelationMemory(packet)
+      ? `关系槽位记忆（只用于保持稳定边界与偏好）:\n${renderRelationMemory(packet)}`
+      : '',
     platformWarmStart: renderPlatformWarmStart(packet.platformWarmStart)
       ? `平台记忆预热（只读背景，不要把它当成本地会话刚刚发生的内容）:\n${renderPlatformWarmStart(packet.platformWarmStart)}`
-      : '',
-    durableMemory: renderDurableMemory(packet.durableMemory)
-      ? `长期记忆（优先保证一致性，不要逐条复述）:\n${renderDurableMemory(packet.durableMemory)}`
-      : '',
-    runningSummary: renderRunningSummary(packet.runningSummary)
-      ? `会话连续性摘要:\n${renderRunningSummary(packet.runningSummary)}`
       : '',
     sessionRecall: renderSessionRecall(packet.sessionRecall)
       ? `历史召回:\n${renderSessionRecall(packet.sessionRecall)}`
       : '',
-    recentBundles: renderRecentBundles(packet.recentBundles),
+    recentTurns: renderRecentTurns(packet.recentTurns),
     userInput: `用户这次说：${packet.userInput || '(empty)'}`,
-    replyStyle: [
-      joinLines('回复风格', packet.target.replyStyleLines),
-      formatReplyStyleProfile(packet.target.replyStyleProfile),
-      formatPacingPlan(packet.pacingPlan),
-      [
-        '输出风格要求：',
-        '- 像朋友发微信一样自然回复，节奏可以有变化。',
-        ...buildPacingInstructions(packet.pacingPlan).map((line) => `- ${line}`),
-        '- 不要每次都固定条数；只有语义真的需要时才分条。',
-      ].join('\n'),
-    ].filter(Boolean).join('\n\n'),
   };
 }
 
@@ -407,12 +440,12 @@ export function compileLocalChatPrompt(input: LocalChatPromptCompileInput): Loca
       laneBudgets,
     },
     retrieval: {
-      durableMemoryCount: input.contextPacket.durableMemory.length,
+      durableMemoryCount: (input.contextPacket.relationMemorySlots || []).length,
       sessionRecallCount: input.contextPacket.sessionRecall.length,
       worldContextCount: input.contextPacket.world.lines.length,
-      recentBundleCount: input.contextPacket.recentBundles.length,
+      recentTurnCount: input.contextPacket.recentTurns.length,
     },
-    compilerVersion: 'v5',
+    compilerVersion: 'v6',
   };
 
   emitLocalChatLog({

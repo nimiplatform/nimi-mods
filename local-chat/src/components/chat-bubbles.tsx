@@ -188,6 +188,21 @@ function bubbleShapeFor(role: ChatMessage['role'], position: MessageVisualPositi
   return 'rounded-[22px] rounded-tl-md';
 }
 
+function entryAnimationFor(message: ChatMessage): string {
+  if (
+    message.kind === 'image'
+    || message.kind === 'video'
+    || message.kind === 'image-pending'
+    || message.kind === 'video-pending'
+  ) {
+    return 'chat-scale-in';
+  }
+  if (message.role === 'assistant') {
+    return 'chat-drift-in';
+  }
+  return 'chat-slide-up';
+}
+
 export function ChatBubble(props: {
   message: ChatMessage;
   agentAvatarUrl: string | null;
@@ -227,6 +242,9 @@ export function ChatBubble(props: {
   const isPlaying = isVoice && voicePlayingMessageId === message.id;
   const time = message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const bubbleShapeClass = bubbleShapeFor(message.role, position);
+  const animationDelayMs = Math.min(Math.max(Number(message.meta?.beatIndex || 0), 0) * 90, 320);
+  const animationName = entryAnimationFor(message);
+  const isMediaCard = isImage || isVideo || isImagePending || isVideoPending;
 
   const [imagePreviewOpen, setImagePreviewOpen] = React.useState(false);
   const [imageLoadError, setImageLoadError] = React.useState(false);
@@ -253,29 +271,6 @@ export function ChatBubble(props: {
   const agentInitial = (String(agentName || 'A').trim().charAt(0) || 'A').toUpperCase();
   const userInitial = (String(userName || 'U').trim().charAt(0) || 'U').toUpperCase();
 
-  const debugMeta = (() => {
-    const parts: string[] = [];
-    if (typeof message.meta?.segmentIndex === 'number' && typeof message.meta?.segmentCount === 'number') {
-      parts.push(`Segment ${message.meta.segmentIndex}/${message.meta.segmentCount}`);
-    }
-    if (message.meta?.channelDecision) {
-      parts.push(`Channel: ${message.meta.channelDecision}`);
-    }
-    if (!isUser && message.meta?.routeSource) {
-      parts.push(`Route: ${message.meta.routeSource === 'token-api' ? 'Token API' : 'Local Runtime'}`);
-    }
-    if (!isUser && message.meta?.routeModel) {
-      parts.push(`Model: ${message.meta.routeModel}`);
-    }
-    if (message.meta?.mediaStatus) {
-      parts.push(`Media: ${message.meta.mediaStatus}`);
-    }
-    if (message.latencyMs != null) {
-      parts.push(`Latency: ${message.latencyMs}ms`);
-    }
-    return parts;
-  })();
-
   const avatarNode = isUser ? (
     userAvatarUrl ? (
       <img src={userAvatarUrl} alt={userName || t('ChatBubble.roleUser')} className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-black/5" />
@@ -300,16 +295,18 @@ export function ChatBubble(props: {
     <>
       <div
         className={`flex gap-2 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
-        style={{ animation: 'chat-slide-up 0.24s cubic-bezier(0.2, 0.7, 0.2, 1) both' }}
+        style={{ animation: `${animationName} 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) ${animationDelayMs}ms both` }}
       >
         {showAvatar ? avatarNode : <span className="h-8 w-8 shrink-0" aria-hidden />}
 
-        <div className="max-w-[72%]">
+        <div className={isMediaCard ? 'max-w-[78%]' : 'max-w-[72%]'}>
           <div
-            className={`${bubbleShapeClass} px-4 py-2.5 text-sm leading-[1.6] ${
-              isUser
-                ? 'bg-gradient-to-br from-mint-500 to-brand-500 text-white shadow-[0_2px_12px_-2px_rgb(78_204_163/0.45)]'
-                : 'border border-gray-200 bg-white text-gray-900 shadow-[0_1px_2px_rgba(15,23,42,0.05)]'
+            className={`${bubbleShapeClass} text-sm leading-[1.6] ${
+              isMediaCard
+                ? 'rounded-[28px] border border-white/80 bg-white/92 p-3 shadow-[0_18px_40px_rgba(15,23,42,0.1)]'
+                : isUser
+                  ? 'bg-gradient-to-br from-mint-500 to-brand-500 px-4 py-2.5 text-white shadow-[0_2px_12px_-2px_rgb(78_204_163/0.45)]'
+                  : 'border border-gray-200 bg-white px-4 py-2.5 text-gray-900 shadow-[0_1px_2px_rgba(15,23,42,0.05)]'
             }`}
           >
             {isVoice ? (
@@ -321,21 +318,24 @@ export function ChatBubble(props: {
                 idleLabel={t('ChatBubble.voiceMessage')}
               />
             ) : isImagePending || isVideoPending ? (
-              <div className="flex items-center gap-2 text-xs text-gray-600">
-                <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-mint-600" />
-                <span>{message.content || (isImagePending ? t('ChatBubble.generatingImage') : t('ChatBubble.generatingVideo'))}</span>
+              <div className="space-y-3">
+                <div className="lc-media-skeleton h-[220px] w-[min(420px,70vw)] rounded-[22px]" />
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-mint-600" />
+                  <span>{message.content || (isImagePending ? t('ChatBubble.generatingImage') : t('ChatBubble.generatingVideo'))}</span>
+                </div>
               </div>
             ) : isImage ? (
               mediaUri && !imageLoadError ? (
                 <button
                   type="button"
                   onClick={() => setImagePreviewOpen(true)}
-                  className="group block overflow-hidden rounded-xl border border-gray-200 bg-gray-50"
+                  className="group block overflow-hidden rounded-[22px] border border-gray-200 bg-gray-50 shadow-[0_12px_24px_rgba(15,23,42,0.08)]"
                 >
                   <img
                     src={mediaUri}
                     alt={message.content || t('ChatBubble.imagePlaceholder')}
-                    className="max-h-[320px] w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                    className="max-h-[360px] w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                     loading="lazy"
                     onError={() => setImageLoadError(true)}
                   />
@@ -349,7 +349,7 @@ export function ChatBubble(props: {
                   src={mediaUri}
                   controls
                   preload="metadata"
-                  className="max-h-[320px] w-full rounded-xl border border-gray-200 bg-black"
+                  className="max-h-[360px] w-full rounded-[22px] border border-gray-200 bg-black shadow-[0_12px_24px_rgba(15,23,42,0.08)]"
                   poster={message.media?.previewUri}
                   onError={() => setVideoLoadError(true)}
                 />
@@ -374,16 +374,6 @@ export function ChatBubble(props: {
             <p className={`mt-1 text-[10px] text-gray-400 ${isUser ? 'text-right' : 'text-left'}`}>
               {time} · {isUser ? t('ChatBubble.roleUser') : (isVoice ? t('ChatBubble.roleAgentVoice') : t('ChatBubble.roleAgent'))}
             </p>
-          ) : null}
-          {showTimestamp && debugMeta.length > 0 ? (
-            <details className={`mt-0.5 ${isUser ? 'text-right' : 'text-left'}`}>
-              <summary className="cursor-pointer text-[10px] text-gray-400 hover:text-gray-500">debug</summary>
-              <div className="mt-1 space-y-0.5 text-[10px] text-gray-400">
-                {debugMeta.map((line, i) => (
-                  <p key={`debug-${i}`}>{line}</p>
-                ))}
-              </div>
-            </details>
           ) : null}
         </div>
       </div>

@@ -1,8 +1,16 @@
 import type React from 'react';
-import type { LocalChatSession } from '../../state/index.js';
+import type {
+  DerivedInteractionProfile,
+  InteractionSnapshot,
+  LocalChatProductSettings,
+  LocalChatSession,
+  RelationMemorySlot,
+  VoiceConversationMode,
+} from '../../state/index.js';
 import type { ChatMessage } from '../../types.js';
 import type { RuntimeStatusSidebar } from '../runtime-status-sidebar.js';
 import type { LocalChatTargetItem, VoiceContextMenu, VoiceInputState } from './types.js';
+import type { MemorySyncStatus } from '../../services/memory/memory-sync-adapter.js';
 
 export type LocalChatShellProps = {
   visibleTargets: LocalChatTargetItem[];
@@ -15,10 +23,11 @@ export type LocalChatShellProps = {
   selectedTarget: LocalChatTargetItem | null;
   selectedTargetAvatarUrl: string | null;
   selectedTargetInitial: string;
+  selectedTargetInteractionProfile: DerivedInteractionProfile | null;
   onOpenSelectedTargetProfile: () => void;
   loadingTargetDetail: boolean;
-  modelLabel: string;
   sessions: LocalChatSession[];
+  loadingSessions: boolean;
   selectedSessionId: string | null;
   onCreateSession: () => void;
   onSelectSession: (sessionId: string) => void;
@@ -42,10 +51,24 @@ export type LocalChatShellProps = {
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
   inputText: string;
   setInputText: (value: string) => void;
+  productSettings: LocalChatProductSettings;
+  activeInteractionSnapshot: InteractionSnapshot | null;
+  activeRelationMemorySlots: RelationMemorySlot[];
+  memorySyncStatus: MemorySyncStatus;
+  onToggleProductSetting: (key: 'enableVoice' | 'allowProactiveContact' | 'autoPlayVoiceReplies', value: boolean) => void;
+  onDefaultMediaAutonomyChange: (value: LocalChatProductSettings['mediaAutonomy']) => void;
+  onDefaultVoiceConversationModeChange: (value: VoiceConversationMode) => void;
+  onVisualComfortLevelChange: (value: LocalChatProductSettings['visualComfortLevel']) => void;
+  onMemoryOverrideChange: (slotId: string, override: RelationMemorySlot['userOverride']) => void;
+  onDeleteMemorySlot: (slotId: string) => void;
+  hasConversationHistory: boolean;
   onInputKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   voiceInputState: VoiceInputState;
   onToggleVoiceInput: () => void;
   onCancelVoiceInput: () => void;
+  enableVoice: boolean;
+  voiceConversationMode: VoiceConversationMode;
+  onVoiceConversationModeChange: (mode: VoiceConversationMode) => void;
   onSend: () => void;
   canSend: boolean;
   voiceContextMenu: VoiceContextMenu | null;

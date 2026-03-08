@@ -9,11 +9,14 @@ import {
 
 function createDefaultSettings(overrides = {}) {
   return {
+    deliveryStyle: 'natural',
+    mediaAutonomy: 'natural',
+    voiceConversationMode: 'off',
+    relationshipBoundaryPreset: 'balanced',
+    visualComfortLevel: 'soft-visuals',
     enableVoice: false,
-    allowMultiReply: false,
     allowProactiveContact: false,
     autoPlayVoiceReplies: false,
-    allowNsfwMedia: false,
     voiceName: 'Cherry',
     ttsRouteSource: 'auto',
     ttsConnectorId: '',
@@ -127,12 +130,137 @@ test('isMediaRouteReady is true when auto route resolves from route options', ()
   }), true);
 });
 
+test('resolveMediaRouteFromOptions skips local-runtime defaults that are not active', () => {
+  const settings = createDefaultSettings({
+    imageRouteSource: 'auto',
+  });
+  const routeOptions = {
+    resolvedDefault: {
+      source: 'local-runtime',
+      connectorId: '',
+      model: 'flux-local',
+      localModelId: 'flux-local',
+      goRuntimeLocalModelId: 'go-flux-local',
+      goRuntimeStatus: 'installed',
+    },
+    selected: {
+      source: 'token-api',
+      connectorId: 'connector-a',
+      model: 'gpt-image-1',
+    },
+    connectors: [{
+      id: 'connector-a',
+      label: 'Image API',
+      models: ['gpt-image-1'],
+    }],
+    localRuntime: {
+      models: [{
+        localModelId: 'flux-local',
+        model: 'flux-local',
+        status: 'installed',
+        goRuntimeLocalModelId: 'go-flux-local',
+        goRuntimeStatus: 'installed',
+        capabilities: ['image.generate'],
+      }],
+    },
+  };
+
+  const resolved = resolveMediaRouteFromOptions({
+    kind: 'image',
+    settings,
+    routeOptions,
+    routeOptionsRevision: 5,
+  });
+
+  assert.deepEqual(resolved, {
+    source: 'token-api',
+    connectorId: 'connector-a',
+    model: 'gpt-image-1',
+    resolvedBy: 'selected',
+    resolvedAt: resolved?.resolvedAt,
+    settingsRevision: 'image|auto||',
+    routeOptionsRevision: 5,
+  });
+});
+
 test('isMediaRouteReady is true for local-runtime route source', () => {
   const settings = createDefaultSettings({
     imageRouteSource: 'local-runtime',
     imageModel: '',
   });
-  assert.equal(isMediaRouteReady({ kind: 'image', settings }), true);
+  assert.equal(isMediaRouteReady({
+    kind: 'image',
+    settings,
+    routeOptions: {
+      selected: {
+        source: 'local-runtime',
+        connectorId: '',
+        model: 'flux-local',
+        localModelId: 'flux-local',
+        goRuntimeLocalModelId: 'go-flux-local',
+        goRuntimeStatus: 'active',
+      },
+      resolvedDefault: {
+        source: 'local-runtime',
+        connectorId: '',
+        model: 'flux-local',
+        localModelId: 'flux-local',
+        goRuntimeLocalModelId: 'go-flux-local',
+        goRuntimeStatus: 'active',
+      },
+      connectors: [],
+      localRuntime: {
+        models: [{
+          localModelId: 'flux-local',
+          model: 'flux-local',
+          status: 'active',
+          goRuntimeLocalModelId: 'go-flux-local',
+          goRuntimeStatus: 'active',
+          capabilities: ['image.generate'],
+        }],
+      },
+    },
+  }), true);
+});
+
+test('isMediaRouteReady is false for local-runtime route source when the model is not active', () => {
+  const settings = createDefaultSettings({
+    imageRouteSource: 'local-runtime',
+    imageModel: '',
+  });
+  assert.equal(isMediaRouteReady({
+    kind: 'image',
+    settings,
+    routeOptions: {
+      selected: {
+        source: 'local-runtime',
+        connectorId: '',
+        model: 'flux-local',
+        localModelId: 'flux-local',
+        goRuntimeLocalModelId: 'go-flux-local',
+        goRuntimeStatus: 'installed',
+      },
+      resolvedDefault: {
+        source: 'local-runtime',
+        connectorId: '',
+        model: 'flux-local',
+        localModelId: 'flux-local',
+        goRuntimeLocalModelId: 'go-flux-local',
+        goRuntimeStatus: 'installed',
+      },
+      connectors: [],
+      localRuntime: {
+        models: [{
+          localModelId: 'flux-local',
+          model: 'flux-local',
+          status: 'installed',
+          goRuntimeLocalModelId: 'go-flux-local',
+          goRuntimeStatus: 'installed',
+          capabilities: ['image.generate'],
+        }],
+      },
+    },
+  }), false);
 });
 
 test('isMediaRouteReady requires connector when route source is token-api', () => {

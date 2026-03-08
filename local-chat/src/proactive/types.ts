@@ -52,7 +52,10 @@ export type LocalChatProactiveAuditEvent = {
 };
 
 export type LocalChatProactiveHeartbeatInput = {
-  aiClient: Pick<LocalChatAiClient, 'generateObject'>;
+  aiClient: Pick<
+    LocalChatAiClient,
+    'generateText' | 'generateObject' | 'streamText' | 'generateImage' | 'generateVideo' | 'resolveRoute'
+  >;
   getReadContext: () => LocalChatReadContext;
   nowMs?: () => number;
   onAuditEvent?: (event: LocalChatProactiveAuditEvent) => void;

@@ -1,18 +1,67 @@
 import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot, RuntimeRouteSource } from '@nimiplatform/sdk/mod/runtime-route';
 import { pickChatModelForConnector } from '../../services/route/route-override-store.js';
-import { resolveLocalRuntimeModelsForScenario } from '../../services/route/connector-model-capabilities.js';
+import {
+  findLocalRuntimeModelForBinding,
+  resolveLocalRuntimeModelsForScenario,
+} from '../../services/route/connector-model-capabilities.js';
+
+export function resolveCommittedChatModelQuery(input: {
+  source: RuntimeRouteSource;
+  query: string;
+  activeModel: string;
+  availableModels: string[];
+}): {
+  nextQuery: string;
+  nextModel: string | null;
+} {
+  const trimmedQuery = String(input.query || '').trim();
+  const activeModel = String(input.activeModel || '').trim();
+  if (!trimmedQuery) {
+    return {
+      nextQuery: activeModel,
+      nextModel: null,
+    };
+  }
+  if (input.source === 'token-api') {
+    return {
+      nextQuery: trimmedQuery,
+      nextModel: trimmedQuery === activeModel ? null : trimmedQuery,
+    };
+  }
+  if (input.availableModels.includes(trimmedQuery)) {
+    return {
+      nextQuery: trimmedQuery,
+      nextModel: trimmedQuery === activeModel ? null : trimmedQuery,
+    };
+  }
+  return {
+    nextQuery: activeModel,
+    nextModel: null,
+  };
+}
 
 export function buildRouteBindingForSource(input: {
   source: RuntimeRouteSource;
   previous: RuntimeRouteBinding | null;
   options: RuntimeRouteOptionsSnapshot | null;
 }): RuntimeRouteBinding {
-  const firstLocalModel = input.options?.localRuntime.models[0] || null;
   const base = input.previous || input.options?.selected || {
     source: 'local-runtime' as const,
     connectorId: '',
     model: '',
   };
+  const firstLocalModel = resolveLocalRuntimeModelsForScenario({
+    models: input.options?.localRuntime.models || [],
+    scenario: 'text.generate',
+  })[0]
+    || findLocalRuntimeModelForBinding({
+      models: input.options?.localRuntime.models || [],
+      binding: {
+        model: base.model,
+        localModelId: base.localModelId,
+        goRuntimeLocalModelId: base.goRuntimeLocalModelId,
+      },
+    });
   if (input.source === 'local-runtime') {
     return {
       source: 'local-runtime',
@@ -20,6 +69,8 @@ export function buildRouteBindingForSource(input: {
       model: firstLocalModel?.model || base.model || '',
       localModelId: firstLocalModel?.localModelId || base.localModelId,
       engine: firstLocalModel?.engine || base.engine,
+      goRuntimeLocalModelId: firstLocalModel?.goRuntimeLocalModelId || base.goRuntimeLocalModelId,
+      goRuntimeStatus: firstLocalModel?.goRuntimeStatus || base.goRuntimeStatus,
     };
   }
   const firstConnector = input.options?.connectors[0];
@@ -61,19 +112,24 @@ export function buildRouteBindingForModel(input: {
     model: '',
   };
   if (base.source === 'local-runtime') {
-    const matchedLocalModel = resolveLocalRuntimeModelsForScenario({
-      models: input.options?.localRuntime.models || [],
-      scenario: 'chat',
-    }).find((candidate) => (
-      String(candidate.model || '').trim() === String(input.model || '').trim()
-      || String(candidate.localModelId || '').trim() === String(input.model || '').trim()
-    )) || null;
+    const matchedLocalModel = findLocalRuntimeModelForBinding({
+      models: resolveLocalRuntimeModelsForScenario({
+        models: input.options?.localRuntime.models || [],
+        scenario: 'chat',
+      }),
+      binding: {
+        model: input.model,
+        localModelId: input.model,
+      },
+    });
     return {
       source: 'local-runtime',
       connectorId: '',
       model: input.model,
       ...(matchedLocalModel?.localModelId ? { localModelId: matchedLocalModel.localModelId } : {}),
       ...(matchedLocalModel?.engine ? { engine: matchedLocalModel.engine } : {}),
+      ...(matchedLocalModel?.goRuntimeLocalModelId ? { goRuntimeLocalModelId: matchedLocalModel.goRuntimeLocalModelId } : {}),
+      ...(matchedLocalModel?.goRuntimeStatus ? { goRuntimeStatus: matchedLocalModel.goRuntimeStatus } : {}),
     };
   }
   return {

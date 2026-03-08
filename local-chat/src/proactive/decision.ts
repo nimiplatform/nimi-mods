@@ -63,19 +63,20 @@ function summarizeContextPacket(input: LocalChatProactiveDecisionInput['contextP
         joinLines('平台 e2e warm-start', input.platformWarmStart.e2e),
       ].filter(Boolean).join('\n\n')
       : '',
-    input.runningSummary
+    input.interactionSnapshot
       ? [
-        joinLines('关系状态', input.runningSummary.relationshipState),
-        joinLines('用户事实', input.runningSummary.userFactsEstablished),
-        joinLines('助手承诺', input.runningSummary.assistantCommitments),
-        joinLines('未完成事项', input.runningSummary.openLoops),
-        joinLines('场景状态', input.runningSummary.sceneState),
+        joinLines('关系状态', [input.interactionSnapshot.relationshipState]),
+        joinLines('助手承诺', input.interactionSnapshot.assistantCommitments),
+        joinLines('用户偏好', input.interactionSnapshot.userPrefs),
+        joinLines('未完成事项', input.interactionSnapshot.openLoops),
+        joinLines('场景状态', input.interactionSnapshot.activeScene),
       ].filter(Boolean).join('\n\n')
       : '',
-    joinLines('本地 durable memory', input.durableMemory.map((entry) => `[${entry.type}] ${entry.content}`)),
-    joinLines('最近精确回合', input.recentBundles.flatMap((bundle) => [
-      `${bundle.role === 'assistant' ? 'Assistant' : 'User'} #${bundle.seq}`,
-      ...bundle.lines,
+    joinLines('关系槽位', (input.relationMemorySlots || []).map((entry) => `[${entry.slotType}] ${entry.key}: ${entry.value}`)),
+    joinLines('历史召回', input.sessionRecall.map((entry) => entry.text)),
+    joinLines('最近精确回合', input.recentTurns.flatMap((turn) => [
+      `${turn.role === 'assistant' ? 'Assistant' : 'User'} #${turn.seq}`,
+      ...turn.lines,
     ])),
   ].filter(Boolean);
   return chunks.join('\n\n').slice(0, PROACTIVE_MAX_CONTEXT_CHARS) || '(empty)';
