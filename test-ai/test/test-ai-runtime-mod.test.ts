@@ -110,6 +110,9 @@ function createSdkRuntimeContext() {
         },
       },
       jobs: {
+        submit: async () => {
+          throw new Error('UNEXPECTED_JOB_SUBMIT');
+        },
         get: async () => {
           throw new Error('UNEXPECTED_JOB_GET');
         },
@@ -175,7 +178,7 @@ function installModSdkHost(runtimeHost: Record<string, unknown>): () => void {
   };
 }
 
-test('test-ai runtime mod registers all 14 capabilities', async () => {
+test('test-ai runtime mod registers all 19 capabilities', async () => {
   const { sdkRuntimeContext, runtimeHost, uiRegistrations } = createSdkRuntimeContext();
   const restoreHost = installModSdkHost(runtimeHost);
   const mod = createTestAiRuntimeMod();
@@ -184,6 +187,11 @@ test('test-ai runtime mod registers all 14 capabilities', async () => {
     assert.ok(mod.capabilities.includes('runtime.ai.text.generate'), 'missing runtime.ai.text.generate');
     assert.ok(mod.capabilities.includes('runtime.ai.text.embed'), 'missing runtime.ai.text.embed');
     assert.ok(mod.capabilities.includes('runtime.media.image.generate'), 'missing runtime.media.image.generate');
+    assert.ok(mod.capabilities.includes('runtime.media.jobs.submit'), 'missing runtime.media.jobs.submit');
+    assert.ok(mod.capabilities.includes('runtime.media.jobs.get'), 'missing runtime.media.jobs.get');
+    assert.ok(mod.capabilities.includes('runtime.media.jobs.cancel'), 'missing runtime.media.jobs.cancel');
+    assert.ok(mod.capabilities.includes('runtime.media.jobs.subscribe'), 'missing runtime.media.jobs.subscribe');
+    assert.ok(mod.capabilities.includes('runtime.media.jobs.get.artifacts'), 'missing runtime.media.jobs.get.artifacts');
     assert.ok(mod.capabilities.includes('runtime.media.video.generate'), 'missing runtime.media.video.generate');
     assert.ok(mod.capabilities.includes('runtime.media.tts.list.voices'), 'missing runtime.media.tts.list.voices');
     assert.ok(mod.capabilities.includes('runtime.media.tts.synthesize'), 'missing runtime.media.tts.synthesize');
@@ -197,7 +205,7 @@ test('test-ai runtime mod registers all 14 capabilities', async () => {
     assert.ok(mod.capabilities.includes('ui.register.ui-extension.app.content.routes'), 'missing routes slot');
 
     assert.equal(mod.capabilities.some((capability) => capability.startsWith('llm.')), false, 'must not contain legacy llm.* prefix');
-    assert.equal(mod.capabilities.length, 14, 'expected exactly 14 capabilities');
+    assert.equal(mod.capabilities.length, 19, 'expected exactly 19 capabilities');
 
     await mod.setup({ sdkRuntimeContext } as never);
 
@@ -241,6 +249,7 @@ test('test-ai runtime client exposes embed, stt, video api surfaces', async () =
     assert.equal(typeof client.media.tts.synthesize, 'function', 'media.tts.synthesize must be a function');
     assert.equal(typeof client.media.tts.listVoices, 'function', 'media.tts.listVoices must be a function');
     assert.equal(typeof client.media.image.generate, 'function', 'media.image.generate must be a function');
+    assert.equal(typeof client.media.jobs.submit, 'function', 'media.jobs.submit must be a function');
     assert.equal(typeof client.localRuntime.listArtifacts, 'function', 'localRuntime.listArtifacts must be a function');
   } finally {
     restoreHost();

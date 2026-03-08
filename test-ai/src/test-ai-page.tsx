@@ -23,6 +23,7 @@ type CapabilityId =
   | 'text.generate'
   | 'text.embed'
   | 'image.generate'
+  | 'image.create-job'
   | 'video.generate'
   | 'audio.synthesize'
   | 'audio.transcribe'
@@ -34,17 +35,19 @@ type CapabilityMeta = {
   label: string;
   description: string;
   hasRoute: boolean;
+  routeCapability?: RuntimeCanonicalCapability;
 };
 
 const CAPABILITIES: CapabilityMeta[] = [
-  { id: 'text.generate',    label: 'Text Generate',    description: 'Text generation (chat)',        hasRoute: true },
-  { id: 'text.embed',       label: 'Text Embed',       description: 'Text embedding (vector)',       hasRoute: true },
-  { id: 'image.generate',   label: 'Image Generate',   description: 'Image generation',             hasRoute: true },
-  { id: 'video.generate',   label: 'Video Generate',   description: 'Video generation',             hasRoute: true },
-  { id: 'audio.synthesize', label: 'Audio Synthesize', description: 'Text-to-speech synthesis',     hasRoute: true },
-  { id: 'audio.transcribe', label: 'Audio Transcribe', description: 'Speech-to-text transcription', hasRoute: true },
-  { id: 'voice.clone',      label: 'Voice Clone',      description: 'Voice asset cloning',          hasRoute: false },
-  { id: 'voice.design',     label: 'Voice Design',     description: 'Voice asset design',           hasRoute: false },
+  { id: 'text.generate',    label: 'Text Generate',    description: 'Text generation (chat)',                hasRoute: true, routeCapability: 'text.generate' },
+  { id: 'text.embed',       label: 'Text Embed',       description: 'Text embedding (vector)',               hasRoute: true, routeCapability: 'text.embed' },
+  { id: 'image.generate',   label: 'Image Generate',   description: 'Image generation (wait for completion)', hasRoute: true, routeCapability: 'image.generate' },
+  { id: 'image.create-job', label: 'Image Create Job', description: 'Submit image job and monitor progress', hasRoute: true, routeCapability: 'image.generate' },
+  { id: 'video.generate',   label: 'Video Generate',   description: 'Video generation',                     hasRoute: true, routeCapability: 'video.generate' },
+  { id: 'audio.synthesize', label: 'Audio Synthesize', description: 'Text-to-speech synthesis',             hasRoute: true, routeCapability: 'audio.synthesize' },
+  { id: 'audio.transcribe', label: 'Audio Transcribe', description: 'Speech-to-text transcription',         hasRoute: true, routeCapability: 'audio.transcribe' },
+  { id: 'voice.clone',      label: 'Voice Clone',      description: 'Voice asset cloning',                  hasRoute: false },
+  { id: 'voice.design',     label: 'Voice Design',     description: 'Voice asset design',                   hasRoute: false },
 ];
 
 type VoiceOption = {
@@ -107,6 +110,25 @@ type ImageWorkflowProfileOverridesInput = {
   rawJsonText?: string;
 };
 
+type ImageWorkflowDraftState = {
+  prompt: string;
+  negativePrompt: string;
+  size: string;
+  n: string;
+  seed: string;
+  responseFormatMode: ImageResponseFormatMode;
+  timeoutMs: string;
+  step: string;
+  cfgScale: string;
+  sampler: string;
+  scheduler: string;
+  optionsText: string;
+  rawProfileOverridesText: string;
+  vaeModel: string;
+  llmModel: string;
+  componentDrafts: ImageWorkflowComponentDraft[];
+};
+
 const COMMON_IMAGE_WORKFLOW_SLOTS = [
   'vae_path',
   'llm_path',
@@ -122,6 +144,42 @@ type CompanionArtifactSelectionsInput = {
   llmModel: string;
   components: Array<Pick<ImageWorkflowComponentDraft, 'slot' | 'localArtifactId'>>;
 };
+
+function routeCapabilityFor(capabilityId: CapabilityId): RuntimeCanonicalCapability | null {
+  const capability = CAPABILITIES.find((item) => item.id === capabilityId)?.routeCapability || null;
+  return capability;
+}
+
+function linkedRouteCapabilityIds(capabilityId: CapabilityId): CapabilityId[] {
+  const routeCapability = routeCapabilityFor(capabilityId);
+  if (!routeCapability) {
+    return [capabilityId];
+  }
+  return CAPABILITIES
+    .filter((item) => item.routeCapability === routeCapability)
+    .map((item) => item.id);
+}
+
+function createInitialImageWorkflowDraftState(): ImageWorkflowDraftState {
+  return {
+    prompt: '一只穿宇航服的橘猫，电影感，细节丰富',
+    negativePrompt: 'low quality, blurry',
+    size: '1024x1024',
+    n: '1',
+    seed: '',
+    responseFormatMode: 'auto',
+    timeoutMs: '600000',
+    step: '25',
+    cfgScale: '',
+    sampler: '',
+    scheduler: '',
+    optionsText: '',
+    rawProfileOverridesText: '',
+    vaeModel: '',
+    llmModel: '',
+    componentDrafts: [],
+  };
+}
 
 // ── Utility ──────────────────────────────────────────────────────────────────
 
@@ -169,6 +227,36 @@ function toArtifactPreviewUri(input: { uri?: string; bytes?: Uint8Array; mimeTyp
   const uri = asString(input.uri);
   if (uri) return uri;
   return '';
+}
+
+function isTerminalScenarioJobStatus(value: unknown): boolean {
+  const numeric = Number(value);
+  if (numeric === 4 || numeric === 5 || numeric === 6 || numeric === 7) {
+    return true;
+  }
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized.includes('completed')
+    || normalized.includes('failed')
+    || normalized.includes('canceled')
+    || normalized.includes('timeout');
+}
+
+function scenarioJobStatusLabel(value: unknown): string {
+  const normalized = String(value || '').trim();
+  if (!normalized) return 'unknown';
+  return normalized
+    .replace(/^scenario_job_status_/i, '')
+    .toLowerCase()
+    .replace(/_/g, ' ');
+}
+
+function scenarioJobEventLabel(value: unknown): string {
+  const normalized = String(value || '').trim();
+  if (!normalized) return 'event';
+  return normalized
+    .replace(/^scenario_job_event_/i, '')
+    .toLowerCase()
+    .replace(/_/g, ' ');
 }
 
 function hydrateTokenApiBinding(
@@ -503,6 +591,7 @@ export function buildImageGenerateRequestParams(input: {
   n: number;
   size: string;
   seed?: string;
+  timeoutMs?: string;
   responseFormatMode: ImageResponseFormatMode;
   extensions?: Record<string, unknown>;
   binding?: RuntimeRouteBinding;
@@ -512,6 +601,7 @@ export function buildImageGenerateRequestParams(input: {
   n: number;
   size: string;
   seed?: number;
+  timeoutMs?: number;
   responseFormat?: 'base64' | 'url';
   extensions?: Record<string, unknown>;
   binding?: RuntimeRouteBinding;
@@ -519,6 +609,8 @@ export function buildImageGenerateRequestParams(input: {
   const responseFormat = resolveImageResponseFormat(input.responseFormatMode);
   const seedText = asString(input.seed);
   const seed = seedText ? Number(seedText) : undefined;
+  const timeoutText = asString(input.timeoutMs);
+  const timeoutMs = timeoutText ? Number(timeoutText) : undefined;
   const extensions = input.extensions && Object.keys(input.extensions).length > 0
     ? input.extensions
     : undefined;
@@ -528,6 +620,7 @@ export function buildImageGenerateRequestParams(input: {
     n: Math.max(1, Number(input.n) || 1),
     size: input.size,
     ...(Number.isFinite(seed) ? { seed } : {}),
+    ...(Number.isFinite(timeoutMs) && Number(timeoutMs) > 0 ? { timeoutMs: Number(timeoutMs) } : {}),
     ...(responseFormat ? { responseFormat } : {}),
     ...(extensions ? { extensions } : {}),
     ...(input.binding ? { binding: input.binding } : {}),
@@ -602,26 +695,40 @@ async function loadRouteSnapshot(input: {
   setStates: React.Dispatch<React.SetStateAction<CapabilityStates>>;
 }): Promise<void> {
   const { runtimeClient, capabilityId, setStates } = input;
+  const targetCapability = routeCapabilityFor(capabilityId);
+  if (!targetCapability) {
+    return;
+  }
+  const linkedIds = linkedRouteCapabilityIds(capabilityId);
   setStates((prev) => ({
     ...prev,
-    [capabilityId]: { ...prev[capabilityId], routeLoading: true, routeError: '' },
+    ...Object.fromEntries(linkedIds.map((id) => [
+      id,
+      { ...prev[id], routeLoading: true, routeError: '' },
+    ])),
   }));
   try {
     const snapshot = await runtimeClient.route.listOptions({
-      capability: capabilityId as RuntimeCanonicalCapability,
+      capability: targetCapability,
     });
     setStates((prev) => ({
       ...prev,
-      [capabilityId]: { ...prev[capabilityId], snapshot, routeLoading: false },
+      ...Object.fromEntries(linkedIds.map((id) => [
+        id,
+        { ...prev[id], snapshot, routeLoading: false, routeError: '' },
+      ])),
     }));
   } catch (error) {
     setStates((prev) => ({
       ...prev,
-      [capabilityId]: {
-        ...prev[capabilityId],
-        routeLoading: false,
-        routeError: error instanceof Error ? error.message : String(error || 'Failed to load route options.'),
-      },
+      ...Object.fromEntries(linkedIds.map((id) => [
+        id,
+        {
+          ...prev[id],
+          routeLoading: false,
+          routeError: error instanceof Error ? error.message : String(error || 'Failed to load route options.'),
+        },
+      ])),
     }));
   }
 }
@@ -1264,33 +1371,34 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
 // ── Panel: image.generate ─────────────────────────────────────────────────────
 
 type ImageGeneratePanelProps = {
+  mode: 'generate' | 'job';
   state: CapabilityState;
   runtimeClient: ModRuntimeClient;
+  draft: ImageWorkflowDraftState;
+  onDraftChange: React.Dispatch<React.SetStateAction<ImageWorkflowDraftState>>;
   onStateChange: (updater: (prev: CapabilityState) => CapabilityState) => void;
   onRouteReload: () => void;
+  onBindingChange: (binding: RuntimeRouteBinding | null) => void;
 };
 
 function ImageGeneratePanel(props: ImageGeneratePanelProps) {
-  const { state, runtimeClient, onStateChange, onRouteReload } = props;
-  const [prompt, setPrompt] = React.useState('一只穿宇航服的橘猫，电影感，细节丰富');
-  const [negativePrompt, setNegativePrompt] = React.useState('low quality, blurry');
-  const [size, setSize] = React.useState('1024x1024');
-  const [n, setN] = React.useState('1');
-  const [seed, setSeed] = React.useState('');
-  const [responseFormatMode, setResponseFormatMode] = React.useState<ImageResponseFormatMode>('auto');
-  const [step, setStep] = React.useState('25');
-  const [cfgScale, setCfgScale] = React.useState('');
-  const [sampler, setSampler] = React.useState('');
-  const [scheduler, setScheduler] = React.useState('');
-  const [optionsText, setOptionsText] = React.useState('');
-  const [rawProfileOverridesText, setRawProfileOverridesText] = React.useState('');
-  const [vaeModel, setVaeModel] = React.useState('');
-  const [llmModel, setLlmModel] = React.useState('');
-  const [componentDrafts, setComponentDrafts] = React.useState<ImageWorkflowComponentDraft[]>([]);
+  const {
+    mode,
+    state,
+    runtimeClient,
+    draft,
+    onDraftChange,
+    onStateChange,
+    onRouteReload,
+    onBindingChange,
+  } = props;
   const [artifacts, setArtifacts] = React.useState<ModRuntimeLocalArtifactRecord[]>([]);
   const [artifactLoading, setArtifactLoading] = React.useState(false);
   const [artifactError, setArtifactError] = React.useState('');
-  const nextComponentIdRef = React.useRef(2);
+  const [watchJobId, setWatchJobId] = React.useState('');
+  const [jobTimeline, setJobTimeline] = React.useState<Array<Record<string, unknown>>>([]);
+  const nextComponentIdRef = React.useRef(draft.componentDrafts.length + 1);
+  const watchSequenceRef = React.useRef(0);
   const effectiveBinding = React.useMemo(
     () => resolveEffectiveBinding(state.snapshot, state.binding),
     [state.snapshot, state.binding],
@@ -1301,6 +1409,16 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
       ? (effectiveBinding?.engine || effectiveBinding?.provider)
       : '',
   );
+  const updateDraft = React.useCallback((
+    updater: Partial<ImageWorkflowDraftState> | ((prev: ImageWorkflowDraftState) => ImageWorkflowDraftState),
+  ) => {
+    onDraftChange((prev) => {
+      if (typeof updater === 'function') {
+        return updater(prev);
+      }
+      return { ...prev, ...updater };
+    });
+  }, [onDraftChange]);
 
   React.useEffect(() => {
     if (!isLocalRuntimeWorkflow) {
@@ -1334,92 +1452,267 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
       return;
     }
     const selectableArtifacts = artifacts.filter(isSelectableLocalArtifact);
-    setVaeModel((current) => {
-      if (current && selectableArtifacts.some((artifact) => artifact.localArtifactId === current)) {
-        return current;
-      }
-      return selectDefaultArtifactIdForKind(selectableArtifacts, 'vae');
-    });
-    setLlmModel((current) => {
-      if (current && selectableArtifacts.some((artifact) => artifact.localArtifactId === current)) {
-        return current;
-      }
-      return selectDefaultArtifactIdForKind(selectableArtifacts, 'llm');
-    });
-  }, [artifacts, isLocalRuntimeWorkflow]);
+    const nextVaeModel = draft.vaeModel && selectableArtifacts.some((artifact) => artifact.localArtifactId === draft.vaeModel)
+      ? draft.vaeModel
+      : selectDefaultArtifactIdForKind(selectableArtifacts, 'vae');
+    const nextLlmModel = draft.llmModel && selectableArtifacts.some((artifact) => artifact.localArtifactId === draft.llmModel)
+      ? draft.llmModel
+      : selectDefaultArtifactIdForKind(selectableArtifacts, 'llm');
+    if (nextVaeModel !== draft.vaeModel || nextLlmModel !== draft.llmModel) {
+      updateDraft({
+        vaeModel: nextVaeModel,
+        llmModel: nextLlmModel,
+      });
+    }
+  }, [artifacts, draft.llmModel, draft.vaeModel, isLocalRuntimeWorkflow, updateDraft]);
 
   const handleComponentChange = React.useCallback((
     componentId: string,
     key: 'slot' | 'localArtifactId',
     value: string,
   ) => {
-    setComponentDrafts((prev) => prev.map((component) => (
-      component.id === componentId
-        ? { ...component, [key]: value }
-        : component
-    )));
-  }, []);
+    updateDraft((prev) => ({
+      ...prev,
+      componentDrafts: prev.componentDrafts.map((component) => (
+        component.id === componentId
+          ? { ...component, [key]: value }
+          : component
+      )),
+    }));
+  }, [updateDraft]);
 
   const handleAddComponent = React.useCallback(() => {
-    setComponentDrafts((prev) => [
+    updateDraft((prev) => ({
       ...prev,
-      {
-        id: `component-${nextComponentIdRef.current++}`,
-        slot: '',
-        localArtifactId: '',
-      },
-    ]);
-  }, []);
+      componentDrafts: [
+        ...prev.componentDrafts,
+        {
+          id: `component-${nextComponentIdRef.current++}`,
+          slot: '',
+          localArtifactId: '',
+        },
+      ],
+    }));
+  }, [updateDraft]);
 
   const handleRemoveComponent = React.useCallback((componentId: string) => {
-    setComponentDrafts((prev) => prev.filter((component) => component.id !== componentId));
-  }, []);
+    updateDraft((prev) => ({
+      ...prev,
+      componentDrafts: prev.componentDrafts.filter((component) => component.id !== componentId),
+    }));
+  }, [updateDraft]);
 
-  const handleRun = React.useCallback(async () => {
-    if (!asString(prompt)) {
-      onStateChange((prev) => ({ ...prev, error: 'Prompt is empty.' }));
-      return;
+  const buildRequestContext = React.useCallback(() => {
+    if (!asString(draft.prompt)) {
+      return { error: 'Prompt is empty.' };
     }
     const profileOverridesResult = buildImageWorkflowProfileOverrides({
-      step,
-      cfgScale,
-      sampler,
-      scheduler,
-      optionsText,
-      rawJsonText: rawProfileOverridesText,
+      step: draft.step,
+      cfgScale: draft.cfgScale,
+      sampler: draft.sampler,
+      scheduler: draft.scheduler,
+      optionsText: draft.optionsText,
+      rawJsonText: draft.rawProfileOverridesText,
     });
-    const profileOverridesError = profileOverridesResult.error;
-    if (profileOverridesError) {
-      onStateChange((prev) => ({ ...prev, error: profileOverridesError }));
-      return;
+    if (profileOverridesResult.error) {
+      return { error: profileOverridesResult.error };
     }
-    onStateChange((prev) => ({ ...prev, busy: true, error: '', diagnostics: makeEmptyDiagnostics() }));
-    const t0 = Date.now();
     const binding = effectiveBinding || undefined;
-    const nNum = Math.max(1, Number(n) || 1);
+    const nNum = Math.max(1, Number(draft.n) || 1);
     const extensions = isLocalRuntimeWorkflow
       ? buildLocalImageWorkflowExtensions({
         components: buildImageWorkflowComponentSelections({
-          vaeModel,
-          llmModel,
-          components: componentDrafts,
+          vaeModel: draft.vaeModel,
+          llmModel: draft.llmModel,
+          components: draft.componentDrafts,
         }),
         profileOverrides: profileOverridesResult.overrides,
       })
       : undefined;
-    const requestParams = buildImageGenerateRequestParams({
-      prompt,
-      negativePrompt,
-      n: nNum,
-      size,
-      seed,
-      responseFormatMode,
-      extensions,
+    return {
+      error: '',
       binding,
+      requestParams: buildImageGenerateRequestParams({
+        prompt: draft.prompt,
+        negativePrompt: draft.negativePrompt,
+        n: nNum,
+        size: draft.size,
+        seed: draft.seed,
+        timeoutMs: draft.timeoutMs,
+        responseFormatMode: draft.responseFormatMode,
+        extensions,
+        binding,
+      }),
+    };
+  }, [draft, effectiveBinding, isLocalRuntimeWorkflow]);
+
+  const finalizeAsyncImageJob = React.useCallback(async (input: {
+    jobId: string;
+    requestParams: Record<string, unknown> | null;
+    resolved: ModRuntimeResolvedBinding | null;
+    job?: Record<string, unknown> | null;
+    elapsed: number;
+  }) => {
+    const artifactsResponse = await runtimeClient.media.jobs.getArtifacts(input.jobId).catch(() => ({ artifacts: [] }));
+    const artifactsTraceId = 'traceId' in artifactsResponse
+      ? asString(artifactsResponse.traceId)
+      : '';
+    const uris = (artifactsResponse.artifacts || [])
+      .map((artifact) => toArtifactPreviewUri({ uri: artifact.uri, bytes: artifact.bytes, mimeType: artifact.mimeType }))
+      .filter(Boolean);
+    const jobRecord = input.job || {};
+    const terminalStatus = scenarioJobStatusLabel(jobRecord.status);
+    const terminalError = terminalStatus !== 'completed'
+      ? asString(jobRecord.reasonDetail || terminalStatus || 'Image job did not complete successfully.')
+      : '';
+    onStateChange((prev) => ({
+      ...prev,
+      busy: false,
+      busyLabel: '',
+      result: terminalError ? 'failed' : 'passed',
+      error: terminalError,
+      output: uris,
+      rawResponse: toPrettyJson({
+        request: input.requestParams,
+        resolved: input.resolved,
+        jobId: input.jobId,
+        job: input.job,
+        events: jobTimeline,
+        artifacts: stripArtifacts({ artifacts: artifactsResponse.artifacts }),
+        previewUris: uris,
+      }),
+      diagnostics: {
+        requestParams: input.requestParams,
+        resolvedRoute: input.resolved,
+        responseMetadata: {
+          jobId: input.jobId,
+          artifactCount: artifactsResponse.artifacts.length,
+          traceId: asString(jobRecord.traceId || artifactsTraceId) || undefined,
+          modelResolved: asString(jobRecord.modelResolved) || undefined,
+          elapsed: input.elapsed,
+        },
+      },
+    }));
+  }, [jobTimeline, onStateChange, runtimeClient.media.jobs]);
+
+  const watchAsyncImageJob = React.useCallback(async (input: {
+    jobId: string;
+    requestParams: Record<string, unknown> | null;
+    resolved: ModRuntimeResolvedBinding | null;
+    initialJob?: Record<string, unknown> | null;
+  }) => {
+    const watchToken = ++watchSequenceRef.current;
+    const startedAt = Date.now();
+    setWatchJobId(input.jobId);
+    setJobTimeline([]);
+    const pushJobEvent = (label: string, job: Record<string, unknown> | null | undefined, sequence?: unknown) => {
+      const normalizedJob = job || {};
+      setJobTimeline((prev) => [
+        ...prev,
+        {
+          sequence: sequence ?? prev.length + 1,
+          label,
+          status: scenarioJobStatusLabel(normalizedJob.status),
+          reasonDetail: asString(normalizedJob.reasonDetail) || undefined,
+          traceId: asString(normalizedJob.traceId) || undefined,
+          providerJobId: asString(normalizedJob.providerJobId) || undefined,
+        },
+      ]);
+    };
+
+    onStateChange((prev) => ({
+      ...prev,
+      busy: true,
+      busyLabel: 'Watching image job...',
+      error: '',
+      output: [],
+      diagnostics: {
+        requestParams: input.requestParams,
+        resolvedRoute: input.resolved,
+        responseMetadata: {
+          jobId: input.jobId,
+        },
+      },
+    }));
+
+    let currentJob = input.initialJob || await runtimeClient.media.jobs.get(input.jobId) as unknown as Record<string, unknown>;
+    if (watchToken !== watchSequenceRef.current) {
+      return;
+    }
+    pushJobEvent('submitted', currentJob);
+    if (isTerminalScenarioJobStatus(currentJob.status)) {
+      await finalizeAsyncImageJob({
+        jobId: input.jobId,
+        requestParams: input.requestParams,
+        resolved: input.resolved,
+        job: currentJob,
+        elapsed: Date.now() - startedAt,
+      });
+      return;
+    }
+
+    const stream = await runtimeClient.media.jobs.subscribe(input.jobId);
+    for await (const event of stream) {
+      if (watchToken !== watchSequenceRef.current) {
+        return;
+      }
+      currentJob = (event.job as unknown as Record<string, unknown>) || currentJob;
+      pushJobEvent(scenarioJobEventLabel(event.eventType), currentJob, event.sequence);
+      if (isTerminalScenarioJobStatus(currentJob.status)) {
+        await finalizeAsyncImageJob({
+          jobId: input.jobId,
+          requestParams: input.requestParams,
+          resolved: input.resolved,
+          job: currentJob,
+          elapsed: Date.now() - startedAt,
+        });
+        return;
+      }
+    }
+
+    if (watchToken !== watchSequenceRef.current) {
+      return;
+    }
+    currentJob = await runtimeClient.media.jobs.get(input.jobId) as unknown as Record<string, unknown>;
+    await finalizeAsyncImageJob({
+      jobId: input.jobId,
+      requestParams: input.requestParams,
+      resolved: input.resolved,
+      job: currentJob,
+      elapsed: Date.now() - startedAt,
     });
+  }, [finalizeAsyncImageJob, onStateChange, runtimeClient.media.jobs]);
+
+  const handleRun = React.useCallback(async () => {
+    const requestContext = buildRequestContext();
+    if (requestContext.error) {
+      onStateChange((prev) => ({ ...prev, error: requestContext.error }));
+      return;
+    }
+    if (!requestContext.requestParams) {
+      onStateChange((prev) => ({ ...prev, error: 'Image request is empty.' }));
+      return;
+    }
+    onStateChange((prev) => ({ ...prev, busy: true, error: '', diagnostics: makeEmptyDiagnostics() }));
+    const t0 = Date.now();
+    const binding = requestContext.binding;
+    const requestParams = requestContext.requestParams;
     let resolved: ModRuntimeResolvedBinding | undefined;
     try {
       resolved = await runtimeClient.route.resolve({ capability: 'image.generate', binding });
+      if (mode === 'job') {
+        const job = await runtimeClient.media.jobs.submit({
+          modal: 'image',
+          input: requestParams,
+        });
+        await watchAsyncImageJob({
+          jobId: asString((job as unknown as Record<string, unknown>)?.jobId),
+          requestParams,
+          resolved: resolved ?? null,
+          initialJob: job as unknown as Record<string, unknown>,
+        });
+        return;
+      }
       const result = await runtimeClient.media.image.generate(requestParams);
       const elapsed = Date.now() - t0;
       const uris = result.artifacts
@@ -1446,7 +1739,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
       }));
     } catch (error) {
       const elapsed = Date.now() - t0;
-      const message = error instanceof Error ? error.message : String(error || 'Image generate failed.');
+      const message = error instanceof Error ? error.message : String(error || (mode === 'job' ? 'Image job submit failed.' : 'Image generate failed.'));
       onStateChange((prev) => ({
         ...prev,
         busy: false,
@@ -1458,26 +1751,63 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
       }));
     }
   }, [
-    prompt,
-    negativePrompt,
-    size,
-    n,
-    seed,
-    responseFormatMode,
-    step,
-    cfgScale,
-    sampler,
-    scheduler,
-    optionsText,
-    rawProfileOverridesText,
-    effectiveBinding,
-    isLocalRuntimeWorkflow,
-    vaeModel,
-    llmModel,
-    componentDrafts,
+    buildRequestContext,
+    mode,
     runtimeClient,
     onStateChange,
+    watchAsyncImageJob,
   ]);
+
+  const handleWatchExistingJob = React.useCallback(async () => {
+    const targetJobId = asString(watchJobId);
+    if (!targetJobId) {
+      onStateChange((prev) => ({ ...prev, error: 'Job ID is empty.' }));
+      return;
+    }
+    try {
+      await watchAsyncImageJob({
+        jobId: targetJobId,
+        requestParams: { jobId: targetJobId, mode: 'attach' },
+        resolved: null,
+      });
+    } catch (error) {
+      onStateChange((prev) => ({
+        ...prev,
+        busy: false,
+        busyLabel: '',
+        result: 'failed',
+        error: error instanceof Error ? error.message : String(error || 'Failed to watch job.'),
+      }));
+    }
+  }, [onStateChange, watchAsyncImageJob, watchJobId]);
+
+  const handleCancelJob = React.useCallback(async () => {
+    const targetJobId = asString(watchJobId);
+    if (!targetJobId) {
+      onStateChange((prev) => ({ ...prev, error: 'Job ID is empty.' }));
+      return;
+    }
+    try {
+      const canceled = await runtimeClient.media.jobs.cancel({
+        jobId: targetJobId,
+        reason: 'test-ai user canceled image job',
+      });
+      setJobTimeline((prev) => [
+        ...prev,
+        {
+          sequence: prev.length + 1,
+          label: 'canceled',
+          status: scenarioJobStatusLabel((canceled as unknown as Record<string, unknown>)?.status),
+          reasonDetail: asString((canceled as unknown as Record<string, unknown>)?.reasonDetail) || undefined,
+        },
+      ]);
+    } catch (error) {
+      onStateChange((prev) => ({
+        ...prev,
+        error: error instanceof Error ? error.message : String(error || 'Failed to cancel job.'),
+      }));
+    }
+  }, [onStateChange, runtimeClient.media.jobs, watchJobId]);
 
   const imageUris = (state.output as string[] | null) || [];
   const vaeArtifacts = React.useMemo(
@@ -1498,18 +1828,18 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
         loading={state.routeLoading}
         error={state.routeError}
         onReload={onRouteReload}
-        onBindingChange={(binding) => onStateChange((prev) => ({ ...prev, binding }))}
+        onBindingChange={onBindingChange}
       />
       <textarea
         className="h-20 w-full resize-y rounded-lg border border-gray-300 bg-white p-2 font-mono text-xs"
-        value={prompt}
-        onChange={(event) => setPrompt(event.target.value)}
+        value={draft.prompt}
+        onChange={(event) => updateDraft({ prompt: event.target.value })}
         placeholder="Prompt"
       />
       <textarea
         className="h-14 w-full resize-y rounded-lg border border-gray-300 bg-white p-2 font-mono text-xs"
-        value={negativePrompt}
-        onChange={(event) => setNegativePrompt(event.target.value)}
+        value={draft.negativePrompt}
+        onChange={(event) => updateDraft({ negativePrompt: event.target.value })}
         placeholder="Negative prompt (optional)"
       />
       <div className="grid grid-cols-2 gap-2">
@@ -1517,8 +1847,8 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
           <span className="text-gray-500">Size</span>
           <input
             className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
-            value={size}
-            onChange={(event) => setSize(event.target.value)}
+            value={draft.size}
+            onChange={(event) => updateDraft({ size: event.target.value })}
             placeholder="1024x1024"
             list="test-ai-image-size-options"
           />
@@ -1531,8 +1861,8 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
           <input
             type="number" min="1" max="4"
             className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
-            value={n}
-            onChange={(event) => setN(event.target.value)}
+            value={draft.n}
+            onChange={(event) => updateDraft({ n: event.target.value })}
           />
         </label>
       </div>
@@ -1557,8 +1887,8 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
               <span className="text-gray-500">VAE model</span>
               <select
                 className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
-                value={vaeModel}
-                onChange={(event) => setVaeModel(event.target.value)}
+                value={draft.vaeModel}
+                onChange={(event) => updateDraft({ vaeModel: event.target.value })}
                 disabled={artifactLoading || vaeArtifacts.length === 0}
               >
                 <option value="">-- optional --</option>
@@ -1573,8 +1903,8 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
               <span className="text-gray-500">LLM model</span>
               <select
                 className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
-                value={llmModel}
-                onChange={(event) => setLlmModel(event.target.value)}
+                value={draft.llmModel}
+                onChange={(event) => updateDraft({ llmModel: event.target.value })}
                 disabled={artifactLoading || llmArtifacts.length === 0}
               >
                 <option value="">-- optional --</option>
@@ -1600,8 +1930,8 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
             <span className="text-gray-500">Response format</span>
             <select
               className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
-              value={responseFormatMode}
-              onChange={(event) => setResponseFormatMode(event.target.value as ImageResponseFormatMode)}
+              value={draft.responseFormatMode}
+              onChange={(event) => updateDraft({ responseFormatMode: event.target.value as ImageResponseFormatMode })}
             >
               <option value="auto">auto</option>
               <option value="base64">base64</option>
@@ -1615,12 +1945,24 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
             <span className="text-gray-500">Seed</span>
             <input
               className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
-              value={seed}
-              onChange={(event) => setSeed(event.target.value)}
+              value={draft.seed}
+              onChange={(event) => updateDraft({ seed: event.target.value })}
               placeholder="optional"
             />
             <span className="text-[11px] text-gray-400">
               Seed stays on the standard image request. Workflow profile overrides stay in the LocalAI extension payload.
+            </span>
+          </label>
+          <label className="flex max-w-xs flex-col gap-1 text-xs">
+            <span className="text-gray-500">Timeout (ms)</span>
+            <input
+              className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
+              value={draft.timeoutMs}
+              onChange={(event) => updateDraft({ timeoutMs: event.target.value })}
+              placeholder="600000"
+            />
+            <span className="text-[11px] text-gray-400">
+              Default is 10 minutes. For heavier local jobs, increase it manually or switch to `Image Create Job`.
             </span>
           </label>
         </div>
@@ -1660,12 +2002,12 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
               </div>
             ) : null}
             <div className="mt-3 flex flex-col gap-2">
-              {componentDrafts.length === 0 ? (
+              {draft.componentDrafts.length === 0 ? (
                 <div className="rounded-md bg-gray-50 p-2 text-[11px] text-gray-500">
                   No extra workflow components configured.
                 </div>
               ) : null}
-              {componentDrafts.map((component) => {
+              {draft.componentDrafts.map((component) => {
                 const selectedArtifact = artifacts.find((artifact) => artifact.localArtifactId === component.localArtifactId) || null;
                 const artifactChoices = (() => {
                   const choices = artifactsForWorkflowSlot(artifacts, component.slot);
@@ -1720,8 +2062,8 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
                 <span className="text-gray-500">Steps</span>
                 <input
                   className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
-                  value={step}
-                  onChange={(event) => setStep(event.target.value)}
+                  value={draft.step}
+                  onChange={(event) => updateDraft({ step: event.target.value })}
                   placeholder="25"
                 />
               </label>
@@ -1729,8 +2071,8 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
                 <span className="text-gray-500">CFG scale</span>
                 <input
                   className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
-                  value={cfgScale}
-                  onChange={(event) => setCfgScale(event.target.value)}
+                  value={draft.cfgScale}
+                  onChange={(event) => updateDraft({ cfgScale: event.target.value })}
                   placeholder="optional"
                 />
               </label>
@@ -1738,8 +2080,8 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
                 <span className="text-gray-500">Sampler</span>
                 <input
                   className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
-                  value={sampler}
-                  onChange={(event) => setSampler(event.target.value)}
+                  value={draft.sampler}
+                  onChange={(event) => updateDraft({ sampler: event.target.value })}
                   placeholder="euler / dpmpp2m / ..."
                 />
               </label>
@@ -1747,8 +2089,8 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
                 <span className="text-gray-500">Scheduler</span>
                 <input
                   className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
-                  value={scheduler}
-                  onChange={(event) => setScheduler(event.target.value)}
+                  value={draft.scheduler}
+                  onChange={(event) => updateDraft({ scheduler: event.target.value })}
                   placeholder="optional"
                 />
               </label>
@@ -1757,8 +2099,8 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
               <span className="text-gray-500">Options (one per line)</span>
               <textarea
                 className="h-20 resize-y rounded-md border border-gray-300 bg-white p-2 font-mono text-xs"
-                value={optionsText}
-                onChange={(event) => setOptionsText(event.target.value)}
+                value={draft.optionsText}
+                onChange={(event) => updateDraft({ optionsText: event.target.value })}
                 placeholder={'diffusion_model\noffload_params_to_cpu:true'}
               />
             </label>
@@ -1766,8 +2108,8 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
               <span className="text-gray-500">Raw profile_overrides JSON</span>
               <textarea
                 className="h-24 resize-y rounded-md border border-gray-300 bg-white p-2 font-mono text-xs"
-                value={rawProfileOverridesText}
-                onChange={(event) => setRawProfileOverridesText(event.target.value)}
+                value={draft.rawProfileOverridesText}
+                onChange={(event) => updateDraft({ rawProfileOverridesText: event.target.value })}
                 placeholder={'{"clip_skip": 2}'}
               />
               <span className="text-[11px] text-gray-400">
@@ -1781,7 +2123,54 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
           </div>
         )}
       </details>
-      <RunButton busy={state.busy} label="Run Image Generate" onClick={() => { void handleRun(); }} />
+      {mode === 'job' ? (
+        <div className="flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-3">
+          <div className="text-xs font-semibold text-gray-700">Async image job</div>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto]">
+            <input
+              className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
+              value={watchJobId}
+              onChange={(event) => setWatchJobId(event.target.value)}
+              placeholder="job id"
+            />
+            <button
+              type="button"
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs"
+              disabled={state.busy}
+              onClick={() => { void handleWatchExistingJob(); }}
+            >
+              Watch Job
+            </button>
+            <button
+              type="button"
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs"
+              disabled={!asString(watchJobId)}
+              onClick={() => { void handleCancelJob(); }}
+            >
+              Cancel Job
+            </button>
+          </div>
+          <RunButton busy={state.busy} busyLabel={state.busyLabel} label="Submit Image Job" onClick={() => { void handleRun(); }} />
+          {jobTimeline.length > 0 ? (
+            <div className="rounded-md bg-gray-50 p-2 text-xs">
+              <div className="mb-1 font-semibold text-gray-600">Job timeline</div>
+              <div className="flex flex-col gap-1">
+                {jobTimeline.map((event, index) => (
+                  <div key={`${String(event.sequence || index)}`} className="grid grid-cols-[80px_1fr] gap-x-2">
+                    <span className="font-mono text-gray-400">{String(event.sequence || index + 1)}</span>
+                    <span className="text-gray-700">
+                      {String(event.label || 'event')} · {String(event.status || 'unknown')}
+                      {event.reasonDetail ? ` · ${String(event.reasonDetail)}` : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <RunButton busy={state.busy} busyLabel={state.busyLabel} label="Run Image Generate" onClick={() => { void handleRun(); }} />
+      )}
       {state.error ? <ErrorBox message={state.error} /> : null}
       {imageUris.length > 0 ? (
         <div className="grid grid-cols-2 gap-2">
@@ -2302,6 +2691,7 @@ export function TestAiPage() {
   const runtimeClient = React.useMemo(() => getTestAiRuntimeClient(), []);
   const [activeCapability, setActiveCapability] = React.useState<CapabilityId>('text.generate');
   const [states, setStates] = React.useState<CapabilityStates>(makeInitialCapabilityStates);
+  const [imageDraft, setImageDraft] = React.useState<ImageWorkflowDraftState>(createInitialImageWorkflowDraftState);
 
   const updateCapabilityState = React.useCallback(
     (capabilityId: CapabilityId, updater: (prev: CapabilityState) => CapabilityState) => {
@@ -2309,6 +2699,14 @@ export function TestAiPage() {
     },
     [],
   );
+
+  const updateSharedImageBinding = React.useCallback((binding: RuntimeRouteBinding | null) => {
+    setStates((prev) => ({
+      ...prev,
+      'image.generate': { ...prev['image.generate'], binding },
+      'image.create-job': { ...prev['image.create-job'], binding },
+    }));
+  }, []);
 
   const reloadRouteFor = React.useCallback(
     (capabilityId: CapabilityId) => {
@@ -2318,10 +2716,13 @@ export function TestAiPage() {
   );
 
   React.useEffect(() => {
+    const loadedCapabilities = new Set<RuntimeCanonicalCapability>();
     for (const cap of CAPABILITIES) {
-      if (cap.hasRoute) {
-        void loadRouteSnapshot({ runtimeClient, capabilityId: cap.id, setStates });
+      if (!cap.hasRoute || !cap.routeCapability || loadedCapabilities.has(cap.routeCapability)) {
+        continue;
       }
+      loadedCapabilities.add(cap.routeCapability);
+      void loadRouteSnapshot({ runtimeClient, capabilityId: cap.id, setStates });
     }
   }, [runtimeClient]);
 
@@ -2351,10 +2752,27 @@ export function TestAiPage() {
       case 'image.generate':
         return (
           <ImageGeneratePanel
+            mode="generate"
             state={activeState}
             runtimeClient={runtimeClient}
+            draft={imageDraft}
+            onDraftChange={setImageDraft}
             onStateChange={(updater) => updateCapabilityState('image.generate', updater)}
             onRouteReload={() => reloadRouteFor('image.generate')}
+            onBindingChange={updateSharedImageBinding}
+          />
+        );
+      case 'image.create-job':
+        return (
+          <ImageGeneratePanel
+            mode="job"
+            state={activeState}
+            runtimeClient={runtimeClient}
+            draft={imageDraft}
+            onDraftChange={setImageDraft}
+            onStateChange={(updater) => updateCapabilityState('image.create-job', updater)}
+            onRouteReload={() => reloadRouteFor('image.create-job')}
+            onBindingChange={updateSharedImageBinding}
           />
         );
       case 'video.generate':

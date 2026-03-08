@@ -45,6 +45,7 @@ test('image generate request forwards seed and workflow extensions', () => {
     n: 1,
     size: '1024x1024',
     seed: '42',
+    timeoutMs: '600000',
     responseFormatMode: 'auto',
     extensions: {
       components: [{ slot: 'vae_path', localArtifactId: 'local_vae_01' }],
@@ -53,6 +54,7 @@ test('image generate request forwards seed and workflow extensions', () => {
   });
 
   assert.equal(request.seed, 42);
+  assert.equal(request.timeoutMs, 600000);
   assert.deepEqual(request.extensions, {
     components: [{ slot: 'vae_path', localArtifactId: 'local_vae_01' }],
     profile_overrides: { step: 25, options: ['diffusion_model'] },
