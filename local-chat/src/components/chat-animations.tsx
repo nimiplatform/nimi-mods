@@ -170,7 +170,6 @@ const KEYFRAMES = `
     color 180ms ease,
     box-shadow 180ms ease,
     opacity 180ms ease;
-  will-change: transform;
 }
 .local-chat-root .lc-btn:hover:not(:disabled) {
   transform: translateY(-1px);
@@ -238,7 +237,6 @@ const KEYFRAMES = `
 }
 .local-chat-root .lc-bubble-ring {
   animation: lc-bubble-ring-pulse 2.4s ease-in-out infinite;
-  will-change: transform, opacity;
 }
 .local-chat-root .lc-input-shell {
   border: 1px solid rgba(203, 213, 225, 0.82);

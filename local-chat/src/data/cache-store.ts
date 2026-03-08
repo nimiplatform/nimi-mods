@@ -1,7 +1,7 @@
 import type { LocalChatTarget } from './types.js';
 
 export const PROFILE_DENY_CACHE_TTL_MS = 60_000;
-export const TARGETS_CACHE_TTL_MS = 3_000;
+export const TARGETS_CACHE_TTL_MS = 45_000;
 
 export const targetDetailCache = new Map<string, LocalChatTarget>();
 export const targetDetailInFlight = new Map<string, Promise<LocalChatTarget | null>>();

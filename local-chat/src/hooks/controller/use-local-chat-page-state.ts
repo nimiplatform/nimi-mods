@@ -8,6 +8,7 @@ import { createModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import { useAppStore } from '@nimiplatform/sdk/mod/ui';
 import { readRuntimeModSettings } from '@nimiplatform/sdk/mod/settings';
+import type { RuntimeCanonicalCapability } from '@nimiplatform/sdk/mod/runtime-route';
 import { LOCAL_CHAT_MOD_ID } from '../../contracts.js';
 import type { LocalChatPromptTrace, LocalChatTurnAudit, VoiceConversationMode } from '../../session-store.js';
 import type { ChatMessage } from '../../types.js';
@@ -27,6 +28,11 @@ import {
   resolveModelsForScenario,
   resolvePreferredModelForScenario,
 } from '../../services/route/connector-model-capabilities.js';
+import {
+  mediaCapabilityForKind,
+  resolveMediaDependencyRouteSourceHint,
+  resolveMediaRouteSnapshot,
+} from '../runtime-route/media-route-helpers.js';
 import {
   extractTtsFailureActionHint,
   extractTtsFailureReasonCode,
@@ -70,6 +76,30 @@ type AppStoreRuntimeSelectorShape = {
 
 const DEFAULT_TTS_VOICE = 'alloy';
 const DEFAULT_TTS_FORMAT = 'mp3';
+const DEPENDENCY_SNAPSHOT_INITIAL_DELAY_MS = 5_000;
+const DEPENDENCY_SNAPSHOT_POLL_INTERVAL_MS = 30_000;
+
+function createDependencySnapshotFailure(input: {
+  routeSourceHint?: 'cloud' | 'local';
+  capability: RuntimeCanonicalCapability;
+  error: unknown;
+}): ModRuntimeDependencySnapshot {
+  return {
+    modId: LOCAL_CHAT_MOD_ID,
+    status: 'missing',
+    routeSource: input.routeSourceHint || 'unknown',
+    reasonCode: ReasonCode.LOCAL_AI_DEPENDENCY_SNAPSHOT_FAILED,
+    warnings: [input.error instanceof Error ? input.error.message : String(input.error || 'unknown error')],
+    dependencies: [],
+    repairActions: [{
+      actionId: 'runtime:open-setup',
+      label: 'Open Runtime Setup',
+      reasonCode: ReasonCode.LOCAL_AI_DEPENDENCY_SNAPSHOT_FAILED,
+      capability: input.capability,
+    }],
+    updatedAt: new Date().toISOString(),
+  };
+}
 
 export function useLocalChatPageState() {
   const runtimeFields = useAppStore((s) => (s as AppStoreRuntimeSelectorShape).runtimeFields);
@@ -88,8 +118,19 @@ export function useLocalChatPageState() {
   const memorySyncAdapter = useMemo(() => createUnsupportedMemorySyncAdapter(), []);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [inputText, setInputText] = useState('');
-  const [isSessionMenuOpen, setIsSessionMenuOpen] = useState(false);
+  const inputTextRef = useRef('');
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [hasInputText, setHasInputText] = useState(false);
+  const setInputText = useCallback((valueOrFn: string | ((prev: string) => string)) => {
+    const value = typeof valueOrFn === 'function' ? valueOrFn(inputTextRef.current) : valueOrFn;
+    inputTextRef.current = value;
+    const hasText = Boolean(value.trim());
+    setHasInputText((prev) => prev === hasText ? prev : hasText);
+    // Sync to textarea DOM directly if ref available
+    if (inputRef.current && inputRef.current.value !== value) {
+      inputRef.current.value = value;
+    }
+  }, []);
   const [isRuntimeSidebarOpen, setIsRuntimeSidebarOpen] = useState(false);
   const [voiceTranscriptVisibleById, setVoiceTranscriptVisibleById] = useState<Record<string, boolean>>({});
   const [voiceContextMenu, setVoiceContextMenu] = useState<{
@@ -100,16 +141,17 @@ export function useLocalChatPageState() {
   const [latestPromptTrace, setLatestPromptTrace] = useState<LocalChatPromptTrace | null>(null);
   const [latestTurnAudit, setLatestTurnAudit] = useState<LocalChatTurnAudit | null>(null);
   const [dependencySnapshot, setDependencySnapshot] = useState<ModRuntimeDependencySnapshot | null>(null);
+  const [imageDependencySnapshot, setImageDependencySnapshot] = useState<ModRuntimeDependencySnapshot | null>(null);
+  const [videoDependencySnapshot, setVideoDependencySnapshot] = useState<ModRuntimeDependencySnapshot | null>(null);
   const [voiceConversationModeBySessionId, setVoiceConversationModeBySessionId] = useState<Record<string, VoiceConversationMode>>({});
   const [activeInteractionSnapshot, setActiveInteractionSnapshot] = useState<InteractionSnapshot | null>(null);
   const [activeRelationMemorySlots, setActiveRelationMemorySlots] = useState<RelationMemorySlot[]>([]);
   const [memorySyncStatus, setMemorySyncStatus] = useState<MemorySyncStatus>({ state: 'unsupported' });
 
-  const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const sessionMenuAnchorRef = useRef<HTMLDivElement>(null);
-  const sessionMenuPanelRef = useRef<HTMLDivElement>(null);
   const didPrimeVoiceDefaultsRef = useRef(false);
+  const dependencySnapshotRefreshRef = useRef<Promise<void> | null>(null);
+  const allDependencySnapshotsRefreshRef = useRef<Promise<void> | null>(null);
 
   const currentUserDisplayName = useMemo(
     () =>
@@ -343,57 +385,148 @@ export function useLocalChatPageState() {
     || runtimeRouteState.routeSnapshot?.source
     || undefined
   ) as 'cloud' | 'local' | undefined;
+  const imageResolvedRoute = useMemo(() => resolveMediaRouteSnapshot({
+    kind: 'image',
+    settings: speechSettingsState.defaultSettings,
+    routeOptions: runtimeRouteState.imageRouteOptions || null,
+  }), [
+    speechSettingsState.defaultSettings,
+    runtimeRouteState.imageRouteOptions,
+  ]);
+  const videoResolvedRoute = useMemo(() => resolveMediaRouteSnapshot({
+    kind: 'video',
+    settings: speechSettingsState.defaultSettings,
+    routeOptions: runtimeRouteState.videoRouteOptions || null,
+  }), [
+    speechSettingsState.defaultSettings,
+    runtimeRouteState.videoRouteOptions,
+  ]);
 
   const refreshDependencySnapshot = useCallback(async () => {
-    const dependencyCapability = speechSettingsState.defaultSettings.enableVoice
-      ? undefined
-      : 'text.generate';
-    if (dependencyCapability === 'text.generate') {
-      setDependencySnapshot((previous) => {
-        if (!previous) return previous;
-        const hasVoiceCapabilityRow = previous.dependencies.some((item) => (
-          item.capability === 'audio.synthesize' || item.capability === 'audio.transcribe'
-        ));
-        return hasVoiceCapabilityRow ? null : previous;
-      });
+    const inFlight = dependencySnapshotRefreshRef.current;
+    if (inFlight) {
+      await inFlight;
+      return;
     }
-    try {
-      const snapshot = await runtimeInspector.getDependencySnapshot(
-        dependencyCapability,
-        effectiveRouteSource,
-      );
-      setDependencySnapshot(snapshot);
-    } catch (error) {
-      setDependencySnapshot({
-        modId: LOCAL_CHAT_MOD_ID,
-        status: 'missing',
-        routeSource: 'cloud',
-        reasonCode: ReasonCode.LOCAL_AI_DEPENDENCY_SNAPSHOT_FAILED,
-        warnings: [error instanceof Error ? error.message : String(error || 'unknown error')],
-        dependencies: [],
-        repairActions: [{
-          actionId: 'runtime:open-setup',
-          label: 'Open Runtime Setup',
+    const task = (async () => {
+      const dependencyCapability = speechSettingsState.defaultSettings.enableVoice
+        ? undefined
+        : 'text.generate';
+      if (dependencyCapability === 'text.generate') {
+        setDependencySnapshot((previous) => {
+          if (!previous) return previous;
+          const hasVoiceCapabilityRow = previous.dependencies.some((item) => (
+            item.capability === 'audio.synthesize' || item.capability === 'audio.transcribe'
+          ));
+          return hasVoiceCapabilityRow ? null : previous;
+        });
+      }
+      try {
+        const snapshot = await runtimeInspector.getDependencySnapshot(
+          dependencyCapability,
+          effectiveRouteSource,
+        );
+        setDependencySnapshot(snapshot);
+      } catch (error) {
+        setDependencySnapshot({
+          modId: LOCAL_CHAT_MOD_ID,
+          status: 'missing',
+          routeSource: 'cloud',
           reasonCode: ReasonCode.LOCAL_AI_DEPENDENCY_SNAPSHOT_FAILED,
-        }],
-        updatedAt: new Date().toISOString(),
-      });
+          warnings: [error instanceof Error ? error.message : String(error || 'unknown error')],
+          dependencies: [],
+          repairActions: [{
+            actionId: 'runtime:open-setup',
+            label: 'Open Runtime Setup',
+            reasonCode: ReasonCode.LOCAL_AI_DEPENDENCY_SNAPSHOT_FAILED,
+          }],
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    })();
+    dependencySnapshotRefreshRef.current = task;
+    try {
+      await task;
+    } finally {
+      if (dependencySnapshotRefreshRef.current === task) {
+        dependencySnapshotRefreshRef.current = null;
+      }
     }
   }, [runtimeInspector, speechSettingsState.defaultSettings.enableVoice, effectiveRouteSource]);
 
-  useEffect(() => {
-    void refreshDependencySnapshot();
-  }, [refreshDependencySnapshot]);
+  const refreshMediaDependencySnapshot = useCallback(async (kind: 'image' | 'video') => {
+    const capability = mediaCapabilityForKind(kind);
+    const routeOptions = kind === 'image'
+      ? runtimeRouteState.imageRouteOptions
+      : runtimeRouteState.videoRouteOptions;
+    const routeSourceHint = resolveMediaDependencyRouteSourceHint({
+      kind,
+      settings: speechSettingsState.defaultSettings,
+      routeOptions: routeOptions || null,
+    });
+    const setSnapshot = kind === 'image'
+      ? setImageDependencySnapshot
+      : setVideoDependencySnapshot;
+    try {
+      const snapshot = await runtimeInspector.getDependencySnapshot(
+        capability,
+        routeSourceHint,
+      );
+      setSnapshot(snapshot);
+    } catch (error) {
+      setSnapshot(createDependencySnapshotFailure({
+        routeSourceHint,
+        capability,
+        error,
+      }));
+    }
+  }, [
+    runtimeInspector,
+    runtimeRouteState.imageRouteOptions,
+    runtimeRouteState.videoRouteOptions,
+    speechSettingsState.defaultSettings,
+  ]);
+
+  const refreshMediaDependencySnapshots = useCallback(async () => {
+    await refreshMediaDependencySnapshot('image');
+    await refreshMediaDependencySnapshot('video');
+  }, [refreshMediaDependencySnapshot]);
+
+  const refreshAllDependencySnapshots = useCallback(async () => {
+    const inFlight = allDependencySnapshotsRefreshRef.current;
+    if (inFlight) {
+      await inFlight;
+      return;
+    }
+    const task = (async () => {
+      await refreshDependencySnapshot();
+      await refreshMediaDependencySnapshots();
+    })();
+    allDependencySnapshotsRefreshRef.current = task;
+    try {
+      await task;
+    } finally {
+      if (allDependencySnapshotsRefreshRef.current === task) {
+        allDependencySnapshotsRefreshRef.current = null;
+      }
+    }
+  }, [refreshDependencySnapshot, refreshMediaDependencySnapshots]);
 
   useEffect(() => {
-    void refreshDependencySnapshot();
-  }, [
-    refreshDependencySnapshot,
-    runtimeRouteState.routeSnapshot?.source,
-    runtimeRouteState.routeSnapshot?.model,
-    runtimeRouteState.routeBinding?.source,
-    runtimeRouteState.routeBinding?.model,
-  ]);
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    const timeoutId = setTimeout(() => {
+      void refreshAllDependencySnapshots();
+      intervalId = setInterval(() => {
+        void refreshAllDependencySnapshots();
+      }, DEPENDENCY_SNAPSHOT_POLL_INTERVAL_MS);
+    }, DEPENDENCY_SNAPSHOT_INITIAL_DELAY_MS);
+    return () => {
+      clearTimeout(timeoutId);
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [refreshAllDependencySnapshots]);
 
   const localSttRouteAvailable = useMemo(
     () => hasReadyLocalRuntimeModelForScenario({
@@ -749,7 +882,8 @@ export function useLocalChatPageState() {
 
   const turnSendState = useLocalChatTurnSend({
     aiClient,
-    inputText,
+    inputText: inputTextRef.current,
+    inputTextRef,
     setInputText,
     viewerId: currentUserId,
     viewerDisplayName: currentUserDisplayName,
@@ -764,6 +898,8 @@ export function useLocalChatPageState() {
         model: runtimeRouteState.routeSnapshot.model,
       }
       : null,
+    imageResolvedRoute,
+    videoResolvedRoute,
     defaultSettings: speechSettingsState.defaultSettings,
     voiceConversationMode: activeVoiceConversationMode,
     setVoiceConversationMode,
@@ -776,6 +912,8 @@ export function useLocalChatPageState() {
     setLatestPromptTrace,
     setLatestTurnAudit,
     setStatusBanner,
+    imageDependencySnapshot,
+    videoDependencySnapshot,
     isTranscribing: speechTranscribeState.voiceInputState === 'transcribing',
     onOpenRuntimeSetup: () => {
       setActiveTab('runtime');
@@ -795,10 +933,9 @@ export function useLocalChatPageState() {
     aiClient,
     messages,
     setMessages,
-    inputText,
+    inputTextRef,
+    hasInputText,
     setInputText,
-    isSessionMenuOpen,
-    setIsSessionMenuOpen,
     isRuntimeSidebarOpen,
     setIsRuntimeSidebarOpen,
     voiceTranscriptVisibleById,
@@ -810,7 +947,11 @@ export function useLocalChatPageState() {
     latestTurnAudit,
     setLatestTurnAudit,
     dependencySnapshot,
+    imageDependencySnapshot,
+    videoDependencySnapshot,
     refreshDependencySnapshot,
+    refreshAllDependencySnapshots,
+    refreshMediaDependencySnapshots,
     activeInteractionSnapshot,
     activeRelationMemorySlots,
     memorySyncStatus,
@@ -819,8 +960,6 @@ export function useLocalChatPageState() {
     deleteRelationMemorySlot,
     inputRef,
     messagesEndRef,
-    sessionMenuAnchorRef,
-    sessionMenuPanelRef,
     currentUserDisplayName,
     currentUserAvatarUrl,
     selectedTargetAvatarUrl,
@@ -836,6 +975,8 @@ export function useLocalChatPageState() {
     speechSettingsState,
     sessionsState,
     runtimeRouteState,
+    imageResolvedRoute,
+    videoResolvedRoute,
     speechPlaybackState,
     speechTranscribeState,
     turnSendState,

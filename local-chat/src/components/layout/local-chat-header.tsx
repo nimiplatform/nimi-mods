@@ -1,8 +1,6 @@
-import type { RefObject, ReactNode } from 'react';
 import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { ChatMessage } from '../../types.js';
-import type { InteractionSnapshot, LocalChatSession } from '../../state/index.js';
-import { SessionMenu } from '../session-menu.js';
+import type { InteractionSnapshot } from '../../state/index.js';
 import { resolvePresenceTheme } from './presence-theme.js';
 import type { LocalChatTargetItem } from './types.js';
 
@@ -19,17 +17,7 @@ type LocalChatHeaderProps = {
   onBackToTargetStage: () => void;
   onOpenSelectedTargetProfile: () => void;
   onOpenSettings: () => void;
-  selectedTargetId: string;
-  sessions: LocalChatSession[];
-  selectedSessionId: string | null;
-  onCreateSession: () => void;
-  onSelectSession: (sessionId: string) => void;
-  onDeleteSession: (sessionId: string) => void;
-  isSessionMenuOpen: boolean;
-  setIsSessionMenuOpen: (updater: boolean | ((previous: boolean) => boolean)) => void;
-  sessionMenuAnchorRef: RefObject<HTMLDivElement | null>;
-  sessionMenuPanelRef: RefObject<HTMLDivElement | null>;
-  chevronIcon: ReactNode;
+  onClearChatHistory: () => void;
 };
 
 const ICON_ARROW_LEFT = (
@@ -42,6 +30,14 @@ const ICON_SETTINGS = (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="3" />
     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01A1.65 1.65 0 0 0 10.91 3H11a2 2 0 1 1 4 0h.09a1.65 1.65 0 0 0 1.51 1 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+  </svg>
+);
+
+const ICON_CLEAR_CHAT = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 6h18" />
+    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
   </svg>
 );
 
@@ -90,17 +86,7 @@ export function LocalChatHeader({
   onBackToTargetStage,
   onOpenSelectedTargetProfile,
   onOpenSettings,
-  selectedTargetId,
-  sessions,
-  selectedSessionId,
-  onCreateSession,
-  onSelectSession,
-  onDeleteSession,
-  isSessionMenuOpen,
-  setIsSessionMenuOpen,
-  sessionMenuAnchorRef,
-  sessionMenuPanelRef,
-  chevronIcon,
+  onClearChatHistory,
 }: LocalChatHeaderProps) {
   const { t } = useModTranslation('local-chat');
   const theme = resolvePresenceTheme({
@@ -118,15 +104,15 @@ export function LocalChatHeader({
   const supportingCopy = String(selectedTarget.bio || '').trim() || selectedTarget.handle || t('Header.noBio');
 
   return (
-    <div className="relative overflow-hidden border-b border-white/70 px-6 pb-8 pt-5">
+    <div className="relative overflow-hidden border-b border-white/70 px-6 pb-4 pt-4">
       <div className="absolute inset-0 opacity-95" style={{ background: theme.roomAura }} />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-white/70" />
 
-      <div className="relative z-10 flex items-start justify-between gap-4">
+      <div className="relative z-10 flex items-center justify-between gap-4">
         <button
           type="button"
           onClick={onBackToTargetStage}
-          className="lc-btn lc-btn-secondary h-10 rounded-full px-4 text-sm font-semibold text-slate-700"
+          className="lc-btn lc-btn-secondary h-9 rounded-full px-3.5 text-sm font-semibold text-slate-700"
           aria-label={t('Header.backToTargets')}
           title={t('Header.backToTargets')}
         >
@@ -135,32 +121,28 @@ export function LocalChatHeader({
         </button>
 
         <div className="flex items-center gap-2">
-          <SessionMenu
-            selectedTargetId={selectedTargetId}
-            isOpen={isSessionMenuOpen}
-            setIsOpen={setIsSessionMenuOpen}
-            sessions={sessions}
-            selectedSessionId={selectedSessionId || ''}
-            anchorRef={sessionMenuAnchorRef}
-            panelRef={sessionMenuPanelRef}
-            onCreateSession={onCreateSession}
-            onSelectSession={onSelectSession}
-            onDeleteSession={onDeleteSession}
-            chevronIcon={chevronIcon}
-          />
+          <button
+            type="button"
+            onClick={onClearChatHistory}
+            title={t('Header.clearChatHistory')}
+            aria-label={t('Header.clearChatHistory')}
+            className="lc-btn lc-btn-secondary h-9 w-9 rounded-full text-slate-700"
+          >
+            {ICON_CLEAR_CHAT}
+          </button>
           <button
             type="button"
             onClick={onOpenSettings}
             title={t('Header.openSettings')}
             aria-label={t('Header.openSettings')}
-            className="lc-btn lc-btn-secondary h-10 w-10 rounded-full text-slate-700"
+            className="lc-btn lc-btn-secondary h-9 w-9 rounded-full text-slate-700"
           >
             {ICON_SETTINGS}
           </button>
         </div>
       </div>
 
-      <div className="relative z-10 mt-8 flex flex-col items-center text-center">
+      <div className="relative z-10 mt-3 flex flex-col items-center text-center">
         <button
           type="button"
           onClick={onOpenSelectedTargetProfile}
@@ -169,14 +151,14 @@ export function LocalChatHeader({
           title={t('Header.openProfileDrawer')}
         >
           <span
-            className="absolute inset-[-10px] rounded-full opacity-60"
+            className="absolute inset-[-6px] rounded-full opacity-60"
             style={{ background: theme.accentSoft }}
           />
           <span
-            className="absolute inset-[-6px] rounded-full border border-white/80"
-            style={{ boxShadow: `0 18px 42px ${theme.accentSoft}` }}
+            className="absolute inset-[-3px] rounded-full border border-white/80"
+            style={{ boxShadow: `0 12px 28px ${theme.accentSoft}` }}
           />
-          <span className="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border border-white/80 bg-white/70 shadow-[0_18px_50px_rgba(15,23,42,0.12)]">
+          <span className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-white/80 bg-white/70 shadow-[0_12px_32px_rgba(15,23,42,0.10)]">
             {selectedTargetAvatarUrl ? (
               <img
                 src={selectedTargetAvatarUrl}
@@ -184,22 +166,22 @@ export function LocalChatHeader({
                 className="h-full w-full object-cover"
               />
             ) : (
-              <span className="text-3xl font-black" style={{ color: theme.text }}>
+              <span className="text-xl font-black" style={{ color: theme.text }}>
                 {selectedTargetInitial}
               </span>
             )}
           </span>
         </button>
 
-        <p className="mt-5 text-[32px] font-black tracking-tight text-slate-950">
+        <p className="mt-2.5 text-lg font-black tracking-tight text-slate-950">
           {selectedTarget.displayName}
         </p>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+        <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
           {supportingCopy}
         </p>
 
         <div
-          className="mt-5 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-[0_12px_26px_rgba(15,23,42,0.08)]"
+          className="mt-2.5 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-[0_8px_18px_rgba(15,23,42,0.06)]"
           style={{
             borderColor: theme.border,
             background: 'rgba(255,255,255,0.78)',
@@ -207,7 +189,7 @@ export function LocalChatHeader({
           }}
         >
           <span
-            className={`inline-block h-2.5 w-2.5 rounded-full ${presenceState.busy ? 'animate-pulse' : ''}`}
+            className={`inline-block h-2 w-2 rounded-full ${presenceState.busy ? 'animate-pulse' : ''}`}
             style={{ background: theme.accentStrong }}
           />
           <span>{presenceState.label}</span>

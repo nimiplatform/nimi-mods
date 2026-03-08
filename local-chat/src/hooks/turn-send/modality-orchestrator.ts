@@ -59,34 +59,55 @@ export function orchestrateBeatModalities(input: {
   policy: ResolvedExperiencePolicy;
   voiceConversationMode: VoiceConversationMode;
 }): InteractionBeat[] {
+  let visualSlotUsed = false;
   return input.beats.map((beat, index, list) => {
-    const visual = shouldSuggestVisual({
-      beat,
-      turnMode: input.turnMode,
-      policy: input.policy,
-      interactionProfile: input.interactionProfile,
-      snapshot: input.snapshot,
-    });
-    if (visual) {
-      return {
-        ...beat,
-        modality: visual,
-        intent: 'media',
-        assetRequest: beat.assetRequest || {
-          kind: visual,
-          prompt: beat.text,
-          confidence: 0.65,
-          nsfwIntent: /暧昧|亲|吻|裸|nsfw/u.test(beat.text) ? 'suggested' : 'none',
-        },
-      };
-    }
-    if (inferVoiceAffinity({
+    const voicePreferred = inferVoiceAffinity({
       beat,
       turnMode: input.turnMode,
       interactionProfile: input.interactionProfile,
       voiceConversationMode: input.voiceConversationMode,
       policy: input.policy,
-    })) {
+    });
+    const forceVoiceBeforeAutoVisual = !beat.assetRequest && voicePreferred && (
+      input.turnMode === 'explicit-voice'
+      || (input.voiceConversationMode === 'on' && input.turnMode !== 'explicit-media')
+    );
+    if (forceVoiceBeforeAutoVisual) {
+      return {
+        ...beat,
+        modality: 'voice',
+        autoPlayVoice: input.policy.voicePolicy.autoPlayReplies,
+      };
+    }
+    // At most one beat per turn can be promoted to visual media.
+    // Beats with explicit assetRequest always get the slot; auto-suggest only
+    // applies to the last beat so text replies are delivered first.
+    const isLastBeat = index === list.length - 1;
+    const canAutoVisual = !visualSlotUsed && (beat.assetRequest || isLastBeat);
+    if (canAutoVisual) {
+      const visual = shouldSuggestVisual({
+        beat,
+        turnMode: input.turnMode,
+        policy: input.policy,
+        interactionProfile: input.interactionProfile,
+        snapshot: input.snapshot,
+      });
+      if (visual) {
+        visualSlotUsed = true;
+        return {
+          ...beat,
+          modality: visual,
+          intent: 'media',
+          assetRequest: beat.assetRequest || {
+            kind: visual,
+            prompt: beat.text,
+            confidence: 0.65,
+            nsfwIntent: /暧昧|亲|吻|裸|nsfw/u.test(beat.text) ? 'suggested' : 'none',
+          },
+        };
+      }
+    }
+    if (voicePreferred) {
       return {
         ...beat,
         modality: 'voice',

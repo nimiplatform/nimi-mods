@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { resolveVoiceAutoplayDecision } from '../src/hooks/controller/use-local-chat-page-effects.js';
+import {
+  findPendingAutoPlayVoiceMessage,
+  listAutoPlayVoiceMessageIds,
+  resolveVoiceAutoplayDecision,
+} from '../src/hooks/controller/use-local-chat-page-effects.js';
 import { resolveAssistantSegmentKind } from '../src/hooks/turn-send/channel-policy.js';
 import { resolveVoiceInputPreflightError } from '../src/hooks/use-speech-transcribe.js';
 import { shouldLoadSpeechVoices } from '../src/hooks/use-local-chat-speech-settings.js';
@@ -72,4 +76,53 @@ test('voice disabled blocks voice autoplay before playback starts', () => {
     autoPlayEnabled: true,
     playingVoiceMessageId: 'voice-message-1',
   }), 'skip-playing');
+});
+
+test('historical voice messages are primed as seen without replaying on reopen', () => {
+  const messages = [
+    {
+      id: 'voice-history-1',
+      role: 'assistant',
+      kind: 'voice',
+      meta: { autoPlayVoice: true },
+    },
+    {
+      id: 'voice-history-2',
+      role: 'assistant',
+      kind: 'voice',
+      meta: { autoPlayVoice: true },
+    },
+  ];
+
+  const primedIds = new Set(listAutoPlayVoiceMessageIds(messages));
+  const candidate = findPendingAutoPlayVoiceMessage({
+    messages,
+    autoPlayedVoiceIds: primedIds,
+  });
+
+  assert.equal(candidate, null);
+});
+
+test('new voice arrivals are still eligible after historical voices are primed', () => {
+  const messages = [
+    {
+      id: 'voice-history-1',
+      role: 'assistant',
+      kind: 'voice',
+      meta: { autoPlayVoice: true },
+    },
+    {
+      id: 'voice-new-1',
+      role: 'assistant',
+      kind: 'voice',
+      meta: { autoPlayVoice: true },
+    },
+  ];
+
+  const candidate = findPendingAutoPlayVoiceMessage({
+    messages,
+    autoPlayedVoiceIds: new Set(['voice-history-1']),
+  });
+
+  assert.equal(candidate?.id, 'voice-new-1');
 });

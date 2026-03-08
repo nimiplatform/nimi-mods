@@ -24,7 +24,8 @@ export type AssistantPlanIntent = 'answer' | 'clarify' | 'plan' | 'checkin' | 'f
 export type SegmentParseMode = 'explicit-delimiter' | 'double-newline' | 'single-message';
 export type LocalChatScheduleCancelReason =
   | 'LOCAL_CHAT_SCHEDULE_CANCELLED_BY_NEW_USER_TURN'
-  | 'LOCAL_CHAT_SCHEDULE_CANCELLED_BY_CONTEXT_CHANGE';
+  | 'LOCAL_CHAT_SCHEDULE_CANCELLED_BY_CONTEXT_CHANGE'
+  | 'LOCAL_CHAT_SCHEDULE_CANCELLED_BY_UNMOUNT';
 
 export type AssistantPlanSegment = {
   id: string;
@@ -49,6 +50,7 @@ export type LocalChatTurnAiClient = Pick<
 export type UseLocalChatTurnSendInput = {
   aiClient: LocalChatTurnAiClient;
   inputText: string;
+  inputTextRef?: { readonly current: string };
   setInputText: (value: string) => void;
   viewerId: string;
   viewerDisplayName: string;

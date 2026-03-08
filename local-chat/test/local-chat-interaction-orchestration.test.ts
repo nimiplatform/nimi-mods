@@ -187,6 +187,66 @@ test('orchestrateBeatModalities prefers voice in voice-first sessions', () => {
   assert.equal(result[0]?.autoPlayVoice, true);
 });
 
+test('orchestrateBeatModalities keeps explicit voice turns voiced even when visual auto is allowed', () => {
+  const result = orchestrateBeatModalities({
+    beats: [createBeat({ text: '可以，我直接说给你听。' })],
+    turnMode: 'explicit-voice',
+    interactionProfile: createInteractionProfile({
+      voice: { voiceAffinity: 'high' },
+      visual: {
+        imageAffinity: 'high',
+        videoAffinity: 'medium',
+      },
+    }),
+    snapshot: createSnapshot({ relationshipState: 'intimate' }),
+    policy: createResolvedExperiencePolicy({
+      voicePolicy: {
+        enabled: true,
+        autoPlayReplies: true,
+      },
+      mediaPolicy: {
+        autonomy: 'natural',
+        allowVisualAuto: true,
+      },
+      contentBoundary: {
+        relationshipState: 'intimate',
+      },
+    }),
+    voiceConversationMode: 'off',
+  });
+
+  assert.equal(result[0]?.modality, 'voice');
+  assert.equal(result[0]?.autoPlayVoice, true);
+});
+
+test('orchestrateBeatModalities does not let voice-first mode swallow explicit media turns', () => {
+  const result = orchestrateBeatModalities({
+    beats: [createBeat({ text: '发张图给我看看。' })],
+    turnMode: 'explicit-media',
+    interactionProfile: createInteractionProfile({
+      voice: { voiceAffinity: 'high' },
+      visual: {
+        imageAffinity: 'medium',
+        videoAffinity: 'low',
+      },
+    }),
+    snapshot: createSnapshot({ relationshipState: 'warm' }),
+    policy: createResolvedExperiencePolicy({
+      voicePolicy: {
+        enabled: true,
+        autoPlayReplies: true,
+      },
+      mediaPolicy: {
+        autonomy: 'natural',
+        allowVisualAuto: true,
+      },
+    }),
+    voiceConversationMode: 'on',
+  });
+
+  assert.equal(result[0]?.modality, 'image');
+});
+
 test('orchestrateBeatModalities promotes image beats only under natural media autonomy', () => {
   const beat = createBeat({
     text: '我想给你看一眼我现在靠在窗边的样子。',

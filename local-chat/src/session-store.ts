@@ -338,6 +338,7 @@ function normalizeInteractionSnapshot(value: unknown): InteractionSnapshot | nul
     openLoops: asArray(record.openLoops).map(trimString).filter(Boolean),
     topicThreads: asArray(record.topicThreads).map(trimString).filter(Boolean),
     lastResolvedTurnId: trimString(record.lastResolvedTurnId) || null,
+    conversationDirective: trimString(record.conversationDirective) || null,
     updatedAt,
   };
 }
@@ -864,6 +865,10 @@ export function getLocalChatSessionUpdatedEventName(): string {
   return LOCAL_CHAT_SESSION_UPDATED_EVENT;
 }
 
+export function warmUpLedgerHydration(): void {
+  void ensureLedgerHydrated();
+}
+
 export async function resetLocalChatConversationLedgerForTests(): Promise<void> {
   ledgerCache = emptyLedgerCache();
   const database = await openLedgerDatabase();
@@ -1053,6 +1058,46 @@ export async function deleteLocalChatSession(sessionId: string): Promise<void> {
   emitSessionUpdated({
     targetId: conversation.targetId,
     sessionId: conversation.id,
+  });
+}
+
+export async function clearLocalChatSessionHistory(sessionId: string): Promise<void> {
+  await ensureLedgerHydrated();
+  const conversation = ledgerCache.conversationsById.get(trimString(sessionId));
+  if (!conversation) return;
+
+  const turnIds = turnsForConversation(conversation.id).map((turn) => turn.id);
+  const beatIds = [...ledgerCache.beatsById.values()]
+    .filter((beat) => beat.conversationId === conversation.id)
+    .map((beat) => beat.id);
+  const mediaAssetIds = [...ledgerCache.mediaAssetsById.values()]
+    .filter((asset) => asset.conversationId === conversation.id)
+    .map((asset) => asset.id);
+
+  turnIds.forEach((turnId) => ledgerCache.turnsById.delete(turnId));
+  beatIds.forEach((beatId) => ledgerCache.beatsById.delete(beatId));
+  mediaAssetIds.forEach((assetId) => ledgerCache.mediaAssetsById.delete(assetId));
+
+  const nextConversation: LocalChatConversationRecord = {
+    ...conversation,
+    lastTurnSeq: 0,
+    updatedAt: nowIso(),
+  };
+  ledgerCache.conversationsById.set(nextConversation.id, nextConversation);
+
+  await persistMutation({
+    puts: {
+      [STORE_CONVERSATIONS]: [nextConversation],
+    },
+    deletes: {
+      [STORE_TURNS]: turnIds,
+      [STORE_BEATS]: beatIds,
+      [STORE_MEDIA_ASSETS]: mediaAssetIds,
+    },
+  });
+  emitSessionUpdated({
+    targetId: nextConversation.targetId,
+    sessionId: nextConversation.id,
   });
 }
 

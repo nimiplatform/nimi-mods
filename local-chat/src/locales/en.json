@@ -204,12 +204,5 @@
   "RuntimeSidebar": {
     "title": "Chat Runtime",
     "subtitle": "Mod-owned route selection for this chat only"
-  },
-  "SessionMenu": {
-    "title": "Sessions",
-    "newSession": "New Session",
-    "noSessions": "No sessions for this Agent.",
-    "turns": "{{count}} turns",
-    "delete": "Delete"
   }
 }

@@ -180,13 +180,15 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
   );
 
   const loadAllRuntimeRouteOptions = useCallback(async () => {
-    const [chat, image, video, tts, stt] = await Promise.all([
-      loadChatRuntimeRouteOptions(),
-      loadImageRuntimeRouteOptions(),
-      loadVideoRuntimeRouteOptions(),
-      loadTtsRuntimeRouteOptions(),
-      loadSttRuntimeRouteOptions(),
-    ]);
+    // Sequential loading: each call triggers a state update + re-render.
+    // Running them in parallel (Promise.all) causes 5 gRPC responses to land
+    // in the same frame, flooding the main thread with state updates and
+    // re-renders — this was the root cause of the app-wide UI stalls.
+    const chat = await loadChatRuntimeRouteOptions();
+    const image = await loadImageRuntimeRouteOptions();
+    const video = await loadVideoRuntimeRouteOptions();
+    const tts = await loadTtsRuntimeRouteOptions();
+    const stt = await loadSttRuntimeRouteOptions();
     return { chat, image, video, tts, stt };
   }, [
     loadChatRuntimeRouteOptions,
@@ -287,7 +289,7 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
       ttsRouteOptions?.connectors.length || 0,
       sttRouteOptions?.connectors.length || 0,
     );
-    const pollIntervalMs = connectorCount > 0 ? 10_000 : 30_000;
+    const pollIntervalMs = connectorCount > 0 ? 30_000 : 60_000;
     const timer = setInterval(() => {
       void loadAllRuntimeRouteOptions();
     }, pollIntervalMs);

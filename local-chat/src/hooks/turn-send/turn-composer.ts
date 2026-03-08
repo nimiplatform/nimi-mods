@@ -1,3 +1,4 @@
+import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import type {
   InteractionBeat,
   InteractionTurnPlan,
@@ -112,15 +113,32 @@ export async function composeInteractionTurnPlan(input: {
   const prompt = [
     input.invokeInput.prompt,
     '',
-    '请规划这轮对话的完整 beat 计划，并仅返回 JSON。',
-    'JSON 结构：',
-    '{"beats":[{"text":"一句完整的话","intent":"answer|clarify|checkin|comfort|tease|invite|media","relationMove":"关系推进标签","sceneMove":"场景标签","pauseMs":650,"assetRequest":{"kind":"image|video","prompt":"可选媒体提示"}}]}',
+    '请规划这轮对话的完整 beat 计划，仅返回一个 JSON 对象，不要有任何其它文字。',
+    '',
+    '严格按照以下 JSON 格式：',
+    '```json',
+    '{"beats":[{"text":"一句完整的话","intent":"answer","relationMove":"friendly","sceneMove":"日常","pauseMs":650}]}',
+    '```',
+    '',
+    '字段说明：',
+    '- text: 必须是完整的句子，不能断在半截，不能是空字符串',
+    '- intent: 只能是 answer/clarify/checkin/comfort/tease/invite/media 之一',
+    '- relationMove: 描述这句话对关系的推进（如 friendly/warm/comfort/tease/closer）',
+    '- sceneMove: 描述场景变化（如 日常/深入/安慰/调侃）',
+    '- pauseMs: 这句话前的停顿毫秒数（第 1 条固定 0，后续 300-2000）',
+    '- assetRequest: 可选，仅在需要生图/视频时添加 {"kind":"image|video","prompt":"描述"}',
+    '',
     '规则：',
-    '- beats 最多 4 条。',
-    '- 每条 beat 的 text 必须是完整的句子，不能断在半截。',
-    '- 第 1 条是最先接住用户的回应，要短但完整。',
-    '- information 模式默认 1-2 条；emotional/intimate/playful/checkin 可以 2-4 条。',
-    '- 不要使用 markdown、不要代码块、不要额外说明。',
+    '- beats 数量 1-4 条，不要超过 4 条',
+    '- information 模式默认 1-2 条；emotional/intimate/playful/checkin 可以 2-4 条',
+    '- 第 1 条 beat 是最先接住用户的回应，要短、快、完整',
+    '- 后续 beat 逐步展开，不要重复第 1 条的内容',
+    '- 不要使用 markdown 格式、不要代码块、不要解释',
+    '- 整个输出只能是一个 JSON 对象，以 { 开头，以 } 结尾',
+    '',
+    '示例（emotional 模式，用户说"好累"）：',
+    '{"beats":[{"text":"怎么了，今天很辛苦吗？","intent":"comfort","relationMove":"warm","sceneMove":"安慰","pauseMs":0},{"text":"跟我说说，我听着呢。","intent":"invite","relationMove":"closer","sceneMove":"深入","pauseMs":800}]}',
+    '',
     `turnMode=${input.turnMode}`,
     `deliveryStyle=${input.contextPacket.target.interactionProfile.expression.pacingBias}`,
     `voiceConversationMode=${input.contextPacket.voiceConversationMode || 'off'}`,
@@ -128,11 +146,18 @@ export async function composeInteractionTurnPlan(input: {
   ].join('\n');
 
   try {
+    console.log('[turn-composer] generateObject: calling...', { turnMode: input.turnMode });
     const result = await input.aiClient.generateObject({
       ...input.invokeInput,
       prompt,
-      maxTokens: 600,
-      temperature: 0.8,
+      maxTokens: 1200,
+      temperature: 0.5,
+    });
+    const rawBeats = (result.object as Record<string, unknown>)?.beats;
+    console.log('[turn-composer] generateObject: success', {
+      beatCount: Array.isArray(rawBeats) ? rawBeats.length : 'non-array',
+      turnMode: input.turnMode,
+      rawText: result.text?.slice(0, 200),
     });
     const plan = parsePlanObject({
       object: result.object,
@@ -140,10 +165,15 @@ export async function composeInteractionTurnPlan(input: {
       turnMode: input.turnMode,
     });
     if (plan.beats.length > 0) {
+      console.log('[turn-composer] plan accepted:', plan.beats.length, 'beats');
       return plan;
     }
-  } catch {
-    // Fall through to legacy fallback.
+    console.warn('[turn-composer] generateObject: parsed but 0 valid beats', { turnMode: input.turnMode });
+  } catch (err) {
+    console.error('[turn-composer] generateObject: FAILED', {
+      error: err instanceof Error ? err.message : String(err),
+      turnMode: input.turnMode,
+    });
   }
   const fallback = await runTextTurn({
     flowId: `fallback_${input.turnId}`,

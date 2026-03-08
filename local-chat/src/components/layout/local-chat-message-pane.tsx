@@ -21,7 +21,7 @@ type LocalChatMessagePaneProps = {
   onVoiceContextMenu: (message: ChatMessage, event: React.MouseEvent<HTMLButtonElement>) => void;
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
-  inputText: string;
+  inputTextRef: React.RefObject<string>;
   setInputText: (value: string) => void;
   productSettings: LocalChatProductSettings;
   hasConversationHistory: boolean;
@@ -132,7 +132,7 @@ const MessageList = React.memo(function MessageList({
   );
 });
 
-export function LocalChatMessagePane({
+export const LocalChatMessagePane = React.memo(function LocalChatMessagePane({
   selectedTarget,
   selectedTargetAvatarUrl,
   loadingTargetDetail,
@@ -147,7 +147,7 @@ export function LocalChatMessagePane({
   onVoiceContextMenu,
   messagesEndRef,
   inputRef,
-  inputText,
+  inputTextRef,
   setInputText,
   productSettings,
   hasConversationHistory,
@@ -165,47 +165,61 @@ export function LocalChatMessagePane({
   const isTranscribing = voiceInputState === 'transcribing';
   const voiceBusy = isRecording || isTranscribing;
   const [showMediaQuickActions, setShowMediaQuickActions] = useState(false);
+  const [localHasText, setLocalHasText] = useState(() => Boolean(inputTextRef.current.trim()));
 
   const resizeTextarea = useCallback((el: HTMLTextAreaElement) => {
     el.style.height = 'auto';
     el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
   }, []);
 
-  const handleTextareaInput = useCallback((event: React.FormEvent<HTMLTextAreaElement>) => {
-    resizeTextarea(event.currentTarget);
-  }, [resizeTextarea]);
+  const handleTextareaChange = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = event.target.value;
+    setInputText(value);
+    const hasText = Boolean(value.trim());
+    setLocalHasText((prev) => prev === hasText ? prev : hasText);
+    resizeTextarea(event.target);
+  }, [resizeTextarea, setInputText]);
 
+  // Sync localHasText + textarea size when external code modifies input (send clears, speech fills)
   useEffect(() => {
-    const textarea = inputRef.current;
-    if (!textarea) return;
-    resizeTextarea(textarea);
-  }, [inputRef, inputText, resizeTextarea]);
+    setLocalHasText(Boolean(inputTextRef.current.trim()));
+    if (inputRef.current) {
+      resizeTextarea(inputRef.current);
+    }
+  }, [isSending, voiceInputState, inputRef, inputTextRef, resizeTextarea]);
 
   const appendMediaPrompt = useCallback((kind: 'image' | 'video') => {
     const prompt = kind === 'image'
       ? t('MessagePane.quickImagePrompt')
       : t('MessagePane.quickVideoPrompt');
-    const nextValue = inputText.trim()
-      ? `${inputText.trim()}\n${prompt}`
-      : prompt;
+    const current = inputTextRef.current.trim();
+    const nextValue = current ? `${current}\n${prompt}` : prompt;
     setInputText(nextValue);
     setShowMediaQuickActions(false);
     requestAnimationFrame(() => {
-      inputRef.current?.focus();
+      const textarea = inputRef.current;
+      if (textarea) {
+        textarea.focus();
+        resizeTextarea(textarea);
+      }
     });
-  }, [inputRef, inputText, setInputText, t]);
+  }, [inputRef, inputTextRef, resizeTextarea, setInputText, t]);
 
   const seedFirstTurnComposer = useCallback(() => {
     if (!selectedTarget) {
       return;
     }
-    if (!inputText.trim()) {
+    if (!inputTextRef.current.trim()) {
       setInputText(t('MessagePane.onboardingStarterPrompt', { name: selectedTarget.displayName }));
     }
     requestAnimationFrame(() => {
-      inputRef.current?.focus();
+      const textarea = inputRef.current;
+      if (textarea) {
+        textarea.focus();
+        resizeTextarea(textarea);
+      }
     });
-  }, [inputRef, inputText, selectedTarget, setInputText, t]);
+  }, [inputRef, inputTextRef, resizeTextarea, selectedTarget, setInputText, t]);
 
   const selectedTargetName = selectedTarget?.displayName || 'Agent';
 
@@ -372,11 +386,10 @@ export function LocalChatMessagePane({
               <textarea
                 ref={inputRef}
                 rows={1}
-                className="min-h-[48px] max-h-32 min-w-0 flex-1 resize-none rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-mint-300 disabled:bg-slate-100"
+                className="min-h-[48px] max-h-32 min-w-0 flex-1 resize-none rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors duration-200 placeholder:text-slate-400 focus:border-mint-300 disabled:bg-slate-100"
                 placeholder={selectedTarget ? t('MessagePane.inputPlaceholder') : t('MessagePane.noAgentPlaceholder')}
-                value={inputText}
-                onChange={(event) => setInputText(event.target.value)}
-                onInput={handleTextareaInput}
+                defaultValue={inputTextRef.current}
+                onChange={handleTextareaChange}
                 onKeyDown={onInputKeyDown}
                 disabled={!canSend || isTranscribing}
               />
@@ -388,7 +401,7 @@ export function LocalChatMessagePane({
                   el.addEventListener('animationend', () => { el.style.animation = ''; }, { once: true });
                   onSend();
                 }}
-                disabled={!canSend || !inputText.trim() || voiceBusy}
+                disabled={!canSend || !localHasText || voiceBusy}
                 className="lc-btn lc-btn-primary h-12 w-12 shrink-0 rounded-[20px]"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -402,4 +415,4 @@ export function LocalChatMessagePane({
       </div>
     </>
   );
-}
+});

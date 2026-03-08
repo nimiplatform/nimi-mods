@@ -1,3 +1,4 @@
+import { useCallback, useRef } from 'react';
 import type { LocalChatShellProps } from '../components/index.js';
 import type { ChatMessage } from '../types.js';
 import { useLocalChatPageActions } from './controller/use-local-chat-page-actions.js';
@@ -9,6 +10,50 @@ export function useLocalChatPageController(): LocalChatShellProps {
   const actions = useLocalChatPageActions(state);
   useLocalChatPageEffects(state);
 
+  // Keep refs to latest state/actions for stable callbacks
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const actionsRef = useRef(actions);
+  actionsRef.current = actions;
+
+  const onRefresh = useCallback(() => {
+    const s = stateRef.current;
+    void s.targetsState.loadTargets();
+    void s.runtimeRouteState.refreshRouteSnapshot();
+    if (s.isRuntimeSidebarOpen) {
+      void s.refreshAllDependencySnapshots();
+    }
+  }, []);
+
+  const onOpenSelectedTargetProfile = useCallback(() => {
+    const s = stateRef.current;
+    const target = s.targetsState.selectedTarget;
+    if (!target?.id) return;
+    const isAgent = target.isAgent === true
+      || String(target.handle || '').startsWith('~')
+      || String(target.id || '').startsWith('~');
+    const preferredIdentifier = isAgent
+      ? (String(target.handle || '').trim() || target.id)
+      : target.id;
+    s.navigateToProfile(preferredIdentifier, isAgent ? 'agent-detail' : 'profile');
+  }, []);
+
+  const onPlayVoiceMessage = useCallback((message: ChatMessage) => {
+    void stateRef.current.speechPlaybackState.playVoiceMessage(message);
+  }, []);
+
+  const onMemoryOverrideChange = useCallback((slotId: string, override: Parameters<LocalChatShellProps['onMemoryOverrideChange']>[1]) => {
+    void stateRef.current.updateRelationMemorySlotOverride(slotId, override);
+  }, []);
+
+  const onDeleteMemorySlot = useCallback((slotId: string) => {
+    void stateRef.current.deleteRelationMemorySlot(slotId);
+  }, []);
+
+  const onSend = useCallback(() => {
+    void actionsRef.current.handleSendAndFocus();
+  }, []);
+
   return {
     visibleTargets: state.targetsState.visibleTargets,
     loadingTargets: state.targetsState.loadingTargets,
@@ -16,41 +61,15 @@ export function useLocalChatPageController(): LocalChatShellProps {
     setSelectedTargetId: state.targetsState.setSelectedTargetId,
     targetSearchText: state.targetsState.targetSearchText,
     setTargetSearchText: state.targetsState.setTargetSearchText,
-    onRefresh: () => {
-      void state.targetsState.loadTargets();
-      void state.runtimeRouteState.refreshRouteSnapshot();
-      if (state.isRuntimeSidebarOpen) {
-        void state.refreshDependencySnapshot();
-      }
-    },
+    onRefresh,
     selectedTarget: state.targetsState.selectedTarget,
     selectedTargetAvatarUrl: state.selectedTargetAvatarUrl,
     selectedTargetInitial: state.selectedTargetInitial,
     selectedTargetInteractionProfile: state.selectedTargetInteractionProfile,
-    onOpenSelectedTargetProfile: () => {
-      const target = state.targetsState.selectedTarget;
-      if (!target?.id) {
-        return;
-      }
-      const isAgent = target.isAgent === true
-        || String(target.handle || '').startsWith('~')
-        || String(target.id || '').startsWith('~');
-      const preferredIdentifier = isAgent
-        ? (String(target.handle || '').trim() || target.id)
-        : target.id;
-      state.navigateToProfile(preferredIdentifier, isAgent ? 'agent-detail' : 'profile');
-    },
+    onOpenSelectedTargetProfile,
     loadingTargetDetail: state.targetsState.loadingTargetDetail,
-    sessions: state.sessionsState.sessions,
     loadingSessions: state.sessionsState.loadingSessions,
-    selectedSessionId: state.sessionsState.selectedSessionId,
-    onCreateSession: state.sessionsState.handleCreateSession,
-    onSelectSession: state.sessionsState.setSelectedSessionId,
-    onDeleteSession: state.sessionsState.handleDeleteSession,
-    isSessionMenuOpen: state.isSessionMenuOpen,
-    setIsSessionMenuOpen: state.setIsSessionMenuOpen,
-    sessionMenuAnchorRef: state.sessionMenuAnchorRef,
-    sessionMenuPanelRef: state.sessionMenuPanelRef,
+    onClearChatHistory: state.sessionsState.handleClearHistory,
     isRuntimeSidebarOpen: state.isRuntimeSidebarOpen,
     setIsRuntimeSidebarOpen: state.setIsRuntimeSidebarOpen,
     runtimeSidebarProps: actions.runtimeSidebarProps,
@@ -60,13 +79,12 @@ export function useLocalChatPageController(): LocalChatShellProps {
     currentUserAvatarUrl: state.currentUserAvatarUrl,
     playingVoiceMessageId: state.speechPlaybackState.playingVoiceMessageId,
     voiceTranscriptVisibleById: state.voiceTranscriptVisibleById,
-    onPlayVoiceMessage: (message: ChatMessage) => {
-      void state.speechPlaybackState.playVoiceMessage(message);
-    },
+    onPlayVoiceMessage,
     onVoiceContextMenu: actions.handleVoiceContextMenu,
     messagesEndRef: state.messagesEndRef,
     inputRef: state.inputRef,
-    inputText: state.inputText,
+    inputTextRef: state.inputTextRef,
+    hasInputText: state.hasInputText,
     setInputText: state.setInputText,
     productSettings: state.speechSettingsState.productSettings,
     activeInteractionSnapshot: state.activeInteractionSnapshot,
@@ -76,13 +94,9 @@ export function useLocalChatPageController(): LocalChatShellProps {
     onDefaultMediaAutonomyChange: actions.handleMediaAutonomyChange,
     onDefaultVoiceConversationModeChange: actions.handleVoiceConversationModeChange,
     onVisualComfortLevelChange: actions.handleVisualComfortLevelChange,
-    onMemoryOverrideChange: (slotId, override) => {
-      void state.updateRelationMemorySlotOverride(slotId, override);
-    },
-    onDeleteMemorySlot: (slotId) => {
-      void state.deleteRelationMemorySlot(slotId);
-    },
-    hasConversationHistory: state.sessionsState.sessions.some((session) => session.turnCount > 0),
+    onMemoryOverrideChange,
+    onDeleteMemorySlot,
+    hasConversationHistory: state.messages.length > 0,
     onInputKeyDown: actions.handleKeyDown,
     voiceInputState: state.speechTranscribeState.voiceInputState,
     onToggleVoiceInput: actions.handleToggleVoiceInput,
@@ -90,9 +104,7 @@ export function useLocalChatPageController(): LocalChatShellProps {
     enableVoice: state.speechSettingsState.defaultSettings.enableVoice,
     voiceConversationMode: state.activeVoiceConversationMode,
     onVoiceConversationModeChange: state.setVoiceConversationMode,
-    onSend: () => {
-      void actions.handleSendAndFocus();
-    },
+    onSend,
     canSend: actions.canSend,
     voiceContextMenu: state.voiceContextMenu,
     onToggleVoiceTranscript: actions.handleToggleVoiceTranscript,

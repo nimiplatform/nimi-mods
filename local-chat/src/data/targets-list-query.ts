@@ -95,8 +95,7 @@ export function deriveLocalChatTargetsFromFriendsPayload(payload: unknown): Loca
         ? toBaseTargetFromFriend(friendRecord)
         : null;
     })
-    .filter((item): item is LocalChatTarget => Boolean(item))
-    .sort((a, b) => a.displayName.localeCompare(b.displayName, 'en'));
+    .filter((item): item is LocalChatTarget => Boolean(item));
 }
 
 export async function listLocalChatTargets(context: LocalChatReadContext): Promise<LocalChatTarget[]> {

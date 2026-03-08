@@ -19,6 +19,7 @@ import {
   type LocalChatSettings,
   persistLocalChatSettings,
 } from '../../src/default-settings-store.ts';
+import { buildLocalChatTurnContextKey } from '../../src/hooks/turn-send/context-key.ts';
 import { runLocalChatTurnSend } from '../../src/hooks/turn-send/send-flow.ts';
 import {
   resetLocalChatConversationLedgerForTests,
@@ -458,6 +459,7 @@ export function createSendFlowHarness(input: {
     latestTurnAudit: null as Record<string, unknown> | null,
     isSending: false,
     scheduleDone: null as Promise<void> | null,
+    activeScheduleContext: null as { targetId: string; sessionId: string; routeBindingSource: string; routeBindingConnector: string; routeBindingModel: string } | null,
   };
 
   return {
@@ -484,6 +486,7 @@ export function createSendFlowHarness(input: {
       state.latestTurnAudit = null;
       state.isSending = false;
       state.scheduleDone = null;
+      state.activeScheduleContext = null;
       statusBanners.length = 0;
 
       await runLocalChatTurnSend({
@@ -550,10 +553,15 @@ export function createSendFlowHarness(input: {
         setIsSending: (next) => {
           state.isSending = next;
         },
-        sendContextKey: 'ctx-stable',
-        getCurrentContextKey: () => 'ctx-stable',
-        registerSchedule: (handle) => {
+        getCurrentContextKey: () => buildLocalChatTurnContextKey({
+          targetId: input.target.id,
+          sessionId: state.selectedSessionId,
+          routeBinding: null,
+          activeSchedule: state.activeScheduleContext,
+        }),
+        registerSchedule: ({ handle, context }) => {
           state.scheduleDone = handle.done;
+          state.activeScheduleContext = context;
         },
         clearScheduleByTxn: () => undefined,
       });

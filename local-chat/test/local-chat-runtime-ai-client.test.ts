@@ -147,6 +147,91 @@ test('local-chat runtime ai client: text calls pass timeoutMs through to runtime
   assert.equal(streamEvents.at(-1)?.traceId, 'trace-stream');
 });
 
+test('local-chat runtime ai client: generateObject repairs missing closing containers', async () => {
+  const runtimeClient = {
+    route: {
+      resolve: async () => createResolvedRoute(),
+    },
+    ai: {
+      text: {
+        generate: async () => ({
+          text: '{"beats":[{"text":"先让我接住你。","intent":"comfort"},{"text":"慢慢说，我听着"}]',
+          trace: {
+            traceId: 'trace-broken-json-1',
+          },
+        }),
+      },
+    },
+  } as unknown as ModRuntimeClient;
+
+  const aiClient = createLocalChatAiClient(runtimeClient);
+  const result = await aiClient.generateObject({
+    prompt: 'repair me',
+    routeBinding: createBinding(),
+  });
+
+  assert.equal(Array.isArray(result.object.beats), true);
+  assert.equal((result.object.beats as Array<Record<string, unknown>>).length, 2);
+});
+
+test('local-chat runtime ai client: generateObject repairs bare string values', async () => {
+  const runtimeClient = {
+    route: {
+      resolve: async () => createResolvedRoute(),
+    },
+    ai: {
+      text: {
+        generate: async () => ({
+          text: '{"turnMode":"emotional","emotionalState":{"detected":疲惫,"cause":"近期压力太大","suggestedApproach":empathize-first},"relevantMemoryIds":[],"conversationDirective":null}',
+          trace: {
+            traceId: 'trace-broken-json-2',
+          },
+        }),
+      },
+    },
+  } as unknown as ModRuntimeClient;
+
+  const aiClient = createLocalChatAiClient(runtimeClient);
+  const result = await aiClient.generateObject({
+    prompt: 'repair me too',
+    routeBinding: createBinding(),
+  });
+
+  assert.deepEqual(result.object.emotionalState, {
+    detected: '疲惫',
+    cause: '近期压力太大',
+    suggestedApproach: 'empathize-first',
+  });
+});
+
+test('local-chat runtime ai client: generateObject repairs broken strings with raw newline and dangling escape', async () => {
+  const runtimeClient = {
+    route: {
+      resolve: async () => createResolvedRoute(),
+    },
+    ai: {
+      text: {
+        generate: async () => ({
+          text: '{"beats":[{"text":"先喝口热水\\\n再慢慢说","intent":"comfort"}]',
+          trace: {
+            traceId: 'trace-broken-json-3',
+          },
+        }),
+      },
+    },
+  } as unknown as ModRuntimeClient;
+
+  const aiClient = createLocalChatAiClient(runtimeClient);
+  const result = await aiClient.generateObject({
+    prompt: 'repair strings',
+    routeBinding: createBinding(),
+  });
+
+  const beats = result.object.beats as Array<Record<string, unknown>>;
+  assert.equal(beats.length, 1);
+  assert.equal(String(beats[0]?.text || '').includes('再慢慢说'), true);
+});
+
 test('local-chat runtime ai client: synthesizeSpeech prefers stream and falls back to bytes', async () => {
   const runtimeClient = {
     route: {

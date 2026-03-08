@@ -17,6 +17,7 @@ import { isMediaRouteReady } from './media-route.js';
 import { createPersistableVoicePlaybackCacheMeta } from '../../services/voice/playback-source.js';
 import { deriveInteractionProfile } from './interaction-profile.js';
 import { resolveTurnMode } from './turn-mode-resolver.js';
+import { perceiveTurn } from './turn-perception.js';
 import { composeInteractionTurnPlan } from './turn-composer.js';
 import { orchestrateBeatModalities } from './modality-orchestrator.js';
 import { compilePortableMemorySlots } from './portable-memory-compiler.js';
@@ -35,6 +36,10 @@ import { compileInteractionState } from './interaction-state-compiler.js';
 import { createUlid } from '../../utils/ulid.js';
 import { createSessionTurn } from '../../services/view/messages.js';
 import type { MediaExecutionDecision } from './media-decision-types.js';
+import {
+  buildLocalChatTurnContextKey,
+  buildLocalChatTurnContextSnapshot,
+} from './context-key.js';
 
 type OrchestratedBeat = ReturnType<typeof orchestrateBeatModalities>[number];
 type ConcreteMediaDecision = Exclude<MediaExecutionDecision, { kind: 'none' }>;
@@ -162,6 +167,7 @@ async function persistInteractionState(input: {
   assistantTurnId: string;
   deliveredBeats: OrchestratedBeat[];
   routeBinding: UseLocalChatTurnSendInput['routeBinding'];
+  conversationDirective?: string | null;
 }): Promise<void> {
   const [session, mediaAssets] = await Promise.all([
     getLocalChatSession(input.sessionId, input.viewerId),
@@ -174,6 +180,7 @@ async function persistInteractionState(input: {
     session,
     deliveredBeats: input.deliveredBeats,
     mediaAssets,
+    conversationDirective: input.conversationDirective,
   });
   const portableMemorySlots = await compilePortableMemorySlots({
     aiClient: input.aiClient,
@@ -203,14 +210,16 @@ export async function runLocalChatTurnSend(input: {
   context: UseLocalChatTurnSendInput;
   isSending: boolean;
   setIsSending: (next: boolean) => void;
-  sendContextKey: string;
   getCurrentContextKey: () => string;
-  registerSchedule: (handle: TurnDeliveryScheduleHandle) => void;
+  registerSchedule: (input: {
+    handle: TurnDeliveryScheduleHandle;
+    context: ReturnType<typeof buildLocalChatTurnContextSnapshot>;
+  }) => void;
   clearScheduleByTxn: (turnTxnId: string) => void;
 }) {
   const { context } = input;
   if (context.isTranscribing) return;
-  const text = context.inputText.trim();
+  const text = (context.inputTextRef ? context.inputTextRef.current : context.inputText).trim();
   if (!text || input.isSending) return;
   if (!context.selectedTarget) {
     context.setStatusBanner({
@@ -229,6 +238,11 @@ export async function runLocalChatTurnSend(input: {
     setSelectedSessionId: context.setSelectedSessionId,
   });
   const sessionId = workingSession.id;
+  const sendContextKey = buildLocalChatTurnContextKey({
+    targetId: selectedTarget.id,
+    sessionId,
+    routeBinding,
+  });
   const userMessage: ChatMessage = createUserMessage(text);
   const turnTxnId = createTurnTxnId();
   const turnId = createTurnId();
@@ -249,7 +263,8 @@ export async function runLocalChatTurnSend(input: {
 
   try {
     const interactionProfile = deriveInteractionProfile(selectedTarget);
-    const turnMode = resolveTurnMode({
+    // Phase 1: build context with regex-based turnMode as initial estimate
+    const regexTurnMode = resolveTurnMode({
       userText: text,
       interactionProfile,
       voiceConversationMode,
@@ -263,9 +278,45 @@ export async function runLocalChatTurnSend(input: {
       runtimeMode: context.runtimeMode,
       routeBinding,
       allowMultiReply: context.defaultSettings.deliveryStyle === 'natural',
-      turnMode,
+      turnMode: regexTurnMode,
       voiceConversationMode,
     });
+    // Phase 2: AI perception — classify turnMode + emotion + memory selection + directive
+    const perception = await perceiveTurn({
+      aiClient: context.aiClient,
+      invokeInput: prepared.invokeInput,
+      userText: text,
+      snapshot: prepared.contextPacket.interactionSnapshot || null,
+      memorySlots: prepared.contextPacket.relationMemorySlots || [],
+      voiceConversationMode,
+      regexFallbackTurnMode: regexTurnMode,
+    });
+    const turnMode = perception.turnMode;
+    // Apply AI-selected memory slots: filter to only relevant ones
+    if (perception.relevantMemoryIds.length > 0 && prepared.contextPacket.relationMemorySlots) {
+      const relevantSet = new Set(perception.relevantMemoryIds);
+      prepared.contextPacket.relationMemorySlots = prepared.contextPacket.relationMemorySlots
+        .filter((slot) => relevantSet.has(slot.id));
+    }
+    // Inject conversation directive from previous snapshot + new perception
+    const activeDirective = perception.conversationDirective
+      || prepared.contextPacket.interactionSnapshot?.conversationDirective
+      || null;
+    // Store perception directive for later persistence
+    const perceptionDirective = perception.conversationDirective;
+    // Inject emotional context into prompt if detected
+    if (perception.emotionalState) {
+      const emotionalHint = [
+        `[感知层判断] 用户情绪：${perception.emotionalState.detected}`,
+        perception.emotionalState.cause ? `原因：${perception.emotionalState.cause}` : '',
+        perception.emotionalState.suggestedApproach ? `建议回应：${perception.emotionalState.suggestedApproach}` : '',
+      ].filter(Boolean).join('；');
+      prepared.invokeInput.prompt = `${emotionalHint}\n\n${prepared.invokeInput.prompt}`;
+    }
+    // Inject conversation directive into prompt
+    if (activeDirective) {
+      prepared.invokeInput.prompt = `[对话方向] ${activeDirective}\n\n${prepared.invokeInput.prompt}`;
+    }
     const resolvedExperiencePolicy = compileResolvedExperiencePolicy({
       interactionProfile: prepared.contextPacket.target.interactionProfile,
       interactionSnapshot: prepared.contextPacket.interactionSnapshot || null,
@@ -303,6 +354,12 @@ export async function runLocalChatTurnSend(input: {
       planId: lockedPlan.planId,
       turnMode,
       voiceConversationMode: effectiveVoiceConversationMode,
+    });
+    console.log('[send-flow] deliveries built:', {
+      count: deliveries.length,
+      kinds: deliveries.map((d) => d.kind),
+      contents: deliveries.map((d) => d.content?.slice(0, 40)),
+      delays: deliveries.map((d) => d.delayMs),
     });
     const latencyMs = Math.round(performance.now() - startedAt);
     const nsfwPolicy = resolvedExperiencePolicy.mediaPolicy.nsfwPolicy;
@@ -440,7 +497,10 @@ export async function runLocalChatTurnSend(input: {
     let mediaDeliveryId: string | null = null;
     if (rawMediaDecision.kind !== 'none') {
       const mediaDelivery = deliveries.find((item) => item.kind === 'image' || item.kind === 'video')
-        || deliveries[0]
+        || deliveries.find((item) => item.kind === 'text')
+        || (rawMediaDecision.intent.source === 'explicit'
+          ? deliveries.find((item) => item.kind === 'voice') || null
+          : null)
         || null;
       if (mediaDelivery) {
         mediaDeliveryId = mediaDelivery.id;
@@ -482,6 +542,7 @@ export async function runLocalChatTurnSend(input: {
         id: delivery.id,
         delayMs: delivery.delayMs,
         run: async ({ assistantTurnId, index }) => {
+          console.log(`[delivery.run] beat ${index}, kind=${delivery.kind}, id=${delivery.id}, content=${delivery.content?.slice(0, 30)}`);
           if (delivery.kind === 'text' || delivery.kind === 'voice') {
             const message: ChatMessage = {
               id: delivery.id,
@@ -495,6 +556,7 @@ export async function runLocalChatTurnSend(input: {
                 scheduledDelayMs: delivery.delayMs,
               },
             };
+            console.log(`[delivery.run] beat ${index}: committing text/voice message`);
             await commitAssistantMessage({
               sessionId,
               targetId: selectedTarget.id,
@@ -507,9 +569,11 @@ export async function runLocalChatTurnSend(input: {
               promptTrace: index === 0 ? latestPromptTrace : null,
               turnAudit: index === 0 ? turnAudit : null,
             });
+            console.log(`[delivery.run] beat ${index}: text/voice committed`);
             return;
           }
           const decision = mediaDeliveryId === delivery.id ? mediaDecision : null;
+          console.log(`[delivery.run] beat ${index}: media path, hasDecision=${Boolean(decision)}, decisionKind=${decision?.kind || 'null'}, mediaDeliveryId=${mediaDeliveryId}, deliveryId=${delivery.id}`);
           if (!decision || decision.kind === 'none') {
             const fallbackMessage: ChatMessage = {
               id: delivery.id,
@@ -522,6 +586,7 @@ export async function runLocalChatTurnSend(input: {
                 scheduledDelayMs: delivery.delayMs,
               },
             };
+            console.log(`[delivery.run] beat ${index}: no media decision, committing as text fallback`);
             await commitAssistantMessage({
               sessionId,
               targetId: selectedTarget.id,
@@ -534,8 +599,10 @@ export async function runLocalChatTurnSend(input: {
               promptTrace: index === 0 ? latestPromptTrace : null,
               turnAudit: index === 0 ? turnAudit : null,
             });
+            console.log(`[delivery.run] beat ${index}: text fallback committed`);
             return;
           }
+          console.log(`[delivery.run] beat ${index}: executing media decision`);
           const executionTracePatch = await executeMediaDecision({
             decision,
             aiClient: context.aiClient,
@@ -550,7 +617,7 @@ export async function runLocalChatTurnSend(input: {
             setSessions: context.setSessions,
             promptTrace: index === 0 ? latestPromptTrace : null,
             turnAudit: index === 0 ? turnAudit : null,
-            sendContextKey: input.sendContextKey,
+            sendContextKey,
             getCurrentContextKey: input.getCurrentContextKey,
           });
           if (executionTracePatch) {
@@ -586,7 +653,14 @@ export async function runLocalChatTurnSend(input: {
         });
       },
     });
-    input.registerSchedule(schedule);
+    input.registerSchedule({
+      handle: schedule,
+      context: buildLocalChatTurnContextSnapshot({
+        targetId: selectedTarget.id,
+        sessionId,
+        routeBinding,
+      }),
+    });
     void schedule.done
       .then(async () => {
         await persistInteractionState({
@@ -597,6 +671,7 @@ export async function runLocalChatTurnSend(input: {
           deliveredBeats: orchestratedBeats,
           aiClient: context.aiClient,
           routeBinding,
+          conversationDirective: perceptionDirective,
         });
       })
       .catch((scheduleError) => {

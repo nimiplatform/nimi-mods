@@ -1,8 +1,21 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import type { useLocalChatPageState } from './use-local-chat-page-state.js';
+import {
+  buildLocalChatTurnContextSnapshot,
+  shouldCancelForTurnContextChange,
+} from '../turn-send/context-key.js';
 
 type LocalChatPageState = ReturnType<typeof useLocalChatPageState>;
+
+type VoiceAutoplayMessageLike = {
+  id?: string;
+  role?: string;
+  kind?: string;
+  meta?: {
+    autoPlayVoice?: boolean;
+  } | null;
+};
 
 export function resolveVoiceAutoplayDecision(input: {
   enableVoice: boolean;
@@ -21,21 +34,48 @@ export function resolveVoiceAutoplayDecision(input: {
   return 'play';
 }
 
-function buildTurnContextKey(state: LocalChatPageState): string {
-  return [
-    state.targetsState.selectedTargetId,
-    state.sessionsState.selectedSessionId,
-    state.runtimeRouteState.routeBinding?.source || '',
-    state.runtimeRouteState.routeBinding?.connectorId || '',
-    state.runtimeRouteState.routeBinding?.model || '',
-    state.runtimeRouteState.routeSnapshot?.source || '',
-    state.runtimeRouteState.routeSnapshot?.model || '',
-  ].join('|');
+function isAutoPlayableVoiceMessage(message: VoiceAutoplayMessageLike | null | undefined): message is VoiceAutoplayMessageLike & { id: string } {
+  return Boolean(
+    message
+    && String(message.id || '').trim()
+    && message.role === 'assistant'
+    && message.kind === 'voice'
+    && message.meta?.autoPlayVoice,
+  );
+}
+
+export function listAutoPlayVoiceMessageIds(messages: ReadonlyArray<VoiceAutoplayMessageLike>): string[] {
+  return messages
+    .filter(isAutoPlayableVoiceMessage)
+    .map((message) => String(message.id || '').trim())
+    .filter(Boolean);
+}
+
+export function findPendingAutoPlayVoiceMessage<T extends VoiceAutoplayMessageLike>(input: {
+  messages: ReadonlyArray<T>;
+  autoPlayedVoiceIds: ReadonlySet<string>;
+}): T | null {
+  for (let index = 0; index < input.messages.length; index += 1) {
+    const message = input.messages[index];
+    if (!isAutoPlayableVoiceMessage(message)) continue;
+    if (input.autoPlayedVoiceIds.has(message.id)) continue;
+    return message;
+  }
+  return null;
+}
+
+function buildTurnContextSnapshot(state: LocalChatPageState) {
+  return buildLocalChatTurnContextSnapshot({
+    targetId: state.targetsState.selectedTargetId,
+    sessionId: state.sessionsState.selectedSessionId,
+    routeBinding: state.runtimeRouteState.routeBinding || null,
+  });
 }
 
 export function useLocalChatPageEffects(state: LocalChatPageState) {
   const autoPlayedVoiceIdsRef = useRef<Set<string>>(new Set());
-  const lastContextKeyRef = useRef<string>('');
+  const sessionVoiceHistoryPrimedRef = useRef(false);
+  const lastTurnContextRef = useRef<ReturnType<typeof buildTurnContextSnapshot> | null>(null);
   const lastAutoplayDecisionKeyRef = useRef<string>('');
 
   useEffect(() => {
@@ -53,41 +93,8 @@ export function useLocalChatPageEffects(state: LocalChatPageState) {
   }, [state.voiceContextMenu, state.setVoiceContextMenu]);
 
   useEffect(() => {
-    state.setIsSessionMenuOpen(false);
-  }, [state.targetsState.selectedTargetId, state.setIsSessionMenuOpen]);
-
-  useEffect(() => {
     state.messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [state.messages, state.messagesEndRef]);
-
-  useEffect(() => {
-    if (!state.isSessionMenuOpen) return;
-    const handleWindowMouseDown = (event: MouseEvent) => {
-      const target = event.target as Node | null;
-      if (!target) return;
-      const insideAnchor = Boolean(state.sessionMenuAnchorRef.current?.contains(target));
-      const insidePanel = Boolean(state.sessionMenuPanelRef.current?.contains(target));
-      if (!insideAnchor && !insidePanel) {
-        state.setIsSessionMenuOpen(false);
-      }
-    };
-    const handleWindowKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        state.setIsSessionMenuOpen(false);
-      }
-    };
-    window.addEventListener('mousedown', handleWindowMouseDown);
-    window.addEventListener('keydown', handleWindowKeyDown);
-    return () => {
-      window.removeEventListener('mousedown', handleWindowMouseDown);
-      window.removeEventListener('keydown', handleWindowKeyDown);
-    };
-  }, [
-    state.isSessionMenuOpen,
-    state.sessionMenuAnchorRef,
-    state.sessionMenuPanelRef,
-    state.setIsSessionMenuOpen,
-  ]);
 
   useEffect(() => {
     if (!state.targetsState.selectedTarget) return;
@@ -98,35 +105,48 @@ export function useLocalChatPageEffects(state: LocalChatPageState) {
 
   useEffect(() => {
     autoPlayedVoiceIdsRef.current.clear();
+    sessionVoiceHistoryPrimedRef.current = false;
     lastAutoplayDecisionKeyRef.current = '';
   }, [state.sessionsState.selectedSessionId]);
 
-  const turnContextKey = buildTurnContextKey(state);
+  const turnContext = useMemo(() => buildTurnContextSnapshot(state), [
+    state.targetsState.selectedTargetId,
+  ]);
   useEffect(() => {
-    const previous = lastContextKeyRef.current;
-    lastContextKeyRef.current = turnContextKey;
-    if (!previous || previous === turnContextKey) return;
+    const previous = lastTurnContextRef.current;
+    lastTurnContextRef.current = turnContext;
+    if (!shouldCancelForTurnContextChange({
+      previous,
+      next: turnContext,
+      activeSchedule: state.turnSendState.getActiveScheduleContext(),
+    })) {
+      return;
+    }
     state.turnSendState.cancelPendingSchedule('LOCAL_CHAT_SCHEDULE_CANCELLED_BY_CONTEXT_CHANGE');
     state.speechPlaybackState.stopVoicePlayback();
     state.speechTranscribeState.cancelRecording('LOCAL_CHAT_STT_RECORDING_CANCELLED_BY_CONTEXT_CHANGE');
   }, [
-    turnContextKey,
+    turnContext,
     state.turnSendState,
     state.speechPlaybackState,
     state.speechTranscribeState.cancelRecording,
   ]);
 
   useEffect(() => {
-    let candidate: (typeof state.messages)[number] | undefined;
-    for (let index = 0; index < state.messages.length; index += 1) {
-      const message = state.messages[index];
-      if (!message) continue;
-      if (message.role !== 'assistant' || message.kind !== 'voice') continue;
-      if (!message.meta?.autoPlayVoice) continue;
-      if (autoPlayedVoiceIdsRef.current.has(message.id)) continue;
-      candidate = message;
-      break;
+    if (state.sessionsState.loadingSessions) {
+      return;
     }
+    if (!sessionVoiceHistoryPrimedRef.current) {
+      for (const messageId of listAutoPlayVoiceMessageIds(state.messages)) {
+        autoPlayedVoiceIdsRef.current.add(messageId);
+      }
+      sessionVoiceHistoryPrimedRef.current = true;
+      return;
+    }
+    const candidate = findPendingAutoPlayVoiceMessage({
+      messages: state.messages,
+      autoPlayedVoiceIds: autoPlayedVoiceIdsRef.current,
+    });
     if (!candidate) return;
 
     const enableVoice = state.speechSettingsState.defaultSettings.enableVoice;
@@ -162,6 +182,7 @@ export function useLocalChatPageEffects(state: LocalChatPageState) {
     void state.speechPlaybackState.playVoiceMessage(candidate);
   }, [
     state.messages,
+    state.sessionsState.loadingSessions,
     state.speechPlaybackState,
     state.speechSettingsState.defaultSettings.enableVoice,
     state.speechSettingsState.defaultSettings.autoPlayVoiceReplies,

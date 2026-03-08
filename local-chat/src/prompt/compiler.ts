@@ -189,26 +189,32 @@ function describeExpression(profile: LocalChatPromptCompileInput['contextPacket'
   const expr = profile.expression;
   const rel = profile.relationship;
   const lines: string[] = [];
-  const lengthMap: Record<string, string> = {
+  const lengthMap: Record<typeof expr.responseLength, string> = {
     short: '偏短句，不要写长段落',
     medium: '适中长度，自然展开',
     long: '可以展开说，但不要啰嗦',
   };
-  const formalityMap: Record<string, string> = {
+  const formalityMap: Record<typeof expr.formality, string> = {
     casual: '口语化，像朋友发消息',
-    neutral: '自然语气，不过分正式也不过分随意',
     formal: '略正式，但保持亲和',
+    slang: '更松弛随性，可以带一点俚语感',
   };
-  const warmthMap: Record<string, string> = {
-    distant: '保持礼貌距离',
+  const sentimentMap: Record<typeof expr.sentiment, string> = {
+    positive: '整体语气偏积极明亮',
+    neutral: '整体语气自然平稳',
+    cynical: '允许一点嘴硬和冷感，但不要攻击用户',
+  };
+  const warmthMap: Record<typeof rel.warmth, string> = {
+    cool: '情感表达克制一些',
     warm: '温暖友善，有关心感',
     intimate: '亲密自然，像很熟的人',
   };
-  lines.push(lengthMap[expr.responseLength] || lengthMap.medium!);
-  lines.push(formalityMap[expr.formality] || formalityMap.neutral!);
-  lines.push(warmthMap[rel.warmth] || warmthMap.warm!);
-  if (expr.firstBeatStyle === 'playful') lines.push('语气偏活泼俏皮');
-  if (expr.firstBeatStyle === 'gentle') lines.push('语气偏温柔体贴');
+  lines.push(lengthMap[expr.responseLength]);
+  lines.push(formalityMap[expr.formality]);
+  lines.push(sentimentMap[expr.sentiment]);
+  lines.push(warmthMap[rel.warmth]);
+  if (expr.firstBeatStyle === 'playful') lines.push('开场语气偏活泼俏皮');
+  if (expr.firstBeatStyle === 'gentle') lines.push('开场语气偏温柔体贴');
   if (rel.flirtAffinity === 'high') lines.push('可以带一点暧昧和撩拨');
   if (expr.pacingBias === 'bursty') lines.push('喜欢连发短消息，节奏快');
   return lines;
@@ -234,6 +240,7 @@ function renderInteractionState(input: LocalChatPromptCompileInput['contextPacke
     joinLines('用户偏好', snapshot.userPrefs),
     joinLines('未完成事项', snapshot.openLoops),
     joinLines('话题线程', snapshot.topicThreads),
+    snapshot.conversationDirective ? joinLines('对话方向指引', [snapshot.conversationDirective]) : '',
   ].filter(Boolean).join('\n\n');
 }
 

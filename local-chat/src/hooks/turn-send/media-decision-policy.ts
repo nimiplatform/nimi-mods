@@ -307,6 +307,7 @@ function evaluateIntentGate(input: {
   videoRouteReady: boolean;
   imageDependencyReady: boolean;
   videoDependencyReady: boolean;
+  requireDependencyReady?: boolean;
 }): IntentGateResult {
   const routeReady = input.intent.type === 'image' ? input.imageRouteReady : input.videoRouteReady;
   const dependencyReady = input.intent.type === 'image' ? input.imageDependencyReady : input.videoDependencyReady;
@@ -326,7 +327,7 @@ function evaluateIntentGate(input: {
       }),
     };
   }
-  if (!dependencyReady) {
+  if (input.requireDependencyReady !== false && !dependencyReady) {
     return {
       allowed: false,
       routeSource,
@@ -678,6 +679,7 @@ export async function decideMediaExecution(input: DecideMediaExecutionInput): Pr
       videoRouteReady,
       imageDependencyReady,
       videoDependencyReady,
+      requireDependencyReady: false,
     });
     if (!gate.allowed) {
       return createBlockedDecision({

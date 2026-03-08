@@ -203,7 +203,7 @@ function entryAnimationFor(message: ChatMessage): string {
   return 'chat-slide-up';
 }
 
-export function ChatBubble(props: {
+export const ChatBubble = React.memo(function ChatBubble(props: {
   message: ChatMessage;
   agentAvatarUrl: string | null;
   agentName: string;
@@ -396,9 +396,9 @@ export function ChatBubble(props: {
       ) : null}
     </>
   );
-}
+});
 
-export function TypingBubble({ agentAvatarUrl, agentName }: { agentAvatarUrl: string | null; agentName: string }) {
+export const TypingBubble = React.memo(function TypingBubble({ agentAvatarUrl, agentName }: { agentAvatarUrl: string | null; agentName: string }) {
   const { t } = useModTranslation('local-chat');
   const agentInitial = (String(agentName || 'A').trim().charAt(0) || 'A').toUpperCase();
   return (
@@ -443,4 +443,4 @@ export function TypingBubble({ agentAvatarUrl, agentName }: { agentAvatarUrl: st
       </div>
     </div>
   );
-}
+});

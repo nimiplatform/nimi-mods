@@ -6,6 +6,11 @@ import {
   resolveMediaRouteFromOptions,
   toPinnedRouteBinding,
 } from '../src/hooks/turn-send/media-route.ts';
+import {
+  mediaCapabilityForKind,
+  resolveMediaDependencyRouteSourceHint,
+  resolveMediaRouteSnapshot,
+} from '../src/hooks/runtime-route/media-route-helpers.ts';
 
 function createDefaultSettings(overrides = {}) {
   return {
@@ -181,6 +186,77 @@ test('resolveMediaRouteFromOptions skips local defaults that are not active', ()
     settingsRevision: 'image|auto||',
     routeOptionsRevision: 5,
   });
+});
+
+test('mediaCapabilityForKind maps media kinds to canonical runtime capabilities', () => {
+  assert.equal(mediaCapabilityForKind('image'), 'image.generate');
+  assert.equal(mediaCapabilityForKind('video'), 'video.generate');
+});
+
+test('resolveMediaDependencyRouteSourceHint keeps manual token-api image routes ready without local dependency checks', () => {
+  const settings = createDefaultSettings({
+    imageRouteSource: 'cloud',
+    imageConnectorId: 'connector-a',
+    imageModel: 'gpt-image-1',
+  });
+
+  assert.equal(resolveMediaDependencyRouteSourceHint({
+    kind: 'image',
+    settings,
+    routeOptions: null,
+  }), 'cloud');
+});
+
+test('resolveMediaDependencyRouteSourceHint follows auto media route fallback when local default is not active', () => {
+  const settings = createDefaultSettings({
+    imageRouteSource: 'auto',
+  });
+  const routeOptions = {
+    resolvedDefault: {
+      source: 'local',
+      connectorId: '',
+      model: 'flux-local',
+      localModelId: 'flux-local',
+      goRuntimeLocalModelId: 'go-flux-local',
+      goRuntimeStatus: 'installed',
+    },
+    selected: {
+      source: 'cloud',
+      connectorId: 'connector-a',
+      model: 'gpt-image-1',
+    },
+    connectors: [{
+      id: 'connector-a',
+      label: 'Image API',
+      models: ['gpt-image-1'],
+    }],
+    local: {
+      models: [{
+        localModelId: 'flux-local',
+        model: 'flux-local',
+        status: 'installed',
+        goRuntimeLocalModelId: 'go-flux-local',
+        goRuntimeStatus: 'installed',
+        capabilities: ['image.generate'],
+      }],
+    },
+  };
+
+  assert.equal(resolveMediaDependencyRouteSourceHint({
+    kind: 'image',
+    settings,
+    routeOptions,
+    routeOptionsRevision: 7,
+  }), 'cloud');
+
+  const resolvedRoute = resolveMediaRouteSnapshot({
+    kind: 'image',
+    settings,
+    routeOptions,
+    routeOptionsRevision: 7,
+  });
+  assert.equal(resolvedRoute?.source, 'cloud');
+  assert.equal(resolvedRoute?.routeOptionsRevision, 7);
 });
 
 test('isMediaRouteReady is true for local route source', () => {

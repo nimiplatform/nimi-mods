@@ -158,15 +158,23 @@ export async function scheduleAssistantTurnDeliveries(input: {
         break;
       }
       if (cancelReason) break;
-      await delivery.run({
-        assistantTurnId: input.assistantTurnId,
-        index,
-        deliveredCount,
-        signal: abortController.signal,
-      });
-      deliveredCount += 1;
+      console.log(`[schedule] delivering beat ${index + 1}/${input.deliveries.length}, delayMs=${delayMs}`);
+      try {
+        await delivery.run({
+          assistantTurnId: input.assistantTurnId,
+          index,
+          deliveredCount,
+          signal: abortController.signal,
+        });
+        deliveredCount += 1;
+        console.log(`[schedule] beat ${index + 1} delivered`);
+      } catch (err) {
+        console.error(`[schedule] beat ${index + 1} failed, continuing`, err);
+        deliveredCount += 1;
+      }
     }
 
+    console.log(`[schedule] loop done: deliveredCount=${deliveredCount}/${input.deliveries.length}, cancelled=${Boolean(cancelReason)}`);
     if (!cancelReason || !input.onScheduleCancelled) return;
     input.onScheduleCancelled({
       turnTxnId: input.turnTxnId,
@@ -219,7 +227,9 @@ export async function commitAssistantMessage(input: {
   turnAudit?: LocalChatTurnAudit | null;
 }) {
   const kind = input.message.kind;
+  console.log(`[commitAssistantMessage] id=${input.messageId}, kind=${kind}, content=${input.message.content?.slice(0, 30)}`);
   if (kind === 'streaming' || kind === 'image-pending' || kind === 'video-pending') {
+    console.log(`[commitAssistantMessage] SKIPPED: kind=${kind} is transient`);
     return;
   }
   input.setMessages((prev) => {
@@ -231,7 +241,9 @@ export async function commitAssistantMessage(input: {
       replaced = true;
       return input.message;
     });
-    return replaced ? next : [...prev, input.message];
+    const result = replaced ? next : [...prev, input.message];
+    console.log(`[commitAssistantMessage] setMessages: replaced=${replaced}, prevLen=${prev.length}, nextLen=${result.length}`);
+    return result;
   });
   await appendBeatToLocalChatTurn({
     conversationId: input.sessionId,
@@ -264,11 +276,8 @@ export async function commitAssistantMessage(input: {
       ? Math.floor(Number(input.message.meta?.beatCount))
       : 1,
   });
-  await refreshSessions({
-    targetId: input.targetId,
-    viewerId: input.viewerId,
-    setSessions: input.setSessions,
-  });
+  // Skip refreshSessions here — it causes contextKey to bounce mid-delivery,
+  // cancelling subsequent beats. Session list is refreshed after full turn.
 }
 
 export async function replacePendingAssistantMessage(input: {

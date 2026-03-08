@@ -24,5 +24,7 @@ export function resolveTurnMode(input: {
   if (PLAYFUL_RE.test(text)) return 'playful';
   if (QUESTION_RE.test(text)) return 'information';
   if (input.interactionProfile.expression.pacingBias === 'bursty') return 'playful';
-  return 'information';
+  // Default to emotional for general conversation — allows multi-beat replies.
+  // Pure information queries are caught by QUESTION_RE above.
+  return 'emotional';
 }

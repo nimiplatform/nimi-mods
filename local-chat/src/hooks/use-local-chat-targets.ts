@@ -11,6 +11,7 @@ import {
 import {
   getLocalChatSessionUpdatedEventName,
   listLocalChatTargetPreviews,
+  warmUpLedgerHydration,
 } from '../state/index.js';
 
 type UseLocalChatTargetsInput = {
@@ -108,6 +109,7 @@ export function useLocalChatTargets(input: UseLocalChatTargetsInput) {
 
   useEffect(() => {
     mountedRef.current = true;
+    warmUpLedgerHydration();
     return () => {
       mountedRef.current = false;
       if (previewRefreshTimerRef.current) {

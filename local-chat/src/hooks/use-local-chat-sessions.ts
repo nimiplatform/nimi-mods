@@ -3,7 +3,7 @@ import { createSessionForTarget } from '../services/view/sessions.js';
 import { toChatMessagesFromSession } from '../services/view/messages.js';
 import type { LocalChatTarget } from '../data/index.js';
 import {
-  deleteLocalChatSession,
+  clearLocalChatSessionHistory,
   getLatestLocalChatArtifacts,
   getLocalChatSession,
   getLocalChatSessionUpdatedEventName,
@@ -89,13 +89,10 @@ export function useLocalChatSessions(input: UseLocalChatSessionsInput) {
         setSelectedSessionId(created.id);
         return;
       }
-      setSessions(found);
-      setSelectedSessionId((previous) => {
-        if (previous && found.some((session) => session.id === previous)) {
-          return previous;
-        }
-        return found[0]?.id || '';
-      });
+      const [firstSession] = found;
+      if (!firstSession) return;
+      setSessions([firstSession]);
+      setSelectedSessionId(firstSession.id);
     })();
     return () => {
       cancelled = true;
@@ -153,19 +150,8 @@ export function useLocalChatSessions(input: UseLocalChatSessionsInput) {
         const custom = event as CustomEvent<{ targetId?: string; sessionId?: string }>;
         const targetId = String(custom.detail?.targetId || '').trim();
         if (!targetId || targetId !== input.selectedTargetId) return;
-        const nextSessions = await listLocalChatSessions(input.selectedTargetId, input.viewerId);
-        setSessions(nextSessions);
-        const selectedStillExists = Boolean(
-          selectedSessionId && nextSessions.some((session) => session.id === selectedSessionId),
-        );
-        const nextSelectedSessionId = selectedStillExists
-          ? selectedSessionId
-          : (nextSessions[0]?.id || '');
-        if (nextSelectedSessionId !== selectedSessionId) {
-          setSelectedSessionId(nextSelectedSessionId);
-        }
-        const session = nextSelectedSessionId
-          ? await getLocalChatSession(nextSelectedSessionId, input.viewerId)
+        const session = selectedSessionId
+          ? await getLocalChatSession(selectedSessionId, input.viewerId)
           : null;
         await applySessionToView(session);
       })();
@@ -176,69 +162,19 @@ export function useLocalChatSessions(input: UseLocalChatSessionsInput) {
     };
   }, [applySessionToView, input.selectedTargetId, input.viewerId, selectedSessionId]);
 
-  const handleCreateSession = useCallback(() => {
-    if (!input.selectedTargetId) return;
+  const handleClearHistory = useCallback(() => {
+    if (!selectedSessionId) return;
     void (async () => {
-      const target = input.selectedTarget
-        || input.targets.find((item) => item.id === input.selectedTargetId)
-        || null;
-      const created = await createSessionForTarget({
-        targetId: input.selectedTargetId,
-        viewerId: input.viewerId,
-        target,
-      });
-      const nextSessions = await listLocalChatSessions(input.selectedTargetId, input.viewerId);
-      setSessions(nextSessions);
-      setSelectedSessionId(created.id);
-      input.setMessages(toChatMessagesFromSession(created));
+      await clearLocalChatSessionHistory(selectedSessionId);
+      input.setMessages([]);
       input.setLatestPromptTrace(null);
       input.setLatestTurnAudit(null);
     })();
   }, [
-    input.selectedTarget,
-    input.selectedTargetId,
-    input.targets,
-    input.viewerId,
-    input.setLatestPromptTrace,
-    input.setLatestTurnAudit,
-    input.setMessages,
-  ]);
-
-  const handleDeleteSession = useCallback((sessionId: string) => {
-    if (!input.selectedTargetId) return;
-    void (async () => {
-      await deleteLocalChatSession(sessionId);
-      const nextSessions = await listLocalChatSessions(input.selectedTargetId, input.viewerId);
-      if (nextSessions.length === 0) {
-        const target = input.selectedTarget
-          || input.targets.find((item) => item.id === input.selectedTargetId)
-          || null;
-        const created = await createSessionForTarget({
-          targetId: input.selectedTargetId,
-          viewerId: input.viewerId,
-          target,
-        });
-        setSessions([created]);
-        setSelectedSessionId(created.id);
-        input.setMessages(toChatMessagesFromSession(created));
-        input.setLatestPromptTrace(null);
-        input.setLatestTurnAudit(null);
-        return;
-      }
-      setSessions(nextSessions);
-      if (sessionId === selectedSessionId) {
-        setSelectedSessionId(nextSessions[0]?.id || '');
-      }
-    })();
-  }, [
-    input.selectedTarget,
-    input.selectedTargetId,
-    input.targets,
-    input.viewerId,
-    input.setLatestPromptTrace,
-    input.setLatestTurnAudit,
-    input.setMessages,
     selectedSessionId,
+    input.setMessages,
+    input.setLatestPromptTrace,
+    input.setLatestTurnAudit,
   ]);
 
   return {
@@ -247,7 +183,6 @@ export function useLocalChatSessions(input: UseLocalChatSessionsInput) {
     setSessions,
     selectedSessionId,
     setSelectedSessionId,
-    handleCreateSession,
-    handleDeleteSession,
+    handleClearHistory,
   };
 }

@@ -204,12 +204,5 @@
   "RuntimeSidebar": {
     "title": "Chat Runtime",
     "subtitle": "此聊天的独立路由选择（由 Mod 管理）"
-  },
-  "SessionMenu": {
-    "title": "会话",
-    "newSession": "新建会话",
-    "noSessions": "此 Agent 暂无会话。",
-    "turns": "{{count}} 轮",
-    "delete": "删除"
   }
 }

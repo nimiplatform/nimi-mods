@@ -7,7 +7,7 @@ import { LocalChatProfileDrawer } from './layout/local-chat-profile-drawer.js';
 import { LocalChatRightSidebar } from './layout/local-chat-right-sidebar.js';
 import { LocalChatSettingsDrawer } from './layout/local-chat-settings-drawer.js';
 import { LocalChatTargetPane } from './layout/local-chat-target-pane.js';
-import { ICON_CHEVRON_DOWN, ICON_SEARCH } from './layout/icons.js';
+import { ICON_SEARCH } from './layout/icons.js';
 import { resolvePresenceTheme } from './layout/presence-theme.js';
 import type { LocalChatShellProps } from './layout/shell-props.js';
 
@@ -39,16 +39,8 @@ export function LocalChatShell(props: LocalChatShellProps) {
     selectedTargetInteractionProfile,
     onOpenSelectedTargetProfile,
     loadingTargetDetail,
-    sessions,
     loadingSessions,
-    selectedSessionId,
-    onCreateSession,
-    onSelectSession,
-    onDeleteSession,
-    isSessionMenuOpen,
-    setIsSessionMenuOpen,
-    sessionMenuAnchorRef,
-    sessionMenuPanelRef,
+    onClearChatHistory,
     isRuntimeSidebarOpen,
     setIsRuntimeSidebarOpen,
     runtimeSidebarProps,
@@ -62,7 +54,8 @@ export function LocalChatShell(props: LocalChatShellProps) {
     onVoiceContextMenu,
     messagesEndRef,
     inputRef,
-    inputText,
+    inputTextRef,
+    hasInputText,
     setInputText,
     productSettings,
     activeInteractionSnapshot,
@@ -134,7 +127,7 @@ export function LocalChatShell(props: LocalChatShellProps) {
                 selectedTargetInitial={selectedTargetInitial}
                 loadingTargetDetail={loadingTargetDetail}
                 interactionSnapshot={activeInteractionSnapshot}
-                hasInputText={Boolean(inputText.trim())}
+                hasInputText={hasInputText}
                 isSending={isSending}
                 messages={messages}
                 playingVoiceMessageId={playingVoiceMessageId}
@@ -145,7 +138,6 @@ export function LocalChatShell(props: LocalChatShellProps) {
                   if (isRuntimeSidebarOpen) {
                     setIsRuntimeSidebarOpen(() => false);
                   }
-                  setIsSessionMenuOpen(false);
                 }}
                 onOpenSelectedTargetProfile={() => {
                   setIsProfileDrawerOpen(true);
@@ -161,17 +153,7 @@ export function LocalChatShell(props: LocalChatShellProps) {
                     setIsRuntimeSidebarOpen(() => false);
                   }
                 }}
-                selectedTargetId={selectedTargetId}
-                sessions={sessions}
-                selectedSessionId={selectedSessionId}
-                onCreateSession={onCreateSession}
-                onSelectSession={onSelectSession}
-                onDeleteSession={onDeleteSession}
-                isSessionMenuOpen={isSessionMenuOpen}
-                setIsSessionMenuOpen={setIsSessionMenuOpen}
-                sessionMenuAnchorRef={sessionMenuAnchorRef}
-                sessionMenuPanelRef={sessionMenuPanelRef}
-                chevronIcon={ICON_CHEVRON_DOWN}
+                onClearChatHistory={onClearChatHistory}
               />
 
               <LocalChatMessagePane
@@ -189,7 +171,7 @@ export function LocalChatShell(props: LocalChatShellProps) {
                 onVoiceContextMenu={onVoiceContextMenu}
                 messagesEndRef={messagesEndRef}
                 inputRef={inputRef}
-                inputText={inputText}
+                inputTextRef={inputTextRef}
                 setInputText={setInputText}
                 productSettings={productSettings}
                 hasConversationHistory={hasConversationHistory}
@@ -207,21 +189,21 @@ export function LocalChatShell(props: LocalChatShellProps) {
         </div>
       </div>
 
-      {overlayVisible ? (
-        <button
-          type="button"
-          aria-label={t('Shell.dismissOverlay')}
-          className="absolute inset-0 z-20 bg-slate-900/28"
-          onClick={() => {
-            setIsSettingsDrawerOpen(false);
-            setIsProfileDrawerOpen(false);
-            if (isRuntimeSidebarOpen) {
-              setIsRuntimeSidebarOpen(() => false);
-            }
-            setIsSessionMenuOpen(false);
-          }}
-        />
-      ) : null}
+      <button
+        type="button"
+        aria-label={t('Shell.dismissOverlay')}
+        className={`absolute inset-0 z-20 bg-slate-900/28 transition-opacity duration-200 ${
+          overlayVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+        tabIndex={overlayVisible ? 0 : -1}
+        onClick={() => {
+          setIsSettingsDrawerOpen(false);
+          setIsProfileDrawerOpen(false);
+          if (isRuntimeSidebarOpen) {
+            setIsRuntimeSidebarOpen(() => false);
+          }
+        }}
+      />
 
       <div className="absolute inset-y-0 right-0 z-30">
         <LocalChatRightSidebar

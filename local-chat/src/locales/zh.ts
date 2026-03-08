@@ -149,6 +149,8 @@ const zhLocale = {
     showRuntime: '显示 Runtime',
     openProfileDrawer: '打开角色详情',
     openSettings: '打开设置',
+    clearChatHistory: '清空聊天记录',
+    clearChatHistoryConfirm: '确定清空所有消息？记忆和人格不会丢失。',
     hideInspect: '隐藏 Inspect',
     showInspect: '显示 Inspect',
   },
@@ -356,13 +358,6 @@ const zhLocale = {
     dependencyUpdatedAt: '更新时间',
     dependencyCta: '安装缺失依赖',
     refreshMediaDependencies: '刷新媒体依赖',
-  },
-  SessionMenu: {
-    title: '会话',
-    newSession: '新建会话',
-    noSessions: '此 Agent 暂无会话。',
-    turns: '{{count}} 轮',
-    delete: '删除',
   },
 } as const;
 

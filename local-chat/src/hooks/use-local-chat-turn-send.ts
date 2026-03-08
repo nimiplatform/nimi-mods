@@ -2,104 +2,97 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { runLocalChatTurnSend } from './turn-send/send-flow.js';
 import type { TurnDeliveryScheduleHandle } from './turn-send/session-persist.js';
 import type { LocalChatScheduleCancelReason, UseLocalChatTurnSendInput } from './turn-send/types.js';
+import {
+  buildLocalChatTurnContextKey,
+  type LocalChatTurnContextSnapshot,
+} from './turn-send/context-key.js';
 
-export function buildTurnSendContextKey(input: UseLocalChatTurnSendInput): string {
-  const targetId = String(input.selectedTarget?.id || '').trim();
-  const sessionId = String(input.selectedSessionId || '').trim();
-  const routeBinding = input.routeBinding || null;
-  const routeBindingSource = String(routeBinding?.source || '').trim();
-  const routeBindingConnector = String(routeBinding?.connectorId || '').trim();
-  const routeBindingModel = String(routeBinding?.model || '').trim();
-  const routeSnapshotSource = String(input.routeSnapshot?.source || '').trim();
-  const routeSnapshotModel = String(input.routeSnapshot?.model || '').trim();
-  const deliveryStyle = String(input.defaultSettings.deliveryStyle || '').trim();
-  const mediaAutonomy = String(input.defaultSettings.mediaAutonomy || '').trim();
-  const voiceConversationMode = String(input.voiceConversationMode || input.defaultSettings.voiceConversationMode || '').trim();
-  const relationshipBoundaryPreset = String(input.defaultSettings.relationshipBoundaryPreset || '').trim();
-  const visualComfortLevel = String(input.defaultSettings.visualComfortLevel || '').trim();
-  return [
-    targetId,
-    sessionId,
-    routeBindingSource,
-    routeBindingConnector,
-    routeBindingModel,
-    routeSnapshotSource,
-    routeSnapshotModel,
-    deliveryStyle,
-    mediaAutonomy,
-    voiceConversationMode,
-    relationshipBoundaryPreset,
-    visualComfortLevel,
-  ].join('|');
+export function buildTurnSendContextKey(
+  input: UseLocalChatTurnSendInput,
+  activeSchedule?: LocalChatTurnContextSnapshot | null,
+): string {
+  return buildLocalChatTurnContextKey({
+    targetId: input.selectedTarget?.id,
+    sessionId: input.selectedSessionId,
+    routeBinding: input.routeBinding || null,
+    activeSchedule: activeSchedule || null,
+  });
 }
 
 export function useLocalChatTurnSend(input: UseLocalChatTurnSendInput) {
   const [isSending, setIsSending] = useState(false);
   const activeScheduleRef = useRef<TurnDeliveryScheduleHandle | null>(null);
-
-  const contextKey = useMemo(() => buildTurnSendContextKey(input), [
-    input.routeBinding?.connectorId,
-    input.routeBinding?.model,
-    input.routeBinding?.source,
-    input.routeSnapshot?.model,
-    input.routeSnapshot?.source,
-    input.defaultSettings.deliveryStyle,
-    input.defaultSettings.mediaAutonomy,
-    input.defaultSettings.voiceConversationMode,
-    input.defaultSettings.relationshipBoundaryPreset,
-    input.defaultSettings.visualComfortLevel,
-    input.voiceConversationMode,
-    input.selectedSessionId,
-    input.selectedTarget?.id,
-  ]);
-  const contextKeyRef = useRef(contextKey);
+  const activeScheduleContextRef = useRef<LocalChatTurnContextSnapshot | null>(null);
+  const inputRef = useRef(input);
+  const isSendingRef = useRef(isSending);
 
   useEffect(() => {
-    contextKeyRef.current = contextKey;
-  }, [contextKey]);
+    inputRef.current = input;
+  });
+  useEffect(() => {
+    isSendingRef.current = isSending;
+  }, [isSending]);
 
-  const registerSchedule = useCallback((handle: TurnDeliveryScheduleHandle) => {
-    activeScheduleRef.current = handle;
+  const contextKey = useMemo(() => buildTurnSendContextKey(input), [
+    input.selectedTarget?.id,
+    input.selectedSessionId,
+  ]);
+
+  const registerSchedule = useCallback((inputValue: {
+    handle: TurnDeliveryScheduleHandle;
+    context: LocalChatTurnContextSnapshot;
+  }) => {
+    activeScheduleRef.current = inputValue.handle;
+    activeScheduleContextRef.current = inputValue.context;
   }, []);
 
   const clearScheduleByTxn = useCallback((turnTxnId: string) => {
     const active = activeScheduleRef.current;
     if (!active || active.turnTxnId !== turnTxnId) return;
     activeScheduleRef.current = null;
+    activeScheduleContextRef.current = null;
   }, []);
 
   const cancelPendingSchedule = useCallback((reason: LocalChatScheduleCancelReason) => {
     const active = activeScheduleRef.current;
     if (!active) return;
+    console.warn(`[turn-send] CANCELLING schedule: reason=${reason}, turnTxnId=${active.turnTxnId}`);
+    console.trace('[turn-send] cancel stack trace');
     active.cancel(reason);
     activeScheduleRef.current = null;
+    activeScheduleContextRef.current = null;
   }, []);
 
+  const getCurrentContextKey = useCallback(() => {
+    return buildTurnSendContextKey(inputRef.current, activeScheduleContextRef.current);
+  }, []);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => () => {
-    cancelPendingSchedule('LOCAL_CHAT_SCHEDULE_CANCELLED_BY_CONTEXT_CHANGE');
-  }, [cancelPendingSchedule]);
+    cancelPendingSchedule('LOCAL_CHAT_SCHEDULE_CANCELLED_BY_UNMOUNT');
+  }, []);
 
   const handleSend = useCallback(async () => {
-    if (input.isTranscribing) {
+    const currentInput = inputRef.current;
+    if (currentInput.isTranscribing) {
       return;
     }
     cancelPendingSchedule('LOCAL_CHAT_SCHEDULE_CANCELLED_BY_NEW_USER_TURN');
-    const sendContextKey = contextKeyRef.current;
     await runLocalChatTurnSend({
-      context: input,
-      isSending,
+      context: currentInput,
+      isSending: isSendingRef.current,
       setIsSending,
-      sendContextKey,
-      getCurrentContextKey: () => contextKeyRef.current,
+      getCurrentContextKey,
       registerSchedule,
       clearScheduleByTxn,
     });
-  }, [cancelPendingSchedule, clearScheduleByTxn, input, isSending, registerSchedule]);
+  }, [cancelPendingSchedule, clearScheduleByTxn, getCurrentContextKey, registerSchedule]);
 
   return {
     isSending,
     handleSend,
     cancelPendingSchedule,
+    getActiveScheduleContext: () => activeScheduleContextRef.current,
     contextKey,
   };
 }

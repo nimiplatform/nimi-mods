@@ -129,6 +129,7 @@ export type InteractionSnapshot = {
   openLoops: string[];
   topicThreads: string[];
   lastResolvedTurnId: string | null;
+  conversationDirective: string | null;
   updatedAt: string;
 };
 

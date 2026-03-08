@@ -118,7 +118,7 @@ export function LocalChatRightSidebar({
                 closeLabel={t('RightSidebar.closeInspect')}
                 onClose={onCloseSidebar}
               >
-                <RuntimeStatusSidebar {...runtimeSidebarProps} />
+                <RuntimeStatusSidebar {...runtimeSidebarProps} sidebarVisible={isRuntimeSidebarOpen} />
               </RuntimeSidebarBoundary>
             </div>
           ) : (

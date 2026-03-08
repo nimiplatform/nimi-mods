@@ -45,6 +45,7 @@ export function compileInteractionState(input: {
   session: LocalChatSession | null;
   deliveredBeats: InteractionBeat[];
   mediaAssets?: LocalChatMediaAssetRecord[];
+  conversationDirective?: string | null;
 }): {
   snapshot: InteractionSnapshot;
   relationMemorySlots: RelationMemorySlot[];
@@ -85,6 +86,7 @@ export function compileInteractionState(input: {
     openLoops,
     topicThreads: dedupe([...historyTexts, ...texts, ...mediaTexts]).slice(0, 8),
     lastResolvedTurnId: lastTurnId,
+    conversationDirective: input.conversationDirective ?? null,
     updatedAt: new Date().toISOString(),
   };
 

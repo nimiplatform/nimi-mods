@@ -74,7 +74,7 @@ function createDependencySnapshot(capability, status) {
   };
 }
 
-test('media decision policy blocks explicit image request when dependency is not ready', async () => {
+test('media decision policy keeps explicit image request aligned with runtime path even when dependency snapshot is stale', async () => {
   const result = await decideMediaExecution({
     aiClient: {
       generateObject: async () => {
@@ -108,9 +108,9 @@ test('media decision policy blocks explicit image request when dependency is not
     markerOverrideIntent: null,
   });
 
-  assert.equal(result.kind, 'blocked');
+  assert.equal(result.kind, 'execute');
   assert.equal(result.promptTracePatch.mediaDecisionSource, 'explicit');
-  assert.equal(result.promptTracePatch.mediaExecutionStatus, 'blocked');
+  assert.equal(result.promptTracePatch.mediaExecutionStatus, 'pending');
   assert.equal(result.promptTracePatch.plannerUsed, false);
 });
 

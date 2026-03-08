@@ -8,6 +8,7 @@ import {
   type LocalChatTarget,
 } from '../src/data/index.ts';
 import { DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS } from '../src/state/index.ts';
+import { buildLocalChatTurnContextKey } from '../src/hooks/turn-send/context-key.ts';
 import { runLocalChatTurnSend } from '../src/hooks/turn-send/send-flow.ts';
 
 class MemoryStorage implements Storage {
@@ -226,6 +227,7 @@ function createHarness() {
     latestTurnAudit: null as Record<string, unknown> | null,
     isSending: false,
     scheduleDone: null as Promise<void> | null,
+    activeScheduleContext: null as { targetId: string; sessionId: string; routeBindingSource: string; routeBindingConnector: string; routeBindingModel: string } | null,
   };
 
   return {
@@ -255,6 +257,7 @@ function createHarness() {
       state.latestTurnAudit = null;
       state.isSending = false;
       state.scheduleDone = null;
+      state.activeScheduleContext = null;
       statusBanners.length = 0;
 
       const counters = {
@@ -400,10 +403,15 @@ function createHarness() {
         setIsSending: (next) => {
           state.isSending = next;
         },
-        sendContextKey: 'ctx-stable',
-        getCurrentContextKey: () => 'ctx-stable',
-        registerSchedule: (handle) => {
+        getCurrentContextKey: () => buildLocalChatTurnContextKey({
+          targetId: target.id,
+          sessionId: state.selectedSessionId,
+          routeBinding: null,
+          activeSchedule: state.activeScheduleContext,
+        }),
+        registerSchedule: ({ handle, context }) => {
           state.scheduleDone = handle.done;
+          state.activeScheduleContext = context;
         },
         clearScheduleByTxn: () => {},
       });
@@ -435,6 +443,78 @@ test('send-flow explicit media request bypasses planner and delivers image', asy
     assert.equal(imageMessage?.meta?.mediaPlannerTrigger, 'user-explicit');
     assert.equal(result.state.latestPromptTrace?.plannerTrigger, 'user-explicit');
     assert.equal(result.state.latestPromptTrace?.plannerUsed, false);
+  });
+});
+
+test('send-flow delivers all planned text beats while session id bootstraps from empty state', async () => {
+  await withSendFlowHarness(async (harness) => {
+    const result = await harness.execute({
+      userText: '我今天真的很累',
+      aiClientOverrides: {
+        generateObject: async (payload: Record<string, unknown>) => {
+          const prompt = String(payload.prompt || '');
+          if (prompt.includes('请规划这轮对话的完整 beat 计划')) {
+            const object = {
+              beats: [
+                {
+                  text: '真的辛苦你了，先让我接住你。',
+                  intent: 'comfort',
+                  relationMove: 'warm',
+                  sceneMove: '安慰',
+                  pauseMs: 0,
+                },
+                {
+                  text: '别急着扛，我们慢慢把今天最重的那口气放下来。',
+                  intent: 'invite',
+                  relationMove: 'closer',
+                  sceneMove: '深入',
+                  pauseMs: 260,
+                },
+              ],
+            };
+            return {
+              object,
+              text: JSON.stringify(object),
+              traceId: 'trace-plan',
+              promptTraceId: 'trace-plan',
+              route: {
+                source: 'local-runtime',
+                model: 'chat-model',
+                localModelId: 'chat-model',
+              },
+            };
+          }
+          const object = {
+            turnMode: 'emotional',
+            emotionalState: null,
+            relevantMemoryIds: [],
+            conversationDirective: null,
+          };
+          return {
+            object,
+            text: JSON.stringify(object),
+            traceId: 'trace-perception',
+            promptTraceId: 'trace-perception',
+            route: {
+              source: 'local-runtime',
+              model: 'chat-model',
+              localModelId: 'chat-model',
+            },
+          };
+        },
+      },
+    });
+
+    assert.equal(Boolean(result.state.selectedSessionId), true);
+    const assistantMessages = result.state.messages.filter((message) => message.role === 'assistant');
+    assert.equal(assistantMessages.length, 2);
+    assert.deepEqual(
+      assistantMessages.map((message) => message.content),
+      [
+        '真的辛苦你了，先让我接住你。',
+        '别急着扛，我们慢慢把今天最重的那口气放下来。',
+      ],
+    );
   });
 });
 
@@ -480,6 +560,68 @@ test('send-flow planner auto path generates image when gate passes', async () =>
   });
 });
 
+test('send-flow planner does not hijack explicit voice delivery into image', async () => {
+  await withSendFlowHarness(async (harness) => {
+    const result = await harness.execute({
+      userText: '我还想再听一句，可以直接说给我听吗？',
+      defaultSettings: {
+        enableVoice: true,
+        voiceConversationMode: 'on',
+      },
+      aiClientOverrides: {
+        generateObject: async (payload: Record<string, unknown>) => {
+          if (String(payload.prompt || '').includes('媒体触发 planner')) {
+            const raw = JSON.stringify({
+              version: 'v1',
+              kind: 'image',
+              trigger: 'scene-enhancement',
+              confidence: 0.91,
+              prompt: 'warm comforting scene indoors',
+              reason: 'visual enhancement',
+              nsfwIntent: 'none',
+            });
+            return {
+              object: (payload.parse as (text: string) => Record<string, unknown>)(raw),
+              text: raw,
+              traceId: 'trace-planner-auto',
+              promptTraceId: 'trace-planner-auto',
+              route: {
+                source: 'local',
+                model: 'chat-model',
+                localModelId: 'chat-model',
+              },
+            };
+          }
+          throw new Error('PLANNER_SHOULD_NOT_RUN');
+        },
+      },
+    });
+
+    const assistantMessages = result.state.messages.filter((message) => message.role === 'assistant');
+    assert.equal(assistantMessages.some((message) => message.kind === 'voice'), true);
+    assert.equal(assistantMessages.some((message) => message.kind === 'image'), false);
+    assert.equal(result.counters.generateObject, 1);
+    assert.equal(result.counters.generateImage, 0);
+  });
+});
+
+test('send-flow explicit media request still delivers image when voice-first mode is on', async () => {
+  await withSendFlowHarness(async (harness) => {
+    const result = await harness.execute({
+      userText: '发张图给我看看',
+      defaultSettings: {
+        enableVoice: true,
+        voiceConversationMode: 'on',
+      },
+    });
+
+    await waitFor(() => result.state.messages.some((message) => message.kind === 'image'));
+    const assistantMessages = result.state.messages.filter((message) => message.role === 'assistant');
+    assert.equal(assistantMessages.some((message) => message.kind === 'image'), true);
+    assert.equal(result.counters.generateImage, 1);
+  });
+});
+
 test('send-flow cooldown gate skips planner invocation', async () => {
   await withSendFlowHarness(async (harness) => {
     const result = await harness.execute({
@@ -514,7 +656,7 @@ test('send-flow cooldown gate skips planner invocation', async () => {
   });
 });
 
-test('send-flow explicit request is blocked when media dependency is not ready', async () => {
+test('send-flow explicit request still calls runtime media image generate when dependency snapshot is stale', async () => {
   await withSendFlowHarness(async (harness) => {
     const result = await harness.execute({
       userText: '请给我发张图',
@@ -526,19 +668,15 @@ test('send-flow explicit request is blocked when media dependency is not ready',
         generateObject: async () => {
           throw new Error('planner should not run for explicit request');
         },
-        generateImage: async () => {
-          throw new Error('image generation should not run when dependency is missing');
-        },
       },
     });
 
     await waitFor(() => result.state.messages.some((message) => message.kind === 'image'));
-    const blockedMessage = result.state.messages.find((message) => message.kind === 'image');
+    const imageMessage = result.state.messages.find((message) => message.kind === 'image');
 
     assert.equal(result.counters.generateObject, 0);
-    assert.equal(result.counters.generateImage, 0);
-    assert.equal(blockedMessage?.meta?.mediaStatus, 'blocked');
-    assert.equal(String(blockedMessage?.content || '').includes('依赖'), true);
+    assert.equal(result.counters.generateImage, 1);
+    assert.equal(imageMessage?.meta?.mediaStatus, 'ready');
     assert.equal(result.state.latestPromptTrace?.plannerTrigger, 'user-explicit');
   });
 });

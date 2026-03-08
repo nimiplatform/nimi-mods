@@ -84,6 +84,7 @@ export type RuntimeStatusSidebarProps = {
   onHealthCheck: () => void;
   onOpenRuntimeSetup: () => void;
   inspectSettings: LocalChatInspectSettings;
+  sidebarVisible?: boolean;
   onRefreshMediaDependencies?: () => void;
   onSidebarBootstrap?: () => void;
   onOpenChatPanel?: () => void;

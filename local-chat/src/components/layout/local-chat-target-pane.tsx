@@ -41,6 +41,12 @@ const JITTER_MAX = 10;
 const GAP = 14;
 const CELL = BASE_SIZE + GAP;
 const ROW_HEIGHT_FACTOR = 0.8660254; // sqrt(3)/2
+const HOVER_SCALE = 1.45;
+const PUSH_RADIUS = CELL * 2.0;
+const PUSH_STRENGTH = 26;
+const FISHEYE_RADIUS = CELL * 3.5;
+const FISHEYE_MIN_SCALE = 0.78;
+const FISHEYE_IDLE_SCALE = 0.88;
 
 function hashSeed(seed: string): number {
   let hash = 0;
@@ -165,8 +171,10 @@ export function LocalChatTargetPane({
   const transitionTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const stageViewportRef = React.useRef<HTMLDivElement | null>(null);
   const [stageWidth, setStageWidth] = React.useState(1280);
-  // Mouse-driven fisheye: mouse position = fisheye centre (content coords).
-  const [mousePos, setMousePos] = React.useState<{ x: number; y: number } | null>(null);
+  // Fisheye state in refs — direct DOM manipulation, no React re-render.
+  const mousePosRef = React.useRef<{ x: number; y: number } | null>(null);
+  const hoveredIdRef = React.useRef<string | null>(null);
+  const transitioningIdRef = React.useRef<string | null>(null);
   const mousePosRafRef = React.useRef(0);
 
   React.useEffect(() => {
@@ -199,6 +207,73 @@ export function LocalChatTargetPane({
     };
   }, []);
 
+  const bubbleLayout = React.useMemo(() => buildBubbleSpaceLayout({
+    targets: visibleTargets,
+    stageWidth,
+  }), [stageWidth, visibleTargets]);
+  const bubbleLayoutRef = React.useRef(bubbleLayout);
+  bubbleLayoutRef.current = bubbleLayout;
+
+  // Apply fisheye transforms directly to DOM — bypasses React entirely.
+  const applyFisheyeTransforms = React.useCallback(() => {
+    const viewport = stageViewportRef.current;
+    if (!viewport) return;
+    const items = bubbleLayoutRef.current.items;
+    const mousePos = mousePosRef.current;
+    const hoveredId = hoveredIdRef.current;
+    const tid = transitioningIdRef.current;
+    const outers = viewport.querySelectorAll<HTMLElement>('[data-bubble-id]');
+    outers.forEach((outerEl) => {
+      const id = outerEl.dataset.bubbleId || '';
+      const innerEl = outerEl.firstElementChild as HTMLElement | null;
+      if (!innerEl || !items[id]) return;
+      const item = items[id];
+      const isHovered = hoveredId === id;
+      const isTransitioning = tid === id;
+      const isMuted = Boolean(tid && !isTransitioning);
+      const cx = item.left + item.size / 2;
+      const cy = item.top + item.size / 2;
+      let fisheyeScale: number;
+      if (mousePos) {
+        const dx = cx - mousePos.x;
+        const dy = cy - mousePos.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        fisheyeScale = 1 - clamp(dist / FISHEYE_RADIUS, 0, 1) * (1 - FISHEYE_MIN_SCALE);
+      } else {
+        fisheyeScale = FISHEYE_IDLE_SCALE;
+      }
+      let tx = 0;
+      let ty = 0;
+      let scaleBoost = 1;
+      if (hoveredId && !isHovered) {
+        const hl = items[hoveredId];
+        if (hl) {
+          const dx = cx - (hl.left + hl.size / 2);
+          const dy = cy - (hl.top + hl.size / 2);
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < PUSH_RADIUS && dist > 0) {
+            const pf = 1 - dist / PUSH_RADIUS;
+            const pd = PUSH_STRENGTH * pf * pf;
+            tx = (dx / dist) * pd;
+            ty = (dy / dist) * pd;
+            scaleBoost = 1 - pf * 0.08;
+          }
+        }
+      }
+      const scale = isTransitioning
+        ? 1.06
+        : isHovered
+          ? fisheyeScale * HOVER_SCALE
+          : isMuted
+            ? fisheyeScale * 0.92 * scaleBoost
+            : fisheyeScale * scaleBoost;
+      const translate = (tx !== 0 || ty !== 0) ? `translate(${tx.toFixed(1)}px,${ty.toFixed(1)}px) ` : '';
+      innerEl.style.transform = `${translate}scale(${scale.toFixed(3)})`;
+      innerEl.style.opacity = isMuted ? '0' : '1';
+      outerEl.style.zIndex = String(isHovered ? item.zIndex + 30 : isTransitioning ? item.zIndex + 20 : item.zIndex);
+    });
+  }, []);
+
   const handleStageMouseMove = React.useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (mousePosRafRef.current) return;
     mousePosRafRef.current = requestAnimationFrame(() => {
@@ -206,16 +281,43 @@ export function LocalChatTargetPane({
       const el = stageViewportRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      setMousePos({
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top + el.scrollTop,
-      });
+      const mx = event.clientX - rect.left;
+      const my = event.clientY - rect.top + el.scrollTop;
+      mousePosRef.current = { x: mx, y: my };
+      // Hit-test: determine which bubble the mouse is over.
+      const items = bubbleLayoutRef.current.items;
+      const hitRadius = BASE_SIZE / 2 + 12;
+      let bestId: string | null = null;
+      for (const id of Object.keys(items)) {
+        const item = items[id]!;
+        const dx = mx - (item.left + item.size / 2);
+        const dy = my - (item.top + item.size / 2);
+        if (dx * dx + dy * dy <= hitRadius * hitRadius) {
+          bestId = id;
+          break;
+        }
+      }
+      hoveredIdRef.current = bestId;
+      applyFisheyeTransforms();
     });
-  }, []);
+  }, [applyFisheyeTransforms]);
 
   const handleStageMouseLeave = React.useCallback(() => {
-    setMousePos(null);
-  }, []);
+    mousePosRef.current = null;
+    hoveredIdRef.current = null;
+    applyFisheyeTransforms();
+  }, [applyFisheyeTransforms]);
+
+  // Sync transitioning state to ref and reapply transforms.
+  React.useEffect(() => {
+    transitioningIdRef.current = transitioningTargetId;
+    applyFisheyeTransforms();
+  }, [transitioningTargetId, applyFisheyeTransforms]);
+
+  // Reapply when layout changes (targets added/removed/resized).
+  React.useEffect(() => {
+    applyFisheyeTransforms();
+  }, [bubbleLayout, applyFisheyeTransforms]);
 
   const handleSelectTarget = React.useCallback((targetId: string) => {
     if (!targetId || transitioningTargetId) {
@@ -228,20 +330,6 @@ export function LocalChatTargetPane({
       transitionTimerRef.current = null;
     }, 220);
   }, [setSelectedTargetId, transitioningTargetId]);
-
-  const bubbleLayout = React.useMemo(() => buildBubbleSpaceLayout({
-    targets: visibleTargets,
-    stageWidth,
-  }), [stageWidth, visibleTargets]);
-
-  // Hover magnification: hovered bubble scales up, neighbours pushed away.
-  const [hoveredTargetId, setHoveredTargetId] = React.useState<string | null>(null);
-  const HOVER_SCALE = 1.45;
-  const PUSH_RADIUS = CELL * 2.0;
-  const PUSH_STRENGTH = 26;
-  const FISHEYE_RADIUS = CELL * 3.5; // mouse-driven fisheye reach
-  const FISHEYE_MIN_SCALE = 0.78; // scale when far from mouse
-  const FISHEYE_IDLE_SCALE = 0.88; // scale when mouse not in area
 
   return (
     <section className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden">
@@ -325,88 +413,27 @@ export function LocalChatTargetPane({
                   const floatDelay = (bubbleSeed % 7) * 160;
                   const onlineState = resolveOnlineBadgeState(target.isOnline);
                   const unreadBadge = resolveUnreadBadge(target.unreadCount);
-                  const isTransitioning = transitioningTargetId === target.id;
-                  const isMuted = Boolean(transitioningTargetId && transitioningTargetId !== target.id);
                   const isSelected = selectedTargetId === target.id;
-
-                  // Mouse-driven fisheye: mouse position = centre of magnification.
-                  const bubbleCenterX = layout.left + layout.size / 2;
-                  const bubbleCenterY = layout.top + layout.size / 2;
-                  let fisheyeScale: number;
-                  if (mousePos) {
-                    const dx = bubbleCenterX - mousePos.x;
-                    const dy = bubbleCenterY - mousePos.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    const distNorm = clamp(dist / FISHEYE_RADIUS, 0, 1);
-                    fisheyeScale = 1 - distNorm * (1 - FISHEYE_MIN_SCALE);
-                  } else {
-                    fisheyeScale = FISHEYE_IDLE_SCALE;
-                  }
-
-                  // Hover magnification + neighbour push.
-                  const isHovered = hoveredTargetId === target.id;
-                  let hoverTranslateX = 0;
-                  let hoverTranslateY = 0;
-                  let hoverScaleBoost = 1;
-
-                  if (hoveredTargetId && !isHovered) {
-                    const hoveredLayout = bubbleLayout.items[hoveredTargetId];
-                    if (hoveredLayout) {
-                      const hcx = hoveredLayout.left + hoveredLayout.size / 2;
-                      const hcy = hoveredLayout.top + hoveredLayout.size / 2;
-                      const dx = bubbleCenterX - hcx;
-                      const dy = bubbleCenterY - hcy;
-                      const dist = Math.sqrt(dx * dx + dy * dy);
-                      if (dist < PUSH_RADIUS && dist > 0) {
-                        const pushFactor = 1 - dist / PUSH_RADIUS; // 1 at center, 0 at edge
-                        const pushDist = PUSH_STRENGTH * pushFactor * pushFactor; // quadratic falloff
-                        hoverTranslateX = (dx / dist) * pushDist;
-                        hoverTranslateY = (dy / dist) * pushDist;
-                        hoverScaleBoost = 1 - pushFactor * 0.08; // neighbours shrink slightly
-                      }
-                    }
-                  }
-
-                  const finalScale = isTransitioning
-                    ? 1.06
-                    : isHovered
-                      ? fisheyeScale * HOVER_SCALE
-                      : isMuted
-                        ? fisheyeScale * 0.92 * hoverScaleBoost
-                        : fisheyeScale * hoverScaleBoost;
-
-                  const finalTranslate = (hoverTranslateX !== 0 || hoverTranslateY !== 0)
-                    ? `translate(${hoverTranslateX.toFixed(1)}px, ${hoverTranslateY.toFixed(1)}px) `
-                    : '';
 
                   return (
                     <div
                       key={target.id}
+                      data-bubble-id={target.id}
                       className="absolute"
                       style={{
                         left: `${layout.left}px`,
                         top: `${layout.top}px`,
                         width: `${layout.size + 24}px`,
                         height: `${layout.size + LABEL_HEIGHT + 24}px`,
-                        zIndex: isHovered
-                          ? layout.zIndex + 30
-                          : isTransitioning
-                            ? layout.zIndex + 20
-                            : layout.zIndex,
-                        animation: transitioningTargetId
-                          ? 'none'
-                          : `lc-bubble-float ${floatDuration}s ease-in-out ${floatDelay}ms infinite`,
+                        zIndex: layout.zIndex,
+                        animation: `lc-bubble-float ${floatDuration}s ease-in-out ${floatDelay}ms infinite`,
                       }}
                     >
-                    {/* Inner div: scale + translate (fisheye, hover, push). */}
+                    {/* Inner div: transform managed by applyFisheyeTransforms via DOM. */}
                     <div
-                      className={`h-full w-full ${
-                        isMuted ? 'opacity-0' : 'opacity-100'
-                      }`}
-                      onMouseEnter={() => setHoveredTargetId(target.id)}
-                      onMouseLeave={() => setHoveredTargetId((prev) => prev === target.id ? null : prev)}
+                      className="h-full w-full"
                       style={{
-                        transform: `${finalTranslate}scale(${finalScale.toFixed(3)})`,
+                        transform: `scale(${FISHEYE_IDLE_SCALE})`,
                         transition: 'transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 200ms ease',
                         willChange: 'transform',
                       }}

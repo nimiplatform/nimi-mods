@@ -3,7 +3,6 @@ import type {
   DerivedInteractionProfile,
   InteractionSnapshot,
   LocalChatProductSettings,
-  LocalChatSession,
   RelationMemorySlot,
   VoiceConversationMode,
 } from '../../state/index.js';
@@ -26,16 +25,8 @@ export type LocalChatShellProps = {
   selectedTargetInteractionProfile: DerivedInteractionProfile | null;
   onOpenSelectedTargetProfile: () => void;
   loadingTargetDetail: boolean;
-  sessions: LocalChatSession[];
   loadingSessions: boolean;
-  selectedSessionId: string | null;
-  onCreateSession: () => void;
-  onSelectSession: (sessionId: string) => void;
-  onDeleteSession: (sessionId: string) => void;
-  isSessionMenuOpen: boolean;
-  setIsSessionMenuOpen: (updater: boolean | ((previous: boolean) => boolean)) => void;
-  sessionMenuAnchorRef: React.RefObject<HTMLDivElement | null>;
-  sessionMenuPanelRef: React.RefObject<HTMLDivElement | null>;
+  onClearChatHistory: () => void;
   isRuntimeSidebarOpen: boolean;
   setIsRuntimeSidebarOpen: (updater: (previous: boolean) => boolean) => void;
   runtimeSidebarProps: React.ComponentProps<typeof RuntimeStatusSidebar>;
@@ -49,7 +40,8 @@ export type LocalChatShellProps = {
   onVoiceContextMenu: (message: ChatMessage, event: React.MouseEvent<HTMLButtonElement>) => void;
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
-  inputText: string;
+  inputTextRef: React.RefObject<string>;
+  hasInputText: boolean;
   setInputText: (value: string) => void;
   productSettings: LocalChatProductSettings;
   activeInteractionSnapshot: InteractionSnapshot | null;

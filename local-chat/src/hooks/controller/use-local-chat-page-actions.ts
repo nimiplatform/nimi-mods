@@ -398,18 +398,18 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         onVideoConnectorChange: state.speechSettingsState.handleVideoConnectorChange,
         onVideoModelChange: state.speechSettingsState.handleVideoModelChange,
         inspectSettings: state.speechSettingsState.inspectSettings,
-        imageResolvedRoute: null,
-        videoResolvedRoute: null,
+        imageResolvedRoute: state.imageResolvedRoute,
+        videoResolvedRoute: state.videoResolvedRoute,
         isMediaRuntimeSidebarLoading: false,
         isImageRouteProbeLoading: false,
         isVideoRouteProbeLoading: false,
         onRefreshMediaDependencies: () => {
           void state.runtimeRouteState.loadAllRuntimeRouteOptions();
-          void state.refreshDependencySnapshot();
+          void state.refreshAllDependencySnapshots();
         },
         onSidebarBootstrap: () => {
           void state.runtimeRouteState.loadAllRuntimeRouteOptions();
-          void state.refreshDependencySnapshot();
+          void state.refreshAllDependencySnapshots();
         },
         onOpenChatPanel: () => {},
         onOpenVoicePanel: () => {},
@@ -428,6 +428,9 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
       state.latestPromptTrace,
       state.latestTurnAudit,
       state.dependencySnapshot,
+      state.imageResolvedRoute,
+      state.videoResolvedRoute,
+      state.refreshAllDependencySnapshots,
       state.runtimeRouteState.routeSnapshot,
       handleVoiceIdChange,
     ],

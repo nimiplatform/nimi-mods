@@ -150,6 +150,8 @@ const enLocale = {
     showRuntime: 'Show Runtime',
     openProfileDrawer: 'Open profile',
     openSettings: 'Open settings',
+    clearChatHistory: 'Clear chat history',
+    clearChatHistoryConfirm: 'Clear all messages? Memory and personality are preserved.',
     hideInspect: 'Hide Inspect',
     showInspect: 'Show Inspect',
   },
@@ -357,13 +359,6 @@ const enLocale = {
     dependencyUpdatedAt: 'Updated',
     dependencyCta: 'Install missing dependencies',
     refreshMediaDependencies: 'Refresh media dependencies',
-  },
-  SessionMenu: {
-    title: 'Sessions',
-    newSession: 'New Session',
-    noSessions: 'No sessions for this Agent.',
-    turns: '{{count}} turns',
-    delete: 'Delete',
   },
 } as const;
 

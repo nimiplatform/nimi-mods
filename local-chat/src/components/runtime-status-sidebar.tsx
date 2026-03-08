@@ -72,6 +72,7 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     onOpenRuntimeSetup,
     inspectSettings,
     enableVoice,
+    sidebarVisible = true,
   } = props;
   const routeBinding = props.routeBinding || null;
   const onClearRouteBinding = props.onClearRouteBinding || (() => {});
@@ -149,12 +150,12 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
   }, [effectiveChatBinding?.model]);
 
   useEffect(() => {
-    if (didBootstrapRef.current) {
+    if (!sidebarVisible || didBootstrapRef.current) {
       return;
     }
     didBootstrapRef.current = true;
     onSidebarBootstrap();
-  }, [onSidebarBootstrap]);
+  }, [onSidebarBootstrap, sidebarVisible]);
 
   const togglePanel = (panel: 'chat' | 'media' | 'voice' | 'diagnostics') => {
     setOpenPanel((previous) => (previous === panel ? null : panel));
