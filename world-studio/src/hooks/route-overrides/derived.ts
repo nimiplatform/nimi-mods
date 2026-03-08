@@ -51,10 +51,10 @@ export function useWorldStudioRouteBindingDerived(input: {
   );
 
   const coarseRouteModelOptions = activeCoarseRouteSource === 'local'
-    ? (input.routeOptions?.local.models.map((model) => model.model) || [])
+    ? (input.routeOptions?.local?.models.map((model) => model.model) || [])
     : (activeCoarseRouteConnector?.models || []);
   const fineRouteModelOptions = activeFineRouteSource === 'local'
-    ? (input.routeOptions?.local.models.map((model) => model.model) || [])
+    ? (input.routeOptions?.local?.models.map((model) => model.model) || [])
     : (activeFineRouteConnector?.models || []);
   const coarseRouteReadiness = useMemo(
     () => evaluateRouteBindingReadiness(effectiveCoarseRouteBinding, input.routeOptions),

@@ -60,8 +60,8 @@ export function RouteCapabilityControls(props: RouteCapabilityControlsProps) {
           onChange={(event) => props.onRouteSourceChange(props.profile, normalizeRuntimeRouteSource(event.target.value))}
           className="h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-900"
         >
-          <option value="local">Local Runtime</option>
-          <option value="cloud">Token API</option>
+          <option value="local">Local</option>
+          <option value="cloud">Cloud</option>
         </select>
       </div>
       <div>
@@ -109,7 +109,7 @@ export function RouteCapabilityControls(props: RouteCapabilityControlsProps) {
         ) : null}
         {props.activeSource === 'local' && props.modelOptions.length === 0 ? (
           <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 space-y-2">
-            <p className="text-[11px] text-amber-800">{t('routeCapabilityControls.emptyLocalRuntimeHint')}</p>
+            <p className="text-[11px] text-amber-800">{t('routeCapabilityControls.emptyLocalHint')}</p>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -123,7 +123,7 @@ export function RouteCapabilityControls(props: RouteCapabilityControlsProps) {
                 className="ui-sync-btn ui-sync-btn-secondary rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-semibold text-amber-800"
                 onClick={() => props.onRouteSourceChange(props.profile, 'cloud')}
               >
-                {t('routeCapabilityControls.switchToTokenApi')}
+                {t('routeCapabilityControls.switchToCloud')}
               </button>
             </div>
           </div>

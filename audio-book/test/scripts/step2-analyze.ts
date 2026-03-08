@@ -2,7 +2,7 @@
 // ---------------------------------------------------------------------------
 // Step 2 — Script Analysis (Layer 2 integration test)
 //
-// Reads a .txt file, splits into chapters, calls runtime Token API for
+// Reads a .txt file, splits into chapters, calls runtime Cloud for
 // per-chapter LLM analysis, classifies characters by tier, outputs JSON.
 // Supports resume: if a previous output file exists, completed chapters
 // are skipped and only unfinished chapters are re-analyzed.
@@ -86,7 +86,7 @@ function buildMetadata(): Record<string, string> | undefined {
 }
 
 // ---------------------------------------------------------------------------
-// Runtime-backed LLM client (Token API via gRPC)
+// Runtime-backed LLM client (Cloud via gRPC)
 // ---------------------------------------------------------------------------
 
 function createRuntimeLlmClient(endpoint: string, modelId: string): LlmClient {
@@ -147,7 +147,7 @@ function createRuntimeLlmClient(endpoint: string, modelId: string): LlmClient {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  console.log('=== Audio Book Step 2: Analysis Test (Runtime Token API) ===');
+  console.log('=== Audio Book Step 2: Analysis Test (Runtime Cloud) ===');
   console.log(`Runtime:  ${RUNTIME_ENDPOINT}`);
   console.log(`Model:    ${MODEL_ID}`);
   console.log(`Provider: ${PROVIDER_TYPE}`);
@@ -207,7 +207,7 @@ async function main() {
     }
   }
 
-  // 3. Analyze via runtime Token API
+  // 3. Analyze via runtime Cloud
   const llm = createRuntimeLlmClient(RUNTIME_ENDPOINT, MODEL_ID);
 
   console.log('Analyzing chapters...');

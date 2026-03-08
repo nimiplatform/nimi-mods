@@ -80,7 +80,7 @@ function buildMetadata(): Record<string, string> | undefined {
 }
 
 // ---------------------------------------------------------------------------
-// Runtime-backed LLM client (Token API via gRPC)
+// Runtime-backed LLM client (Cloud via gRPC)
 // ---------------------------------------------------------------------------
 
 function createRuntimeLlmClient(endpoint: string, modelId: string): LlmClient {
@@ -212,7 +212,7 @@ function createQwenTtsClient() {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  console.log('=== Audio Book Step 3: Voice Casting Test (Runtime Token API) ===');
+  console.log('=== Audio Book Step 3: Voice Casting Test (Runtime Cloud) ===');
   console.log(`Runtime:  ${RUNTIME_ENDPOINT}`);
   console.log(`Model:    ${MODEL_ID}`);
   console.log(`Provider: ${PROVIDER_TYPE}`);
@@ -233,7 +233,7 @@ async function main() {
   }
   console.log('');
 
-  // 3. Recommend voices via runtime Token API
+  // 3. Recommend voices via runtime Cloud
   const llm = createRuntimeLlmClient(RUNTIME_ENDPOINT, MODEL_ID);
   const tts = createQwenTtsClient();
 

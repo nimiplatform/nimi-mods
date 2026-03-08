@@ -559,7 +559,7 @@ function deriveRouteBindingBySource(input: {
 }): RuntimeRouteBinding {
   const previous = input.previous || input.options?.selected || null;
   if (input.source === 'local') {
-    const firstLocal = input.options?.local.models[0] || null;
+    const firstLocal = input.options?.local?.models[0] || null;
     return {
       source: 'local',
       connectorId: '',
@@ -734,7 +734,7 @@ export function useTextplayController(): TextplayShellProps {
   const routeConnectors = chatRouteOptions?.connectors || [];
   const routeModelOptions = routeSource === 'cloud'
     ? (routeConnectors.find((item) => item.id === routeConnectorId)?.models || [])
-    : (chatRouteOptions?.local.models || []).map((item) => item.model);
+    : (chatRouteOptions?.local?.models || []).map((item) => item.model);
 
   const syncPresenceView = useCallback(() => {
     setPresenceState(presenceMachine.getState());

@@ -153,7 +153,7 @@ function RoutePanel(props: {
     return props.routeOptions?.connectors.find((item) => item.id === id) || props.routeOptions?.connectors[0] || null;
   }, [props.connectorId, props.routeOptions]);
 
-  const tokenApiModels = useMemo(() => {
+  const cloudModels = useMemo(() => {
     const models = selectedConnector?.models || [];
     const current = asString(props.model);
     if (!current || models.includes(current)) return models;
@@ -184,8 +184,8 @@ function RoutePanel(props: {
           value={props.source}
           options={[
             { value: 'auto', label: 'Auto (cloud-first)' },
-            { value: 'cloud', label: 'Token API' },
-            { value: 'local', label: 'Local Runtime' },
+            { value: 'cloud', label: 'Cloud' },
+            { value: 'local', label: 'Local' },
           ]}
           onChange={(v) => props.onSourceChange(v as KBSettings['chatRouteSource'])}
         />
@@ -212,7 +212,7 @@ function RoutePanel(props: {
               onChange={props.onModelChange}
             >
               <datalist id={props.modelListId}>
-                {tokenApiModels.map((m) => (
+                {cloudModels.map((m) => (
                   <option key={`${props.title}-m-${m}`} value={m} />
                 ))}
               </datalist>

@@ -160,8 +160,8 @@ export function MintYouRouteSidebar() {
               disabled={!routeOptions}
               className="h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-900 disabled:bg-gray-100 disabled:text-gray-400"
             >
-              <option value="local">Local Runtime</option>
-              <option value="cloud">Token API</option>
+              <option value="local">Local</option>
+              <option value="cloud">Cloud</option>
             </select>
           </div>
 

@@ -12,9 +12,9 @@
     "modelPlaceholder": "搜索并选择模型...",
     "noAvailableModel": "当前路由暂无可用模型。",
     "noMatchModel": "没有匹配当前搜索的模型。",
-    "emptyLocalRuntimeHint": "当前 profile 在 Local Runtime 下暂无可用模型。",
+    "emptyLocalHint": "当前 profile 在 Local 下暂无可用模型。",
     "goInstallModels": "前往安装模型",
-    "switchToTokenApi": "切换到 Token API",
+    "switchToCloud": "切换到 Cloud",
     "useRuntimeDefault": "使用运行时默认"
   },
   "routeConfig": {

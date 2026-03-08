@@ -68,7 +68,7 @@ function ChevronDownIcon({ className }: { className?: string }) {
 
 function RouteChip({ label, value }: { label: string; value: RouteDisplay }) {
   const sourceLabel = value.source === 'auto' ? 'Auto'
-    : value.source === 'cloud' ? 'Token API'
+    : value.source === 'cloud' ? 'Cloud'
     : 'Local';
   const modelLabel = value.model || '(auto)';
 

@@ -43,7 +43,7 @@ export function evaluateRouteBindingReadiness(
         message: 'No local runtime model selected.',
       };
     }
-    const localModels = routeOptions?.local.models || [];
+    const localModels = routeOptions?.local?.models || [];
     const matchedModel = localModels.find((item) => item.model === binding.model || item.localModelId === binding.localModelId) || null;
     if (!matchedModel) {
       return {
@@ -74,7 +74,7 @@ export function evaluateRouteBindingReadiness(
       ready: false,
       reasonCode: ReasonCode.WORLD_STUDIO_TOKEN_ROUTE_INCOMPLETE,
       actionHint: 'select-connector',
-      message: 'Token API route requires connector and model.',
+      message: 'Cloud route requires connector and model.',
     };
   }
   if (!routeOptions) {
@@ -82,7 +82,7 @@ export function evaluateRouteBindingReadiness(
       ready: true,
       reasonCode: ReasonCode.WORLD_STUDIO_ROUTE_READY,
       actionHint: 'none',
-      message: 'Token API route is ready.',
+      message: 'Cloud route is ready.',
     };
   }
 
@@ -92,7 +92,7 @@ export function evaluateRouteBindingReadiness(
       ready: false,
       reasonCode: ReasonCode.WORLD_STUDIO_CONNECTOR_MISSING,
       actionHint: 'select-connector',
-      message: 'Selected Token API connector is missing.',
+      message: 'Selected Cloud connector is missing.',
     };
   }
   if (connector.models.length === 0 || connector.models.includes(binding.model)) {
@@ -100,14 +100,14 @@ export function evaluateRouteBindingReadiness(
       ready: true,
       reasonCode: ReasonCode.WORLD_STUDIO_ROUTE_READY,
       actionHint: 'none',
-      message: 'Token API route is ready.',
+      message: 'Cloud route is ready.',
     };
   }
   return {
     ready: false,
     reasonCode: ReasonCode.WORLD_STUDIO_TOKEN_MODEL_UNAVAILABLE,
     actionHint: 'select-model',
-    message: 'Selected Token API model is unavailable on connector.',
+    message: 'Selected Cloud model is unavailable on connector.',
   };
 }
 

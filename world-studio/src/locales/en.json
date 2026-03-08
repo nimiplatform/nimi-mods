@@ -12,9 +12,9 @@
     "modelPlaceholder": "Search and select model...",
     "noAvailableModel": "No available model for current route.",
     "noMatchModel": "No model matches current search.",
-    "emptyLocalRuntimeHint": "Local runtime has no available model for this profile.",
+    "emptyLocalHint": "Local has no available model for this profile.",
     "goInstallModels": "Go Install Models",
-    "switchToTokenApi": "Switch to Token API",
+    "switchToCloud": "Switch to Cloud",
     "useRuntimeDefault": "Use Runtime Default"
   },
   "routeConfig": {

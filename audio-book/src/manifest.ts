@@ -52,7 +52,7 @@ export const AUDIO_BOOK_MANIFEST = {
           kind: 'node',
           capability: 'speech',
           nodeId: 'speech.synthesize.cloud',
-          title: 'Token API TTS node',
+          title: 'Cloud TTS node',
         },
       ],
       preferred: {

@@ -52,7 +52,7 @@ export const WORLD_STUDIO_MANIFEST = {
           kind: 'node',
           capability: 'image',
           nodeId: 'image.generate.cloud',
-          title: 'Token API image generation node',
+          title: 'Cloud image generation node',
         },
       ],
       preferred: {

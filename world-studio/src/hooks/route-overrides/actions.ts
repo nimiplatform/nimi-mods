@@ -23,7 +23,7 @@ export function useWorldStudioRouteBindingActions(input: {
     const source = normalizeRuntimeRouteSource(sourceInput);
     input.setRouteBindingMap((previous) => {
       const current = previous[profile];
-      const firstLocalModel = input.routeOptions?.local.models[0] || null;
+      const firstLocalModel = input.routeOptions?.local?.models[0] || null;
       const base = current || input.routeOptions?.selected || {
         source: 'local' as const,
         connectorId: '',

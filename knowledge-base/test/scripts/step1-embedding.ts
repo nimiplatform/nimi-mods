@@ -3,7 +3,7 @@
 // Step 1 — Embedding Verification (Knowledge-Base Layer 2 test)
 //
 // Reads a document, splits into chunks, generates embeddings via Runtime
-// Token API, then runs a self-retrieval sanity check.
+// Cloud, then runs a self-retrieval sanity check.
 //
 // Usage:
 //   npx tsx test/scripts/step1-embedding.ts [path-to-doc.md]
@@ -89,7 +89,7 @@ async function main() {
   console.log(`Chunks:  ${chunks.length} chunks (avg ${avgTokens} tokens)`);
   console.log('');
 
-  // 3. Embed all chunks via Runtime Token API
+  // 3. Embed all chunks via Runtime Cloud
   const embedModel = createEmbeddingClient();
   const store = new InMemoryVectorStore();
   const chunkTexts = chunks.map((c) => c.text);
