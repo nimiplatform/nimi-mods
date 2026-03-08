@@ -70,9 +70,7 @@ export function useKismetController() {
     const primary = loadPrimaryProfile();
     if (primary) {
       store.setPrimaryProfile(primary);
-      store.setBirthInput(primary.birthInput);
       store.setConfirmedProfile(primary.canonicalProfile);
-      store.setDraftProfile(primary.canonicalProfile);
       emitKismetLog({ message: 'kismet.primary-profile.restored', source: 'useKismetController' });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -142,7 +140,7 @@ export function useKismetController() {
     if (result.ok) {
       setLastAiRawResponse(result.rawResponse);
       store.setRouteSource(result.routeSource);
-      store.setNatalResult({
+      const natalResult = {
         canonicalProfile: derived.canonicalProfile,
         birthCityLabel,
         analysis: result.data.analysis,
@@ -150,18 +148,17 @@ export function useKismetController() {
         chartData: interpolateKeyNodes(result.data.keyNodes, Number(derived.birthInput.birthDate.slice(0, 4))),
         recommendedCities: result.data.recommendedCities,
         citySummary: result.data.citySummary,
-      });
-      // Auto-save as primary profile on first generation
-      if (!store.primaryProfile) {
-        const primary = {
-          birthInput: derived.birthInput,
-          canonicalProfile: derived.canonicalProfile,
-          savedAt: new Date().toISOString(),
-        };
-        persistPrimaryProfile(primary);
-        store.setPrimaryProfile(primary);
-        emitKismetLog({ message: KISMET_AUDIT.LOCAL_PROFILE_SAVED, source: 'useKismetController.auto-save' });
-      }
+      };
+      store.setNatalResult(natalResult);
+      // Save/update primary profile with natal result
+      const primary = {
+        birthInput: derived.birthInput,
+        canonicalProfile: derived.canonicalProfile,
+        natalResult,
+        savedAt: new Date().toISOString(),
+      };
+      persistPrimaryProfile(primary);
+      store.setPrimaryProfile(primary);
       emitKismetLog({ message: KISMET_AUDIT.NATAL_GENERATE_SUCCEEDED, source: 'useKismetController' });
       return;
     }

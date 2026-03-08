@@ -203,6 +203,7 @@ export function KismetShell() {
   const controller = useKismetController();
   const exportActions = useKismetExport();
   const { route } = controller;
+  const [routeExpanded, setRouteExpanded] = useState(false);
 
   const showPromptPanel = Boolean(store.generatedPrompt && store.error);
 
@@ -257,51 +258,72 @@ export function KismetShell() {
             <ModeSwitcher activeTab={store.activeTab} onTabChange={store.setActiveTab} />
           </div>
 
-          <div className="mb-5 space-y-3">
-            <RouteStatusBadge source={route.routeSource} />
-            <ModelSelector
-              routeOverride={route.routeOverride}
-              chatRouteOptions={route.chatRouteOptions}
-              routeOptionsLoading={route.routeOptionsLoading}
-              routeOptionsError={route.routeOptionsError}
-              onSourceChange={route.handleSourceChange}
-              onConnectorChange={route.handleConnectorChange}
-              onModelChange={route.handleModelChange}
-              onClear={route.clearOverride}
-              onReload={() => {
-                void route.reloadRouteOptions();
+          <div className="mb-5">
+            <button
+              type="button"
+              onClick={() => setRouteExpanded(!routeExpanded)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0',
               }}
-            />
+            >
+              <RouteStatusBadge source={route.routeSource} />
+              <span style={{ fontSize: '0.7rem', color: '#8C857B', transition: 'transform 0.2s', transform: routeExpanded ? 'rotate(180deg)' : 'none' }}>▼</span>
+            </button>
+            {routeExpanded && (
+              <div className="mt-3 space-y-3">
+                <ModelSelector
+                  routeOverride={route.routeOverride}
+                  chatRouteOptions={route.chatRouteOptions}
+                  routeOptionsLoading={route.routeOptionsLoading}
+                  routeOptionsError={route.routeOptionsError}
+                  onSourceChange={route.handleSourceChange}
+                  onConnectorChange={route.handleConnectorChange}
+                  onModelChange={route.handleModelChange}
+                  onClear={route.clearOverride}
+                  onReload={() => {
+                    void route.reloadRouteOptions();
+                  }}
+                />
+              </div>
+            )}
           </div>
 
-          {store.activeTab === 'natal-profile' && (
-            <div className="space-y-5">
-              <InputForm
-                title={t('InputForm.natalTitle')}
-                value={store.birthInput}
-                onChange={store.setBirthInput}
-                onSubmit={controller.deriveBirthProfile}
-                submitLabel={t('InputForm.deriveButton')}
-                disabled={store.loading}
-              />
-              {store.draftProfile && (
-                <DraftProfileCard
-                  pillars={store.draftProfile.pillars}
-                  onPillarChange={(key, value) => {
-                    if (store.draftProfile) {
-                      store.setDraftProfile({
-                        ...store.draftProfile,
-                        pillars: { ...store.draftProfile.pillars, [key]: value },
-                      });
+          {store.primaryProfile && (
+            <div style={{ padding: '10px 14px', background: 'rgba(138,114,84,0.08)', border: '1px solid rgba(138,114,84,0.15)' }}>
+              <div className="ks-serif text-xs" style={{ color: '#8A7254' }}>当前命主</div>
+              <div className="ks-serif mt-1" style={{ fontSize: '0.9rem', color: '#E8E3D7' }}>
+                {store.primaryProfile.birthInput.name || store.primaryProfile.canonicalProfile.dayMaster.label} · {store.primaryProfile.canonicalProfile.zodiac}
+              </div>
+              {!store.natalResult && store.primaryProfile.natalResult && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (store.primaryProfile) {
+                      store.setNatalResult(store.primaryProfile.natalResult!);
+                      store.setConfirmedProfile(store.primaryProfile.canonicalProfile);
+                      store.setActiveTab('natal-profile');
                     }
                   }}
-                  onGenerate={controller.generateNatalAnalysis}
-                  onSave={controller.saveLocalProfile}
-                  canSave
-                  loading={store.loading}
-                />
+                  disabled={store.loading}
+                  className="ks-serif"
+                  style={{ marginTop: 10, width: '100%', padding: '8px 0', background: 'transparent', border: '1px solid rgba(138,114,84,0.3)', color: '#8A7254', fontSize: '0.8rem', cursor: 'pointer', letterSpacing: 2, transition: 'all 0.3s' }}
+                >
+                  加载上次命盘
+                </button>
               )}
             </div>
+          )}
+
+          {store.activeTab === 'natal-profile' && (
+            <InputForm
+              title={t('InputForm.natalTitle')}
+              value={store.birthInput}
+              onChange={store.setBirthInput}
+              onSubmit={() => { store.setNatalResult(null); controller.deriveBirthProfile(); }}
+              submitLabel={t('InputForm.deriveButton')}
+              disabled={store.loading}
+            />
           )}
 
           {store.activeTab === 'daily-fortune' && (
@@ -439,6 +461,32 @@ export function KismetShell() {
             )}
 
             {store.activeTab === 'natal-profile' && store.natalResult && <ResultView result={store.natalResult} />}
+            {store.activeTab === 'natal-profile' && !store.natalResult && store.draftProfile && (
+              <div className="flex items-start justify-center" style={{ paddingTop: 40 }}>
+                <div style={{ width: '100%', maxWidth: 480 }}>
+                  <DraftProfileCard
+                    pillars={store.draftProfile.pillars}
+                    onPillarChange={(key, value) => {
+                      if (store.draftProfile) {
+                        store.setDraftProfile({
+                          ...store.draftProfile,
+                          pillars: { ...store.draftProfile.pillars, [key]: value },
+                        });
+                      }
+                    }}
+                    onGenerate={controller.generateNatalAnalysis}
+                    onSave={controller.saveLocalProfile}
+                    canSave
+                    loading={store.loading}
+                  />
+                </div>
+              </div>
+            )}
+            {store.activeTab === 'natal-profile' && !store.natalResult && !store.draftProfile && !store.loading && !store.error && (
+              <div className="gu-card flex items-center justify-center" style={{ minHeight: 320, color: '#8C857B', fontSize: '0.9rem' }}>
+                {t('EmptyState.natal')}
+              </div>
+            )}
             {store.activeTab === 'daily-fortune' && store.dailyResult && (
               <DailyFortuneView
                 result={store.dailyResult}
@@ -448,19 +496,10 @@ export function KismetShell() {
                 onShare={controller.shareContent}
               />
             )}
-            {!store.loading && !store.error && (
-              <>
-                {store.activeTab === 'natal-profile' && !store.natalResult && (
-                  <div className="gu-card flex items-center justify-center" style={{ minHeight: 320, color: '#8C857B', fontSize: '0.9rem' }}>
-                    {t('EmptyState.natal')}
-                  </div>
-                )}
-                {store.activeTab === 'daily-fortune' && !store.dailyResult && (
-                  <div className="gu-card flex items-center justify-center" style={{ minHeight: 320, color: '#8C857B', fontSize: '0.9rem' }}>
-                    {t('EmptyState.daily')}
-                  </div>
-                )}
-              </>
+            {!store.loading && !store.error && store.activeTab === 'daily-fortune' && !store.dailyResult && (
+              <div className="gu-card flex items-center justify-center" style={{ minHeight: 320, color: '#8C857B', fontSize: '0.9rem' }}>
+                {t('EmptyState.daily')}
+              </div>
             )}
           </div>
         )}

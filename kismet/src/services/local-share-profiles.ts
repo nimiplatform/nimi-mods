@@ -1,4 +1,4 @@
-import type { KismetBirthInputV2, KismetCanonicalProfile, KismetLocalShareProfile } from '../types.js';
+import type { KismetBirthInputV2, KismetCanonicalProfile, KismetLocalShareProfile, KismetNatalAnalysisResult } from '../types.js';
 import { createUlid } from '../utils/ulid.js';
 
 const STORAGE_KEY = 'nimi.kismet.local-share-profiles.v2';
@@ -7,6 +7,7 @@ const PRIMARY_PROFILE_KEY = 'nimi.kismet.primary-profile.v1';
 export type KismetPrimaryProfile = {
   birthInput: KismetBirthInputV2;
   canonicalProfile: KismetCanonicalProfile;
+  natalResult?: KismetNatalAnalysisResult;
   savedAt: string;
 };
 
