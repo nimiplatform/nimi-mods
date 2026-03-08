@@ -1,4 +1,9 @@
 import { runVideoPlayEpisodeProduction } from '../src/pipeline/orchestrator.ts';
+import {
+  VIDEOPLAY_DATA_API_ASSET_BATCH_UPSERT,
+  VIDEOPLAY_DATA_API_EPISODE_UPSERT,
+  VIDEOPLAY_DATA_API_RELEASE_PUBLISH,
+} from '../src/contracts.ts';
 
 const SMOKE_FLAG = 'NIMI_VIDEOPLAY_SMOKE';
 
@@ -134,11 +139,22 @@ function createDeps() {
   const hookClient = {
     data: {
       query: async ({ capability, query }) => {
-        if (capability === 'data-api.videoplay.episode.upsert' && query.operation === 'upsert') {
-          writes.episodes.push(query.episode);
-          return { episode: query.episode };
+        if (capability === VIDEOPLAY_DATA_API_EPISODE_UPSERT) {
+          if (query.operation === 'upsert') {
+            writes.episodes.push(query.episode);
+            return { episode: query.episode };
+          }
+          if (
+            query.operation === 'upsert-candidate-selection'
+            || query.operation === 'upsert-audio-design'
+            || query.operation === 'upsert-character-casting'
+            || query.operation === 'upsert-scene-planning'
+          ) {
+            return { ok: true };
+          }
         }
-        if (capability === 'data-api.videoplay.asset.batch-upsert' && query.operation === 'upsert') {
+
+        if (capability === VIDEOPLAY_DATA_API_ASSET_BATCH_UPSERT && query.operation === 'upsert') {
           writes.assets.push(...query.assets);
           return {
             assetBatchResult: {
@@ -147,6 +163,15 @@ function createDeps() {
             },
           };
         }
+
+        if (capability === VIDEOPLAY_DATA_API_RELEASE_PUBLISH && query.operation === 'publish') {
+          return {
+            releaseId: query.releasePackage?.releaseId || 'release-smoke-1',
+            episodeId: query.episodeId,
+            releasePackage: query.releasePackage,
+          };
+        }
+
         throw new Error(`VIDEOPLAY_SMOKE_UNSUPPORTED_CAPABILITY:${capability}`);
       },
     },
@@ -157,22 +182,22 @@ function createDeps() {
       listOptions: async ({ capability }) => ({
         capability,
         selected: {
-          source: 'local-runtime',
+          source: 'local',
           connectorId: '',
           model: 'smoke-model',
         },
         resolvedDefault: {
-          source: 'local-runtime',
+          source: 'local',
           connectorId: '',
           model: 'smoke-model',
         },
         connectors: [],
-        localRuntime: {
+        local: {
           models: [{ localModelId: 'm1', model: 'smoke-model' }],
         },
       }),
       resolve: async ({ binding }) => ({
-        source: binding?.source || 'local-runtime',
+        source: binding?.source || 'local',
         connectorId: binding?.connectorId || '',
         model: binding?.model || 'smoke-model',
         provider: 'provider-main',
@@ -199,7 +224,7 @@ function createDeps() {
     generateText: async () => ({
       text: '{}',
       route: {
-        source: 'local-runtime',
+        source: 'local',
         connectorId: '',
         model: 'smoke-model',
       },
@@ -207,7 +232,7 @@ function createDeps() {
     generateImage: async () => ({
       images: [{ uri: 'image://smoke', mimeType: 'image/png' }],
       route: {
-        source: 'local-runtime',
+        source: 'local',
         connectorId: '',
         model: 'smoke-model',
       },
@@ -215,7 +240,7 @@ function createDeps() {
     generateVideo: async () => ({
       videos: [{ uri: 'video://smoke', mimeType: 'video/mp4' }],
       route: {
-        source: 'local-runtime',
+        source: 'local',
         connectorId: '',
         model: 'smoke-model',
       },
@@ -225,7 +250,7 @@ function createDeps() {
       mimeType: 'audio/mpeg',
       durationMs: 2200,
       route: {
-        source: 'local-runtime',
+        source: 'local',
         connectorId: '',
         model: 'smoke-model',
       },

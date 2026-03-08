@@ -44,10 +44,10 @@ cases:
     reason_code: null
     source_rule: V-ACC-002
   - id: VID-007-ROUTE-FALLBACK-AUDITED
-    description: Route fallback to token-api is visible and auditable.
+    description: Route fallback to cloud is visible and auditable.
     expected_ok: true
     fallback_visible: true
-    audit_contains: fallback_to_token_api
+    audit_contains: fallback_to_cloud
     reason_code: null
     source_rule: V-ACC-002
   - id: VID-008-PERSIST-WARN-NONBLOCKING
@@ -140,7 +140,7 @@ cases:
     reason_code: null
     source_rule: V-ACC-002
   - id: VID-023-VOICE-ROUTE-FALLBACK-AUDITED
-    description: Voice rendering route fallback from local-runtime to token-api is auditable with required fields.
+    description: Voice rendering route fallback from local to cloud is auditable with required fields.
     expected_ok: true
     stage: asset-render-voice
     fallback_visible: true

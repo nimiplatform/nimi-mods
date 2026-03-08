@@ -6,7 +6,7 @@ import { createLocalChatAiClient } from '../src/runtime-ai-client.ts';
 
 function createBinding(): RuntimeRouteBinding {
   return {
-    source: 'token-api',
+    source: 'cloud',
     connectorId: 'connector-1',
     model: 'gemini-2.5-flash',
   };
@@ -14,7 +14,7 @@ function createBinding(): RuntimeRouteBinding {
 
 function createResolvedRoute() {
   return {
-    source: 'token-api' as const,
+    source: 'cloud' as const,
     provider: 'gemini',
     model: 'gemini-2.5-flash',
     connectorId: 'connector-1',
@@ -25,8 +25,8 @@ test('local-chat runtime ai client: resolveRoute preserves go-runtime metadata',
   const runtimeClient = {
     route: {
       resolve: async () => ({
-        source: 'local-runtime' as const,
-        provider: 'local-runtime',
+        source: 'local' as const,
+        provider: 'local',
         model: 'qwen-tts',
         connectorId: '',
         localModelId: 'qwen-tts',
@@ -40,7 +40,7 @@ test('local-chat runtime ai client: resolveRoute preserves go-runtime metadata',
   const route = await aiClient.resolveRoute({
     capability: 'audio.synthesize',
     routeBinding: {
-      source: 'local-runtime',
+      source: 'local',
       connectorId: '',
       model: 'qwen-tts',
       localModelId: 'qwen-tts',
@@ -126,22 +126,25 @@ test('local-chat runtime ai client: text calls pass timeoutMs through to runtime
   } as unknown as ModRuntimeClient;
 
   const aiClient = createLocalChatAiClient(runtimeClient);
+  const streamEvents: Array<{ type: string; traceId?: string }> = [];
 
   await aiClient.generateText({
     prompt: '你好',
     timeoutMs: 4321,
     routeBinding: createBinding(),
   });
-  for await (const _event of aiClient.streamText({
+  for await (const event of aiClient.streamText({
     prompt: '你好',
     timeoutMs: 8765,
     routeBinding: createBinding(),
   })) {
-    // no-op
+    streamEvents.push(event);
   }
 
   assert.equal(captured.generateTimeoutMs, 4321);
   assert.equal(captured.streamTimeoutMs, 8765);
+  assert.equal(streamEvents.at(-1)?.type, 'done');
+  assert.equal(streamEvents.at(-1)?.traceId, 'trace-stream');
 });
 
 test('local-chat runtime ai client: synthesizeSpeech prefers stream and falls back to bytes', async () => {

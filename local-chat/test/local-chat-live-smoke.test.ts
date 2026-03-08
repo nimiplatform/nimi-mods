@@ -81,7 +81,7 @@ async function waitForRuntimeReady(endpoint: string): Promise<void> {
   let lastError: unknown = null;
   for (let attempt = 0; attempt < 120; attempt += 1) {
     try {
-      await client.localRuntime.listLocalModels({});
+      await client.local.listLocalModels({});
       return;
     } catch (error) {
       lastError = error;
@@ -173,6 +173,18 @@ async function withRuntimeDaemon(
 
 function requiredEnv(name: string): string {
   return String(process.env[name] || '').trim();
+}
+
+function normalizeCloudModelId(provider: LiveProviderConfig['provider'], modelId: string): string {
+  const normalized = String(modelId || '').trim();
+  if (!normalized) {
+    return '';
+  }
+  const lower = normalized.toLowerCase();
+  if (lower.startsWith('cloud/') || lower.startsWith(`${provider}/`)) {
+    return normalized;
+  }
+  return `${provider}/${normalized}`;
 }
 
 function resolveProviderConfigOrSkip(t: { skip: (msg?: string) => void }): LiveProviderConfig | null {
@@ -267,12 +279,14 @@ test('local-chat live smoke: runTextTurn real provider with trace continuity', {
       const provider = createNimiAiProvider({
         runtime,
         appId: APP_ID,
-        routePolicy: 'token-api',
+        routePolicy: 'cloud',
         fallback: 'deny',
         timeoutMs: 45_000,
       });
 
-      const textModel = provider.text(providerConfig.modelId);
+      const textModel = provider.text(
+        normalizeCloudModelId(providerConfig.provider, providerConfig.modelId),
+      );
 
       const aiClient = {
         streamText: async function* (input: Record<string, unknown>) {
@@ -291,7 +305,7 @@ test('local-chat live smoke: runTextTurn real provider with trace continuity', {
           if (text) {
             yield { type: 'text_delta', textDelta: text };
           }
-          yield { type: 'done' };
+          yield { type: 'done', traceId: traceId || undefined };
         },
         generateText: async (input: Record<string, unknown>) => {
           const generated = await textModel.doGenerate({

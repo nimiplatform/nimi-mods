@@ -13,6 +13,9 @@ import {
 } from '../src/storage/state.ts';
 import { runPromptCanaryCases } from '../src/prompt/canary.ts';
 import {
+  VIDEOPLAY_DATA_API_ASSET_BATCH_UPSERT,
+  VIDEOPLAY_DATA_API_EPISODE_UPSERT,
+  VIDEOPLAY_DATA_API_RELEASE_PUBLISH,
   VIDEOPLAY_REASON,
 } from '../src/contracts.ts';
 
@@ -314,7 +317,7 @@ function makeQualityFixture(overrides = {}) {
         fps: 30,
         resolution: '1920x1080',
         sourceEventIds: ['ev-1'],
-        routeSource: 'local-runtime',
+        routeSource: 'local',
         metadata: {},
       },
       {
@@ -329,7 +332,7 @@ function makeQualityFixture(overrides = {}) {
         fps: 30,
         resolution: '1920x1080',
         sourceEventIds: ['ev-2'],
-        routeSource: 'local-runtime',
+        routeSource: 'local',
         metadata: {},
       },
     ],
@@ -368,7 +371,7 @@ function createPipelineDeps(options = {}) {
   const hookClient = {
     data: {
       query: async ({ capability, query }) => {
-        if (capability === 'data-api.videoplay.episode.upsert') {
+        if (capability === VIDEOPLAY_DATA_API_EPISODE_UPSERT) {
           if (query.operation === 'upsert') {
             writes.episodes.push(query.episode);
             return { episode: query.episode };
@@ -378,13 +381,21 @@ function createPipelineDeps(options = {}) {
           }
         }
 
-        if (capability === 'data-api.videoplay.asset.batch-upsert' && query.operation === 'upsert') {
+        if (capability === VIDEOPLAY_DATA_API_ASSET_BATCH_UPSERT && query.operation === 'upsert') {
           writes.assets.push(...query.assets);
           return {
             assetBatchResult: {
               episodeId: query.episodeId,
               writeCount: query.assets.length,
             },
+          };
+        }
+
+        if (capability === VIDEOPLAY_DATA_API_RELEASE_PUBLISH && query.operation === 'publish') {
+          return {
+            releaseId: query.releasePackage?.releaseId || 'release-test-1',
+            episodeId: query.episodeId,
+            releasePackage: query.releasePackage,
           };
         }
 
@@ -402,22 +413,22 @@ function createPipelineDeps(options = {}) {
       listOptions: async ({ capability }) => ({
         capability,
         selected: {
-          source: 'local-runtime',
+          source: 'local',
           connectorId: '',
           model: 'mock-model',
         },
         resolvedDefault: {
-          source: 'local-runtime',
+          source: 'local',
           connectorId: '',
           model: 'mock-model',
         },
         connectors: [],
-        localRuntime: {
+        local: {
           models: [{ localModelId: 'm1', model: 'mock-model' }],
         },
       }),
       resolve: async ({ binding }) => ({
-        source: binding?.source || 'local-runtime',
+        source: binding?.source || 'local',
         connectorId: binding?.connectorId || '',
         model: binding?.model || 'mock-model',
         provider: 'provider-main',
@@ -474,7 +485,7 @@ function createPipelineDeps(options = {}) {
       if (typeof options.checkRouteHealth === 'function') {
         return options.checkRouteHealth({ capability, binding });
       }
-      if (binding?.source === 'local-runtime') {
+      if (binding?.source === 'local') {
         return {
           status: 'healthy',
           reasonCode: 'RUNTIME_ROUTE_HEALTHY',
@@ -485,9 +496,9 @@ function createPipelineDeps(options = {}) {
         reasonCode: 'RUNTIME_ROUTE_HEALTHY',
       };
     },
-    generateText: async () => ({ text: '{}', route: { source: 'local-runtime', connectorId: '', model: 'mock-model' } }),
-    generateImage: async () => ({ images: [{ uri: 'image://x', mimeType: 'image/png' }], route: { source: 'local-runtime', connectorId: '', model: 'mock-model' } }),
-    generateVideo: async () => ({ videos: [{ uri: 'video://x', mimeType: 'video/mp4' }], route: { source: 'local-runtime', connectorId: '', model: 'mock-model' } }),
+    generateText: async () => ({ text: '{}', route: { source: 'local', connectorId: '', model: 'mock-model' } }),
+    generateImage: async () => ({ images: [{ uri: 'image://x', mimeType: 'image/png' }], route: { source: 'local', connectorId: '', model: 'mock-model' } }),
+    generateVideo: async () => ({ videos: [{ uri: 'video://x', mimeType: 'video/mp4' }], route: { source: 'local', connectorId: '', model: 'mock-model' } }),
     synthesizeSpeech: async () => ({
       ...(typeof options.synthesizeSpeech === 'function'
         ? await options.synthesizeSpeech()
@@ -495,7 +506,7 @@ function createPipelineDeps(options = {}) {
           audioUri: 'audio://x',
           mimeType: 'audio/mpeg',
           durationMs: 3000,
-          route: { source: 'local-runtime', connectorId: '', model: 'mock-model' },
+          route: { source: 'local', connectorId: '', model: 'mock-model' },
         }),
     }),
   };
@@ -572,7 +583,7 @@ test('route fallback audit fields are complete', async () => {
       capability: 'text.generate',
       traceId: 'trace-1',
       checkHealth: async (_capability, binding) => {
-        if (binding?.source === 'local-runtime') {
+        if (binding?.source === 'local') {
           return { status: 'unhealthy', reasonCode: 'RUNTIME_ROUTE_DOWN' };
         }
         return { status: 'healthy', reasonCode: 'RUNTIME_ROUTE_HEALTHY' };
@@ -585,8 +596,8 @@ test('route fallback audit fields are complete', async () => {
       assert.equal(error?.details?.fallbackAudit?.traceId, 'trace-1');
       assert.equal(error?.details?.fallbackAudit?.stage, 'screenplay');
       assert.equal(error?.details?.fallbackAudit?.capability, 'text.generate');
-      assert.equal(error?.details?.fallbackAudit?.from, 'local-runtime');
-      assert.equal(error?.details?.fallbackAudit?.to, 'token-api');
+      assert.equal(error?.details?.fallbackAudit?.from, 'local');
+      assert.equal(error?.details?.fallbackAudit?.to, 'cloud');
       assert.ok(String(error?.details?.fallbackAudit?.reason || '').length > 0);
       return true;
     },
@@ -751,7 +762,7 @@ test('compose requires selected timeline segments', () => {
           fps: 30,
           resolution: '1920x1080',
           sourceEventIds: ['ev-1'],
-          routeSource: 'local-runtime',
+          routeSource: 'local',
           metadata: {},
         },
         {
@@ -766,7 +777,7 @@ test('compose requires selected timeline segments', () => {
           fps: 30,
           resolution: '1920x1080',
           sourceEventIds: ['ev-1'],
-          routeSource: 'local-runtime',
+          routeSource: 'local',
           metadata: {},
         },
       ],
@@ -905,7 +916,7 @@ test('asset render emits analysis/queue trace and voice assets', async () => {
 test('voice route fallback is audited in pipeline', async () => {
   const { deps } = createPipelineDeps({
     checkRouteHealth: ({ capability, binding }) => {
-      if (capability === 'audio.synthesize' && binding?.source === 'local-runtime') {
+      if (capability === 'audio.synthesize' && binding?.source === 'local') {
         return { status: 'unhealthy', reasonCode: 'RUNTIME_ROUTE_DOWN' };
       }
       return { status: 'healthy', reasonCode: 'RUNTIME_ROUTE_HEALTHY' };
@@ -924,8 +935,8 @@ test('voice route fallback is audited in pipeline', async () => {
       const checkpoint = error?.details?.checkpoint;
       const voiceFallback = checkpoint?.fallbackAudits?.find((item) => item.stage === 'asset-render-voice');
       assert.ok(voiceFallback);
-      assert.equal(voiceFallback.from, 'local-runtime');
-      assert.equal(voiceFallback.to, 'token-api');
+      assert.equal(voiceFallback.from, 'local');
+      assert.equal(voiceFallback.to, 'cloud');
       assert.equal(voiceFallback.capability, 'audio.synthesize');
       return true;
     },

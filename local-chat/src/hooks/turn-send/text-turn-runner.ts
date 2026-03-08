@@ -341,6 +341,7 @@ export async function runTextTurn(input: RunTextTurnInput): Promise<TextTurnResu
   let fullText = '';
   let streamDeltaCount = 0;
   let streamCompleted = false;
+  let streamTraceId = '';
   let streamFailed = false;
   let streamFailureMessage = '';
   const streamStartedAt = performance.now();
@@ -358,6 +359,7 @@ export async function runTextTurn(input: RunTextTurnInput): Promise<TextTurnResu
       })) {
         if (event.type === 'done') {
           streamCompleted = true;
+          streamTraceId = String(event.traceId || '').trim() || streamTraceId;
           continue;
         }
         if (event.type !== 'text_delta') {
@@ -440,6 +442,6 @@ export async function runTextTurn(input: RunTextTurnInput): Promise<TextTurnResu
     streamDeltaCount,
     streamDurationMs,
     segmentParseMode: splitResult.parseMode,
-    traceId: undefined,
+    traceId: streamTraceId || undefined,
   };
 }

@@ -10,8 +10,9 @@ import {
 type StreamEvent = {
   type: 'text_delta' | 'done';
   textDelta?: string;
+  traceId?: string;
   route: {
-    source: 'local-runtime' | 'token-api';
+    source: 'local' | 'cloud';
     model: string;
     localModelId?: string;
     connectorId?: string;
@@ -51,7 +52,7 @@ function createBaseInput(aiClient: TestAiClient) {
 
 function createRoute() {
   return {
-    source: 'local-runtime' as const,
+    source: 'local' as const,
     model: 'kimi-k2-instruct',
     localModelId: 'kimi-k2-instruct',
   };
@@ -67,6 +68,7 @@ async function* streamFromDeltas(deltas: string[]): AsyncIterable<StreamEvent> {
   }
   yield {
     type: 'done',
+    traceId: 'trace-stream-success',
     route: createRoute(),
   };
 }
@@ -144,6 +146,7 @@ test('local-chat runTextTurn e2e: stream path returns normalized segments withou
     assert.equal(streamedChunks.length >= 2, true);
     assert.equal(typeof streamInputs[0]?.timeoutMs, 'number');
     assert.equal(Number(streamInputs[0]?.timeoutMs) > 0, true);
+    assert.equal(result.traceId, 'trace-stream-success');
   });
 });
 

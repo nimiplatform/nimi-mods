@@ -87,7 +87,7 @@ export type LocalChatAiClient = {
   }>;
   streamText(input: LocalChatAiTextRequest): AsyncIterable<
     | { type: 'text_delta'; textDelta: string }
-    | { type: 'done' }
+    | { type: 'done'; traceId?: string }
   >;
   generateImage(input: LocalChatAiImageRequest): Promise<{
     images: Array<{ uri?: string; b64Json?: string; mimeType?: string }>;
@@ -262,7 +262,10 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
           continue;
         }
         if (event.type === 'finish') {
-          yield { type: 'done' };
+          yield {
+            type: 'done',
+            traceId: String(event.trace?.traceId || '').trim() || undefined,
+          };
           continue;
         }
         if (event.type === 'error') {
@@ -340,7 +343,7 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
         audioFormat: input.audioFormat,
         language: input.language,
         model: input.model || route.model || undefined,
-        binding: input.routeBinding || input.routeOverride,
+        binding: input.routeBinding,
         extensions: input.extensions,
         timeoutMs: input.timeoutMs,
       };
