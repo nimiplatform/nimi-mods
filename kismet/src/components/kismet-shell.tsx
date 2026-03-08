@@ -273,7 +273,7 @@ export function KismetShell() {
             {routeExpanded && (
               <div className="mt-3 space-y-3">
                 <ModelSelector
-                  routeOverride={route.routeOverride}
+                  routeBinding={route.routeBinding}
                   chatRouteOptions={route.chatRouteOptions}
                   routeOptionsLoading={route.routeOptionsLoading}
                   routeOptionsError={route.routeOptionsError}

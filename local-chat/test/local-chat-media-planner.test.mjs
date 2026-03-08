@@ -47,7 +47,7 @@ test('media planner returns parsed decision on valid JSON object', async () => {
         };
       },
     },
-    routeOverride: null,
+    routeBinding: null,
     userText: '刚刚那个场景很像电影镜头',
     assistantText: '我脑子里已经有画面了。',
     target: createTarget(),
@@ -90,7 +90,7 @@ test('media planner silently reports failure on invalid JSON', async () => {
         };
       },
     },
-    routeOverride: null,
+    routeBinding: null,
     userText: '发点什么',
     assistantText: '普通聊天回复',
     target: createTarget(),

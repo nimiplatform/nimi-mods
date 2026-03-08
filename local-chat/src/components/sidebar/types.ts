@@ -18,7 +18,6 @@ export type RuntimeStatusSidebarProps = {
   imageResolvedRoute?: LocalChatResolvedMediaRoute | null;
   videoResolvedRoute?: LocalChatResolvedMediaRoute | null;
   routeBinding?: RuntimeRouteBinding | null;
-  routeOverride?: RuntimeRouteBinding | null;
   speechVoices: Array<{ id: string; providerId?: string; name: string }>;
   selectedSpeechProviderId?: string;
   selectedVoiceId: string;
@@ -56,7 +55,6 @@ export type RuntimeStatusSidebarProps = {
   onRouteConnectorChange: (connectorId: string) => void;
   onRouteModelChange: (model: string) => void;
   onClearRouteBinding?: () => void;
-  onClearRouteOverride?: () => void;
   onVoiceIdChange: (voiceId: string) => void;
   ttsConnectorId: string;
   ttsModel: string;

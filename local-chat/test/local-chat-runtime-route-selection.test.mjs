@@ -5,7 +5,7 @@ import {
   hasValidLocalRuntimeChatModelSelection,
   hasValidTokenApiChatModelSelection,
 } from '../src/hooks/use-local-chat-runtime-route.ts';
-import { buildRouteOverrideForModel } from '../src/hooks/runtime-route/override-actions.ts';
+import { buildRouteBindingForModel } from '../src/hooks/runtime-route/override-actions.ts';
 
 test('token-api chat model selection stays valid when user picks a non-preferred but chat-capable model', () => {
   const result = hasValidTokenApiChatModelSelection({
@@ -16,9 +16,9 @@ test('token-api chat model selection stays valid when user picks a non-preferred
       'models/gemini-3-pro-preview',
     ],
     modelCapabilities: {
-      'models/aqa': ['llm.text.generate', 'llm.text.stream'],
-      'models/gemini-3-flash-preview': ['llm.text.generate', 'llm.text.stream'],
-      'models/gemini-3-pro-preview': ['llm.text.generate', 'llm.text.stream'],
+      'models/aqa': ['text.generate'],
+      'models/gemini-3-flash-preview': ['text.generate'],
+      'models/gemini-3-pro-preview': ['text.generate'],
     },
   });
 
@@ -33,8 +33,8 @@ test('token-api chat model selection is rejected when the current model is no lo
       'models/image-only',
     ],
     modelCapabilities: {
-      'models/gemini-3-flash-preview': ['llm.text.generate', 'llm.text.stream'],
-      'models/image-only': ['llm.image.generate'],
+      'models/gemini-3-flash-preview': ['text.generate'],
+      'models/image-only': ['image.generate'],
     },
   });
 
@@ -49,12 +49,12 @@ test('local runtime chat model selection stays valid when user picks a non-prefe
       {
         localModelId: 'chat-default',
         model: 'chat-default',
-        capabilities: ['llm.text.generate', 'llm.text.stream'],
+        capabilities: ['text.generate'],
       },
       {
         localModelId: 'chat-alt',
         model: 'chat-alt',
-        capabilities: ['llm.text.generate', 'llm.text.stream'],
+        capabilities: ['text.generate'],
       },
     ],
   });
@@ -62,8 +62,8 @@ test('local runtime chat model selection stays valid when user picks a non-prefe
   assert.equal(result, true);
 });
 
-test('buildRouteOverrideForModel refreshes local runtime metadata when user switches models', () => {
-  const result = buildRouteOverrideForModel({
+test('buildRouteBindingForModel refreshes local runtime metadata when user switches models', () => {
+  const result = buildRouteBindingForModel({
     model: 'chat-alt',
     previous: {
       source: 'local-runtime',
@@ -90,13 +90,13 @@ test('buildRouteOverrideForModel refreshes local runtime metadata when user swit
             localModelId: 'chat-default',
             model: 'chat-default',
             engine: 'llama.cpp',
-            capabilities: ['llm.text.generate', 'llm.text.stream'],
+            capabilities: ['text.generate'],
           },
           {
             localModelId: 'chat-alt',
             model: 'chat-alt',
             engine: 'mlx',
-            capabilities: ['llm.text.generate', 'llm.text.stream'],
+            capabilities: ['text.generate'],
           },
         ],
       },

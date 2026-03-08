@@ -62,8 +62,6 @@ function matchesScenarioByCapability(capabilities: string[], scenario: ExtendedS
       'chat',
       'text',
       'completion',
-      'llm.text.generate',
-      'llm.text.stream',
       'text.generate',
     );
   }
@@ -72,7 +70,6 @@ function matchesScenarioByCapability(capabilities: string[], scenario: ExtendedS
       'tts',
       'audio.synthesize',
       'speech.synthesize',
-      'llm.speech.synthesize',
     );
   }
   if (normalizedScenario === 'stt') {
@@ -80,7 +77,6 @@ function matchesScenarioByCapability(capabilities: string[], scenario: ExtendedS
       'stt',
       'audio.transcribe',
       'speech.transcribe',
-      'llm.speech.transcribe',
     );
   }
   if (normalizedScenario === 'image') {
@@ -88,14 +84,12 @@ function matchesScenarioByCapability(capabilities: string[], scenario: ExtendedS
       'image',
       't2i',
       'i2i',
-      'llm.image.generate',
       'image.generate',
     );
   }
   return hasAny(
     'video',
     't2v',
-    'llm.video.generate',
     'video.generate',
     'text.video',
   );

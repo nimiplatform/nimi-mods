@@ -24,7 +24,6 @@ export function resolveMediaRouteConfig(input: {
 }): {
   routeSource: MediaRouteSource;
   routeBinding?: RuntimeRouteBinding;
-  routeOverride?: RuntimeRouteBinding;
   model?: string;
 } {
   const routeSource = normalizeRouteSource(
@@ -54,7 +53,6 @@ export function resolveMediaRouteConfig(input: {
     return {
       routeSource,
       routeBinding: override,
-      routeOverride: override,
       model: model || undefined,
     };
   }
@@ -70,7 +68,6 @@ export function resolveMediaRouteConfig(input: {
     return {
       routeSource,
       routeBinding: override,
-      routeOverride: override,
       model: model || undefined,
     };
   }
@@ -88,7 +85,6 @@ export function resolveMediaRouteConfig(input: {
     return {
       routeSource,
       routeBinding: override,
-      routeOverride: override,
       model: model || undefined,
     };
   }
@@ -294,27 +290,5 @@ export function toPinnedRouteBinding(route: {
     connectorId: '',
     model,
     ...(localModelId ? { localModelId } : {}),
-  };
-}
-
-export function toPinnedRouteOverride(route: {
-  source: string;
-  connectorId?: string;
-  model?: string;
-  localModelId?: string;
-}): {
-  source: 'local-runtime' | 'token-api';
-  connectorId?: string;
-  model: string;
-  localModelId?: string;
-} {
-  const pinned = toPinnedRouteBinding(route);
-  if (pinned.source === 'token-api') {
-    return pinned;
-  }
-  return {
-    source: 'local-runtime',
-    model: pinned.model,
-    ...(pinned.localModelId ? { localModelId: pinned.localModelId } : {}),
   };
 }

@@ -45,7 +45,7 @@ test('media decision policy blocks explicit image request when dependency is not
       },
     },
     turnTxnId: 'txn-explicit-blocked',
-    routeOverride: null,
+    routeBinding: null,
     defaultSettings: {
       ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
       imageRouteSource: 'local-runtime',
@@ -90,7 +90,7 @@ test('media decision policy returns planner execution decision when auto gate pa
       }),
     },
     turnTxnId: 'txn-planner-ok',
-    routeOverride: null,
+    routeBinding: null,
     defaultSettings: {
       ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
       imageRouteSource: 'local-runtime',
@@ -131,7 +131,7 @@ test('media decision policy resolves auto image route via preflight for explicit
       }),
     },
     turnTxnId: 'txn-explicit-auto-preflight',
-    routeOverride: null,
+    routeBinding: null,
     defaultSettings: {
       ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
       imageRouteSource: 'auto',

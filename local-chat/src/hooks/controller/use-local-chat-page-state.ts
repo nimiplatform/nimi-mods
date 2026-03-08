@@ -601,7 +601,6 @@ export function useLocalChatPageState() {
     imageRouteOptions: runtimeRouteState.imageRouteOptions,
     videoRouteOptions: runtimeRouteState.videoRouteOptions,
     routeBinding: runtimeRouteState.routeBinding,
-    routeOverride: runtimeRouteState.routeBinding,
     routeSnapshot: runtimeRouteState.routeSnapshot
       ? {
         source: runtimeRouteState.routeSnapshot.source,

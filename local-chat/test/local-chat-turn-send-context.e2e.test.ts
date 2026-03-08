@@ -24,7 +24,7 @@ function createBaseInput(): UseLocalChatTurnSendInput {
     videoRouteOptions: null,
     imageRouteOptionsRevision: 1,
     videoRouteOptionsRevision: 1,
-    routeOverride: null,
+    routeBinding: null,
     routeSnapshot: {
       source: 'token-api',
       model: 'models/gemini-3-flash-preview',

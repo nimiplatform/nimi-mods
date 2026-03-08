@@ -1,16 +1,20 @@
 version: 2
 capabilities:
-  - key: llm.text.generate
+  - key: runtime.ai.text.generate
     direction: consume
     purpose: generate natal, daily, and compatibility narratives
     source_rule: KIS-CAP-002
-  - key: llm.text.stream
-    direction: consume
-    purpose: route compatibility with host AI contract surface
-    source_rule: KIS-CAP-002
-  - key: data.query.data-api.runtime.route.options
+  - key: runtime.route.list.options
     direction: consume
     purpose: discover route and model options for AI generation
+    source_rule: KIS-CAP-002
+  - key: runtime.route.resolve
+    direction: consume
+    purpose: resolve the active AI route before generation
+    source_rule: KIS-CAP-002
+  - key: runtime.route.check.health
+    direction: consume
+    purpose: verify configured route health for sidebar status and recovery
     source_rule: KIS-CAP-002
   - key: ui.register.ui-extension.app.sidebar.mods
     direction: consume

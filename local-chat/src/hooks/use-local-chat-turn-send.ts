@@ -6,7 +6,7 @@ import type { LocalChatScheduleCancelReason, UseLocalChatTurnSendInput } from '.
 export function buildTurnSendContextKey(input: UseLocalChatTurnSendInput): string {
   const targetId = String(input.selectedTarget?.id || '').trim();
   const sessionId = String(input.selectedSessionId || '').trim();
-  const routeBinding = input.routeBinding || input.routeOverride || null;
+  const routeBinding = input.routeBinding || null;
   const routeBindingSource = String(routeBinding?.source || '').trim();
   const routeBindingConnector = String(routeBinding?.connectorId || '').trim();
   const routeBindingModel = String(routeBinding?.model || '').trim();
@@ -35,9 +35,6 @@ export function useLocalChatTurnSend(input: UseLocalChatTurnSendInput) {
     input.routeBinding?.connectorId,
     input.routeBinding?.model,
     input.routeBinding?.source,
-    input.routeOverride?.connectorId,
-    input.routeOverride?.model,
-    input.routeOverride?.source,
     input.routeSnapshot?.model,
     input.routeSnapshot?.source,
     input.defaultSettings.segmentationMode,

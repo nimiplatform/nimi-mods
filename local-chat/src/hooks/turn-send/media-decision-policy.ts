@@ -61,7 +61,7 @@ type IntentGateResult =
 export type DecideMediaExecutionInput = {
   aiClient: Pick<LocalChatTurnAiClient, 'generateObject'> & Partial<Pick<LocalChatTurnAiClient, 'resolveRoute'>>;
   turnTxnId: string;
-  routeOverride: RuntimeRouteBinding | null;
+  routeBinding: RuntimeRouteBinding | null;
   defaultSettings: LocalChatDefaultSettings;
   userText: string;
   assistantText: string;
@@ -516,8 +516,8 @@ async function resolveAuthorityMediaRoute(input: {
   if (routeConfig.routeSource === 'auto') {
     return null;
   }
-  const connectorId = String(routeConfig.routeOverride?.connectorId || '').trim();
-  const model = String(routeConfig.model || routeConfig.routeOverride?.model || '').trim()
+  const connectorId = String(routeConfig.routeBinding?.connectorId || '').trim();
+  const model = String(routeConfig.model || routeConfig.routeBinding?.model || '').trim()
     || (routeSource === 'local-runtime' ? 'selected-local-model' : 'selected-token-model');
   return {
     routeSource,
@@ -770,7 +770,7 @@ export async function decideMediaExecution(input: DecideMediaExecutionInput): Pr
   if (!plannerLocalBlockReason) {
     const plannerResult = await planMediaTurn({
       aiClient: input.aiClient,
-      routeOverride: input.routeOverride,
+      routeBinding: input.routeBinding,
       userText: input.userText,
       assistantText: input.assistantText,
       target: input.target,

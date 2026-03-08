@@ -18,7 +18,7 @@ type GenerateJsonViaAiInput<T> = {
   aiClient: ModRuntimeClient['ai']['text'];
   systemPrompt: string;
   userPrompt: string;
-  routeOverride?: RuntimeRouteBinding;
+  routeBinding?: RuntimeRouteBinding;
   abortSignal?: AbortSignal;
   validate: (raw: unknown) => { ok: true; data: T } | { ok: false; error: KismetError };
 };
@@ -101,9 +101,9 @@ export async function generateJsonViaAi<T>(input: GenerateJsonViaAiInput<T>): Pr
       input: input.userPrompt,
       system: input.systemPrompt,
       temperature: 0.4,
-      ...(input.routeOverride ? {
-        binding: input.routeOverride,
-        model: input.routeOverride.model,
+      ...(input.routeBinding ? {
+        binding: input.routeBinding,
+        model: input.routeBinding.model,
       } : {}),
     });
 

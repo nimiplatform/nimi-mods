@@ -84,5 +84,3 @@ export function buildRouteBindingForModel(input: {
     engine: undefined,
   };
 }
-
-export const buildRouteOverrideForModel = buildRouteBindingForModel;

@@ -352,7 +352,7 @@ function createHarness() {
         },
         runtimeMode: 'STORY' as const,
         chatRouteOptions: null,
-        routeOverride: null,
+        routeBinding: null,
         routeSnapshot: {
           source: 'local-runtime',
           model: 'chat-model',

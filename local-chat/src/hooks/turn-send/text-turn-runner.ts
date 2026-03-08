@@ -292,9 +292,7 @@ export async function runTextTurn(input: RunTextTurnInput): Promise<TextTurnResu
     allowMultiReply: input.allowMultiReply,
     segmentationMode: input.segmentationMode || 'adaptive',
   });
-  const routeBinding = input.invokeInput.routeBinding || (
-    input.invokeInput as TurnInvokeInput & { routeOverride?: TurnInvokeInput['routeBinding'] }
-  ).routeOverride;
+  const routeBinding = input.invokeInput.routeBinding;
 
   let fullText = '';
   let streamDeltaCount = 0;

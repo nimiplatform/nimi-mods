@@ -4,7 +4,7 @@ import {
   isMediaRouteReady,
   resolveMediaRouteConfig,
   resolveMediaRouteFromOptions,
-  toPinnedRouteOverride,
+  toPinnedRouteBinding,
 } from '../src/hooks/turn-send/media-route.ts';
 
 function createDefaultSettings(overrides = {}) {
@@ -43,11 +43,11 @@ test('resolveMediaRouteConfig does not convert undefined settings into "undefine
 
   assert.equal(resolved.routeSource, 'auto');
   assert.equal(resolved.model, undefined);
-  assert.equal(resolved.routeOverride, undefined);
+  assert.equal(resolved.routeBinding, undefined);
 });
 
-test('toPinnedRouteOverride keeps token-api connector and model', () => {
-  const override = toPinnedRouteOverride({
+test('toPinnedRouteBinding keeps token-api connector and model', () => {
+  const binding = toPinnedRouteBinding({
     source: 'token-api',
     runtimeModelType: 'image',
     provider: 'openai',
@@ -57,15 +57,15 @@ test('toPinnedRouteOverride keeps token-api connector and model', () => {
     localOpenAiEndpoint: 'http://127.0.0.1:11434/v1',
   });
 
-  assert.deepEqual(override, {
+  assert.deepEqual(binding, {
     source: 'token-api',
     connectorId: 'connector-a',
     model: 'gpt-image-1',
   });
 });
 
-test('toPinnedRouteOverride keeps local-runtime model and localModelId', () => {
-  const override = toPinnedRouteOverride({
+test('toPinnedRouteBinding keeps local-runtime model and localModelId', () => {
+  const binding = toPinnedRouteBinding({
     source: 'local-runtime',
     runtimeModelType: 'image',
     provider: 'localai',
@@ -79,8 +79,9 @@ test('toPinnedRouteOverride keeps local-runtime model and localModelId', () => {
     localOpenAiEndpoint: 'http://127.0.0.1:8080/v1',
   });
 
-  assert.deepEqual(override, {
+  assert.deepEqual(binding, {
     source: 'local-runtime',
+    connectorId: '',
     model: 'z-image-turbo',
     localModelId: 'z-image-turbo',
   });

@@ -197,7 +197,7 @@ function normalizeReason(error: unknown): string {
 
 export async function planMediaTurn(input: {
   aiClient: Pick<LocalChatTurnAiClient, 'generateObject'>;
-  routeOverride: RuntimeRouteBinding | null;
+  routeBinding: RuntimeRouteBinding | null;
   userText: string;
   assistantText: string;
   target: LocalChatTarget;
@@ -216,8 +216,8 @@ export async function planMediaTurn(input: {
   }, MEDIA_PLANNER_TIMEOUT_MS);
   try {
     const result = await input.aiClient.generateObject({
-      routeHint: 'chat/default',
-      routeOverride: input.routeOverride || undefined,
+      capability: 'text.generate',
+      routeBinding: input.routeBinding || undefined,
       mode: 'STORY',
       worldId: input.worldId || undefined,
       agentId: input.target.id,

@@ -86,8 +86,8 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     onMediaPlannerModeChange,
     onVideoAutoPolicyChange,
   } = props;
-  const routeBinding = props.routeBinding || props.routeOverride || null;
-  const onClearRouteBinding = props.onClearRouteBinding || props.onClearRouteOverride || (() => {});
+  const routeBinding = props.routeBinding || null;
+  const onClearRouteBinding = props.onClearRouteBinding || (() => {});
   const onRefreshMediaDependencies = props.onRefreshMediaDependencies || (() => {});
   const onSidebarBootstrap = props.onSidebarBootstrap || (() => {});
   const onOpenChatPanel = props.onOpenChatPanel || (() => {});
@@ -361,7 +361,7 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
           onRouteSourceChange={onRouteSourceChange}
           onRouteConnectorChange={onRouteConnectorChange}
           onRouteModelChange={onRouteModelChange}
-          onClearRouteOverride={onClearRouteBinding}
+          onClearRouteBinding={onClearRouteBinding}
         />
 
         <VoicePanel

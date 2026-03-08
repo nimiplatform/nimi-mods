@@ -116,7 +116,7 @@ export function useKismetController() {
       birthCityLabel,
     });
     store.setGeneratedPrompt(promptPackage);
-    if (route.routeOverride && !route.isUsableRouteBinding(route.routeOverride)) {
+    if (route.routeBinding && !route.isUsableRouteBinding(route.routeBinding)) {
       setLastAiRawResponse(null);
       store.setRouteSource('unavailable');
       store.setError(buildRouteUnavailableError());
@@ -132,7 +132,7 @@ export function useKismetController() {
       aiClient,
       systemPrompt: promptPackage.systemPrompt,
       userPrompt: promptPackage.userPrompt,
-      routeOverride: route.routeOverride || undefined,
+      routeBinding: route.routeBinding || undefined,
       validate: validateNatalAiOutput,
     });
 
@@ -179,7 +179,7 @@ export function useKismetController() {
     }
     store.setError(result.error);
     emitKismetLog({ level: 'error', message: KISMET_AUDIT.NATAL_GENERATE_FAILED, source: 'useKismetController' });
-  }, [deriveBirthProfile, route.routeOverride, setLastAiRawResponse, store]);
+  }, [deriveBirthProfile, route.routeBinding, setLastAiRawResponse, store]);
 
   const generateDailyFortune = useCallback(async () => {
     const confirmedProfile = store.confirmedProfile || deriveBirthProfile()?.canonicalProfile;
@@ -210,7 +210,7 @@ export function useKismetController() {
       dailyDefaults,
     });
     store.setGeneratedPrompt(promptPackage);
-    if (route.routeOverride && !route.isUsableRouteBinding(route.routeOverride)) {
+    if (route.routeBinding && !route.isUsableRouteBinding(route.routeBinding)) {
       setLastAiRawResponse(null);
       store.setRouteSource('unavailable');
       store.setError(buildRouteUnavailableError());
@@ -225,7 +225,7 @@ export function useKismetController() {
       aiClient: getKismetAiClient(),
       systemPrompt: promptPackage.systemPrompt,
       userPrompt: promptPackage.userPrompt,
-      routeOverride: route.routeOverride || undefined,
+      routeBinding: route.routeBinding || undefined,
       validate: validateDailyResult,
     });
 
@@ -244,7 +244,7 @@ export function useKismetController() {
     }
     store.setError(result.error);
     emitKismetLog({ level: 'error', message: KISMET_AUDIT.DAILY_GENERATE_FAILED, source: 'useKismetController' });
-  }, [deriveBirthProfile, route.routeOverride, setLastAiRawResponse, store]);
+  }, [deriveBirthProfile, route.routeBinding, setLastAiRawResponse, store]);
 
   const generateCompatibility = useCallback(async () => {
     const selfProfile = store.confirmedProfile || deriveBirthProfile()?.canonicalProfile;
@@ -270,7 +270,7 @@ export function useKismetController() {
     const compatibilityInput = scoreCompatibility(selfShareProfile, targetShareProfile);
     const promptPackage = buildCompatibilityPromptPackage(compatibilityInput);
     store.setGeneratedPrompt(promptPackage);
-    if (route.routeOverride && !route.isUsableRouteBinding(route.routeOverride)) {
+    if (route.routeBinding && !route.isUsableRouteBinding(route.routeBinding)) {
       setLastAiRawResponse(null);
       store.setRouteSource('unavailable');
       store.setError(buildRouteUnavailableError());
@@ -285,7 +285,7 @@ export function useKismetController() {
       aiClient: getKismetAiClient(),
       systemPrompt: promptPackage.systemPrompt,
       userPrompt: promptPackage.userPrompt,
-      routeOverride: route.routeOverride || undefined,
+      routeBinding: route.routeBinding || undefined,
       validate: validateCompatibilityResult,
     });
 
@@ -305,7 +305,7 @@ export function useKismetController() {
     store.setCompatibilityResult(buildCompatibilityFallback(compatibilityInput));
     store.setError(result.error);
     emitKismetLog({ level: 'error', message: KISMET_AUDIT.COMPATIBILITY_GENERATE_FAILED, source: 'useKismetController' });
-  }, [deriveBirthProfile, route.routeOverride, setLastAiRawResponse, store]);
+  }, [deriveBirthProfile, route.routeBinding, setLastAiRawResponse, store]);
 
   const generateFortuneStick = useCallback(async () => {
     const confirmedProfile = store.confirmedProfile;
@@ -319,7 +319,7 @@ export function useKismetController() {
       dailyResult,
     });
     store.setGeneratedPrompt(promptPackage);
-    if (route.routeOverride && !route.isUsableRouteBinding(route.routeOverride)) {
+    if (route.routeBinding && !route.isUsableRouteBinding(route.routeBinding)) {
       setLastAiRawResponse(null);
       store.setRouteSource('unavailable');
       store.setError(buildRouteUnavailableError());
@@ -334,7 +334,7 @@ export function useKismetController() {
       aiClient: getKismetAiClient(),
       systemPrompt: promptPackage.systemPrompt,
       userPrompt: promptPackage.userPrompt,
-      routeOverride: route.routeOverride || undefined,
+      routeBinding: route.routeBinding || undefined,
       validate: validateFortuneStickResult,
     });
 
@@ -353,7 +353,7 @@ export function useKismetController() {
     }
     store.setError(result.error);
     emitKismetLog({ level: 'error', message: KISMET_AUDIT.FORTUNE_STICK_GENERATE_FAILED, source: 'useKismetController' });
-  }, [route.routeOverride, setLastAiRawResponse, store]);
+  }, [route.routeBinding, setLastAiRawResponse, store]);
 
   const shareContent = useCallback((text: string) => {
     navigator.clipboard.writeText(text).then(() => {

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot, RuntimeRouteSource } from '@nimiplatform/sdk/mod/runtime-route';
 
 type ModelSelectorProps = {
-  routeOverride: RuntimeRouteBinding | null;
+  routeBinding: RuntimeRouteBinding | null;
   chatRouteOptions: RuntimeRouteOptionsSnapshot | null;
   routeOptionsLoading: boolean;
   routeOptionsError: string | null;
@@ -15,7 +15,7 @@ type ModelSelectorProps = {
 };
 
 export function ModelSelector({
-  routeOverride,
+  routeBinding,
   chatRouteOptions,
   routeOptionsLoading,
   routeOptionsError,
@@ -27,9 +27,9 @@ export function ModelSelector({
 }: ModelSelectorProps) {
   const { t } = useTranslation('kismet');
 
-  const activeSource = routeOverride?.source || chatRouteOptions?.selected.source || 'local-runtime';
-  const activeConnectorId = routeOverride?.connectorId || chatRouteOptions?.selected.connectorId || '';
-  const activeModel = routeOverride?.model || chatRouteOptions?.selected.model || '';
+  const activeSource = routeBinding?.source || chatRouteOptions?.selected.source || 'local-runtime';
+  const activeConnectorId = routeBinding?.connectorId || chatRouteOptions?.selected.connectorId || '';
+  const activeModel = routeBinding?.model || chatRouteOptions?.selected.model || '';
   const [modelQuery, setModelQuery] = useState(activeModel);
   const focusedRef = useRef(false);
 
@@ -86,7 +86,7 @@ export function ModelSelector({
       {routeOptionsAlert}
       <div className="flex items-center justify-between">
         <label className="text-xs" style={{ color: '#8C857B', letterSpacing: 1 }}>{t('ModelSelector.title')}</label>
-        {routeOverride && (
+        {routeBinding && (
           <button onClick={onClear} style={{ background: 'none', border: 'none', color: '#8A7254', cursor: 'pointer', fontSize: '0.7rem' }}>
             {t('ModelSelector.reset')}
           </button>

@@ -64,8 +64,8 @@ type KismetStore = {
 
   routeSource: RouteSourceDisplay;
   setRouteSource: (source: RouteSourceDisplay) => void;
-  routeOverride: RuntimeRouteBinding | null;
-  setRouteOverride: (override: RuntimeRouteBinding | null) => void;
+  routeBinding: RuntimeRouteBinding | null;
+  setRouteBinding: (override: RuntimeRouteBinding | null) => void;
   chatRouteOptions: RuntimeRouteOptionsSnapshot | null;
   setChatRouteOptions: (options: RuntimeRouteOptionsSnapshot | null | ((prev: RuntimeRouteOptionsSnapshot | null) => RuntimeRouteOptionsSnapshot | null)) => void;
   routeOptionsLoading: boolean;
@@ -113,7 +113,7 @@ const initialState = {
   generatedPrompt: null as GeneratedPromptPackage | null,
   lastAiRawResponse: null as KismetAiRawResponse | null,
   routeSource: 'unavailable' as RouteSourceDisplay,
-  routeOverride: null as RuntimeRouteBinding | null,
+  routeBinding: null as RuntimeRouteBinding | null,
   chatRouteOptions: null as RuntimeRouteOptionsSnapshot | null,
   routeOptionsLoading: false,
   routeOptionsError: null as string | null,
@@ -173,7 +173,7 @@ export const useKismetStore = create<KismetStore>((set) => ({
   setLastAiRawResponse: (lastAiRawResponse) => set({ lastAiRawResponse }),
 
   setRouteSource: (routeSource) => set({ routeSource }),
-  setRouteOverride: (routeOverride) => set({ routeOverride }),
+  setRouteBinding: (routeBinding) => set({ routeBinding }),
   setChatRouteOptions: (chatRouteOptions) => set((state) => ({
     chatRouteOptions: typeof chatRouteOptions === 'function'
       ? chatRouteOptions(state.chatRouteOptions)

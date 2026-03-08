@@ -50,7 +50,6 @@ export type UseLocalChatTurnSendInput = {
   imageRouteOptionsRevision?: number;
   videoRouteOptionsRevision?: number;
   routeBinding?: RuntimeRouteBinding | null;
-  routeOverride?: RuntimeRouteBinding | null;
   routeSnapshot: ChatRouteSnapshot | null;
   imageResolvedRoute?: LocalChatResolvedMediaRoute | null;
   videoResolvedRoute?: LocalChatResolvedMediaRoute | null;

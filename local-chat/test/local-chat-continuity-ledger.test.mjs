@@ -214,7 +214,7 @@ test('continuity maintenance writes running summary and durable memory', async (
 
   const continuityHealth = await runLocalChatContinuityMaintenance({
     aiClient,
-    routeOverride: null,
+    routeBinding: null,
     conversationId: session.id,
     viewerId: 'viewer.test',
     target,

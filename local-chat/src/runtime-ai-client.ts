@@ -4,8 +4,6 @@ import type { RuntimeCanonicalCapability, RuntimeRouteBinding } from '@nimiplatf
 export type LocalChatAiRouteInput = {
   capability?: RuntimeCanonicalCapability;
   routeBinding?: RuntimeRouteBinding;
-  routeOverride?: RuntimeRouteBinding;
-  routeHint?: string;
 };
 
 export type LocalChatAiTextRequest = LocalChatAiRouteInput & {
@@ -162,7 +160,7 @@ function encodeBase64(bytes: Uint8Array): string {
 
 export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalChatAiClient {
   const resolveRoute: LocalChatAiClient['resolveRoute'] = async (input) => {
-    const binding = input?.routeBinding || input?.routeOverride;
+    const binding = input?.routeBinding;
     return runtimeClient.route.resolve({
       capability: resolveCapability(input?.capability),
       binding,
@@ -170,7 +168,7 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
   };
 
   const checkRouteHealth: LocalChatAiClient['checkRouteHealth'] = async (input) => {
-    const binding = input?.routeBinding || input?.routeOverride;
+    const binding = input?.routeBinding;
     return runtimeClient.route.checkHealth({
       capability: resolveCapability(input?.capability),
       binding,
@@ -188,7 +186,7 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
         maxTokens: input.maxTokens,
         temperature: input.temperature,
         model: route.model || undefined,
-        binding: input.routeBinding || input.routeOverride,
+        binding: input.routeBinding,
       });
       const traceId = String(response.trace?.traceId || '').trim();
       return {
@@ -205,7 +203,7 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
         system: input.systemPrompt,
         maxTokens: input.maxTokens,
         temperature: input.temperature,
-        binding: input.routeBinding || input.routeOverride,
+        binding: input.routeBinding,
       });
       const text = String(textResult.text || '');
       const traceId = String(textResult.trace?.traceId || '').trim();
@@ -223,7 +221,7 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
         system: input.systemPrompt,
         maxTokens: input.maxTokens,
         temperature: input.temperature,
-        binding: input.routeBinding || input.routeOverride,
+        binding: input.routeBinding,
       });
       for await (const event of response.stream) {
         if (event.type === 'delta') {
@@ -244,7 +242,7 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
         prompt: input.prompt,
         negativePrompt: input.negativePrompt,
         model: input.model || route.model || undefined,
-        binding: input.routeBinding || input.routeOverride,
+        binding: input.routeBinding,
         extensions: input.extensions,
       });
       return {
@@ -266,7 +264,7 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
         model: input.model || route.model || undefined,
         content: input.content,
         options: input.options,
-        binding: input.routeBinding || input.routeOverride,
+        binding: input.routeBinding,
       });
       return {
         videos: response.artifacts.map((artifact) => ({
@@ -289,7 +287,7 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
         mimeType: input.mimeType,
         language: input.language,
         model: route.model || undefined,
-        binding: input.routeBinding || input.routeOverride,
+        binding: input.routeBinding,
       });
       return {
         text: String(response.text || ''),

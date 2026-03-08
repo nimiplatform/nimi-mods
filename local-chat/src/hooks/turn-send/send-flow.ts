@@ -211,7 +211,7 @@ export async function runLocalChatTurnSend(input: {
     return;
   }
   const selectedTarget = context.selectedTarget;
-  const routeBinding = context.routeBinding || context.routeOverride || null;
+  const routeBinding = context.routeBinding || null;
 
   const workingSession = await ensureWorkingSession({
     selectedSessionId: context.selectedSessionId,
@@ -413,7 +413,7 @@ export async function runLocalChatTurnSend(input: {
     const mediaDecision = await decideMediaExecution({
       aiClient: context.aiClient,
       turnTxnId,
-      routeOverride: routeBinding,
+      routeBinding,
       defaultSettings: context.defaultSettings,
       userText: text,
       assistantText,

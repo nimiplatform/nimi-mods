@@ -391,7 +391,7 @@ function applyAppendOrResolve(input: {
 
 async function refreshRunningSummary(input: {
   aiClient: Pick<LocalChatTurnAiClient, 'generateObject'>;
-  routeOverride: RuntimeRouteBinding | null;
+  routeBinding: RuntimeRouteBinding | null;
   target: LocalChatTarget;
   conversationId: string;
   bundles: LocalChatTurnBundle[];
@@ -404,8 +404,8 @@ async function refreshRunningSummary(input: {
   }
   try {
     const result = await withTimeout((abortSignal) => input.aiClient.generateObject({
-      routeHint: 'chat/default',
-      routeOverride: input.routeOverride || undefined,
+      capability: 'text.generate',
+      routeBinding: input.routeBinding || undefined,
       mode: 'STORY',
       worldId: input.target.worldId || undefined,
       agentId: input.target.id,
@@ -461,7 +461,7 @@ async function refreshRunningSummary(input: {
 
 async function writeDurableMemory(input: {
   aiClient: Pick<LocalChatTurnAiClient, 'generateObject'>;
-  routeOverride: RuntimeRouteBinding | null;
+  routeBinding: RuntimeRouteBinding | null;
   target: LocalChatTarget;
   viewerId: string;
   conversationId: string;
@@ -482,8 +482,8 @@ async function writeDurableMemory(input: {
   });
   try {
     const result = await withTimeout((abortSignal) => input.aiClient.generateObject({
-      routeHint: 'chat/default',
-      routeOverride: input.routeOverride || undefined,
+      capability: 'text.generate',
+      routeBinding: input.routeBinding || undefined,
       mode: 'STORY',
       worldId: input.target.worldId || undefined,
       agentId: input.target.id,
@@ -565,7 +565,7 @@ async function writeDurableMemory(input: {
 
 export async function runLocalChatContinuityMaintenance(input: {
   aiClient: Pick<LocalChatTurnAiClient, 'generateObject'>;
-  routeOverride: RuntimeRouteBinding | null;
+  routeBinding: RuntimeRouteBinding | null;
   conversationId: string;
   viewerId: string;
   target: LocalChatTarget;
@@ -574,14 +574,14 @@ export async function runLocalChatContinuityMaintenance(input: {
   if (bundles.length === 0) return getLocalChatContinuityHealth(input.conversationId);
   const runningSummary = await refreshRunningSummary({
     aiClient: input.aiClient,
-    routeOverride: input.routeOverride,
+    routeBinding: input.routeBinding,
     target: input.target,
     conversationId: input.conversationId,
     bundles,
   });
   await writeDurableMemory({
     aiClient: input.aiClient,
-    routeOverride: input.routeOverride,
+    routeBinding: input.routeBinding,
     target: input.target,
     viewerId: input.viewerId,
     conversationId: input.conversationId,

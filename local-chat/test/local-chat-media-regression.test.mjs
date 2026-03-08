@@ -75,7 +75,7 @@ for (const fixture of mediaDecisionRegressionCases) {
     const result = await decideMediaExecution({
       aiClient: createDecisionAiClient(fixture),
       turnTxnId: `txn-${fixture.name.replace(/\s+/g, '-').toLowerCase()}`,
-      routeOverride: null,
+      routeBinding: null,
       defaultSettings: createDecisionSettings(fixture),
       userText: fixture.userText,
       assistantText: fixture.assistantText,
