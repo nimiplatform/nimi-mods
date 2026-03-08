@@ -21,6 +21,11 @@ cases:
     expected_ok: true
     reason_code: null
     source_rule: TAI-ACC-002
+  - id: TAI-010-IMAGE-CREATE-JOB-PASS
+    description: Async image job diagnostics path succeeds and returns preview artifacts after job completion.
+    expected_ok: true
+    reason_code: null
+    source_rule: TAI-ACC-002
   - id: TAI-004-VIDEO-GENERATE-PASS
     description: Video generation diagnostics path succeeds and returns job ID.
     expected_ok: true

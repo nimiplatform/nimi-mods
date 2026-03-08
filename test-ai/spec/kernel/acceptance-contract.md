@@ -13,9 +13,10 @@ Minimum acceptance coverage must include:
 1. text generate pass
 2. text embed pass
 3. image generate pass
-4. video generate pass
-5. audio synthesize pass
-6. audio transcribe pass
-7. route query unavailable handling
-8. voice clone not-available handling
-9. voice design not-available handling
+4. image create job pass
+5. video generate pass
+6. audio synthesize pass
+7. audio transcribe pass
+8. route query unavailable handling
+9. voice clone not-available handling
+10. voice design not-available handling

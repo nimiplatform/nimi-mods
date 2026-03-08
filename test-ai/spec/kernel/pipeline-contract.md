@@ -12,8 +12,13 @@ Text embedding flow must include route query, embedding generation, and dimensio
 
 ## TAI-PIPE-003 Image Generate Diagnostics Flow
 
-Image diagnostics flow must support text-to-image request: normalize inputs, execute
-`runtime.media.image.generate`, render generated image preview and structured raw response.
+Image diagnostics flow must support both:
+
+- sync text-to-image request: normalize inputs, execute `runtime.media.image.generate`, render generated image preview and structured raw response.
+- async image job request: normalize inputs, execute `runtime.media.jobs.submit`, subscribe/watch the job lifecycle, fetch artifacts on terminal completion, and render generated image preview plus structured diagnostics.
+
+For LocalAI dynamic image workflows, companion artifact selections (`vae` / `llm` / extra slots) and `profile_overrides` must flow through the async path unchanged.
+If a terminal image job completes but artifact fetch fails, the UI must surface an explicit artifact-fetch error instead of silently rendering an empty success state.
 
 ## TAI-PIPE-004 Video Generate Diagnostics Flow
 

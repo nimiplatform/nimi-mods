@@ -3,10 +3,14 @@ import test from 'node:test';
 
 import {
   bindingForModel,
+  buildAsyncImageJobOutcome,
   buildImageWorkflowProfileOverrides,
   buildImageWorkflowComponentSelections,
   buildImageGenerateRequestParams,
   resolveRouteModelPickerState,
+  scenarioJobEventLabel,
+  scenarioJobStatusLabel,
+  toArtifactPreviewUri,
 } from '../src/test-ai-page.tsx';
 
 test('image generate request omits responseFormat in auto mode', () => {
@@ -265,4 +269,33 @@ test('route model picker normalizes local-runtime selector model ids', () => {
   assert.equal(state.activeModel, 'z-image-turbo-Q8_0');
   assert.equal(state.activeModelInOptions, true);
   assert.deepEqual(state.modelOptions, ['z-image-turbo-Q8_0']);
+});
+
+test('scenario job labels map numeric protobuf enums to readable values', () => {
+  assert.equal(scenarioJobStatusLabel(4), 'completed');
+  assert.equal(scenarioJobStatusLabel(5), 'failed');
+  assert.equal(scenarioJobEventLabel(4), 'completed');
+  assert.equal(scenarioJobEventLabel(2), 'queued');
+});
+
+test('artifact preview bytes default to image/png data URI', () => {
+  const uri = toArtifactPreviewUri({
+    bytes: new Uint8Array([137, 80, 78, 71]),
+    defaultMimeType: 'image/png',
+  });
+
+  assert.match(uri, /^data:image\/png;base64,/);
+});
+
+test('completed async image job surfaces artifact fetch failure explicitly', () => {
+  const outcome = buildAsyncImageJobOutcome({
+    status: 4,
+    artifactFetchError: 'artifact fetch failed',
+  });
+
+  assert.deepEqual(outcome, {
+    result: 'failed',
+    error: 'artifact fetch failed',
+    terminalStatus: 'completed',
+  });
 });

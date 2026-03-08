@@ -215,13 +215,28 @@ function bytesToBase64(bytes: Uint8Array): string {
   for (const value of bytes) {
     binary += String.fromCharCode(value);
   }
-  return window.btoa(binary);
+  const bufferCtor = (globalThis as typeof globalThis & {
+    Buffer?: {
+      from(input: string, encoding: string): {
+        toString(encoding: string): string;
+      };
+    };
+  }).Buffer;
+  const base64Encoder = typeof globalThis.btoa === 'function'
+    ? globalThis.btoa.bind(globalThis)
+    : ((value: string) => bufferCtor?.from(value, 'binary').toString('base64') || '');
+  return base64Encoder(binary);
 }
 
-function toArtifactPreviewUri(input: { uri?: string; bytes?: Uint8Array; mimeType?: string }): string {
+export function toArtifactPreviewUri(input: {
+  uri?: string;
+  bytes?: Uint8Array;
+  mimeType?: string;
+  defaultMimeType?: string;
+}): string {
   // Prefer bytes → data: URI because file:// URIs are blocked in Tauri webview.
   if (input.bytes && input.bytes.length > 0) {
-    const mimeType = asString(input.mimeType) || 'application/octet-stream';
+    const mimeType = asString(input.mimeType) || asString(input.defaultMimeType) || 'application/octet-stream';
     return `data:${mimeType};base64,${bytesToBase64(input.bytes)}`;
   }
   const uri = asString(input.uri);
@@ -241,7 +256,22 @@ function isTerminalScenarioJobStatus(value: unknown): boolean {
     || normalized.includes('timeout');
 }
 
-function scenarioJobStatusLabel(value: unknown): string {
+const SCENARIO_JOB_STATUS_LABELS: Record<number, string> = {
+  0: 'unspecified',
+  1: 'submitted',
+  2: 'queued',
+  3: 'running',
+  4: 'completed',
+  5: 'failed',
+  6: 'canceled',
+  7: 'timeout',
+};
+
+export function scenarioJobStatusLabel(value: unknown): string {
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && SCENARIO_JOB_STATUS_LABELS[numeric]) {
+    return SCENARIO_JOB_STATUS_LABELS[numeric];
+  }
   const normalized = String(value || '').trim();
   if (!normalized) return 'unknown';
   return normalized
@@ -250,7 +280,44 @@ function scenarioJobStatusLabel(value: unknown): string {
     .replace(/_/g, ' ');
 }
 
-function scenarioJobEventLabel(value: unknown): string {
+export function buildAsyncImageJobOutcome(input: {
+  status: unknown;
+  reasonDetail?: unknown;
+  artifactFetchError?: unknown;
+}): {
+  result: 'passed' | 'failed';
+  error: string;
+  terminalStatus: string;
+} {
+  const terminalStatus = scenarioJobStatusLabel(input.status);
+  const terminalError = terminalStatus !== 'completed'
+    ? asString(input.reasonDetail || terminalStatus || 'Image job did not complete successfully.')
+    : '';
+  const artifactFetchError = asString(input.artifactFetchError);
+  const error = [terminalError, artifactFetchError].filter(Boolean).join(' | ');
+  return {
+    result: error ? 'failed' : 'passed',
+    error,
+    terminalStatus,
+  };
+}
+
+const SCENARIO_JOB_EVENT_LABELS: Record<number, string> = {
+  0: 'event',
+  1: 'submitted',
+  2: 'queued',
+  3: 'running',
+  4: 'completed',
+  5: 'failed',
+  6: 'canceled',
+  7: 'timeout',
+};
+
+export function scenarioJobEventLabel(value: unknown): string {
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && SCENARIO_JOB_EVENT_LABELS[numeric]) {
+    return SCENARIO_JOB_EVENT_LABELS[numeric];
+  }
   const normalized = String(value || '').trim();
   if (!normalized) return 'event';
   return normalized
@@ -1553,24 +1620,42 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
     job?: Record<string, unknown> | null;
     elapsed: number;
   }) => {
-    const artifactsResponse = await runtimeClient.media.jobs.getArtifacts(input.jobId).catch(() => ({ artifacts: [] }));
+    let artifactFetchError = '';
+    let artifactsResponse: { artifacts: Array<{ uri?: string; bytes?: Uint8Array; mimeType?: string }>; traceId?: string } = {
+      artifacts: [],
+    };
+    try {
+      const response = await runtimeClient.media.jobs.getArtifacts(input.jobId);
+      artifactsResponse = {
+        artifacts: Array.isArray(response.artifacts) ? response.artifacts : [],
+        traceId: response.traceId,
+      };
+    } catch (error) {
+      artifactFetchError = error instanceof Error ? error.message : String(error || 'Failed to fetch image job artifacts.');
+    }
     const artifactsTraceId = 'traceId' in artifactsResponse
       ? asString(artifactsResponse.traceId)
       : '';
     const uris = (artifactsResponse.artifacts || [])
-      .map((artifact) => toArtifactPreviewUri({ uri: artifact.uri, bytes: artifact.bytes, mimeType: artifact.mimeType }))
+      .map((artifact) => toArtifactPreviewUri({
+        uri: artifact.uri,
+        bytes: artifact.bytes,
+        mimeType: artifact.mimeType,
+        defaultMimeType: 'image/png',
+      }))
       .filter(Boolean);
     const jobRecord = input.job || {};
-    const terminalStatus = scenarioJobStatusLabel(jobRecord.status);
-    const terminalError = terminalStatus !== 'completed'
-      ? asString(jobRecord.reasonDetail || terminalStatus || 'Image job did not complete successfully.')
-      : '';
+    const outcome = buildAsyncImageJobOutcome({
+      status: jobRecord.status,
+      reasonDetail: jobRecord.reasonDetail,
+      artifactFetchError,
+    });
     onStateChange((prev) => ({
       ...prev,
       busy: false,
       busyLabel: '',
-      result: terminalError ? 'failed' : 'passed',
-      error: terminalError,
+      result: outcome.result,
+      error: outcome.error,
       output: uris,
       rawResponse: toPrettyJson({
         request: input.requestParams,
@@ -1579,6 +1664,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
         job: input.job,
         events: jobTimeline,
         artifacts: stripArtifacts({ artifacts: artifactsResponse.artifacts }),
+        artifactFetchError: artifactFetchError || undefined,
         previewUris: uris,
       }),
       diagnostics: {
@@ -1716,7 +1802,12 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
       const result = await runtimeClient.media.image.generate(requestParams);
       const elapsed = Date.now() - t0;
       const uris = result.artifacts
-        .map((artifact) => toArtifactPreviewUri({ uri: artifact.uri, bytes: artifact.bytes, mimeType: artifact.mimeType }))
+        .map((artifact) => toArtifactPreviewUri({
+          uri: artifact.uri,
+          bytes: artifact.bytes,
+          mimeType: artifact.mimeType,
+          defaultMimeType: 'image/png',
+        }))
         .filter(Boolean);
 
       onStateChange((prev) => ({

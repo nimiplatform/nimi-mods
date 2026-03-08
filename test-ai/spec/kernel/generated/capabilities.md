@@ -17,6 +17,16 @@ required_capabilities:
     source_rule: TAI-CAP-001
   - key: runtime.media.image.generate
     source_rule: TAI-CAP-001
+  - key: runtime.media.jobs.submit
+    source_rule: TAI-CAP-001
+  - key: runtime.media.jobs.get
+    source_rule: TAI-CAP-001
+  - key: runtime.media.jobs.cancel
+    source_rule: TAI-CAP-001
+  - key: runtime.media.jobs.subscribe
+    source_rule: TAI-CAP-001
+  - key: runtime.media.jobs.get.artifacts
+    source_rule: TAI-CAP-001
   - key: runtime.media.video.generate
     source_rule: TAI-CAP-001
   - key: runtime.media.tts.list.voices
@@ -32,6 +42,8 @@ required_capabilities:
   - key: runtime.route.list.options
     source_rule: TAI-CAP-001
   - key: runtime.route.resolve
+    source_rule: TAI-CAP-001
+  - key: runtime.local.artifacts.list
     source_rule: TAI-CAP-001
   - key: ui.register.ui-extension.app.sidebar.mods
     source_rule: TAI-CAP-001
