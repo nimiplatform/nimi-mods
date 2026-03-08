@@ -2,6 +2,9 @@ import React from 'react';
 import {
   buildLocalImageWorkflowExtensions,
 } from '@nimiplatform/sdk/mod/runtime';
+import {
+  parseRuntimeRouteOptions,
+} from '@nimiplatform/sdk/mod/runtime-route';
 import type {
   LocalImageWorkflowComponentSelection,
   ModRuntimeClient,
@@ -343,6 +346,22 @@ function hydrateTokenApiBinding(
   };
 }
 
+function ensureRouteOptionsSnapshotShape(
+  snapshot: RuntimeRouteOptionsSnapshot | null,
+): RuntimeRouteOptionsSnapshot | null {
+  if (!snapshot) {
+    return null;
+  }
+  return {
+    ...snapshot,
+    local: {
+      models: snapshot.local?.models || [],
+      defaultEndpoint: snapshot.local?.defaultEndpoint,
+    },
+    connectors: Array.isArray(snapshot.connectors) ? snapshot.connectors : [],
+  };
+}
+
 function normalizeLocalRuntimeModelRoot(value: unknown): string {
   const trimmed = asString(value);
   const lower = trimmed.toLowerCase();
@@ -382,7 +401,7 @@ function hydrateLocalRuntimeBinding(
   const normalizedLocalModelId = asString(binding.localModelId);
   const normalizedModelId = normalizeLocalRuntimeModelRoot(binding.modelId || binding.model);
   const normalizedEngine = asString(binding.engine || binding.provider).toLowerCase();
-  const localModel = snapshot.local.models.find((item) => (
+  const localModel = (snapshot.local?.models || []).find((item) => (
     (normalizedLocalModelId && asString(item.localModelId) === normalizedLocalModelId)
     || (
       normalizeLocalRuntimeModelRoot(item.modelId || item.model) === normalizedModelId
@@ -439,7 +458,7 @@ function bindingForSource(
     if (!connector) return null;
     return tokenApiBindingForConnector(connector, connector.models[0] || '');
   }
-  const local = snapshot?.local.models[0] || null;
+  const local = snapshot?.local?.models[0] || null;
   if (!local) return null;
   return localBindingFromOption(local);
 }
@@ -474,7 +493,7 @@ export function bindingForModel(
     };
   }
   const normalizedLocalModel = normalizeLocalRuntimeModelRoot(normalizedModel);
-  const localModel = snapshot?.local.models.find((item) => (
+  const localModel = snapshot?.local?.models.find((item) => (
     normalizeLocalRuntimeModelRoot(item.modelId || item.model) === normalizedLocalModel
   )) || null;
   if (localModel) {
@@ -713,7 +732,7 @@ export function resolveRouteModelPickerState(
   const activeModel = activeSource === 'local'
     ? normalizeLocalRuntimeModelRoot(effectiveBinding?.modelId || effectiveBinding?.model || snapshot?.selected?.modelId || snapshot?.selected?.model || '')
     : (effectiveBinding?.model || snapshot?.selected?.model || '');
-  const localModels = snapshot?.local.models || [];
+  const localModels = snapshot?.local?.models || [];
   const modelOptions = activeSource === 'local'
     ? localModels.map((item) => normalizeLocalRuntimeModelRoot(item.modelId || item.model))
     : (activeConnector?.models || []);
@@ -775,9 +794,16 @@ async function loadRouteSnapshot(input: {
     ])),
   }));
   try {
-    const snapshot = await runtimeClient.route.listOptions({
-      capability: targetCapability,
-    });
+    const snapshot = ensureRouteOptionsSnapshotShape(
+      parseRuntimeRouteOptions(await runtimeClient.route.listOptions({
+        capability: targetCapability,
+      }), {
+        includeResolvedDefault: true,
+      }),
+    );
+    if (!snapshot) {
+      throw new Error('TEST_AI_ROUTE_OPTIONS_INVALID');
+    }
     setStates((prev) => ({
       ...prev,
       ...Object.fromEntries(linkedIds.map((id) => [

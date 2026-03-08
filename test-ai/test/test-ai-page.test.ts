@@ -271,6 +271,25 @@ test('route model picker normalizes local selector model ids', () => {
   assert.deepEqual(state.modelOptions, ['z-image-turbo-Q8_0']);
 });
 
+test('route model picker tolerates missing local snapshot payload', () => {
+  const snapshot = {
+    capability: 'image.generate' as const,
+    selected: {
+      source: 'local' as const,
+      connectorId: '',
+      model: 'z-image-turbo-Q8_0',
+      modelId: 'z-image-turbo-Q8_0',
+    },
+    connectors: [],
+  } as any;
+
+  const state = resolveRouteModelPickerState(snapshot, snapshot.selected);
+
+  assert.equal(state.activeSource, 'local');
+  assert.deepEqual(state.modelOptions, []);
+  assert.equal(state.activeModel, 'z-image-turbo-Q8_0');
+});
+
 test('scenario job labels map numeric protobuf enums to readable values', () => {
   assert.equal(scenarioJobStatusLabel(4), 'completed');
   assert.equal(scenarioJobStatusLabel(5), 'failed');
