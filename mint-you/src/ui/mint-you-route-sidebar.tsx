@@ -54,7 +54,7 @@ export function MintYouRouteSidebar() {
     || null;
 
   const modelOptionsRaw = activeSource === 'local'
-    ? (routeOptions?.local.models.map((item) => item.model) || [])
+    ? (routeOptions?.local?.models.map((item) => item.model) || [])
     : (activeConnector?.models || []);
   const modelOptions = useMemo(() => dedupeModelIds(modelOptionsRaw), [modelOptionsRaw]);
 
@@ -73,7 +73,7 @@ export function MintYouRouteSidebar() {
     if (!normalized) {
       return;
     }
-    const matchedLocalModel = routeOptions?.local.models.find((item) => item.model === normalized) || null;
+    const matchedLocalModel = routeOptions?.local?.models.find((item) => item.model === normalized) || null;
     const nextBinding: RuntimeRouteBinding = activeSource === 'cloud'
       ? {
         source: 'cloud',
@@ -102,7 +102,7 @@ export function MintYouRouteSidebar() {
       return;
     }
 
-    const fallbackLocalModel = routeOptions?.local.models[0] || null;
+    const fallbackLocalModel = routeOptions?.local?.models[0] || null;
     setRouteBinding({
       source: 'local',
       connectorId: '',

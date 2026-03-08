@@ -161,7 +161,7 @@ function RoutePanel(props: {
   }, [selectedConnector, props.model]);
 
   const localModels = useMemo(() => {
-    const models = (props.routeOptions?.local.models || []).map((item) => ({
+  const models = (props.routeOptions?.local?.models || []).map((item) => ({
       id: asString(item.localModelId),
       model: asString(item.model),
       label: asString(item.label || item.model || item.localModelId),

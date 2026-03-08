@@ -1,7 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
+import { parseRuntimeRouteOptions, type RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
 import { emitMintYouLog } from '../logging.js';
 import { getMintYouRuntimeClient } from '../runtime-mod.js';
+
+function ensureRouteOptionsSnapshotShape(
+  snapshot: RuntimeRouteOptionsSnapshot | null,
+): RuntimeRouteOptionsSnapshot | null {
+  if (!snapshot) {
+    return null;
+  }
+  return {
+    ...snapshot,
+    local: {
+      models: snapshot.local?.models || [],
+      defaultEndpoint: snapshot.local?.defaultEndpoint,
+    },
+    connectors: Array.isArray(snapshot.connectors) ? snapshot.connectors : [],
+  };
+}
 
 export function useMintYouRouteOptions() {
   const [routeOptions, setRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
@@ -22,9 +38,16 @@ export function useMintYouRouteOptions() {
 
       try {
         const runtimeClient = getMintYouRuntimeClient();
-        const snapshot = await runtimeClient.route.listOptions({
-          capability: 'text.generate',
-        });
+        const snapshot = ensureRouteOptionsSnapshotShape(
+          parseRuntimeRouteOptions(await runtimeClient.route.listOptions({
+            capability: 'text.generate',
+          }), {
+            includeResolvedDefault: true,
+          }),
+        );
+        if (!snapshot) {
+          throw new Error('MINT_YOU_ROUTE_OPTIONS_INVALID');
+        }
         setRouteOptions(snapshot);
         emitMintYouLog({
           level: 'debug',
@@ -35,7 +58,7 @@ export function useMintYouRouteOptions() {
             selectedSource: snapshot.selected.source,
             selectedConnectorId: snapshot.selected.connectorId,
             selectedModel: snapshot.selected.model,
-            localModelCount: snapshot.local.models.length,
+            localModelCount: snapshot.local?.models.length || 0,
             connectorCount: snapshot.connectors.length,
           },
         });

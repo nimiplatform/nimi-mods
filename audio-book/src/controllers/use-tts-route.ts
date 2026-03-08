@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
+  parseRuntimeRouteOptions,
   type RuntimeCanonicalCapability,
   type RuntimeRouteConnectorOption,
   type RuntimeRouteOptionsSnapshot,
@@ -51,6 +52,22 @@ const OPENAI_TTS_MODEL_PREFERENCES = [
   'gpt-4o-audio-preview',
 ];
 
+function ensureRouteOptionsSnapshotShape(
+  snapshot: RuntimeRouteOptionsSnapshot | null,
+): RuntimeRouteOptionsSnapshot | null {
+  if (!snapshot) {
+    return null;
+  }
+  return {
+    ...snapshot,
+    local: {
+      models: snapshot.local?.models || [],
+      defaultEndpoint: snapshot.local?.defaultEndpoint,
+    },
+    connectors: Array.isArray(snapshot.connectors) ? snapshot.connectors : [],
+  };
+}
+
 function loadPersisted(key: string): RouteSelection {
   try {
     const raw = localStorage.getItem(key);
@@ -79,7 +96,7 @@ async function loadRouteOptions(
   capability: RuntimeCanonicalCapability,
 ): Promise<RuntimeRouteOptionsSnapshot | null> {
   try {
-    const snapshot = await Promise.race<RuntimeRouteOptionsSnapshot>([
+    const rawSnapshot = await Promise.race<unknown>([
       runtimeClient.route.listOptions({ capability }),
       new Promise<never>((_, reject) => {
         setTimeout(
@@ -88,6 +105,14 @@ async function loadRouteOptions(
         );
       }),
     ]);
+    const snapshot = ensureRouteOptionsSnapshotShape(
+      parseRuntimeRouteOptions(rawSnapshot, {
+        includeResolvedDefault: true,
+      }),
+    );
+    if (!snapshot) {
+      throw new Error('AUDIO_BOOK_ROUTE_OPTIONS_INVALID');
+    }
     console.info(LOG_PREFIX, 'loadRouteOptions:ok', {
       capability,
       selectedSource: snapshot.selected.source,

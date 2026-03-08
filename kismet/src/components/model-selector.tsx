@@ -42,7 +42,7 @@ export function ModelSelector({
   const modelOptions = useMemo(() => {
     if (!chatRouteOptions) return [];
     if (activeSource === 'local') {
-      return chatRouteOptions.local.models.map((m) => m.model);
+      return (chatRouteOptions.local?.models || []).map((m) => m.model);
     }
     const connector = chatRouteOptions.connectors.find((c) => c.id === activeConnectorId);
     return connector?.models || [];

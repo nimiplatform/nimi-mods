@@ -76,6 +76,22 @@ function normalizeTokenApiBinding(
   return { ...binding, connectorId, model };
 }
 
+function ensureRouteOptionsSnapshotShape(
+  snapshot: RuntimeRouteOptionsSnapshot | null,
+): RuntimeRouteOptionsSnapshot | null {
+  if (!snapshot) {
+    return null;
+  }
+  return {
+    ...snapshot,
+    local: {
+      models: snapshot.local?.models || [],
+      defaultEndpoint: snapshot.local?.defaultEndpoint,
+    },
+    connectors: Array.isArray(snapshot.connectors) ? snapshot.connectors : [],
+  };
+}
+
 function isConnectorNotFoundError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error || '');
   return message.includes('AI_CONNECTOR_NOT_FOUND');
@@ -111,7 +127,9 @@ async function loadRouteOptionsWithTimeout(routeClient: ReturnType<typeof getKis
     if (timeoutHandle) clearTimeout(timeoutHandle);
   });
   console.log('[KISMET:route] loadRouteOptions: raw payload', JSON.stringify(payload, null, 2)?.slice(0, 2000));
-  const parsed = parseRuntimeRouteOptions(payload, { includeResolvedDefault: true });
+  const parsed = ensureRouteOptionsSnapshotShape(
+    parseRuntimeRouteOptions(payload, { includeResolvedDefault: true }),
+  );
   console.log('[KISMET:route] loadRouteOptions: parsed', parsed ? {
     selectedSource: parsed.selected.source,
     selectedConnectorId: parsed.selected.connectorId,
@@ -119,7 +137,7 @@ async function loadRouteOptionsWithTimeout(routeClient: ReturnType<typeof getKis
     connectorsCount: parsed.connectors.length,
     connectorIds: parsed.connectors.map((c) => c.id),
     connectorModels: parsed.connectors.map((c) => ({ id: c.id, models: c.models.slice(0, 5) })),
-    localModelsCount: parsed.local.models.length,
+    localModelsCount: parsed.local?.models.length || 0,
   } : null);
   if (!parsed) return null;
   const selected = normalizeTokenApiBinding(parsed.selected, parsed.connectors);
@@ -366,7 +384,7 @@ export function useKismetRoute() {
   // Selection handlers
   const handleSourceChange = useCallback((source: RuntimeRouteSource) => {
     if (source === 'local') {
-      const firstModel = chatRouteOptions?.local.models[0];
+      const firstModel = chatRouteOptions?.local?.models[0];
       setRouteBinding(firstModel ? {
         source: 'local',
         connectorId: '',
@@ -397,7 +415,7 @@ export function useKismetRoute() {
     const current = useKismetStore.getState().routeBinding;
     const source = current?.source || 'local';
     const localModel = source === 'local'
-      ? chatRouteOptions?.local.models.find((m) => m.model === model)
+      ? chatRouteOptions?.local?.models.find((m) => m.model === model)
       : undefined;
     setRouteBinding({
       source,

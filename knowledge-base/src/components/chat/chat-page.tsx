@@ -49,7 +49,7 @@ function resolveRouteDisplay(input: {
   const localModel = asString(
     input.model
       || (selected?.source === 'local' ? selected.model : '')
-      || input.routeOptions?.local.models[0]?.model,
+    || input.routeOptions?.local?.models[0]?.model,
   );
   return {
     source: 'local',

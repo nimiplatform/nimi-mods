@@ -6,7 +6,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
 import { createModRuntimeClient, type ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import type { HookClient } from '@nimiplatform/sdk/mod/types';
-import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
+import {
+  parseRuntimeRouteOptions,
+  type RuntimeRouteBinding,
+  type RuntimeRouteOptionsSnapshot,
+} from '@nimiplatform/sdk/mod/runtime-route';
 import { KB_MOD_ID } from '../contracts.js';
 import { createLlmClientAdapter } from '../adapters/llm-adapter.js';
 import { createEmbeddingClientAdapter } from '../adapters/embedding-adapter.js';
@@ -25,6 +29,22 @@ export function useRuntimeClient(): ModRuntimeClient {
 
 function asString(value: unknown): string {
   return String(value || '').trim();
+}
+
+function ensureRouteOptionsSnapshotShape(
+  snapshot: RuntimeRouteOptionsSnapshot | null,
+): RuntimeRouteOptionsSnapshot | null {
+  if (!snapshot) {
+    return null;
+  }
+  return {
+    ...snapshot,
+    local: {
+      models: snapshot.local?.models || [],
+      defaultEndpoint: snapshot.local?.defaultEndpoint,
+    },
+    connectors: Array.isArray(snapshot.connectors) ? snapshot.connectors : [],
+  };
 }
 
 function resolveTokenApiBindingFromOptions(
@@ -78,13 +98,14 @@ function resolveLocalRuntimeBindingFromOptions(
   const selectedModel = options?.selected.source === 'local'
     ? asString(options.selected.model)
     : '';
-  const matchedModel = options?.local.models.find((item) => {
+  const localModels = options?.local?.models || [];
+  const matchedModel = localModels.find((item) => {
     const model = asString(item.model);
     const localModelId = asString(item.localModelId);
     return (targetModel && (model === targetModel || localModelId === targetModel))
       || (selectedModel && (model === selectedModel || localModelId === selectedModel));
   }) || null;
-  const fallbackModel = matchedModel || options?.local.models[0] || null;
+  const fallbackModel = matchedModel || localModels[0] || null;
   const model = asString(matchedModel?.model || targetModel || selectedModel || fallbackModel?.model);
   const localModelId = asString(matchedModel?.localModelId || fallbackModel?.localModelId);
   if (!model) {
@@ -120,7 +141,14 @@ export function useKBClients(
   const loadRouteOptions = useCallback(async (capability: RouteCapability): Promise<RuntimeRouteOptionsSnapshot | null> => {
     const flowId = createKBFlowId(`route-options-${capability}`);
     try {
-      const options = await runtimeClient.route.listOptions({ capability });
+      const options = ensureRouteOptionsSnapshotShape(
+        parseRuntimeRouteOptions(await runtimeClient.route.listOptions({ capability }), {
+          includeResolvedDefault: true,
+        }),
+      );
+      if (!options) {
+        throw new Error('KB_ROUTE_OPTIONS_INVALID');
+      }
 
       emitKBLog({
         level: 'info',
@@ -133,7 +161,7 @@ export function useKBClients(
           selectedConnectorId: options.selected.connectorId || null,
           selectedModel: options.selected.model || null,
           connectorsCount: options.connectors.length,
-          localModelsCount: options.local.models.length,
+          localModelsCount: options.local?.models.length || 0,
         },
       });
       if (capability === 'text.generate') {
