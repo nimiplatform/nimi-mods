@@ -38,7 +38,7 @@
 //
 // Prerequisites:
 //   1. Start nimi runtime:  cd runtime && go run ./cmd/nimi
-//   2. Ensure embedding + chat models are available via token-api
+//   2. Ensure embedding + chat models are available via cloud
 // ---------------------------------------------------------------------------
 
 import { readFileSync } from 'node:fs';

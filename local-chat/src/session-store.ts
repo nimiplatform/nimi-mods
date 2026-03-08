@@ -275,7 +275,7 @@ function normalizeCachedMediaAsset(value: unknown): LocalChatCachedMediaAsset | 
     kind: record.kind === 'video' ? 'video' : 'image',
     renderUri,
     mimeType,
-    routeSource: record.routeSource === 'token-api' ? 'token-api' : 'local-runtime',
+    routeSource: record.routeSource === 'cloud' ? 'cloud' : 'local',
     ...(trimString(record.connectorId) ? { connectorId: trimString(record.connectorId) } : {}),
     ...(trimString(record.model) ? { model: trimString(record.model) } : {}),
     createdAt,

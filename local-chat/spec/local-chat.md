@@ -23,7 +23,7 @@
 
 - `LC-DOM-010`: Session entry uses target-scoped sessions and supports create/switch/delete.
 - `LC-DOM-011`: Prompt and route resolution are controller-layer concerns, not view-layer logic.
-- `LC-DOM-012`: TTS route source is explicit (`local-runtime|token-api|auto`).
+- `LC-DOM-012`: TTS route source is explicit (`local|cloud|auto`).
 - `LC-DOM-013`: Agent voice style prompt is auto-locked and not user-editable.
 - `LC-DOM-014`: `allowProactiveContact` is opt-in and driven by heartbeat scheduling.
 - `LC-DOM-015`: Proactive heartbeat policy emits deterministic reason codes for gate/audit outcomes.

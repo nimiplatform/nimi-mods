@@ -66,7 +66,7 @@ function createSnapshot(overrides: Partial<InteractionSnapshot> = {}): Interacti
   };
 }
 
-test('resolved experience policy keeps token-api visuals on safe boundary', () => {
+test('resolved experience policy keeps cloud visuals on safe boundary', () => {
   const policy = compileResolvedExperiencePolicy({
     interactionProfile: createInteractionProfile(),
     interactionSnapshot: createSnapshot(),
@@ -76,11 +76,11 @@ test('resolved experience policy keeps token-api visuals on safe boundary', () =
       relationshipBoundaryPreset: 'close',
       visualComfortLevel: 'natural-visuals',
     },
-    routeSource: 'token-api',
+    routeSource: 'cloud',
   });
 
-  assert.equal(policy.mediaPolicy.routeSource, 'token-api');
-  assert.equal(policy.mediaPolicy.nsfwPolicy, 'local-runtime-only');
+  assert.equal(policy.mediaPolicy.routeSource, 'cloud');
+  assert.equal(policy.mediaPolicy.nsfwPolicy, 'local-only');
   assert.equal(policy.mediaPolicy.allowVisualAuto, true);
 });
 
@@ -99,7 +99,7 @@ test('resolved experience policy enables local visual freedom only for close nat
       mediaAutonomy: 'natural',
     },
     requestedVoiceConversationMode: 'suggested',
-    routeSource: 'local-runtime',
+    routeSource: 'local',
   });
 
   assert.equal(policy.mediaPolicy.nsfwPolicy, 'allowed');

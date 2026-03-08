@@ -19,7 +19,7 @@ function createResolvedPolicy(settings = DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS, ov
     mediaPolicy: {
       autonomy: settings.mediaAutonomy,
       visualComfortLevel: settings.visualComfortLevel,
-      routeSource: 'local-runtime',
+      routeSource: 'local',
       nsfwPolicy: 'disabled',
       allowVisualAuto: settings.mediaAutonomy === 'natural' && settings.visualComfortLevel !== 'text-only',
       allowAutoVisualHighRisk: false,
@@ -28,7 +28,7 @@ function createResolvedPolicy(settings = DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS, ov
     contentBoundary: {
       relationshipBoundaryPreset: settings.relationshipBoundaryPreset,
       visualComfortLevel: settings.visualComfortLevel,
-      routeSource: 'local-runtime',
+      routeSource: 'local',
       relationshipState: 'new',
       ...(overrides.contentBoundary || {}),
     },
@@ -56,7 +56,7 @@ function createDependencySnapshot(capability, status) {
   return {
     modId: 'local-chat',
     status,
-    routeSource: 'local-runtime',
+    routeSource: 'local',
     warnings: [],
     dependencies: status === 'ready'
       ? [{
@@ -85,14 +85,14 @@ test('media decision policy blocks explicit image request when dependency is not
     routeBinding: null,
     defaultSettings: {
       ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
-      imageRouteSource: 'local-runtime',
+      imageRouteSource: 'local',
     },
     resolvedPolicy: createResolvedPolicy({
       ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
-      imageRouteSource: 'local-runtime',
+      imageRouteSource: 'local',
     }, {
       mediaPolicy: {
-        routeSource: 'local-runtime',
+        routeSource: 'local',
       },
     }),
     userText: '给我来张图',
@@ -102,7 +102,7 @@ test('media decision policy blocks explicit image request when dependency is not
     messages: [],
     promptTrace: null,
     nsfwPolicy: 'allowed',
-    fallbackRouteSource: 'local-runtime',
+    fallbackRouteSource: 'local',
     imageDependencySnapshot: createDependencySnapshot('image', 'missing'),
     videoDependencySnapshot: createDependencySnapshot('video', 'ready'),
     markerOverrideIntent: null,
@@ -132,7 +132,7 @@ test('media decision policy returns planner execution decision when auto gate pa
         },
         traceId: 'trace-media-policy',
         route: {
-          source: 'local-runtime',
+          source: 'local',
           model: 'chat-model',
         },
       }),
@@ -141,14 +141,14 @@ test('media decision policy returns planner execution decision when auto gate pa
     routeBinding: null,
     defaultSettings: {
       ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
-      imageRouteSource: 'local-runtime',
+      imageRouteSource: 'local',
     },
     resolvedPolicy: createResolvedPolicy({
       ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
-      imageRouteSource: 'local-runtime',
+      imageRouteSource: 'local',
     }, {
       mediaPolicy: {
-        routeSource: 'local-runtime',
+        routeSource: 'local',
       },
     }),
     userText: '刚刚那个霓虹雨夜、潮湿街道、玻璃反光和侧脸特写的画面像电影一样。',
@@ -158,7 +158,7 @@ test('media decision policy returns planner execution decision when auto gate pa
     messages: [],
     promptTrace: null,
     nsfwPolicy: 'allowed',
-    fallbackRouteSource: 'local-runtime',
+    fallbackRouteSource: 'local',
     imageDependencySnapshot: createDependencySnapshot('image', 'ready'),
     videoDependencySnapshot: createDependencySnapshot('video', 'missing'),
     markerOverrideIntent: null,
@@ -181,7 +181,7 @@ test('media decision policy resolves auto image route via preflight for explicit
         throw new Error('planner should not run for explicit request');
       },
       resolveRoute: async () => ({
-        source: 'local-runtime',
+        source: 'local',
         provider: 'localai',
         model: 'flux-local',
       }),
@@ -197,7 +197,7 @@ test('media decision policy resolves auto image route via preflight for explicit
       imageRouteSource: 'auto',
     }, {
       mediaPolicy: {
-        routeSource: 'local-runtime',
+        routeSource: 'local',
       },
     }),
     userText: '给我来一张图',
@@ -207,7 +207,7 @@ test('media decision policy resolves auto image route via preflight for explicit
     messages: [],
     promptTrace: null,
     nsfwPolicy: 'allowed',
-    fallbackRouteSource: 'local-runtime',
+    fallbackRouteSource: 'local',
     imageRouteOptions: null,
     videoRouteOptions: null,
     imageRouteOptionsRevision: 1,
@@ -223,7 +223,7 @@ test('media decision policy resolves auto image route via preflight for explicit
   if (result.kind !== 'execute') {
     return;
   }
-  assert.equal(result.resolvedRoute.source, 'local-runtime');
+  assert.equal(result.resolvedRoute.source, 'local');
   assert.equal(result.promptTracePatch.mediaDecisionSource, 'explicit');
   assert.equal(result.promptTracePatch.mediaRouteResolvedBy, 'preflight');
 });

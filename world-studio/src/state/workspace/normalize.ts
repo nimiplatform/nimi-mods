@@ -353,7 +353,7 @@ function normalizeEmbeddingIndex(value: unknown): WorldStudioEmbeddingIndex {
     ? statusRaw
     : 'idle';
   const routeSourceRaw = String(record.routeSource || '').trim();
-  const routeSource = routeSourceRaw === 'local-runtime' || routeSourceRaw === 'token-api'
+  const routeSource = routeSourceRaw === 'local' || routeSourceRaw === 'cloud'
     ? routeSourceRaw
     : null;
   const entriesRecord = asRecord(record.entries);

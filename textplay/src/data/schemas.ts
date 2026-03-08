@@ -385,7 +385,7 @@ const PersistRouteSchema = z.strictObject({
   source: z.string().min(1),
   connectorId: z.string(),
   model: z.string().min(1),
-  // token-api route metadata can omit concrete endpoint in some connectors.
+  // cloud route metadata can omit concrete endpoint in some connectors.
   provider: z.string(),
   endpoint: z.string(),
 });

@@ -10,14 +10,14 @@ function hasText(value: unknown): boolean {
 export type RouteReadinessResult = {
   ready: boolean;
   reasonCode: string;
-  actionHint: 'none' | 'install-local-model' | 'switch-token-api' | 'select-model' | 'select-connector';
+  actionHint: 'none' | 'install-local-model' | 'switch-cloud' | 'select-model' | 'select-connector';
   message: string;
 };
 
 export type EmbeddingReadinessResult = {
   healthy: boolean;
   reasonCode: string;
-  actionHint: 'none' | 'install-local-model' | 'switch-token-api' | 'retry';
+  actionHint: 'none' | 'install-local-model' | 'switch-cloud' | 'retry';
   message: string;
 };
 
@@ -34,7 +34,7 @@ export function evaluateRouteBindingReadiness(
     };
   }
 
-  if (binding.source === 'local-runtime') {
+  if (binding.source === 'local') {
     if (!hasText(binding.model)) {
       return {
         ready: false,
@@ -43,7 +43,7 @@ export function evaluateRouteBindingReadiness(
         message: 'No local runtime model selected.',
       };
     }
-    const localModels = routeOptions?.localRuntime.models || [];
+    const localModels = routeOptions?.local.models || [];
     const matchedModel = localModels.find((item) => item.model === binding.model || item.localModelId === binding.localModelId) || null;
     if (!matchedModel) {
       return {

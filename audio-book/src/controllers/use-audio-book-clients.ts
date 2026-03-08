@@ -23,7 +23,7 @@ export function useRuntimeClient() {
 
 function toBinding(selection?: RouteSelection): RuntimeRouteBinding | undefined {
   if (!selection) return undefined;
-  const source = selection.routeSource === 'token-api' || selection.routeSource === 'local-runtime'
+  const source = selection.routeSource === 'cloud' || selection.routeSource === 'local'
     ? selection.routeSource
     : undefined;
   const connectorId = String(selection.connectorId || '').trim();
@@ -32,7 +32,7 @@ function toBinding(selection?: RouteSelection): RuntimeRouteBinding | undefined 
     return undefined;
   }
   return {
-    source: source || 'token-api',
+    source: source || 'cloud',
     connectorId,
     model,
   };

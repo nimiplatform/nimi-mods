@@ -53,8 +53,8 @@ const result = await aiClient.transcribeAudio({
   mimeType: meeting.audioMimeType,
   capability: 'audio.transcribe',
   binding: meeting.localOnly
-    ? { source: 'local-runtime', connectorId: '', model: '' }
-    : { source: 'token-api', connectorId: '', model: '' },
+    ? { source: 'local', connectorId: '', model: '' }
+    : { source: 'cloud', connectorId: '', model: '' },
 });
 ```
 
@@ -138,8 +138,8 @@ const transcribeStage: PipelineStage<AudioInput, TranscriptSegment[]> = {
       audioBase64: input.audioBase64,
       mimeType: input.mimeType,
       binding: ctx.localOnly
-        ? { source: 'local-runtime', connectorId: '', model: '' }
-        : { source: 'token-api', connectorId: '', model: '' },
+        ? { source: 'local', connectorId: '', model: '' }
+        : { source: 'cloud', connectorId: '', model: '' },
     });
   },
 };

@@ -141,7 +141,7 @@ version: 1.0.0
 |----------|-----------|
 | IndexedDB 而非 Runtime KnowledgeService | K-KNOW Phase 1 仅 in-memory + substring matching，KB 需要持久化向量存储 |
 | 浏览器端余弦相似度全扫描 | 文档量在 Desktop 场景下有限（<1000 docs），O(n) 扫描足够 |
-| Cloud-first embedding（auto 模式） | Token-api 质量更高；local-runtime 作为离线 fallback |
+| Cloud-first embedding（auto 模式） | Token-api 质量更高；local 作为离线 fallback |
 | Async generator RAG 管线 | 流式输出 + 进度回调，避免 UI 阻塞 |
 | Paragraph-based chunking（`\n\n` 分割） | 简单有效，保持语义完整性；未来可升级为 sentence-level |
 | Adapter pattern（ModRuntimeClient → LlmClient/EmbeddingClient） | 解耦 SDK 调用与业务逻辑，便于测试和路由切换 |

@@ -81,7 +81,7 @@ const enLocale = {
     title: 'AI Route',
     loading: 'Loading route options...',
     loadFailed: 'Failed to load route options.',
-    localRuntime: 'Local Runtime',
+    local: 'Local Runtime',
     tokenApi: 'Token API',
     selectModel: 'Select model',
     reset: 'Reset',
@@ -91,7 +91,7 @@ const enLocale = {
     noConnectorModels: 'No models available for this connector. Check connector settings.',
   },
   RouteStatus: {
-    localRuntime: 'Local Runtime',
+    local: 'Local Runtime',
     tokenApi: 'Token API',
     unavailable: 'Unavailable',
     routeSource: 'Route Source',

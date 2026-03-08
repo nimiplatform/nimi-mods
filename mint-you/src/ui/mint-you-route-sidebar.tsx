@@ -24,7 +24,7 @@ function toDefaultBinding(routeBinding: RuntimeRouteBinding | null, routeOptions
     return routeOptions.selected;
   }
   return {
-    source: 'local-runtime',
+    source: 'local',
     connectorId: '',
     model: '',
   };
@@ -46,15 +46,15 @@ export function MintYouRouteSidebar() {
   const activeSource = effectiveBinding.source;
 
   const connectors = routeOptions?.connectors || [];
-  const activeConnectorId = activeSource === 'token-api'
+  const activeConnectorId = activeSource === 'cloud'
     ? (effectiveBinding.connectorId || connectors[0]?.id || '')
     : '';
   const activeConnector = connectors.find((item) => item.id === activeConnectorId)
     || connectors[0]
     || null;
 
-  const modelOptionsRaw = activeSource === 'local-runtime'
-    ? (routeOptions?.localRuntime.models.map((item) => item.model) || [])
+  const modelOptionsRaw = activeSource === 'local'
+    ? (routeOptions?.local.models.map((item) => item.model) || [])
     : (activeConnector?.models || []);
   const modelOptions = useMemo(() => dedupeModelIds(modelOptionsRaw), [modelOptionsRaw]);
 
@@ -73,15 +73,15 @@ export function MintYouRouteSidebar() {
     if (!normalized) {
       return;
     }
-    const matchedLocalModel = routeOptions?.localRuntime.models.find((item) => item.model === normalized) || null;
-    const nextBinding: RuntimeRouteBinding = activeSource === 'token-api'
+    const matchedLocalModel = routeOptions?.local.models.find((item) => item.model === normalized) || null;
+    const nextBinding: RuntimeRouteBinding = activeSource === 'cloud'
       ? {
-        source: 'token-api',
+        source: 'cloud',
         connectorId: activeConnectorId,
         model: normalized,
       }
       : {
-        source: 'local-runtime',
+        source: 'local',
         connectorId: '',
         model: normalized,
         localModelId: matchedLocalModel?.localModelId,
@@ -92,19 +92,19 @@ export function MintYouRouteSidebar() {
 
   const handleSourceChange = (sourceRaw: string) => {
     const source = normalizeRuntimeRouteSource(sourceRaw);
-    if (source === 'token-api') {
+    if (source === 'cloud') {
       const fallbackConnector = connectors[0] || null;
       setRouteBinding({
-        source: 'token-api',
+        source: 'cloud',
         connectorId: fallbackConnector?.id || '',
         model: fallbackConnector?.models[0] || '',
       });
       return;
     }
 
-    const fallbackLocalModel = routeOptions?.localRuntime.models[0] || null;
+    const fallbackLocalModel = routeOptions?.local.models[0] || null;
     setRouteBinding({
-      source: 'local-runtime',
+      source: 'local',
       connectorId: '',
       model: fallbackLocalModel?.model || '',
       localModelId: fallbackLocalModel?.localModelId,
@@ -116,7 +116,7 @@ export function MintYouRouteSidebar() {
     const connector = connectors.find((item) => item.id === connectorId) || null;
     if (!connector) {
       setRouteBinding({
-        source: 'token-api',
+        source: 'cloud',
         connectorId,
         model: '',
       });
@@ -128,7 +128,7 @@ export function MintYouRouteSidebar() {
       : (connector.models[0] || '');
 
     setRouteBinding({
-      source: 'token-api',
+      source: 'cloud',
       connectorId,
       model,
     });
@@ -160,8 +160,8 @@ export function MintYouRouteSidebar() {
               disabled={!routeOptions}
               className="h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-900 disabled:bg-gray-100 disabled:text-gray-400"
             >
-              <option value="local-runtime">Local Runtime</option>
-              <option value="token-api">Token API</option>
+              <option value="local">Local Runtime</option>
+              <option value="cloud">Token API</option>
             </select>
           </div>
 
@@ -169,7 +169,7 @@ export function MintYouRouteSidebar() {
             <p className="mb-1 text-xs text-gray-500">{t('RouteSidebar.connector')}</p>
             <select
               value={activeConnectorId}
-              disabled={!routeOptions || activeSource !== 'token-api'}
+              disabled={!routeOptions || activeSource !== 'cloud'}
               onChange={(event) => handleConnectorChange(event.target.value)}
               className="h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-900 disabled:bg-gray-100 disabled:text-gray-400"
             >
@@ -180,7 +180,7 @@ export function MintYouRouteSidebar() {
                 </option>
               ))}
             </select>
-            {activeSource === 'token-api' && connectors.length === 0 ? (
+            {activeSource === 'cloud' && connectors.length === 0 ? (
               <p className="mt-1 text-[11px] text-amber-700">{t('RouteSidebar.noConnectors')}</p>
             ) : null}
           </div>

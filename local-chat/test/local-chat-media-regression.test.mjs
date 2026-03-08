@@ -11,12 +11,12 @@ import {
 } from './fixtures/media-regression-fixtures.mjs';
 
 function createResolvedRoute(input = {}) {
-  const routeSource = input.source === 'token-api' ? 'token-api' : 'local-runtime';
+  const routeSource = input.source === 'cloud' ? 'cloud' : 'local';
   return {
     source: routeSource,
-    ...(routeSource === 'token-api' ? { connectorId: String(input.connectorId || 'connector.media').trim() } : {}),
-    model: String(input.model || (routeSource === 'token-api' ? 'media-cloud-model' : 'media-local-model')).trim(),
-    provider: String(input.provider || (routeSource === 'token-api' ? 'openai-compatible' : 'localai')).trim(),
+    ...(routeSource === 'cloud' ? { connectorId: String(input.connectorId || 'connector.media').trim() } : {}),
+    model: String(input.model || (routeSource === 'cloud' ? 'media-cloud-model' : 'media-local-model')).trim(),
+    provider: String(input.provider || (routeSource === 'cloud' ? 'openai-compatible' : 'localai')).trim(),
     resolvedBy: 'preflight',
     resolvedAt: new Date().toISOString(),
     settingsRevision: 'regression-test',
@@ -48,9 +48,9 @@ function createDecisionAiClient(fixture) {
         traceId: `trace-${fixture.name}`,
         promptTraceId: `trace-${fixture.name}`,
         route: {
-          source: fixture.routeSource === 'token-api' ? 'token-api' : 'local-runtime',
-          connectorId: fixture.routeSource === 'token-api' ? 'connector.media' : undefined,
-          model: fixture.routeSource === 'token-api' ? 'planner-cloud-model' : 'planner-local-model',
+          source: fixture.routeSource === 'cloud' ? 'cloud' : 'local',
+          connectorId: fixture.routeSource === 'cloud' ? 'connector.media' : undefined,
+          model: fixture.routeSource === 'cloud' ? 'planner-cloud-model' : 'planner-local-model',
         },
       };
     },
@@ -63,10 +63,10 @@ function createDecisionAiClient(fixture) {
 function createDecisionSettings(fixture) {
   return {
     ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
-    imageRouteSource: fixture.routeSource === 'token-api' ? 'token-api' : 'local-runtime',
-    videoRouteSource: fixture.routeSource === 'token-api' ? 'token-api' : 'local-runtime',
-    imageConnectorId: fixture.routeSource === 'token-api' ? 'connector.media' : '',
-    videoConnectorId: fixture.routeSource === 'token-api' ? 'connector.media' : '',
+    imageRouteSource: fixture.routeSource === 'cloud' ? 'cloud' : 'local',
+    videoRouteSource: fixture.routeSource === 'cloud' ? 'cloud' : 'local',
+    imageConnectorId: fixture.routeSource === 'cloud' ? 'connector.media' : '',
+    videoConnectorId: fixture.routeSource === 'cloud' ? 'connector.media' : '',
   };
 }
 
@@ -86,7 +86,7 @@ function createResolvedPolicy(settings, fixture) {
     mediaPolicy: {
       autonomy: settings.mediaAutonomy,
       visualComfortLevel: settings.visualComfortLevel,
-      routeSource: fixture.routeSource === 'token-api' ? 'token-api' : 'local-runtime',
+      routeSource: fixture.routeSource === 'cloud' ? 'cloud' : 'local',
       nsfwPolicy: fixture.nsfwPolicy || 'disabled',
       allowVisualAuto: settings.mediaAutonomy === 'natural' && settings.visualComfortLevel !== 'text-only',
       allowAutoVisualHighRisk: false,
@@ -94,7 +94,7 @@ function createResolvedPolicy(settings, fixture) {
     contentBoundary: {
       relationshipBoundaryPreset: settings.relationshipBoundaryPreset,
       visualComfortLevel: settings.visualComfortLevel,
-      routeSource: fixture.routeSource === 'token-api' ? 'token-api' : 'local-runtime',
+      routeSource: fixture.routeSource === 'cloud' ? 'cloud' : 'local',
       relationshipState: 'new',
     },
     inspectFlags: {
@@ -122,7 +122,7 @@ for (const fixture of mediaDecisionRegressionCases) {
         : [],
       promptTrace: null,
       nsfwPolicy: fixture.nsfwPolicy || 'allowed',
-      fallbackRouteSource: fixture.routeSource === 'token-api' ? 'token-api' : 'local-runtime',
+      fallbackRouteSource: fixture.routeSource === 'cloud' ? 'cloud' : 'local',
       imageDependencySnapshot: fixture.imageDependencyStatus
         ? createMediaDependencySnapshot('image', fixture.imageDependencyStatus)
         : createMediaDependencySnapshot('image', 'ready'),

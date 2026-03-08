@@ -38,7 +38,7 @@ type UseLocalChatSpeechSettingsInput = {
 };
 
 type VoiceQueryOverride = {
-  routeSource?: 'auto' | 'local-runtime' | 'token-api';
+  routeSource?: 'auto' | 'local' | 'cloud';
   connectorId?: string;
   model?: string;
 };
@@ -121,7 +121,7 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
     const requestId = latestVoiceRequestRef.current + 1;
     latestVoiceRequestRef.current = requestId;
     const binding = (
-      voiceInput.routeSource === 'token-api' || voiceInput.routeSource === 'local-runtime'
+      voiceInput.routeSource === 'cloud' || voiceInput.routeSource === 'local'
     ) ? {
       source: voiceInput.routeSource,
       connectorId: voiceInput.connectorId || '',
@@ -329,7 +329,7 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
     }));
   }, [updateInspectSettings]);
 
-  const handleTtsRouteSourceChange = useCallback((value: 'auto' | 'local-runtime' | 'token-api') => {
+  const handleTtsRouteSourceChange = useCallback((value: 'auto' | 'local' | 'cloud') => {
     updateInspectSettings((previous) => ({
       ...previous,
       ttsRouteSource: value,
@@ -350,7 +350,7 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
     }));
   }, [updateInspectSettings]);
 
-  const handleSttRouteSourceChange = useCallback((value: 'auto' | 'local-runtime' | 'token-api') => {
+  const handleSttRouteSourceChange = useCallback((value: 'auto' | 'local' | 'cloud') => {
     updateInspectSettings((previous) => ({
       ...previous,
       sttRouteSource: value,
@@ -371,7 +371,7 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
     }));
   }, [updateInspectSettings]);
 
-  const handleImageRouteSourceChange = useCallback((value: 'auto' | 'local-runtime' | 'token-api') => {
+  const handleImageRouteSourceChange = useCallback((value: 'auto' | 'local' | 'cloud') => {
     updateInspectSettings((previous) => ({
       ...previous,
       imageRouteSource: value,
@@ -392,7 +392,7 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
     }));
   }, [updateInspectSettings]);
 
-  const handleVideoRouteSourceChange = useCallback((value: 'auto' | 'local-runtime' | 'token-api') => {
+  const handleVideoRouteSourceChange = useCallback((value: 'auto' | 'local' | 'cloud') => {
     updateInspectSettings((previous) => ({
       ...previous,
       videoRouteSource: value,

@@ -40,7 +40,7 @@ test('media planner returns parsed decision on valid JSON object', async () => {
           traceId: 'trace-media-planner-1',
           promptTraceId: 'trace-media-planner-1',
           route: {
-            source: 'local-runtime',
+            source: 'local',
             model: 'local-chat-model',
             localModelId: 'local-chat-model',
           },
@@ -65,7 +65,7 @@ test('media planner returns parsed decision on valid JSON object', async () => {
   if (result.status === 'ok') {
     assert.equal(result.decision.kind, 'image');
     assert.equal(result.decision.confidence, 0.91);
-    assert.equal(result.routeSource, 'local-runtime');
+    assert.equal(result.routeSource, 'local');
   }
 });
 
@@ -83,7 +83,7 @@ test('media planner silently reports failure on invalid JSON', async () => {
           traceId: 'trace-media-planner-bad',
           promptTraceId: 'trace-media-planner-bad',
           route: {
-            source: 'token-api',
+            source: 'cloud',
             connectorId: 'openai',
             model: 'gpt-5-mini',
           },

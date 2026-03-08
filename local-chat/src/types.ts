@@ -6,7 +6,7 @@ export type LocalChatMediaPlannerTrigger =
   | 'scene-enhancement'
   | 'none'
   | 'marker-override';
-export type LocalChatMediaRouteSource = 'local-runtime' | 'token-api';
+export type LocalChatMediaRouteSource = 'local' | 'cloud';
 export type LocalChatResolvedMediaRouteSource = LocalChatMediaRouteSource;
 export type LocalChatResolvedMediaRouteResolvedBy = 'resolved-default' | 'selected' | 'preflight';
 export type LocalChatMediaCacheStatus = 'none' | 'hit' | 'miss';
@@ -122,14 +122,14 @@ export type ChatMessageMeta = {
   intent?: string;
   scheduledDelayMs?: number;
   channelDecision?: 'text' | 'voice';
-  routeSource?: 'local-runtime' | 'token-api';
+  routeSource?: 'local' | 'cloud';
   routeModel?: string;
   audioUri?: string;
   audioBytes?: Uint8Array;
   audioMimeType?: string;
   streamId?: string;
   streamChunkCount?: number;
-  nsfwPolicy?: 'disabled' | 'local-runtime-only' | 'allowed';
+  nsfwPolicy?: 'disabled' | 'local-only' | 'allowed';
   segmentParseMode?: 'explicit-delimiter' | 'double-newline' | 'single-message';
   mediaType?: 'image' | 'video';
   mediaStatus?: 'pending' | 'ready' | 'failed' | 'blocked';

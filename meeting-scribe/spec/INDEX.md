@@ -6,7 +6,7 @@
 
 ## Overview
 
-Meeting Scribe 是一个 nimi-mod，提供 AI 会议转录与分析能力。核心流程：上传会议录音 → STT 转录（含说话人分离）→ 一次性生成结构化摘要（要点 + 决议 + 待办事项）。支持 token-api（云端 Gemini）和 local-only（本地 Whisper）两种路由模式。
+Meeting Scribe 是一个 nimi-mod，提供 AI 会议转录与分析能力。核心流程：上传会议录音 → STT 转录（含说话人分离）→ 一次性生成结构化摘要（要点 + 决议 + 待办事项）。支持 cloud（云端 Gemini）和 local-only（本地 Whisper）两种路由模式。
 
 ## Architecture
 

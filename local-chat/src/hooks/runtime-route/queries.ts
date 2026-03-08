@@ -76,7 +76,7 @@ export async function resolveRouteSnapshot(input: {
       source: resolved.source,
       provider: resolved.provider,
       model: resolved.model,
-      endpoint: resolved.source === 'local-runtime'
+      endpoint: resolved.source === 'local'
         ? (resolved.localProviderEndpoint || '-')
         : (resolved.localOpenAiEndpoint || '-'),
       connectorId: resolved.connectorId,

@@ -6,7 +6,7 @@ function asRouteBinding(value: Record<string, unknown> | undefined): RuntimeRout
     return undefined;
   }
   return {
-    source: String(value.source || '').trim() === 'token-api' ? 'token-api' : 'local-runtime',
+    source: String(value.source || '').trim() === 'cloud' ? 'cloud' : 'local',
     connectorId: String(value.connectorId || '').trim(),
     model: String(value.model || '').trim(),
     localModelId: String(value.localModelId || '').trim() || undefined,

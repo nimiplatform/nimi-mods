@@ -139,7 +139,7 @@ export function useSpeechPlayback(input: {
   enableVoice: boolean;
   defaultVoiceName: string;
   defaultVoiceId: string;
-  ttsRouteSource: 'auto' | 'local-runtime' | 'token-api';
+  ttsRouteSource: 'auto' | 'local' | 'cloud';
   selectedTargetId: string;
   selectedTarget: LocalChatTarget | null;
   synthesizeVoice: (text: string) => Promise<LocalChatAudioPlaybackSource>;

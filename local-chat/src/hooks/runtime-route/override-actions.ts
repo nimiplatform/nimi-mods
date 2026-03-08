@@ -22,7 +22,7 @@ export function resolveCommittedChatModelQuery(input: {
       nextModel: null,
     };
   }
-  if (input.source === 'token-api') {
+  if (input.source === 'cloud') {
     return {
       nextQuery: trimmedQuery,
       nextModel: trimmedQuery === activeModel ? null : trimmedQuery,
@@ -46,25 +46,25 @@ export function buildRouteBindingForSource(input: {
   options: RuntimeRouteOptionsSnapshot | null;
 }): RuntimeRouteBinding {
   const base = input.previous || input.options?.selected || {
-    source: 'local-runtime' as const,
+    source: 'local' as const,
     connectorId: '',
     model: '',
   };
   const firstLocalModel = resolveLocalRuntimeModelsForScenario({
-    models: input.options?.localRuntime.models || [],
+    models: input.options?.local.models || [],
     scenario: 'text.generate',
   })[0]
     || findLocalRuntimeModelForBinding({
-      models: input.options?.localRuntime.models || [],
+      models: input.options?.local.models || [],
       binding: {
         model: base.model,
         localModelId: base.localModelId,
         goRuntimeLocalModelId: base.goRuntimeLocalModelId,
       },
     });
-  if (input.source === 'local-runtime') {
+  if (input.source === 'local') {
     return {
-      source: 'local-runtime',
+      source: 'local',
       connectorId: '',
       model: firstLocalModel?.model || base.model || '',
       localModelId: firstLocalModel?.localModelId || base.localModelId,
@@ -75,7 +75,7 @@ export function buildRouteBindingForSource(input: {
   }
   const firstConnector = input.options?.connectors[0];
   return {
-    source: 'token-api',
+    source: 'cloud',
     connectorId: firstConnector?.id || base.connectorId || '',
     model: pickChatModelForConnector(firstConnector || null, base.model || ''),
     localModelId: undefined,
@@ -90,12 +90,12 @@ export function buildRouteBindingForConnector(input: {
 }): RuntimeRouteBinding {
   const connector = input.options?.connectors.find((item) => item.id === input.connectorId) || null;
   const base = input.previous || input.options?.selected || {
-    source: 'token-api' as const,
+    source: 'cloud' as const,
     connectorId: '',
     model: '',
   };
   return {
-    source: 'token-api',
+    source: 'cloud',
     connectorId: input.connectorId,
     model: pickChatModelForConnector(connector, base.model || ''),
   };
@@ -107,14 +107,14 @@ export function buildRouteBindingForModel(input: {
   options: RuntimeRouteOptionsSnapshot | null;
 }): RuntimeRouteBinding {
   const base = input.previous || input.options?.selected || {
-    source: 'local-runtime' as const,
+    source: 'local' as const,
     connectorId: '',
     model: '',
   };
-  if (base.source === 'local-runtime') {
+  if (base.source === 'local') {
     const matchedLocalModel = findLocalRuntimeModelForBinding({
       models: resolveLocalRuntimeModelsForScenario({
-        models: input.options?.localRuntime.models || [],
+        models: input.options?.local.models || [],
         scenario: 'chat',
       }),
       binding: {
@@ -123,7 +123,7 @@ export function buildRouteBindingForModel(input: {
       },
     });
     return {
-      source: 'local-runtime',
+      source: 'local',
       connectorId: '',
       model: input.model,
       ...(matchedLocalModel?.localModelId ? { localModelId: matchedLocalModel.localModelId } : {}),
@@ -133,7 +133,7 @@ export function buildRouteBindingForModel(input: {
     };
   }
   return {
-    source: 'token-api',
+    source: 'cloud',
     connectorId: base.connectorId,
     model: input.model,
     localModelId: undefined,

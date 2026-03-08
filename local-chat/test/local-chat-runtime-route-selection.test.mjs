@@ -14,7 +14,7 @@ import {
   hasPendingChatModelChange,
 } from '../src/components/sidebar/runtime-status-state.ts';
 
-test('token-api chat model selection stays valid when user picks a non-preferred but chat-capable model', () => {
+test('cloud chat model selection stays valid when user picks a non-preferred but chat-capable model', () => {
   const result = hasValidTokenApiChatModelSelection({
     model: 'models/gemini-3-flash-preview',
     models: [
@@ -32,7 +32,7 @@ test('token-api chat model selection stays valid when user picks a non-preferred
   assert.equal(result, true);
 });
 
-test('token-api chat model selection is rejected when the current model is no longer valid for chat', () => {
+test('cloud chat model selection is rejected when the current model is no longer valid for chat', () => {
   const result = hasValidTokenApiChatModelSelection({
     model: 'models/image-only',
     models: [
@@ -96,7 +96,7 @@ test('buildRouteBindingForModel refreshes local runtime metadata when user switc
   const result = buildRouteBindingForModel({
     model: 'chat-alt',
     previous: {
-      source: 'local-runtime',
+      source: 'local',
       connectorId: '',
       model: 'chat-default',
       localModelId: 'chat-default',
@@ -104,17 +104,17 @@ test('buildRouteBindingForModel refreshes local runtime metadata when user switc
     },
     options: {
       selected: {
-        source: 'local-runtime',
+        source: 'local',
         connectorId: '',
         model: 'chat-default',
       },
       resolvedDefault: {
-        source: 'local-runtime',
+        source: 'local',
         connectorId: '',
         model: 'chat-default',
       },
       connectors: [],
-      localRuntime: {
+      local: {
         models: [
           {
             localModelId: 'chat-default',
@@ -140,7 +140,7 @@ test('buildRouteBindingForModel refreshes local runtime metadata when user switc
   });
 
   assert.deepEqual(result, {
-    source: 'local-runtime',
+    source: 'local',
     connectorId: '',
     model: 'chat-alt',
     localModelId: 'chat-alt',
@@ -150,11 +150,11 @@ test('buildRouteBindingForModel refreshes local runtime metadata when user switc
   });
 });
 
-test('buildRouteOverrideForModel ignores non-active local runtime candidates', () => {
-  const result = buildRouteOverrideForModel({
+test('buildRouteBindingForModel ignores non-active local runtime candidates', () => {
+  const result = buildRouteBindingForModel({
     model: 'chat-installed',
     previous: {
-      source: 'local-runtime',
+      source: 'local',
       connectorId: '',
       model: 'chat-default',
       localModelId: 'chat-default',
@@ -164,17 +164,17 @@ test('buildRouteOverrideForModel ignores non-active local runtime candidates', (
     },
     options: {
       selected: {
-        source: 'local-runtime',
+        source: 'local',
         connectorId: '',
         model: 'chat-default',
       },
       resolvedDefault: {
-        source: 'local-runtime',
+        source: 'local',
         connectorId: '',
         model: 'chat-default',
       },
       connectors: [],
-      localRuntime: {
+      local: {
         models: [
           {
             localModelId: 'chat-default',
@@ -183,7 +183,7 @@ test('buildRouteOverrideForModel ignores non-active local runtime candidates', (
             status: 'active',
             goRuntimeLocalModelId: 'go-chat-default',
             goRuntimeStatus: 'active',
-            capabilities: ['llm.text.generate', 'llm.text.stream'],
+            capabilities: ['runtime.ai.text.generate', 'runtime.ai.text.stream'],
           },
           {
             localModelId: 'chat-installed',
@@ -192,7 +192,7 @@ test('buildRouteOverrideForModel ignores non-active local runtime candidates', (
             status: 'installed',
             goRuntimeLocalModelId: 'go-chat-installed',
             goRuntimeStatus: 'installed',
-            capabilities: ['llm.text.generate', 'llm.text.stream'],
+            capabilities: ['runtime.ai.text.generate', 'runtime.ai.text.stream'],
           },
         ],
       },
@@ -200,15 +200,15 @@ test('buildRouteOverrideForModel ignores non-active local runtime candidates', (
   });
 
   assert.deepEqual(result, {
-    source: 'local-runtime',
+    source: 'local',
     connectorId: '',
     model: 'chat-installed',
   });
 });
 
-test('token-api chat model query commits freeform model input on blur/enter', () => {
+test('cloud chat model query commits freeform model input on blur/enter', () => {
   const result = resolveCommittedChatModelQuery({
-    source: 'token-api',
+    source: 'cloud',
     query: 'gemini-3-flash-preview',
     activeModel: 'gemini-2.5-flash',
     availableModels: ['gemini-2.5-flash'],
@@ -220,9 +220,9 @@ test('token-api chat model query commits freeform model input on blur/enter', ()
   });
 });
 
-test('local-runtime chat model query reverts invalid freeform input', () => {
+test('local chat model query reverts invalid freeform input', () => {
   const result = resolveCommittedChatModelQuery({
-    source: 'local-runtime',
+    source: 'local',
     query: 'gemini-3-flash-preview',
     activeModel: 'chat-default',
     availableModels: ['chat-default', 'chat-alt'],
@@ -237,14 +237,14 @@ test('local-runtime chat model query reverts invalid freeform input', () => {
 test('runtime status prefers resolved runtime snapshot for effective route label', () => {
   const result = formatRouteSnapshotLabel({
     snapshot: {
-      source: 'token-api',
+      source: 'cloud',
       provider: 'google-gemini',
       model: 'gemini-3-flash-preview',
       endpoint: 'https://example.test',
       connectorId: 'connector-a',
     },
     fallbackBinding: {
-      source: 'token-api',
+      source: 'cloud',
       connectorId: 'connector-a',
       model: 'gemini-2.5-flash',
     },
@@ -257,7 +257,7 @@ test('runtime status prefers resolved runtime snapshot for effective route label
     ],
   });
 
-  assert.equal(result, 'Token API · API Connector · gemini-3-flash-preview');
+  assert.equal(result, 'Cloud · API Connector · gemini-3-flash-preview');
 });
 
 test('runtime status detects pending chat model edits', () => {

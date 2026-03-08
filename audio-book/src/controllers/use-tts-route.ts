@@ -16,7 +16,7 @@ import type { ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 
 export type RouteSelection = {
   connectorId: string;
-  routeSource: 'auto' | 'local-runtime' | 'token-api';
+  routeSource: 'auto' | 'local' | 'cloud';
   model?: string;
 };
 
@@ -59,7 +59,7 @@ function loadPersisted(key: string): RouteSelection {
       const persistedModel = String(parsed.model || '').trim();
       return {
         connectorId: String(parsed.connectorId || ''),
-        routeSource: parsed.routeSource === 'token-api' ? 'token-api' : parsed.routeSource === 'local-runtime' ? 'local-runtime' : 'auto',
+        routeSource: parsed.routeSource === 'cloud' ? 'cloud' : parsed.routeSource === 'local' ? 'local' : 'auto',
         model: persistedModel && !isPlaceholderModel(persistedModel) ? persistedModel : undefined,
       };
     }
@@ -115,9 +115,9 @@ async function resolveRouteBinding(
       capability,
       binding: selection
         ? {
-          source: selection.routeSource === 'token-api' || selection.routeSource === 'local-runtime'
+          source: selection.routeSource === 'cloud' || selection.routeSource === 'local'
             ? selection.routeSource
-            : 'token-api',
+            : 'cloud',
           connectorId: String(selection.connectorId || '').trim(),
           model: String(selection.model || '').trim(),
         }
@@ -304,7 +304,7 @@ function resolveSelection(
       : '';
     const next: RouteSelection = {
       connectorId: persisted.connectorId,
-      routeSource: 'token-api',
+      routeSource: 'cloud',
       model: preferredPersistedModel || modelPicker(connectors, persisted.connectorId, fallback.model || ''),
     };
     persist(storageKey, next);
@@ -317,7 +317,7 @@ function resolveSelection(
       : modelPicker(connectors, fallback.connectorId, fallback.model || '');
     const next: RouteSelection = {
       connectorId: fallback.connectorId,
-      routeSource: 'token-api',
+      routeSource: 'cloud',
       model: nextModel || undefined,
     };
     persist(storageKey, next);
@@ -331,7 +331,7 @@ function resolveSelection(
     const nextModel = modelPicker(connectors, first, fallback.model || '');
     const selection: RouteSelection = {
       connectorId: first,
-      routeSource: 'token-api',
+      routeSource: 'cloud',
       model: nextModel || undefined,
     };
     persist(storageKey, selection);
@@ -340,7 +340,7 @@ function resolveSelection(
   if (fallback.connectorId) {
     const selection: RouteSelection = {
       connectorId: fallback.connectorId,
-      routeSource: 'token-api',
+      routeSource: 'cloud',
       model: fallback.model || undefined,
     };
     persist(storageKey, selection);
@@ -521,7 +521,7 @@ export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
   ]);
 
   useEffect(() => {
-    if (!ttsSelection.connectorId || ttsSelection.routeSource !== 'token-api') return;
+    if (!ttsSelection.connectorId || ttsSelection.routeSource !== 'cloud') return;
     let cancelled = false;
 
     async function syncSelectedTtsModel() {
@@ -558,7 +558,7 @@ export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
       : undefined;
     const selection: RouteSelection = {
       connectorId,
-      routeSource: connectorId ? 'token-api' : 'auto',
+      routeSource: connectorId ? 'cloud' : 'auto',
       model: connectorId ? nextModel : undefined,
     };
     setChatSelection(selection);
@@ -588,7 +588,7 @@ export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
       : undefined;
     const selection: RouteSelection = {
       connectorId,
-      routeSource: connectorId ? 'token-api' : 'auto',
+      routeSource: connectorId ? 'cloud' : 'auto',
       model: connectorId ? nextModel : undefined,
     };
     setTtsSelection(selection);

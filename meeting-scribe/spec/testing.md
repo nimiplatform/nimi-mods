@@ -39,7 +39,7 @@ test script (TypeScript, node:test)
 
 **文件**: `test/smoke/stt-transcribe.test.ts`
 
-**目的**: 验证音频文件能通过 Gemini token-api 成功转录。
+**目的**: 验证音频文件能通过 Gemini cloud 成功转录。
 
 **运行方式**:
 ```bash
@@ -67,7 +67,7 @@ runtime.media.stt.transcribe({
   audio: { kind: 'bytes', bytes: audioBuffer },
   mimeType: 'audio/wav',
   diarization: true,       // 请求说话人分离
-  route: 'token-api',
+  route: 'cloud',
   fallback: 'deny',
 });
 ```
@@ -107,7 +107,7 @@ runtime.ai.text.generate({
   input: transcriptText,
   maxTokens: 2048,
   temperature: 0.3,
-  route: 'token-api',
+  route: 'cloud',
   fallback: 'deny',
 });
 ```

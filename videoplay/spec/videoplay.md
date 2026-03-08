@@ -36,7 +36,7 @@
 
 - `VID-010`: Segmentation is deterministic under same input and policy.
 - `VID-011`: Edit compose forbids timeline overlap and enforces AV drift threshold.
-- `VID-012`: Fallback from local-runtime to token-api must be auditable.
+- `VID-012`: Fallback from local to cloud must be auditable.
 - `VID-013`: Same idempotency key replay cannot duplicate side effects.
 - `VID-014`: Release package minimum set is mandatory for publish readiness.
 - `VID-015`: Continuity rules are capability contracts and cannot be hard-bound to one UI component.

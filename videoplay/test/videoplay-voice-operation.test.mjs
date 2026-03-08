@@ -97,7 +97,7 @@ test('generate-voice-line hard rejects route fallback and records audit details'
       runtimeClient: {
         route: {
           resolve: async ({ binding }) => ({
-            source: binding?.source || 'local-runtime',
+            source: binding?.source || 'local',
             connectorId: binding?.connectorId || '',
             model: binding?.model || '',
             provider: 'provider-main',
@@ -117,7 +117,7 @@ test('generate-voice-line hard rejects route fallback and records audit details'
       },
       aiClient: {
         checkRouteHealth: async ({ binding }) => {
-          if (binding?.source === 'local-runtime') {
+          if (binding?.source === 'local') {
             return { status: 'unhealthy', reasonCode: 'RUNTIME_ROUTE_DOWN' };
           }
           return { status: 'healthy', reasonCode: 'RUNTIME_ROUTE_HEALTHY' };
@@ -139,8 +139,8 @@ test('generate-voice-line hard rejects route fallback and records audit details'
     (error) => {
       assert.equal(error?.reasonCode, VIDEOPLAY_REASON.ROUTE_UNAVAILABLE);
       assert.equal(error?.details?.fallbackAudit?.traceId, 'trace-voice-op-1');
-      assert.equal(error?.details?.fallbackAudit?.from, 'local-runtime');
-      assert.equal(error?.details?.fallbackAudit?.to, 'token-api');
+      assert.equal(error?.details?.fallbackAudit?.from, 'local');
+      assert.equal(error?.details?.fallbackAudit?.to, 'cloud');
       return true;
     },
   );

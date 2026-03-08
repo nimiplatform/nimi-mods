@@ -171,7 +171,7 @@ runtime with `NIMI_RUNTIME_CLOUD_*` env vars.
 Mode A: `NIMI_PROVIDER_TYPE` is missing or the provider requires an explicit endpoint.
 
 ### "AI_ROUTE_FALLBACK_DENIED"
-Model ID prefix doesn't match token-api route. Use a `cloud/` or provider-prefixed model ID
+Model ID prefix doesn't match cloud route. Use a `cloud/` or provider-prefixed model ID
 (e.g., `dashscope/qwen-plus`, `openai/gpt-4o`).
 
 ### No runtime logs for desktop Token API

@@ -87,7 +87,7 @@ const zhLocale = {
     title: 'AI 路由',
     loading: '加载路由选项中...',
     loadFailed: '路由选项加载失败。',
-    localRuntime: '本地 Runtime',
+    local: '本地 Runtime',
     tokenApi: 'Token API',
     selectModel: '选择模型',
     reset: '重置',
@@ -97,7 +97,7 @@ const zhLocale = {
     noConnectorModels: '该连接器暂无可用模型，请检查连接器配置。',
   },
   RouteStatus: {
-    localRuntime: '本地运行时',
+    local: '本地运行时',
     tokenApi: 'Token API',
     unavailable: '不可用',
     routeSource: '当前路由',

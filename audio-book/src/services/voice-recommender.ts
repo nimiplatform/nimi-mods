@@ -121,7 +121,7 @@ export async function recommendAllVoices(
   tts: TtsClient,
   characters: CharacterProfile[],
   options?: {
-    binding?: { source: 'local-runtime' | 'token-api'; connectorId: string; model: string };
+    binding?: { source: 'local' | 'cloud'; connectorId: string; model: string };
     model?: string;
   },
 ): Promise<VoiceCasting[]> {

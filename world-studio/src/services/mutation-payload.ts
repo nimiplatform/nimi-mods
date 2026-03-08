@@ -32,8 +32,8 @@ export function persistWorldStudioRouteBindingMap(
 
 export function formatRouteBindingSummary(binding: RuntimeRouteBinding | null): string {
   if (!binding) return 'runtime default';
-  if (binding.source === 'local-runtime') {
-    return `local-runtime / ${binding.model || '-'}`;
+  if (binding.source === 'local') {
+    return `local / ${binding.model || '-'}`;
   }
-  return `token-api / ${binding.connectorId || '-'} / ${binding.model || '-'}`;
+  return `cloud / ${binding.connectorId || '-'} / ${binding.model || '-'}`;
 }

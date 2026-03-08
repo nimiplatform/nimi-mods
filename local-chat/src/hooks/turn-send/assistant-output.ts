@@ -22,7 +22,7 @@ export function buildAssistantTurnOutput(input: {
   streamDeltaCount: number;
   streamDurationMs: number;
   segmentParseMode: SegmentParseMode;
-  nsfwPolicy: 'disabled' | 'local-runtime-only' | 'allowed';
+  nsfwPolicy: 'disabled' | 'local-only' | 'allowed';
   plannerUsed?: boolean;
   plannerKind?: 'none' | 'image' | 'video';
   plannerTrigger?: 'user-explicit' | 'assistant-offer' | 'scene-enhancement' | 'none' | 'marker-override';
@@ -35,7 +35,7 @@ export function buildAssistantTurnOutput(input: {
   mediaDecisionSource?: 'tag' | 'explicit' | 'planner' | 'none';
   mediaDecisionKind?: 'none' | 'image' | 'video';
   mediaExecutionStatus?: 'none' | 'blocked' | 'pending' | 'ready' | 'failed';
-  mediaExecutionRouteSource?: 'local-runtime' | 'token-api' | null;
+  mediaExecutionRouteSource?: 'local' | 'cloud' | null;
   mediaExecutionRouteModel?: string | null;
   mediaExecutionReason?: string | null;
 }) {
@@ -46,7 +46,7 @@ export function buildAssistantTurnOutput(input: {
     autoPlayVoiceReplies: input.autoPlayVoiceReplies,
     planId,
   });
-  const routeSource = input.routeSnapshot?.source === 'token-api' ? 'token-api' : 'local-runtime';
+  const routeSource = input.routeSnapshot?.source === 'cloud' ? 'cloud' : 'local';
   const routeModel = String(input.routeSnapshot?.model || input.routeBinding?.model || input.chatRouteOptions?.selected.model || '').trim();
   assistantOutput.deliveries.forEach((delivery) => {
     delivery.meta = {

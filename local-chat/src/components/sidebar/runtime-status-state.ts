@@ -2,8 +2,8 @@ import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot, RuntimeRouteSour
 import type { ChatRouteSnapshot } from '../../hooks/runtime-route/types.js';
 
 export function sourceLabel(source: RuntimeRouteSource | 'mixed' | 'unknown'): string {
-  if (source === 'token-api') return 'Token API';
-  if (source === 'local-runtime') return 'Local Runtime';
+  if (source === 'cloud') return 'Cloud';
+  if (source === 'local') return 'Local';
   if (source === 'mixed') return 'Mixed';
   return 'Unknown';
 }
@@ -25,7 +25,7 @@ export function formatRouteBindingLabel(input: {
   const binding = input.binding;
   if (!binding) return '-';
   const routeSourceLabel = sourceLabel(binding.source);
-  if (binding.source === 'token-api') {
+  if (binding.source === 'cloud') {
     const connector = input.connectors.find((item) => item.id === binding.connectorId) || null;
     const connectorLabel = String(connector?.label || binding.connectorId || '').trim() || '-';
     const model = String(binding.model || '').trim() || '-';
@@ -46,10 +46,10 @@ export function formatRouteSnapshotLabel(input: {
       connectors: input.connectors,
     });
   }
-  const normalizedSource = input.snapshot.source === 'token-api'
-    ? 'token-api'
-    : 'local-runtime';
-  if (normalizedSource === 'token-api') {
+  const normalizedSource = input.snapshot.source === 'cloud'
+    ? 'cloud'
+    : 'local';
+  if (normalizedSource === 'cloud') {
     const connectorId = String(input.snapshot.connectorId || input.fallbackBinding?.connectorId || '').trim();
     const connector = input.connectors.find((item) => item.id === connectorId) || null;
     const connectorLabel = String(connector?.label || connectorId || '').trim() || '-';

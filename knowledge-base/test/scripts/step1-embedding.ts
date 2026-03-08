@@ -25,7 +25,7 @@
 //
 // Prerequisites:
 //   1. Start nimi runtime:  cd runtime && go run ./cmd/nimi
-//   2. Ensure the embedding model is available via token-api
+//   2. Ensure the embedding model is available via cloud
 // ---------------------------------------------------------------------------
 
 import { readFileSync } from 'node:fs';

@@ -92,7 +92,7 @@ function createPersistRecord() {
       traceId: 'trace-1',
       promptTraceId: 'prompt-1',
       route: {
-        source: 'token-api',
+        source: 'cloud',
         connectorId: 'connector-main',
         model: 'gpt-4.1-mini',
         provider: 'openai',

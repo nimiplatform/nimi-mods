@@ -133,7 +133,7 @@ export function createReadyMediaMessage(input: {
   shadow?: LocalChatMediaArtifactShadow;
   cacheStatus?: 'hit' | 'miss';
   executionCacheKey?: string;
-  nsfwPolicy: 'disabled' | 'local-runtime-only' | 'allowed';
+  nsfwPolicy: 'disabled' | 'local-only' | 'allowed';
 }): ChatMessage {
   return {
     id: input.intent.pendingMessageId,

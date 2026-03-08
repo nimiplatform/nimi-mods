@@ -138,8 +138,8 @@ async function submitAndCollect(runtime: Runtime, request: Record<string, unknow
 
 function createRuntimeHost(runtime: Runtime, fixture: ReturnType<typeof loadGoldFixture>): ModRuntimeHost {
   const resolveBinding = (capability: string, binding?: { source?: string; model?: string; connectorId?: string }) => {
-    const source = binding?.source === 'local-runtime' ? 'local-runtime' : 'token-api';
-    const defaultModel = source === 'token-api'
+    const source = binding?.source === 'local' ? 'local' : 'cloud';
+    const defaultModel = source === 'cloud'
       ? toTokenApiModelID(fixture.model_id)
       : String(fixture.model_id || '').trim();
     return {
@@ -172,7 +172,7 @@ function createRuntimeHost(runtime: Runtime, fixture: ReturnType<typeof loadGold
       listOptions: async ({ capability }) => ({
         connectors: [],
         selected: {
-          source: 'token-api',
+          source: 'cloud',
           connectorId: '',
           model: toTokenApiModelID(fixture.model_id),
         },
@@ -259,7 +259,7 @@ function createRuntimeHost(runtime: Runtime, fixture: ReturnType<typeof loadGold
             head: {
               appId: runtime.appId,
               modelId: request.model || resolved.model,
-              routePolicy: resolved.source === 'local-runtime' ? 1 : 2,
+              routePolicy: resolved.source === 'local' ? 1 : 2,
               fallback: 1,
               timeoutMs: 180_000,
               connectorId: '',
@@ -373,7 +373,7 @@ async function main(): Promise<void> {
     resolvedProvider: fixture.provider,
     resolvedModel: fixture.model_id,
     resolvedTargetModel: fixture.target_model_id || undefined,
-    routePolicy: 'token-api',
+    routePolicy: 'cloud',
     fallbackPolicy: 'deny',
   };
 

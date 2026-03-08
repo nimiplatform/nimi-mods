@@ -115,7 +115,7 @@ function resolveConfiguredMediaRouteSource(input: {
   const configured = input.kind === 'image'
     ? input.settings.imageRouteSource
     : input.settings.videoRouteSource;
-  if (configured === 'local-runtime' || configured === 'token-api') {
+  if (configured === 'local' || configured === 'cloud') {
     return configured;
   }
   return input.fallbackRouteSource;
@@ -292,8 +292,8 @@ function buildMediaGateBlockedMessage(input: {
   if (input.nsfwPolicy === 'disabled') {
     return `已拦截本次${noun}发送：当前未开启 NSFW 媒体。`;
   }
-  if (input.nsfwPolicy === 'local-runtime-only' && input.routeSource !== 'local-runtime') {
-    return `已拦截本次${noun}发送：NSFW 仅允许本地路由。请切到“本地运行时”后重试。`;
+  if (input.nsfwPolicy === 'local-only' && input.routeSource !== 'local') {
+    return `已拦截本次${noun}发送：NSFW 仅允许本地路由。请切到“本地”后重试。`;
   }
   return `已拦截本次${noun}发送：当前 NSFW 策略不允许该请求。`;
 }
@@ -520,7 +520,7 @@ async function resolveAuthorityMediaRoute(input: {
   }
   const connectorId = String(routeConfig.routeBinding?.connectorId || '').trim();
   const model = String(routeConfig.model || routeConfig.routeBinding?.model || '').trim()
-    || (routeSource === 'local-runtime' ? 'selected-local-model' : 'selected-token-model');
+    || (routeSource === 'local' ? 'selected-local-model' : 'selected-token-model');
   return {
     routeSource,
     resolvedRoute: {

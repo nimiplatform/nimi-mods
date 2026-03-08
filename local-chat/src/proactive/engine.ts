@@ -253,7 +253,7 @@ export async function runLocalChatProactiveHeartbeatCycle(
         interactionSnapshot: prepared.contextPacket.interactionSnapshot || null,
         settings,
         requestedVoiceConversationMode: voiceConversationMode,
-        routeSource: prepared.invokeInput.routeBinding?.source || 'local-runtime',
+        routeSource: prepared.invokeInput.routeBinding?.source || 'local',
       });
       const effectiveVoiceConversationMode = resolvedExperiencePolicy.voicePolicy.conversationMode;
       const proactiveDirective = '请自然地主动联系用户，像刚刚想起对方一样发起问候，不要解释理由。';
@@ -355,7 +355,7 @@ export async function runLocalChatProactiveHeartbeatCycle(
       const rawMediaDecision = await decideMediaExecution({
         aiClient: input.aiClient,
         turnTxnId: turnId,
-        routeOverride: null,
+        routeBinding: null,
         defaultSettings: settings,
         resolvedPolicy: resolvedExperiencePolicy,
         userText: '',
@@ -365,7 +365,7 @@ export async function runLocalChatProactiveHeartbeatCycle(
         messages: toChatMessagesFromSession(session),
         promptTrace: latestPromptTrace,
         nsfwPolicy,
-        fallbackRouteSource: prepared.invokeInput.routeBinding?.source === 'token-api' ? 'token-api' : 'local-runtime',
+        fallbackRouteSource: prepared.invokeInput.routeBinding?.source === 'cloud' ? 'cloud' : 'local',
         imageRouteOptions: null,
         videoRouteOptions: null,
         imageRouteOptionsRevision: 0,
@@ -474,7 +474,7 @@ export async function runLocalChatProactiveHeartbeatCycle(
               aiClient: input.aiClient,
               defaultSettings: settings,
               nsfwPolicy,
-              fallbackRouteSource: prepared.invokeInput.routeBinding?.source === 'token-api' ? 'token-api' : 'local-runtime',
+              fallbackRouteSource: prepared.invokeInput.routeBinding?.source === 'cloud' ? 'cloud' : 'local',
               sessionId: session.id,
               targetId: target.id,
               viewerId: session.viewerId,

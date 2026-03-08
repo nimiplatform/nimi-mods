@@ -75,7 +75,7 @@ function createProvider(callerId: string) {
   return createNimiAiProvider({
     runtime,
     appId: APP_ID,
-    routePolicy: 'token-api',
+    routePolicy: 'cloud',
     fallback: 'deny',
     timeoutMs: 300_000,
     metadata: buildMetadata(),

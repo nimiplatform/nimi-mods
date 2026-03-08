@@ -7,7 +7,7 @@ test('media generation result can be soft-cancelled by caller context change', a
 
   const task = runImageTurn({
     aiClient: {
-      resolveRoute: async () => ({ source: 'local-runtime', model: 'z-image-turbo' }),
+      resolveRoute: async () => ({ source: 'local', model: 'z-image-turbo' }),
       generateImage: async () => {
         await new Promise((resolve) => {
           setTimeout(resolve, 8);
@@ -15,7 +15,7 @@ test('media generation result can be soft-cancelled by caller context change', a
         return {
           images: [{ uri: 'data:image/png;base64,ZmFrZQ==', mimeType: 'image/png' }],
           traceId: 'trace-soft-cancel',
-          route: { source: 'local-runtime', model: 'z-image-turbo' },
+          route: { source: 'local', model: 'z-image-turbo' },
         };
       },
     },
@@ -44,7 +44,7 @@ test('media generation result can be soft-cancelled by caller context change', a
       videoConnectorId: '',
       videoModel: '',
     },
-    fallbackRouteSource: 'local-runtime',
+    fallbackRouteSource: 'local',
   });
 
   activeContextKey = 'ctx-b';
@@ -59,11 +59,11 @@ test('media generation result is accepted when context key stays unchanged', asy
 
   const result = await runImageTurn({
     aiClient: {
-      resolveRoute: async () => ({ source: 'local-runtime', model: 'z-image-turbo', localModelId: 'z-image-turbo' }),
+      resolveRoute: async () => ({ source: 'local', model: 'z-image-turbo', localModelId: 'z-image-turbo' }),
       generateImage: async () => ({
         images: [{ uri: 'data:image/png;base64,ZmFrZQ==', mimeType: 'image/png' }],
         traceId: 'trace-happy-path',
-        route: { source: 'local-runtime', model: 'z-image-turbo', localModelId: 'z-image-turbo' },
+        route: { source: 'local', model: 'z-image-turbo', localModelId: 'z-image-turbo' },
       }),
     },
     prompt: 'sample prompt',
@@ -91,7 +91,7 @@ test('media generation result is accepted when context key stays unchanged', asy
       videoConnectorId: '',
       videoModel: '',
     },
-    fallbackRouteSource: 'local-runtime',
+    fallbackRouteSource: 'local',
   });
 
   const accepted = activeContextKey === 'ctx-a' ? result : null;

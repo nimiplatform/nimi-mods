@@ -47,7 +47,7 @@ export function ChatRoutePanel(props: Props) {
     onClearRouteBinding,
   } = props;
   const hasPendingModelChange = String(chatModelQuery || '').trim() !== String(activeChatModel || '').trim();
-  const showEmptyLocalRuntimeCta = activeChatSource === 'local-runtime' && chatModelOptions.length === 0;
+  const showEmptyLocalCta = activeChatSource === 'local' && chatModelOptions.length === 0;
   const commitChatModelQuery = (query: string) => {
     const resolved = resolveCommittedChatModelQuery({
       source: activeChatSource,
@@ -84,8 +84,8 @@ export function ChatRoutePanel(props: Props) {
                 onChange={(event) => onRouteSourceChange(normalizeRuntimeRouteSource(event.target.value))}
                 className="h-8 w-full rounded-xl border border-gray-200 bg-white px-2 text-xs text-gray-900"
               >
-                <option value="local-runtime">Local Runtime</option>
-                <option value="token-api">Token API</option>
+                <option value="local">{t('MediaRoute.local')}</option>
+                <option value="cloud">{t('MediaRoute.cloud')}</option>
               </select>
             </div>
 
@@ -93,7 +93,7 @@ export function ChatRoutePanel(props: Props) {
               <p className="mb-1 text-gray-500">{t('ChatRoute.connector')}</p>
               <select
                 value={activeChatConnectorId}
-                disabled={activeChatSource !== 'token-api'}
+                disabled={activeChatSource !== 'cloud'}
                 onChange={(event) => onRouteConnectorChange(event.target.value)}
                 className="h-8 w-full rounded-xl border border-gray-200 bg-white px-2 text-xs text-gray-900 disabled:bg-gray-100 disabled:text-gray-400"
               >
@@ -148,9 +148,9 @@ export function ChatRoutePanel(props: Props) {
               ) : null}
             </div>
 
-            {showEmptyLocalRuntimeCta ? (
+            {showEmptyLocalCta ? (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 space-y-2">
-                <p className="text-[11px] text-amber-800">{t('ChatRoute.emptyLocalRuntimeHint')}</p>
+                <p className="text-[11px] text-amber-800">{t('ChatRoute.emptyLocalHint')}</p>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -162,9 +162,9 @@ export function ChatRoutePanel(props: Props) {
                   <button
                     type="button"
                     className="lc-btn lc-btn-warning h-7 px-2 text-[11px] font-medium"
-                    onClick={() => onRouteSourceChange('token-api')}
+                    onClick={() => onRouteSourceChange('cloud')}
                   >
-                    {t('ChatRoute.switchToTokenApi')}
+                    {t('ChatRoute.switchToCloud')}
                   </button>
                 </div>
               </div>

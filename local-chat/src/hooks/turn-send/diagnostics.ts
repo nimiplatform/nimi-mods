@@ -23,7 +23,7 @@ type BuildPromptTraceInput = {
   streamDeltaCount: number;
   streamDurationMs: number;
   segmentParseMode: SegmentParseMode;
-  nsfwPolicy: 'disabled' | 'local-runtime-only' | 'allowed';
+  nsfwPolicy: 'disabled' | 'local-only' | 'allowed';
   plannerUsed: boolean;
   plannerKind: 'none' | 'image' | 'video';
   plannerTrigger: 'user-explicit' | 'assistant-offer' | 'scene-enhancement' | 'none' | 'marker-override';
@@ -36,7 +36,7 @@ type BuildPromptTraceInput = {
   mediaDecisionSource: 'tag' | 'explicit' | 'planner' | 'none';
   mediaDecisionKind: 'none' | 'image' | 'video';
   mediaExecutionStatus: 'none' | 'blocked' | 'pending' | 'ready' | 'failed';
-  mediaExecutionRouteSource: 'local-runtime' | 'token-api' | null;
+  mediaExecutionRouteSource: 'local' | 'cloud' | null;
   mediaExecutionRouteModel: string | null;
   mediaExecutionReason: string | null;
 };

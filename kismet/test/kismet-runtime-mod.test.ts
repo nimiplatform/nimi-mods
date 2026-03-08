@@ -43,11 +43,11 @@ function createSdkRuntimeContext() {
       listOptions: async () => ({
         selected: null,
         resolvedDefault: null,
-        localRuntime: { models: [] },
+        local: { models: [] },
         connectors: [],
       }),
       resolve: async () => ({
-        source: 'token-api',
+        source: 'cloud',
         connectorId: 'connector-1',
         provider: 'openai',
         model: 'gpt-4o-mini',

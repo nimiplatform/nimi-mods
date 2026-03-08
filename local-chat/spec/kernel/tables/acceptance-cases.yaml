@@ -50,7 +50,7 @@ cases:
     test_reference: local-chat-turn-stream-lifecycle.test.mjs
     source_rule: LC-ACC-002
   - id: LC-010-NSFW-POLICY-GUARDRAIL
-    description: NSFW policy defaults to disabled and only resolves to allowed on local-runtime when explicitly enabled.
+    description: NSFW policy defaults to disabled and only resolves to allowed on local when explicitly enabled.
     expected_ok: true
     reason_code: LOCAL_CHAT_NSFW_POLICY_GUARDRAIL_OK
     test_reference: local-chat-nsfw-policy.test.mjs

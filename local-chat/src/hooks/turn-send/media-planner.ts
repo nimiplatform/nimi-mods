@@ -34,7 +34,7 @@ export type MediaPlannerResult =
       status: 'ok';
       decision: MediaPlannerDecision;
       traceId: string;
-      routeSource: 'local-runtime' | 'token-api';
+      routeSource: 'local' | 'cloud';
       routeModel?: string;
     }
   | {
@@ -274,7 +274,7 @@ export async function planMediaTurn(input: {
         nsfwIntent: decision.nsfwIntent,
       },
       traceId: String(result.traceId || '').trim(),
-      routeSource: result.route.source === 'token-api' ? 'token-api' : 'local-runtime',
+      routeSource: result.route.source === 'cloud' ? 'cloud' : 'local',
       routeModel: String(result.route.model || '').trim() || undefined,
     };
   } catch (error) {

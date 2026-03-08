@@ -23,11 +23,11 @@ export function WorldStudioRouteConfigCard(props: {
   effectiveFineRouteSummary: string;
   routeConfigReady: boolean;
   routeConfigReasonCode: string;
-  routeConfigActionHint: 'none' | 'install-local-model' | 'switch-token-api' | 'select-model' | 'select-connector';
+  routeConfigActionHint: 'none' | 'install-local-model' | 'switch-cloud' | 'select-model' | 'select-connector';
   embeddingReadiness: {
     healthy: boolean;
     reasonCode: string;
-    actionHint: 'none' | 'install-local-model' | 'switch-token-api' | 'retry';
+    actionHint: 'none' | 'install-local-model' | 'switch-cloud' | 'retry';
     message: string;
   };
   embeddingIndexStatus: 'idle' | 'building' | 'ready' | 'failed';

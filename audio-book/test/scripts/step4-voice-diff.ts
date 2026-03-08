@@ -98,7 +98,7 @@ async function synthesizeOne(
     speed: 1.0,
     pitch: 0,
     emotion: '',
-    route: 'token-api',
+    route: 'cloud',
     fallback: 'deny',
     timeoutMs: 60_000,
     metadata,

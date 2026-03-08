@@ -271,7 +271,7 @@ export async function runLocalChatTurnSend(input: {
       interactionSnapshot: prepared.contextPacket.interactionSnapshot || null,
       settings: context.defaultSettings,
       requestedVoiceConversationMode: voiceConversationMode,
-      routeSource: prepared.invokeInput.routeBinding?.source || context.routeSnapshot?.source || 'local-runtime',
+      routeSource: prepared.invokeInput.routeBinding?.source || context.routeSnapshot?.source || 'local',
     });
     const effectiveVoiceConversationMode = resolvedExperiencePolicy.voicePolicy.conversationMode;
     const plan = await composeInteractionTurnPlan({
@@ -406,7 +406,7 @@ export async function runLocalChatTurnSend(input: {
     const rawMediaDecision = await decideMediaExecution({
       aiClient: context.aiClient,
       turnTxnId,
-      routeOverride: routeBinding,
+      routeBinding,
       defaultSettings: context.defaultSettings,
       resolvedPolicy: resolvedExperiencePolicy,
       userText: text,
@@ -416,7 +416,7 @@ export async function runLocalChatTurnSend(input: {
       messages: [...context.messages, userMessage],
       promptTrace: latestPromptTrace,
       nsfwPolicy,
-      fallbackRouteSource: prepared.invokeInput.routeBinding?.source === 'token-api' ? 'token-api' : 'local-runtime',
+      fallbackRouteSource: prepared.invokeInput.routeBinding?.source === 'cloud' ? 'cloud' : 'local',
       imageRouteOptions: context.imageRouteOptions || null,
       videoRouteOptions: context.videoRouteOptions || null,
       imageRouteOptionsRevision: context.imageRouteOptionsRevision,
@@ -541,7 +541,7 @@ export async function runLocalChatTurnSend(input: {
             aiClient: context.aiClient,
             defaultSettings: context.defaultSettings,
             nsfwPolicy,
-            fallbackRouteSource: prepared.invokeInput.routeBinding?.source === 'token-api' ? 'token-api' : 'local-runtime',
+            fallbackRouteSource: prepared.invokeInput.routeBinding?.source === 'cloud' ? 'cloud' : 'local',
             sessionId,
             targetId: selectedTarget.id,
             viewerId: context.viewerId,

@@ -23,17 +23,17 @@ export function useWorldStudioRouteBindingActions(input: {
     const source = normalizeRuntimeRouteSource(sourceInput);
     input.setRouteBindingMap((previous) => {
       const current = previous[profile];
-      const firstLocalModel = input.routeOptions?.localRuntime.models[0] || null;
+      const firstLocalModel = input.routeOptions?.local.models[0] || null;
       const base = current || input.routeOptions?.selected || {
-        source: 'local-runtime' as const,
+        source: 'local' as const,
         connectorId: '',
         model: '',
       };
-      if (source === 'local-runtime') {
+      if (source === 'local') {
         return {
           ...previous,
           [profile]: {
-            source: 'local-runtime',
+            source: 'local',
             connectorId: '',
             model: firstLocalModel?.model || base.model || '',
             localModelId: firstLocalModel?.localModelId || base.localModelId,
@@ -45,7 +45,7 @@ export function useWorldStudioRouteBindingActions(input: {
       return {
         ...previous,
         [profile]: {
-          source: 'token-api',
+          source: 'cloud',
           connectorId: firstConnector?.id || base.connectorId || '',
           model: firstConnector?.models[0] || base.model || '',
           localModelId: undefined,
@@ -59,14 +59,14 @@ export function useWorldStudioRouteBindingActions(input: {
     input.setRouteBindingMap((previous) => {
       const connector = input.routeOptions?.connectors.find((item) => item.id === connectorId) || null;
       const base = previous[profile] || input.routeOptions?.selected || {
-        source: 'token-api' as const,
+        source: 'cloud' as const,
         connectorId: '',
         model: '',
       };
       return {
         ...previous,
         [profile]: {
-          source: 'token-api',
+          source: 'cloud',
           connectorId,
           model: connector?.models[0] || base.model || '',
         },
@@ -77,7 +77,7 @@ export function useWorldStudioRouteBindingActions(input: {
   const onRouteModelChange = useCallback((profile: RouteStage, model: string) => {
     input.setRouteBindingMap((previous) => {
       const base = previous[profile] || input.routeOptions?.selected || {
-        source: 'local-runtime' as const,
+        source: 'local' as const,
         connectorId: '',
         model: '',
       };

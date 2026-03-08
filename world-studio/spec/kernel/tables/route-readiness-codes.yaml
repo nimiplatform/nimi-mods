@@ -8,32 +8,32 @@ route_readiness:
   - reason_code: WORLD_STUDIO_LOCAL_MODEL_MISSING
     ready: false
     action_hint: install-local-model
-    binding_source: local-runtime
+    binding_source: local
     source_rule: WS-ROUTE-002
   - reason_code: WORLD_STUDIO_LOCAL_MODEL_UNAVAILABLE
     ready: false
     action_hint: install-local-model
-    binding_source: local-runtime
+    binding_source: local
     source_rule: WS-ROUTE-002
   - reason_code: WORLD_STUDIO_LOCAL_MODEL_UNHEALTHY
     ready: false
     action_hint: install-local-model
-    binding_source: local-runtime
+    binding_source: local
     source_rule: WS-ROUTE-002
   - reason_code: WORLD_STUDIO_TOKEN_ROUTE_INCOMPLETE
     ready: false
     action_hint: select-connector
-    binding_source: token-api
+    binding_source: cloud
     source_rule: WS-ROUTE-002
   - reason_code: WORLD_STUDIO_CONNECTOR_MISSING
     ready: false
     action_hint: select-connector
-    binding_source: token-api
+    binding_source: cloud
     source_rule: WS-ROUTE-002
   - reason_code: WORLD_STUDIO_TOKEN_MODEL_UNAVAILABLE
     ready: false
     action_hint: select-model
-    binding_source: token-api
+    binding_source: cloud
     source_rule: WS-ROUTE-002
   - reason_code: WORLD_STUDIO_ROUTE_READY
     ready: true

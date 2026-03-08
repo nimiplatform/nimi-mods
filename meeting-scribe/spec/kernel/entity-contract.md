@@ -29,7 +29,7 @@
 - `index` 从 0 开始，表示在完整转录中的顺序。
 - `startMs` / `endMs` 为相对于音频起始点的毫秒时间戳。
 - `speaker` 为说话人标签：
-  - Gemini token-api 模式：由 STT 自动标注（如 `"Speaker 1"`, `"Speaker 2"`）。
+  - Gemini cloud 模式：由 STT 自动标注（如 `"Speaker 1"`, `"Speaker 2"`）。
   - Local-only 模式（Whisper）：固定为 `"Unknown"`（无说话人分离能力）。
   - 用户可手动编辑说话人标签（映射为真实姓名）。
 - `text` 为该片段的转录文本，不可为空。

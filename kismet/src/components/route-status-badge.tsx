@@ -9,14 +9,14 @@ export function RouteStatusBadge({ source }: RouteStatusBadgeProps) {
   const { t } = useTranslation('kismet');
 
   const colorMap: Record<RouteSourceDisplay, string> = {
-    'local-runtime': '#526B5D',
-    'token-api': '#3A4B59',
+    'local': '#526B5D',
+    'cloud': '#3A4B59',
     unavailable: '#8C857B',
   };
 
   const labelMap: Record<RouteSourceDisplay, string> = {
-    'local-runtime': t('RouteStatus.localRuntime'),
-    'token-api': t('RouteStatus.tokenApi'),
+    'local': t('RouteStatus.local'),
+    'cloud': t('RouteStatus.tokenApi'),
     unavailable: t('RouteStatus.unavailable'),
   };
 

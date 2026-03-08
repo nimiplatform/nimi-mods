@@ -34,8 +34,8 @@
 const result = await aiClient.generateObject({
   capability: 'text.generate',
   binding: meeting.localOnly
-    ? { source: 'local-runtime', connectorId: '', model: '' }
-    : { source: 'token-api', connectorId: '', model: '' },
+    ? { source: 'local', connectorId: '', model: '' }
+    : { source: 'cloud', connectorId: '', model: '' },
   systemPrompt: buildSystemPrompt(meeting.language),
   prompt: buildAnalysisPrompt(meeting.transcript),
   schema: MeetingSummarySchema,
@@ -149,8 +149,8 @@ const analyzeStage: PipelineStage<TranscriptSegment[], MeetingSummary> = {
     const transcript = formatTranscriptForAnalysis(segments);
     return ctx.runtimeClient.ai.text.generate({
       binding: ctx.localOnly
-        ? { source: 'local-runtime', connectorId: '', model: '' }
-        : { source: 'token-api', connectorId: '', model: '' },
+        ? { source: 'local', connectorId: '', model: '' }
+        : { source: 'cloud', connectorId: '', model: '' },
       systemPrompt: buildSystemPrompt(ctx.language),
       prompt: transcript,
     });

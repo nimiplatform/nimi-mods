@@ -40,12 +40,12 @@ const CHEVRON_ICON = (
   </svg>
 );
 
-function localRuntimeMediaModels(
+function localMediaModels(
   options: RuntimeStatusSidebarProps['imageRouteOptions'] | RuntimeStatusSidebarProps['videoRouteOptions'],
   scenario: 'image.generate' | 'video.generate',
 ): string[] {
   const models = resolveLocalRuntimeModelsForScenario({
-    models: options?.localRuntime.models || [],
+    models: options?.local.models || [],
     scenario,
   })
     .map((item) => String(item.model || item.localModelId || '').trim())
@@ -75,8 +75,8 @@ function formatResolvedRouteLabel(input: {
 }): string {
   const route = input.route;
   if (!route) return '';
-  if (route.source === 'local-runtime') {
-    return String(route.model || '').trim() || 'Local Runtime';
+  if (route.source === 'local') {
+    return String(route.model || '').trim() || 'Local';
   }
   const allConnectors = [
     ...(Array.isArray(input.imageConnectors) ? input.imageConnectors : []),
@@ -85,7 +85,7 @@ function formatResolvedRouteLabel(input: {
   const connector = allConnectors.find((item) => item.id === route.connectorId) || null;
   const connectorLabel = String(connector?.label || route.connectorId || '').trim();
   const model = String(route.model || '').trim();
-  return [connectorLabel, model].filter(Boolean).join(' · ') || 'Token API';
+  return [connectorLabel, model].filter(Boolean).join(' · ') || 'Cloud';
 }
 
 export function MediaRoutePanel(props: Props) {
@@ -101,17 +101,17 @@ export function MediaRoutePanel(props: Props) {
     scenario: 'video.generate',
   }), [props.videoConnectors, props.videoConnectorId]);
   const imageLocalModels = useMemo(
-    () => localRuntimeMediaModels(props.imageRouteOptions, 'image.generate'),
+    () => localMediaModels(props.imageRouteOptions, 'image.generate'),
     [props.imageRouteOptions],
   );
   const videoLocalModels = useMemo(
-    () => localRuntimeMediaModels(props.videoRouteOptions, 'video.generate'),
+    () => localMediaModels(props.videoRouteOptions, 'video.generate'),
     [props.videoRouteOptions],
   );
-  const imageModelOptions = props.imageRouteSource === 'token-api' ? imageConnectorModels : imageLocalModels;
-  const videoModelOptions = props.videoRouteSource === 'token-api' ? videoConnectorModels : videoLocalModels;
-  const imageConnectorMissing = props.imageRouteSource === 'token-api' && !String(props.imageConnectorId || '').trim();
-  const videoConnectorMissing = props.videoRouteSource === 'token-api' && !String(props.videoConnectorId || '').trim();
+  const imageModelOptions = props.imageRouteSource === 'cloud' ? imageConnectorModels : imageLocalModels;
+  const videoModelOptions = props.videoRouteSource === 'cloud' ? videoConnectorModels : videoLocalModels;
+  const imageConnectorMissing = props.imageRouteSource === 'cloud' && !String(props.imageConnectorId || '').trim();
+  const videoConnectorMissing = props.videoRouteSource === 'cloud' && !String(props.videoConnectorId || '').trim();
   const fullyAutoWithoutOverrides = (
     props.imageRouteSource === 'auto'
     && props.videoRouteSource === 'auto'
@@ -137,21 +137,21 @@ export function MediaRoutePanel(props: Props) {
     videoConnectors: props.videoConnectors,
   }), [props.imageConnectors, props.videoConnectors, props.videoResolvedRoute]);
   const buildRouteStatusText = (input: {
-    routeSource: 'auto' | 'local-runtime' | 'token-api';
+    routeSource: 'auto' | 'local' | 'cloud';
     loading: boolean;
     resolvedRoute: RuntimeStatusSidebarProps['imageResolvedRoute'] | RuntimeStatusSidebarProps['videoResolvedRoute'];
     resolvedLabel: string;
   }): string => {
     if (input.routeSource !== 'auto') {
-      return `${t('MediaRoute.manualRoutePrefix')}: ${input.routeSource === 'local-runtime' ? t('MediaRoute.localRuntime') : t('MediaRoute.tokenApi')}`;
+      return `${t('MediaRoute.manualRoutePrefix')}: ${input.routeSource === 'local' ? t('MediaRoute.local') : t('MediaRoute.cloud')}`;
     }
     if (input.loading) {
       return t('MediaRoute.routeCheckingHint');
     }
     if (input.resolvedRoute) {
-      const routeSourceLabel = input.resolvedRoute.source === 'local-runtime'
-        ? t('MediaRoute.localRuntime')
-        : t('MediaRoute.tokenApi');
+      const routeSourceLabel = input.resolvedRoute.source === 'local'
+        ? t('MediaRoute.local')
+        : t('MediaRoute.cloud');
       return `${t('MediaRoute.autoResolvedPrefix')}: ${routeSourceLabel}${input.resolvedLabel ? ` · ${input.resolvedLabel}` : ''}`;
     }
     return t('MediaRoute.autoUnresolvedHint');
@@ -199,16 +199,16 @@ export function MediaRoutePanel(props: Props) {
             </p>
             <select
               value={props.imageRouteSource}
-              onChange={(event) => props.onImageRouteSourceChange(event.target.value as 'auto' | 'local-runtime' | 'token-api')}
+              onChange={(event) => props.onImageRouteSourceChange(event.target.value as 'auto' | 'local' | 'cloud')}
               className="h-8 w-full rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-900"
             >
               <option value="auto">{t('MediaRoute.auto')}</option>
-              <option value="local-runtime">{t('MediaRoute.localRuntime')}</option>
-              <option value="token-api">{t('MediaRoute.tokenApi')}</option>
+              <option value="local">{t('MediaRoute.local')}</option>
+              <option value="cloud">{t('MediaRoute.cloud')}</option>
             </select>
             <select
               value={props.imageConnectorId}
-              disabled={props.imageRouteSource !== 'token-api'}
+              disabled={props.imageRouteSource !== 'cloud'}
               onChange={(event) => props.onImageConnectorChange(event.target.value)}
               className="h-8 w-full rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-900 disabled:bg-gray-100 disabled:text-gray-400"
             >
@@ -243,16 +243,16 @@ export function MediaRoutePanel(props: Props) {
             </p>
             <select
               value={props.videoRouteSource}
-              onChange={(event) => props.onVideoRouteSourceChange(event.target.value as 'auto' | 'local-runtime' | 'token-api')}
+              onChange={(event) => props.onVideoRouteSourceChange(event.target.value as 'auto' | 'local' | 'cloud')}
               className="h-8 w-full rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-900"
             >
               <option value="auto">{t('MediaRoute.auto')}</option>
-              <option value="local-runtime">{t('MediaRoute.localRuntime')}</option>
-              <option value="token-api">{t('MediaRoute.tokenApi')}</option>
+              <option value="local">{t('MediaRoute.local')}</option>
+              <option value="cloud">{t('MediaRoute.cloud')}</option>
             </select>
             <select
               value={props.videoConnectorId}
-              disabled={props.videoRouteSource !== 'token-api'}
+              disabled={props.videoRouteSource !== 'cloud'}
               onChange={(event) => props.onVideoConnectorChange(event.target.value)}
               className="h-8 w-full rounded-lg border border-gray-200 bg-white px-2 text-xs text-gray-900 disabled:bg-gray-100 disabled:text-gray-400"
             >

@@ -29,16 +29,16 @@ function createRuntimeRouteClient() {
     listOptions: async () => ({
       capability: 'text.generate',
       selected: {
-        source: 'token-api',
+        source: 'cloud',
         connectorId: '01KJPF2VWTYXQ0Y40Q3Y3EAHF0',
         model: 'models/gemini-3-flash-preview',
       },
       resolvedDefault: {
-        source: 'token-api',
+        source: 'cloud',
         connectorId: '01KJPF2VWTYXQ0Y40Q3Y3EAHF0',
         model: 'models/gemini-3-flash-preview',
       },
-      localRuntime: {
+      local: {
         models: [],
         defaultEndpoint: 'http://127.0.0.1:8080/v1',
       },
@@ -59,7 +59,7 @@ function createRuntimeTextClient() {
       text: '开场风雷已起，韩立立于余烬之上，下一步由你决断。',
       promptTraceId: makeId('prompt'),
       route: {
-        source: 'token-api',
+        source: 'cloud',
         connectorId: '01KJPF2VWTYXQ0Y40Q3Y3EAHF0',
         model: 'models/gemini-3-flash-preview',
         provider: 'openai-compatible',
@@ -128,7 +128,7 @@ async function main() {
         },
       },
       binding: {
-        source: 'token-api',
+        source: 'cloud',
         connectorId: '01KJPF2VWTYXQ0Y40Q3Y3EAHF0',
         model: 'models/gemini-3-flash-preview',
       },

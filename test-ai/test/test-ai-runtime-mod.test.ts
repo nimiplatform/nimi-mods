@@ -40,13 +40,13 @@ function createSdkRuntimeContext() {
     }),
     route: {
       listOptions: async () => ({
-        selected: { source: 'token-api', connectorId: '', model: '' },
+        selected: { source: 'cloud', connectorId: '', model: '' },
         resolvedDefault: null,
-        localRuntime: { models: [] },
+        local: { models: [] },
         connectors: [],
       }),
       resolve: async () => ({
-        source: 'token-api',
+        source: 'cloud',
         connectorId: 'connector-1',
         provider: 'openai',
         model: 'gpt-4o-mini',
@@ -58,7 +58,7 @@ function createSdkRuntimeContext() {
         status: 'healthy',
       }),
     },
-    localRuntime: {
+    local: {
       listArtifacts: async () => [],
     },
     ai: {
@@ -250,7 +250,7 @@ test('test-ai runtime client exposes embed, stt, video api surfaces', async () =
     assert.equal(typeof client.media.tts.listVoices, 'function', 'media.tts.listVoices must be a function');
     assert.equal(typeof client.media.image.generate, 'function', 'media.image.generate must be a function');
     assert.equal(typeof client.media.jobs.submit, 'function', 'media.jobs.submit must be a function');
-    assert.equal(typeof client.localRuntime.listArtifacts, 'function', 'localRuntime.listArtifacts must be a function');
+    assert.equal(typeof client.local.listArtifacts, 'function', 'local.listArtifacts must be a function');
   } finally {
     restoreHost();
   }

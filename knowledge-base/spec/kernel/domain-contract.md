@@ -68,6 +68,6 @@
 
 - **分块参数**：`chunkSize`（128-2048 tokens）、`chunkOverlap`（0-256 tokens，必须小于 chunkSize）。
 - **检索参数**：`topK`（1-20）、`similarityThreshold`（0.0-1.0）、`maxContextChunks`。
-- **路由参数**：`chatRouteSource`/`embeddingRouteSource`（`auto`|`local-runtime`|`token-api`），配套 `connectorId` 和 `model` 字段。
+- **路由参数**：`chatRouteSource`/`embeddingRouteSource`（`auto`|`local`|`cloud`），配套 `connectorId` 和 `model` 字段。
 - `queryRewritingEnabled` 控制多轮 query rewriting 开关。
 - 修改分块参数不影响已处理文档；需用户显式重新导入。

@@ -66,7 +66,7 @@ test('step2 prompt includes governance priorities and mandatory self-review rule
         routeOptions: {
           capability: 'text.generate',
           selected: {
-            source: 'token-api',
+            source: 'cloud',
             model: 'models/gemini-3-flash-preview',
             connectorId: 'connector-1',
           },

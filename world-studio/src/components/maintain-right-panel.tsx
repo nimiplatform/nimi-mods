@@ -47,8 +47,8 @@ export function MaintainRightPanel(props: {
   routeConnectors: RuntimeRouteConnectorOption[];
   routeConfigReady: boolean;
   routeConfigReasonCode: string;
-  routeConfigActionHint: 'none' | 'install-local-model' | 'switch-token-api' | 'select-model' | 'select-connector';
-  embeddingReadiness: { healthy: boolean; reasonCode: string; actionHint: 'none' | 'install-local-model' | 'switch-token-api' | 'retry'; message: string };
+  routeConfigActionHint: 'none' | 'install-local-model' | 'switch-cloud' | 'select-model' | 'select-connector';
+  embeddingReadiness: { healthy: boolean; reasonCode: string; actionHint: 'none' | 'install-local-model' | 'switch-cloud' | 'retry'; message: string };
   embeddingIndexStatus: 'idle' | 'building' | 'ready' | 'failed';
   embeddingEntryCount: number;
   embeddingIndexLastBuiltAt: string | null;

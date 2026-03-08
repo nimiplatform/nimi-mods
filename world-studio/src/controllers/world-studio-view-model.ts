@@ -125,13 +125,13 @@ export type WorldStudioShellRoutingInput = {
   onRebuildEmbeddingIndex: () => Promise<void>;
   routeConfigReady: boolean;
   routeConfigReasonCode: string;
-  routeConfigActionHint: 'none' | 'install-local-model' | 'switch-token-api' | 'select-model' | 'select-connector';
+  routeConfigActionHint: 'none' | 'install-local-model' | 'switch-cloud' | 'select-model' | 'select-connector';
   coarseRouteReadiness: { ready: boolean; reasonCode: string; actionHint: string; message: string };
   fineRouteReadiness: { ready: boolean; reasonCode: string; actionHint: string; message: string };
   embeddingReadiness: {
     healthy: boolean;
     reasonCode: string;
-    actionHint: 'none' | 'install-local-model' | 'switch-token-api' | 'retry';
+    actionHint: 'none' | 'install-local-model' | 'switch-cloud' | 'retry';
     message: string;
   };
   embeddingIndexStatus: 'idle' | 'building' | 'ready' | 'failed';

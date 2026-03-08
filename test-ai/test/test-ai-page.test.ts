@@ -21,7 +21,7 @@ test('image generate request omits responseFormat in auto mode', () => {
     size: '1024x1024',
     responseFormatMode: 'auto',
     binding: {
-      source: 'token-api',
+      source: 'cloud',
       connectorId: 'connector-dashscope',
       provider: 'dashscope',
       model: 'wan2.6-t2i',
@@ -114,12 +114,12 @@ test('route model picker exposes connector catalog models for dashscope image ge
   const snapshot = {
     capability: 'image.generate' as const,
     selected: {
-      source: 'token-api' as const,
+      source: 'cloud' as const,
       connectorId: 'connector-dashscope',
       provider: 'dashscope',
       model: 'wan2.6-t2i',
     },
-    localRuntime: {
+    local: {
       models: [],
     },
     connectors: [{
@@ -146,16 +146,16 @@ test('route model picker exposes connector catalog models for dashscope image ge
   ]);
 });
 
-test('manual token-api model override preserves connector provider', () => {
+test('manual cloud model override preserves connector provider', () => {
   const snapshot = {
     capability: 'image.generate' as const,
     selected: {
-      source: 'token-api' as const,
+      source: 'cloud' as const,
       connectorId: 'connector-dashscope',
       provider: 'dashscope',
       model: 'wan2.6-t2i',
     },
-    localRuntime: {
+    local: {
       models: [],
     },
     connectors: [{
@@ -169,18 +169,18 @@ test('manual token-api model override preserves connector provider', () => {
   const nextBinding = bindingForModel(snapshot, 'qwen-image-2.0-pro', snapshot.selected);
 
   assert.deepEqual(nextBinding, {
-    source: 'token-api',
+    source: 'cloud',
     connectorId: 'connector-dashscope',
     provider: 'dashscope',
     model: 'qwen-image-2.0-pro',
   });
 });
 
-test('local-runtime model selection preserves adapter and go runtime metadata', () => {
+test('local model selection preserves adapter and go runtime metadata', () => {
   const snapshot = {
     capability: 'image.generate' as const,
     selected: {
-      source: 'local-runtime' as const,
+      source: 'local' as const,
       connectorId: '',
       provider: 'localai',
       model: 'z-image-turbo-Q8_0',
@@ -191,7 +191,7 @@ test('local-runtime model selection preserves adapter and go runtime metadata', 
       goRuntimeLocalModelId: '01JTESTLOCALAIMODEL',
       goRuntimeStatus: 'active',
     },
-    localRuntime: {
+    local: {
       models: [{
         localModelId: 'file:local-import-z-image-turbo-q8-0',
         label: 'z-image-turbo-Q8_0',
@@ -213,7 +213,7 @@ test('local-runtime model selection preserves adapter and go runtime metadata', 
   const nextBinding = bindingForModel(snapshot, 'z-image-turbo-Q8_0', snapshot.selected);
 
   assert.deepEqual(nextBinding, {
-    source: 'local-runtime',
+    source: 'local',
     connectorId: '',
     model: 'z-image-turbo-Q8_0',
     modelId: 'z-image-turbo-Q8_0',
@@ -227,11 +227,11 @@ test('local-runtime model selection preserves adapter and go runtime metadata', 
   });
 });
 
-test('route model picker normalizes local-runtime selector model ids', () => {
+test('route model picker normalizes local selector model ids', () => {
   const snapshot = {
     capability: 'image.generate' as const,
     selected: {
-      source: 'local-runtime' as const,
+      source: 'local' as const,
       connectorId: '',
       provider: 'localai',
       model: 'z-image-turbo-Q8_0',
@@ -240,7 +240,7 @@ test('route model picker normalizes local-runtime selector model ids', () => {
       engine: 'localai',
       adapter: 'localai_native_adapter',
     },
-    localRuntime: {
+    local: {
       models: [{
         localModelId: 'file:local-import-z-image-turbo-q8-0',
         label: 'z-image-turbo-Q8_0',
@@ -257,7 +257,7 @@ test('route model picker normalizes local-runtime selector model ids', () => {
   };
 
   const state = resolveRouteModelPickerState(snapshot, {
-    source: 'local-runtime',
+    source: 'local',
     connectorId: '',
     provider: 'localai',
     model: 'localai/z-image-turbo-Q8_0',

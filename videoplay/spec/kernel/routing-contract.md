@@ -4,7 +4,7 @@
 
 ## V-ROUTE-001 Route Sources
 
-Preferred route source is `local-runtime`, fallback is `token-api`.
+Preferred route source is `local`, fallback is `cloud`.
 
 ## V-ROUTE-002 Stage Capability Mapping
 

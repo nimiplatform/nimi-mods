@@ -85,10 +85,10 @@ export type KBSettings = {
   chunkOverlap: number;
   topK: number;
   similarityThreshold: number;
-  chatRouteSource: 'auto' | 'local-runtime' | 'token-api';
+  chatRouteSource: 'auto' | 'local' | 'cloud';
   chatConnectorId: string;
   chatModel: string;
-  embeddingRouteSource: 'auto' | 'local-runtime' | 'token-api';
+  embeddingRouteSource: 'auto' | 'local' | 'cloud';
   embeddingConnectorId: string;
   embeddingModel: string;
   maxContextChunks: number;
@@ -98,7 +98,7 @@ export type KBSettings = {
 export type KBAiTrace = {
   traceId?: string;
   modelResolved?: string;
-  routeDecision?: 'local-runtime' | 'token-api' | string;
+  routeDecision?: 'local' | 'cloud' | string;
 };
 
 export const DEFAULT_KB_SETTINGS: KBSettings = {
@@ -150,7 +150,7 @@ export type EmbeddingClient = {
 };
 
 export type KBRoutePreference = {
-  source: 'auto' | 'local-runtime' | 'token-api';
+  source: 'auto' | 'local' | 'cloud';
   connectorId: string;
   model: string;
 };

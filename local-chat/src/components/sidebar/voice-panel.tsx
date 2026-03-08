@@ -10,10 +10,10 @@ type Props = {
   embedded?: boolean;
   enableVoice: boolean;
   selectedVoiceId: string;
-  ttsRouteSource: 'auto' | 'local-runtime' | 'token-api';
+  ttsRouteSource: 'auto' | 'local' | 'cloud';
   ttsConnectorId: string;
   ttsModel: string;
-  sttRouteSource: 'auto' | 'local-runtime' | 'token-api';
+  sttRouteSource: 'auto' | 'local' | 'cloud';
   sttConnectorId: string;
   sttModel: string;
   ttsConnectors: Array<{ id: string; label: string; models: string[]; modelCapabilities?: Record<string, string[]> }>;
@@ -22,10 +22,10 @@ type Props = {
   localSttRouteAvailable: boolean;
   speechVoices: Array<{ id: string; name: string }>;
   onVoiceIdChange: (voiceId: string) => void;
-  onTtsRouteSourceChange: (source: 'auto' | 'local-runtime' | 'token-api') => void;
+  onTtsRouteSourceChange: (source: 'auto' | 'local' | 'cloud') => void;
   onTtsConnectorChange: (connectorId: string) => void;
   onTtsModelChange: (model: string) => void;
-  onSttRouteSourceChange: (source: 'auto' | 'local-runtime' | 'token-api') => void;
+  onSttRouteSourceChange: (source: 'auto' | 'local' | 'cloud') => void;
   onSttConnectorChange: (connectorId: string) => void;
   onSttModelChange: (model: string) => void;
 };
@@ -135,21 +135,21 @@ export function VoicePanel(props: Props) {
                 value={ttsRouteSource}
                 disabled={!enableVoice}
                 onChange={(event) => onTtsRouteSourceChange(
-                  event.target.value === 'local-runtime'
-                    ? 'local-runtime'
-                    : event.target.value === 'token-api'
-                      ? 'token-api'
+                  event.target.value === 'local'
+                    ? 'local'
+                    : event.target.value === 'cloud'
+                      ? 'cloud'
                       : 'auto',
                 )}
                 className={selectClassName}
               >
                 <option value="auto">{t('VoicePanel.routeAuto')}</option>
-                <option value="local-runtime">Local Runtime</option>
-                <option value="token-api">Token API</option>
+                <option value="local">{t('MediaRoute.local')}</option>
+                <option value="cloud">{t('MediaRoute.cloud')}</option>
               </select>
             </div>
 
-            {ttsRouteSource === 'token-api' ? (
+            {ttsRouteSource === 'cloud' ? (
               <>
                 <div>
                   <p className="mb-1 text-gray-500">{t('VoicePanel.ttsConnector')}</p>
@@ -206,21 +206,21 @@ export function VoicePanel(props: Props) {
                 value={sttRouteSource}
                 disabled={!enableVoice}
                 onChange={(event) => onSttRouteSourceChange(
-                  event.target.value === 'local-runtime'
-                    ? 'local-runtime'
-                    : event.target.value === 'token-api'
-                      ? 'token-api'
+                  event.target.value === 'local'
+                    ? 'local'
+                    : event.target.value === 'cloud'
+                      ? 'cloud'
                       : 'auto',
                 )}
                 className={selectClassName}
               >
                 <option value="auto">{t('VoicePanel.routeAuto')}</option>
-                <option value="local-runtime">Local Runtime</option>
-                <option value="token-api">Token API</option>
+                <option value="local">{t('MediaRoute.local')}</option>
+                <option value="cloud">{t('MediaRoute.cloud')}</option>
               </select>
             </div>
 
-            {sttRouteSource === 'token-api' ? (
+            {sttRouteSource === 'cloud' ? (
               <>
                 <div>
                   <p className="mb-1 text-gray-500">{t('VoicePanel.sttConnector')}</p>
@@ -291,7 +291,7 @@ export function VoicePanel(props: Props) {
             </div>
 
             {/* ── Warnings ── */}
-            {ttsRouteSource === 'local-runtime' && !localTtsRouteAvailable ? (
+            {ttsRouteSource === 'local' && !localTtsRouteAvailable ? (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 space-y-2">
                 <p className="text-[11px] text-amber-800">{t('VoicePanel.noLocalTtsRoute')}</p>
                 <div className="flex gap-2">
@@ -305,15 +305,15 @@ export function VoicePanel(props: Props) {
                   <button
                     type="button"
                     className="lc-btn lc-btn-warning h-7 px-2 text-[11px] font-medium"
-                    onClick={() => onTtsRouteSourceChange('token-api')}
+                    onClick={() => onTtsRouteSourceChange('cloud')}
                   >
-                    {t('VoicePanel.useTokenApi')}
+                    {t('VoicePanel.useCloud')}
                   </button>
                 </div>
               </div>
             ) : null}
 
-            {sttRouteSource === 'local-runtime' && !localSttRouteAvailable ? (
+            {sttRouteSource === 'local' && !localSttRouteAvailable ? (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 space-y-2">
                 <p className="text-[11px] text-amber-800">{t('VoicePanel.noLocalSttRoute')}</p>
                 <div className="flex gap-2">
@@ -327,9 +327,9 @@ export function VoicePanel(props: Props) {
                   <button
                     type="button"
                     className="lc-btn lc-btn-warning h-7 px-2 text-[11px] font-medium"
-                    onClick={() => onSttRouteSourceChange('token-api')}
+                    onClick={() => onSttRouteSourceChange('cloud')}
                   >
-                    {t('VoicePanel.useTokenApi')}
+                    {t('VoicePanel.useCloud')}
                   </button>
                 </div>
               </div>

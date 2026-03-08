@@ -22,22 +22,22 @@ export type ResolvedExperiencePolicy = {
   mediaPolicy: {
     autonomy: LocalChatProductSettings['mediaAutonomy'];
     visualComfortLevel: LocalChatProductSettings['visualComfortLevel'];
-    routeSource: 'local-runtime' | 'token-api';
-    nsfwPolicy: 'disabled' | 'local-runtime-only' | 'allowed';
+    routeSource: 'local' | 'cloud';
+    nsfwPolicy: 'disabled' | 'local-only' | 'allowed';
     allowVisualAuto: boolean;
     allowAutoVisualHighRisk: false;
   };
   contentBoundary: {
     relationshipBoundaryPreset: LocalChatProductSettings['relationshipBoundaryPreset'];
     visualComfortLevel: LocalChatProductSettings['visualComfortLevel'];
-    routeSource: 'local-runtime' | 'token-api';
+    routeSource: 'local' | 'cloud';
     relationshipState: InteractionSnapshot['relationshipState'] | 'new';
   };
   inspectFlags: Pick<LocalChatInspectSettings, 'diagnosticsVisible' | 'runtimeInspectorVisible'>;
 };
 
-function resolveRouteSource(value: unknown): 'local-runtime' | 'token-api' {
-  return value === 'token-api' ? 'token-api' : 'local-runtime';
+function resolveRouteSource(value: unknown): 'local' | 'cloud' {
+  return value === 'cloud' ? 'cloud' : 'local';
 }
 
 function resolveVoiceConversationMode(input: {
@@ -58,11 +58,11 @@ function resolveVoiceConversationMode(input: {
 }
 
 function resolveNsfwPolicy(input: {
-  routeSource: 'local-runtime' | 'token-api';
+  routeSource: 'local' | 'cloud';
   settings: LocalChatDefaultSettings;
 }): ResolvedExperiencePolicy['mediaPolicy']['nsfwPolicy'] {
-  if (input.routeSource === 'token-api') {
-    return 'local-runtime-only';
+  if (input.routeSource === 'cloud') {
+    return 'local-only';
   }
   if (
     input.settings.visualComfortLevel === 'natural-visuals'

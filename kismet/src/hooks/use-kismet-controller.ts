@@ -55,7 +55,7 @@ function buildRouteUnavailableError(): {
   return {
     reasonCode: KISMET_REASON.ROUTE_UNAVAILABLE,
     message: '当前 AI 路由无有效 connector/model 绑定，已阻止本次请求。',
-    actionHint: '请确认 token-api 已选择有效连接器和模型，或改用 Prompt Import。',
+    actionHint: '请确认 cloud 已选择有效连接器和模型，或改用 Prompt Import。',
   };
 }
 

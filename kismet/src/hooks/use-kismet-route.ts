@@ -23,7 +23,7 @@ function isUsableRouteBinding(
   if (!model) {
     return false;
   }
-  if (binding.source === 'local-runtime') {
+  if (binding.source === 'local') {
     return true;
   }
   const connectorId = String(binding.connectorId || '').trim();
@@ -61,7 +61,7 @@ function normalizeTokenApiBinding(
   binding: RuntimeRouteBinding,
   connectors: RuntimeRouteOptionsSnapshot['connectors'],
 ): RuntimeRouteBinding {
-  if (binding.source !== 'token-api' || connectors.length === 0) {
+  if (binding.source !== 'cloud' || connectors.length === 0) {
     return binding;
   }
   const matched = connectors.find((c) => c.id === binding.connectorId) || connectors[0];
@@ -119,7 +119,7 @@ async function loadRouteOptionsWithTimeout(routeClient: ReturnType<typeof getKis
     connectorsCount: parsed.connectors.length,
     connectorIds: parsed.connectors.map((c) => c.id),
     connectorModels: parsed.connectors.map((c) => ({ id: c.id, models: c.models.slice(0, 5) })),
-    localModelsCount: parsed.localRuntime.models.length,
+    localModelsCount: parsed.local.models.length,
   } : null);
   if (!parsed) return null;
   const selected = normalizeTokenApiBinding(parsed.selected, parsed.connectors);
@@ -159,7 +159,7 @@ export function useKismetRoute() {
 
   const recoverFromMissingConnector = useCallback((binding: RuntimeRouteBinding | null | undefined): boolean => {
     let recovered = false;
-    if (binding?.source === 'token-api' && String(binding.connectorId || '').trim()) {
+    if (binding?.source === 'cloud' && String(binding.connectorId || '').trim()) {
       setRouteBinding(null);
       recovered = true;
     }
@@ -245,9 +245,9 @@ export function useKismetRoute() {
     return () => clearInterval(timer);
   }, [chatRouteOptions?.connectors.length, loadRouteOptions]);
 
-  // Auto-correct stale token-api override when route options change
+  // Auto-correct stale cloud override when route options change
   useEffect(() => {
-    if (!routeBinding || routeBinding.source !== 'token-api') return;
+    if (!routeBinding || routeBinding.source !== 'cloud') return;
     const connectors = chatRouteOptions?.connectors || [];
     if (connectors.length === 0) return;
     const matched = connectors.find((c) => c.id === routeBinding.connectorId) || null;
@@ -257,7 +257,7 @@ export function useKismetRoute() {
       const fallbackModel = matched.models[0] || '';
       if (!fallbackModel || fallbackModel === routeBinding.model) return;
       setRouteBinding({
-        source: 'token-api',
+        source: 'cloud',
         connectorId: matched.id,
         model: fallbackModel,
       });
@@ -266,7 +266,7 @@ export function useKismetRoute() {
     const fallbackConnector = connectors[0] || null;
     if (!fallbackConnector) return;
     setRouteBinding({
-      source: 'token-api',
+      source: 'cloud',
       connectorId: fallbackConnector.id,
       model: fallbackConnector.models[0] || routeBinding.model || '',
     });
@@ -329,7 +329,7 @@ export function useKismetRoute() {
         provider: route.provider,
         connectorId: route.connectorId,
       });
-      const source = (route.source === 'local-runtime' ? 'local-runtime' : 'token-api') as RouteSourceDisplay;
+      const source = (route.source === 'local' ? 'local' : 'cloud') as RouteSourceDisplay;
       setRouteSource(source);
       return source;
     } catch (err) {
@@ -365,29 +365,29 @@ export function useKismetRoute() {
 
   // Selection handlers
   const handleSourceChange = useCallback((source: RuntimeRouteSource) => {
-    if (source === 'local-runtime') {
-      const firstModel = chatRouteOptions?.localRuntime.models[0];
+    if (source === 'local') {
+      const firstModel = chatRouteOptions?.local.models[0];
       setRouteBinding(firstModel ? {
-        source: 'local-runtime',
+        source: 'local',
         connectorId: '',
         model: firstModel.model,
         localModelId: firstModel.localModelId,
         engine: firstModel.engine,
-      } : { source: 'local-runtime', connectorId: '', model: '' });
+      } : { source: 'local', connectorId: '', model: '' });
     } else {
       const firstConnector = chatRouteOptions?.connectors[0];
       setRouteBinding(firstConnector ? {
-        source: 'token-api',
+        source: 'cloud',
         connectorId: firstConnector.id,
         model: firstConnector.models[0] || '',
-      } : { source: 'token-api', connectorId: '', model: '' });
+      } : { source: 'cloud', connectorId: '', model: '' });
     }
   }, [chatRouteOptions, setRouteBinding]);
 
   const handleConnectorChange = useCallback((connectorId: string) => {
     const connector = chatRouteOptions?.connectors.find((c) => c.id === connectorId);
     setRouteBinding({
-      source: 'token-api',
+      source: 'cloud',
       connectorId,
       model: connector?.models[0] || '',
     });
@@ -395,9 +395,9 @@ export function useKismetRoute() {
 
   const handleModelChange = useCallback((model: string) => {
     const current = useKismetStore.getState().routeBinding;
-    const source = current?.source || 'local-runtime';
-    const localModel = source === 'local-runtime'
-      ? chatRouteOptions?.localRuntime.models.find((m) => m.model === model)
+    const source = current?.source || 'local';
+    const localModel = source === 'local'
+      ? chatRouteOptions?.local.models.find((m) => m.model === model)
       : undefined;
     setRouteBinding({
       source,

@@ -22,7 +22,7 @@
 //
 // Environment:
 //   NIMI_RUNTIME_ENDPOINT  — runtime gRPC address (default: 127.0.0.1:46371)
-//   NIMI_MODEL_ID          — chat model ID for token-api (default: cloud/default)
+//   NIMI_MODEL_ID          — chat model ID for cloud (default: cloud/default)
 //   NIMI_API_KEY            — cloud provider API key (inline key-source)
 //   NIMI_PROVIDER_TYPE      — cloud provider type (default: dashscope)
 //   NIMI_PROVIDER_ENDPOINT  — cloud provider endpoint (optional)
@@ -102,7 +102,7 @@ function createRuntimeLlmClient(endpoint: string, modelId: string): LlmClient {
   const provider = createNimiAiProvider({
     runtime,
     appId: APP_ID,
-    routePolicy: 'token-api',
+    routePolicy: 'cloud',
     fallback: 'deny',
     timeoutMs: 300_000,
     metadata: buildMetadata(),

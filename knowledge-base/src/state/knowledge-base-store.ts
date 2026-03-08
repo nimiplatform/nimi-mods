@@ -87,15 +87,15 @@ function normalizeSettings(settings: Partial<KBSettings> | null | undefined): KB
   };
   if (
     merged.chatRouteSource !== 'auto'
-    && merged.chatRouteSource !== 'token-api'
-    && merged.chatRouteSource !== 'local-runtime'
+    && merged.chatRouteSource !== 'cloud'
+    && merged.chatRouteSource !== 'local'
   ) {
     merged.chatRouteSource = DEFAULT_KB_SETTINGS.chatRouteSource;
   }
   if (
     merged.embeddingRouteSource !== 'auto'
-    && merged.embeddingRouteSource !== 'token-api'
-    && merged.embeddingRouteSource !== 'local-runtime'
+    && merged.embeddingRouteSource !== 'cloud'
+    && merged.embeddingRouteSource !== 'local'
   ) {
     merged.embeddingRouteSource = DEFAULT_KB_SETTINGS.embeddingRouteSource;
   }

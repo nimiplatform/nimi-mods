@@ -5,7 +5,7 @@
 
 ## Problem
 
-Meeting Scribe spec 假设 STT 走 `runtime.media.stt.transcribe()` + Gemini token-api，但实际调查发现 **runtime 的 STT 适配器与所有可直接使用的 cloud provider API 格式不匹配**。
+Meeting Scribe spec 假设 STT 走 `runtime.media.stt.transcribe()` + Gemini cloud，但实际调查发现 **runtime 的 STT 适配器与所有可直接使用的 cloud provider API 格式不匹配**。
 
 ## Runtime STT 适配器现状
 
@@ -98,7 +98,7 @@ Runtime 有三条 STT 路径：
 
 | Spec 文档 | 需要更新的内容 |
 |-----------|--------------|
-| `INDEX.md` | Design Decisions 表中 STT 方案从 "Gemini token-api" 改为 "待定，受 runtime adapter 限制" |
+| `INDEX.md` | Design Decisions 表中 STT 方案从 "Gemini cloud" 改为 "待定，受 runtime adapter 限制" |
 | `transcription.md` | § 3.1 调用方式需根据最终选定的 provider 更新 |
 | `testing.md` | § 3.1 STT 测试的 env vars 和 model ID 需更新 |
 | `routing-contract.md` | MS-ROUTE-001 cloud 路由的具体 provider 需更新 |

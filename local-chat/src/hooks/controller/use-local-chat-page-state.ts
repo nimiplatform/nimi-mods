@@ -192,15 +192,15 @@ export function useLocalChatPageState() {
   ), [ttsRouteOptions?.connectors]);
   const localTtsRouteAvailable = useMemo(
     () => hasReadyLocalRuntimeModelForScenario({
-      models: ttsRouteOptions?.localRuntime.models || runtimeRouteState.chatRouteOptions?.localRuntime.models || [],
+      models: ttsRouteOptions?.local.models || runtimeRouteState.chatRouteOptions?.local.models || [],
       scenario: 'audio.synthesize',
     }),
-    [runtimeRouteState.chatRouteOptions?.localRuntime.models, ttsRouteOptions?.localRuntime.models],
+    [runtimeRouteState.chatRouteOptions?.local.models, ttsRouteOptions?.local.models],
   );
 
   const effectiveTtsConnectorId = useMemo(
     () => {
-      if (speechSettingsState.defaultSettings.ttsRouteSource === 'local-runtime') {
+      if (speechSettingsState.defaultSettings.ttsRouteSource === 'local') {
         return '';
       }
       const preferredConnectorId = String(speechSettingsState.defaultSettings.ttsConnectorId || '').trim();
@@ -248,8 +248,8 @@ export function useLocalChatPageState() {
   useEffect(() => {
     const ttsRouteSource = speechSettingsState.defaultSettings.ttsRouteSource;
     const resolvedRouteSource = ttsRouteOptions?.selected?.source;
-    const shouldAlignTokenRoute = ttsRouteSource === 'token-api'
-      || (ttsRouteSource === 'auto' && resolvedRouteSource === 'token-api');
+    const shouldAlignTokenRoute = ttsRouteSource === 'cloud'
+      || (ttsRouteSource === 'auto' && resolvedRouteSource === 'cloud');
     if (!shouldAlignTokenRoute) {
       return;
     }
@@ -270,8 +270,8 @@ export function useLocalChatPageState() {
   useEffect(() => {
     const ttsRouteSource = speechSettingsState.defaultSettings.ttsRouteSource;
     const resolvedRouteSource = ttsRouteOptions?.selected?.source;
-    const shouldAlignTokenRoute = ttsRouteSource === 'token-api'
-      || (ttsRouteSource === 'auto' && resolvedRouteSource === 'token-api');
+    const shouldAlignTokenRoute = ttsRouteSource === 'cloud'
+      || (ttsRouteSource === 'auto' && resolvedRouteSource === 'cloud');
     if (!shouldAlignTokenRoute) {
       return;
     }
@@ -313,8 +313,8 @@ export function useLocalChatPageState() {
     }
     const ttsRouteSource = speechSettingsState.defaultSettings.ttsRouteSource;
     const resolvedRouteSource = ttsRouteOptions?.selected?.source;
-    const shouldUseTokenRoute = ttsRouteSource === 'token-api'
-      || (ttsRouteSource === 'auto' && resolvedRouteSource === 'token-api');
+    const shouldUseTokenRoute = ttsRouteSource === 'cloud'
+      || (ttsRouteSource === 'auto' && resolvedRouteSource === 'cloud');
     if (shouldUseTokenRoute) {
       const connectorId = String(effectiveTtsConnectorId || '').trim();
       const model = String(effectiveTtsModel || '').trim();
@@ -322,7 +322,7 @@ export function useLocalChatPageState() {
         return;
       }
       void speechSettingsState.loadSpeechVoices({
-        routeSource: 'token-api',
+        routeSource: 'cloud',
         connectorId,
         model,
       });
@@ -342,7 +342,7 @@ export function useLocalChatPageState() {
     runtimeRouteState.routeBinding?.source
     || runtimeRouteState.routeSnapshot?.source
     || undefined
-  ) as 'token-api' | 'local-runtime' | undefined;
+  ) as 'cloud' | 'local' | undefined;
 
   const refreshDependencySnapshot = useCallback(async () => {
     const dependencyCapability = speechSettingsState.defaultSettings.enableVoice
@@ -367,7 +367,7 @@ export function useLocalChatPageState() {
       setDependencySnapshot({
         modId: LOCAL_CHAT_MOD_ID,
         status: 'missing',
-        routeSource: 'token-api',
+        routeSource: 'cloud',
         reasonCode: ReasonCode.LOCAL_AI_DEPENDENCY_SNAPSHOT_FAILED,
         warnings: [error instanceof Error ? error.message : String(error || 'unknown error')],
         dependencies: [],
@@ -397,10 +397,10 @@ export function useLocalChatPageState() {
 
   const localSttRouteAvailable = useMemo(
     () => hasReadyLocalRuntimeModelForScenario({
-      models: sttRouteOptions?.localRuntime.models || runtimeRouteState.chatRouteOptions?.localRuntime.models || [],
+      models: sttRouteOptions?.local.models || runtimeRouteState.chatRouteOptions?.local.models || [],
       scenario: 'audio.transcribe',
     }),
-    [runtimeRouteState.chatRouteOptions?.localRuntime.models, sttRouteOptions?.localRuntime.models],
+    [runtimeRouteState.chatRouteOptions?.local.models, sttRouteOptions?.local.models],
   );
 
   useEffect(() => {
@@ -449,9 +449,9 @@ export function useLocalChatPageState() {
     if (normalizedModel && availableVoiceIds.length === 0) {
       const configuredRouteSource = speechSettingsState.defaultSettings.ttsRouteSource;
       const resolvedRouteSource = ttsRouteOptions?.selected?.source;
-      const explicitRouteSource = configuredRouteSource === 'token-api' || configuredRouteSource === 'local-runtime'
+      const explicitRouteSource = configuredRouteSource === 'cloud' || configuredRouteSource === 'local'
         ? configuredRouteSource
-        : resolvedRouteSource === 'token-api' || resolvedRouteSource === 'local-runtime'
+        : resolvedRouteSource === 'cloud' || resolvedRouteSource === 'local'
           ? resolvedRouteSource
           : undefined;
       const refreshedVoices = await speechSettingsState.loadSpeechVoices({
@@ -492,7 +492,7 @@ export function useLocalChatPageState() {
     });
     const selectedModel = String(modelOverride || effectiveTtsModel || '').trim();
     const selectedVoiceId = await resolvePlayableTtsVoiceId(selectedModel);
-    const binding = speechSettingsState.defaultSettings.ttsRouteSource === 'token-api' || speechSettingsState.defaultSettings.ttsRouteSource === 'local-runtime'
+    const binding = speechSettingsState.defaultSettings.ttsRouteSource === 'cloud' || speechSettingsState.defaultSettings.ttsRouteSource === 'local'
       ? {
         source: speechSettingsState.defaultSettings.ttsRouteSource,
         connectorId: String(effectiveTtsConnectorId || '').trim(),
@@ -652,8 +652,8 @@ export function useLocalChatPageState() {
     onOpenRuntimeSetup: () => {
       setActiveTab('runtime');
     },
-    onSwitchSttToTokenApi: () => {
-      speechSettingsState.handleSttRouteSourceChange('token-api');
+    onSwitchSttToCloud: () => {
+      speechSettingsState.handleSttRouteSourceChange('cloud');
     },
   });
 

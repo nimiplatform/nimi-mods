@@ -107,7 +107,7 @@ export async function generateJsonViaAi<T>(input: GenerateJsonViaAiInput<T>): Pr
       } : {}),
     });
 
-    const routeSource = result.trace.routeDecision || 'local-runtime';
+    const routeSource = result.trace.routeDecision || 'local';
     const rawText = String(result.text || '');
     const rawResponse = {
       text: rawText,

@@ -26,8 +26,8 @@ export function evaluateNsfwMediaPolicy(input: {
   relationshipBoundaryPreset?: 'reserved' | 'balanced' | 'close';
   visualComfortLevel?: 'text-only' | 'soft-visuals' | 'natural-visuals';
 }): NsfwMediaPolicy {
-  if (input.routeSource === 'token-api') {
-    return 'local-runtime-only';
+  if (input.routeSource === 'cloud') {
+    return 'local-only';
   }
   if (
     input.visualComfortLevel === 'natural-visuals'
@@ -50,7 +50,7 @@ export function isPromptLikelyNsfw(prompt: string): boolean {
 
 export function isMediaGenerationAllowed(input: {
   policy: NsfwMediaPolicy;
-  routeSource: 'local-runtime' | 'token-api' | string;
+  routeSource: 'local' | 'cloud' | string;
   prompt?: string;
   isNsfwPrompt?: boolean;
 }): boolean {
@@ -64,5 +64,5 @@ export function isMediaGenerationAllowed(input: {
   if (input.policy === 'allowed') {
     return true;
   }
-  return input.routeSource === 'local-runtime';
+  return input.routeSource === 'local';
 }

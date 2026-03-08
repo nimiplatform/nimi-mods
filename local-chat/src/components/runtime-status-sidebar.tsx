@@ -85,7 +85,7 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
   const isVideoRouteProbeLoading = props.isVideoRouteProbeLoading || false;
 
   const hasValidTokenApiOverride = (
-    routeBinding?.source === 'token-api'
+    routeBinding?.source === 'cloud'
       ? (
         (chatRouteOptions?.connectors.length || 0) === 0
           || chatRouteOptions?.connectors.some((connector) => connector.id === routeBinding.connectorId)
@@ -97,10 +97,10 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
       ? routeBinding
       : chatRouteOptions?.selected || routeBinding || null
   );
-  const activeChatSource = effectiveChatBinding?.source || 'local-runtime';
+  const activeChatSource = effectiveChatBinding?.source || 'local';
   const fallbackConnectorId = chatRouteOptions?.connectors[0]?.id || '';
   const activeChatConnectorId = (
-    activeChatSource === 'token-api'
+    activeChatSource === 'cloud'
       ? (effectiveChatBinding?.connectorId || fallbackConnectorId || '')
       : ''
   );
@@ -108,9 +108,9 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     || chatRouteOptions?.connectors[0]
     || null;
   const chatModelOptionsRaw = useMemo(() => {
-    if (activeChatSource === 'local-runtime') {
+    if (activeChatSource === 'local') {
       return resolveLocalRuntimeModelsForScenario({
-        models: chatRouteOptions?.localRuntime.models || [],
+        models: chatRouteOptions?.local.models || [],
         scenario: 'chat',
       }).map((model) => model.model);
     }
@@ -123,7 +123,7 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     activeChatConnector?.modelCapabilities,
     activeChatConnector?.models,
     activeChatSource,
-    chatRouteOptions?.localRuntime.models,
+    chatRouteOptions?.local.models,
   ]);
   const chatModelOptions = useMemo(
     () => dedupeModelIds(chatModelOptionsRaw),

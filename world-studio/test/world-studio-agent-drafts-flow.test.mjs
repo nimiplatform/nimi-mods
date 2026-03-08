@@ -100,7 +100,7 @@ test('world-studio agent drafts flow persists phase2 drafts and publishes with d
   };
 
   const binding = {
-    source: 'token-api',
+    source: 'cloud',
     connectorId: 'connector-1',
     model: 'deepseek/deepseek-chat',
   };

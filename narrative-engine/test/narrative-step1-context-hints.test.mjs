@@ -162,7 +162,7 @@ test('step1 detects rhythm monotony when 3+ of last 5 spine events share same ty
     turn: makeTurn(),
     recentSpineEvents,
     queryRuntimeRouteOptions: async () => ({
-      selected: { source: 'token-api', model: 'models/gemini-3-flash-preview', connectorId: 'c-1' },
+      selected: { source: 'cloud', model: 'models/gemini-3-flash-preview', connectorId: 'c-1' },
     }),
     queryWorldEvents: async () => ([
       { id: 'event-1', title: '城门戒严', summary: '守军封锁。', eventHorizon: 'PAST', level: 'PRIMARY', characterRefs: ['agent-1', 'player-1'], updatedAt: '2026-03-02T12:00:00.000Z' },
@@ -190,7 +190,7 @@ test('step1 does not generate rhythm hints when no spine history provided', asyn
   const result = await runNarrativeStep1Assembly({
     turn: makeTurn(),
     queryRuntimeRouteOptions: async () => ({
-      selected: { source: 'token-api', model: 'models/gemini-3-flash-preview', connectorId: 'c-1' },
+      selected: { source: 'cloud', model: 'models/gemini-3-flash-preview', connectorId: 'c-1' },
     }),
     queryWorldEvents: async () => ([
       { id: 'event-1', title: '城门戒严', summary: '守军封锁。', eventHorizon: 'PAST', level: 'PRIMARY', characterRefs: ['agent-1', 'player-1'], updatedAt: '2026-03-02T12:00:00.000Z' },

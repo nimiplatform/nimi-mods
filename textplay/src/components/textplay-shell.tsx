@@ -1113,14 +1113,14 @@ export function TextplayShell(props: TextplayShellProps) {
                   <select
                     className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-xs"
                     value={props.routeSource}
-                    onChange={(event) => props.onRouteSourceChange(event.target.value === 'token-api' ? 'token-api' : 'local-runtime')}
+                    onChange={(event) => props.onRouteSourceChange(event.target.value === 'cloud' ? 'cloud' : 'local')}
                   >
-                    <option value="local-runtime">local-runtime</option>
-                    <option value="token-api">token-api</option>
+                    <option value="local">local</option>
+                    <option value="cloud">cloud</option>
                   </select>
                 </label>
 
-                {props.routeSource === 'token-api' ? (
+                {props.routeSource === 'cloud' ? (
                   <label className="mt-2 block">
                     <div className="mb-1 text-gray-500">Connector</div>
                     <select
@@ -1147,7 +1147,7 @@ export function TextplayShell(props: TextplayShellProps) {
                     list={routeModelListId}
                     value={props.routeModel}
                     onChange={(event) => props.onRouteModelChange(event.target.value)}
-                    placeholder={props.routeSource === 'token-api' && !activeConnector ? 'Select connector first' : 'model id'}
+                    placeholder={props.routeSource === 'cloud' && !activeConnector ? 'Select connector first' : 'model id'}
                   />
                   <datalist id={routeModelListId}>
                     {props.routeModelOptions.map((model) => (

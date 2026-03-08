@@ -94,7 +94,7 @@ function nowIso(): string {
 
 type RuntimeRouteCatalogSnapshot = {
   selected: {
-    source: 'local-runtime' | 'token-api';
+    source: 'local' | 'cloud';
     connectorId: string;
     model: string;
   };
@@ -112,7 +112,7 @@ function parseRuntimeRouteCatalogSnapshot(value: unknown): RuntimeRouteCatalogSn
     return null;
   }
   const selectedRecord = selected as Record<string, unknown>;
-  const source = String(selectedRecord.source || '').trim() === 'token-api' ? 'token-api' : 'local-runtime';
+  const source = String(selectedRecord.source || '').trim() === 'cloud' ? 'cloud' : 'local';
   const connectorId = String(selectedRecord.connectorId || '').trim();
   const model = String(selectedRecord.model || '').trim();
   if (!model) {
@@ -262,15 +262,15 @@ function extractFallbackAuditRecord(details: unknown): FallbackAuditRecord | nul
   const from = String(record.from || '').trim();
   const to = String(record.to || '').trim();
   const reason = String(record.reason || '').trim();
-  if (!traceId || !stage || !capability || from !== 'local-runtime' || to !== 'token-api' || !reason) {
+  if (!traceId || !stage || !capability || from !== 'local' || to !== 'cloud' || !reason) {
     return null;
   }
   return {
     traceId,
     stage: stage as VideoPlayRouteStage,
     capability: capability as RuntimeCanonicalCapability,
-    from: 'local-runtime',
-    to: 'token-api',
+    from: 'local',
+    to: 'cloud',
     reason,
   };
 }
@@ -1039,7 +1039,7 @@ export function evaluateQualityGates(input: {
   return parsed.data;
 }
 
-function toRouteBinding(source: 'local-runtime' | 'token-api'): RuntimeRouteBinding {
+function toRouteBinding(source: 'local' | 'cloud'): RuntimeRouteBinding {
   return {
     source,
     connectorId: '',
@@ -1053,22 +1053,22 @@ export async function invokeWithRouteFallback<T>(
   },
 ): Promise<{
   result: T;
-  routeSource: 'local-runtime' | 'token-api';
+  routeSource: 'local' | 'cloud';
   fallbackAudit: FallbackAuditRecord | null;
 }> {
-  let localReason = 'local-runtime-unavailable';
+  let localReason = 'local-unavailable';
   try {
-    const health = await input.checkHealth(input.capability, toRouteBinding('local-runtime'));
+    const health = await input.checkHealth(input.capability, toRouteBinding('local'));
     if (isRouteHealthy(health)) {
       try {
-        const result = await input.invoke(toRouteBinding('local-runtime'));
+        const result = await input.invoke(toRouteBinding('local'));
         return {
           result,
-          routeSource: 'local-runtime',
+          routeSource: 'local',
           fallbackAudit: null,
         };
       } catch (error) {
-        localReason = error instanceof Error ? error.message : String(error || 'local-runtime-error');
+        localReason = error instanceof Error ? error.message : String(error || 'local-error');
       }
     } else {
       localReason = String(health?.reasonCode || health?.status || localReason);
@@ -1077,9 +1077,9 @@ export async function invokeWithRouteFallback<T>(
     localReason = error instanceof Error ? error.message : String(error || localReason);
   }
 
-  let tokenReason = 'token-api-unavailable';
+  let tokenReason = 'cloud-unavailable';
   try {
-    const tokenHealth = await input.checkHealth(input.capability, toRouteBinding('token-api'));
+    const tokenHealth = await input.checkHealth(input.capability, toRouteBinding('cloud'));
     tokenReason = String(tokenHealth?.reasonCode || tokenHealth?.status || tokenReason);
   } catch (error) {
     tokenReason = error instanceof Error ? error.message : String(error || tokenReason);
@@ -1089,8 +1089,8 @@ export async function invokeWithRouteFallback<T>(
     traceId: input.traceId,
     stage: input.stage,
     capability: input.capability,
-    from: 'local-runtime',
-    to: 'token-api',
+    from: 'local',
+    to: 'cloud',
     reason: localReason,
   };
   throw new VideoPlayError({
@@ -1859,7 +1859,7 @@ type AssetRenderQueueItem = {
   clipId: string;
   modality: AssetRenderModality;
   status: 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'SKIPPED';
-  routeSource: 'local-runtime' | 'token-api' | 'unknown';
+  routeSource: 'local' | 'cloud' | 'unknown';
   errorMessage: string | null;
 };
 
@@ -2018,7 +2018,7 @@ async function resolveVoiceProfile(input: {
   binding: RuntimeRouteBinding | undefined;
   preferredLanguage: string;
 }): Promise<VoiceProfile> {
-  const routeSource = input.binding?.source === 'token-api' ? 'token-api' : 'local-runtime';
+  const routeSource = input.binding?.source === 'cloud' ? 'cloud' : 'local';
   const binding = {
     source: routeSource,
     connectorId: '',
@@ -3145,7 +3145,7 @@ async function executeStep(input: {
           traceId: input.traceId,
           checkHealth: async (capability, binding) => input.deps.aiClient.checkRouteHealth({ capability, binding }),
                 invoke: async (binding) => {
-                  const routeSource = binding?.source === 'token-api' ? 'token-api' : 'local-runtime';
+                  const routeSource = binding?.source === 'cloud' ? 'cloud' : 'local';
                   const cacheKey = `${routeSource}:${plan.language}`;
                   let profile = voiceProfileCache.get(cacheKey);
                   if (!profile) {

@@ -27,7 +27,7 @@ export function ModelSelector({
 }: ModelSelectorProps) {
   const { t } = useTranslation('kismet');
 
-  const activeSource = routeBinding?.source || chatRouteOptions?.selected.source || 'local-runtime';
+  const activeSource = routeBinding?.source || chatRouteOptions?.selected.source || 'local';
   const activeConnectorId = routeBinding?.connectorId || chatRouteOptions?.selected.connectorId || '';
   const activeModel = routeBinding?.model || chatRouteOptions?.selected.model || '';
   const [modelQuery, setModelQuery] = useState(activeModel);
@@ -41,8 +41,8 @@ export function ModelSelector({
 
   const modelOptions = useMemo(() => {
     if (!chatRouteOptions) return [];
-    if (activeSource === 'local-runtime') {
-      return chatRouteOptions.localRuntime.models.map((m) => m.model);
+    if (activeSource === 'local') {
+      return chatRouteOptions.local.models.map((m) => m.model);
     }
     const connector = chatRouteOptions.connectors.find((c) => c.id === activeConnectorId);
     return connector?.models || [];
@@ -99,11 +99,11 @@ export function ModelSelector({
         className="ks-input"
         style={{ appearance: 'none', fontSize: '0.85rem' }}
       >
-        <option value="local-runtime" style={{ background: '#181615' }}>{t('ModelSelector.localRuntime')}</option>
-        <option value="token-api" style={{ background: '#181615' }}>{t('ModelSelector.tokenApi')}</option>
+        <option value="local" style={{ background: '#181615' }}>{t('ModelSelector.local')}</option>
+        <option value="cloud" style={{ background: '#181615' }}>{t('ModelSelector.tokenApi')}</option>
       </select>
 
-      {activeSource === 'token-api' && (
+      {activeSource === 'cloud' && (
         <select
           value={activeConnectorId}
           onChange={(e) => onConnectorChange(e.target.value)}
@@ -146,7 +146,7 @@ export function ModelSelector({
         </datalist>
         {modelOptions.length === 0 && (
           <p className="mt-1 text-xs" style={{ color: '#A6382E' }}>
-            {activeSource === 'local-runtime'
+            {activeSource === 'local'
               ? t('ModelSelector.noLocalModels')
               : t('ModelSelector.noConnectorModels')}
           </p>

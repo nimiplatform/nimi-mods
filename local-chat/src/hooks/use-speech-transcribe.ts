@@ -15,14 +15,14 @@ type StatusBannerPayload = {
 type UseSpeechTranscribeInput = {
   aiClient: Pick<LocalChatAiClient, 'transcribeAudio'>;
   enableVoice: boolean;
-  sttRouteSource: 'auto' | 'local-runtime' | 'token-api';
+  sttRouteSource: 'auto' | 'local' | 'cloud';
   localSttRouteAvailable: boolean;
   selectedTargetId: string;
   selectedSessionId: string;
   setInputText: Dispatch<SetStateAction<string>>;
   setStatusBanner: (payload: StatusBannerPayload) => void;
   onOpenRuntimeSetup?: () => void;
-  onSwitchSttToTokenApi?: () => void;
+  onSwitchSttToCloud?: () => void;
 };
 
 const DEFAULT_AUDIO_MIME = 'audio/webm';
@@ -49,7 +49,7 @@ export function resolveVoiceInputPreflightError(input: {
       detail: 'Select an Agent before recording',
     };
   }
-  if (input.sttRouteSource === 'local-runtime' && !input.localSttRouteAvailable) {
+  if (input.sttRouteSource === 'local' && !input.localSttRouteAvailable) {
     return {
       reasonCode: 'LOCAL_CHAT_STT_LOCAL_ROUTE_UNAVAILABLE',
       detail: 'No local STT-capable model is available',
@@ -60,8 +60,8 @@ export function resolveVoiceInputPreflightError(input: {
 
 function resolveRouteBinding(
   source: UseSpeechTranscribeInput['sttRouteSource'],
-): { source: 'local-runtime' | 'token-api'; connectorId: string; model: string } | undefined {
-  if (source === 'local-runtime' || source === 'token-api') {
+): { source: 'local' | 'cloud'; connectorId: string; model: string } | undefined {
+  if (source === 'local' || source === 'cloud') {
     return {
       source,
       connectorId: '',
@@ -156,8 +156,8 @@ export function useSpeechTranscribe(input: UseSpeechTranscribeInput) {
 
   const emitFailureBanner = useCallback((reasonCode: string, detail: string) => {
     const hasOpenRuntime = typeof input.onOpenRuntimeSetup === 'function';
-    const hasTokenFallback = typeof input.onSwitchSttToTokenApi === 'function';
-    const shouldOpenRuntime = input.sttRouteSource === 'local-runtime' || !hasTokenFallback;
+    const hasCloudFallback = typeof input.onSwitchSttToCloud === 'function';
+    const shouldOpenRuntime = input.sttRouteSource === 'local' || !hasCloudFallback;
 
     let actionLabel: string | undefined;
     let onAction: (() => void) | undefined;
@@ -165,9 +165,9 @@ export function useSpeechTranscribe(input: UseSpeechTranscribeInput) {
     if (shouldOpenRuntime && hasOpenRuntime) {
       actionLabel = 'Open AI Runtime';
       onAction = input.onOpenRuntimeSetup;
-    } else if (hasTokenFallback) {
-      actionLabel = 'Use Token API';
-      onAction = input.onSwitchSttToTokenApi;
+    } else if (hasCloudFallback) {
+      actionLabel = 'Use Cloud';
+      onAction = input.onSwitchSttToCloud;
     }
 
     input.setStatusBanner({

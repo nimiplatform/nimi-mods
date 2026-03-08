@@ -35,7 +35,7 @@ export function useMintYouRouteOptions() {
             selectedSource: snapshot.selected.source,
             selectedConnectorId: snapshot.selected.connectorId,
             selectedModel: snapshot.selected.model,
-            localModelCount: snapshot.localRuntime.models.length,
+            localModelCount: snapshot.local.models.length,
             connectorCount: snapshot.connectors.length,
           },
         });

@@ -83,16 +83,16 @@ function createRouteOptionsPayload() {
   return {
     capability: 'text.generate',
     selected: {
-      source: 'token-api',
+      source: 'cloud',
       connectorId: 'connector-main',
       model: 'gpt-4.1-mini',
     },
     resolvedDefault: {
-      source: 'token-api',
+      source: 'cloud',
       connectorId: 'connector-main',
       model: 'gpt-4.1-mini',
     },
-    localRuntime: {
+    local: {
       models: [],
       defaultEndpoint: 'http://127.0.0.1:8080/v1',
     },
@@ -260,7 +260,7 @@ function createRuntimeTextClient(options = {}) {
         text: 'You push through the gate, and the courtyard answers with distant iron bells.',
         promptTraceId: 'prompt-trace-1',
         route: {
-          source: 'token-api',
+          source: 'cloud',
           connectorId: 'connector-main',
           model: 'gpt-4.1-mini',
           provider,
@@ -419,7 +419,7 @@ test('textplay forwards binding and skips default route precheck when binding ex
   const request = {
     ...createBaseRequest(),
     binding: {
-      source: 'token-api',
+      source: 'cloud',
       connectorId: 'connector-override',
       model: 'gpt-override',
     },

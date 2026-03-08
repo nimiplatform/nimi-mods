@@ -60,15 +60,15 @@ export function RouteCapabilityControls(props: RouteCapabilityControlsProps) {
           onChange={(event) => props.onRouteSourceChange(props.profile, normalizeRuntimeRouteSource(event.target.value))}
           className="h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-900"
         >
-          <option value="local-runtime">Local Runtime</option>
-          <option value="token-api">Token API</option>
+          <option value="local">Local Runtime</option>
+          <option value="cloud">Token API</option>
         </select>
       </div>
       <div>
         <p className="mb-1 text-xs text-gray-500">{t('routeCapabilityControls.connector')}</p>
         <select
           value={props.activeConnectorId}
-          disabled={props.activeSource !== 'token-api'}
+          disabled={props.activeSource !== 'cloud'}
           onChange={(event) => props.onRouteConnectorChange(props.profile, event.target.value)}
           className="h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-900 disabled:bg-gray-100 disabled:text-gray-400"
         >
@@ -107,7 +107,7 @@ export function RouteCapabilityControls(props: RouteCapabilityControlsProps) {
         {props.modelOptions.length > 0 && filteredModelOptions.length === 0 ? (
           <p className="mt-1 text-[11px] text-amber-700">{t('routeCapabilityControls.noMatchModel')}</p>
         ) : null}
-        {props.activeSource === 'local-runtime' && props.modelOptions.length === 0 ? (
+        {props.activeSource === 'local' && props.modelOptions.length === 0 ? (
           <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 space-y-2">
             <p className="text-[11px] text-amber-800">{t('routeCapabilityControls.emptyLocalRuntimeHint')}</p>
             <div className="flex gap-2">
@@ -121,7 +121,7 @@ export function RouteCapabilityControls(props: RouteCapabilityControlsProps) {
               <button
                 type="button"
                 className="ui-sync-btn ui-sync-btn-secondary rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-semibold text-amber-800"
-                onClick={() => props.onRouteSourceChange(props.profile, 'token-api')}
+                onClick={() => props.onRouteSourceChange(props.profile, 'cloud')}
               >
                 {t('routeCapabilityControls.switchToTokenApi')}
               </button>

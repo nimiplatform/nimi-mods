@@ -82,10 +82,10 @@ entities:
       - { name: similarityThreshold, type: number, required: true, default: 0.3,  description: "最低相似度阈值" }
       - { name: maxContextChunks,   type: number,  required: true, default: 8,    description: "注入 prompt 的最大 chunk 数" }
       - { name: queryRewritingEnabled, type: boolean, required: true, default: true, description: "是否启用多轮 query rewriting" }
-      - { name: chatRouteSource,    type: string,  required: true, default: "'auto'", description: "'auto' | 'local-runtime' | 'token-api'" }
+      - { name: chatRouteSource,    type: string,  required: true, default: "'auto'", description: "'auto' | 'local' | 'cloud'" }
       - { name: chatConnectorId,    type: string,  required: true, default: "''", description: "Chat connector 指定（空则自动）" }
       - { name: chatModel,          type: string,  required: true, default: "''", description: "Chat model 指定（空则自动）" }
-      - { name: embeddingRouteSource, type: string, required: true, default: "'auto'", description: "'auto' | 'local-runtime' | 'token-api'" }
+      - { name: embeddingRouteSource, type: string, required: true, default: "'auto'", description: "'auto' | 'local' | 'cloud'" }
       - { name: embeddingConnectorId, type: string, required: true, default: "''", description: "Embedding connector 指定（空则自动）" }
       - { name: embeddingModel,     type: string,  required: true, default: "''", description: "Embedding model 指定（空则自动）" }
 

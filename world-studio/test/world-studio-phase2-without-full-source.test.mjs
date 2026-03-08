@@ -99,7 +99,7 @@ test('world-studio phase2 can synthesize without full source text after refresh'
   let lastStatusBanner = null;
 
   const binding = {
-    source: 'token-api',
+    source: 'cloud',
     connectorId: 'connector-1',
     model: 'deepseek/deepseek-chat',
   };

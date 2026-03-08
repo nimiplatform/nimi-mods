@@ -558,10 +558,10 @@ function deriveRouteBindingBySource(input: {
   options: RuntimeRouteOptionsSnapshot | null;
 }): RuntimeRouteBinding {
   const previous = input.previous || input.options?.selected || null;
-  if (input.source === 'local-runtime') {
-    const firstLocal = input.options?.localRuntime.models[0] || null;
+  if (input.source === 'local') {
+    const firstLocal = input.options?.local.models[0] || null;
     return {
-      source: 'local-runtime',
+      source: 'local',
       connectorId: '',
       model: firstLocal?.model || previous?.model || '',
       localModelId: firstLocal?.localModelId || previous?.localModelId,
@@ -571,7 +571,7 @@ function deriveRouteBindingBySource(input: {
   const firstConnector = input.options?.connectors[0] || null;
   const firstModel = firstConnector?.models[0] || '';
   return {
-    source: 'token-api',
+    source: 'cloud',
     connectorId: firstConnector?.id || previous?.connectorId || '',
     model: firstModel || previous?.model || '',
   };
@@ -585,7 +585,7 @@ function deriveRouteBindingByConnector(input: {
   const connector = input.options?.connectors.find((item) => item.id === input.connectorId) || null;
   const previous = input.previous || input.options?.selected || null;
   return {
-    source: 'token-api',
+    source: 'cloud',
     connectorId: input.connectorId,
     model: connector?.models[0] || previous?.model || '',
   };
@@ -598,7 +598,7 @@ function deriveRouteBindingByModel(input: {
 }): RuntimeRouteBinding {
   const previous = input.previous || input.options?.selected || null;
   return {
-    source: previous?.source || 'local-runtime',
+    source: previous?.source || 'local',
     connectorId: previous?.connectorId || '',
     model: input.model.trim(),
     ...(previous?.localModelId ? { localModelId: previous.localModelId } : {}),
@@ -728,13 +728,13 @@ export function useTextplayController(): TextplayShellProps {
   const previousPlayerProfileScopeRef = useRef(playerProfileScope);
   const agentId = agentIdRuntime || selectedStory?.primaryAgentId || '';
   const effectiveRouteBinding = binding || chatRouteOptions?.selected || null;
-  const routeSource = effectiveRouteBinding?.source || 'local-runtime';
+  const routeSource = effectiveRouteBinding?.source || 'local';
   const routeConnectorId = effectiveRouteBinding?.connectorId || '';
   const routeModel = effectiveRouteBinding?.model || '';
   const routeConnectors = chatRouteOptions?.connectors || [];
-  const routeModelOptions = routeSource === 'token-api'
+  const routeModelOptions = routeSource === 'cloud'
     ? (routeConnectors.find((item) => item.id === routeConnectorId)?.models || [])
-    : (chatRouteOptions?.localRuntime.models || []).map((item) => item.model);
+    : (chatRouteOptions?.local.models || []).map((item) => item.model);
 
   const syncPresenceView = useCallback(() => {
     setPresenceState(presenceMachine.getState());

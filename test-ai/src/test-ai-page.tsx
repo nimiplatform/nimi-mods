@@ -330,7 +330,7 @@ function hydrateTokenApiBinding(
   snapshot: RuntimeRouteOptionsSnapshot | null,
   binding: RuntimeRouteBinding | null,
 ): RuntimeRouteBinding | null {
-  if (!snapshot || !binding || binding.source !== 'token-api') {
+  if (!snapshot || !binding || binding.source !== 'cloud') {
     return binding;
   }
   const connector = snapshot.connectors.find((item) => item.id === binding.connectorId) || null;
@@ -352,12 +352,12 @@ function normalizeLocalRuntimeModelRoot(value: unknown): string {
   return trimmed;
 }
 
-function localRuntimeBindingFromOption(
-  option: RuntimeRouteOptionsSnapshot['localRuntime']['models'][number],
+function localBindingFromOption(
+  option: RuntimeRouteOptionsSnapshot['local']['models'][number],
 ): RuntimeRouteBinding {
   const modelId = asString(option.modelId || option.model);
   return {
-    source: 'local-runtime',
+    source: 'local',
     connectorId: '',
     model: modelId,
     modelId: modelId || undefined,
@@ -376,13 +376,13 @@ function hydrateLocalRuntimeBinding(
   snapshot: RuntimeRouteOptionsSnapshot | null,
   binding: RuntimeRouteBinding | null,
 ): RuntimeRouteBinding | null {
-  if (!snapshot || !binding || binding.source !== 'local-runtime') {
+  if (!snapshot || !binding || binding.source !== 'local') {
     return binding;
   }
   const normalizedLocalModelId = asString(binding.localModelId);
   const normalizedModelId = normalizeLocalRuntimeModelRoot(binding.modelId || binding.model);
   const normalizedEngine = asString(binding.engine || binding.provider).toLowerCase();
-  const localModel = snapshot.localRuntime.models.find((item) => (
+  const localModel = snapshot.local.models.find((item) => (
     (normalizedLocalModelId && asString(item.localModelId) === normalizedLocalModelId)
     || (
       normalizeLocalRuntimeModelRoot(item.modelId || item.model) === normalizedModelId
@@ -397,7 +397,7 @@ function hydrateLocalRuntimeBinding(
     };
   }
   return {
-    ...localRuntimeBindingFromOption(localModel),
+    ...localBindingFromOption(localModel),
     model: normalizedModelId || asString(localModel.modelId || localModel.model),
     modelId: normalizedModelId || asString(localModel.modelId || localModel.model) || undefined,
     localModelId: asString(binding.localModelId || localModel.localModelId) || undefined,
@@ -408,11 +408,11 @@ function resolveEffectiveBinding(
   snapshot: RuntimeRouteOptionsSnapshot | null,
   binding: RuntimeRouteBinding | null,
 ): RuntimeRouteBinding | null {
-  if (binding?.source === 'token-api') return hydrateTokenApiBinding(snapshot, binding);
-  if (binding?.source === 'local-runtime') return hydrateLocalRuntimeBinding(snapshot, binding);
+  if (binding?.source === 'cloud') return hydrateTokenApiBinding(snapshot, binding);
+  if (binding?.source === 'local') return hydrateLocalRuntimeBinding(snapshot, binding);
   if (!snapshot) return null;
   const fallback = snapshot.selected || snapshot.resolvedDefault || null;
-  if (fallback?.source === 'local-runtime') {
+  if (fallback?.source === 'local') {
     return hydrateLocalRuntimeBinding(snapshot, fallback);
   }
   return hydrateTokenApiBinding(snapshot, fallback);
@@ -423,7 +423,7 @@ function tokenApiBindingForConnector(
   model: string,
 ): RuntimeRouteBinding {
   return {
-    source: 'token-api',
+    source: 'cloud',
     connectorId: connector.id,
     provider: asString(connector.provider) || undefined,
     model,
@@ -434,14 +434,14 @@ function bindingForSource(
   snapshot: RuntimeRouteOptionsSnapshot | null,
   source: RuntimeRouteSource,
 ): RuntimeRouteBinding | null {
-  if (source === 'token-api') {
+  if (source === 'cloud') {
     const connector = snapshot?.connectors[0] || null;
     if (!connector) return null;
     return tokenApiBindingForConnector(connector, connector.models[0] || '');
   }
-  const local = snapshot?.localRuntime.models[0] || null;
+  const local = snapshot?.local.models[0] || null;
   if (!local) return null;
-  return localRuntimeBindingFromOption(local);
+  return localBindingFromOption(local);
 }
 
 function bindingForConnector(
@@ -451,7 +451,7 @@ function bindingForConnector(
 ): RuntimeRouteBinding | null {
   const connector = snapshot?.connectors.find((item) => item.id === connectorId) || null;
   if (!connector) return null;
-  const currentModel = current?.source === 'token-api' ? current.model : '';
+  const currentModel = current?.source === 'cloud' ? current.model : '';
   const model = connector.models.includes(currentModel) ? currentModel : (connector.models[0] || '');
   return tokenApiBindingForConnector(connector, model);
 }
@@ -465,23 +465,23 @@ export function bindingForModel(
   if (!normalizedModel) return current;
   const effective = resolveEffectiveBinding(snapshot, current);
   if (!effective) return null;
-  if (effective.source === 'token-api') {
+  if (effective.source === 'cloud') {
     return {
-      source: 'token-api',
+      source: 'cloud',
       connectorId: effective.connectorId,
       provider: asString(effective.provider) || undefined,
       model: normalizedModel,
     };
   }
   const normalizedLocalModel = normalizeLocalRuntimeModelRoot(normalizedModel);
-  const localModel = snapshot?.localRuntime.models.find((item) => (
+  const localModel = snapshot?.local.models.find((item) => (
     normalizeLocalRuntimeModelRoot(item.modelId || item.model) === normalizedLocalModel
   )) || null;
   if (localModel) {
-    return localRuntimeBindingFromOption(localModel);
+    return localBindingFromOption(localModel);
   }
   return {
-    source: 'local-runtime',
+    source: 'local',
     connectorId: '',
     model: normalizedLocalModel,
     modelId: normalizedLocalModel || undefined,
@@ -707,14 +707,14 @@ export function resolveRouteModelPickerState(
   activeModelInOptions: boolean;
 } {
   const effectiveBinding = resolveEffectiveBinding(snapshot, binding);
-  const activeSource = effectiveBinding?.source || snapshot?.selected?.source || 'local-runtime';
+  const activeSource = effectiveBinding?.source || snapshot?.selected?.source || 'local';
   const activeConnectorId = effectiveBinding?.connectorId || snapshot?.selected?.connectorId || '';
   const activeConnector = snapshot?.connectors.find((item) => item.id === activeConnectorId) || null;
-  const activeModel = activeSource === 'local-runtime'
+  const activeModel = activeSource === 'local'
     ? normalizeLocalRuntimeModelRoot(effectiveBinding?.modelId || effectiveBinding?.model || snapshot?.selected?.modelId || snapshot?.selected?.model || '')
     : (effectiveBinding?.model || snapshot?.selected?.model || '');
-  const localModels = snapshot?.localRuntime.models || [];
-  const modelOptions = activeSource === 'local-runtime'
+  const localModels = snapshot?.local.models || [];
+  const modelOptions = activeSource === 'local'
     ? localModels.map((item) => normalizeLocalRuntimeModelRoot(item.modelId || item.model))
     : (activeConnector?.models || []);
   return {
@@ -723,7 +723,7 @@ export function resolveRouteModelPickerState(
     activeConnectorId,
     activeModel,
     modelOptions,
-    tokenApiCatalogMissing: activeSource === 'token-api' && activeConnectorId.length > 0 && modelOptions.length === 0,
+    tokenApiCatalogMissing: activeSource === 'cloud' && activeConnectorId.length > 0 && modelOptions.length === 0,
     activeModelInOptions: modelOptions.includes(activeModel),
   };
 }
@@ -873,19 +873,19 @@ function RouteBindingEditor(props: RouteBindingEditorProps) {
             }}
             disabled={!props.snapshot}
           >
-            <option value="local-runtime">local-runtime</option>
-            <option value="token-api">token-api</option>
+            <option value="local">local</option>
+            <option value="cloud">cloud</option>
           </select>
         </label>
         <label className="flex flex-col gap-1 text-xs">
           <span className="text-gray-500">Connector</span>
           <select
             className="rounded-md border border-gray-300 bg-white px-2 py-1"
-            value={activeSource === 'token-api' ? activeConnectorId : ''}
+            value={activeSource === 'cloud' ? activeConnectorId : ''}
             onChange={(event) => {
               props.onBindingChange(bindingForConnector(props.snapshot, event.target.value, effectiveBinding));
             }}
-            disabled={!props.snapshot || activeSource !== 'token-api'}
+            disabled={!props.snapshot || activeSource !== 'cloud'}
           >
             <option value="">--</option>
             {tokenConnectors.map((connector) => (
@@ -908,7 +908,7 @@ function RouteBindingEditor(props: RouteBindingEditorProps) {
           >
             <option value="">
               {modelOptions.length === 0
-                ? (activeSource === 'token-api' ? 'Connector catalog missing models' : 'No local models')
+                ? (activeSource === 'cloud' ? 'Connector catalog missing models' : 'No local models')
                 : 'Select model'}
             </option>
             {modelOptions.map((model) => (
@@ -924,7 +924,7 @@ function RouteBindingEditor(props: RouteBindingEditorProps) {
       ) : null}
       <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
         <span>
-          {activeSource === 'token-api'
+          {activeSource === 'cloud'
             ? `provider: ${activeConnector?.provider || effectiveBinding?.provider || 'unknown'}`
             : 'local runtime model catalog'}
         </span>
@@ -958,7 +958,7 @@ function RouteBindingEditor(props: RouteBindingEditorProps) {
           ? `${effectiveBinding.source} · ${effectiveBinding.provider || '—'} · ${effectiveBinding.connectorId || '—'} · ${effectiveBinding.model || '—'}`
           : 'runtime default'}
       </div>
-      {effectiveBinding?.source === 'local-runtime' ? (
+      {effectiveBinding?.source === 'local' ? (
         <div className="mt-1 text-xs text-gray-500">
           {`adapter=${effectiveBinding.adapter || '—'} · go-runtime=${effectiveBinding.goRuntimeStatus || 'unknown'} · localModelId=${effectiveBinding.localModelId || '—'}`}
         </div>
@@ -1215,7 +1215,7 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
       onStateChange((prev) => ({
         ...prev,
         busy: true,
-        busyLabel: resolved?.source === 'local-runtime' ? 'Warming local model...' : 'Running...',
+        busyLabel: resolved?.source === 'local' ? 'Warming local model...' : 'Running...',
       }));
       const result = await runtimeClient.ai.text.generate({
         input: prompt,
@@ -1470,8 +1470,8 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
     () => resolveEffectiveBinding(state.snapshot, state.binding),
     [state.snapshot, state.binding],
   );
-  const isLocalRuntimeWorkflow = effectiveBinding?.source === 'local-runtime';
-  const localRuntimeEngine = asString(
+  const isLocalRuntimeWorkflow = effectiveBinding?.source === 'local';
+  const localEngine = asString(
     isLocalRuntimeWorkflow
       ? (effectiveBinding?.engine || effectiveBinding?.provider)
       : '',
@@ -1497,8 +1497,8 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
     let cancelled = false;
     setArtifactLoading(true);
     setArtifactError('');
-    void runtimeClient.localRuntime.listArtifacts(
-      localRuntimeEngine ? { engine: localRuntimeEngine } : undefined,
+    void runtimeClient.local.listArtifacts(
+      localEngine ? { engine: localEngine } : undefined,
     ).then((rows) => {
       if (cancelled) return;
       setArtifacts(rows);
@@ -1512,7 +1512,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
     return () => {
       cancelled = true;
     };
-  }, [runtimeClient, isLocalRuntimeWorkflow, localRuntimeEngine]);
+  }, [runtimeClient, isLocalRuntimeWorkflow, localEngine]);
 
   React.useEffect(() => {
     if (!isLocalRuntimeWorkflow || artifacts.length === 0) {
@@ -2210,7 +2210,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
           </div>
         ) : (
           <div className="mt-3 rounded-md bg-blue-50 p-2 text-[11px] text-blue-700">
-            Local workflow controls apply only when the route source is `local-runtime`. When using `token-api`, the request only sends the standard image fields.
+            Local workflow controls apply only when the route source is `local`. When using `cloud`, the request only sends the standard image fields.
           </div>
         )}
       </details>

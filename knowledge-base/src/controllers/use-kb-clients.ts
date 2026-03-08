@@ -34,7 +34,7 @@ function resolveTokenApiBindingFromOptions(
 ): RuntimeRouteBinding | undefined {
   if (!options) return undefined;
   const targetConnectorId = asString(preferredConnectorId);
-  const selectedConnectorId = options.selected.source === 'token-api'
+  const selectedConnectorId = options.selected.source === 'cloud'
     ? asString(options.selected.connectorId)
     : '';
   const connector = (
@@ -46,7 +46,7 @@ function resolveTokenApiBindingFromOptions(
   const connectorId = asString(connector?.id || targetConnectorId || selectedConnectorId);
 
   const preferred = asString(preferredModel);
-  const selectedModel = options.selected.source === 'token-api'
+  const selectedModel = options.selected.source === 'cloud'
     ? asString(options.selected.model)
     : '';
   const connectorModels = connector?.models || [];
@@ -63,7 +63,7 @@ function resolveTokenApiBindingFromOptions(
   }
 
   return {
-    source: 'token-api',
+    source: 'cloud',
     connectorId,
     model,
   };
@@ -75,23 +75,23 @@ function resolveLocalRuntimeBindingFromOptions(
 ): RuntimeRouteBinding | undefined {
   if (!options) return undefined;
   const targetModel = asString(preferredModel);
-  const selectedModel = options?.selected.source === 'local-runtime'
+  const selectedModel = options?.selected.source === 'local'
     ? asString(options.selected.model)
     : '';
-  const matchedModel = options?.localRuntime.models.find((item) => {
+  const matchedModel = options?.local.models.find((item) => {
     const model = asString(item.model);
     const localModelId = asString(item.localModelId);
     return (targetModel && (model === targetModel || localModelId === targetModel))
       || (selectedModel && (model === selectedModel || localModelId === selectedModel));
   }) || null;
-  const fallbackModel = matchedModel || options?.localRuntime.models[0] || null;
+  const fallbackModel = matchedModel || options?.local.models[0] || null;
   const model = asString(matchedModel?.model || targetModel || selectedModel || fallbackModel?.model);
   const localModelId = asString(matchedModel?.localModelId || fallbackModel?.localModelId);
   if (!model) {
     return undefined;
   }
   return {
-    source: 'local-runtime',
+    source: 'local',
     connectorId: '',
     model,
     ...(localModelId ? { localModelId } : {}),
@@ -104,7 +104,7 @@ function resolveConfiguredBinding(
   options: RuntimeRouteOptionsSnapshot | null,
 ): RuntimeRouteBinding | undefined {
   if (preference.source === 'auto') return undefined;
-  if (preference.source === 'token-api') {
+  if (preference.source === 'cloud') {
     return resolveTokenApiBindingFromOptions(options, preference.connectorId, preference.model);
   }
   return resolveLocalRuntimeBindingFromOptions(options, preference.model);
@@ -133,7 +133,7 @@ export function useKBClients(
           selectedConnectorId: options.selected.connectorId || null,
           selectedModel: options.selected.model || null,
           connectorsCount: options.connectors.length,
-          localModelsCount: options.localRuntime.models.length,
+          localModelsCount: options.local.models.length,
         },
       });
       if (capability === 'text.generate') {

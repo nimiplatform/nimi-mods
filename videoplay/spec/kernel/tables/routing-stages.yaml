@@ -1,67 +1,67 @@
 version: 1
 route_sources:
-  preferred: local-runtime
-  fallback: token-api
+  preferred: local
+  fallback: cloud
   source_rule: V-ROUTE-001
 stages:
   - stage: screenplay
     capability: runtime.ai.text.generate
-    fallback_on_unavailable: token-api
+    fallback_on_unavailable: cloud
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002
   - stage: storyboard
     capability: runtime.ai.text.generate
-    fallback_on_unavailable: token-api
+    fallback_on_unavailable: cloud
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002
   - stage: asset-render-image
     capability: runtime.media.image.generate
-    fallback_on_unavailable: token-api
+    fallback_on_unavailable: cloud
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002
   - stage: asset-render-video
     capability: runtime.media.video.generate
-    fallback_on_unavailable: token-api
+    fallback_on_unavailable: cloud
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002
   - stage: asset-render-voice
     capability: runtime.media.tts.synthesize
-    fallback_on_unavailable: token-api
+    fallback_on_unavailable: cloud
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002
   - stage: character-casting-text
     capability: runtime.ai.text.generate
-    fallback_on_unavailable: token-api
+    fallback_on_unavailable: cloud
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002
   - stage: character-casting-visual
     capability: runtime.media.image.generate
-    fallback_on_unavailable: token-api
+    fallback_on_unavailable: cloud
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002
   - stage: scene-planning-text
     capability: runtime.ai.text.generate
-    fallback_on_unavailable: token-api
+    fallback_on_unavailable: cloud
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002
   - stage: scene-planning-visual
     capability: runtime.media.image.generate
-    fallback_on_unavailable: token-api
+    fallback_on_unavailable: cloud
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002
   - stage: storyboard-cinematography
     capability: runtime.ai.text.generate
-    fallback_on_unavailable: token-api
+    fallback_on_unavailable: cloud
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002
   - stage: storyboard-acting
     capability: runtime.ai.text.generate
-    fallback_on_unavailable: token-api
+    fallback_on_unavailable: cloud
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002
   - stage: audio-design-bgm
     capability: runtime.ai.text.generate
-    fallback_on_unavailable: token-api
+    fallback_on_unavailable: cloud
     fail_code_when_both_unavailable: VIDEOPLAY_ROUTE_UNAVAILABLE
     source_rule: V-ROUTE-002
 audit:

@@ -11,7 +11,7 @@ type MediaRouteSource = LocalChatDefaultSettings['imageRouteSource'];
 type MediaRouteCapability = 'image.generate' | 'video.generate';
 
 function normalizeRouteSource(value: string): MediaRouteSource {
-  if (value === 'local-runtime' || value === 'token-api') {
+  if (value === 'local' || value === 'cloud') {
     return value;
   }
   return 'auto';
@@ -29,9 +29,9 @@ function resolveReadyLocalRuntimeBinding(input: {
   binding?: RuntimeRouteBinding | null;
   routeOptions?: RuntimeRouteOptionsSnapshot | null;
 }): RuntimeRouteBinding | null {
-  const localRuntimeModels = input.routeOptions?.localRuntime.models || [];
+  const localModels = input.routeOptions?.local.models || [];
   const matchedLocalModel = findLocalRuntimeModelForBinding({
-    models: localRuntimeModels,
+    models: localModels,
     binding: {
       model: input.binding?.model,
       localModelId: input.binding?.localModelId,
@@ -41,7 +41,7 @@ function resolveReadyLocalRuntimeBinding(input: {
 
   if (matchedLocalModel && isLocalRuntimeModelReady(matchedLocalModel)) {
     return {
-      source: 'local-runtime',
+      source: 'local',
       connectorId: '',
       model: asTrimmedString(matchedLocalModel.model || matchedLocalModel.localModelId),
       ...(asTrimmedString(matchedLocalModel.localModelId) ? { localModelId: asTrimmedString(matchedLocalModel.localModelId) } : {}),
@@ -54,17 +54,17 @@ function resolveReadyLocalRuntimeBinding(input: {
   if (input.binding && isActiveGoRuntimeStatus(input.binding.goRuntimeStatus)) {
     return {
       ...input.binding,
-      source: 'local-runtime',
+      source: 'local',
       connectorId: '',
       model: asTrimmedString(input.binding.model || input.binding.localModelId),
     };
   }
 
   if (!input.binding || (!asTrimmedString(input.binding.model) && !asTrimmedString(input.binding.localModelId))) {
-    const firstReadyModel = localRuntimeModels.find((model) => isLocalRuntimeModelReady(model)) || null;
+    const firstReadyModel = localModels.find((model) => isLocalRuntimeModelReady(model)) || null;
     if (firstReadyModel) {
       return {
-        source: 'local-runtime',
+        source: 'local',
         connectorId: '',
         model: asTrimmedString(firstReadyModel.model || firstReadyModel.localModelId),
         ...(asTrimmedString(firstReadyModel.localModelId) ? { localModelId: asTrimmedString(firstReadyModel.localModelId) } : {}),
@@ -75,13 +75,13 @@ function resolveReadyLocalRuntimeBinding(input: {
     }
   }
 
-  if (localRuntimeModels.length === 0 && input.binding && !asTrimmedString(input.binding.goRuntimeStatus)) {
+  if (localModels.length === 0 && input.binding && !asTrimmedString(input.binding.goRuntimeStatus)) {
     const model = asTrimmedString(input.binding.model || input.binding.localModelId);
     const localModelId = asTrimmedString(input.binding.localModelId);
     if (model) {
       return {
         ...input.binding,
-        source: 'local-runtime',
+        source: 'local',
         connectorId: '',
         model,
         ...(localModelId ? { localModelId } : {}),
@@ -96,7 +96,7 @@ function isResolvedMediaRouteOperational(input: {
   resolvedRoute: LocalChatResolvedMediaRoute;
   routeOptions?: RuntimeRouteOptionsSnapshot | null;
 }): boolean {
-  if (input.resolvedRoute.source === 'token-api') {
+  if (input.resolvedRoute.source === 'cloud') {
     return true;
   }
   const goRuntimeStatus = asTrimmedString(input.resolvedRoute.goRuntimeStatus).toLowerCase();
@@ -104,7 +104,7 @@ function isResolvedMediaRouteOperational(input: {
     return goRuntimeStatus === 'active';
   }
   const matchedLocalModel = findLocalRuntimeModelForBinding({
-    models: input.routeOptions?.localRuntime.models || [],
+    models: input.routeOptions?.local.models || [],
     binding: {
       model: input.resolvedRoute.model,
       localModelId: input.resolvedRoute.localModelId,
@@ -126,7 +126,7 @@ function toResolvedMediaRouteIfReady(input: {
   routeOptionsRevision?: number;
   provider?: string;
 }): LocalChatResolvedMediaRoute | null {
-  if (input.binding.source === 'local-runtime') {
+  if (input.binding.source === 'local') {
     const readyBinding = resolveReadyLocalRuntimeBinding({
       binding: input.binding,
       routeOptions: input.routeOptions,
@@ -149,7 +149,7 @@ function toResolvedMediaRouteIfReady(input: {
 export function resolveMediaRouteConfig(input: {
   kind: MediaKind;
   settings: LocalChatDefaultSettings;
-  fallbackSource?: 'local-runtime' | 'token-api';
+  fallbackSource?: 'local' | 'cloud';
 }): {
   routeSource: MediaRouteSource;
   routeBinding?: RuntimeRouteBinding;
@@ -170,11 +170,11 @@ export function resolveMediaRouteConfig(input: {
       ? input.settings.imageModel
       : input.settings.videoModel,
   );
-  const fallbackSource = input.fallbackSource || 'local-runtime';
+  const fallbackSource = input.fallbackSource || 'local';
 
-  if (routeSource === 'local-runtime') {
+  if (routeSource === 'local') {
     const override: RuntimeRouteBinding = {
-      source: 'local-runtime',
+      source: 'local',
       connectorId: '',
       model: model || '',
       ...(model ? { model, localModelId: model } : {}),
@@ -186,9 +186,9 @@ export function resolveMediaRouteConfig(input: {
     };
   }
 
-  if (routeSource === 'token-api') {
+  if (routeSource === 'cloud') {
     const override: RuntimeRouteBinding = {
-      source: 'token-api',
+      source: 'cloud',
       connectorId,
       model: model || '',
       ...(connectorId ? { connectorId } : {}),
@@ -202,14 +202,14 @@ export function resolveMediaRouteConfig(input: {
   }
 
   if (connectorId || model) {
-    const inferredSource = connectorId ? 'token-api' : fallbackSource;
+    const inferredSource = connectorId ? 'cloud' : fallbackSource;
     const override: RuntimeRouteBinding = {
       source: inferredSource,
       connectorId,
       model: model || '',
       ...(connectorId ? { connectorId } : {}),
       ...(model ? { model } : {}),
-      ...(model && inferredSource === 'local-runtime' ? { localModelId: model } : {}),
+      ...(model && inferredSource === 'local' ? { localModelId: model } : {}),
     };
     return {
       routeSource,
@@ -259,7 +259,7 @@ export function isMediaRouteReady(input: {
       routeOptionsRevision: input.routeOptionsRevision,
     }));
   }
-  if (routeSource === 'local-runtime') {
+  if (routeSource === 'local') {
     return Boolean(resolveReadyLocalRuntimeBinding({
       binding: resolveMediaRouteConfig({
         kind: input.kind,
@@ -391,7 +391,7 @@ export async function preflightResolveMediaRoute(input: {
   }> };
   kind: MediaKind;
   settings: LocalChatDefaultSettings;
-  fallbackSource?: 'local-runtime' | 'token-api';
+  fallbackSource?: 'local' | 'cloud';
   routeOptionsRevision?: number;
 }): Promise<LocalChatResolvedMediaRoute | null> {
   const routeConfig = resolveMediaRouteConfig({
@@ -405,7 +405,7 @@ export async function preflightResolveMediaRoute(input: {
   });
   const resolvedRoute = toResolvedMediaRouteIfReady({
     binding: {
-      source: resolved.source === 'token-api' ? 'token-api' : 'local-runtime',
+      source: resolved.source === 'cloud' ? 'cloud' : 'local',
       connectorId: asTrimmedString(resolved.connectorId),
       model: asTrimmedString(resolved.model || resolved.localModelId),
       ...(asTrimmedString(resolved.localModelId) ? { localModelId: asTrimmedString(resolved.localModelId) } : {}),
@@ -430,11 +430,11 @@ export function toPinnedRouteBinding(route: {
   model?: string;
   localModelId?: string;
 }): RuntimeRouteBinding {
-  if (route.source === 'token-api') {
+  if (route.source === 'cloud') {
     const connectorId = asTrimmedString(route.connectorId);
     const model = asTrimmedString(route.model);
     return {
-      source: 'token-api',
+      source: 'cloud',
       connectorId,
       model,
     };
@@ -442,7 +442,7 @@ export function toPinnedRouteBinding(route: {
   const model = asTrimmedString(route.model);
   const localModelId = asTrimmedString(route.localModelId) || model;
   return {
-    source: 'local-runtime',
+    source: 'local',
     connectorId: '',
     model,
     ...(localModelId ? { localModelId } : {}),

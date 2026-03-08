@@ -91,7 +91,7 @@ export type WorldStudioEmbeddingIndexEntry = {
 export type WorldStudioEmbeddingIndex = {
   status: 'idle' | 'building' | 'ready' | 'failed';
   lastBuiltAt: string | null;
-  routeSource: 'local-runtime' | 'token-api' | null;
+  routeSource: 'local' | 'cloud' | null;
   routeModel: string | null;
   entries: Record<string, WorldStudioEmbeddingIndexEntry>;
   errorMessage: string | null;

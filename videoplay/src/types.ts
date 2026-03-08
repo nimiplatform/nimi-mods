@@ -358,7 +358,7 @@ export type RenderedAsset = {
   fps: number;
   resolution: string;
   sourceEventIds: string[];
-  routeSource: 'local-runtime' | 'token-api' | 'unknown';
+  routeSource: 'local' | 'cloud' | 'unknown';
   metadata: Record<string, unknown>;
 };
 
@@ -456,8 +456,8 @@ export type FallbackAuditRecord = {
   traceId: string;
   stage: VideoPlayRouteStage;
   capability: RuntimeCanonicalCapability;
-  from: 'local-runtime';
-  to: 'token-api';
+  from: 'local';
+  to: 'cloud';
   reason: string;
 };
 

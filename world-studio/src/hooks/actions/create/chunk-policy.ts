@@ -55,7 +55,7 @@ function resolveBindingModelProfiles(
   routeOptions: RuntimeRouteOptionsSnapshot | null,
 ): RuntimeRouteModelProfile[] {
   if (!binding || !routeOptions) return [];
-  if (binding.source === 'local-runtime') {
+  if (binding.source === 'local') {
     return [];
   }
 

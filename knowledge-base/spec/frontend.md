@@ -77,8 +77,8 @@ KnowledgeBasePage
 路由解析在 `use-kb-clients.ts`：
 
 - 按 capability 调 `runtime.route.listOptions()`
-- 根据 `KBSettings.*RouteSource` 选择 token-api / local-runtime / auto
-- Auto 模式 embedding adapter 实现 token-api → local-runtime 回退（KB-CAP-002）
+- 根据 `KBSettings.*RouteSource` 选择 cloud / local / auto
+- Auto 模式 embedding adapter 实现 cloud → local 回退（KB-CAP-002）
 
 ## Service Layer
 

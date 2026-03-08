@@ -112,7 +112,7 @@ test('turn-mode regression: high flirt affinity does not upcast neutral question
       mediaAutonomy: 'natural',
       visualComfortLevel: 'natural-visuals',
     },
-    routeSource: 'local-runtime',
+    routeSource: 'local',
   });
   const beats = orchestrateBeatModalities({
     beats: [createBeat('我今天在整理资料，等会儿再陪你慢慢聊。')],

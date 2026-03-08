@@ -51,7 +51,7 @@ export const AUDIO_BOOK_MANIFEST = {
           dependencyId: 'audio-book/tts-token-node',
           kind: 'node',
           capability: 'speech',
-          nodeId: 'speech.synthesize.token-api',
+          nodeId: 'speech.synthesize.cloud',
           title: 'Token API TTS node',
         },
       ],

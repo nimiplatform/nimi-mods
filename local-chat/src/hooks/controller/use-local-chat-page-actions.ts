@@ -126,20 +126,20 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
       const resolvedDefaultSource = state.runtimeRouteState.chatRouteOptions?.resolvedDefault?.source;
       const dependencySnapshot = state.dependencySnapshot;
       const autoBoundSource: RuntimeStatusSidebarProps['autoBoundSource'] = (
-        dependencySnapshot?.routeSource === 'local-runtime'
-        || dependencySnapshot?.routeSource === 'token-api'
+        dependencySnapshot?.routeSource === 'local'
+        || dependencySnapshot?.routeSource === 'cloud'
         || dependencySnapshot?.routeSource === 'mixed'
       )
         ? dependencySnapshot.routeSource
         : (
-          resolvedDefaultSource === 'local-runtime' || resolvedDefaultSource === 'token-api'
+          resolvedDefaultSource === 'local' || resolvedDefaultSource === 'cloud'
         )
         ? resolvedDefaultSource
         : 'unknown';
 
-      const localChatRuntimeModels = state.runtimeRouteState.chatRouteOptions?.localRuntime.models || [];
-      const localTtsRuntimeModels = state.runtimeRouteState.ttsRouteOptions?.localRuntime.models || localChatRuntimeModels;
-      const localSttRuntimeModels = state.runtimeRouteState.sttRouteOptions?.localRuntime.models || localChatRuntimeModels;
+      const localChatRuntimeModels = state.runtimeRouteState.chatRouteOptions?.local.models || [];
+      const localTtsRuntimeModels = state.runtimeRouteState.ttsRouteOptions?.local.models || localChatRuntimeModels;
+      const localSttRuntimeModels = state.runtimeRouteState.sttRouteOptions?.local.models || localChatRuntimeModels;
       const localTtsRouteAvailable = hasReadyLocalRuntimeModelForScenario({
         models: localTtsRuntimeModels,
         scenario: 'audio.synthesize',
@@ -156,7 +156,7 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
           return chatRows.some((item) => item.selected);
         }
         const selected = state.runtimeRouteState.routeBinding || state.runtimeRouteState.chatRouteOptions?.selected || null;
-        if (!selected || selected.source !== 'local-runtime') return true;
+        if (!selected || selected.source !== 'local') return true;
         const localModel = findLocalRuntimeModelForBinding({
           models: localChatRuntimeModels,
           binding: {
@@ -174,13 +174,13 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
 
       const chatRouteReady = (() => {
         const resolvedSnapshot = state.runtimeRouteState.routeSnapshot;
-        if (resolvedSnapshot?.source === 'token-api') {
+        if (resolvedSnapshot?.source === 'cloud') {
           return true;
         }
         const selectedBinding = state.runtimeRouteState.routeBinding
           || state.runtimeRouteState.chatRouteOptions?.selected
           || null;
-        if (selectedBinding?.source === 'token-api') {
+        if (selectedBinding?.source === 'cloud') {
           return true;
         }
         const localModel = findLocalRuntimeModelForBinding({
@@ -194,13 +194,13 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         if (localModel) {
           return isLocalRuntimeModelReady(localModel);
         }
-        if (resolvedSnapshot?.source === 'local-runtime' && resolvedSnapshot.goRuntimeStatus) {
+        if (resolvedSnapshot?.source === 'local' && resolvedSnapshot.goRuntimeStatus) {
           return String(resolvedSnapshot.goRuntimeStatus).trim().toLowerCase() === 'active';
         }
         return false;
       })();
 
-      const isLocalSnapshotFailure = autoBoundSource === 'token-api'
+      const isLocalSnapshotFailure = autoBoundSource === 'cloud'
         && dependencySnapshot?.reasonCode === ReasonCode.LOCAL_AI_DEPENDENCY_SNAPSHOT_FAILED;
 
       const capabilityMatchedFromSnapshot = (capability: 'text.generate' | 'audio.synthesize' | 'audio.transcribe'): boolean => {
@@ -209,19 +209,19 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         if (rows.length === 0) {
           if (capability === 'text.generate') return chatCapabilityMatched;
           if (capability === 'audio.synthesize') {
-            if (state.speechSettingsState.defaultSettings.ttsRouteSource === 'token-api') return true;
+            if (state.speechSettingsState.defaultSettings.ttsRouteSource === 'cloud') return true;
             if (
               state.speechSettingsState.defaultSettings.ttsRouteSource === 'auto'
-              && state.runtimeRouteState.ttsRouteOptions?.selected?.source === 'token-api'
+              && state.runtimeRouteState.ttsRouteOptions?.selected?.source === 'cloud'
             ) {
               return true;
             }
             return localTtsRouteAvailable;
           }
-          if (state.speechSettingsState.defaultSettings.sttRouteSource === 'token-api') return true;
+          if (state.speechSettingsState.defaultSettings.sttRouteSource === 'cloud') return true;
           if (
             state.speechSettingsState.defaultSettings.sttRouteSource === 'auto'
-            && state.runtimeRouteState.sttRouteOptions?.selected?.source === 'token-api'
+            && state.runtimeRouteState.sttRouteOptions?.selected?.source === 'cloud'
           ) {
             return true;
           }

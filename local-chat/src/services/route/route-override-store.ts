@@ -24,15 +24,15 @@ export function loadLocalChatRouteBinding(): RuntimeRouteBinding | null {
       const connectorId = String(record.connectorId || '').trim();
       const model = String(record.model || '').trim();
       if (!source || !model) return null;
-      const normalizedSource = source === 'token-api' ? 'token-api' : 'local-runtime';
+      const normalizedSource = source === 'cloud' ? 'cloud' : 'local';
       return {
         source: normalizedSource,
         connectorId,
         model,
-        localModelId: normalizedSource === 'local-runtime'
+        localModelId: normalizedSource === 'local'
           ? (String(record.localModelId || '').trim() || undefined)
           : undefined,
-        engine: normalizedSource === 'local-runtime'
+        engine: normalizedSource === 'local'
           ? (String(record.engine || '').trim() || undefined)
           : undefined,
       };

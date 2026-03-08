@@ -23,7 +23,7 @@ export function createMediaDependencySnapshot(capability, status = 'ready') {
   return {
     modId: 'local-chat',
     status,
-    routeSource: 'local-runtime',
+    routeSource: 'local',
     warnings: [],
     dependencies: status === 'ready'
       ? [{
@@ -111,7 +111,7 @@ export const mediaDecisionRegressionCases = [
     expected: {
       kind: 'execute',
       intentType: 'image',
-      routeSource: 'local-runtime',
+      routeSource: 'local',
       requestedSize: '1024x1536',
     },
   },
@@ -136,7 +136,7 @@ export const mediaDecisionRegressionCases = [
     expected: {
       kind: 'execute',
       intentType: 'image',
-      routeSource: 'local-runtime',
+      routeSource: 'local',
       requestedSize: '1024x1024',
     },
   },
@@ -182,7 +182,7 @@ export const mediaDecisionRegressionCases = [
     expected: {
       kind: 'execute',
       intentType: 'video',
-      routeSource: 'local-runtime',
+      routeSource: 'local',
       requestedDurationSeconds: 6,
     },
   },
@@ -216,7 +216,7 @@ export const mediaDecisionRegressionCases = [
     },
   },
   {
-    name: 'planner blocks NSFW image on token route when policy is local-runtime-only',
+    name: 'planner blocks NSFW image on token route when policy is local-only',
     userText: '给我看点更暧昧的样子',
     assistantText: '如果你想看，我可以把那一瞬拍给你。',
     plannerDecision: {
@@ -233,11 +233,11 @@ export const mediaDecisionRegressionCases = [
       reason: 'assistant offers a more intimate look',
       nsfwIntent: 'suggested',
     },
-    routeSource: 'token-api',
-    nsfwPolicy: 'local-runtime-only',
+    routeSource: 'cloud',
+    nsfwPolicy: 'local-only',
     expected: {
       kind: 'none',
-      plannerBlockedReason: '已拦截本次图片发送：NSFW 仅允许本地路由。请切到“本地运行时”后重试。',
+      plannerBlockedReason: '已拦截本次图片发送：NSFW 仅允许本地路由。请切到“本地”后重试。',
     },
   },
 ];

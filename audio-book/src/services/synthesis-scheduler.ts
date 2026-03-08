@@ -121,7 +121,7 @@ async function synthesizeWithChunking(
     pitch?: number;
     emotion?: string;
     binding?: {
-      source: 'local-runtime' | 'token-api';
+      source: 'local' | 'cloud';
       connectorId: string;
       model: string;
     };
@@ -224,7 +224,7 @@ export function runSynthesisJob(
     existingJobs?: SegmentJob[];
     /** TTS routing options — runtime route binding passed to every synthesize call. */
     ttsRoute?: {
-      binding?: { source: 'local-runtime' | 'token-api'; connectorId: string; model: string };
+      binding?: { source: 'local' | 'cloud'; connectorId: string; model: string };
       model?: string;
     };
   },

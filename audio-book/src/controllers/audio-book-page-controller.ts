@@ -454,7 +454,7 @@ export function useAudioBookPageController() {
         {
           binding: ttsRoute.ttsSelection.connectorId
             ? {
-              source: ttsRoute.ttsSelection.routeSource === 'local-runtime' ? 'local-runtime' : 'token-api',
+              source: ttsRoute.ttsSelection.routeSource === 'local' ? 'local' : 'cloud',
               connectorId: ttsRoute.ttsSelection.connectorId,
               model: ttsRoute.ttsSelection.model || '',
             }
@@ -538,7 +538,7 @@ export function useAudioBookPageController() {
           emotion: casting.emotion,
           binding: ttsRoute.ttsSelection.connectorId
             ? {
-              source: ttsRoute.ttsSelection.routeSource === 'local-runtime' ? 'local-runtime' : 'token-api',
+              source: ttsRoute.ttsSelection.routeSource === 'local' ? 'local' : 'cloud',
               connectorId: ttsRoute.ttsSelection.connectorId,
               model: ttsRoute.ttsSelection.model || '',
             }
@@ -666,7 +666,7 @@ export function useAudioBookPageController() {
         ttsRoute: {
           binding: ttsRoute.ttsSelection.connectorId
             ? {
-              source: ttsRoute.ttsSelection.routeSource === 'local-runtime' ? 'local-runtime' : 'token-api',
+              source: ttsRoute.ttsSelection.routeSource === 'local' ? 'local' : 'cloud',
               connectorId: ttsRoute.ttsSelection.connectorId,
               model: ttsRoute.ttsSelection.model || '',
             }

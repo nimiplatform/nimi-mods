@@ -113,7 +113,7 @@ function createResolvedExperiencePolicy(
     mediaPolicy: {
       autonomy: 'natural',
       visualComfortLevel: 'soft-visuals',
-      routeSource: 'local-runtime',
+      routeSource: 'local',
       nsfwPolicy: 'disabled',
       allowVisualAuto: true,
       allowAutoVisualHighRisk: false,
@@ -122,7 +122,7 @@ function createResolvedExperiencePolicy(
     contentBoundary: {
       relationshipBoundaryPreset: 'balanced',
       visualComfortLevel: 'soft-visuals',
-      routeSource: 'local-runtime',
+      routeSource: 'local',
       relationshipState: 'new',
       ...(overrides.contentBoundary || {}),
     },

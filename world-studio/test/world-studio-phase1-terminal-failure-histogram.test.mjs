@@ -48,7 +48,7 @@ test('runCreatePhase1 emits terminal failure histogram in diagnostics', async ()
       withOpenApiContextLock: async (_context, task) => task(),
       getRuntimeHookRuntime: () => ({}),
       resolveRouteBinding: async () => ({
-        source: 'token-api',
+        source: 'cloud',
         connectorId: 'connector-1',
         model: 'deepseek/deepseek-chat',
       }),
@@ -75,7 +75,7 @@ test('runCreatePhase1 emits terminal failure histogram in diagnostics', async ()
   try {
     const snapshotRef = { current: cloneDefaultSnapshot() };
     const binding = {
-      source: 'token-api',
+      source: 'cloud',
       connectorId: 'connector-1',
       model: 'deepseek/deepseek-chat',
     };

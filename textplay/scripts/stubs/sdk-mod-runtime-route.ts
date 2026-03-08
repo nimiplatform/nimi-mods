@@ -11,7 +11,7 @@ export function parseRuntimeRouteOptions(payload: unknown): {
     model: string;
   };
   resolvedDefault: Record<string, unknown>;
-  localRuntime: Record<string, unknown>;
+  local: Record<string, unknown>;
   connectors: unknown[];
 } | null {
   const record = asRecord(payload);
@@ -29,7 +29,7 @@ export function parseRuntimeRouteOptions(payload: unknown): {
       model,
     },
     resolvedDefault: asRecord(record.resolvedDefault),
-    localRuntime: asRecord(record.localRuntime),
+    local: asRecord(record.local),
     connectors: Array.isArray(record.connectors) ? record.connectors : [],
   };
 }

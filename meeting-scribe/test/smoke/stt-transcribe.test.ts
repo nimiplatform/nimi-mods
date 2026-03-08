@@ -80,7 +80,7 @@ function loadAudioFixture(): { bytes: Uint8Array; mimeType: string; fileName: st
   };
 }
 
-test('meeting-scribe stt: gemini token-api transcription', {
+test('meeting-scribe stt: gemini cloud transcription', {
   skip: process.env.NIMI_SDK_LIVE !== '1',
   timeout: 300_000,
 }, async (t) => {
@@ -114,7 +114,7 @@ test('meeting-scribe stt: gemini token-api transcription', {
         audio: { kind: 'bytes', bytes: audio.bytes },
         mimeType: audio.mimeType,
         diarization: true,
-        route: 'token-api',
+        route: 'cloud',
         fallback: 'deny',
         timeoutMs: 300_000,
       });

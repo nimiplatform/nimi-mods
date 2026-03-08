@@ -423,7 +423,7 @@ export const RenderedAssetSchema = z.object({
   fps: z.number().int().positive(),
   resolution: z.string().min(1),
   sourceEventIds: SourceEventIdsSchema,
-  routeSource: z.enum(['local-runtime', 'token-api', 'unknown']),
+  routeSource: z.enum(['local', 'cloud', 'unknown']),
   metadata: z.record(z.string(), z.unknown()),
 });
 
@@ -586,8 +586,8 @@ export const ReleasePackageSchema = z.object({
         'voice_workflow.tts_v2v',
         'voice_workflow.tts_t2v',
       ]),
-      from: z.literal('local-runtime'),
-      to: z.literal('token-api'),
+      from: z.literal('local'),
+      to: z.literal('cloud'),
       reason: z.string().min(1),
     })),
     runEvents: z.array(RunEventSchema),

@@ -62,7 +62,7 @@ type CanonicalExecution = {
   routeSource: LocalChatResolvedMediaRoute['source'];
   connectorId?: string;
   model?: string;
-  nsfwPolicy: 'disabled' | 'local-runtime-only' | 'allowed';
+  nsfwPolicy: 'disabled' | 'local-only' | 'allowed';
 };
 
 function trimAndCollapseWhitespace(value: string): string {
@@ -400,7 +400,7 @@ function toCanonicalExecution(input: {
   compiled: LocalChatCompiledMediaExecution;
   spec: LocalChatMediaGenerationSpec;
   resolvedRoute: LocalChatResolvedMediaRoute;
-  nsfwPolicy: 'disabled' | 'local-runtime-only' | 'allowed';
+  nsfwPolicy: 'disabled' | 'local-only' | 'allowed';
 }): CanonicalExecution {
   return {
     specHash: input.specHash,
@@ -436,7 +436,7 @@ export async function createMediaExecutionCacheKey(input: {
   compiled: LocalChatCompiledMediaExecution;
   spec: LocalChatMediaGenerationSpec;
   resolvedRoute: LocalChatResolvedMediaRoute;
-  nsfwPolicy: 'disabled' | 'local-runtime-only' | 'allowed';
+  nsfwPolicy: 'disabled' | 'local-only' | 'allowed';
 }): Promise<string> {
   return sha256Hex(serializeCanonicalRecord(toCanonicalExecution(input)));
 }

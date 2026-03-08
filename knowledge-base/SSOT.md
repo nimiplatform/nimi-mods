@@ -9,7 +9,7 @@ rules:
   - 文档数据默认仅本地处理（IndexedDB），不隐式上传；导出/分享必须由用户显式触发。
   - AI 调用入口统一为 `@nimiplatform/sdk/mod/runtime`（`runtime.ai.text.*` / `runtime.ai.embedding.generate`），不保留 legacy 场景调用兼容路径。
   - 搜索能力通过 `data.register` 暴露为 data-api capability，不使用 `inter-mod.provide`。
-  - Embedding 路由默认 cloud-first（token-api），预留 local-runtime 接口；路由来源由 `RuntimeRouteBinding` 控制，不硬编码 provider。
+  - Embedding 路由默认 cloud-first（cloud），预留 local 接口；路由来源由 `RuntimeRouteBinding` 控制，不硬编码 provider。
   - 向量检索使用 cosine similarity 浏览器端实现，不依赖 runtime RuntimeKnowledgeService（K-KNOW Phase 1 仅 in-memory + substring matching）。
   - 多轮对话通过 query rewriting 实现上下文连贯；rewritten query 记录在 turn 中供审计。
   - Hook 客户端创建入口统一为 `createHookClient(modId)`，不得恢复历史命名与中间别名。
@@ -101,4 +101,4 @@ rules:
 2. `spec/runtime/kernel/knowledge-contract.md`（K-KNOW-*）— RuntimeKnowledgeService 接口；KB mod 独立实现（Phase 1）。
 3. `spec/desktop/kernel/hook-capability-contract.md`（D-HOOK-*）— Hook 能力模型；KB 遵循但不重定义。
 4. `@nimiplatform/nimi-mods/local-chat/SSOT.md` — local-chat 集成协议见 `spec/kernel/capability-contract.md` § KB-CAP-007。
-5. `@nimiplatform/nimi/ssot/runtime/local-runtime.md` — 路由语义；KB 消费但不定义。
+5. `@nimiplatform/nimi/ssot/runtime/local.md` — 路由语义；KB 消费但不定义。

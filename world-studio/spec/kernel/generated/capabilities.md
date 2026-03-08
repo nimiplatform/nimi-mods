@@ -28,7 +28,7 @@ ai_profile:
     - dependency_id: world-studio/image-token-node
       kind: node
       capability: image
-      node_id: image.generate.token-api
+      node_id: image.generate.cloud
   preferred_binding:
     chat: world-studio/chat-qwen2.5-7b
   source_rule: WS-CAP-003

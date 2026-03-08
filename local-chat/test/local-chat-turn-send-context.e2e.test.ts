@@ -12,7 +12,7 @@ function createBaseInput(): UseLocalChatTurnSendInput {
       streamText: async function* () {},
       generateImage: async () => ({ image: '' }),
       generateVideo: async () => ({ video: '' }),
-      resolveRoute: async () => ({ source: 'local-runtime', model: 'model-a' }),
+      resolveRoute: async () => ({ source: 'local', model: 'model-a' }),
     },
     viewerId: 'viewer.test',
     viewerDisplayName: 'Viewer',
@@ -26,7 +26,7 @@ function createBaseInput(): UseLocalChatTurnSendInput {
     videoRouteOptionsRevision: 1,
     routeBinding: null,
     routeSnapshot: {
-      source: 'token-api',
+      source: 'cloud',
       model: 'models/gemini-3-flash-preview',
     },
     imageResolvedRoute: null,
@@ -75,7 +75,7 @@ function createBaseInput(): UseLocalChatTurnSendInput {
     imageDependencySnapshot: {
       modId: 'world.nimi.local-chat',
       status: 'ready',
-      routeSource: 'token-api',
+      routeSource: 'cloud',
       reasonCode: undefined,
       warnings: [],
       dependencies: [],
@@ -85,7 +85,7 @@ function createBaseInput(): UseLocalChatTurnSendInput {
     videoDependencySnapshot: {
       modId: 'world.nimi.local-chat',
       status: 'ready',
-      routeSource: 'token-api',
+      routeSource: 'cloud',
       reasonCode: undefined,
       warnings: [],
       dependencies: [],
@@ -105,14 +105,14 @@ test('turn send context key stays stable across background route and dependency 
     imageRouteOptionsRevision: 9,
     videoRouteOptionsRevision: 12,
     imageResolvedRoute: {
-      source: 'token-api',
+      source: 'cloud',
       connectorId: 'connector-a',
       model: 'image-model-a',
       resolvedBy: 'preflight',
       resolvedAt: '2026-03-07T00:00:10.000Z',
       settingsRevision: 'settings-a',
       routeOptionsRevision: 9,
-      provider: 'token-api',
+      provider: 'cloud',
     },
     imageDependencySnapshot: {
       ...base.imageDependencySnapshot!,

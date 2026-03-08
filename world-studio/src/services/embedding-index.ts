@@ -43,9 +43,9 @@ function buildLorebookId(lorebook: WorldLorebookDraftRow, index: number): string
   return key ? `${key}:${index}` : `lorebook:${index}`;
 }
 
-function toRouteSource(binding: RuntimeRouteBinding | null | undefined): 'local-runtime' | 'token-api' | null {
+function toRouteSource(binding: RuntimeRouteBinding | null | undefined): 'local' | 'cloud' | null {
   const source = String(binding?.source || '').trim();
-  if (source === 'local-runtime' || source === 'token-api') {
+  if (source === 'local' || source === 'cloud') {
     return source;
   }
   return null;

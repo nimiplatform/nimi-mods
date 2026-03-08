@@ -19,7 +19,7 @@ Minimum acceptance coverage must include:
 7. proactive policy allow path when wake strategy and idle window are eligible
 8. fallback stream parser deterministic segmentation (explicit delimiter + double newline fallback + max 4)
 9. first-beat delivery lifecycle (successful path has no streaming placeholder; fallback placeholder must still be replaced and never persist)
-10. NSFW guardrail policy (default disabled + local-runtime-only enforcement)
+10. NSFW guardrail policy (default disabled + local-only enforcement)
 11. media intent parser coverage (explicit tag + marker-only cleanup/fallback)
 12. media async delivery lifecycle (text first, media appended later)
 13. media soft-cancel behavior on session/context change

@@ -142,7 +142,7 @@ export function buildManualLipSyncAssets(input: {
       fps: 30,
       resolution: 'n/a',
       sourceEventIds: [...shot.sourceEventIds],
-      routeSource: 'local-runtime',
+      routeSource: 'local',
       metadata: {
         anchors,
         source: 'manual-lip-sync',
@@ -154,7 +154,7 @@ export function buildManualLipSyncAssets(input: {
 
 async function resolveCreatorVoiceProfile(input: {
   runtimeClient: RuntimeSpeechClientLike;
-  routeSource: 'local-runtime' | 'token-api';
+  routeSource: 'local' | 'cloud';
   preferredLanguage: string;
 }): Promise<{
   voiceId: string;
@@ -226,7 +226,7 @@ export async function buildGeneratedVoiceAssets(input: {
           traceId: input.traceId,
           checkHealth: async (capability, binding) => input.aiClient.checkRouteHealth({ capability, binding }),
     invoke: async (binding) => {
-      const routeSource = binding?.source === 'token-api' ? 'token-api' : 'local-runtime';
+      const routeSource = binding?.source === 'cloud' ? 'cloud' : 'local';
       const profile = await resolveCreatorVoiceProfile({
         runtimeClient: input.runtimeClient,
         routeSource,

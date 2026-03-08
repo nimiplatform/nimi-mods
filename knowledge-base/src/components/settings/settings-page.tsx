@@ -160,8 +160,8 @@ function RoutePanel(props: {
     return [current, ...models];
   }, [selectedConnector, props.model]);
 
-  const localRuntimeModels = useMemo(() => {
-    const models = (props.routeOptions?.localRuntime.models || []).map((item) => ({
+  const localModels = useMemo(() => {
+    const models = (props.routeOptions?.local.models || []).map((item) => ({
       id: asString(item.localModelId),
       model: asString(item.model),
       label: asString(item.label || item.model || item.localModelId),
@@ -184,13 +184,13 @@ function RoutePanel(props: {
           value={props.source}
           options={[
             { value: 'auto', label: 'Auto (cloud-first)' },
-            { value: 'token-api', label: 'Token API' },
-            { value: 'local-runtime', label: 'Local Runtime' },
+            { value: 'cloud', label: 'Token API' },
+            { value: 'local', label: 'Local Runtime' },
           ]}
           onChange={(v) => props.onSourceChange(v as KBSettings['chatRouteSource'])}
         />
 
-        {props.source === 'token-api' && (
+        {props.source === 'cloud' && (
           <>
             <SelectField
               label="Connector"
@@ -220,13 +220,13 @@ function RoutePanel(props: {
           </>
         )}
 
-        {props.source === 'local-runtime' && (
+        {props.source === 'local' && (
           <SelectField
             label="Model"
             value={props.model}
             options={[
               { value: '', label: '(auto)' },
-              ...localRuntimeModels.map((item) => ({
+              ...localModels.map((item) => ({
                 value: item.model,
                 label: item.label,
               })),

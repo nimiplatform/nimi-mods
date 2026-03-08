@@ -2,7 +2,7 @@ export type Gender = 'male' | 'female';
 
 export type ElementKey = 'metal' | 'wood' | 'water' | 'fire' | 'earth';
 
-export type RouteSourceDisplay = 'local-runtime' | 'token-api' | 'unavailable';
+export type RouteSourceDisplay = 'local' | 'cloud' | 'unavailable';
 
 export type KismetFeatureTab = 'natal-profile' | 'daily-fortune' | 'compatibility';
 

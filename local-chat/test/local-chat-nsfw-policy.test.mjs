@@ -6,10 +6,10 @@ import {
   isPromptLikelyNsfw,
 } from '../src/services/policy/nsfw-media-policy.ts';
 
-test('nsfw policy keeps token-api on safe boundary by default', () => {
+test('nsfw policy keeps cloud on safe boundary by default', () => {
   assert.equal(
     evaluateNsfwMediaPolicy({
-      routeSource: 'local-runtime',
+      routeSource: 'local',
       relationshipBoundaryPreset: 'balanced',
       visualComfortLevel: 'soft-visuals',
     }),
@@ -17,29 +17,29 @@ test('nsfw policy keeps token-api on safe boundary by default', () => {
   );
   assert.equal(
     evaluateNsfwMediaPolicy({
-      routeSource: 'token-api',
+      routeSource: 'cloud',
       relationshipBoundaryPreset: 'close',
       visualComfortLevel: 'natural-visuals',
     }),
-    'local-runtime-only',
+    'local-only',
   );
 });
 
-test('nsfw policy is local-runtime-only on token-api even for close natural visuals', () => {
+test('nsfw policy is local-only on cloud even for close natural visuals', () => {
   assert.equal(
     evaluateNsfwMediaPolicy({
-      routeSource: 'token-api',
+      routeSource: 'cloud',
       relationshipBoundaryPreset: 'close',
       visualComfortLevel: 'natural-visuals',
     }),
-    'local-runtime-only',
+    'local-only',
   );
 });
 
 test('nsfw policy is allowed only for local runtime with close natural visuals', () => {
   assert.equal(
     evaluateNsfwMediaPolicy({
-      routeSource: 'local-runtime',
+      routeSource: 'local',
       relationshipBoundaryPreset: 'close',
       visualComfortLevel: 'natural-visuals',
     }),
@@ -50,27 +50,27 @@ test('nsfw policy is allowed only for local runtime with close natural visuals',
 test('nsfw media generation gate follows strict tri-state policy', () => {
   assert.equal(isMediaGenerationAllowed({
     policy: 'disabled',
-    routeSource: 'token-api',
+    routeSource: 'cloud',
     prompt: 'A sunny mountain landscape.',
   }), true);
   assert.equal(isMediaGenerationAllowed({
     policy: 'disabled',
-    routeSource: 'local-runtime',
+    routeSource: 'local',
     prompt: 'NSFW nude portrait',
   }), false);
   assert.equal(isMediaGenerationAllowed({
-    policy: 'local-runtime-only',
-    routeSource: 'token-api',
+    policy: 'local-only',
+    routeSource: 'cloud',
     prompt: 'adult erotic character art',
   }), false);
   assert.equal(isMediaGenerationAllowed({
-    policy: 'local-runtime-only',
-    routeSource: 'local-runtime',
+    policy: 'local-only',
+    routeSource: 'local',
     prompt: 'adult erotic character art',
   }), true);
   assert.equal(isMediaGenerationAllowed({
     policy: 'allowed',
-    routeSource: 'token-api',
+    routeSource: 'cloud',
     prompt: 'adult erotic character art',
   }), true);
 });

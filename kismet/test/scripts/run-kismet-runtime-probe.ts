@@ -104,14 +104,14 @@ async function main() {
   }
 
   const endpoint = getArg('runtime-endpoint', process.env.NIMI_RUNTIME_ENDPOINT || '127.0.0.1:46371');
-  const route = (getArg('route', process.env.KISMET_PROBE_ROUTE || 'token-api') || 'token-api') as 'token-api' | 'local-runtime';
+  const route = (getArg('route', process.env.KISMET_PROBE_ROUTE || 'cloud') || 'cloud') as 'cloud' | 'local';
   const connectorId = getArg('connector-id', process.env.KISMET_PROBE_CONNECTOR_ID || '01KJZGX0JHNX6474GPZ1N04AZX');
   const model = getArg('model', process.env.KISMET_PROBE_MODEL || 'models/gemini-2.5-flash');
   const maxTokens = Number(getArg('max-tokens', process.env.KISMET_PROBE_MAX_TOKENS || '2048'));
   const temperature = Number(getArg('temperature', process.env.KISMET_PROBE_TEMPERATURE || '0.4'));
 
-  if (route === 'token-api' && !connectorId) {
-    throw new Error('connector-id is required for token-api probe');
+  if (route === 'cloud' && !connectorId) {
+    throw new Error('connector-id is required for cloud probe');
   }
 
   const birthInput = resolveBirthInput();
@@ -146,10 +146,10 @@ async function main() {
     temperature,
     topP: 0,
     maxTokens,
-    routePolicy: route === 'token-api' ? RoutePolicy.TOKEN_API : RoutePolicy.LOCAL_RUNTIME,
+    routePolicy: route === 'cloud' ? RoutePolicy.CLOUD : RoutePolicy.LOCAL,
     fallback: FallbackPolicy.DENY,
     timeoutMs: 60_000,
-    connectorId: route === 'token-api' ? connectorId : '',
+    connectorId: route === 'cloud' ? connectorId : '',
   });
 
   const responseRecord = asRecord(response);
@@ -160,7 +160,7 @@ async function main() {
       kind,
       endpoint,
       route,
-      connectorId: route === 'token-api' ? connectorId : '',
+      connectorId: route === 'cloud' ? connectorId : '',
       model,
       maxTokens,
       temperature,
@@ -172,7 +172,7 @@ async function main() {
     response: {
       traceId,
       modelResolved: String(responseRecord.modelResolved || '').trim(),
-      routeDecision: Number(responseRecord.routeDecision) === RoutePolicy.TOKEN_API ? 'token-api' : 'local-runtime',
+      routeDecision: Number(responseRecord.routeDecision) === RoutePolicy.CLOUD ? 'cloud' : 'local',
       finishReason: normalizeFinishReason(Number(responseRecord.finishReason)),
       textLength: text.length,
       firstChar: text[0] || '',

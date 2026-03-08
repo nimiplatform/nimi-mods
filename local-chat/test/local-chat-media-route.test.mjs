@@ -41,7 +41,7 @@ test('resolveMediaRouteConfig does not convert undefined settings into "undefine
       imageConnectorId: undefined,
       imageModel: undefined,
     }),
-    fallbackSource: 'local-runtime',
+    fallbackSource: 'local',
   });
 
   assert.equal(resolved.routeSource, 'auto');
@@ -49,9 +49,9 @@ test('resolveMediaRouteConfig does not convert undefined settings into "undefine
   assert.equal(resolved.routeBinding, undefined);
 });
 
-test('toPinnedRouteBinding keeps token-api connector and model', () => {
+test('toPinnedRouteBinding keeps cloud connector and model', () => {
   const binding = toPinnedRouteBinding({
-    source: 'token-api',
+    source: 'cloud',
     runtimeModelType: 'image',
     provider: 'openai',
     connectorId: 'connector-a',
@@ -61,15 +61,15 @@ test('toPinnedRouteBinding keeps token-api connector and model', () => {
   });
 
   assert.deepEqual(binding, {
-    source: 'token-api',
+    source: 'cloud',
     connectorId: 'connector-a',
     model: 'gpt-image-1',
   });
 });
 
-test('toPinnedRouteBinding keeps local-runtime model and localModelId', () => {
+test('toPinnedRouteBinding keeps local model and localModelId', () => {
   const binding = toPinnedRouteBinding({
-    source: 'local-runtime',
+    source: 'local',
     runtimeModelType: 'image',
     provider: 'localai',
     connectorId: '',
@@ -83,7 +83,7 @@ test('toPinnedRouteBinding keeps local-runtime model and localModelId', () => {
   });
 
   assert.deepEqual(binding, {
-    source: 'local-runtime',
+    source: 'local',
     connectorId: '',
     model: 'z-image-turbo',
     localModelId: 'z-image-turbo',
@@ -105,12 +105,12 @@ test('isMediaRouteReady is true when auto route resolves from route options', ()
   });
   const routeOptions = {
     resolvedDefault: {
-      source: 'local-runtime',
+      source: 'local',
       model: 'flux-local',
     },
     selected: null,
     connectors: [],
-    localRuntime: {
+    local: {
       models: [],
     },
   };
@@ -130,13 +130,13 @@ test('isMediaRouteReady is true when auto route resolves from route options', ()
   }), true);
 });
 
-test('resolveMediaRouteFromOptions skips local-runtime defaults that are not active', () => {
+test('resolveMediaRouteFromOptions skips local defaults that are not active', () => {
   const settings = createDefaultSettings({
     imageRouteSource: 'auto',
   });
   const routeOptions = {
     resolvedDefault: {
-      source: 'local-runtime',
+      source: 'local',
       connectorId: '',
       model: 'flux-local',
       localModelId: 'flux-local',
@@ -144,7 +144,7 @@ test('resolveMediaRouteFromOptions skips local-runtime defaults that are not act
       goRuntimeStatus: 'installed',
     },
     selected: {
-      source: 'token-api',
+      source: 'cloud',
       connectorId: 'connector-a',
       model: 'gpt-image-1',
     },
@@ -153,7 +153,7 @@ test('resolveMediaRouteFromOptions skips local-runtime defaults that are not act
       label: 'Image API',
       models: ['gpt-image-1'],
     }],
-    localRuntime: {
+    local: {
       models: [{
         localModelId: 'flux-local',
         model: 'flux-local',
@@ -173,7 +173,7 @@ test('resolveMediaRouteFromOptions skips local-runtime defaults that are not act
   });
 
   assert.deepEqual(resolved, {
-    source: 'token-api',
+    source: 'cloud',
     connectorId: 'connector-a',
     model: 'gpt-image-1',
     resolvedBy: 'selected',
@@ -183,9 +183,9 @@ test('resolveMediaRouteFromOptions skips local-runtime defaults that are not act
   });
 });
 
-test('isMediaRouteReady is true for local-runtime route source', () => {
+test('isMediaRouteReady is true for local route source', () => {
   const settings = createDefaultSettings({
-    imageRouteSource: 'local-runtime',
+    imageRouteSource: 'local',
     imageModel: '',
   });
   assert.equal(isMediaRouteReady({
@@ -193,7 +193,7 @@ test('isMediaRouteReady is true for local-runtime route source', () => {
     settings,
     routeOptions: {
       selected: {
-        source: 'local-runtime',
+        source: 'local',
         connectorId: '',
         model: 'flux-local',
         localModelId: 'flux-local',
@@ -201,7 +201,7 @@ test('isMediaRouteReady is true for local-runtime route source', () => {
         goRuntimeStatus: 'active',
       },
       resolvedDefault: {
-        source: 'local-runtime',
+        source: 'local',
         connectorId: '',
         model: 'flux-local',
         localModelId: 'flux-local',
@@ -209,7 +209,7 @@ test('isMediaRouteReady is true for local-runtime route source', () => {
         goRuntimeStatus: 'active',
       },
       connectors: [],
-      localRuntime: {
+      local: {
         models: [{
           localModelId: 'flux-local',
           model: 'flux-local',
@@ -223,9 +223,9 @@ test('isMediaRouteReady is true for local-runtime route source', () => {
   }), true);
 });
 
-test('isMediaRouteReady is false for local-runtime route source when the model is not active', () => {
+test('isMediaRouteReady is false for local route source when the model is not active', () => {
   const settings = createDefaultSettings({
-    imageRouteSource: 'local-runtime',
+    imageRouteSource: 'local',
     imageModel: '',
   });
   assert.equal(isMediaRouteReady({
@@ -233,7 +233,7 @@ test('isMediaRouteReady is false for local-runtime route source when the model i
     settings,
     routeOptions: {
       selected: {
-        source: 'local-runtime',
+        source: 'local',
         connectorId: '',
         model: 'flux-local',
         localModelId: 'flux-local',
@@ -241,7 +241,7 @@ test('isMediaRouteReady is false for local-runtime route source when the model i
         goRuntimeStatus: 'installed',
       },
       resolvedDefault: {
-        source: 'local-runtime',
+        source: 'local',
         connectorId: '',
         model: 'flux-local',
         localModelId: 'flux-local',
@@ -249,7 +249,7 @@ test('isMediaRouteReady is false for local-runtime route source when the model i
         goRuntimeStatus: 'installed',
       },
       connectors: [],
-      localRuntime: {
+      local: {
         models: [{
           localModelId: 'flux-local',
           model: 'flux-local',
@@ -263,13 +263,13 @@ test('isMediaRouteReady is false for local-runtime route source when the model i
   }), false);
 });
 
-test('isMediaRouteReady requires connector when route source is token-api', () => {
+test('isMediaRouteReady requires connector when route source is cloud', () => {
   const settingsMissingConnector = createDefaultSettings({
-    imageRouteSource: 'token-api',
+    imageRouteSource: 'cloud',
     imageConnectorId: '',
   });
   const settingsWithConnector = createDefaultSettings({
-    imageRouteSource: 'token-api',
+    imageRouteSource: 'cloud',
     imageConnectorId: 'connector-1',
   });
   assert.equal(isMediaRouteReady({ kind: 'image', settings: settingsMissingConnector }), false);

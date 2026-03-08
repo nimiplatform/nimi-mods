@@ -34,7 +34,7 @@ describe('createTtsClientAdapter', () => {
       },
     } as unknown as Parameters<typeof createTtsClientAdapter>[0];
     const binding = {
-      source: 'token-api' as const,
+      source: 'cloud' as const,
       connectorId: 'conn-1',
       model: 'cloud/default',
     };
@@ -92,7 +92,7 @@ describe('createTtsClientAdapter', () => {
       },
     } as unknown as Parameters<typeof createTtsClientAdapter>[0];
     const binding = {
-      source: 'token-api' as const,
+      source: 'cloud' as const,
       connectorId: 'conn-1',
       model: 'cloud/default',
     };

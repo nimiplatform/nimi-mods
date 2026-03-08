@@ -75,7 +75,7 @@ function createDependencySnapshot(input: {
   return {
     modId: 'local-chat',
     status: input.status,
-    routeSource: 'local-runtime',
+    routeSource: 'local',
     warnings: [],
     dependencies: input.status === 'ready'
       ? [{
@@ -106,7 +106,7 @@ function createTextStream(text: string) {
       type: 'text_delta' as const,
       textDelta: text,
       route: {
-        source: 'local-runtime' as const,
+        source: 'local' as const,
         model: 'chat-model',
         localModelId: 'chat-model',
       },
@@ -114,7 +114,7 @@ function createTextStream(text: string) {
     yield {
       type: 'done' as const,
       route: {
-        source: 'local-runtime' as const,
+        source: 'local' as const,
         model: 'chat-model',
         localModelId: 'chat-model',
       },
@@ -264,9 +264,9 @@ function createHarness() {
       };
       const defaultSettings = {
         ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
-        imageRouteSource: 'local-runtime' as const,
+        imageRouteSource: 'local' as const,
         imageModel: 'image-model',
-        videoRouteSource: 'local-runtime' as const,
+        videoRouteSource: 'local' as const,
         videoModel: 'video-model',
         ...input.defaultSettings,
       };
@@ -284,7 +284,7 @@ function createHarness() {
               traceId: 'trace-fallback',
               promptTraceId: 'trace-fallback',
               route: {
-                source: 'local-runtime',
+                source: 'local',
                 model: 'chat-model',
                 localModelId: 'chat-model',
               },
@@ -313,7 +313,7 @@ function createHarness() {
                 images: [{ uri: 'data:image/png;base64,ZmFrZQ==', mimeType: 'image/png' }],
                 traceId: 'trace-image',
                 route: {
-                  source: 'local-runtime',
+                  source: 'local',
                   model: 'image-model',
                   localModelId: 'image-model',
                 },
@@ -330,7 +330,7 @@ function createHarness() {
                 videos: [{ uri: 'file:///tmp/video.mp4', mimeType: 'video/mp4' }],
                 traceId: 'trace-video',
                 route: {
-                  source: 'local-runtime',
+                  source: 'local',
                   model: 'video-model',
                   localModelId: 'video-model',
                 },
@@ -339,7 +339,7 @@ function createHarness() {
           resolveRoute: input.aiClientOverrides?.resolveRoute
             ? input.aiClientOverrides.resolveRoute
             : async () => ({
-              source: 'local-runtime',
+              source: 'local',
               model: 'image-model',
               localModelId: 'image-model',
             }),
@@ -354,7 +354,7 @@ function createHarness() {
         chatRouteOptions: null,
         routeBinding: null,
         routeSnapshot: {
-          source: 'local-runtime',
+          source: 'local',
           model: 'chat-model',
         },
         defaultSettings,
@@ -459,7 +459,7 @@ test('send-flow planner auto path generates image when gate passes', async () =>
             traceId: 'trace-planner-auto',
             promptTraceId: 'trace-planner-auto',
             route: {
-              source: 'local-runtime',
+              source: 'local',
               model: 'chat-model',
               localModelId: 'chat-model',
             },

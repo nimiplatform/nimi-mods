@@ -70,9 +70,9 @@ function createWindowShim(localStorage: Storage) {
   };
 }
 
-function localRuntimeRoute(model: string): Record<string, unknown> {
+function localRoute(model: string): Record<string, unknown> {
   return {
-    source: 'local-runtime',
+    source: 'local',
     model,
     localModelId: model,
   };
@@ -155,7 +155,7 @@ export function createDependencySnapshot(input: {
   return {
     modId: 'local-chat',
     status: input.status,
-    routeSource: 'local-runtime',
+    routeSource: 'local',
     warnings: [],
     dependencies: input.status === 'ready'
       ? [{
@@ -234,7 +234,7 @@ export function createScriptedAiClient(input: {
           text: String(input.firstBeatText || '嗯，我在。'),
           traceId: 'trace-first-beat',
           promptTraceId: 'trace-first-beat',
-          route: localRuntimeRoute('chat-model'),
+          route: localRoute('chat-model'),
         };
       },
       async generateObject(payload: Record<string, unknown>) {
@@ -257,7 +257,7 @@ export function createScriptedAiClient(input: {
             text: JSON.stringify(object),
             traceId: 'trace-plan',
             promptTraceId: 'trace-plan',
-            route: localRuntimeRoute('chat-model'),
+            route: localRoute('chat-model'),
           };
         }
         if (prompt.includes('你是 local-chat 的记忆治理编译器')) {
@@ -270,7 +270,7 @@ export function createScriptedAiClient(input: {
             text: JSON.stringify(object),
             traceId: 'trace-governance',
             promptTraceId: 'trace-governance',
-            route: localRuntimeRoute('chat-model'),
+            route: localRoute('chat-model'),
           };
         }
         if (prompt.includes('你是 local-chat 的媒体触发 planner。')) {
@@ -283,7 +283,7 @@ export function createScriptedAiClient(input: {
             text: JSON.stringify(input.mediaPlannerDecision),
             traceId: 'trace-planner',
             promptTraceId: 'trace-planner',
-            route: localRuntimeRoute('chat-model'),
+            route: localRoute('chat-model'),
           };
         }
         throw new Error(`LOCAL_CHAT_TEST_UNHANDLED_GENERATE_OBJECT:${prompt.slice(0, 80)}`);
@@ -292,11 +292,11 @@ export function createScriptedAiClient(input: {
         yield {
           type: 'text_delta' as const,
           textDelta: String(input.streamText || 'fallback stream text'),
-          route: localRuntimeRoute('chat-model'),
+          route: localRoute('chat-model'),
         };
         yield {
           type: 'done' as const,
-          route: localRuntimeRoute('chat-model'),
+          route: localRoute('chat-model'),
         };
       },
       async generateImage() {
@@ -304,7 +304,7 @@ export function createScriptedAiClient(input: {
         return {
           images: [{ uri: 'data:image/png;base64,ZmFrZQ==', mimeType: 'image/png' }],
           traceId: 'trace-image',
-          route: localRuntimeRoute('image-model'),
+          route: localRoute('image-model'),
         };
       },
       async generateVideo() {
@@ -312,11 +312,11 @@ export function createScriptedAiClient(input: {
         return {
           videos: [{ uri: 'file:///tmp/video.mp4', mimeType: 'video/mp4' }],
           traceId: 'trace-video',
-          route: localRuntimeRoute('video-model'),
+          route: localRoute('video-model'),
         };
       },
       async resolveRoute() {
-        return localRuntimeRoute('chat-model');
+        return localRoute('chat-model');
       },
     },
   };
@@ -497,16 +497,16 @@ export function createSendFlowHarness(input: {
           },
           runtimeMode: 'STORY' as const,
           chatRouteOptions: null,
-          routeOverride: null,
+          routeBinding: null,
           routeSnapshot: {
-            source: 'local-runtime',
+            source: 'local',
             model: 'chat-model',
           },
           defaultSettings: {
             ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
-            imageRouteSource: 'local-runtime',
+            imageRouteSource: 'local',
             imageModel: 'image-model',
-            videoRouteSource: 'local-runtime',
+            videoRouteSource: 'local',
             videoModel: 'video-model',
             ...input.defaultSettings,
             ...exec.defaultSettings,

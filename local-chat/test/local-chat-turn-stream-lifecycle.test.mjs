@@ -37,7 +37,7 @@ test('scheduled assistant beats are committed in order through the unified deliv
   const promptTrace = {
     id: 'trace-1',
     conversationId: session.id,
-    routeSource: 'local-runtime',
+    routeSource: 'local',
     routeModel: 'model-a',
     promptChars: 10,
     layerOrder: [],

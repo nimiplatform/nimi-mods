@@ -51,7 +51,7 @@ export const WORLD_STUDIO_MANIFEST = {
           dependencyId: 'world-studio/image-token-node',
           kind: 'node',
           capability: 'image',
-          nodeId: 'image.generate.token-api',
+          nodeId: 'image.generate.cloud',
           title: 'Token API image generation node',
         },
       ],

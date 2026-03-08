@@ -14,13 +14,13 @@ export type ImageTurnRunnerResult =
       uri: string;
       mimeType: string;
       traceId: string;
-      routeSource: 'local-runtime' | 'token-api';
+      routeSource: 'local' | 'cloud';
       routeModel?: string;
     }
   | {
       status: 'blocked';
       reasonCode: 'LOCAL_CHAT_MEDIA_NSFW_BLOCKED';
-      routeSource: 'local-runtime' | 'token-api';
+      routeSource: 'local' | 'cloud';
       message: string;
     }
   | {
@@ -28,7 +28,7 @@ export type ImageTurnRunnerResult =
       reasonCode: 'LOCAL_CHAT_MEDIA_GENERATE_FAILED';
       message: string;
       traceId?: string;
-      routeSource?: 'local-runtime' | 'token-api';
+      routeSource?: 'local' | 'cloud';
     };
 
 function toErrorMessage(error: unknown): string {
@@ -40,13 +40,13 @@ function toErrorMessage(error: unknown): string {
 
 function buildNsfwBlockedMessage(input: {
   policy: NsfwMediaPolicy;
-  routeSource: 'local-runtime' | 'token-api';
+  routeSource: 'local' | 'cloud';
 }): string {
   if (input.policy === 'disabled') {
     return '已拦截本次图片生成：当前未开启 NSFW 媒体。';
   }
-  if (input.policy === 'local-runtime-only' && input.routeSource !== 'local-runtime') {
-    return '已拦截本次图片生成：NSFW 仅允许本地路由。请切到“本地运行时”后重试。';
+  if (input.policy === 'local-only' && input.routeSource !== 'local') {
+    return '已拦截本次图片生成：NSFW 仅允许本地路由。请切到“本地”后重试。';
   }
   return '已拦截本次图片生成：当前 NSFW 策略不允许该请求。';
 }
@@ -66,13 +66,13 @@ function normalizeReasonCode(error: unknown): string {
 }
 
 function resolveIntendedRouteSource(input: {
-  routeSource: 'auto' | 'local-runtime' | 'token-api';
-  fallbackRouteSource?: 'local-runtime' | 'token-api';
-}): 'local-runtime' | 'token-api' {
-  if (input.routeSource === 'local-runtime' || input.routeSource === 'token-api') {
+  routeSource: 'auto' | 'local' | 'cloud';
+  fallbackRouteSource?: 'local' | 'cloud';
+}): 'local' | 'cloud' {
+  if (input.routeSource === 'local' || input.routeSource === 'cloud') {
     return input.routeSource;
   }
-  return input.fallbackRouteSource || 'local-runtime';
+  return input.fallbackRouteSource || 'local';
 }
 
 function toFriendlyImageErrorMessage(error: unknown): string {
@@ -91,7 +91,7 @@ export async function runImageTurn(input: {
   prompt: string;
   defaultSettings: LocalChatDefaultSettings;
   nsfwPolicy: NsfwMediaPolicy;
-  fallbackRouteSource?: 'local-runtime' | 'token-api';
+  fallbackRouteSource?: 'local' | 'cloud';
   resolvedRoute?: LocalChatResolvedMediaRoute;
   negativePrompt?: string;
   size?: string;
@@ -119,18 +119,18 @@ export async function runImageTurn(input: {
     fallbackRouteSource: input.fallbackRouteSource,
   });
   if (
-    routeConfig.routeSource === 'token-api'
+    routeConfig.routeSource === 'cloud'
     && !String(routeConfig.routeBinding?.connectorId || '').trim()
   ) {
     return {
       status: 'failed',
       reasonCode: 'LOCAL_CHAT_MEDIA_GENERATE_FAILED',
       message: '图片生成失败：请先在右侧“媒体路由配置”中选择图片连接器。',
-      routeSource: 'token-api',
+      routeSource: 'cloud',
     };
   }
   const promptLikelyNsfw = isPromptLikelyNsfw(normalizedPrompt);
-  let resolvedRouteSource: 'local-runtime' | 'token-api' = intendedRouteSource;
+  let resolvedRouteSource: 'local' | 'cloud' = intendedRouteSource;
 
   try {
     const resolvedRoute = input.resolvedRoute
@@ -144,7 +144,7 @@ export async function runImageTurn(input: {
         capability: 'image.generate',
         routeBinding: routeConfig.routeBinding,
       });
-    resolvedRouteSource = resolvedRoute.source === 'token-api' ? 'token-api' : 'local-runtime';
+    resolvedRouteSource = resolvedRoute.source === 'cloud' ? 'cloud' : 'local';
     if (!isMediaGenerationAllowed({
       policy: input.nsfwPolicy,
       routeSource: resolvedRouteSource,
@@ -177,7 +177,7 @@ export async function runImageTurn(input: {
         ...(typeof input.count === 'number' ? { count: input.count } : {}),
       },
     });
-    const finalRouteSource = generated.route.source === 'token-api' ? 'token-api' : 'local-runtime';
+    const finalRouteSource = generated.route.source === 'cloud' ? 'cloud' : 'local';
     const artifact = generated.images.find((item) => {
       const uri = String(item.uri || '').trim();
       const b64 = String(item.b64Json || '').trim();

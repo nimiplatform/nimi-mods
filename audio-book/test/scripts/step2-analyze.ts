@@ -27,14 +27,14 @@
 //
 // Environment:
 //   NIMI_RUNTIME_ENDPOINT  — runtime gRPC address (default: 127.0.0.1:46371)
-//   NIMI_MODEL_ID          — chat model ID for token-api (default: cloud/default)
+//   NIMI_MODEL_ID          — chat model ID for cloud (default: cloud/default)
 //   NIMI_API_KEY            — cloud provider API key (inline key-source)
 //   NIMI_PROVIDER_TYPE      — cloud provider type (default: dashscope)
 //   NIMI_PROVIDER_ENDPOINT  — cloud provider endpoint (optional)
 //
 // Prerequisites:
 //   1. Start nimi runtime:  cd runtime && go run ./cmd/nimi
-//   2. Ensure the model is available via token-api or local runtime
+//   2. Ensure the model is available via cloud or local runtime
 // ---------------------------------------------------------------------------
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
@@ -108,7 +108,7 @@ function createRuntimeLlmClient(endpoint: string, modelId: string): LlmClient {
   const provider = createNimiAiProvider({
     runtime,
     appId: APP_ID,
-    routePolicy: 'token-api',
+    routePolicy: 'cloud',
     fallback: 'deny',
     timeoutMs: 300_000,
     metadata: buildMetadata(),

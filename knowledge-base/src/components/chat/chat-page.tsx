@@ -15,7 +15,7 @@ type ChatPageProps = {
 };
 
 type RouteDisplay = {
-  source: 'auto' | 'local-runtime' | 'token-api';
+  source: 'auto' | 'local' | 'cloud';
   connectorId: string;
   model: string;
 };
@@ -25,7 +25,7 @@ function asString(value: unknown): string {
 }
 
 function resolveRouteDisplay(input: {
-  source: 'auto' | 'local-runtime' | 'token-api';
+  source: 'auto' | 'local' | 'cloud';
   connectorId: string;
   model: string;
   routeOptions: KBPageController['chatRouteOptions'] | KBPageController['embeddingRouteOptions'];
@@ -34,25 +34,25 @@ function resolveRouteDisplay(input: {
   if (input.source === 'auto') {
     return {
       source: 'auto',
-      connectorId: asString(selected?.source === 'token-api' ? selected.connectorId : ''),
+      connectorId: asString(selected?.source === 'cloud' ? selected.connectorId : ''),
       model: asString(selected?.model),
     };
   }
-  if (input.source === 'token-api') {
-    const selectedConnectorId = asString(selected?.source === 'token-api' ? selected.connectorId : '');
+  if (input.source === 'cloud') {
+    const selectedConnectorId = asString(selected?.source === 'cloud' ? selected.connectorId : '');
     const connectorId = asString(input.connectorId || selectedConnectorId || input.routeOptions?.connectors[0]?.id);
     const connector = input.routeOptions?.connectors.find((item) => item.id === connectorId) || null;
-    const selectedModel = asString(selected?.source === 'token-api' ? selected.model : '');
+    const selectedModel = asString(selected?.source === 'cloud' ? selected.model : '');
     const model = asString(input.model || selectedModel || connector?.models[0]);
-    return { source: 'token-api', connectorId, model };
+    return { source: 'cloud', connectorId, model };
   }
   const localModel = asString(
     input.model
-      || (selected?.source === 'local-runtime' ? selected.model : '')
-      || input.routeOptions?.localRuntime.models[0]?.model,
+      || (selected?.source === 'local' ? selected.model : '')
+      || input.routeOptions?.local.models[0]?.model,
   );
   return {
-    source: 'local-runtime',
+    source: 'local',
     connectorId: '',
     model: localModel,
   };
@@ -68,7 +68,7 @@ function ChevronDownIcon({ className }: { className?: string }) {
 
 function RouteChip({ label, value }: { label: string; value: RouteDisplay }) {
   const sourceLabel = value.source === 'auto' ? 'Auto'
-    : value.source === 'token-api' ? 'Token API'
+    : value.source === 'cloud' ? 'Token API'
     : 'Local';
   const modelLabel = value.model || '(auto)';
 

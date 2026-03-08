@@ -107,16 +107,16 @@ function CollapsibleSection(props: {
 function InlineChatRoute(props: { rsp: RuntimeStatusSidebarProps }) {
   const { t } = useModTranslation('local-chat');
   const { rsp } = props;
-  const routeBinding = rsp.routeBinding || rsp.routeOverride || null;
+  const routeBinding = rsp.routeBinding || null;
   const chatRouteOptions = rsp.chatRouteOptions;
   const effectiveChatBinding: RuntimeRouteBinding | null = (
     routeBinding
     || chatRouteOptions?.selected
     || null
   );
-  const activeChatSource = effectiveChatBinding?.source || 'local-runtime';
+  const activeChatSource = effectiveChatBinding?.source || 'local';
   const fallbackConnectorId = chatRouteOptions?.connectors[0]?.id || '';
-  const activeChatConnectorId = activeChatSource === 'token-api'
+  const activeChatConnectorId = activeChatSource === 'cloud'
     ? (effectiveChatBinding?.connectorId || fallbackConnectorId || '')
     : '';
   const activeChatConnector = chatRouteOptions?.connectors.find((c) => c.id === activeChatConnectorId)
@@ -124,9 +124,9 @@ function InlineChatRoute(props: { rsp: RuntimeStatusSidebarProps }) {
     || null;
 
   const chatModelOptions = useMemo(() => {
-    const raw = activeChatSource === 'local-runtime'
+    const raw = activeChatSource === 'local'
       ? resolveLocalRuntimeModelsForScenario({
-        models: chatRouteOptions?.localRuntime.models || [],
+        models: chatRouteOptions?.local.models || [],
         scenario: 'chat',
       }).map((m) => m.model)
       : resolveModelsForScenario({
@@ -135,7 +135,7 @@ function InlineChatRoute(props: { rsp: RuntimeStatusSidebarProps }) {
         scenario: 'chat',
       });
     return dedupeModelIds(raw);
-  }, [activeChatConnector?.modelCapabilities, activeChatConnector?.models, activeChatSource, chatRouteOptions?.localRuntime.models]);
+  }, [activeChatConnector?.modelCapabilities, activeChatConnector?.models, activeChatSource, chatRouteOptions?.local.models]);
 
   const [chatModelQuery, setChatModelQuery] = useState(effectiveChatBinding?.model || '');
   const filteredChatModelOptions = useMemo(
@@ -143,8 +143,8 @@ function InlineChatRoute(props: { rsp: RuntimeStatusSidebarProps }) {
     [chatModelOptions, chatModelQuery],
   );
   const hasPendingModelChange = String(chatModelQuery || '').trim() !== String(effectiveChatBinding?.model || '').trim();
-  const showEmptyLocalRuntimeCta = activeChatSource === 'local-runtime' && chatModelOptions.length === 0;
-  const onClearRouteOverride = rsp.onClearRouteBinding || rsp.onClearRouteOverride || (() => {});
+  const showEmptyLocalCta = activeChatSource === 'local' && chatModelOptions.length === 0;
+  const onClearRouteBinding = rsp.onClearRouteBinding || (() => {});
 
   const commitChatModelQuery = (query: string) => {
     const resolved = resolveCommittedChatModelQuery({
@@ -170,15 +170,15 @@ function InlineChatRoute(props: { rsp: RuntimeStatusSidebarProps }) {
           onChange={(e) => rsp.onRouteSourceChange(normalizeRuntimeRouteSource(e.target.value))}
           className={selectClassName}
         >
-          <option value="local-runtime">Local Runtime</option>
-          <option value="token-api">Token API</option>
+          <option value="local">Local</option>
+          <option value="cloud">Cloud</option>
         </select>
       </div>
       <div>
         <p className="mb-1 text-gray-500">{t('ChatRoute.connector')}</p>
         <select
           value={activeChatConnectorId}
-          disabled={activeChatSource !== 'token-api'}
+          disabled={activeChatSource !== 'cloud'}
           onChange={(e) => rsp.onRouteConnectorChange(e.target.value)}
           className={`${selectClassName} disabled:bg-gray-100 disabled:text-gray-400`}
         >
@@ -216,14 +216,14 @@ function InlineChatRoute(props: { rsp: RuntimeStatusSidebarProps }) {
         {hasPendingModelChange ? <p className="mt-1 text-[11px] text-amber-700">{t('ChatRoute.pendingModelHint')}</p> : null}
         {chatModelOptions.length === 0 ? <p className="mt-1 text-[11px] text-amber-700">{t('ChatRoute.noModels')}</p> : null}
       </div>
-      {showEmptyLocalRuntimeCta ? (
+      {showEmptyLocalCta ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800">
-          {t('ChatRoute.emptyLocalRuntimeHint')}
+          {t('ChatRoute.emptyLocalHint')}
         </div>
       ) : null}
       <button
         type="button"
-        onClick={onClearRouteOverride}
+        onClick={onClearRouteBinding}
         className="lc-btn lc-btn-secondary h-8 w-full px-2 text-xs font-semibold"
       >
         {t('ChatRoute.useRuntimeDefault')}

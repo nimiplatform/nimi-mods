@@ -29,7 +29,7 @@ codes:
   - code: KB_EMBEDDING_ROUTE_UNAVAILABLE
     stage: embedding
     blocking: true
-    action_hint: Configure an embedding route (token-api or local-runtime).
+    action_hint: Configure an embedding route (cloud or local).
     source_rule: KB-ERR-003
   - code: KB_SEARCH_EMPTY
     stage: vector-search

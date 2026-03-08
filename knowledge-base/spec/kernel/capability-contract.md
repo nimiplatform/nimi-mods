@@ -25,8 +25,8 @@ KB mod 消费三种 runtime 能力：
 调用入口统一为 `@nimiplatform/sdk/mod/runtime`（`createModRuntimeClient`）。
 
 路由策略：
-- Chat route：`auto`（cloud-first）| `token-api` | `local-runtime`，由 `KBSettings.chatRouteSource` 控制。
-- Embedding route：`auto`（cloud-first）| `token-api` | `local-runtime`，由 `KBSettings.embeddingRouteSource` 控制。
+- Chat route：`auto`（cloud-first）| `cloud` | `local`，由 `KBSettings.chatRouteSource` 控制。
+- Embedding route：`auto`（cloud-first）| `cloud` | `local`，由 `KBSettings.embeddingRouteSource` 控制。
 - Adapter 层（`llm-adapter.ts`、`embedding-adapter.ts`）桥接 `ModRuntimeClient` + selected binding → 服务层接口。
 
 ## KB-CAP-003 — 文档数据 API
@@ -74,7 +74,7 @@ KB mod 消费三种 runtime 能力：
 ## KB-CAP-008 — 隐私与安全约束
 
 - 文档原文与分块文本仅存储在浏览器 IndexedDB，不离开设备。
-- Cloud-first（token-api）模式下 embedding 请求发送 chunk 文本到远端——设置页必须明示此行为。
+- Cloud-first（cloud）模式下 embedding 请求发送 chunk 文本到远端——设置页必须明示此行为。
 - 不得未经用户确认自动上传文档原文。
 - 对话历史仅本地存储。
 - 不持久化第三方 API key。

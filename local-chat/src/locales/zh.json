@@ -89,10 +89,10 @@
     "imageTitle": "图片生成",
     "videoTitle": "视频生成",
     "auto": "自动",
-    "localRuntime": "本地运行时",
-    "tokenApi": "Token API",
+    "local": "本地",
+    "cloud": "Cloud",
     "modelPlaceholder": "可选模型覆盖...",
-    "connectorRequiredHint": "当前已选择 Token API，但还没有配置连接器，媒体生成会失败。",
+    "connectorRequiredHint": "当前已选择 Cloud，但还没有配置连接器，媒体生成会失败。",
     "autoCapability": "当前为自动模式且未设置覆盖参数。若媒体生成失败，请手动指定连接器/模型。"
   },
   "VoicePanel": {

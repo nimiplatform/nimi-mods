@@ -24,7 +24,7 @@ function createAssetGenerationInput(overrides = {}) {
   let lastStatusBanner = null;
 
   const binding = {
-    source: 'token-api',
+    source: 'cloud',
     connectorId: 'connector-image',
     model: 'openai/gpt-image-1',
   };

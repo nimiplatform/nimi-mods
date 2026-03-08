@@ -207,8 +207,8 @@ function describeExpression(profile: LocalChatPromptCompileInput['contextPacket'
   lines.push(lengthMap[expr.responseLength] || lengthMap.medium!);
   lines.push(formalityMap[expr.formality] || formalityMap.neutral!);
   lines.push(warmthMap[rel.warmth] || warmthMap.warm!);
-  if (expr.sentiment === 'playful') lines.push('语气偏活泼俏皮');
-  if (expr.sentiment === 'gentle') lines.push('语气偏温柔体贴');
+  if (expr.firstBeatStyle === 'playful') lines.push('语气偏活泼俏皮');
+  if (expr.firstBeatStyle === 'gentle') lines.push('语气偏温柔体贴');
   if (rel.flirtAffinity === 'high') lines.push('可以带一点暧昧和撩拨');
   if (expr.pacingBias === 'bursty') lines.push('喜欢连发短消息，节奏快');
   return lines;

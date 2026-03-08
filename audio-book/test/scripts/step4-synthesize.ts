@@ -118,7 +118,7 @@ function createRuntimeTtsClient(endpoint: string, modelId: string): TtsClient {
     async listVoices() {
       const result = await runtime.media.tts.listVoices({
         model: modelId,
-        route: 'token-api',
+        route: 'cloud',
         fallback: 'deny',
         metadata,
       });
@@ -142,7 +142,7 @@ function createRuntimeTtsClient(endpoint: string, modelId: string): TtsClient {
         speed: input.speakingRate ?? 1.0,
         pitch: input.pitch ?? 0,
         emotion: input.emotion ?? '',
-        route: 'token-api',
+        route: 'cloud',
         fallback: 'deny',
         timeoutMs: 60_000,
         metadata,

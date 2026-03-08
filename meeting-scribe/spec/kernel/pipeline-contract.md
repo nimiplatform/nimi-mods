@@ -39,8 +39,8 @@ Step 3 在 Step 2 完成后自动触发。
 
 - 转录调用 `aiClient.transcribeAudio()`，传入音频数据和 MIME type。
 - Runtime capability / binding 由 `localOnly` 开关决定：
-  - `localOnly = false`: `audio.transcribe` + `binding.source = token-api`（走 Gemini token-api）。
-  - `localOnly = true`: `audio.transcribe` + `binding.source = local-runtime`（走本地 Whisper）。
+  - `localOnly = false`: `audio.transcribe` + `binding.source = cloud`（走 Gemini cloud）。
+  - `localOnly = true`: `audio.transcribe` + `binding.source = local`（走本地 Whisper）。
 - 转录结果包含：
   - 有序的文本片段（含时间戳）。
   - 说话人标签（Gemini 模式下可用；local 模式下为 `"Unknown"`）。
@@ -53,8 +53,8 @@ Step 3 在 Step 2 完成后自动触发。
 - 分析调用 `aiClient.generateObject()`，传入完整转录文本。
 - 一次调用同时生成摘要、决议、待办事项（单一 Zod schema 约束输出）。
 - Runtime capability / binding 由 `localOnly` 开关决定：
-  - `localOnly = false`: `text.generate` + `binding.source = token-api`。
-  - `localOnly = true`: `text.generate` + `binding.source = local-runtime`。
+  - `localOnly = false`: `text.generate` + `binding.source = cloud`。
+  - `localOnly = true`: `text.generate` + `binding.source = local`。
 - 分析进度通过 `hook.event.publish('ms:analysis:progress', ...)` 推送。
 - 分析语言自动跟随 STT 检测到的语言（不硬编码语言）。
 

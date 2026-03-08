@@ -205,7 +205,7 @@ export type LocalChatContextTrace = {
   streamDurationMs?: number;
   segmentParseMode?: 'explicit-delimiter' | 'double-newline' | 'single-message';
   pacingPlan?: LocalChatReplyPacingPlan;
-  nsfwPolicy?: 'disabled' | 'local-runtime-only' | 'allowed';
+  nsfwPolicy?: 'disabled' | 'local-only' | 'allowed';
   plannerUsed?: boolean;
   plannerKind?: 'none' | 'image' | 'video';
   plannerTrigger?: 'user-explicit' | 'assistant-offer' | 'scene-enhancement' | 'none' | 'marker-override';
@@ -218,7 +218,7 @@ export type LocalChatContextTrace = {
   mediaDecisionSource?: 'tag' | 'explicit' | 'planner' | 'none';
   mediaDecisionKind?: 'none' | 'image' | 'video';
   mediaExecutionStatus?: 'none' | 'blocked' | 'pending' | 'ready' | 'failed';
-  mediaExecutionRouteSource?: 'local-runtime' | 'token-api' | null;
+  mediaExecutionRouteSource?: 'local' | 'cloud' | null;
   mediaExecutionRouteModel?: string | null;
   mediaExecutionReason?: string | null;
   selectedTurnSeqs: number[];

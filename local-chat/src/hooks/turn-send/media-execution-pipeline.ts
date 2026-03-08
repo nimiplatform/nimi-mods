@@ -31,7 +31,7 @@ export type ExecuteMediaDecisionInput = {
   decision: MediaExecutionDecision;
   aiClient: LocalChatTurnAiClient;
   defaultSettings: LocalChatDefaultSettings;
-  nsfwPolicy: 'disabled' | 'local-runtime-only' | 'allowed';
+  nsfwPolicy: 'disabled' | 'local-only' | 'allowed';
   fallbackRouteSource: MediaRouteSource;
   sessionId: string;
   targetId: string;

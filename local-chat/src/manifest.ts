@@ -105,7 +105,7 @@ export const LOCAL_CHAT_MANIFEST = {
           dependencyId: 'local-chat/video-generate-token-node',
           kind: 'node',
           capability: 'video',
-          nodeId: 'video.generate.token-api',
+          nodeId: 'video.generate.cloud',
           title: 'Optional video generation node',
         },
         {

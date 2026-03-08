@@ -32,9 +32,9 @@ export function useWorldStudioRouteBindingDerived(input: {
     [effectiveFineRouteBinding],
   );
 
-  const activeCoarseRouteSource = effectiveCoarseRouteBinding?.source || 'local-runtime';
+  const activeCoarseRouteSource = effectiveCoarseRouteBinding?.source || 'local';
   const activeCoarseRouteConnectorId = effectiveCoarseRouteBinding?.connectorId || '';
-  const activeFineRouteSource = effectiveFineRouteBinding?.source || 'local-runtime';
+  const activeFineRouteSource = effectiveFineRouteBinding?.source || 'local';
   const activeFineRouteConnectorId = effectiveFineRouteBinding?.connectorId || '';
 
   const activeCoarseRouteConnector = useMemo(
@@ -50,11 +50,11 @@ export function useWorldStudioRouteBindingDerived(input: {
     [activeFineRouteConnectorId, input.routeOptions?.connectors],
   );
 
-  const coarseRouteModelOptions = activeCoarseRouteSource === 'local-runtime'
-    ? (input.routeOptions?.localRuntime.models.map((model) => model.model) || [])
+  const coarseRouteModelOptions = activeCoarseRouteSource === 'local'
+    ? (input.routeOptions?.local.models.map((model) => model.model) || [])
     : (activeCoarseRouteConnector?.models || []);
-  const fineRouteModelOptions = activeFineRouteSource === 'local-runtime'
-    ? (input.routeOptions?.localRuntime.models.map((model) => model.model) || [])
+  const fineRouteModelOptions = activeFineRouteSource === 'local'
+    ? (input.routeOptions?.local.models.map((model) => model.model) || [])
     : (activeFineRouteConnector?.models || []);
   const coarseRouteReadiness = useMemo(
     () => evaluateRouteBindingReadiness(effectiveCoarseRouteBinding, input.routeOptions),

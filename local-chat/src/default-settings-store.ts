@@ -35,16 +35,16 @@ export type LocalChatInspectSettings = {
   voiceName: LocalChatTtsVoice;
   diagnosticsVisible: boolean;
   runtimeInspectorVisible: boolean;
-  ttsRouteSource: 'auto' | 'local-runtime' | 'token-api';
+  ttsRouteSource: 'auto' | 'local' | 'cloud';
   ttsConnectorId: string;
   ttsModel: string;
-  sttRouteSource: 'auto' | 'local-runtime' | 'token-api';
+  sttRouteSource: 'auto' | 'local' | 'cloud';
   sttConnectorId: string;
   sttModel: string;
-  imageRouteSource: 'auto' | 'local-runtime' | 'token-api';
+  imageRouteSource: 'auto' | 'local' | 'cloud';
   imageConnectorId: string;
   imageModel: string;
-  videoRouteSource: 'auto' | 'local-runtime' | 'token-api';
+  videoRouteSource: 'auto' | 'local' | 'cloud';
   videoConnectorId: string;
   videoModel: string;
 };
@@ -141,16 +141,16 @@ export function normalizeLocalChatInspectSettings(value: unknown): LocalChatInsp
   const normalizedSttRouteSource = String(record.sttRouteSource || '').trim();
   const normalizedImageRouteSource = String(record.imageRouteSource || '').trim();
   const normalizedVideoRouteSource = String(record.videoRouteSource || '').trim();
-  const ttsRouteSource = normalizedTtsRouteSource === 'local-runtime' || normalizedTtsRouteSource === 'token-api'
+  const ttsRouteSource = normalizedTtsRouteSource === 'local' || normalizedTtsRouteSource === 'cloud'
     ? normalizedTtsRouteSource
     : 'auto';
-  const sttRouteSource = normalizedSttRouteSource === 'local-runtime' || normalizedSttRouteSource === 'token-api'
+  const sttRouteSource = normalizedSttRouteSource === 'local' || normalizedSttRouteSource === 'cloud'
     ? normalizedSttRouteSource
     : 'auto';
-  const imageRouteSource = normalizedImageRouteSource === 'local-runtime' || normalizedImageRouteSource === 'token-api'
+  const imageRouteSource = normalizedImageRouteSource === 'local' || normalizedImageRouteSource === 'cloud'
     ? normalizedImageRouteSource
     : 'auto';
-  const videoRouteSource = normalizedVideoRouteSource === 'local-runtime' || normalizedVideoRouteSource === 'token-api'
+  const videoRouteSource = normalizedVideoRouteSource === 'local' || normalizedVideoRouteSource === 'cloud'
     ? normalizedVideoRouteSource
     : 'auto';
   const ttsConnectorId = String(record.ttsConnectorId || '').trim();

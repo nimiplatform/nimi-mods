@@ -333,16 +333,16 @@ function createRuntimeRouteClient() {
     listOptions: async () => ({
       capability: 'text.generate',
       selected: {
-        source: 'token-api',
+        source: 'cloud',
         connectorId: CONNECTOR_ID,
         model: MODEL_ID,
       },
       resolvedDefault: {
-        source: 'token-api',
+        source: 'cloud',
         connectorId: CONNECTOR_ID,
         model: MODEL_ID,
       },
-      localRuntime: {
+      local: {
         models: [],
         defaultEndpoint: 'http://127.0.0.1:8080/v1',
       },
@@ -369,7 +369,7 @@ function createRuntimeTextClient() {
         text,
         promptTraceId: makeId('prompt'),
         route: {
-          source: 'token-api',
+          source: 'cloud',
           connectorId: CONNECTOR_ID,
           model: MODEL_ID,
           provider: 'openai-compatible',
@@ -541,7 +541,7 @@ async function main() {
         userMessage: requestSeed.userMessage,
         systemPayload: requestSeed.systemPayload,
         binding: {
-          source: 'token-api',
+          source: 'cloud',
           connectorId: CONNECTOR_ID,
           model: MODEL_ID,
         },

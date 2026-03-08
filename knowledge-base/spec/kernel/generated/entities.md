@@ -272,7 +272,7 @@ entities:
         type: string
         required: true
         default: "'auto'"
-        description: "'auto' | 'local-runtime' | 'token-api'"
+        description: "'auto' | 'local' | 'cloud'"
       - name: chatConnectorId
         type: string
         required: true
@@ -287,7 +287,7 @@ entities:
         type: string
         required: true
         default: "'auto'"
-        description: "'auto' | 'local-runtime' | 'token-api'"
+        description: "'auto' | 'local' | 'cloud'"
       - name: embeddingConnectorId
         type: string
         required: true

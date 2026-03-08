@@ -62,8 +62,8 @@ Delivery director owns beat persistence and cancellation:
 NSFW media policy is settings + route-source gated:
 
 1. default policy is disabled
-2. enabling NSFW media only allows media path on `local-runtime`
-3. non-local routes must downgrade to `local-runtime-only` policy state
+2. enabling NSFW media only allows media path on `local`
+3. non-local routes must downgrade to `local-only` policy state
 
 Policy decision must be recorded in assistant turn diagnostics/audit metadata even when no media generation is executed.
 

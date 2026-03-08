@@ -99,7 +99,7 @@ test('meeting-scribe analysis: gemini structured summary generation', {
         input: transcript,
         maxTokens: 2048,
         temperature: 0.3,
-        route: 'token-api',
+        route: 'cloud',
         fallback: 'deny',
         timeoutMs: 60_000,
       });
