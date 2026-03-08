@@ -192,10 +192,10 @@ export function useLocalChatPageState() {
   ), [ttsRouteOptions?.connectors]);
   const localTtsRouteAvailable = useMemo(
     () => hasReadyLocalRuntimeModelForScenario({
-      models: ttsRouteOptions?.local.models || runtimeRouteState.chatRouteOptions?.local.models || [],
+      models: ttsRouteOptions?.local?.models || runtimeRouteState.chatRouteOptions?.local?.models || [],
       scenario: 'audio.synthesize',
     }),
-    [runtimeRouteState.chatRouteOptions?.local.models, ttsRouteOptions?.local.models],
+    [runtimeRouteState.chatRouteOptions?.local?.models, ttsRouteOptions?.local?.models],
   );
 
   const effectiveTtsConnectorId = useMemo(
@@ -397,10 +397,10 @@ export function useLocalChatPageState() {
 
   const localSttRouteAvailable = useMemo(
     () => hasReadyLocalRuntimeModelForScenario({
-      models: sttRouteOptions?.local.models || runtimeRouteState.chatRouteOptions?.local.models || [],
+      models: sttRouteOptions?.local?.models || runtimeRouteState.chatRouteOptions?.local?.models || [],
       scenario: 'audio.transcribe',
     }),
-    [runtimeRouteState.chatRouteOptions?.local.models, sttRouteOptions?.local.models],
+    [runtimeRouteState.chatRouteOptions?.local?.models, sttRouteOptions?.local?.models],
   );
 
   useEffect(() => {

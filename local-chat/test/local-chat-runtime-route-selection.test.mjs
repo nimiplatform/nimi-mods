@@ -7,6 +7,7 @@ import {
 } from '../src/hooks/use-local-chat-runtime-route.ts';
 import {
   buildRouteBindingForModel,
+  buildRouteBindingForSource,
   resolveCommittedChatModelQuery,
 } from '../src/hooks/runtime-route/override-actions.ts';
 import {
@@ -203,6 +204,48 @@ test('buildRouteBindingForModel ignores non-active local runtime candidates', ()
     source: 'local',
     connectorId: '',
     model: 'chat-installed',
+  });
+});
+
+test('buildRouteBindingForSource tolerates route options without a local snapshot', () => {
+  const result = buildRouteBindingForSource({
+    source: 'local',
+    previous: {
+      source: 'local',
+      connectorId: '',
+      model: 'chat-default',
+      localModelId: 'chat-default',
+      engine: 'llama.cpp',
+    },
+    options: {
+      selected: {
+        source: 'cloud',
+        connectorId: 'connector-a',
+        model: 'gemini-2.5-flash',
+      },
+      resolvedDefault: {
+        source: 'cloud',
+        connectorId: 'connector-a',
+        model: 'gemini-2.5-flash',
+      },
+      connectors: [
+        {
+          id: 'connector-a',
+          label: 'API Connector',
+          models: ['gemini-2.5-flash'],
+        },
+      ],
+    },
+  });
+
+  assert.deepEqual(result, {
+    source: 'local',
+    connectorId: '',
+    model: 'chat-default',
+    localModelId: 'chat-default',
+    engine: 'llama.cpp',
+    goRuntimeLocalModelId: undefined,
+    goRuntimeStatus: undefined,
   });
 });
 

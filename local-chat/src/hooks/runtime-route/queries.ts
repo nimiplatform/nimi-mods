@@ -1,5 +1,10 @@
 import { asRecord } from '@nimiplatform/sdk/mod/utils';
-import { type RuntimeCanonicalCapability, type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
+import {
+  parseRuntimeRouteOptions,
+  type RuntimeCanonicalCapability,
+  type RuntimeRouteBinding,
+  type RuntimeRouteOptionsSnapshot,
+} from '@nimiplatform/sdk/mod/runtime-route';
 import { createRendererFlowId, logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import { emitLocalChatLog } from '../../logging.js';
 import type { ChatRouteSnapshot, UseLocalChatRuntimeRouteInput } from './types.js';
@@ -39,25 +44,44 @@ function normalizeTokenApiBinding(
 }
 
 function normalizeRouteOptionsSnapshot(
-  snapshot: RuntimeRouteOptionsSnapshot | null,
+  snapshot: unknown,
 ): RuntimeRouteOptionsSnapshot | null {
-  if (!snapshot || snapshot.connectors.length === 0) {
-    return snapshot;
+  const parsed = parseRuntimeRouteOptions(snapshot, {
+    includeResolvedDefault: true,
+  });
+  if (!parsed || parsed.connectors.length === 0) {
+    return parsed;
   }
-  const selected = normalizeTokenApiBinding(snapshot.selected, snapshot.connectors);
-  const resolvedDefault = snapshot.resolvedDefault
-    ? normalizeTokenApiBinding(snapshot.resolvedDefault, snapshot.connectors)
+  const selected = normalizeTokenApiBinding(parsed.selected, parsed.connectors);
+  const resolvedDefault = parsed.resolvedDefault
+    ? normalizeTokenApiBinding(parsed.resolvedDefault, parsed.connectors)
     : undefined;
   if (
-    selected === snapshot.selected
-    && resolvedDefault === snapshot.resolvedDefault
+    selected === parsed.selected
+    && resolvedDefault === parsed.resolvedDefault
   ) {
-    return snapshot;
+    return parsed;
+  }
+  return {
+    ...parsed,
+    selected,
+    ...(resolvedDefault ? { resolvedDefault } : {}),
+  };
+}
+
+function ensureRouteOptionsSnapshotShape(
+  snapshot: RuntimeRouteOptionsSnapshot | null,
+): RuntimeRouteOptionsSnapshot | null {
+  if (!snapshot) {
+    return null;
   }
   return {
     ...snapshot,
-    selected,
-    ...(resolvedDefault ? { resolvedDefault } : {}),
+    local: {
+      models: snapshot.local?.models || [],
+      defaultEndpoint: snapshot.local?.defaultEndpoint,
+    },
+    connectors: Array.isArray(snapshot.connectors) ? snapshot.connectors : [],
   };
 }
 
@@ -122,7 +146,7 @@ export async function loadRouteOptions(input: {
         clearTimeout(timeoutHandle);
       }
     });
-    const resolved = normalizeRouteOptionsSnapshot(payload);
+    const resolved = ensureRouteOptionsSnapshotShape(normalizeRouteOptionsSnapshot(payload));
     safeLogRendererEvent({
       level: 'debug',
       area: 'local-chat',

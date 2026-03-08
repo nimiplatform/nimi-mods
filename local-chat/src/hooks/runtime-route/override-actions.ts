@@ -51,11 +51,11 @@ export function buildRouteBindingForSource(input: {
     model: '',
   };
   const firstLocalModel = resolveLocalRuntimeModelsForScenario({
-    models: input.options?.local.models || [],
+    models: input.options?.local?.models || [],
     scenario: 'text.generate',
   })[0]
     || findLocalRuntimeModelForBinding({
-      models: input.options?.local.models || [],
+      models: input.options?.local?.models || [],
       binding: {
         model: base.model,
         localModelId: base.localModelId,
@@ -114,7 +114,7 @@ export function buildRouteBindingForModel(input: {
   if (base.source === 'local') {
     const matchedLocalModel = findLocalRuntimeModelForBinding({
       models: resolveLocalRuntimeModelsForScenario({
-        models: input.options?.local.models || [],
+        models: input.options?.local?.models || [],
         scenario: 'chat',
       }),
       binding: {

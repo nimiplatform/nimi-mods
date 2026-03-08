@@ -126,7 +126,7 @@ function InlineChatRoute(props: { rsp: RuntimeStatusSidebarProps }) {
   const chatModelOptions = useMemo(() => {
     const raw = activeChatSource === 'local'
       ? resolveLocalRuntimeModelsForScenario({
-        models: chatRouteOptions?.local.models || [],
+        models: chatRouteOptions?.local?.models || [],
         scenario: 'chat',
       }).map((m) => m.model)
       : resolveModelsForScenario({
@@ -135,7 +135,7 @@ function InlineChatRoute(props: { rsp: RuntimeStatusSidebarProps }) {
         scenario: 'chat',
       });
     return dedupeModelIds(raw);
-  }, [activeChatConnector?.modelCapabilities, activeChatConnector?.models, activeChatSource, chatRouteOptions?.local.models]);
+  }, [activeChatConnector?.modelCapabilities, activeChatConnector?.models, activeChatSource, chatRouteOptions?.local?.models]);
 
   const [chatModelQuery, setChatModelQuery] = useState(effectiveChatBinding?.model || '');
   const filteredChatModelOptions = useMemo(

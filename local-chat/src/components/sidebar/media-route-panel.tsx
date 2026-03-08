@@ -45,7 +45,7 @@ function localMediaModels(
   scenario: 'image.generate' | 'video.generate',
 ): string[] {
   const models = resolveLocalRuntimeModelsForScenario({
-    models: options?.local.models || [],
+    models: options?.local?.models || [],
     scenario,
   })
     .map((item) => String(item.model || item.localModelId || '').trim())

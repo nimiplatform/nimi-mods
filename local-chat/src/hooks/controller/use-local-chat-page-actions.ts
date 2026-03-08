@@ -137,9 +137,9 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         ? resolvedDefaultSource
         : 'unknown';
 
-      const localChatRuntimeModels = state.runtimeRouteState.chatRouteOptions?.local.models || [];
-      const localTtsRuntimeModels = state.runtimeRouteState.ttsRouteOptions?.local.models || localChatRuntimeModels;
-      const localSttRuntimeModels = state.runtimeRouteState.sttRouteOptions?.local.models || localChatRuntimeModels;
+      const localChatRuntimeModels = state.runtimeRouteState.chatRouteOptions?.local?.models || [];
+      const localTtsRuntimeModels = state.runtimeRouteState.ttsRouteOptions?.local?.models || localChatRuntimeModels;
+      const localSttRuntimeModels = state.runtimeRouteState.sttRouteOptions?.local?.models || localChatRuntimeModels;
       const localTtsRouteAvailable = hasReadyLocalRuntimeModelForScenario({
         models: localTtsRuntimeModels,
         scenario: 'audio.synthesize',

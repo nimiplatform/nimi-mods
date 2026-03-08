@@ -110,7 +110,7 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
   const chatModelOptionsRaw = useMemo(() => {
     if (activeChatSource === 'local') {
       return resolveLocalRuntimeModelsForScenario({
-        models: chatRouteOptions?.local.models || [],
+        models: chatRouteOptions?.local?.models || [],
         scenario: 'chat',
       }).map((model) => model.model);
     }
@@ -123,7 +123,7 @@ export function RuntimeStatusSidebar(props: RuntimeStatusSidebarProps) {
     activeChatConnector?.modelCapabilities,
     activeChatConnector?.models,
     activeChatSource,
-    chatRouteOptions?.local.models,
+    chatRouteOptions?.local?.models,
   ]);
   const chatModelOptions = useMemo(
     () => dedupeModelIds(chatModelOptionsRaw),

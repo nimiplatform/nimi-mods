@@ -29,7 +29,7 @@ function resolveReadyLocalRuntimeBinding(input: {
   binding?: RuntimeRouteBinding | null;
   routeOptions?: RuntimeRouteOptionsSnapshot | null;
 }): RuntimeRouteBinding | null {
-  const localModels = input.routeOptions?.local.models || [];
+  const localModels = input.routeOptions?.local?.models || [];
   const matchedLocalModel = findLocalRuntimeModelForBinding({
     models: localModels,
     binding: {
@@ -104,7 +104,7 @@ function isResolvedMediaRouteOperational(input: {
     return goRuntimeStatus === 'active';
   }
   const matchedLocalModel = findLocalRuntimeModelForBinding({
-    models: input.routeOptions?.local.models || [],
+    models: input.routeOptions?.local?.models || [],
     binding: {
       model: input.resolvedRoute.model,
       localModelId: input.resolvedRoute.localModelId,
