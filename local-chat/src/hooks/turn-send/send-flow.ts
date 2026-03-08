@@ -391,68 +391,6 @@ export async function runLocalChatTurnSend(input: {
       }
     }
 
-    const fallbackRouteSource = prepared.routeSnapshot?.source === 'token-api' ? 'token-api' : 'local-runtime';
-    const assistantText = assistantPayload.assistantOutput.deliveries
-      .map((delivery) => String(delivery.content || '').trim())
-      .filter(Boolean)
-      .join('\n\n');
-    const mediaDecision = await decideMediaExecution({
-      aiClient: context.aiClient,
-      turnTxnId,
-      routeBinding,
-      defaultSettings: context.defaultSettings,
-      userText: text,
-      assistantText,
-      target: selectedTarget,
-      worldId: selectedTarget.worldId || null,
-      messages: context.messages,
-      promptTrace: assistantPayload.promptTrace,
-      nsfwPolicy,
-      fallbackRouteSource,
-      imageRouteOptions: context.imageRouteOptions || null,
-      videoRouteOptions: context.videoRouteOptions || null,
-      imageRouteOptionsRevision: context.imageRouteOptionsRevision,
-      videoRouteOptionsRevision: context.videoRouteOptionsRevision,
-      imageResolvedRoute: context.imageResolvedRoute || null,
-      videoResolvedRoute: context.videoResolvedRoute || null,
-      imageDependencySnapshot: context.imageDependencySnapshot || null,
-      videoDependencySnapshot: context.videoDependencySnapshot || null,
-      markerOverrideIntent,
-    });
-    let latestPromptTrace = {
-      ...assistantPayload.promptTrace,
-      ...mediaDecision.promptTracePatch,
-    };
-    assistantPayload.promptTrace = latestPromptTrace;
-
-    const contextChanged = input.getCurrentContextKey() !== input.sendContextKey;
-    if (contextChanged) {
-      context.setMessages((prev) => prev.filter((message) => message.id !== streamingMessage.id));
-      const userOnly = await persistSuccessfulTurn({
-        sessionId,
-        targetId: selectedTarget.id,
-        viewerId: context.viewerId,
-        turnTxnId,
-        userMessage,
-        assistantDeliveries: [],
-        latencyMs,
-        promptTrace: assistantPayload.promptTrace,
-        turnAudit: assistantPayload.turnAudit,
-        setMessages: context.setMessages,
-        setSessions: context.setSessions,
-      });
-      await userOnly.done;
-      const cancelledReason: LocalChatScheduleCancelReason = 'LOCAL_CHAT_SCHEDULE_CANCELLED_BY_CONTEXT_CHANGE';
-      context.setLatestPromptTrace(null);
-      context.setLatestTurnAudit(createCancelledAudit({
-        reason: cancelledReason,
-        targetId: selectedTarget.id,
-        worldId: selectedTarget.worldId || null,
-        latencyMs,
-      }));
-      return;
-    }
-
     context.setLatestPromptTrace(promptTrace);
     context.setLatestTurnAudit(turnAudit);
 
