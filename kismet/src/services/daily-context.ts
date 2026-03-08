@@ -1,4 +1,4 @@
-import { EARTHLY_BRANCHES, HEAVENLY_STEMS, LUCK_COLORS, LUCK_DIRECTIONS } from './bazi/constants.js';
+import { EARTHLY_BRANCHES, HEAVENLY_STEMS, LUCK_COLORS, LUCK_DIRECTIONS, LUCK_ITEMS } from './bazi/constants.js';
 import type { ElementKey, KismetCanonicalProfile } from '../types.js';
 
 function positiveMod(value: number, mod: number): number {
@@ -31,6 +31,12 @@ export function deriveTodayGanzhi(date: string): string {
   return buildGanzhi(dayDiff(target, reference));
 }
 
+function pickByDay(items: string[], date: string): string {
+  const [y = 2000, m = 1, d = 1] = date.split('-').map(Number);
+  const idx = Math.abs(dayDiff(new Date(y, m - 1, d), new Date(2024, 0, 1))) % items.length;
+  return items[idx] || items[0]!;
+}
+
 export function buildDailyDefaults(profile: KismetCanonicalProfile, timezone: string, referenceDate?: Date) {
   const date = resolveLocalDateString(timezone, referenceDate);
   const todayGanZhi = deriveTodayGanzhi(date);
@@ -47,7 +53,10 @@ export function buildDailyDefaults(profile: KismetCanonicalProfile, timezone: st
     relationshipScore: Math.round(Math.min(95, overallScore + 2)),
     wealthScore: Math.round(Math.max(40, overallScore - 3)),
     healthScore: Math.round(Math.max(45, overallScore - 1)),
-    luckyElements: [primaryElement, secondaryElement] as ElementKey[],
+    luckyElements: [
+      pickByDay(LUCK_ITEMS[primaryElement], date),
+      pickByDay(LUCK_ITEMS[secondaryElement], date),
+    ],
     luckyDirections: [LUCK_DIRECTIONS[primaryElement][0] || '中宫', LUCK_DIRECTIONS[secondaryElement][0] || '中宫'],
     luckyColors: [LUCK_COLORS[primaryElement][0] || '白色', LUCK_COLORS[secondaryElement][0] || '白色'],
     luckyNumbers: [((profile.fiveElementRatio[primaryElement] % 9) || 9), ((profile.fiveElementRatio[secondaryElement] % 9) || 9)],

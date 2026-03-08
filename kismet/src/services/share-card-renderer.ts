@@ -1,5 +1,5 @@
 import type { KismetNatalAnalysisResult } from '../types.js';
-import { HORSE_BG_BASE64 } from '../assets/horse-bg.js';
+import { GOLD_BG_BASE64 } from '../assets/gold-bg.js';
 
 export type ShareCardInput = {
   name: string;
@@ -34,7 +34,7 @@ function buildShareCardDocument(input: ShareCardInput): string {
   const fortuneTitle = fortune ? `【${fortune.year}流年总批】` : '';
   const fortuneLines = splitFortune(analysis.summary);
 
-  // Build fortune HTML — strict reference: row-reverse flex, each line vertical-rl
+  // Build fortune HTML — row-reverse flex, each line vertical-rl
   let fortuneHtml = '';
   if (fortuneTitle) {
     fortuneHtml += `<div class="ft-line" style="color: #dcb347; font-size: 0.95rem;">${esc(fortuneTitle)}</div>`;
@@ -44,7 +44,7 @@ function buildShareCardDocument(input: ShareCardInput): string {
     fortuneHtml += `<div class="ft-line"${mt}>${esc(line)}</div>`;
   });
 
-  // Reference shows 3 pillars: 日(highlight) 月 年, flex row-reverse
+  // 3 pillars: 日(highlight) 月 年, flex row-reverse
   const pillarCols = [
     { chars: pillars.day, highlight: true },
     { chars: pillars.month, highlight: false },
@@ -55,7 +55,6 @@ function buildShareCardDocument(input: ShareCardInput): string {
     return `<div class="${cls}"><span>${esc(col.chars[0] || '')}</span><span>${esc(col.chars[1] || '')}</span></div>`;
   }).join('\n                    ');
 
-  // ---- Strict copy of reference HTML ----
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -84,20 +83,17 @@ function buildShareCardDocument(input: ShareCardInput): string {
             pointer-events: none; z-index: 1;
         }
 
-        .golden-horse-bg {
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -45%);
-            width: 140%; height: 140%;
-            background-image: url('${HORSE_BG_BASE64}');
+        .gold-bg {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background-image: url('${GOLD_BG_BASE64}');
             background-size: cover;
             background-position: center;
             mix-blend-mode: screen;
-            opacity: 0.35;
-            filter: contrast(1.2) brightness(1.1) grayscale(0.2);
+            opacity: 0.3;
+            filter: contrast(1.2) brightness(1.1);
             z-index: 2; pointer-events: none;
-            mask-image: radial-gradient(circle at center, black 40%, transparent 70%);
-            -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 70%);
+            mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+            -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
         }
 
         .border-frame {
@@ -107,9 +103,13 @@ function buildShareCardDocument(input: ShareCardInput): string {
 
         .content { position: relative; z-index: 10; display: flex; flex-direction: column; height: 100%; }
 
-        .seal-group {
-            display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+        .header-row {
+            display: flex; justify-content: space-between; align-items: flex-start;
             margin-bottom: 20px;
+        }
+
+        .seal-group {
+            display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
         }
 
         .gold-seal-block {
@@ -126,14 +126,11 @@ function buildShareCardDocument(input: ShareCardInput): string {
         }
         .gold-seal-block span { transform: scaleY(1.1); }
 
-        .seal-text-cn {
-            color: #dcb347; font-size: 1.1rem; letter-spacing: 2px; font-weight: 600; text-shadow: 0 2px 4px rgba(0,0,0,0.8);
-        }
         .seal-text-en {
             color: #dcb347; font-size: 0.75rem; font-family: sans-serif; line-height: 1.2; text-shadow: 0 2px 4px rgba(0,0,0,0.8);
         }
 
-        .bazi-section { align-self: flex-end; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; margin-top: -100px; }
+        .bazi-section { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
         .subject-name { font-size: 1rem; color: #dcb347; letter-spacing: 2px; }
         .bazi-grid {
             display: flex; flex-direction: row-reverse; gap: 20px;
@@ -143,8 +140,8 @@ function buildShareCardDocument(input: ShareCardInput): string {
         .bazi-col.highlight { color: #dcb347; font-weight: 600; text-shadow: 0 0 10px rgba(220, 179, 71, 0.3); }
 
         .fortune-text {
-            display: flex; flex-direction: row-reverse; justify-content: flex-start; gap: 15px;
-            margin-top: auto; margin-bottom: 60px; margin-right: 20px;
+            display: flex; flex-direction: row-reverse; justify-content: center; gap: 15px;
+            margin-top: auto; margin-bottom: 60px;
         }
         .ft-line {
             writing-mode: vertical-rl; text-orientation: upright;
@@ -169,25 +166,26 @@ function buildShareCardDocument(input: ShareCardInput): string {
 
     <div class="bookmark-card">
         <div class="bg-noise"></div>
-        <div class="golden-horse-bg"></div>
+        <div class="gold-bg"></div>
         <div class="border-frame"></div>
 
         <div class="content">
-            <div class="seal-group">
-                <div class="gold-seal-block">
-                    <span>運</span><span>時</span>
-                    <span>轉</span><span>來</span>
+            <div class="header-row">
+                <div class="seal-group">
+                    <div class="gold-seal-block">
+                        <span>運</span><span>時</span>
+                        <span>轉</span><span>來</span>
+                    </div>
+                    <div class="seal-text-en">Fortunes turn<br>for the better</div>
                 </div>
-                <div class="seal-text-cn">時來運轉</div>
-                <div class="seal-text-en">Fortunes turn<br>for the better</div>
-            </div>
 
-            <div class="bazi-section">
-                <div class="subject-name">
-                    <span style="color: #736b60; font-size: 0.8rem; margin-right: 8px;">命主</span> ${esc(input.name)}
-                </div>
-                <div class="bazi-grid">
-                    ${pillarHtml}
+                <div class="bazi-section">
+                    <div class="subject-name">
+                        <span style="color: #736b60; font-size: 0.8rem; margin-right: 8px;">命主</span> ${esc(input.name)}
+                    </div>
+                    <div class="bazi-grid">
+                        ${pillarHtml}
+                    </div>
                 </div>
             </div>
 

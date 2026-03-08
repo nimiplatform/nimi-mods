@@ -47,6 +47,8 @@ const enLocale = {
     avoidActions: 'Avoid',
     shareButton: 'Share',
     savedProfileLabel: 'Current Profile',
+    subTabFortune: 'Daily Fortune',
+    subTabStick: 'Fortune Stick',
   },
   FortuneStick: {
     drawButton: 'Draw Fortune Stick',
@@ -60,6 +62,9 @@ const enLocale = {
     health: 'Health',
     adviceTitle: 'Fortune Message',
     share: 'Share Fortune',
+    backToFortune: 'Back to Fortune',
+    readyHint: 'Draw a fortune stick with sincerity',
+    needProfileHint: 'Please complete natal profile first',
   },
   Share: {
     copiedToast: 'Copied to clipboard — paste into a new post',

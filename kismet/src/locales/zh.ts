@@ -47,6 +47,8 @@ const zhLocale = {
     avoidActions: '忌',
     shareButton: '分 享',
     savedProfileLabel: '当前命盘',
+    subTabFortune: '今日运势',
+    subTabStick: '签文',
   },
   FortuneStick: {
     drawButton: '求 签',
@@ -60,6 +62,9 @@ const zhLocale = {
     health: '健康',
     adviceTitle: '签语',
     share: '分享签文',
+    backToFortune: '返回运势',
+    readyHint: '诚心求签，天机自现',
+    needProfileHint: '请先完成命盘推演',
   },
   Share: {
     copiedToast: '已复制至剪贴板，可粘贴至动态发布',

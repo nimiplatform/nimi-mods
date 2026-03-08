@@ -26,11 +26,14 @@ import {
 } from '../validation/validate-result.js';
 import {
   createLocalShareProfile,
+  loadCachedFortuneStick,
   loadLocalShareProfiles,
   loadPrimaryProfile,
+  persistFortuneStick,
   persistLocalShareProfiles,
   persistPrimaryProfile,
 } from '../services/local-share-profiles.js';
+import { resolveLocalDateString } from '../services/daily-context.js';
 import { buildCompatibilityFallback, scoreCompatibility } from '../services/compatibility.js';
 import type {
   KismetCompatibilityResult,
@@ -72,6 +75,13 @@ export function useKismetController() {
       store.setPrimaryProfile(primary);
       store.setConfirmedProfile(primary.canonicalProfile);
       emitKismetLog({ message: 'kismet.primary-profile.restored', source: 'useKismetController' });
+    }
+    const cachedStick = loadCachedFortuneStick();
+    if (cachedStick) {
+      const today = resolveLocalDateString('Asia/Shanghai');
+      if (cachedStick.date === today) {
+        store.setFortuneStickResult(cachedStick.result);
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setSavedProfiles]);
@@ -187,7 +197,11 @@ export function useKismetController() {
       return;
     }
 
-    const validation = validateKismetBirthInput(store.birthInput);
+    // Use current birthInput if filled, otherwise fall back to cached primaryProfile birthInput
+    const effectiveBirthInput = store.birthInput.birthDate
+      ? store.birthInput
+      : store.primaryProfile?.birthInput ?? store.birthInput;
+    const validation = validateKismetBirthInput(effectiveBirthInput);
     if (!validation.ok) {
       store.setError(validation.error);
       return;
@@ -309,10 +323,20 @@ export function useKismetController() {
 
   const generateFortuneStick = useCallback(async () => {
     const confirmedProfile = store.confirmedProfile;
-    const dailyResult = store.dailyResult;
-    if (!confirmedProfile || !dailyResult) {
+    if (!confirmedProfile) {
       return;
     }
+
+    // Use existing dailyResult if available, otherwise build minimal daily context
+    const dailyResult: KismetDailyFortuneResult = store.dailyResult || (() => {
+      const defaults = buildDailyDefaults(confirmedProfile, 'Asia/Shanghai');
+      return {
+        ...defaults,
+        summary: '',
+        recommendedActions: [],
+        avoidActions: [],
+      } as KismetDailyFortuneResult;
+    })();
 
     const promptPackage = buildFortuneStickPromptPackage({
       canonicalProfile: confirmedProfile,
@@ -343,6 +367,11 @@ export function useKismetController() {
       setLastAiRawResponse(result.rawResponse);
       store.setRouteSource(result.routeSource);
       store.setFortuneStickResult(result.data);
+      persistFortuneStick({
+        result: result.data,
+        date: dailyResult.date || resolveLocalDateString('Asia/Shanghai'),
+        savedAt: new Date().toISOString(),
+      });
       emitKismetLog({ message: KISMET_AUDIT.FORTUNE_STICK_GENERATE_SUCCEEDED, source: 'useKismetController' });
       return;
     }

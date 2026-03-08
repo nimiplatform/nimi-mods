@@ -2,16 +2,15 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useKismetStore } from '../state/kismet-store.js';
 import { useKismetController } from '../hooks/use-kismet-controller.js';
-import { useKismetExport } from '../hooks/use-kismet-export.js';
 import { InputForm } from './input-form.js';
 import { ModelSelector } from './model-selector.js';
 import { PromptImportPanel } from './prompt-import-panel.js';
 import { RouteStatusBadge } from './route-status-badge.js';
 import { ResultView } from './result-view.js';
-import { ExportToolbar } from './export-toolbar.js';
 import { ErrorPanel } from './error-panel.js';
 import { ModeSwitcher } from './mode-switcher.js';
 import { DailyFortuneView } from './daily-fortune-view.js';
+import { FortuneStickView } from './fortune-stick-view.js';
 
 const KISMET_STYLES = `
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;600;900&family=Noto+Sans+SC:wght@300;400;500&display=swap');
@@ -121,6 +120,41 @@ const KISMET_STYLES = `
 }
 .ks-ritual-box::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
 .ks-ritual-box::after { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+
+/* ── Draft pillar animations ── */
+@keyframes ks-pillar-in {
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes ks-name-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes ks-day-breathe {
+  0% { text-shadow: 0 0 5px rgba(166,56,46,0.1); opacity: 0.85; }
+  100% { text-shadow: 0 0 20px rgba(166,56,46,0.6); opacity: 1; }
+}
+@keyframes ks-ring-expand {
+  0% { transform: translate(-50%,-50%) scale(0.5); opacity: 0; border-width: 8px; }
+  50% { opacity: 1; border-width: 2px; }
+  100% { transform: translate(-50%,-50%) scale(5); opacity: 0; border-width: 0; }
+}
+@keyframes ks-flash {
+  0% { opacity: 0; }
+  60% { opacity: 0.8; background: #D4AF37; }
+  100% { opacity: 0; background: #100f0d; }
+}
+.ks-pillar-char { transition: all 0.8s ease; }
+.ks-activating .ks-pillar-char {
+  color: #fff !important;
+  text-shadow: 0 0 20px #D4AF37, 0 0 40px #D4AF37, 0 0 80px #D4AF37 !important;
+  transform: scale(1.1);
+}
+.ks-activating .ks-day-char {
+  color: #fff !important;
+  text-shadow: 0 0 20px #ff4d40, 0 0 40px #D4AF37, 0 0 80px #ff4d40 !important;
+  animation: none !important;
+}
 `;
 
 const PILLAR_LABELS = [
@@ -130,69 +164,187 @@ const PILLAR_LABELS = [
   ['hour', '时'],
 ] as const;
 
+const PILLAR_DELAYS = { year: '0.2s', month: '0.4s', day: '0.6s', hour: '0.8s' } as const;
+
 function DraftProfileCard(props: {
+  subjectName: string;
   pillars: { year: string; month: string; day: string; hour: string };
   onPillarChange: (key: 'year' | 'month' | 'day' | 'hour', value: string) => void;
   onGenerate: () => void;
-  onSave: () => void;
-  canSave: boolean;
   loading: boolean;
 }) {
   const [editing, setEditing] = useState(false);
+  const [activating, setActivating] = useState(false);
+
+  function handleConfirm() {
+    setActivating(true);
+    setTimeout(() => {
+      setActivating(false);
+      props.onGenerate();
+    }, 2200);
+  }
 
   return (
-    <div>
-      <div className="flex justify-evenly" style={{ flexDirection: 'row-reverse', paddingTop: 16, borderTop: '1px dashed rgba(138,114,84,0.3)' }}>
-        {PILLAR_LABELS.map(([key, label]) => (
-          <div key={key} className="flex flex-col items-center gap-2">
-            <div className="text-xs" style={{ color: '#8C857B', borderBottom: '1px solid rgba(138,114,84,0.4)', paddingBottom: 4 }}>{label}</div>
-            {editing ? (
-              <input
-                type="text"
-                value={props.pillars[key]}
-                onChange={(e) => props.onPillarChange(key, e.target.value)}
-                className="ks-serif"
-                style={{ width: 48, background: 'transparent', border: 'none', borderBottom: '1px solid rgba(138,114,84,0.4)', outline: 'none', textAlign: 'center', fontSize: '1.2rem', color: '#8A7254' }}
-                disabled={props.loading}
-              />
-            ) : (
+    <div className={activating ? 'ks-activating' : ''} style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      {/* Subject name */}
+      <div
+        style={{
+          alignSelf: 'center',
+          marginBottom: 20,
+          opacity: activating ? 0 : 1,
+          transition: 'opacity 0.5s',
+          animation: 'ks-name-in 1.2s ease forwards',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 28, height: 1, background: 'linear-gradient(to right, transparent, #8A7254)' }} />
+          <span className="ks-serif" style={{ fontSize: '0.75rem', color: '#8C857B', letterSpacing: 4 }}>命 主</span>
+          <div style={{ width: 28, height: 1, background: 'linear-gradient(to left, transparent, #8A7254)' }} />
+        </div>
+        <div
+          className="ks-serif"
+          style={{
+            fontSize: '1.4rem',
+            fontWeight: 600,
+            letterSpacing: 6,
+            background: 'linear-gradient(135deg, #C9A96E 0%, #8A7254 40%, #D4AF37 60%, #8A7254 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            textShadow: 'none',
+            filter: 'drop-shadow(0 0 6px rgba(138,114,84,0.3))',
+          }}
+        >
+          {props.subjectName || '—'}
+        </div>
+      </div>
+
+      {/* Dashed separator */}
+      <div style={{ width: '100%', borderTop: '1px dashed rgba(138,114,84,0.3)', marginBottom: 40 }} />
+
+      {/* Magic ring (hidden, activated on confirm) */}
+      <div style={{
+        position: 'absolute', top: '45%', left: '50%',
+        transform: 'translate(-50%,-50%) scale(0)',
+        width: 160, height: 160, borderRadius: '50%',
+        border: '2px solid #D4AF37',
+        boxShadow: '0 0 40px #D4AF37, inset 0 0 40px #D4AF37',
+        opacity: 0, pointerEvents: 'none', zIndex: 0,
+        ...(activating ? { animation: 'ks-ring-expand 2.2s cubic-bezier(0.25,1,0.5,1) forwards' } : {}),
+      }} />
+
+      {/* Pillars */}
+      <div style={{ display: 'flex', flexDirection: 'row-reverse', gap: 60, marginBottom: 24, position: 'relative', zIndex: 2 }}>
+        {PILLAR_LABELS.map(([key, label]) => {
+          const isDay = key === 'day';
+          return (
+            <div
+              key={key}
+              className="flex flex-col items-center"
+              style={{
+                gap: 12,
+                opacity: 0,
+                animation: `ks-pillar-in 0.8s ease forwards ${PILLAR_DELAYS[key]}`,
+              }}
+            >
               <div
                 className="ks-serif"
-                style={{ fontSize: '1.4rem', lineHeight: 1.3, fontWeight: 600, color: key === 'day' ? '#A6382E' : '#8A7254', textAlign: 'center' }}
+                style={{
+                  fontSize: '0.8rem',
+                  color: isDay ? '#A6382E' : '#8C857B',
+                  borderBottom: `1px solid ${isDay ? 'rgba(166,56,46,0.4)' : 'rgba(138,114,84,0.4)'}`,
+                  paddingBottom: 4,
+                  width: '100%',
+                  textAlign: 'center',
+                }}
               >
-                {props.pillars[key].charAt(0)}
-                <br />
-                {props.pillars[key].charAt(1) || ''}
+                {label}
               </div>
-            )}
-          </div>
-        ))}
+              {editing ? (
+                <input
+                  type="text"
+                  value={props.pillars[key]}
+                  onChange={(e) => props.onPillarChange(key, e.target.value)}
+                  className="ks-serif"
+                  style={{ width: 48, background: 'transparent', border: 'none', borderBottom: '1px solid rgba(138,114,84,0.4)', outline: 'none', textAlign: 'center', fontSize: '1.6rem', color: '#8A7254' }}
+                  disabled={props.loading || activating}
+                />
+              ) : (
+                <div
+                  className={`ks-serif ks-pillar-char${isDay ? ' ks-day-char' : ''}`}
+                  style={{
+                    fontSize: '2rem',
+                    lineHeight: 1.4,
+                    fontWeight: isDay ? 500 : 400,
+                    color: isDay ? '#A6382E' : '#E8E3D7',
+                    textAlign: 'center',
+                    letterSpacing: 2,
+                    ...(isDay && !activating ? { animation: 'ks-day-breathe 4s infinite alternate ease-in-out' } : {}),
+                  }}
+                >
+                  {props.pillars[key].charAt(0)}
+                  <br />
+                  {props.pillars[key].charAt(1) || ''}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
-      <div className="mt-3 flex justify-end">
+
+      {/* Modify link */}
+      <div
+        style={{
+          alignSelf: 'flex-end', marginBottom: 30,
+          opacity: activating ? 0 : 1,
+          transition: 'opacity 0.5s',
+        }}
+      >
         <button
           type="button"
           onClick={() => setEditing(!editing)}
-          disabled={props.loading}
-          className="text-xs"
-          style={{ background: 'none', border: 'none', color: '#8C857B', cursor: 'pointer' }}
+          disabled={props.loading || activating}
+          className="ks-serif"
+          style={{ background: 'none', border: 'none', color: '#8C857B', cursor: 'pointer', fontSize: '0.9rem', letterSpacing: 2 }}
         >
           {editing ? '完成' : '修改'}
         </button>
       </div>
-      <div className="mt-3 flex gap-3">
-        <button type="button" onClick={props.onGenerate} disabled={props.loading} className="ks-btn-seal flex-1" style={{ letterSpacing: '4px' }}>
-          确认生成
-        </button>
+
+      {/* Action button */}
+      <div
+        style={{
+          width: '100%',
+          opacity: activating ? 0 : 1,
+          transition: 'opacity 0.5s',
+          pointerEvents: activating ? 'none' : 'auto',
+        }}
+      >
         <button
           type="button"
-          onClick={props.onSave}
-          disabled={!props.canSave || props.loading}
-          className="ks-serif flex-1"
-          style={{ padding: 14, background: 'transparent', border: '1px solid rgba(138,114,84,0.4)', color: '#8C857B', cursor: 'pointer', letterSpacing: '2px', fontSize: '1rem', opacity: !props.canSave || props.loading ? 0.5 : 1 }}
+          onClick={handleConfirm}
+          disabled={props.loading || activating}
+          className="ks-serif"
+          style={{
+            width: '100%', padding: '15px 0', background: 'transparent',
+            border: '1px solid rgba(166,56,46,0.4)', color: '#A6382E',
+            fontSize: '1rem', letterSpacing: 4, cursor: 'pointer',
+            borderRadius: 2, transition: 'all 0.3s',
+          }}
         >
-          保存画像
+          {activating ? '天 机 衍 算 中 …' : props.loading ? '推 演 中 …' : '确 认 生 成'}
         </button>
       </div>
+
+      {/* Screen flash overlay */}
+      {activating && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          pointerEvents: 'none', zIndex: 9999, mixBlendMode: 'overlay',
+          animation: 'ks-flash 2.2s ease-in forwards 0.3s',
+        }} />
+      )}
     </div>
   );
 }
@@ -201,9 +353,9 @@ export function KismetShell() {
   const { t } = useTranslation('kismet');
   const store = useKismetStore();
   const controller = useKismetController();
-  const exportActions = useKismetExport();
   const { route } = controller;
   const [routeExpanded, setRouteExpanded] = useState(false);
+  const [dailySubTab, setDailySubTab] = useState<'fortune' | 'stick'>('fortune');
 
   const showPromptPanel = Boolean(store.generatedPrompt && store.error);
 
@@ -425,13 +577,33 @@ export function KismetShell() {
         ) : (
           <div className="flex-1 overflow-y-auto p-6" style={{ maxWidth: 1200 }}>
             <div className="mb-5 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(138,114,84,0.2)', paddingBottom: 12 }}>
-              <div className="text-sm" style={{ color: '#8C857B', letterSpacing: 2 }}>{t(`Tabs.${store.activeTab}`)}</div>
-              <ExportToolbar
-                canExport={exportActions.canExport}
-                onExportJson={exportActions.handleExportJson}
-                onExportPdf={exportActions.handleExportPdf}
-                onExportHtml={exportActions.handleExportHtml}
-              />
+              {store.activeTab === 'daily-fortune' ? (
+                <div className="flex" style={{ gap: 0 }}>
+                  {([['fortune', t('DailyFortune.subTabFortune')], ['stick', t('DailyFortune.subTabStick')]] as const).map(([key, label]) => {
+                    const active = dailySubTab === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setDailySubTab(key)}
+                        className="ks-serif"
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          padding: '0 16px 0 0', fontSize: '0.85rem', letterSpacing: 2,
+                          color: active ? '#8A7254' : '#8C857B',
+                          borderBottom: active ? '2px solid #8A7254' : '2px solid transparent',
+                          paddingBottom: 2, marginRight: 16,
+                          transition: 'all 0.3s',
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-sm" style={{ color: '#8C857B', letterSpacing: 2 }}>{t(`Tabs.${store.activeTab}`)}</div>
+              )}
             </div>
 
             {store.error && (
@@ -465,6 +637,7 @@ export function KismetShell() {
               <div className="flex items-start justify-center" style={{ paddingTop: 40 }}>
                 <div style={{ width: '100%', maxWidth: 480 }}>
                   <DraftProfileCard
+                    subjectName={store.birthInput.name || ''}
                     pillars={store.draftProfile.pillars}
                     onPillarChange={(key, value) => {
                       if (store.draftProfile) {
@@ -475,8 +648,6 @@ export function KismetShell() {
                       }
                     }}
                     onGenerate={controller.generateNatalAnalysis}
-                    onSave={controller.saveLocalProfile}
-                    canSave
                     loading={store.loading}
                   />
                 </div>
@@ -487,18 +658,88 @@ export function KismetShell() {
                 {t('EmptyState.natal')}
               </div>
             )}
-            {store.activeTab === 'daily-fortune' && store.dailyResult && (
+            {/* Daily fortune sub-tab: fortune */}
+            {store.activeTab === 'daily-fortune' && dailySubTab === 'fortune' && store.dailyResult && (
               <DailyFortuneView
                 result={store.dailyResult}
-                fortuneStickResult={store.fortuneStickResult}
                 loading={store.loading}
-                onDrawFortuneStick={controller.generateFortuneStick}
+                onDrawFortuneStick={() => { controller.generateFortuneStick(); setDailySubTab('stick'); }}
                 onShare={controller.shareContent}
               />
             )}
-            {!store.loading && !store.error && store.activeTab === 'daily-fortune' && !store.dailyResult && (
+            {store.activeTab === 'daily-fortune' && dailySubTab === 'fortune' && !store.dailyResult && store.confirmedProfile && (
+              <div className="flex items-start justify-center" style={{ paddingTop: 40 }}>
+                <div style={{ width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, marginBottom: 20 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 28, height: 1, background: 'linear-gradient(to right, transparent, #8A7254)' }} />
+                      <span className="ks-serif" style={{ fontSize: '0.75rem', color: '#8C857B', letterSpacing: 4 }}>命 主</span>
+                      <div style={{ width: 28, height: 1, background: 'linear-gradient(to left, transparent, #8A7254)' }} />
+                    </div>
+                    <div
+                      className="ks-serif"
+                      style={{
+                        fontSize: '1.4rem', fontWeight: 600, letterSpacing: 6,
+                        background: 'linear-gradient(135deg, #C9A96E 0%, #8A7254 40%, #D4AF37 60%, #8A7254 100%)',
+                        WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                        backgroundClip: 'text',
+                        filter: 'drop-shadow(0 0 6px rgba(138,114,84,0.3))',
+                      }}
+                    >
+                      {store.birthInput.name || store.primaryProfile?.birthInput.name || store.confirmedProfile.dayMaster.label}
+                    </div>
+                  </div>
+                  <div style={{ width: '100%', borderTop: '1px dashed rgba(138,114,84,0.3)', marginBottom: 40 }} />
+                  {store.draftProfile && (
+                    <div style={{ display: 'flex', flexDirection: 'row-reverse', gap: 60, marginBottom: 24 }}>
+                      {PILLAR_LABELS.map(([key, label]) => {
+                        const isDay = key === 'day';
+                        return (
+                          <div key={key} className="flex flex-col items-center" style={{ gap: 12 }}>
+                            <div className="ks-serif" style={{ fontSize: '0.8rem', color: isDay ? '#A6382E' : '#8C857B', borderBottom: `1px solid ${isDay ? 'rgba(166,56,46,0.4)' : 'rgba(138,114,84,0.4)'}`, paddingBottom: 4, width: '100%', textAlign: 'center' }}>{label}</div>
+                            <div className={`ks-serif${isDay ? ' ks-day-char' : ''}`} style={{ fontSize: '2rem', lineHeight: 1.4, fontWeight: isDay ? 500 : 400, color: isDay ? '#A6382E' : '#E8E3D7', textAlign: 'center', letterSpacing: 2, ...(isDay ? { animation: 'ks-day-breathe 4s infinite alternate ease-in-out' } : {}) }}>
+                              {store.draftProfile!.pillars[key].charAt(0)}<br />{store.draftProfile!.pillars[key].charAt(1) || ''}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div className="ks-serif" style={{ fontSize: '0.9rem', color: '#8C857B', letterSpacing: 2, marginTop: 8 }}>
+                    {store.confirmedProfile.dayMaster.label} · {store.confirmedProfile.zodiac}
+                  </div>
+                </div>
+              </div>
+            )}
+            {!store.loading && !store.error && store.activeTab === 'daily-fortune' && dailySubTab === 'fortune' && !store.dailyResult && !store.confirmedProfile && (
               <div className="gu-card flex items-center justify-center" style={{ minHeight: 320, color: '#8C857B', fontSize: '0.9rem' }}>
                 {t('EmptyState.daily')}
+              </div>
+            )}
+
+            {/* Daily fortune sub-tab: stick */}
+            {store.activeTab === 'daily-fortune' && dailySubTab === 'stick' && store.fortuneStickResult && (
+              <FortuneStickView
+                result={store.fortuneStickResult}
+                onShare={controller.shareContent}
+              />
+            )}
+            {store.activeTab === 'daily-fortune' && dailySubTab === 'stick' && !store.fortuneStickResult && (
+              <div className="flex items-center justify-center" style={{ minHeight: 320 }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div className="ks-serif" style={{ fontSize: '1.2rem', color: '#8C857B', letterSpacing: 4, marginBottom: 24 }}>
+                    {store.confirmedProfile ? t('FortuneStick.readyHint') : t('FortuneStick.needProfileHint')}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={controller.generateFortuneStick}
+                    disabled={store.loading || !store.confirmedProfile}
+                    className="ks-btn-seal"
+                    style={{ letterSpacing: 4, padding: '14px 48px' }}
+                  >
+                    {store.loading ? t('FortuneStick.generating') : t('FortuneStick.drawButton')}
+                  </button>
+                </div>
               </div>
             )}
           </div>

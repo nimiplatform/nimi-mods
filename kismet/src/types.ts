@@ -182,7 +182,7 @@ export type KismetDailyFortuneResult = {
   relationshipScore: number;
   wealthScore: number;
   healthScore: number;
-  luckyElements: ElementKey[];
+  luckyElements: string[];
   luckyDirections: string[];
   luckyColors: string[];
   luckyNumbers: number[];

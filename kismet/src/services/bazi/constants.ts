@@ -108,6 +108,14 @@ export const ELEMENT_ARCHETYPES: Record<ElementKey, string> = {
   earth: '土系命格',
 };
 
+export const LUCK_ITEMS: Record<ElementKey, string[]> = {
+  metal: ['白玉', '银饰', '铜铃', '金箔'],
+  wood: ['紫檀', '翠竹', '清茶', '兰草'],
+  water: ['墨砚', '琉璃', '冰泉', '珍珠'],
+  fire: ['朱砂', '红玛瑙', '檀香', '琥珀'],
+  earth: ['黄玉', '陶器', '沉香', '蜜蜡'],
+};
+
 export const LUCK_DIRECTIONS: Record<ElementKey, string[]> = {
   metal: ['西', '西北'],
   wood: ['东', '东南'],

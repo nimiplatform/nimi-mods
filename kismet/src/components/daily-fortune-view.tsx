@@ -1,10 +1,8 @@
 import { useTranslation } from 'react-i18next';
-import type { KismetDailyFortuneResult, KismetFortuneStickResult } from '../types.js';
-import { FortuneStickView } from './fortune-stick-view.js';
+import type { KismetDailyFortuneResult } from '../types.js';
 
 type DailyFortuneViewProps = {
   result: KismetDailyFortuneResult;
-  fortuneStickResult: KismetFortuneStickResult | null;
   loading: boolean;
   onDrawFortuneStick: () => void;
   onShare: (text: string) => void;
@@ -12,14 +10,28 @@ type DailyFortuneViewProps = {
 
 const CN_NUMERALS = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
 
+const COLOR_NAME_CSS: Record<string, string> = {
+  '银白': '#C0C0C0', '金色': '#D4AF37',
+  '青绿': '#5B8C5A', '翠色': '#3DAA6D',
+  '深蓝': '#2E5A8E', '墨黑': '#3A3A3A',
+  '赤红': '#C93A3A', '橙色': '#D4873A',
+  '赭黄': '#B8944A', '棕色': '#8B6B3D',
+};
+
+function scoreColor(score: number): string {
+  if (score >= 80) return '#D4AF37';
+  if (score >= 70) return '#C9633A';
+  if (score >= 60) return '#8A7254';
+  return '#4A5B6A';
+}
+
 function ScoreCard(props: { title: string; score: number }) {
-  const tens = Math.round(props.score / 10);
-  const color = tens >= 8 ? '#A6382E' : tens >= 6 ? '#8A7254' : '#3A4B59';
+  const color = scoreColor(props.score);
 
   return (
     <div className="gu-card" style={{ padding: 18 }}>
-      <div className="text-xs" style={{ color: '#8C857B' }}>{props.title}</div>
-      <div className="ks-serif mt-2" style={{ fontSize: '2rem', fontWeight: 600, color: '#E8E3D7' }}>{props.score}</div>
+      <div className="ks-serif text-xs" style={{ color: '#A6382E', fontWeight: 600, letterSpacing: 2 }}>{props.title}</div>
+      <div className="ks-serif mt-2" style={{ fontSize: '2rem', fontWeight: 600, color }}>{props.score}</div>
       <div className="mt-3" style={{ height: 3, background: 'rgba(138,114,84,0.15)', overflow: 'hidden' }}>
         <div style={{ height: '100%', width: `${props.score}%`, background: color, transition: 'width 0.5s' }} />
       </div>
@@ -44,11 +56,11 @@ function buildDailyShareText(result: KismetDailyFortuneResult): string {
   return lines.join('\n');
 }
 
-export function DailyFortuneView({ result, fortuneStickResult, loading, onDrawFortuneStick, onShare }: DailyFortuneViewProps) {
+export function DailyFortuneView({ result, loading, onDrawFortuneStick, onShare }: DailyFortuneViewProps) {
   const { t } = useTranslation('kismet');
 
   const overallSeal = Math.round(result.overallScore / 10);
-  const sealColor = overallSeal >= 8 ? '#A6382E' : overallSeal >= 6 ? '#8A7254' : '#3A4B59';
+  const sealColor = overallSeal >= 8 ? '#D4AF37' : overallSeal >= 6 ? '#C9633A' : '#4A5B6A';
 
   return (
     <div className="space-y-6">
@@ -70,6 +82,7 @@ export function DailyFortuneView({ result, fortuneStickResult, loading, onDrawFo
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: '1.3rem', fontWeight: 900, borderRadius: 4,
                 transform: 'rotate(-3deg)', opacity: 0.85, marginTop: 4,
+                boxShadow: `0 0 12px ${sealColor}40`,
               }}
             >
               {CN_NUMERALS[overallSeal] || overallSeal}
@@ -89,29 +102,48 @@ export function DailyFortuneView({ result, fortuneStickResult, loading, onDrawFo
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
+        {/* Lucky context */}
         <div className="gu-card" style={{ padding: 24 }}>
-          <h3 className="ks-serif text-sm" style={{ color: '#8A7254', fontWeight: 600 }}>{t('DailyFortune.luckyTitle')}</h3>
-          <div className="mt-4 space-y-2 text-sm" style={{ color: '#E8E3D7' }}>
-            <div><span style={{ color: '#8C857B' }}>{t('DailyFortune.luckyElements')}: </span>{result.luckyElements.join(' / ')}</div>
-            <div><span style={{ color: '#8C857B' }}>{t('DailyFortune.luckyDirections')}: </span>{result.luckyDirections.join(' / ')}</div>
-            <div><span style={{ color: '#8C857B' }}>{t('DailyFortune.luckyColors')}: </span>{result.luckyColors.join(' / ')}</div>
-            <div><span style={{ color: '#8C857B' }}>{t('DailyFortune.luckyNumbers')}: </span>{result.luckyNumbers.join(' / ')}</div>
+          <h3 className="ks-serif text-sm" style={{ color: '#D4AF37', fontWeight: 600, letterSpacing: 2 }}>{t('DailyFortune.luckyTitle')}</h3>
+          <div className="mt-4 space-y-3 text-sm">
+            <div>
+              <span className="ks-serif" style={{ color: '#8C857B', letterSpacing: 1 }}>{t('DailyFortune.luckyElements')}: </span>
+              <span className="ks-serif" style={{ color: '#D4AF37', fontWeight: 500 }}>{result.luckyElements.join(' / ')}</span>
+            </div>
+            <div>
+              <span className="ks-serif" style={{ color: '#8C857B', letterSpacing: 1 }}>{t('DailyFortune.luckyDirections')}: </span>
+              <span className="ks-serif" style={{ color: '#D4AF37', fontWeight: 500 }}>{result.luckyDirections.join(' / ')}</span>
+            </div>
+            <div>
+              <span className="ks-serif" style={{ color: '#8C857B', letterSpacing: 1 }}>{t('DailyFortune.luckyColors')}: </span>
+              {result.luckyColors.map((c, i) => (
+                <span key={c}>
+                  {i > 0 && <span style={{ color: '#8C857B' }}> / </span>}
+                  <span className="ks-serif" style={{ color: COLOR_NAME_CSS[c] || '#D4AF37', fontWeight: 600 }}>{c}</span>
+                </span>
+              ))}
+            </div>
+            <div>
+              <span className="ks-serif" style={{ color: '#8C857B', letterSpacing: 1 }}>{t('DailyFortune.luckyNumbers')}: </span>
+              <span className="ks-serif" style={{ color: '#D4AF37', fontWeight: 500 }}>{result.luckyNumbers[0]}</span>
+            </div>
           </div>
         </div>
 
+        {/* Actions */}
         <div className="gu-card" style={{ padding: 24 }}>
-          <h3 className="ks-serif text-sm" style={{ color: '#8A7254', fontWeight: 600 }}>{t('DailyFortune.actionsTitle')}</h3>
+          <h3 className="ks-serif text-sm" style={{ color: '#A6382E', fontWeight: 600, letterSpacing: 2 }}>{t('DailyFortune.actionsTitle')}</h3>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <div>
-              <div className="gu-tag ks-serif mb-2 inline-block text-xs" style={{ color: '#526B5D' }}>{t('DailyFortune.recommendedActions')}</div>
+              <div className="gu-tag ks-serif mb-2 inline-block text-xs" style={{ color: '#526B5D', fontWeight: 600 }}>{t('DailyFortune.recommendedActions')}</div>
               <ul className="space-y-2 text-sm" style={{ color: '#E8E3D7' }}>
-                {result.recommendedActions.map((item) => <li key={item}>· {item}</li>)}
+                {result.recommendedActions.map((item) => <li key={item}><span style={{ color: '#526B5D' }}>·</span> {item}</li>)}
               </ul>
             </div>
             <div>
-              <div className="gu-tag ks-serif mb-2 inline-block text-xs" style={{ color: '#A6382E' }}>{t('DailyFortune.avoidActions')}</div>
+              <div className="gu-tag ks-serif mb-2 inline-block text-xs" style={{ color: '#A6382E', fontWeight: 600 }}>{t('DailyFortune.avoidActions')}</div>
               <ul className="space-y-2 text-sm" style={{ color: '#E8E3D7' }}>
-                {result.avoidActions.map((item) => <li key={item}>· {item}</li>)}
+                {result.avoidActions.map((item) => <li key={item}><span style={{ color: '#A6382E' }}>·</span> {item}</li>)}
               </ul>
             </div>
           </div>
@@ -148,10 +180,6 @@ export function DailyFortuneView({ result, fortuneStickResult, loading, onDrawFo
         </button>
       </div>
 
-      {/* Fortune Stick Result */}
-      {fortuneStickResult && (
-        <FortuneStickView result={fortuneStickResult} onShare={onShare} />
-      )}
     </div>
   );
 }

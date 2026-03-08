@@ -55,6 +55,8 @@ export function buildDailySystemPrompt(): string {
     '输出必须以 { 开始，以 } 结束。',
     '字段只允许 date, timezone, todayGanZhi, overallScore, careerScore, relationshipScore, wealthScore, healthScore, luckyElements, luckyDirections, luckyColors, luckyNumbers, recommendedActions, avoidActions, summary。',
     '所有 score 范围必须是 0-100。',
+    'luckyElements 应输出 1-3 个具体的幸运物品或材质（如"翡翠"、"紫檀"、"清茶"、"朱砂"），不要输出抽象五行名称（金木水火土）。',
+    'luckyNumbers 只输出 1 个幸运数字。',
     'recommendedActions 和 avoidActions 各输出 2 到 5 条。',
     '禁止输出 markdown 或额外文本。',
   ].join('\n');

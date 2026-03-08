@@ -11,6 +11,7 @@ import {
   getKismetHookClient,
   getKismetRuntimeClient,
 } from '../src/runtime-mod.js';
+import { KISMET_MANIFEST } from '../src/manifest.js';
 
 function createSdkRuntimeContext() {
   const uiRegistrations: Array<{ slot: string; extension: Record<string, unknown> }> = [];
@@ -196,4 +197,23 @@ test('kismet runtime mod setup registers runtime-aligned UI surfaces', async () 
   } finally {
     restoreHost();
   }
+});
+
+test('kismet manifest declares chat ai dependencies and cloud-chat requirement', () => {
+  assert.deepEqual(
+    KISMET_MANIFEST.ai.dependencies.required,
+    [{
+      dependencyId: 'kismet/chat-qwen2.5-7b',
+      kind: 'model',
+      capability: 'chat',
+      modelId: 'qwen2.5-7b-instruct',
+      repo: 'Qwen/Qwen2.5-7B-Instruct-GGUF',
+      engine: 'openai-compatible',
+      title: 'Qwen2.5 7B Instruct (analysis)',
+    }],
+  );
+  assert.deepEqual(KISMET_MANIFEST.ai.dependencies.preferred, {
+    chat: 'kismet/chat-qwen2.5-7b',
+  });
+  assert.deepEqual(KISMET_MANIFEST.requires, ['desktop-core-cloud-chat']);
 });
