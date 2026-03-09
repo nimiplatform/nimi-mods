@@ -26,7 +26,7 @@
 ## 2. Domain Increments
 
 - `WS-DOM-010`: Phase1 retry supports failed-subset rerun with logical chunk index mapping.
-- `WS-DOM-011`: Start-time projection is non-destructive and keeps future events as projected entries.
+- `WS-DOM-011`: Start-time projection is non-destructive, keeps future events as projected FUTURE entries, and supports restoration when selecting a later start.
 - `WS-DOM-012`: Reload conflict action replaces local unsaved snapshot with remote authoritative snapshot.
 - `WS-DOM-013`: Reload recovery converts live task to `PAUSED` or `FAILED` by resumable capability.
 - `WS-DOM-014`: Publish path keeps agent sync world-owned and normalizes invalid handles.
@@ -34,6 +34,7 @@
 - `WS-DOM-016`: Start-time options must prioritize temporal semantics (`timeRef`, dependency edges) over raw merge order when both are available.
 - `WS-DOM-017`: Phase2 synthesize must auto-retry once with compact budget on timeout or JSON-object parse failure before surfacing an error.
 - `WS-DOM-018`: Publish agent sync must normalize `dnaPrimary/dnaSecondary` into backend enum domain and omit non-enum values.
+- `WS-DOM-019`: Event graph, synthesize output, and event upsert payloads must preserve explicit `eventHorizon`; non-`FUTURE` `PRIMARY` events alone participate in evidence gating.
 
 ## 3. No Over-Design Guard
 

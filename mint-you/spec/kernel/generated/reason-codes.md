@@ -29,7 +29,7 @@ codes:
   - code: MINTYOU_TRAIT_EXTRACTION_FAILED
     stage: trait-extract
     blocking: true
-    action_hint: Verify scenario data integrity and retry extraction.
+    action_hint: Verify interview signal integrity and retry extraction.
     source_rule: MY-ERR-001
   - code: MINTYOU_DNA_SYNTHESIS_FAILED
     stage: dna-synthesize

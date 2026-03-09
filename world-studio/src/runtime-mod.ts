@@ -1,0 +1,14 @@
+import type { ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
+
+let _runtimeClient: ModRuntimeClient | null = null;
+
+export function initializeWorldStudioRuntimeClient(runtimeClient: ModRuntimeClient): void {
+  _runtimeClient = runtimeClient;
+}
+
+export function getWorldStudioRuntimeClient(): ModRuntimeClient {
+  if (!_runtimeClient) {
+    throw new Error('WORLD_STUDIO_RUNTIME_CLIENT_NOT_INITIALIZED');
+  }
+  return _runtimeClient;
+}

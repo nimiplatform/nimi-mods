@@ -268,6 +268,118 @@ function createHookClientWithCrossStoryContextLeak() {
   };
 }
 
+function createHookClientWithMainlineStoryAnchor() {
+  return {
+    data: {
+      query: async ({ capability }) => {
+        if (capability === 'data-api.world.lorebooks.list') {
+          return {
+            worldId: 'world-1',
+            items: [
+              {
+                id: 'lore-1',
+                key: 'storm.harbor',
+                content: 'Harbor district with iron bells and rain.',
+                keywords: ['harbor', 'storm'],
+              },
+            ],
+          };
+        }
+
+        if (capability === 'data-api.world.scenes.list') {
+          return {
+            worldId: 'world-1',
+            items: [
+              {
+                id: 'scene-docks',
+                worldId: 'world-1',
+                name: 'Iron Docks',
+                description: 'Rain hammers the mooring towers.',
+                setting: { weather: 'rain' },
+                activeEntities: ['agent-1', 'agent-2', 'player-1'],
+                updatedAt: '2026-03-02T09:00:00.000Z',
+              },
+            ],
+          };
+        }
+
+        if (capability === 'data-api.world.narrative-contexts.list') {
+          return {
+            worldId: 'world-1',
+            items: [
+              {
+                id: 'ctx-canon',
+                scope: 'CANON',
+                scopeKey: 'canon:world-1',
+                storyId: null,
+                narrativeSetting: { pacingPolicy: { curve: 'steady' } },
+                narrativeState: {},
+              },
+              {
+                id: 'ctx-story-mainline',
+                scope: 'STORY',
+                scopeKey: 'story:world-mainline',
+                storyId: 'story:world-mainline',
+                narrativeSetting: {
+                  recommendedSceneId: 'scene-docks',
+                  castPolicy: {
+                    mandatorySubjectIds: ['agent-1', 'agent-2'],
+                  },
+                  initiativePolicy: { enabled: true, tickSeconds: 10, cooldownSeconds: 180, maxConsecutive: 3 },
+                  pacingPolicy: { targetTension: 0.68, tensionBand: [0.5, 0.8], beatDensity: 0.55, curve: 'steady-rise' },
+                },
+                narrativeState: {
+                  phase: 'in-progress',
+                  objective: 'Hold the harbor line',
+                  tension: 0.7,
+                  openThreads: ['hidden reinforcements'],
+                },
+              },
+              {
+                id: 'ctx-subject-mainline',
+                scope: 'SUBJECT',
+                scopeKey: 'subject:world-mainline:agent-1',
+                storyId: 'story:world-mainline',
+                subjectType: 'AGENT',
+                subjectId: 'agent-1',
+                narrativeSetting: { dramaticRole: 'mediator' },
+                narrativeState: { activeObjective: 'protect the line' },
+              },
+              {
+                id: 'ctx-relation-mainline',
+                scope: 'RELATION',
+                scopeKey: 'relation:world-mainline:agent-1:agent-2',
+                storyId: 'story:world-mainline',
+                subjectType: 'AGENT',
+                subjectId: 'agent-1',
+                targetSubjectType: 'AGENT',
+                targetSubjectId: 'agent-2',
+                narrativeSetting: { relationContract: 'cautious-allies' },
+                narrativeState: { trust: 0.3 },
+              },
+            ],
+          };
+        }
+
+        if (capability === 'data-api.core.agent.memory.recall.for-entity') {
+          return {
+            recallSource: 'remote-only',
+            items: [
+              { content: 'The player once crossed this harbor at dawn.' },
+            ],
+            core: [
+              { summary: 'The guide distrusts sudden moves.' },
+            ],
+            e2e: [],
+          };
+        }
+
+        throw new Error(`unsupported-capability:${capability}`);
+      },
+    },
+  };
+}
+
 const detail = {
   storyId: 'story.world-1.evt-primary',
   worldId: 'world-1',
@@ -349,4 +461,28 @@ test('startup package does not borrow SUBJECT or RELATION context from a differe
   assert.equal(startup.snapshot.gapWarnings.includes('TEXTPLAY_CONTEXT_RELATION_MISSING_WARN'), true);
   assert.equal(startup.materials.contexts.some((row) => row.id === 'ctx-subject-other'), false);
   assert.equal(startup.materials.contexts.some((row) => row.id === 'ctx-relation-other'), false);
+});
+
+test('startup package accepts stable mainline context anchor and AGENT-to-AGENT relation rows', async () => {
+  const startup = await loadStoryStartupPackage({
+    hookClient: createHookClientWithMainlineStoryAnchor(),
+    narrativeEngine: {
+      turnLatest: async () => null,
+    },
+    detail: {
+      ...detail,
+      participants: ['agent-1', 'agent-2', 'player-1'],
+      characterRefs: ['agent-1', 'agent-2', 'player-1'],
+    },
+    playerId: 'player-1',
+  });
+
+  assert.equal(startup.snapshot.contextCoverage.story, true);
+  assert.equal(startup.snapshot.contextCoverage.subject, true);
+  assert.equal(startup.snapshot.contextCoverage.relation, true);
+  assert.equal(startup.snapshot.gapWarnings.includes('TEXTPLAY_CONTEXT_SUBJECT_MISSING_WARN'), false);
+  assert.equal(startup.snapshot.gapWarnings.includes('TEXTPLAY_CONTEXT_RELATION_MISSING_WARN'), false);
+  assert.equal(startup.materials.contexts.some((row) => row.id === 'ctx-story-mainline'), true);
+  assert.equal(startup.materials.contexts.some((row) => row.id === 'ctx-relation-mainline'), true);
+  assert.equal(startup.narrativeScopes.RELATION.relationContract, 'cautious-allies');
 });

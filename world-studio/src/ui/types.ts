@@ -20,7 +20,7 @@ export type WorldDraftSummary = {
 export type WorldSummary = {
   id: string;
   name: string;
-  status: 'DRAFT' | 'ACTIVE' | 'ARCHIVED' | 'FROZEN';
+  status: 'DRAFT' | 'PENDING_REVIEW' | 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
   description: string | null;
   updatedAt: string;
 };
@@ -48,6 +48,7 @@ export type WorldEventSummary = {
   id: string;
   worldId: string;
   level: 'PRIMARY' | 'SECONDARY';
+  eventHorizon: 'PAST' | 'ONGOING' | 'FUTURE';
   parentEventId: string | null;
   title: string;
   summary: string | null;

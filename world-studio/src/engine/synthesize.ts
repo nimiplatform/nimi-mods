@@ -25,6 +25,10 @@ import {
   PRIMARY_EVIDENCE_COVERAGE_BLOCK_THRESHOLD,
   summarizePrimaryEvidenceCoverage,
 } from './primary-evidence.js';
+import {
+  deriveNeedsEvidence,
+  normalizeEventHorizon,
+} from '../services/event-horizon.js';
 
 function diagLog(message: string, details?: Record<string, unknown>) {
   try {
@@ -114,6 +118,7 @@ function asEventArray(value: unknown): EventNodeDraft[] {
       const level = String(record.level || '').trim().toUpperCase() === 'SECONDARY'
         ? 'SECONDARY'
         : 'PRIMARY';
+      const eventHorizon = normalizeEventHorizon(record.eventHorizon, 'PAST');
       const evidenceRefs = Array.isArray(record.evidenceRefs)
         ? record.evidenceRefs.filter((entry) => entry && typeof entry === 'object').map((entry) => ({
           segmentId: String(asRecord(entry).segmentId || ''),
@@ -134,6 +139,7 @@ function asEventArray(value: unknown): EventNodeDraft[] {
       return {
         id: String(record.id || `${level.toLowerCase()}-${index + 1}`),
         level,
+        eventHorizon,
         parentEventId: String(record.parentEventId || '').trim() || null,
         title: String(record.title || `Event ${index + 1}`),
         summary: String(record.summary || ''),
@@ -161,7 +167,12 @@ function asEventArray(value: unknown): EventNodeDraft[] {
           : {}),
         evidenceRefs,
         confidence: Number(record.confidence || 0.5),
-        needsEvidence: Boolean(record.needsEvidence),
+        needsEvidence: deriveNeedsEvidence({
+          level,
+          eventHorizon,
+          evidenceRefs,
+          needsEvidence: record.needsEvidence,
+        }),
       };
     });
 }
@@ -503,7 +514,7 @@ function buildSynthesizePrompt(input: {
     '{',
     '  "world": {"name":"...","description":"...","lore":"...","genre":"...","themes":["..."],"era":"...","timeFlowRatio":1,"rules": {}},',
     '  "worldview": {"timeModel": {"currentNode":"...","timeline":[]},"spaceTopology": {},"causality": {},"coreSystem": {},"existences": {},"resources": {},"structures": {},"visualGuide": {},"narrativeHooks": {}},',
-    '  "worldEvents":[{"id":"evt-p1","level":"PRIMARY","parentEventId":null,"title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"text"}],"confidence":0.0,"needsEvidence":false}],',
+    '  "worldEvents":[{"id":"evt-p1","level":"PRIMARY","eventHorizon":"PAST","parentEventId":null,"title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"text"}],"confidence":0.0,"needsEvidence":false}],',
     '  "worldLorebooks":[{"key":"topic:subtopic:item_name","name":"...","content":"...","keywords":["..."],"value":{"details":{}},"provenance":{"source":"synthesize"}}],',
     '  "futureHistoricalEvents":[{"id":"future-1","title":"...","description":"...","timeNode":"...","impact":"..."}],',
     '  "agentDrafts":[{"characterName":"...","handle":"...","concept":"...","backstory":"...","coreValues":"...","relationshipStyle":"...","description":"...","scenario":"...","greeting":"...","exampleDialogue":"...","systemPromptBase":"...","rules":{"format":"rule-lines-v1","lines":["..."],"text":"..."},"postHistoryInstructions":"...","alternateGreetings":["..."],"agentLorebooks":[{"name":"...","content":"...","keywords":["..."],"priority":10,"insertionOrder":100,"constant":false,"selective":false,"secondaryKeys":[],"enabled":true,"source":"world-studio.synthesize"}],"dna":{"identity":{"name":"...","role":"...","worldview":"...","species":"...","summary":"..."},"biological":{"gender":"...","visualAge":"...","ethnicity":"...","heightCm":0,"weightKg":0},"appearance":{"artStyle":"...","hair":"...","eyes":"...","skin":"...","fashionStyle":"...","signatureItems":[]},"personality":{"summary":"...","mbti":"...","interests":[],"goals":[],"relationshipMode":"..."},"communication":{"summary":"...","responseLength":"medium","formality":"casual","sentiment":"neutral"},"voice":{"voiceId":"...","emotionEnabled":true,"speed":0,"pitch":0},"nsfwLevel":"SAFE"}}]',
@@ -538,7 +549,8 @@ function buildSynthesizePrompt(input: {
     '- worldLorebooks keys should use topic:subtopic:item_name format.',
     '',
     '## General Rules',
-    '- worldEvents must align with the event graph and keep PRIMARY/SECONDARY hierarchy.',
+    '- worldEvents must align with the event graph, keep PRIMARY/SECONDARY hierarchy, and preserve explicit eventHorizon.',
+    '- PRIMARY events with PAST or ONGOING horizon should keep evidenceRefs when the source provides them.',
     '- Prefer accumulator values when they are already specific and consistent; only refine when needed.',
     '- futureHistoricalEvents: ONLY include events explicitly described as future or prophesied in the source text. If none exist in the source, return empty array [].',
     '- No markdown, no explanation, JSON only.',

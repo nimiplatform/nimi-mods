@@ -5,6 +5,7 @@ import type {
   EventNodeDraft,
   WorldStudioKnowledgeGraphDraft,
 } from '../types.js';
+import { deriveNeedsEvidence } from '../../services/event-horizon.js';
 
 type TextSearchIndex = {
   raw: string;
@@ -338,7 +339,10 @@ function backfillEventFieldsInternal(input: {
       characterRefs,
       locationRefs,
       timeRef,
-      needsEvidence: !hasEvidence,
+      needsEvidence: deriveNeedsEvidence({
+        ...event,
+        level: 'PRIMARY',
+      }),
     };
   });
 
@@ -404,7 +408,10 @@ function backfillEventFieldsInternal(input: {
       locationRefs,
       timeRef,
       dependsOnEventIds,
-      needsEvidence: Boolean(event.needsEvidence) || !hasEvidence,
+      needsEvidence: deriveNeedsEvidence({
+        ...event,
+        level: 'SECONDARY',
+      }),
     };
   });
 
@@ -415,8 +422,10 @@ function backfillEventFieldsInternal(input: {
 
   return {
     primary: pruned.primary.map((event) => {
-      const hasEvidence = Array.isArray(event.evidenceRefs) && event.evidenceRefs.length > 0;
-      return { ...event, needsEvidence: !hasEvidence };
+      return {
+        ...event,
+        needsEvidence: deriveNeedsEvidence(event),
+      };
     }),
     secondary: pruned.secondary,
   };

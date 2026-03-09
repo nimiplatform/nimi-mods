@@ -35,7 +35,7 @@
 - `NAR-015`: Initiative cooldown hit returns non-blocking no-op with `NARRATIVE_INITIATIVE_COOLDOWN_ACTIVE`.
 - `NAR-016`: Resume must validate `stepInputHash`; mismatch is fail-close.
 - `NAR-017`: Step1 context assembly reads `worldEvents/lorebooks/scenes/narrative-contexts/memory` from realm boundaries and emits bounded snapshot.
-- `NAR-018`: Missing `CANON/STORY` is fail-close; missing `SUBJECT/RELATION/scene` keeps run approved with coverage warnings.
+- `NAR-018`: Missing `CANON/STORY` is fail-close; missing `SUBJECT/RELATION/scene` keeps run approved with coverage warnings. Event-derived player-facing story ids may resolve via a stable non-event story anchor, but cross-event context borrowing remains forbidden.
 - `NAR-019`: Guard adjusts excessive tension jump with non-blocking `NARRATIVE_TENSION_JUMP_ADJUSTED`.
 
 ## 3. No Over-Design Guard

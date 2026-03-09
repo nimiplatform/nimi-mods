@@ -97,9 +97,11 @@ function createNarrativeEngine() {
       }
       if (capability === 'data-api.world.narrative-contexts.list') {
         const storyId = String(query.storyId || '');
-        if (storyId === 'story-context-missing' || storyId === 'story.world.event') {
+        if (storyId === 'story-context-missing') {
           return { worldId: String(query.worldId || ''), items: [] };
         }
+        const useStableStoryAnchor = storyId === 'story.world.event';
+        const resolvedStoryId = useStableStoryAnchor ? 'story:world-mainline' : storyId;
         const storyInitiativePolicy = storyId === 'story-initiative-zero-cooldown'
           ? {
             enabled: true,
@@ -125,12 +127,19 @@ function createNarrativeEngine() {
               id: 'ctx-story',
               worldId: String(query.worldId || ''),
               scope: 'STORY',
-              scopeKey: `story:${storyId}`,
-              storyId,
+              scopeKey: `story:${resolvedStoryId}`,
+              storyId: resolvedStoryId,
               narrativeSetting: {
                 initiativePolicy: storyInitiativePolicy,
                 pacingPolicy: { targetTension: 0.6 },
                 materialHints: { conflicts: ['storm-front'] },
+                ...(useStableStoryAnchor
+                  ? {
+                    castPolicy: {
+                      mandatorySubjectIds: ['agent-1', 'agent-2'],
+                    },
+                  }
+                  : {}),
               },
               narrativeState: {
                 phase: 'opening',
@@ -144,8 +153,8 @@ function createNarrativeEngine() {
               id: 'ctx-subject',
               worldId: String(query.worldId || ''),
               scope: 'SUBJECT',
-              scopeKey: `subject:${storyId}:agent-1`,
-              storyId,
+              scopeKey: `subject:${resolvedStoryId}:agent-1`,
+              storyId: resolvedStoryId,
               subjectType: 'AGENT',
               subjectId: 'agent-1',
               narrativeSetting: { dramaticRole: 'guardian' },
@@ -156,12 +165,14 @@ function createNarrativeEngine() {
               id: 'ctx-relation',
               worldId: String(query.worldId || ''),
               scope: 'RELATION',
-              scopeKey: `relation:${storyId}:agent-1:player-1`,
-              storyId,
+              scopeKey: useStableStoryAnchor
+                ? `relation:${resolvedStoryId}:agent-1:agent-2`
+                : `relation:${resolvedStoryId}:agent-1:player-1`,
+              storyId: resolvedStoryId,
               subjectType: 'AGENT',
               subjectId: 'agent-1',
-              targetSubjectType: 'PLAYER',
-              targetSubjectId: 'player-1',
+              targetSubjectType: useStableStoryAnchor ? 'AGENT' : 'PLAYER',
+              targetSubjectId: useStableStoryAnchor ? 'agent-2' : 'player-1',
               narrativeSetting: { relationContract: 'allies' },
               narrativeState: { trust: 0.4 },
               updatedAt: '2026-03-02T00:00:03.000Z',
@@ -340,7 +351,7 @@ test('NAR-004 Missing context rejects before write', async () => {
   assert.equal(getNarrativeSpineByStoryId('story-context-missing').length, 0);
 });
 
-test('NAR-008 Dotted story id falls back to world-level context when scoped rows are empty', async () => {
+test('NAR-008 Event story accepts stable mainline anchor fallback without borrowing another event story', async () => {
   const narrativeEngine = createNarrativeEngine();
   const response = await narrativeEngine.turnResultUpsert(makeTurnInput({
     storyId: 'story.world.event',
@@ -351,6 +362,13 @@ test('NAR-008 Dotted story id falls back to world-level context when scoped rows
   assert.equal(response.status, 'APPROVED');
   assert.equal(response.reasonCode, null);
   assert.equal(getNarrativeSpineByStoryId('story.world.event').length, 2);
+  const projection = await narrativeEngine.projectionRenderInput({ storyId: 'story.world.event' });
+  assert.equal(projection.worldStyle.contextCoverage.story, true);
+  assert.equal(projection.worldStyle.contextCoverage.relation, true);
+  assert.equal(
+    projection.worldStyle.contextCoverage.warnings.includes('NARRATIVE_CONTEXT_STORY_SCOPE_FALLBACK_WARN'),
+    true,
+  );
 });
 
 test('NAR-005 Initiative cooldown returns NOOP and no additional spine write', async () => {

@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import type { EventNodeDraft } from '../../contracts.js';
+import { countPrimaryEventsMissingEvidence } from '../../services/event-horizon.js';
 import { buildDiagnosticsSummary, detectDependencyDiagnostics } from './event-graph/diagnostics.js';
 import {
   resolveActivePrimaryId,
@@ -59,7 +60,7 @@ export function EventGraphEditor(props: EventGraphEditorProps) {
   const secondaryForPrimary = expandedPrimaryIds.includes(activePrimaryId)
     ? graph.secondary.filter((item) => item.parentEventId === activePrimaryId)
     : [];
-  const missingEvidencePrimaryCount = graph.primary.filter((item) => item.evidenceRefs.length === 0).length;
+  const missingEvidencePrimaryCount = countPrimaryEventsMissingEvidence(graph.primary);
   const dependencyDiagnostics = useMemo(
     () => detectDependencyDiagnostics(graph),
     [graph],

@@ -13,6 +13,7 @@ import {
   projectEventsForSelectedStartTime,
   START_TIME_PROJECTED_FUTURE_EVENT_KIND,
 } from '../../../services/start-time-projection.js';
+import { isEvidenceRequiredForEvent } from '../../../services/event-horizon.js';
 import type { WorldStudioCreateActionsInput } from './types.js';
 
 type RunCreatePhase2Options = {
@@ -253,6 +254,7 @@ export async function runCreatePhase2(
     && primaryEvidenceSummary.coverage < PRIMARY_EVIDENCE_COVERAGE_BLOCK_THRESHOLD
   ) {
     const missingEvidencePrimary = primaryEvents.filter((item) => {
+      if (!isEvidenceRequiredForEvent(item)) return false;
       return !Array.isArray(item.evidenceRefs) || item.evidenceRefs.length === 0;
     });
     diagLog('Phase2 blocked: primary evidence coverage below threshold', {

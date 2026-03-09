@@ -23,3 +23,8 @@ Missing `CANON` or `STORY` coverage is fail-close. Missing `SUBJECT|RELATION|sce
 ## N-CTX-005 Raw Payload Ban
 
 Narrative context must not persist raw world or agent payload.
+
+## N-CTX-006 Stable Story Anchor Fallback
+
+When player-facing story ids are event-derived, assembly may resolve `STORY|SUBJECT|RELATION` through a stable non-event story anchor if exact scoped rows are absent.
+Fallback must emit a coverage warning and must not borrow `SUBJECT|RELATION` rows from a different event-derived story id.

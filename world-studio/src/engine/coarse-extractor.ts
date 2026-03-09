@@ -8,6 +8,10 @@ import type {
 import { buildRepairPrompt, parseJsonRecord, summarizeModelError } from './json-repair.js';
 import { isSyntheticEntityName } from './errors.js';
 import { emitWorldStudioLog } from '../logging.js';
+import {
+  deriveNeedsEvidence,
+  normalizeEventHorizon,
+} from '../services/event-horizon.js';
 
 const CHUNK_TIMELINE_MAX = 8;
 const CHUNK_LOCATIONS_MAX = 10;
@@ -64,6 +68,7 @@ function normalizeEvent(value: unknown, level: 'PRIMARY' | 'SECONDARY', index: n
   const normalizedLevel = String(record.level || level).trim().toUpperCase() === 'SECONDARY'
     ? 'SECONDARY'
     : 'PRIMARY';
+  const eventHorizon = normalizeEventHorizon(record.eventHorizon, 'PAST');
   const temporalBeforeEventIds = toStringArray(record.temporalBeforeEventIds || record.beforeEventIds);
   const temporalAfterEventIds = toStringArray(record.temporalAfterEventIds || record.afterEventIds);
   const dependsOnEventIds = Array.from(new Set([
@@ -75,6 +80,7 @@ function normalizeEvent(value: unknown, level: 'PRIMARY' | 'SECONDARY', index: n
   return {
     id: String(record.id || `${normalizedLevel.toLowerCase()}-${index + 1}`),
     level: normalizedLevel,
+    eventHorizon,
     parentEventId: String(record.parentEventId || '').trim() || null,
     title: title || `Event ${index + 1}`,
     summary: String(record.summary || record.description || '').trim(),
@@ -90,7 +96,12 @@ function normalizeEvent(value: unknown, level: 'PRIMARY' | 'SECONDARY', index: n
     ...(Number.isFinite(temporalConfidence) ? { temporalConfidence: clamp01(temporalConfidence, 0.6) } : {}),
     evidenceRefs,
     confidence: clamp01(record.confidence, 0.6),
-    needsEvidence: normalizedLevel === 'PRIMARY' ? evidenceRefs.length === 0 : false,
+    needsEvidence: deriveNeedsEvidence({
+      level: normalizedLevel,
+      eventHorizon,
+      evidenceRefs,
+      needsEvidence: record.needsEvidence,
+    }),
   };
 }
 
@@ -224,13 +235,13 @@ function buildCoarsePrompt(input: { chunk: string; index: number; total: number;
     '  "locations":[{"id":"place-anchor-1","name":"...","description":"...","importance":0.0}],',
     '  "characters":[{"id":"person-anchor-1","name":"...","summary":"...","significance":0.0}],',
     '  "events": {',
-    '    "primary":[{"id":"evt-p1","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"beforeEventIds":[],"afterEventIds":[],"temporalConfidence":0.0,"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}],',
-    '    "secondary":[{"id":"evt-s1","parentEventId":"evt-p1","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"beforeEventIds":[],"afterEventIds":[],"temporalConfidence":0.0,"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}]',
+    '    "primary":[{"id":"evt-p1","eventHorizon":"PAST","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"beforeEventIds":[],"afterEventIds":[],"temporalConfidence":0.0,"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}],',
+    '    "secondary":[{"id":"evt-s1","eventHorizon":"PAST","parentEventId":"evt-p1","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"beforeEventIds":[],"afterEventIds":[],"temporalConfidence":0.0,"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}]',
     '  },',
     '  "characterRelations":[{"source":"...","target":"...","relation":"...","reason":"...","strength":0.0}]',
     '}',
     `Limit timeline <= ${CHUNK_TIMELINE_MAX}, locations <= ${CHUNK_LOCATIONS_MAX}, characters <= ${CHUNK_CHARACTERS_MAX}, primary events <= ${CHUNK_PRIMARY_EVENTS_MAX}, secondary events <= ${CHUNK_SECONDARY_EVENTS_MAX}, relations <= ${CHUNK_RELATIONS_MAX}.`,
-    'PRIMARY events must include at least one evidenceRefs item if possible.',
+    'PRIMARY events with PAST or ONGOING horizon must include at least one evidenceRefs item if possible.',
     `CHUNK_INDEX: ${input.index + 1}/${input.total}`,
     '<document_content>',
     input.chunk,
@@ -245,7 +256,7 @@ function buildCoarseSchemaLines(): string[] {
     '  "timeline":[{"id":"timeline-anchor-1","label":"...","description":"...","time":"...","weight":0.0}],',
     '  "locations":[{"id":"place-anchor-1","name":"...","description":"...","importance":0.0}],',
     '  "characters":[{"id":"person-anchor-1","name":"...","summary":"...","significance":0.0}],',
-    '  "events":{"primary":[{"id":"evt-p1","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"beforeEventIds":[],"afterEventIds":[],"temporalConfidence":0.0,"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}],"secondary":[{"id":"evt-s1","parentEventId":"evt-p1","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"beforeEventIds":[],"afterEventIds":[],"temporalConfidence":0.0,"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}]},',
+    '  "events":{"primary":[{"id":"evt-p1","eventHorizon":"PAST","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"beforeEventIds":[],"afterEventIds":[],"temporalConfidence":0.0,"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}],"secondary":[{"id":"evt-s1","eventHorizon":"PAST","parentEventId":"evt-p1","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"beforeEventIds":[],"afterEventIds":[],"temporalConfidence":0.0,"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}]},',
     '  "characterRelations":[{"source":"...","target":"...","relation":"...","reason":"...","strength":0.0}]',
     '}',
   ];

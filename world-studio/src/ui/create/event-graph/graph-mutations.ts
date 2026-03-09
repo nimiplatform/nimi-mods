@@ -1,4 +1,5 @@
 import type { EventNodeDraft } from '../../../contracts.js';
+import { countPrimaryEventsMissingEvidence } from '../../../services/event-horizon.js';
 import { moveItemByIndex } from './state.js';
 
 export function movePrimaryEvent(
@@ -34,11 +35,11 @@ export function moveSecondaryEvent(
 }
 
 export function applyEvidenceTemplateForMissingPrimary(primary: EventNodeDraft[]): EventNodeDraft[] {
-  const missingEvidencePrimaryCount = primary.filter((item) => item.evidenceRefs.length === 0).length;
+  const missingEvidencePrimaryCount = countPrimaryEventsMissingEvidence(primary);
   if (missingEvidencePrimaryCount <= 0) return primary;
   const baseSegmentId = `manual-evidence-${Date.now()}`;
   return primary.map((event, index) => {
-    if (event.evidenceRefs.length > 0) return event;
+    if (event.evidenceRefs.length > 0 || event.eventHorizon === 'FUTURE') return event;
     const excerpt = String(event.summary || event.process || event.title || '').trim().slice(0, 280);
     return {
       ...event,

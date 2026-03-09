@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { summarizeTerminalChunkTasks } from '../ui/status-summary.js';
 import type { EventNodeDraft } from '../contracts.js';
 import type { Phase1Result } from '../generation/pipeline.js';
+import { countPrimaryEventsMissingEvidence } from '../services/event-horizon.js';
 
 type EventGraphDraft = {
   primary: EventNodeDraft[];
@@ -23,9 +24,7 @@ export function useWorldStudioStatusMetrics(input: {
 
   const primaryEventCount = input.eventsGraph.primary.length;
   const secondaryEventCount = input.eventsGraph.secondary.length;
-  const missingPrimaryEvidenceCount = input.eventsGraph.primary
-    .filter((item) => item.evidenceRefs.length === 0)
-    .length;
+  const missingPrimaryEvidenceCount = countPrimaryEventsMissingEvidence(input.eventsGraph.primary);
   const allEventCount = Math.max(1, primaryEventCount + secondaryEventCount);
   const eventCharacterCoverage = Math.round(
     (

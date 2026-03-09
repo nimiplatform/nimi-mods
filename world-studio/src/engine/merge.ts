@@ -10,6 +10,10 @@ import type {
   TimelinePoint,
   WorldStudioKnowledgeGraphDraft,
 } from './types.js';
+import {
+  deriveNeedsEvidence,
+  normalizeEventHorizon,
+} from '../services/event-horizon.js';
 
 function normalizeId(value: unknown): string {
   return String(value || '').trim().toLowerCase();
@@ -243,10 +247,12 @@ function dedupeEventsBySemanticAlias(
 function normalizeEvent(item: EventNodeDraft, fallbackLevel: 'PRIMARY' | 'SECONDARY'): EventNodeDraft {
   const level = item.level === 'SECONDARY' ? 'SECONDARY' : 'PRIMARY';
   const evidenceRefs = Array.isArray(item.evidenceRefs) ? item.evidenceRefs : [];
+  const eventHorizon = normalizeEventHorizon(item.eventHorizon, 'PAST');
   return {
     ...item,
     id: String(item.id || `${fallbackLevel.toLowerCase()}-${Math.random().toString(36).slice(2, 8)}`),
     level,
+    eventHorizon,
     parentEventId: item.parentEventId || null,
     title: String(item.title || '').trim() || 'Untitled Event',
     summary: String(item.summary || '').trim(),
@@ -269,7 +275,12 @@ function normalizeEvent(item: EventNodeDraft, fallbackLevel: 'PRIMARY' | 'SECOND
       : [],
     evidenceRefs,
     confidence: clamp01(item.confidence, 0.5),
-    needsEvidence: level === 'PRIMARY' ? evidenceRefs.length === 0 : Boolean(item.needsEvidence),
+    needsEvidence: deriveNeedsEvidence({
+      level,
+      eventHorizon,
+      evidenceRefs,
+      needsEvidence: item.needsEvidence,
+    }),
   };
 }
 

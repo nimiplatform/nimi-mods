@@ -8,6 +8,7 @@ status_model:
   source_rule: WS-QG-001
 thresholds:
   primary_evidence_coverage_block_lt: 0.75
+  primary_evidence_coverage_scope: PRIMARY_AND_EVENT_HORIZON_NOT_FUTURE
   chunk_success_ratio_block_lt: 0.4
   chunk_success_ratio_warn_lt: 0.7
   primary_time_ref_warn_lt_when_no_temporal_edges: 0.5
@@ -27,7 +28,7 @@ issue_catalog:
     source_rule: WS-QG-005
   - code: WORLD_STUDIO_PRIMARY_EVIDENCE_MISSING
     severity: BLOCK
-    trigger: primary_evidence_coverage_below_threshold
+    trigger: non_future_primary_evidence_coverage_below_threshold
     source_rule: WS-QG-005
   - code: WORLD_STUDIO_TEMPORAL_ANCHOR_MISSING
     severity: BLOCK

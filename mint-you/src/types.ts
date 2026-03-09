@@ -1,4 +1,8 @@
 import type {
+  AgentDnaDto,
+  CreateAgentDto as RealmCreateAgentDto,
+} from '@nimiplatform/sdk/realm';
+import type {
   DnaPrimaryType,
   DnaSecondaryTrait,
   RelationshipMode,
@@ -118,67 +122,11 @@ export type DnaSynthesisOutput = {
 
 // ── Agent DNA Structure ──
 
-export type AgentDna = {
-  identity: {
-    name: string;
-    role: string;
-    worldview: string;
-    species: string;
-    summary: string;
-  };
-  biological: {
-    gender: string;
-    visualAge: string;
-    ethnicity: string;
-    heightCm: number;
-    weightKg: number;
-  };
-  appearance: {
-    artStyle: string;
-    hair: string;
-    eyes: string;
-    skin: string;
-    fashionStyle: string;
-    signatureItems: string[];
-  };
-  personality: {
-    summary: string;
-    mbti: string;
-    interests: string[];
-    goals: string[];
-    relationshipMode: RelationshipMode;
-  };
-  communication: {
-    summary: string;
-    responseLength: string;
-    formality: FormalityValue;
-    sentiment: SentimentValue;
-  };
-};
+export type AgentDna = AgentDnaDto;
 
 // ── Create Agent DTO ──
 
-export type CreateAgentDto = {
-  handle: string;
-  concept: string;
-  displayName: string;
-  dnaPrimary: DnaPrimaryType;
-  dnaSecondary: DnaSecondaryTrait[];
-  worldId: string;
-  ownershipType: 'MASTER_OWNED';
-  wakeStrategy: 'PASSIVE';
-  dna: AgentDna;
-  description?: string;
-  greeting?: string;
-  exampleDialogue?: string;
-  systemPromptBase?: string;
-  rules?: AgentRules;
-  scenario?: string;
-  referenceImageUrl?: string;
-  agentLorebooks?: never[];
-  alternateGreetings?: never[];
-  postHistoryInstructions?: null;
-};
+export type CreateAgentDto = RealmCreateAgentDto;
 
 // ── Session ──
 
@@ -220,6 +168,13 @@ export type PhotoAuthRecord = {
   requestedBy: string | null;
   declinedAt: number | null;
   worldId: string;
+};
+
+export type PhotoAuthSnapshot = {
+  state: PhotoAuthState;
+  requestedBy: string | null;
+  cooldownRemainingMs: number;
+  canRequest: boolean;
 };
 
 // ── Error ──

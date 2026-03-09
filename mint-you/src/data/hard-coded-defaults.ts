@@ -22,7 +22,7 @@ export const HARDCODED_AGENT = {
   wakeStrategy: 'PASSIVE' as const,
   agentLorebooks: [] as never[],
   alternateGreetings: [] as never[],
-  postHistoryInstructions: null,
+  postHistoryInstructions: undefined as string | undefined,
 } as const;
 
 export function ageRangeToVisualAge(ageRange: string): string {

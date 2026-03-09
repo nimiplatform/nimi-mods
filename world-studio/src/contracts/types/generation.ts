@@ -40,6 +40,7 @@ export type EvidenceRefDraft = {
 export type EventNodeDraft = {
   id: string;
   level: 'PRIMARY' | 'SECONDARY';
+  eventHorizon: 'PAST' | 'ONGOING' | 'FUTURE';
   parentEventId: string | null;
   title: string;
   summary: string;

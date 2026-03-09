@@ -16,12 +16,16 @@ import type {
   SentimentValue,
 } from '../contracts.js';
 import { emitMintYouLog } from '../logging.js';
+import {
+  readModState,
+  removeModState,
+  writeModState,
+} from './mod-state.js';
 
 export const SESSION_VERSION = 2;
 
 const SESSION_KEY_PREFIX = 'mint-you:session:';
 const SESSION_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-const MOD_STATE_CAPABILITY = 'data.store.mod-state';
 
 const MAX_PERSISTED_MESSAGES = 8;
 const MAX_MEMORY_DIGEST_LENGTH = 2000;
@@ -35,70 +39,6 @@ function normalizeScopeKey(scopeKey: string): string {
 
 function getSessionKey(scopeKey: string): string {
   return `${SESSION_KEY_PREFIX}${normalizeScopeKey(scopeKey)}`;
-}
-
-function extractStateValue(response: unknown): string | null {
-  if (typeof response === 'string') return response;
-  if (!response || typeof response !== 'object') return null;
-  const record = response as Record<string, unknown>;
-  if ('ok' in record && record.ok === false) return null;
-  if (typeof record.value === 'string') return record.value;
-  return null;
-}
-
-function extractStateAck(response: unknown): boolean {
-  if (!response || typeof response !== 'object') return true;
-  const record = response as Record<string, unknown>;
-  if (typeof record.ok === 'boolean') {
-    return record.ok;
-  }
-  return true;
-}
-
-async function readFromModStateStore(
-  hookClient: HookClient,
-  key: string,
-): Promise<string | null> {
-  try {
-    const response = await hookClient.data.query({
-      capability: MOD_STATE_CAPABILITY,
-      query: { op: 'get', key },
-    });
-    return extractStateValue(response);
-  } catch {
-    return null;
-  }
-}
-
-async function writeToModStateStore(
-  hookClient: HookClient,
-  key: string,
-  value: string,
-): Promise<boolean> {
-  try {
-    const response = await hookClient.data.query({
-      capability: MOD_STATE_CAPABILITY,
-      query: { op: 'set', key, value },
-    });
-    return extractStateAck(response);
-  } catch {
-    return false;
-  }
-}
-
-async function removeFromModStateStore(
-  hookClient: HookClient,
-  key: string,
-): Promise<boolean> {
-  try {
-    const response = await hookClient.data.query({
-      capability: MOD_STATE_CAPABILITY,
-      query: { op: 'delete', key },
-    });
-    return extractStateAck(response);
-  } catch {
-    return false;
-  }
 }
 
 function parseSession(raw: string | null): MintYouSession | null {
@@ -167,7 +107,7 @@ export async function saveSession(
   const hookClient = options?.hookClient ?? null;
   if (!hookClient) return null;
 
-  const ok = await writeToModStateStore(hookClient, key, data);
+  const ok = await writeModState(hookClient.data, key, data);
   if (!ok) {
     emitMintYouLog({
       level: 'warn',
@@ -188,7 +128,7 @@ export async function loadSession(
 
   const hookClient = options?.hookClient ?? null;
   if (!hookClient) return null;
-  const remote = await readFromModStateStore(hookClient, key);
+  const remote = await readModState(hookClient.data, key);
   return parseSession(remote);
 }
 
@@ -200,7 +140,7 @@ export async function clearSession(
 
   const hookClient = options?.hookClient ?? null;
   if (!hookClient) return;
-  await removeFromModStateStore(hookClient, key);
+  await removeModState(hookClient.data, key);
 }
 
 export function isSessionExpired(session: MintYouSession): boolean {

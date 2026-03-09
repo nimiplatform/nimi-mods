@@ -23,6 +23,7 @@ export function createHeuristicEvent(input: {
   return {
     id: eventId,
     level: input.level,
+    eventHorizon: 'PAST',
     parentEventId: input.parentEventId,
     title: clipped.slice(0, 24) || `Event ${input.sentenceIndex + 1}`,
     summary: clipped,

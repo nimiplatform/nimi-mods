@@ -4,6 +4,7 @@ import {
   MINTYOU_REASON,
 } from '../contracts.js';
 import { emitMintYouLog } from '../logging.js';
+import { extractCreateAgentId } from '../realm-contract.js';
 import type {
   BasicInfo,
   TraitExtractionResult,
@@ -64,8 +65,17 @@ async function tryCreateAgent(
       query: dto,
     });
 
-    const result = response as Record<string, unknown>;
-    const agentId = String(result?.id || result?.agentId || '');
+    const agentId = extractCreateAgentId(response);
+    if (!agentId) {
+      return {
+        ok: false,
+        error: {
+          reasonCode: MINTYOU_REASON.AGENT_CREATE_FAILED,
+          message: 'Agent creation failed: creator.agents.create returned no agent id.',
+          actionHint: 'Check backend response shape and runtime capability wiring.',
+        },
+      };
+    }
     return { ok: true, data: { agentId } };
   } catch (error) {
     if (isHandleConflictError(error)) {

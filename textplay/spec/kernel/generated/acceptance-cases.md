@@ -112,7 +112,7 @@ cases:
     reason_code: TEXTPLAY_CONTEXT_MISSING_CRITICAL
     source_rule: T-ACC-002
   - id: TXT-014A-CONTEXT-NO-CROSS-STORY-FALLBACK
-    description: SUBJECT and RELATION context resolution may use exact-story or storyless baseline only; context from another story must not be borrowed silently.
+    description: SUBJECT and RELATION context resolution may use exact-story match, resolved stable non-event story anchor, or storyless baseline only; context from another story must not be borrowed silently.
     expected_ok: true
     cross_story_fallback_forbidden: true
     reason_code: null

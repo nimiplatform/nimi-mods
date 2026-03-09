@@ -13,6 +13,7 @@ import {
   getMintYouRuntimeClient,
 } from '../src/runtime-mod.js';
 import {
+  readPhotoAuthSnapshot,
   requestPhoto,
   respondToRequest,
   revokeAccess,
@@ -81,6 +82,32 @@ function createSdkRuntimeContext() {
       }) => Promise<{ referenceImageUrl?: string | null }> | { referenceImageUrl?: string | null };
     }) => {
       profileFilters.push(input);
+    },
+    queryData: async (input: {
+      capability: string;
+      query: Record<string, unknown>;
+    }) => {
+      if (input.capability !== 'data.store.mod-state') {
+        throw new Error(`UNEXPECTED_DATA_QUERY:${input.capability}`);
+      }
+      const op = String(input.query.op || '');
+      const key = String(input.query.key || '');
+      if (!globalThis.localStorage) {
+        return { ok: false, reasonCode: 'MOD_STATE_UNAVAILABLE' };
+      }
+      const storageKey = `nimi:mod-state:${key}`;
+      if (op === 'get') {
+        return { ok: true, value: globalThis.localStorage.getItem(storageKey) };
+      }
+      if (op === 'set') {
+        globalThis.localStorage.setItem(storageKey, String(input.query.value || ''));
+        return { ok: true };
+      }
+      if (op === 'delete') {
+        globalThis.localStorage.removeItem(storageKey);
+        return { ok: true };
+      }
+      return { ok: false, reasonCode: 'MOD_STATE_INVALID_OP' };
     },
   };
 
@@ -263,6 +290,7 @@ test('mint-you runtime mod setup registers profile filter and enforces photo vis
       const profileFilter = profileFilters[0]?.handler;
       const profile = {
         id: 'agent-owner',
+        creatorId: 'user-owner',
         worldId: 'world-1',
         referenceImageUrl: 'https://example.com/photo.png',
       };
@@ -276,15 +304,15 @@ test('mint-you runtime mod setup registers profile filter and enforces photo vis
       assert.equal(unauthorized.referenceImageUrl, null);
 
       const ownerView = await profileFilter({
-        viewerUserId: 'agent-owner',
+        viewerUserId: 'user-owner',
         ownerAgentId: 'agent-owner',
         worldId: 'world-1',
         profile,
       });
       assert.equal(ownerView.referenceImageUrl, 'https://example.com/photo.png');
 
-      requestPhoto('viewer-b', 'agent-owner', 'world-1');
-      respondToRequest('agent-owner', 'viewer-b', 'world-1', true);
+      await requestPhoto(getMintYouHookClient().data, 'viewer-b', 'user-owner', 'world-1');
+      await respondToRequest(getMintYouHookClient().data, 'user-owner', 'viewer-b', 'world-1', true);
       const mutualView = await profileFilter({
         viewerUserId: 'viewer-b',
         ownerAgentId: 'agent-owner',
@@ -293,7 +321,7 @@ test('mint-you runtime mod setup registers profile filter and enforces photo vis
       });
       assert.equal(mutualView.referenceImageUrl, 'https://example.com/photo.png');
 
-      revokeAccess('viewer-b', 'agent-owner', 'world-1');
+      await revokeAccess(getMintYouHookClient().data, 'viewer-b', 'user-owner', 'world-1');
       const revokedView = await profileFilter({
         viewerUserId: 'viewer-b',
         ownerAgentId: 'agent-owner',
@@ -301,6 +329,47 @@ test('mint-you runtime mod setup registers profile filter and enforces photo vis
         profile,
       });
       assert.equal(revokedView.referenceImageUrl, null);
+    } finally {
+      restoreHost();
+    }
+  } finally {
+    restoreLocalStorage();
+  }
+});
+
+test('mint-you photo auth stores directional cooldown in mod-state', async () => {
+  const restoreLocalStorage = installLocalStorage();
+  try {
+    const { sdkRuntimeContext, runtimeHost } = createSdkRuntimeContext();
+    const restoreHost = installModSdkHost(runtimeHost);
+    const mod = createMintYouRuntimeMod();
+
+    try {
+      await mod.setup({ sdkRuntimeContext } as never);
+      const dataClient = getMintYouHookClient().data;
+
+      await requestPhoto(dataClient, 'user-a', 'user-b', 'world-1');
+      let snapshot = await readPhotoAuthSnapshot(dataClient, 'user-a', 'user-b', 'world-1');
+      assert.equal(snapshot.state, 'A_REQUESTED');
+      assert.equal(snapshot.requestedBy, 'user-a');
+      assert.equal(snapshot.canRequest, false);
+
+      await respondToRequest(dataClient, 'user-b', 'user-a', 'world-1', false);
+      snapshot = await readPhotoAuthSnapshot(dataClient, 'user-a', 'user-b', 'world-1');
+      assert.equal(snapshot.state, 'DECLINED');
+      assert.equal(snapshot.requestedBy, 'user-a');
+      assert.equal(snapshot.canRequest, false);
+      assert.ok(snapshot.cooldownRemainingMs > 0);
+
+      const reverseSnapshot = await readPhotoAuthSnapshot(dataClient, 'user-b', 'user-a', 'world-1');
+      assert.equal(reverseSnapshot.state, 'DECLINED');
+      assert.equal(reverseSnapshot.canRequest, true);
+      assert.equal(reverseSnapshot.cooldownRemainingMs, 0);
+
+      await requestPhoto(dataClient, 'user-b', 'user-a', 'world-1');
+      snapshot = await readPhotoAuthSnapshot(dataClient, 'user-b', 'user-a', 'world-1');
+      assert.equal(snapshot.state, 'A_REQUESTED');
+      assert.equal(snapshot.requestedBy, 'user-b');
     } finally {
       restoreHost();
     }

@@ -107,9 +107,9 @@ create_agent_dto:
     source_rule: MY-PROF-005
   - field: postHistoryInstructions
     provenance: hard-coded
-    source: null
+    source: omitted
     required: false
-    note: not applicable for social-persona agents
+    note: not applicable for social-persona agents and therefore omitted from CreateAgentDto
     source_rule: MY-PROF-005
 
 # ─── AgentDna.identity ───

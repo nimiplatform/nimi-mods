@@ -201,7 +201,7 @@ export function evaluateQualityGate(input: {
     pushIssue(
       'WORLD_STUDIO_PRIMARY_EVIDENCE_MISSING',
       'BLOCK',
-      '存在主线事件缺少证据引用。',
+      '存在非 FUTURE 主线事件缺少证据引用。',
       `primaryEvidenceCoverage=${Math.round(primaryEvidenceCoverage * 100)}%, threshold=${Math.round(PRIMARY_EVIDENCE_COVERAGE_BLOCK_THRESHOLD * 100)}%`,
     );
   }
