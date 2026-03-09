@@ -235,7 +235,7 @@ function DraftProfileCard(props: {
       }} />
 
       {/* Pillars */}
-      <div style={{ display: 'flex', flexDirection: 'row-reverse', gap: 60, marginBottom: 24, position: 'relative', zIndex: 2 }}>
+      <div style={{ display: 'flex', gap: 60, marginBottom: 24, position: 'relative', zIndex: 2 }}>
         {PILLAR_LABELS.map(([key, label]) => {
           const isDay = key === 'day';
           return (
@@ -691,7 +691,7 @@ export function KismetShell() {
                   </div>
                   <div style={{ width: '100%', borderTop: '1px dashed rgba(138,114,84,0.3)', marginBottom: 40 }} />
                   {store.draftProfile && (
-                    <div style={{ display: 'flex', flexDirection: 'row-reverse', gap: 60, marginBottom: 24 }}>
+                    <div style={{ display: 'flex', gap: 60, marginBottom: 24 }}>
                       {PILLAR_LABELS.map(([key, label]) => {
                         const isDay = key === 'day';
                         return (

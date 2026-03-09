@@ -13,7 +13,8 @@ import {
   STEM_TO_ELEMENT,
   STEM_TO_YIN_YANG,
 } from './constants.js';
-import { resolveDaysToNextSolarTerm, resolveSolarMonthIndex, resolveStartOfSpring } from './solar-terms.js';
+import { addCivilDays, parseCivilDateParts, parseCivilTimeParts, zonedCivilStringToUtc } from './datetime.js';
+import { resolveDaysToAdjacentSolarTerm, resolveSolarMonthIndex, resolveStartOfSpring } from './solar-terms.js';
 
 type Ganzhi = {
   stem: (typeof HEAVENLY_STEMS)[number];
@@ -53,15 +54,14 @@ function buildGanzhi(stemIndex: number, branchIndex: number): Ganzhi {
   };
 }
 
-function deriveYearGanzhi(date: Date): Ganzhi {
-  const year = date.getFullYear();
-  const startOfSpring = resolveStartOfSpring(year);
-  const effectiveYear = date < startOfSpring ? year - 1 : year;
+function deriveYearGanzhi(birthInstant: Date, birthLocalYear: number): Ganzhi {
+  const startOfSpring = resolveStartOfSpring(birthLocalYear);
+  const effectiveYear = birthInstant < startOfSpring ? birthLocalYear - 1 : birthLocalYear;
   return buildGanzhi(effectiveYear - 4, effectiveYear - 4);
 }
 
-function deriveMonthGanzhi(date: Date, yearStemIndex: number): Ganzhi {
-  const solarMonthIndex = resolveSolarMonthIndex(date);
+function deriveMonthGanzhi(birthInstant: Date, birthLocalYear: number, yearStemIndex: number): Ganzhi {
+  const solarMonthIndex = resolveSolarMonthIndex(birthInstant, birthLocalYear);
   const branchIndex = solarMonthIndex + 2;
   const startStemIndex = positiveMod((positiveMod(yearStemIndex, 5) * 2) + 2, 10);
   return buildGanzhi(startStemIndex + solarMonthIndex, branchIndex);
@@ -70,11 +70,11 @@ function deriveMonthGanzhi(date: Date, yearStemIndex: number): Ganzhi {
 function deriveDayGanzhi(date: Date): Ganzhi {
   const reference = new Date(1984, 1, 2);
   const offset = dayDiff(date, reference);
-  return buildGanzhi(offset, offset);
+  return buildGanzhi(offset + 2, offset + 2);
 }
 
-function deriveHourGanzhi(dayStemIndex: number, birthTime: string): Ganzhi {
-  const hour = Number((birthTime.split(':')[0] || '0').trim());
+function deriveHourGanzhi(dayStemIndex: number, birthHour: number): Ganzhi {
+  const hour = positiveMod(birthHour, 24);
   const branch = HOUR_BRANCHES[hour] || '子';
   const branchIndex = EARTHLY_BRANCHES.indexOf(branch);
   const stemIndex = positiveMod((dayStemIndex % 5) * 2 + branchIndex, 10);
@@ -144,31 +144,29 @@ function shiftGanzhi(input: Ganzhi, steps: number): Ganzhi {
   return buildGanzhi(stemIndex + steps, branchIndex + steps);
 }
 
-function deriveBigLuckCycles(monthGanzhi: Ganzhi, direction: number): { startAge: number; firstDaYun: string; bigLuckCycles: string[] } {
-  const startAge = Math.max(1, Math.min(12, Math.round(resolveDaysToNextSolarTerm(parseCivilDate('2000-01-01')) / 3)));
-  const firstDaYun = shiftGanzhi(monthGanzhi, direction).label;
-  const bigLuckCycles = Array.from({ length: 8 }, (_, index) => shiftGanzhi(monthGanzhi, direction * (index + 1)).label);
-  return {
-    startAge,
-    firstDaYun,
-    bigLuckCycles,
-  };
-}
-
 export function deriveCanonicalProfile(input: KismetBirthInputV2): KismetCanonicalProfile {
-  const birthDate = parseCivilDate(input.birthDate);
-  const yearPillar = deriveYearGanzhi(birthDate);
+  const birthDateParts = parseCivilDateParts(input.birthDate);
+  const birthTimeParts = parseCivilTimeParts(input.birthTime);
+  const birthInstant = zonedCivilStringToUtc(input.birthDate, input.birthTime, input.timezone);
+  const dayBoundaryDate = birthTimeParts.hour >= 23 ? addCivilDays(input.birthDate, 1) : input.birthDate;
+  const birthDate = parseCivilDate(dayBoundaryDate);
+
+  const yearPillar = deriveYearGanzhi(birthInstant, birthDateParts.year);
   const yearStemIndex = HEAVENLY_STEMS.indexOf(yearPillar.stem);
-  const monthPillar = deriveMonthGanzhi(birthDate, yearStemIndex);
+  const monthPillar = deriveMonthGanzhi(birthInstant, birthDateParts.year, yearStemIndex);
   const dayPillar = deriveDayGanzhi(birthDate);
   const dayStemIndex = HEAVENLY_STEMS.indexOf(dayPillar.stem);
-  const hourPillar = deriveHourGanzhi(dayStemIndex, input.birthTime);
+  const hourPillar = deriveHourGanzhi(dayStemIndex, birthTimeParts.hour);
   const fiveElementRatio = deriveFiveElementRatio([yearPillar, monthPillar, dayPillar, hourPillar]);
   const dayMasterElement = STEM_TO_ELEMENT[dayPillar.stem];
   const preferences = deriveElementPreferences(dayMasterElement, fiveElementRatio);
   const direction = deriveLuckDirection(yearPillar, monthPillar, input.gender);
-  const nextSolarTermDays = resolveDaysToNextSolarTerm(birthDate);
-  const startAge = Math.max(1, Math.min(12, Math.round(nextSolarTermDays / 3)));
+  const adjacentSolarTermDays = resolveDaysToAdjacentSolarTerm(
+    birthInstant,
+    birthDateParts.year,
+    direction === 1 ? 1 : -1,
+  );
+  const startAge = Math.max(1, Math.min(12, Math.round(adjacentSolarTermDays / 3)));
   const firstDaYun = shiftGanzhi(monthPillar, direction).label;
   const bigLuckCycles = Array.from({ length: 8 }, (_, index) => shiftGanzhi(monthPillar, direction * (index + 1)).label);
 
