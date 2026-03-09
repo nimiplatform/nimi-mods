@@ -82,9 +82,9 @@ export function useChatActions(input: {
       // Build document lookup maps
       const documents = new Map(store.documents.map((d) => [d.id, d]));
 
-      // Get recent turns for context
-      const currentConv = store.activeConversation;
-      const recentTurns = currentConv?.turns.slice(0, -1) ?? []; // Exclude the empty assistant turn
+      // Get recent turns for context (read latest state, not stale closure)
+      const freshConv = useKnowledgeBaseStore.getState().activeConversation;
+      const recentTurns = freshConv?.turns.slice(0, -1) ?? []; // Exclude the empty assistant turn
 
       // Run RAG pipeline
       for await (const event of runRagPipeline({
@@ -116,12 +116,14 @@ export function useChatActions(input: {
 
       // Update conversation title from first query if it was auto-generated
       if (conv.turns.length === 0) {
-        store.updateConversation({
-          ...conv,
-          title: query.slice(0, 50),
-          updatedAt: new Date().toISOString(),
-          turns: store.activeConversation?.turns ?? [],
-        });
+        const latestConv = useKnowledgeBaseStore.getState().activeConversation;
+        if (latestConv && latestConv.id === convId) {
+          store.updateConversation({
+            ...latestConv,
+            title: query.slice(0, 50),
+            updatedAt: new Date().toISOString(),
+          });
+        }
       }
     } catch (err) {
       ui.setError(err instanceof Error ? err.message : 'Failed to generate response');
