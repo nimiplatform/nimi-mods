@@ -162,10 +162,8 @@ function parseStringArray(value: unknown): string[] {
 function tryHardcodedOverride(input: {
   userText: string;
   proactive?: boolean;
-  voiceConversationMode?: string;
 }): LocalChatTurnMode | null {
   if (input.proactive) return 'checkin';
-  if (input.voiceConversationMode === 'on') return 'explicit-voice';
   // Explicit media/voice keywords that are completely unambiguous
   const text = input.userText.trim();
   if (/^(发图|来张图|发一张|给我看看你|发个视频|来个视频)\b/u.test(text)) return 'explicit-media';
@@ -181,7 +179,6 @@ export async function perceiveTurn(input: {
   memorySlots: RelationMemorySlot[];
   recentTurns?: Array<{ role: string; text: string }>;
   proactive?: boolean;
-  voiceConversationMode?: string;
   regexFallbackTurnMode?: LocalChatTurnMode;
 }): Promise<TurnPerceptionResult> {
   const currentRelationship = input.snapshot?.relationshipState || 'new';
@@ -194,7 +191,6 @@ export async function perceiveTurn(input: {
   const hardcoded = tryHardcodedOverride({
     userText: input.userText,
     proactive: input.proactive,
-    voiceConversationMode: input.voiceConversationMode,
   });
   if (hardcoded) {
     return {

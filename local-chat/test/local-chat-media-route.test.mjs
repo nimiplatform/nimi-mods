@@ -16,10 +16,10 @@ function createDefaultSettings(overrides = {}) {
   return {
     deliveryStyle: 'natural',
     mediaAutonomy: 'natural',
+    voiceAutonomy: 'off',
     voiceConversationMode: 'off',
     relationshipBoundaryPreset: 'balanced',
-    visualComfortLevel: 'soft-visuals',
-    enableVoice: false,
+    visualComfortLevel: 'restrained-visuals',
     allowProactiveContact: false,
     autoPlayVoiceReplies: false,
     voiceName: 'Cherry',

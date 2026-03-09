@@ -1,4 +1,4 @@
-import type { DerivedInteractionProfile, LocalChatTurnMode, VoiceConversationMode } from '../../state/index.js';
+import type { DerivedInteractionProfile, LocalChatTurnMode } from '../../state/index.js';
 
 const QUESTION_RE = /[?？]|为什么|怎么|如何|能不能|可不可以|是什么|什么意思|怎样/u;
 const EMOTIONAL_RE = /难过|好累|很累|烦|崩溃|想哭|孤单|害怕|抱抱|安慰|委屈|想你|心情不好|睡不着/u;
@@ -11,12 +11,11 @@ const CHECKIN_RE = /^(在吗|早安|晚安|想你了|喂|hi|hello|hey|你好|嗨
 export function resolveTurnMode(input: {
   userText: string;
   interactionProfile: DerivedInteractionProfile;
-  voiceConversationMode?: VoiceConversationMode;
   proactive?: boolean;
 }): LocalChatTurnMode {
   const text = String(input.userText || '').trim();
   if (input.proactive) return 'checkin';
-  if (input.voiceConversationMode === 'on' || EXPLICIT_VOICE_RE.test(text)) return 'explicit-voice';
+  if (EXPLICIT_VOICE_RE.test(text)) return 'explicit-voice';
   if (EXPLICIT_MEDIA_RE.test(text)) return 'explicit-media';
   if (CHECKIN_RE.test(text)) return 'checkin';
   if (INTIMATE_RE.test(text)) return 'intimate';

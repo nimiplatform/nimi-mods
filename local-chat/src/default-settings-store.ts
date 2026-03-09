@@ -4,9 +4,10 @@ import { LOCAL_CHAT_MOD_ID } from './contracts.js';
 export type LocalChatTtsVoice = string;
 export type LocalChatDeliveryStyle = 'natural' | 'compact';
 export type LocalChatMediaAutonomy = 'off' | 'explicit-only' | 'natural';
-export type LocalChatVoiceConversationMode = 'off' | 'suggested' | 'on';
+export type LocalChatVoiceAutonomy = 'off' | 'explicit-only' | 'natural';
+export type LocalChatVoiceConversationMode = 'off' | 'on';
 export type LocalChatRelationshipBoundaryPreset = 'reserved' | 'balanced' | 'close';
-export type LocalChatVisualComfortLevel = 'text-only' | 'soft-visuals' | 'natural-visuals';
+export type LocalChatVisualComfortLevel = 'text-only' | 'restrained-visuals' | 'natural-visuals';
 export const LOCAL_CHAT_TTS_VOICE_OPTIONS = [
   'alloy',
   'echo',
@@ -16,17 +17,14 @@ export const LOCAL_CHAT_TTS_VOICE_OPTIONS = [
   'shimmer',
 ] as const;
 export type LocalChatBooleanSettingKey =
-  | 'enableVoice'
   | 'allowProactiveContact'
   | 'autoPlayVoiceReplies';
 
 export type LocalChatProductSettings = {
-  deliveryStyle: LocalChatDeliveryStyle;
   mediaAutonomy: LocalChatMediaAutonomy;
+  voiceAutonomy: LocalChatVoiceAutonomy;
   voiceConversationMode: LocalChatVoiceConversationMode;
-  relationshipBoundaryPreset: LocalChatRelationshipBoundaryPreset;
   visualComfortLevel: LocalChatVisualComfortLevel;
-  enableVoice: boolean;
   allowProactiveContact: boolean;
   autoPlayVoiceReplies: boolean;
 };
@@ -55,15 +53,17 @@ export type LocalChatSettings = {
 };
 
 // Internal merged view for existing execution paths that still consume a flat settings shape.
-export type LocalChatDefaultSettings = LocalChatProductSettings & LocalChatInspectSettings;
+export type LocalChatDefaultSettings = LocalChatProductSettings & LocalChatInspectSettings & {
+  enableVoice: boolean;
+  deliveryStyle: LocalChatDeliveryStyle;
+  relationshipBoundaryPreset: LocalChatRelationshipBoundaryPreset;
+};
 
 export const DEFAULT_LOCAL_CHAT_PRODUCT_SETTINGS: LocalChatProductSettings = {
-  deliveryStyle: 'natural',
   mediaAutonomy: 'natural',
+  voiceAutonomy: 'natural',
   voiceConversationMode: 'off',
-  relationshipBoundaryPreset: 'balanced',
   visualComfortLevel: 'natural-visuals',
-  enableVoice: false,
   allowProactiveContact: true,
   autoPlayVoiceReplies: false,
 };
@@ -91,7 +91,14 @@ export const DEFAULT_LOCAL_CHAT_SETTINGS: LocalChatSettings = {
   inspect: { ...DEFAULT_LOCAL_CHAT_INSPECT_SETTINGS },
 };
 
+export function resolveLocalChatVoiceEnabled(input: Pick<LocalChatProductSettings, 'voiceAutonomy' | 'voiceConversationMode'>): boolean {
+  return input.voiceConversationMode === 'on' || input.voiceAutonomy !== 'off';
+}
+
 export const DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS: LocalChatDefaultSettings = {
+  enableVoice: resolveLocalChatVoiceEnabled(DEFAULT_LOCAL_CHAT_PRODUCT_SETTINGS),
+  deliveryStyle: 'natural',
+  relationshipBoundaryPreset: 'balanced',
   ...DEFAULT_LOCAL_CHAT_PRODUCT_SETTINGS,
   ...DEFAULT_LOCAL_CHAT_INSPECT_SETTINGS,
 };
@@ -102,30 +109,32 @@ export function normalizeLocalChatProductSettings(value: unknown): LocalChatProd
   }
   const record = value as Record<string, unknown>;
   const normalizedMediaAutonomy = String(record.mediaAutonomy || '').trim();
+  const normalizedVoiceAutonomy = String(record.voiceAutonomy || '').trim();
   const normalizedVoiceConversationMode = String(record.voiceConversationMode || '').trim();
-  const deliveryStyle: 'natural' = 'natural';
   const mediaAutonomy = normalizedMediaAutonomy === 'off'
     || normalizedMediaAutonomy === 'explicit-only'
     ? normalizedMediaAutonomy
     : 'natural';
-  const voiceConversationMode = normalizedVoiceConversationMode === 'suggested'
-    || normalizedVoiceConversationMode === 'on'
-    ? normalizedVoiceConversationMode
+  const voiceAutonomy = normalizedVoiceAutonomy === 'off'
+    || normalizedVoiceAutonomy === 'explicit-only'
+    || normalizedVoiceAutonomy === 'natural'
+    ? normalizedVoiceAutonomy
+    : DEFAULT_LOCAL_CHAT_PRODUCT_SETTINGS.voiceAutonomy;
+  const voiceConversationMode = normalizedVoiceConversationMode === 'on'
+    ? 'on'
     : 'off';
-  const relationshipBoundaryPreset: 'balanced' = 'balanced';
   const normalizedVisualComfort = String(record.visualComfortLevel || '').trim();
   const visualComfortLevel = normalizedVisualComfort === 'text-only'
+    || normalizedVisualComfort === 'restrained-visuals'
     || normalizedVisualComfort === 'natural-visuals'
     ? normalizedVisualComfort
-    : 'soft-visuals';
+    : DEFAULT_LOCAL_CHAT_PRODUCT_SETTINGS.visualComfortLevel;
   return {
-    deliveryStyle,
     mediaAutonomy,
+    voiceAutonomy,
     voiceConversationMode,
-    relationshipBoundaryPreset,
     visualComfortLevel,
-    enableVoice: Boolean(record.enableVoice),
-    allowProactiveContact: Boolean(record.allowProactiveContact),
+    allowProactiveContact: record.allowProactiveContact !== false,
     autoPlayVoiceReplies: Boolean(record.autoPlayVoiceReplies),
   };
 }
@@ -199,6 +208,7 @@ export function mergeLocalChatSettings(settings: LocalChatSettings): LocalChatDe
     ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
     ...settings.product,
     ...settings.inspect,
+    enableVoice: resolveLocalChatVoiceEnabled(settings.product),
   };
 }
 

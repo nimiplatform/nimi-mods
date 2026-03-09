@@ -104,6 +104,7 @@ function createResolvedExperiencePolicy(
     },
     voicePolicy: {
       enabled: true,
+      autonomy: 'natural',
       conversationMode: 'off',
       autoPlayReplies: false,
       selectedVoiceId: 'alloy',
@@ -112,7 +113,7 @@ function createResolvedExperiencePolicy(
     },
     mediaPolicy: {
       autonomy: 'natural',
-      visualComfortLevel: 'soft-visuals',
+      visualComfortLevel: 'restrained-visuals',
       routeSource: 'local',
       nsfwPolicy: 'disabled',
       allowVisualAuto: true,
@@ -121,7 +122,7 @@ function createResolvedExperiencePolicy(
     },
     contentBoundary: {
       relationshipBoundaryPreset: 'balanced',
-      visualComfortLevel: 'soft-visuals',
+      visualComfortLevel: 'restrained-visuals',
       routeSource: 'local',
       relationshipState: 'new',
       ...(overrides.contentBoundary || {}),
@@ -139,12 +140,10 @@ test('resolveTurnMode prioritizes explicit voice and media intents', () => {
   assert.equal(resolveTurnMode({
     userText: '直接用语音和我说吧',
     interactionProfile: profile,
-    voiceConversationMode: 'off',
   }), 'explicit-voice');
   assert.equal(resolveTurnMode({
     userText: '发张图给我看看你现在的样子',
     interactionProfile: profile,
-    voiceConversationMode: 'off',
   }), 'explicit-media');
 });
 
@@ -154,7 +153,6 @@ test('resolveTurnMode falls back to playful for bursty persona without direct qu
     interactionProfile: createInteractionProfile({
       expression: { pacingBias: 'bursty' },
     }),
-    voiceConversationMode: 'off',
   }), 'playful');
 });
 
@@ -173,6 +171,8 @@ test('orchestrateBeatModalities prefers voice in voice-first sessions', () => {
     policy: createResolvedExperiencePolicy({
       voicePolicy: {
         enabled: true,
+        autonomy: 'natural',
+        conversationMode: 'on',
         autoPlayReplies: true,
       },
       mediaPolicy: {
@@ -180,7 +180,6 @@ test('orchestrateBeatModalities prefers voice in voice-first sessions', () => {
         allowVisualAuto: false,
       },
     }),
-    voiceConversationMode: 'on',
   });
 
   assert.equal(result[0]?.modality, 'voice');
@@ -201,16 +200,16 @@ test('orchestrateBeatModalities keeps emotional turns text-first when voice mode
     policy: createResolvedExperiencePolicy({
       voicePolicy: {
         enabled: true,
+        autonomy: 'off',
         autoPlayReplies: true,
       },
     }),
-    voiceConversationMode: 'off',
   });
 
   assert.equal(result[0]?.modality, 'text');
 });
 
-test('orchestrateBeatModalities allows narrow suggested voice moments instead of full voice-first takeover', () => {
+test('orchestrateBeatModalities allows natural voice moments instead of full voice-session takeover', () => {
   const result = orchestrateBeatModalities({
     beats: [createBeat({
       text: '那你先靠过来一点，我慢慢说。',
@@ -224,10 +223,10 @@ test('orchestrateBeatModalities allows narrow suggested voice moments instead of
     policy: createResolvedExperiencePolicy({
       voicePolicy: {
         enabled: true,
+        autonomy: 'natural',
         autoPlayReplies: true,
       },
     }),
-    voiceConversationMode: 'suggested',
   });
 
   assert.equal(result[0]?.modality, 'voice');
@@ -248,6 +247,7 @@ test('orchestrateBeatModalities keeps explicit voice turns voiced even when visu
     policy: createResolvedExperiencePolicy({
       voicePolicy: {
         enabled: true,
+        autonomy: 'off',
         autoPlayReplies: true,
       },
       mediaPolicy: {
@@ -258,7 +258,6 @@ test('orchestrateBeatModalities keeps explicit voice turns voiced even when visu
         relationshipState: 'intimate',
       },
     }),
-    voiceConversationMode: 'off',
   });
 
   assert.equal(result[0]?.modality, 'voice');
@@ -288,6 +287,8 @@ test('orchestrateBeatModalities does not let voice-first mode swallow explicit m
     policy: createResolvedExperiencePolicy({
       voicePolicy: {
         enabled: true,
+        autonomy: 'natural',
+        conversationMode: 'on',
         autoPlayReplies: true,
       },
       mediaPolicy: {
@@ -295,7 +296,6 @@ test('orchestrateBeatModalities does not let voice-first mode swallow explicit m
         allowVisualAuto: true,
       },
     }),
-    voiceConversationMode: 'on',
   });
 
   assert.equal(result[0]?.modality, 'image');
@@ -332,7 +332,6 @@ test('orchestrateBeatModalities keeps non-explicit turns text-first even if a be
         relationshipState: 'intimate',
       },
     }),
-    voiceConversationMode: 'off',
   });
   const explicitMedia = orchestrateBeatModalities({
     beats: [beat],
@@ -348,7 +347,6 @@ test('orchestrateBeatModalities keeps non-explicit turns text-first even if a be
         relationshipState: 'intimate',
       },
     }),
-    voiceConversationMode: 'off',
   });
 
   assert.equal(intimate[0]?.modality, 'text');

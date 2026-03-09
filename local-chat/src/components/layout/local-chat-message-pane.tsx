@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { LocalChatProductSettings } from '../../state/index.js';
 import type { ChatMessage } from '../../types.js';
@@ -34,6 +34,9 @@ type LocalChatMessagePaneProps = {
   canSend: boolean;
   runtimeReady: boolean;
 };
+
+const MIN_TEXTAREA_HEIGHT_PX = 48;
+const MAX_TEXTAREA_HEIGHT_PX = 128;
 
 function formatDateLabel(date: Date, t: (key: string, values?: Record<string, unknown>) => string): string {
   const now = new Date();
@@ -71,7 +74,7 @@ function CurrentTurnTypingBubble(props: {
 }) {
   const agentInitial = (String(props.agentName || 'A').trim().charAt(0) || 'A').toUpperCase();
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-2" role="status" aria-live="polite" aria-label={props.t('ChatBubble.agentPending')}>
       {props.agentAvatarUrl ? (
         <img
           src={props.agentAvatarUrl}
@@ -166,33 +169,46 @@ const MessageList = React.memo(function MessageList({
         ? t('Header.presenceSpeaking')
         : '';
     messageElements.push(
-      <section
-        key={`group-${group.groupIndex}`}
-        className={isFocusedGroup
-          ? 'lc-current-turn-card rounded-[28px] border border-white/85 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(238,247,247,0.9))] px-4 py-4'
-          : 'space-y-2.5'}
-      >
-        {isFocusedGroup && focusSummary ? (
-          <div className="mb-3 flex justify-end">
-            <span className="lc-current-turn-chip text-[11px] font-medium text-mint-700">{focusSummary}</span>
+      isFocusedGroup ? (
+        <section
+          key={`group-${group.groupIndex}`}
+          className="lc-message-group lc-current-turn-shell"
+        >
+          <div className="lc-current-turn-halo" aria-hidden />
+          <div className="lc-current-turn-card rounded-[28px] border border-white/85 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(238,247,247,0.9))] px-4 py-4">
+            {focusSummary ? (
+              <div className="mb-3 flex justify-end">
+                <span className="lc-current-turn-chip text-[11px] font-medium text-mint-700">{focusSummary}</span>
+              </div>
+            ) : null}
+            <div className="space-y-2.5">
+              {groupNodes}
+            </div>
           </div>
-        ) : null}
-        <div className="space-y-2.5">
+        </section>
+      ) : (
+        <section
+          key={`group-${group.groupIndex}`}
+          className="lc-message-group lc-message-group-history space-y-2.5"
+        >
           {groupNodes}
-        </div>
-      </section>,
+        </section>
+      ),
     );
   }
   return (
     <>
       {messageElements}
       {isSending ? (
-        <section className="lc-current-turn-card lc-current-turn-card-pending min-h-[112px] rounded-[26px] border border-dashed border-mint-200/80 bg-white/88 px-4 py-4">
-          <CurrentTurnTypingBubble
-            agentAvatarUrl={selectedTargetAvatarUrl}
-            agentName={selectedTargetName}
-            t={t}
-          />
+        <section className="lc-message-group lc-current-turn-shell">
+          <div className="lc-current-turn-halo lc-current-turn-halo-pending" aria-hidden />
+          <div className="lc-current-turn-card lc-current-turn-card-pending min-h-[112px] rounded-[26px] border border-dashed border-mint-200/80 bg-white/88 px-4 py-4">
+            <CurrentTurnTypingBubble
+              agentAvatarUrl={selectedTargetAvatarUrl}
+              agentName={selectedTargetName}
+              t={t}
+            />
+          </div>
         </section>
       ) : null}
     </>
@@ -233,27 +249,54 @@ export const LocalChatMessagePane = React.memo(function LocalChatMessagePane({
   const voiceBusy = isRecording || isTranscribing;
   const [showMediaQuickActions, setShowMediaQuickActions] = useState(false);
   const [localHasText, setLocalHasText] = useState(() => Boolean(inputTextRef.current.trim()));
+  const textareaResizeFrameRef = useRef<number | null>(null);
+  const lastTextareaHeightRef = useRef(MIN_TEXTAREA_HEIGHT_PX);
 
-  const resizeTextarea = useCallback((el: HTMLTextAreaElement) => {
+  const resizeTextareaNow = useCallback((el: HTMLTextAreaElement) => {
     el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+    const nextHeight = Math.min(Math.max(el.scrollHeight, MIN_TEXTAREA_HEIGHT_PX), MAX_TEXTAREA_HEIGHT_PX);
+    lastTextareaHeightRef.current = nextHeight;
+    el.style.height = `${nextHeight}px`;
   }, []);
+
+  const cancelScheduledTextareaResize = useCallback(() => {
+    if (textareaResizeFrameRef.current === null || typeof window === 'undefined') {
+      return;
+    }
+    window.cancelAnimationFrame(textareaResizeFrameRef.current);
+    textareaResizeFrameRef.current = null;
+  }, []);
+
+  const scheduleTextareaResize = useCallback((el: HTMLTextAreaElement | null) => {
+    if (!el) {
+      return;
+    }
+    if (typeof window === 'undefined') {
+      resizeTextareaNow(el);
+      return;
+    }
+    cancelScheduledTextareaResize();
+    textareaResizeFrameRef.current = window.requestAnimationFrame(() => {
+      textareaResizeFrameRef.current = null;
+      resizeTextareaNow(el);
+    });
+  }, [cancelScheduledTextareaResize, resizeTextareaNow]);
 
   const handleTextareaChange = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = event.target.value;
     setInputText(value);
     const hasText = Boolean(value.trim());
     setLocalHasText((prev) => prev === hasText ? prev : hasText);
-    resizeTextarea(event.target);
-  }, [resizeTextarea, setInputText]);
+    scheduleTextareaResize(event.target);
+  }, [scheduleTextareaResize, setInputText]);
+
+  useEffect(() => cancelScheduledTextareaResize, [cancelScheduledTextareaResize]);
 
   // Sync localHasText + textarea size when external code modifies input (send clears, speech fills)
   useEffect(() => {
     setLocalHasText(Boolean(inputTextRef.current.trim()));
-    if (inputRef.current) {
-      resizeTextarea(inputRef.current);
-    }
-  }, [isSending, voiceInputState, inputRef, inputTextRef, resizeTextarea]);
+    scheduleTextareaResize(inputRef.current);
+  }, [isSending, voiceInputState, inputRef, inputTextRef, scheduleTextareaResize]);
 
   const appendMediaPrompt = useCallback((kind: 'image' | 'video') => {
     const prompt = kind === 'image'
@@ -267,10 +310,10 @@ export const LocalChatMessagePane = React.memo(function LocalChatMessagePane({
       const textarea = inputRef.current;
       if (textarea) {
         textarea.focus();
-        resizeTextarea(textarea);
+        scheduleTextareaResize(textarea);
       }
     });
-  }, [inputRef, inputTextRef, resizeTextarea, setInputText, t]);
+  }, [inputRef, inputTextRef, scheduleTextareaResize, setInputText, t]);
 
   const seedFirstTurnComposer = useCallback(() => {
     if (!selectedTarget) {
@@ -283,10 +326,10 @@ export const LocalChatMessagePane = React.memo(function LocalChatMessagePane({
       const textarea = inputRef.current;
       if (textarea) {
         textarea.focus();
-        resizeTextarea(textarea);
+        scheduleTextareaResize(textarea);
       }
     });
-  }, [inputRef, inputTextRef, resizeTextarea, selectedTarget, setInputText, t]);
+  }, [inputRef, inputTextRef, scheduleTextareaResize, selectedTarget, setInputText, t]);
 
   const selectedTargetName = selectedTarget?.displayName || 'Agent';
 
@@ -328,7 +371,6 @@ export const LocalChatMessagePane = React.memo(function LocalChatMessagePane({
                 <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-slate-600">
                   {t('MessagePane.welcomeDescription', {
                     name: welcomeTarget.displayName,
-                    deliveryStyle: productSettings.deliveryStyle,
                   })}
                 </p>
                 <button
@@ -463,6 +505,7 @@ export const LocalChatMessagePane = React.memo(function LocalChatMessagePane({
                 onChange={handleTextareaChange}
                 onKeyDown={onInputKeyDown}
                 disabled={!canSend || isTranscribing}
+                style={{ height: `${lastTextareaHeightRef.current}px` }}
               />
               <button
                 type="button"

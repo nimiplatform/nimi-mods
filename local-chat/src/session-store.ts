@@ -216,6 +216,18 @@ function compareIsoTimestamp(left: string | null | undefined, right: string | nu
   return normalizedLeft - normalizedRight;
 }
 
+function buildConversationScopeKey(targetId: string, viewerId: string): string {
+  return `${trimString(viewerId)}::${trimString(targetId)}`;
+}
+
+function sortConversationRecords(records: LocalChatConversationRecord[]): LocalChatConversationRecord[] {
+  return [...records].sort((left, right) => (
+    compareIsoTimestamp(right.updatedAt, left.updatedAt)
+    || compareIsoTimestamp(right.createdAt, left.createdAt)
+    || left.id.localeCompare(right.id)
+  ));
+}
+
 function normalizeBeatKind(value: unknown): LocalChatStoredBeat['kind'] {
   return value === 'voice' || value === 'image' || value === 'video' ? value : 'text';
 }
@@ -539,6 +551,18 @@ function turnsForConversation(conversationId: string): LocalChatTurnRecord[] {
   return sortTurnRecords(
     [...ledgerCache.turnsById.values()].filter((turn) => turn.conversationId === conversationId),
   );
+}
+
+function findConversationForScope(input: {
+  targetId: string;
+  viewerId: string;
+}): LocalChatConversationRecord | null {
+  const scopeKey = buildConversationScopeKey(input.targetId, input.viewerId);
+  return sortConversationRecords(
+    [...ledgerCache.conversationsById.values()].filter((conversation) => (
+      buildConversationScopeKey(conversation.targetId, conversation.viewerId) === scopeKey
+    )),
+  )[0] || null;
 }
 
 function beatsForTurn(turnId: string): LocalChatStoredBeat[] {
@@ -899,6 +923,16 @@ export async function listLocalChatSessions(targetId: string, viewerId?: string)
   await ensureLedgerHydrated();
   const normalizedTargetId = trimString(targetId);
   if (!normalizedTargetId) return [];
+  const normalizedViewerId = trimString(viewerId);
+  if (normalizedViewerId) {
+    const scopedConversation = findConversationForScope({
+      targetId: normalizedTargetId,
+      viewerId: normalizedViewerId,
+    });
+    return scopedConversation
+      ? [buildProjectionSession(projectConversationToSession(scopedConversation))]
+      : [];
+  }
   return [...ledgerCache.conversationsById.values()]
     .filter((conversation) => (
       conversation.targetId === normalizedTargetId
@@ -971,11 +1005,20 @@ export async function listLocalChatExactHistoryTurns(conversationId: string, vie
 
 export async function createLocalChatSession(input: CreateConversationInput): Promise<LocalChatSession> {
   await ensureLedgerHydrated();
+  const targetId = trimString(input.targetId);
+  const viewerId = trimString(input.viewerId) || 'viewer';
+  const existing = findConversationForScope({
+    targetId,
+    viewerId,
+  });
+  if (existing) {
+    return buildProjectionSession(projectConversationToSession(existing));
+  }
   const createdAt = nowIso();
   const conversation: LocalChatConversationRecord = {
     id: `conv_${createUlid()}`,
-    targetId: trimString(input.targetId),
-    viewerId: trimString(input.viewerId) || 'viewer',
+    targetId,
+    viewerId,
     worldId: trimString(input.worldId) || null,
     title: trimString(input.title) || 'Session',
     createdAt,
@@ -997,17 +1040,27 @@ export async function createLocalChatSession(input: CreateConversationInput): Pr
 
 export async function upsertLocalChatSession(session: UpsertConversationInput | LocalChatSession): Promise<LocalChatSession> {
   await ensureLedgerHydrated();
-  const existing = ledgerCache.conversationsById.get(trimString(session.id));
-  const createdAt = existing?.createdAt || nowIso();
+  const requestedId = trimString(session.id);
+  const targetId = trimString(session.targetId);
+  const viewerId = trimString(session.viewerId) || 'viewer';
+  const existing = ledgerCache.conversationsById.get(requestedId);
+  const scopedExisting = targetId
+    ? findConversationForScope({
+      targetId,
+      viewerId,
+    })
+    : null;
+  const base = scopedExisting || existing || null;
+  const createdAt = base?.createdAt || nowIso();
   const next: LocalChatConversationRecord = {
-    id: trimString(session.id),
-    targetId: trimString(session.targetId) || existing?.targetId || '',
-    viewerId: trimString(session.viewerId) || existing?.viewerId || 'viewer',
-    worldId: trimString(session.worldId) || existing?.worldId || null,
-    title: trimString(session.title) || existing?.title || 'Session',
+    id: scopedExisting?.id || requestedId,
+    targetId: targetId || base?.targetId || '',
+    viewerId: viewerId || base?.viewerId || 'viewer',
+    worldId: trimString(session.worldId) || base?.worldId || null,
+    title: trimString(session.title) || base?.title || 'Session',
     createdAt,
     updatedAt: nowIso(),
-    lastTurnSeq: existing?.lastTurnSeq || 0,
+    lastTurnSeq: base?.lastTurnSeq || 0,
   };
   ledgerCache.conversationsById.set(next.id, next);
   await persistMutation({

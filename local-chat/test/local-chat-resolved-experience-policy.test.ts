@@ -94,7 +94,7 @@ test('resolved experience policy enables local visual freedom for local natural 
     interactionSnapshot: createSnapshot({ relationshipState: 'intimate' }),
     settings: {
       ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
-      enableVoice: true,
+      voiceAutonomy: 'natural',
       voiceConversationMode: 'off',
       autoPlayVoiceReplies: true,
       voiceName: 'voice-custom',
@@ -102,12 +102,13 @@ test('resolved experience policy enables local visual freedom for local natural 
       visualComfortLevel: 'natural-visuals',
       mediaAutonomy: 'natural',
     },
-    requestedVoiceConversationMode: 'suggested',
+    requestedVoiceConversationMode: 'on',
     routeSource: 'local',
   });
 
   assert.equal(policy.mediaPolicy.nsfwPolicy, 'allowed');
-  assert.equal(policy.voicePolicy.conversationMode, 'suggested');
+  assert.equal(policy.voicePolicy.autonomy, 'natural');
+  assert.equal(policy.voicePolicy.conversationMode, 'on');
   assert.equal(policy.voicePolicy.selectionMode, 'manual');
 });
 
@@ -117,7 +118,7 @@ test('resolved experience policy keeps voice conversation off unless explicitly 
     interactionSnapshot: createSnapshot(),
     settings: {
       ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
-      enableVoice: true,
+      voiceAutonomy: 'natural',
       voiceConversationMode: 'off',
     },
     routeSource: 'local',

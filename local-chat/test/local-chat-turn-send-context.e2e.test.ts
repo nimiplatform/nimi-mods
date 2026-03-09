@@ -34,10 +34,10 @@ function createBaseInput(): UseLocalChatTurnSendInput {
     defaultSettings: {
       deliveryStyle: 'natural',
       mediaAutonomy: 'natural',
+      voiceAutonomy: 'off',
       voiceConversationMode: 'off',
       relationshipBoundaryPreset: 'balanced',
-      visualComfortLevel: 'soft-visuals',
-      enableVoice: false,
+      visualComfortLevel: 'restrained-visuals',
       voiceName: 'alloy',
       allowProactiveContact: false,
       autoPlayVoiceReplies: false,

@@ -23,8 +23,7 @@ const NSFW_PROMPT_PATTERNS: RegExp[] = [
 
 export function evaluateNsfwMediaPolicy(input: {
   routeSource: string;
-  relationshipBoundaryPreset?: 'reserved' | 'balanced' | 'close';
-  visualComfortLevel?: 'text-only' | 'soft-visuals' | 'natural-visuals';
+  visualComfortLevel?: 'text-only' | 'restrained-visuals' | 'natural-visuals';
 }): NsfwMediaPolicy {
   if (input.routeSource === 'cloud') {
     return 'local-only';

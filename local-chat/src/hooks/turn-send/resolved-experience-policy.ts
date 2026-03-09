@@ -3,33 +3,33 @@ import type {
   InteractionSnapshot,
   LocalChatDefaultSettings,
   LocalChatInspectSettings,
-  LocalChatProductSettings,
   VoiceConversationMode,
 } from '../../state/index.js';
 
 export type ResolvedExperiencePolicy = {
   deliveryPolicy: {
-    style: LocalChatProductSettings['deliveryStyle'];
+    style: LocalChatDefaultSettings['deliveryStyle'];
     allowMultiReply: boolean;
   };
   voicePolicy: {
     enabled: boolean;
+    autonomy: LocalChatDefaultSettings['voiceAutonomy'];
     conversationMode: VoiceConversationMode;
     autoPlayReplies: boolean;
     selectedVoiceId: string | null;
     selectionMode: 'auto' | 'manual';
   };
   mediaPolicy: {
-    autonomy: LocalChatProductSettings['mediaAutonomy'];
-    visualComfortLevel: LocalChatProductSettings['visualComfortLevel'];
+    autonomy: LocalChatDefaultSettings['mediaAutonomy'];
+    visualComfortLevel: LocalChatDefaultSettings['visualComfortLevel'];
     routeSource: 'local' | 'cloud';
     nsfwPolicy: 'disabled' | 'local-only' | 'allowed';
     allowVisualAuto: boolean;
     allowAutoVisualHighRisk: false;
   };
   contentBoundary: {
-    relationshipBoundaryPreset: LocalChatProductSettings['relationshipBoundaryPreset'];
-    visualComfortLevel: LocalChatProductSettings['visualComfortLevel'];
+    relationshipBoundaryPreset: LocalChatDefaultSettings['relationshipBoundaryPreset'];
+    visualComfortLevel: LocalChatDefaultSettings['visualComfortLevel'];
     routeSource: 'local' | 'cloud';
     relationshipState: InteractionSnapshot['relationshipState'] | 'new';
   };
@@ -47,10 +47,10 @@ function resolveVoiceConversationMode(input: {
   if (!input.settings.enableVoice) {
     return 'off';
   }
-  if (input.requestedMode === 'on' || input.requestedMode === 'suggested') {
+  if (input.requestedMode === 'on') {
     return input.requestedMode;
   }
-  if (input.settings.voiceConversationMode === 'on' || input.settings.voiceConversationMode === 'suggested') {
+  if (input.settings.voiceConversationMode === 'on') {
     return input.settings.voiceConversationMode;
   }
   return 'off';
@@ -86,6 +86,7 @@ export function compileResolvedExperiencePolicy(input: {
     },
     voicePolicy: {
       enabled: input.settings.enableVoice,
+      autonomy: input.settings.enableVoice ? input.settings.voiceAutonomy : 'off',
       conversationMode: resolveVoiceConversationMode({
         requestedMode: input.requestedVoiceConversationMode,
         settings: input.settings,

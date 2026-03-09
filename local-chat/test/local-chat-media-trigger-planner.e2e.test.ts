@@ -10,6 +10,8 @@ import {
 import { DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS } from '../src/state/index.ts';
 import { buildLocalChatTurnContextKey } from '../src/hooks/turn-send/context-key.ts';
 import { runLocalChatTurnSend } from '../src/hooks/turn-send/send-flow.ts';
+import { resetTextTurnStreamHealthForTests } from '../src/hooks/turn-send/text-turn-runner.ts';
+import { resetLocalChatConversationLedgerForTests } from '../src/session-store.ts';
 
 class MemoryStorage implements Storage {
   private store = new Map<string, string>();
@@ -184,6 +186,8 @@ async function withSendFlowHarness(
   } as never);
 
   try {
+    resetTextTurnStreamHealthForTests();
+    await resetLocalChatConversationLedgerForTests();
     await run(createHarness());
   } finally {
     clearModSdkHost();
@@ -630,7 +634,6 @@ test('send-flow planner does not hijack explicit voice delivery into image', asy
     const result = await harness.execute({
       userText: '我还想再听一句，可以直接说给我听吗？',
       defaultSettings: {
-        enableVoice: true,
         voiceConversationMode: 'on',
       },
       aiClientOverrides: {
@@ -675,7 +678,6 @@ test('send-flow explicit media request still delivers image when voice-first mod
     const result = await harness.execute({
       userText: '发张图给我看看',
       defaultSettings: {
-        enableVoice: true,
         voiceConversationMode: 'on',
       },
     });

@@ -7,7 +7,6 @@ import { createHookClient } from '@nimiplatform/sdk/mod/hook';
 import { createModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import { useAppStore } from '@nimiplatform/sdk/mod/ui';
-import { readRuntimeModSettings } from '@nimiplatform/sdk/mod/settings';
 import type { RuntimeCanonicalCapability } from '@nimiplatform/sdk/mod/runtime-route';
 import { LOCAL_CHAT_MOD_ID } from '../../contracts.js';
 import type { LocalChatPromptTrace, LocalChatTurnAudit, VoiceConversationMode } from '../../session-store.js';
@@ -51,7 +50,6 @@ import {
   createUnsupportedMemorySyncAdapter,
   type MemorySyncStatus,
 } from '../../services/memory/memory-sync-adapter.js';
-import { hasStoredVoicePreference, shouldAutoPrimeVoiceDefaults } from './voice-defaults-policy.js';
 
 type RuntimeFieldsMap = {
   mode?: 'STORY' | 'SCENE_TURN';
@@ -149,7 +147,6 @@ export function useLocalChatPageState() {
   const [memorySyncStatus, setMemorySyncStatus] = useState<MemorySyncStatus>({ state: 'unsupported' });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const didPrimeVoiceDefaultsRef = useRef(false);
   const dependencySnapshotRefreshRef = useRef<Promise<void> | null>(null);
   const allDependencySnapshotsRefreshRef = useRef<Promise<void> | null>(null);
   const stableVoiceIdByTargetIdRef = useRef<Record<string, string>>({});
@@ -535,41 +532,6 @@ export function useLocalChatPageState() {
     }),
     [runtimeRouteState.chatRouteOptions?.local?.models, sttRouteOptions?.local?.models],
   );
-
-  useEffect(() => {
-    if (didPrimeVoiceDefaultsRef.current) {
-      return;
-    }
-    const ttsReady = localTtsRouteAvailable || ttsConnectorCandidates.length > 0;
-    const rawSettings = readRuntimeModSettings(LOCAL_CHAT_MOD_ID);
-    const looksFresh =
-      speechSettingsState.productSettings.enableVoice === false
-      && speechSettingsState.productSettings.voiceConversationMode === 'off';
-    if (hasStoredVoicePreference(rawSettings) || !looksFresh) {
-      didPrimeVoiceDefaultsRef.current = true;
-      return;
-    }
-    if (!shouldAutoPrimeVoiceDefaults({
-      alreadyPrimed: didPrimeVoiceDefaultsRef.current,
-      rawSettings,
-      productSettings: speechSettingsState.productSettings,
-      ttsReady,
-    })) {
-      return;
-    }
-    didPrimeVoiceDefaultsRef.current = true;
-    speechSettingsState.updateProductSettings((previous) => ({
-      ...previous,
-      enableVoice: true,
-      voiceConversationMode: 'suggested',
-    }));
-  }, [
-    localTtsRouteAvailable,
-    speechSettingsState.productSettings.enableVoice,
-    speechSettingsState.productSettings.voiceConversationMode,
-    speechSettingsState.updateProductSettings,
-    ttsConnectorCandidates.length,
-  ]);
 
   const resolvePlayableTtsVoiceId = useCallback(async (selectedModel: string): Promise<string> => {
     const normalizedModel = String(selectedModel || '').trim();

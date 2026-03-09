@@ -63,6 +63,15 @@ function createTurnId(): string {
   return `turn_${createUlid()}`;
 }
 
+function waitForNextPaint(): Promise<void> {
+  if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
+}
+
 function createCancelledAudit(input: {
   reason: LocalChatScheduleCancelReason;
   targetId: string;
@@ -232,44 +241,57 @@ export async function runLocalChatTurnSend(input: {
   }
   const selectedTarget = context.selectedTarget;
   const routeBinding = context.routeBinding || null;
-
-  const workingSession = await ensureWorkingSession({
-    selectedSessionId: context.selectedSessionId,
-    viewerId: context.viewerId,
-    selectedTarget,
-    setSelectedSessionId: context.setSelectedSessionId,
-  });
-  const sessionId = workingSession.id;
-  const sendContextKey = buildLocalChatTurnContextKey({
-    targetId: selectedTarget.id,
-    sessionId,
-    routeBinding,
-  });
   const userMessage: ChatMessage = createUserMessage(text);
   const turnTxnId = createTurnTxnId();
   const turnId = createTurnId();
   const voiceConversationMode = context.voiceConversationMode || context.defaultSettings.voiceConversationMode || 'off';
+  const existingSessionId = String(context.selectedSessionId || '').trim();
+  const canOptimisticallyReflectUserTurn = Boolean(existingSessionId);
+  let sessionId = '';
+  let sendContextKey = '';
+  let hasWorkingSession = false;
 
-  context.setMessages((prev) => [...prev, userMessage]);
-  context.setInputText('');
-  input.setIsSending(true);
+  if (canOptimisticallyReflectUserTurn) {
+    context.setMessages((prev) => [...prev, userMessage]);
+    context.setInputText('');
+    input.setIsSending(true);
+    await waitForNextPaint();
+  }
 
   const flowId = createRendererFlowId('local-chat-send-turn');
   const startedAt = performance.now();
-  logTurnSendStart({
-    flowId,
-    target: selectedTarget,
-    sessionId,
-    turnTxnId,
-  });
 
   try {
+    const workingSession = await ensureWorkingSession({
+      selectedSessionId: context.selectedSessionId,
+      viewerId: context.viewerId,
+      selectedTarget,
+      setSelectedSessionId: context.setSelectedSessionId,
+    });
+    sessionId = workingSession.id;
+    hasWorkingSession = true;
+    sendContextKey = buildLocalChatTurnContextKey({
+      targetId: selectedTarget.id,
+      sessionId,
+      routeBinding,
+    });
+    if (!canOptimisticallyReflectUserTurn) {
+      context.setMessages((prev) => [...prev, userMessage]);
+      context.setInputText('');
+      input.setIsSending(true);
+      await waitForNextPaint();
+    }
+    logTurnSendStart({
+      flowId,
+      target: selectedTarget,
+      sessionId,
+      turnTxnId,
+    });
     const interactionProfile = deriveInteractionProfile(selectedTarget);
     // Phase 1: build context with regex-based turnMode as initial estimate
     const regexTurnMode = resolveTurnMode({
       userText: text,
       interactionProfile,
-      voiceConversationMode,
     });
     const prepared = await buildTurnRequestInput({
       text,
@@ -294,7 +316,6 @@ export async function runLocalChatTurnSend(input: {
       snapshot: prepared.contextPacket.interactionSnapshot || null,
       memorySlots: prepared.contextPacket.relationMemorySlots || [],
       recentTurns: recentTurnsForPerception,
-      voiceConversationMode,
       regexFallbackTurnMode: regexTurnMode,
     });
     const turnMode = perception.turnMode;
@@ -379,7 +400,6 @@ export async function runLocalChatTurnSend(input: {
       interactionProfile: prepared.contextPacket.target.interactionProfile,
       snapshot: prepared.contextPacket.interactionSnapshot || null,
       policy: resolvedExperiencePolicy,
-      voiceConversationMode: effectiveVoiceConversationMode,
     });
     const deliveries = buildAssistantDeliveries({
       beats: orchestratedBeats,
@@ -742,16 +762,20 @@ export async function runLocalChatTurnSend(input: {
     });
     context.setLatestPromptTrace(null);
     context.setLatestTurnAudit(errorPayload.turnAudit);
-    await persistFailedTurn({
-      sessionId,
-      targetId: selectedTarget.id,
-      viewerId: context.viewerId,
-      userMessage,
-      errorMessage: errorPayload.errorMessage,
-      turnAudit: errorPayload.turnAudit,
-      setMessages: context.setMessages,
-      setSessions: context.setSessions,
-    });
+    if (hasWorkingSession) {
+      await persistFailedTurn({
+        sessionId,
+        targetId: selectedTarget.id,
+        viewerId: context.viewerId,
+        userMessage,
+        errorMessage: errorPayload.errorMessage,
+        turnAudit: errorPayload.turnAudit,
+        setMessages: context.setMessages,
+        setSessions: context.setSessions,
+      });
+    } else {
+      context.setMessages((prev) => [...prev, errorPayload.errorMessage]);
+    }
     context.setStatusBanner({ kind: 'error', message: errorPayload.message });
     logTurnSendFailed(flowId, errorPayload.message);
   } finally {

@@ -24,10 +24,10 @@ test('media generation result can be soft-cancelled by caller context change', a
     defaultSettings: {
       deliveryStyle: 'natural',
       mediaAutonomy: 'natural',
+      voiceAutonomy: 'off',
       voiceConversationMode: 'off',
       relationshipBoundaryPreset: 'close',
       visualComfortLevel: 'natural-visuals',
-      enableVoice: false,
       allowProactiveContact: false,
       autoPlayVoiceReplies: false,
       voiceName: 'Cherry',
@@ -71,10 +71,10 @@ test('media generation result is accepted when context key stays unchanged', asy
     defaultSettings: {
       deliveryStyle: 'natural',
       mediaAutonomy: 'natural',
+      voiceAutonomy: 'off',
       voiceConversationMode: 'off',
       relationshipBoundaryPreset: 'close',
       visualComfortLevel: 'natural-visuals',
-      enableVoice: false,
       allowProactiveContact: false,
       autoPlayVoiceReplies: false,
       voiceName: 'Cherry',

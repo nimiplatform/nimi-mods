@@ -22,7 +22,7 @@ export type LocalChatContextLaneId =
   | 'relationMemory'
   | 'turnMode';
 
-export type VoiceConversationMode = 'off' | 'suggested' | 'on';
+export type VoiceConversationMode = 'off' | 'on';
 
 export type DerivedInteractionProfile = {
   expression: {

@@ -3,7 +3,6 @@ import type {
   InteractionBeat,
   InteractionSnapshot,
   LocalChatTurnMode,
-  VoiceConversationMode,
 } from '../../state/index.js';
 import type { ResolvedExperiencePolicy } from './resolved-experience-policy.js';
 
@@ -11,13 +10,12 @@ function inferVoiceAffinity(input: {
   beat: InteractionBeat;
   turnMode: LocalChatTurnMode;
   interactionProfile: DerivedInteractionProfile;
-  voiceConversationMode: VoiceConversationMode;
   policy: ResolvedExperiencePolicy;
 }): boolean {
   if (!input.policy.voicePolicy.enabled) return false;
+  if (input.policy.voicePolicy.conversationMode === 'on') return input.turnMode !== 'explicit-media';
   if (input.turnMode === 'explicit-voice') return true;
-  if (input.voiceConversationMode === 'on') return input.turnMode !== 'explicit-media';
-  if (input.voiceConversationMode !== 'suggested') return false;
+  if (input.policy.voicePolicy.autonomy !== 'natural') return false;
   if (input.turnMode === 'information' || input.turnMode === 'explicit-media') return false;
   if (input.interactionProfile.voice.voiceAffinity !== 'high') return false;
   if (input.beat.text.length > 48) return false;
@@ -46,7 +44,6 @@ export function orchestrateBeatModalities(input: {
   interactionProfile: DerivedInteractionProfile;
   snapshot: InteractionSnapshot | null;
   policy: ResolvedExperiencePolicy;
-  voiceConversationMode: VoiceConversationMode;
 }): InteractionBeat[] {
   let visualSlotUsed = false;
   return input.beats.map((beat, index, list) => {
@@ -54,12 +51,11 @@ export function orchestrateBeatModalities(input: {
       beat,
       turnMode: input.turnMode,
       interactionProfile: input.interactionProfile,
-      voiceConversationMode: input.voiceConversationMode,
       policy: input.policy,
     });
     const forceVoiceBeforeAutoVisual = !beat.assetRequest && voicePreferred && (
       input.turnMode === 'explicit-voice'
-      || (input.voiceConversationMode === 'on' && input.turnMode !== 'explicit-media')
+      || (input.policy.voicePolicy.conversationMode === 'on' && input.turnMode !== 'explicit-media')
     );
     if (forceVoiceBeforeAutoVisual) {
       return {
@@ -87,7 +83,12 @@ export function orchestrateBeatModalities(input: {
     if (input.turnMode === 'explicit-media') {
       return {
         ...beat,
-        modality: 'text',
+        modality: input.policy.voicePolicy.enabled && input.policy.voicePolicy.conversationMode === 'on'
+          ? 'voice'
+          : 'text',
+        ...(input.policy.voicePolicy.enabled && input.policy.voicePolicy.conversationMode === 'on'
+          ? { autoPlayVoice: input.policy.voicePolicy.autoPlayReplies }
+          : {}),
         beatIndex: index,
         beatCount: list.length,
       };

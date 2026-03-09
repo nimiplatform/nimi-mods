@@ -61,11 +61,11 @@ const KEYFRAMES = `
 @keyframes typing-bubble-breathe {
   0%, 100% {
     transform: translateY(0);
-    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+    opacity: 0.98;
   }
   50% {
     transform: translateY(-1px);
-    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
+    opacity: 1;
   }
 }
 @keyframes typing-caret-pulse {
@@ -137,30 +137,26 @@ const KEYFRAMES = `
 }
 @keyframes lc-current-turn-glow {
   0%, 100% {
-    border-color: rgba(167, 243, 208, 0.72);
+    opacity: 0.22;
   }
   50% {
-    border-color: rgba(94, 234, 212, 0.98);
+    opacity: 0.42;
   }
 }
 @keyframes lc-current-turn-aura {
   0%, 100% {
-    opacity: 0.08;
-    transform: scale(0.994);
+    opacity: 0.18;
   }
   50% {
-    opacity: 0.24;
-    transform: scale(1.012);
+    opacity: 0.34;
   }
 }
 @keyframes lc-current-turn-edge {
   0%, 100% {
-    opacity: 0.22;
-    transform: scale(0.996);
+    opacity: 0.16;
   }
   50% {
-    opacity: 0.82;
-    transform: scale(1.012);
+    opacity: 0.28;
   }
 }
 .local-chat-root .lc-pane-stage {
@@ -311,16 +307,46 @@ const KEYFRAMES = `
   color: var(--lc-text-soft);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
+.local-chat-root .lc-message-group {
+  position: relative;
+}
+.local-chat-root .lc-message-group-history {
+  content-visibility: auto;
+  contain-intrinsic-size: 240px;
+}
+.local-chat-root .lc-current-turn-shell {
+  position: relative;
+  isolation: isolate;
+}
+.local-chat-root .lc-current-turn-halo {
+  position: absolute;
+  inset: -7px -9px;
+  border-radius: 30px;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(108% 112% at 50% 50%, rgba(220, 252, 231, 0.3) 0%, rgba(187, 247, 208, 0.22) 38%, rgba(94, 234, 212, 0.1) 58%, rgba(94, 234, 212, 0) 78%),
+    radial-gradient(40% 42% at 16% 22%, rgba(52, 211, 153, 0.12), rgba(52, 211, 153, 0) 82%),
+    radial-gradient(38% 40% at 84% 18%, rgba(45, 212, 191, 0.1), rgba(45, 212, 191, 0) 82%);
+  animation: lc-current-turn-aura 6.4s ease-in-out infinite;
+  will-change: opacity;
+}
+.local-chat-root .lc-current-turn-halo-pending {
+  opacity: 0.82;
+  animation-duration: 5.1s;
+}
 .local-chat-root .lc-current-turn-card {
   position: relative;
   overflow: hidden;
   isolation: isolate;
+  contain: paint;
+  transform: translateZ(0);
+  z-index: 1;
   border-color: rgba(187, 247, 208, 0.76);
   box-shadow:
     0 12px 28px rgba(15, 23, 42, 0.06),
-    0 0 0 1px rgba(255, 255, 255, 0.78);
-  animation: lc-current-turn-glow 3.8s ease-in-out infinite;
-  will-change: border-color, box-shadow;
+    0 0 0 1px rgba(255, 255, 255, 0.78),
+    0 0 0 6px rgba(167, 243, 208, 0.06);
 }
 .local-chat-root .lc-current-turn-card::before {
   content: '';
@@ -328,21 +354,24 @@ const KEYFRAMES = `
   inset: 0;
   pointer-events: none;
   border-radius: inherit;
-  background: radial-gradient(circle at center, rgba(94, 234, 212, 0.24) 0%, rgba(94, 234, 212, 0.08) 42%, rgba(94, 234, 212, 0) 72%);
-  animation: lc-current-turn-aura 3.8s ease-in-out infinite;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.46) 0%, rgba(255, 255, 255, 0.12) 42%, rgba(236, 253, 245, 0.34) 74%, rgba(220, 252, 231, 0.24) 100%),
+    radial-gradient(circle at 12% 14%, rgba(167, 243, 208, 0.18) 0%, rgba(167, 243, 208, 0) 40%),
+    radial-gradient(circle at 86% 16%, rgba(94, 234, 212, 0.12) 0%, rgba(94, 234, 212, 0) 42%);
+  animation: lc-current-turn-glow 6.4s ease-in-out infinite;
   z-index: 0;
-  will-change: opacity, transform;
+  will-change: opacity;
 }
 .local-chat-root .lc-current-turn-card::after {
   content: '';
   position: absolute;
-  inset: -4px;
+  inset: 0;
   pointer-events: none;
-  border: 2px solid rgba(110, 231, 183, 0.72);
   border-radius: inherit;
-  animation: lc-current-turn-edge 3.8s ease-in-out infinite;
+  background: radial-gradient(circle at 50% 50%, rgba(167, 243, 208, 0.1), rgba(167, 243, 208, 0) 72%);
+  animation: lc-current-turn-edge 6.4s ease-in-out infinite;
   z-index: 0;
-  will-change: opacity, transform;
+  will-change: opacity;
 }
 .local-chat-root .lc-current-turn-card > * {
   position: relative;
@@ -355,7 +384,10 @@ const KEYFRAMES = `
     0 0 0 1px rgba(148, 163, 184, 0.06);
 }
 .local-chat-root .lc-current-turn-card-pending::before {
-  opacity: 0.14;
+  opacity: 0.5;
+}
+.local-chat-root .lc-current-turn-card-pending::after {
+  opacity: 0.3;
 }
 .local-chat-root .lc-current-turn-chip {
   display: inline-flex;
@@ -365,13 +397,13 @@ const KEYFRAMES = `
   padding: 0 12px;
   border: 1px solid rgba(94, 234, 212, 0.3);
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.78);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(244, 253, 250, 0.92) 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(8px);
 }
 .local-chat-root .lc-typing-bubble {
   position: relative;
   overflow: hidden;
+  contain: paint;
   border: 1px solid rgba(203, 213, 225, 0.94);
   border-radius: 24px;
   background:
@@ -435,30 +467,6 @@ const KEYFRAMES = `
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
-  }
-  .local-chat-root .lc-current-turn-card {
-    animation: lc-current-turn-glow 4.8s ease-in-out infinite !important;
-  }
-  .local-chat-root .lc-current-turn-card::before {
-    animation: lc-current-turn-aura 4.8s ease-in-out infinite !important;
-  }
-  .local-chat-root .lc-current-turn-card::after {
-    animation: lc-current-turn-edge 4.8s ease-in-out infinite !important;
-  }
-  .local-chat-root .lc-typing-bubble {
-    animation: typing-bubble-breathe 3.4s ease-in-out infinite !important;
-  }
-  .local-chat-root .lc-typing-bubble::after {
-    animation: lc-shimmer 4.8s linear infinite !important;
-  }
-  .local-chat-root .lc-typing-dot {
-    animation: typing-dot-bounce 1.4s ease-in-out infinite !important;
-  }
-  .local-chat-root .lc-typing-caret {
-    animation: typing-caret-pulse 1.6s ease-in-out infinite !important;
-  }
-  .local-chat-root .lc-typing-trail > span {
-    animation: typing-trail-flow 2.1s ease-in-out infinite !important;
   }
 }
 `;

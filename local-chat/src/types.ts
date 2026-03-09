@@ -113,7 +113,7 @@ export type ChatMessageMeta = {
   relationMove?: string;
   sceneMove?: string;
   turnMode?: LocalChatTurnMode;
-  voiceConversationMode?: 'off' | 'suggested' | 'on';
+  voiceConversationMode?: 'off' | 'on';
   autoPlayVoice?: boolean;
   planId?: string;
   segmentId?: string;

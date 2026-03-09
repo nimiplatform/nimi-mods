@@ -78,6 +78,7 @@ function createResolvedPolicy(settings, fixture) {
     },
     voicePolicy: {
       enabled: settings.enableVoice,
+      autonomy: settings.voiceAutonomy,
       conversationMode: settings.voiceConversationMode,
       autoPlayReplies: settings.autoPlayVoiceReplies,
       selectedVoiceId: settings.voiceName || null,

@@ -17,8 +17,10 @@ type LocalChatSettingsDrawerProps = {
   open: boolean;
   onClose: () => void;
   productSettings: LocalChatProductSettings;
-  onToggleProductSetting: (key: 'enableVoice' | 'allowProactiveContact' | 'autoPlayVoiceReplies', value: boolean) => void;
+  enableVoice: boolean;
+  onToggleProductSetting: (key: 'allowProactiveContact' | 'autoPlayVoiceReplies', value: boolean) => void;
   onMediaAutonomyChange: (value: LocalChatProductSettings['mediaAutonomy']) => void;
+  onVoiceAutonomyChange: (value: LocalChatProductSettings['voiceAutonomy']) => void;
   onVoiceConversationModeChange: (value: LocalChatProductSettings['voiceConversationMode']) => void;
   onVisualComfortLevelChange: (value: LocalChatProductSettings['visualComfortLevel']) => void;
   runtimeSidebarProps: RuntimeStatusSidebarProps;
@@ -238,8 +240,10 @@ export const LocalChatSettingsDrawer = React.memo(function LocalChatSettingsDraw
     open,
     onClose,
     productSettings,
+    enableVoice,
     onToggleProductSetting,
     onMediaAutonomyChange,
+    onVoiceAutonomyChange,
     onVoiceConversationModeChange,
     onVisualComfortLevelChange,
     runtimeSidebarProps,
@@ -304,26 +308,26 @@ export const LocalChatSettingsDrawer = React.memo(function LocalChatSettingsDraw
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">{t('SettingsDrawer.voiceTitle')}</p>
               <p className="mt-1 text-sm text-gray-600">{t('SettingsDrawer.voiceHint')}</p>
             </div>
-            <ToggleRow
-              label={t('SettingsDrawer.enableVoice')}
-              hint={t('SettingsDrawer.enableVoiceHint')}
-              checked={productSettings.enableVoice}
-              onChange={(value) => onToggleProductSetting('enableVoice', value)}
-            />
             <div>
-              <p className="mb-2 text-xs font-semibold text-gray-500">{t('SettingsDrawer.voiceConversationMode')}</p>
+              <p className="mb-2 text-xs font-semibold text-gray-500">{t('SettingsDrawer.voiceAutonomy')}</p>
               <div className="flex flex-wrap gap-2 rounded-2xl bg-[#eef5f5] p-1.5">
-                <SegmentButton active={productSettings.voiceConversationMode === 'off'} onClick={() => onVoiceConversationModeChange('off')}>
-                  {t('SettingsDrawer.voiceModeOff')}
+                <SegmentButton active={productSettings.voiceAutonomy === 'off'} onClick={() => onVoiceAutonomyChange('off')}>
+                  {t('SettingsDrawer.voiceAutonomyOff')}
                 </SegmentButton>
-                <SegmentButton active={productSettings.voiceConversationMode === 'suggested'} onClick={() => onVoiceConversationModeChange('suggested')}>
-                  {t('SettingsDrawer.voiceModeSuggested')}
+                <SegmentButton active={productSettings.voiceAutonomy === 'explicit-only'} onClick={() => onVoiceAutonomyChange('explicit-only')}>
+                  {t('SettingsDrawer.voiceAutonomyExplicitOnly')}
                 </SegmentButton>
-                <SegmentButton active={productSettings.voiceConversationMode === 'on'} onClick={() => onVoiceConversationModeChange('on')}>
-                  {t('SettingsDrawer.voiceModeOn')}
+                <SegmentButton active={productSettings.voiceAutonomy === 'natural'} onClick={() => onVoiceAutonomyChange('natural')}>
+                  {t('SettingsDrawer.voiceAutonomyNatural')}
                 </SegmentButton>
               </div>
             </div>
+            <ToggleRow
+              label={t('SettingsDrawer.voiceConversationMode')}
+              hint={t('SettingsDrawer.voiceConversationModeHint')}
+              checked={productSettings.voiceConversationMode === 'on'}
+              onChange={(value) => onVoiceConversationModeChange(value ? 'on' : 'off')}
+            />
             <ToggleRow
               label={t('SettingsDrawer.autoPlayVoiceReplies')}
               hint={t('SettingsDrawer.autoPlayVoiceRepliesHint')}
@@ -339,7 +343,7 @@ export const LocalChatSettingsDrawer = React.memo(function LocalChatSettingsDraw
                 embedded
                 open
                 onToggle={() => {}}
-                enableVoice={productSettings.enableVoice}
+                enableVoice={enableVoice}
                 selectedVoiceId={runtimeSidebarProps.selectedVoiceId}
                 ttsRouteSource={runtimeSidebarProps.ttsRouteSource}
                 ttsConnectorId={runtimeSidebarProps.ttsConnectorId}
@@ -387,8 +391,8 @@ export const LocalChatSettingsDrawer = React.memo(function LocalChatSettingsDraw
               <div>
                 <p className="mb-2 text-xs font-semibold text-gray-500">{t('SettingsDrawer.visualComfort')}</p>
                 <div className="flex flex-wrap gap-2 rounded-2xl bg-[#eef5f5] p-1.5">
-                  <SegmentButton active={productSettings.visualComfortLevel === 'soft-visuals'} onClick={() => onVisualComfortLevelChange('soft-visuals')}>
-                    {t('SettingsDrawer.visualComfortSoft')}
+                  <SegmentButton active={productSettings.visualComfortLevel === 'restrained-visuals'} onClick={() => onVisualComfortLevelChange('restrained-visuals')}>
+                    {t('SettingsDrawer.visualComfortRestrained')}
                   </SegmentButton>
                   <SegmentButton active={productSettings.visualComfortLevel === 'natural-visuals'} onClick={() => onVisualComfortLevelChange('natural-visuals')}>
                     {t('SettingsDrawer.visualComfortNatural')}
