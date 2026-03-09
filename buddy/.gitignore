@@ -1,0 +1,15 @@
+dist/
+node_modules/
+*.tsbuildinfo
+
+# Live2D 模型文件（专有资产，不可再分发）
+# 开发者需从 https://www.live2d.com/zh-CHS/learn/sample/ 自行下载
+assets/models/haru/**
+assets/models/haru_greeter/**
+assets/live2d-core/*
+
+# 保留目录结构的占位文件
+!assets/models/haru/.gitkeep
+!assets/models/haru_greeter/.gitkeep
+!assets/live2d-core/.gitkeep
+!assets/live2d-core/README.md

@@ -1,0 +1,97 @@
+version: 1
+model_lifecycle:
+  - state: idle
+    label: 空闲
+    description: 未加载任何模型
+    source_rule: BD-PIPE-005
+  - state: loading
+    label: 加载中
+    description: 正在加载 PIXI.Application 和 .moc3 模型资源
+    source_rule: BD-PIPE-005
+  - state: ready
+    label: 就绪
+    description: 模型渲染完毕，动画插件已启动
+    source_rule: BD-PIPE-005
+  - state: error
+    label: 错误
+    description: 模型加载失败，显示回退 UI
+    source_rule: BD-PIPE-005
+model_transitions:
+  - from: idle
+    to: loading
+    trigger: model_selected
+    source_rule: BD-PIPE-005
+  - from: loading
+    to: ready
+    trigger: all_resources_loaded
+    source_rule: BD-PIPE-005
+  - from: loading
+    to: error
+    trigger: resource_load_failed
+    source_rule: BD-PIPE-005
+  - from: error
+    to: loading
+    trigger: user_retry
+    source_rule: BD-PIPE-005
+  - from: ready
+    to: loading
+    trigger: model_switch
+    source_rule: BD-PIPE-005
+text_turn_chain:
+  - step: input-received
+    order: 1
+    description: 接收用户文字输入或 STT 转写文本
+    source_rule: BD-PIPE-001
+  - step: context-compile
+    order: 2
+    description: 编译上下文包（system prompt + 历史 + 情绪指令）
+    source_rule: BD-PIPE-001
+  - step: llm-stream
+    order: 3
+    description: runtime.ai.text.stream() 流式生成回复
+    source_rule: BD-PIPE-001
+  - step: emotion-extract
+    order: 4
+    description: 正则提取情绪标签，剥离后传递给显示和动画
+    source_rule: BD-PIPE-004
+  - step: text-display
+    order: 5
+    description: 流式文字气泡显示（剥离情绪标签后的纯文本）
+    source_rule: BD-PIPE-001
+  - step: expression-drive
+    order: 6
+    description: 情绪标签驱动 AnimationController 表情切换
+    source_rule: BD-PIPE-004
+  - step: tts-synthesize
+    order: 7
+    description: 回复文本提交 TTS 合成（与文字显示并行）
+    source_rule: BD-PIPE-002
+  - step: lip-sync-drive
+    order: 8
+    description: TTS 音频流实时驱动口型同步
+    source_rule: BD-PIPE-002
+  - step: turn-persist
+    order: 9
+    description: 对话轮次持久化到 mod-state
+    source_rule: BD-PIPE-006
+voice_input_chain:
+  - step: mic-capture
+    order: 1
+    description: getUserMedia 开始录制音频
+    source_rule: BD-PIPE-003
+  - step: audio-encode
+    order: 2
+    description: MediaRecorder 编码（webm/opus 优先）
+    source_rule: BD-PIPE-003
+  - step: stt-transcribe
+    order: 3
+    description: runtime.media.stt.transcribe() 转写
+    source_rule: BD-PIPE-003
+  - step: text-pipeline-enter
+    order: 4
+    description: 转写文本进入 text_turn_chain
+    source_rule: BD-PIPE-003
+route_scope_policy:
+  override_scope: buddy-only
+  must_not_mutate_global_defaults: true
+  source_rule: BD-CAP-004

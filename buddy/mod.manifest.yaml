@@ -1,0 +1,29 @@
+id: world.nimi.buddy
+name: Buddy
+version: 1.0.0
+kind: capability-mod
+icon: buddy
+entry: ./dist/mods/buddy/index.js
+description: >
+  Live2D 儿童互动陪伴 mod。渲染卡通角色，通过文字和语音与用户互动，
+  角色具备眨眼、眼球微动、呼吸、口型同步和情绪表情等动画能力。
+
+capabilities:
+  - runtime.ai.text.generate
+  - runtime.ai.text.stream
+  - runtime.media.tts.stream
+  - runtime.media.tts.synthesize
+  - runtime.media.tts.list.voices
+  - runtime.media.stt.transcribe
+  - runtime.route.list.options
+  - runtime.route.resolve
+  - runtime.route.check.health
+  - data.store.mod-state
+  - ui.register.ui-extension.app.sidebar.mods
+  - ui.register.ui-extension.app.content.routes
+
+ai:
+  consume:
+    - chat
+    - tts
+    - stt

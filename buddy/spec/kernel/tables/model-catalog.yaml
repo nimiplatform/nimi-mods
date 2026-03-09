@@ -1,0 +1,42 @@
+version: 1
+description: 预制 Live2D 模型目录
+source_rule: BD-CAP-005
+
+models:
+  - id: haru
+    label: 春（Haru）
+    label_zh: 春
+    source: live2d-official-sample
+    entry: haru.model3.json
+    texture_size: 1024
+    param_count: 43
+    has_expressions: true
+    expression_count: 8
+    has_physics: true
+    physics_groups: 4
+    has_pose: true
+    has_sounds: true
+    license: live2d-free-material
+    license_restriction: 不可再分发模型文件；年收入 < 1000 万日元可商用
+    phase: development-only
+    notes: 官方完整版示范模型，用于开发阶段验证技术栈
+    source_rule: BD-CAP-005
+
+  - id: haru_greeter
+    label: 春・接待（Haru Greeter）
+    label_zh: 春・接待版
+    source: live2d-official-sample
+    entry: haru_greeter_t05.model3.json
+    texture_size: 2048
+    param_count: ~30
+    has_expressions: false
+    expression_count: 0
+    has_physics: true
+    physics_groups: ~3
+    has_pose: true
+    has_sounds: false
+    license: live2d-free-material
+    license_restriction: 同 haru
+    phase: development-only
+    notes: 接待版本，无表情和语音文件，2048 纹理
+    source_rule: BD-CAP-005
