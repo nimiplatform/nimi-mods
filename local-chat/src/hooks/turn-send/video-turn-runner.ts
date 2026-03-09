@@ -43,12 +43,12 @@ function buildNsfwBlockedMessage(input: {
   routeSource: 'local' | 'cloud';
 }): string {
   if (input.policy === 'disabled') {
-    return '已拦截本次视频生成：当前未开启 NSFW 媒体。';
+    return '已拦截本次视频生成：当前内容风格已收敛，本次不发送这类画面。';
   }
   if (input.policy === 'local-only' && input.routeSource !== 'local') {
-    return '已拦截本次视频生成：NSFW 仅允许本地路由。请切到“本地”后重试。';
+    return '已拦截本次视频生成：当前内容风格仅支持本地生成，请切到“本地”后重试。';
   }
-  return '已拦截本次视频生成：当前 NSFW 策略不允许该请求。';
+  return '已拦截本次视频生成：当前内容风格不允许该请求。';
 }
 
 function normalizeReasonCode(error: unknown): string {

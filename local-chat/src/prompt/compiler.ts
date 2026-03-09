@@ -271,10 +271,29 @@ function buildLayerContent(input: LocalChatPromptCompileInput): Record<PromptLay
       `voiceConversationMode=${packet.voiceConversationMode || 'off'}`,
       `pacing=${packet.pacingPlan.mode}/${packet.pacingPlan.energy}`,
       ...buildPacingInstructions(packet.pacingPlan),
+      ...(packet.perceptionOverlay?.emotionalState
+        ? [
+          `用户情绪：${packet.perceptionOverlay.emotionalState}${packet.perceptionOverlay.emotionalCause ? `（${packet.perceptionOverlay.emotionalCause}）` : ''}`,
+          ...(packet.perceptionOverlay.suggestedApproach
+            ? [`回应策略：${packet.perceptionOverlay.suggestedApproach}`]
+            : ['回应时优先共情。']),
+        ]
+        : []),
+      ...(packet.perceptionOverlay?.directive
+        ? [`对话方向：${packet.perceptionOverlay.directive}`]
+        : []),
+      ...(packet.perceptionOverlay?.intimacyCeiling
+        ? [`亲密度上限：${packet.perceptionOverlay.intimacyCeiling}，语气和行为不要超过这个阶段。`]
+        : []),
     ]),
     interactionProfile: renderInteractionProfile(packet),
     interactionState: renderInteractionState(packet)
-      ? `最近交流状态（优先保持一致性，不要逐条复述）:\n${renderInteractionState(packet)}`
+      ? [
+        `最近交流状态（优先保持一致性，不要逐条复述）:\n${renderInteractionState(packet)}`,
+        ...(packet.perceptionOverlay?.intimacyCeiling
+          ? [`当前关系阶段上限：${packet.perceptionOverlay.intimacyCeiling}。回复语气和亲密度不要超过这个阶段。`]
+          : []),
+      ].join('\n\n')
       : '',
     relationMemory: renderRelationMemory(packet)
       ? `关系槽位记忆（只用于保持稳定边界与偏好）:\n${renderRelationMemory(packet)}`

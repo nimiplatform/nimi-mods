@@ -58,16 +58,83 @@ function lexicalScore(haystack: string, query: string): number {
   return hits / tokens.length;
 }
 
+function recencyScore(updatedAt: string): number {
+  const updatedMs = new Date(updatedAt).getTime();
+  if (!Number.isFinite(updatedMs)) return 0;
+  const diffDays = Math.max(0, (Date.now() - updatedMs) / 86_400_000);
+  if (diffDays <= 1) return 0.22;
+  if (diffDays <= 7) return 0.14;
+  if (diffDays <= 30) return 0.07;
+  return 0;
+}
+
+function relationSlotTypeBoost(slotType: string, query: string): number {
+  const normalized = query.toLowerCase();
+  const emotionalQuery = /累|难过|委屈|安慰|抱抱|想你|孤单|害怕|烦|关系|暧昧|亲密|边界|promise|comfort|miss you/u.test(normalized);
+  const relationalQuery = /一起|继续|陪|等零点|今晚|约定|记得|我们|还要|下次|回来|再聊|再见面|陪我|陪你/u.test(normalized);
+  const preferenceQuery = /喜欢|偏好|讨厌|不想|想要|习惯|风格|爱吃|不爱|希望|最好|what|which|prefer/u.test(normalized);
+  if (emotionalQuery) {
+    if (slotType === 'rapport') return 0.32;
+    if (slotType === 'promise') return 0.24;
+    if (slotType === 'taboo') return 0.18;
+    if (slotType === 'boundary') return 0.16;
+    return 0.04;
+  }
+  if (relationalQuery) {
+    if (slotType === 'rapport') return 0.3;
+    if (slotType === 'promise') return 0.24;
+    if (slotType === 'recurringCue') return 0.12;
+    if (slotType === 'preference') return 0.06;
+    return 0.03;
+  }
+  if (preferenceQuery) {
+    if (slotType === 'preference') return 0.3;
+    if (slotType === 'recurringCue') return 0.2;
+    if (slotType === 'promise') return 0.08;
+    return 0.03;
+  }
+  if (slotType === 'preference' || slotType === 'rapport') return 0.08;
+  return 0;
+}
+
 const GREETING_RE = /^(?:hi|hello|hey|yo|你好|嗨|哈喽|在吗|早安|晚安|想你了|在不在|喂)[\s!,.?？！，。~]*$/iu;
 const QUESTION_RE = /[?？]|为什么|怎么|如何|能不能|可不可以|是什么|什么意思|怎样|要不要/u;
 const EMOTIONAL_RE = /难过|好累|很累|烦|崩溃|想哭|孤单|害怕|抱抱|安慰|委屈|想你/u;
 const EXCITED_RE = /(?:[!！]{2,}|哈哈|hh+|lol|好耶|太好了|天啊|卧槽|真的耶|笑死)/iu;
+
+const HIGH_EMOTION_RE = /难过|崩溃|想哭|害怕|焦虑|孤单|委屈|绝望|恐惧|暴怒/u;
+
+type ApproachPacingHint = {
+  energyOverride?: LocalChatReplyPacingPlan['energy'];
+  segmentDelta: number;
+};
+
+function resolveApproachPacing(suggestedApproach?: string): ApproachPacingHint {
+  if (!suggestedApproach) return { segmentDelta: 0 };
+  const approach = suggestedApproach.toLowerCase();
+  // Empathy-first strategies: allow more room for comfort followup
+  if (/empathize|be-supportive|comfort|安慰|共情/u.test(approach)) {
+    return { energyOverride: 'low', segmentDelta: 1 };
+  }
+  // Lighten-mood strategies: keep beat count but raise energy
+  if (/lighten|playful|humor|逗|轻松/u.test(approach)) {
+    return { energyOverride: 'medium', segmentDelta: 0 };
+  }
+  // Redirect/distract strategies: compact, gentle pivot
+  if (/redirect|distract|转移/u.test(approach)) {
+    return { energyOverride: 'low', segmentDelta: -1 };
+  }
+  return { segmentDelta: 0 };
+}
 
 export function derivePacingPlan(input: {
   text: string;
   interactionProfile: DerivedInteractionProfile;
   allowMultiReply: boolean;
   turnMode?: LocalChatTurnMode;
+  emotionalHint?: string;
+  suggestedApproach?: string;
+  momentum?: 'accelerating' | 'steady' | 'cooling';
 }): LocalChatReplyPacingPlan {
   const text = String(input.text || '').replace(/\s+/g, ' ').trim();
   const isGreeting = GREETING_RE.test(text);
@@ -78,69 +145,88 @@ export function derivePacingPlan(input: {
   const energetic = profile.expression.pacingBias === 'bursty';
   const intimate = profile.relationship.warmth === 'intimate';
   const gentle = profile.relationship.warmth === 'warm';
+  const highEmotion = input.emotionalHint ? HIGH_EMOTION_RE.test(input.emotionalHint) : false;
+  const approachHint = resolveApproachPacing(input.suggestedApproach);
+
+  // Combined adjustments from momentum + suggestedApproach
+  const momentumDelta = input.momentum === 'accelerating' ? 1
+    : input.momentum === 'cooling' ? -1
+      : 0;
+  const totalDelta = momentumDelta + approachHint.segmentDelta;
+
+  function applyAdjustments(plan: LocalChatReplyPacingPlan): LocalChatReplyPacingPlan {
+    const energy = approachHint.energyOverride || plan.energy;
+    if (totalDelta === 0 && energy === plan.energy) return plan;
+    const adjusted = Math.max(1, Math.min(3, plan.maxSegments + totalDelta)) as 1 | 2 | 3;
+    const mode: LocalChatReplyPacingPlan['mode'] =
+      adjusted === 1 ? 'single'
+        : adjusted === 2 ? (plan.mode === 'answer-followup' ? 'answer-followup' : 'burst-2')
+          : 'burst-3';
+    return { ...plan, maxSegments: adjusted, mode, energy };
+  }
 
   if (input.turnMode === 'explicit-media') {
-    return {
+    return applyAdjustments({
       mode: 'answer-followup',
       maxSegments: 2,
       energy: 'medium',
       reason: 'explicit-media-needs-setup-and-delivery',
-    };
+    });
   }
   if (input.turnMode === 'information') {
-    return {
+    return applyAdjustments({
       mode: isQuestion && input.allowMultiReply ? 'answer-followup' : 'single',
       maxSegments: isQuestion && input.allowMultiReply ? 2 : 1,
       energy: 'low',
       reason: 'information-prefers-compact',
-    };
+    });
   }
-  if (isEmotional) {
-    return {
+  if (isEmotional || highEmotion) {
+    return applyAdjustments({
       mode: 'answer-followup',
-      maxSegments: 2,
+      maxSegments: highEmotion ? 3 : 2,
       energy: 'low',
-      reason: 'emotional-needs-soft-followup',
-    };
+      reason: highEmotion ? 'high-emotion-needs-extended-followup' : 'emotional-needs-soft-followup',
+    });
   }
   if (isExcited && energetic) {
-    return {
+    return applyAdjustments({
       mode: 'burst-3',
       maxSegments: 3,
       energy: 'high',
       reason: 'playful-high-energy',
-    };
+    });
   }
   if (isGreeting && (intimate || gentle || energetic)) {
-    return {
+    return applyAdjustments({
       mode: 'burst-2',
       maxSegments: 2,
       energy: gentle ? 'medium' : 'high',
       reason: 'greeting-needs-two-beats',
-    };
+    });
   }
   if (intimate) {
-    return {
+    return applyAdjustments({
       mode: 'burst-3',
       maxSegments: 3,
       energy: 'medium',
       reason: 'intimate-scene-escalation',
-    };
+    });
   }
   if (input.allowMultiReply && (gentle || energetic || isQuestion)) {
-    return {
+    return applyAdjustments({
       mode: isQuestion ? 'answer-followup' : 'burst-2',
       maxSegments: 2,
       energy: energetic ? 'medium' : 'low',
       reason: 'natural-delivery-style',
-    };
+    });
   }
-  return {
+  return applyAdjustments({
     mode: 'single',
     maxSegments: 1,
     energy: energetic ? 'medium' : 'low',
     reason: 'default-single',
-  };
+  });
 }
 
 function summarizeWorld(target: LocalChatTarget): string[] {
@@ -229,7 +315,12 @@ function selectRelationMemorySlots(
   return [...entries]
     .map((entry) => ({
       entry,
-      score: lexicalScore(`${entry.key} ${entry.value}`, query) + entry.confidence,
+      score: (
+        lexicalScore(`${entry.key} ${entry.value}`, query) * 1.35
+        + entry.confidence
+        + recencyScore(entry.updatedAt)
+        + relationSlotTypeBoost(entry.slotType, query)
+      ),
     }))
     .sort((left, right) => right.score - left.score || right.entry.updatedAt.localeCompare(left.entry.updatedAt))
     .slice(0, 8)

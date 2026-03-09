@@ -29,10 +29,7 @@ export function evaluateNsfwMediaPolicy(input: {
   if (input.routeSource === 'cloud') {
     return 'local-only';
   }
-  if (
-    input.visualComfortLevel === 'natural-visuals'
-    && input.relationshipBoundaryPreset === 'close'
-  ) {
+  if (input.visualComfortLevel === 'natural-visuals') {
     return 'allowed';
   }
   return 'disabled';

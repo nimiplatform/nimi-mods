@@ -10,7 +10,7 @@ import type {
   LocalChatResolvedMediaRoute,
 } from '../../types.js';
 
-export const LOCAL_CHAT_MEDIA_COMPILER_REVISION = 'media-compiler.2026-03-07.runtime-payload-v2';
+export const LOCAL_CHAT_MEDIA_COMPILER_REVISION = 'media-compiler.2026-03-09.context-enrich-v1';
 
 export type MediaIntent = {
   kind: LocalChatMediaKind;
@@ -331,12 +331,13 @@ export function compileMediaExecution(
 ): LocalChatCompiledMediaExecution {
   const lines = [
     spec.kind === 'image'
-      ? '请生成一张贴合当前对话氛围的图像。'
-      : '请生成一段贴合当前对话氛围的短视频。',
+      ? '请生成一张延续当前聊天场景、保持同一角色稳定外观的图像。'
+      : '请生成一段延续当前聊天场景、保持同一角色稳定外观的短视频。',
     `主体: ${spec.subject}`,
     `场景: ${spec.scene}`,
     `风格: ${spec.styleIntent}`,
     `情绪: ${spec.mood}`,
+    spec.hints?.continuityRefs?.length ? '要求: 不要换成另一位角色，保持外观、穿搭和氛围连续。' : '',
     ...summarizeHints(spec.hints),
   ].filter(Boolean);
   const compiledPromptText = lines.join('\n').trim();

@@ -84,7 +84,11 @@ test('resolved experience policy keeps cloud visuals on safe boundary', () => {
   assert.equal(policy.mediaPolicy.allowVisualAuto, true);
 });
 
-test('resolved experience policy enables local visual freedom only for close natural visuals', () => {
+test('default settings prefer authentic visuals by default', () => {
+  assert.equal(DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS.visualComfortLevel, 'natural-visuals');
+});
+
+test('resolved experience policy enables local visual freedom for local natural visuals', () => {
   const policy = compileResolvedExperiencePolicy({
     interactionProfile: createInteractionProfile(),
     interactionSnapshot: createSnapshot({ relationshipState: 'intimate' }),
@@ -94,7 +98,7 @@ test('resolved experience policy enables local visual freedom only for close nat
       voiceConversationMode: 'off',
       autoPlayVoiceReplies: true,
       voiceName: 'voice-custom',
-      relationshipBoundaryPreset: 'close',
+      relationshipBoundaryPreset: 'balanced',
       visualComfortLevel: 'natural-visuals',
       mediaAutonomy: 'natural',
     },
@@ -105,4 +109,19 @@ test('resolved experience policy enables local visual freedom only for close nat
   assert.equal(policy.mediaPolicy.nsfwPolicy, 'allowed');
   assert.equal(policy.voicePolicy.conversationMode, 'suggested');
   assert.equal(policy.voicePolicy.selectionMode, 'manual');
+});
+
+test('resolved experience policy keeps voice conversation off unless explicitly requested', () => {
+  const policy = compileResolvedExperiencePolicy({
+    interactionProfile: createInteractionProfile(),
+    interactionSnapshot: createSnapshot(),
+    settings: {
+      ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
+      enableVoice: true,
+      voiceConversationMode: 'off',
+    },
+    routeSource: 'local',
+  });
+
+  assert.equal(policy.voicePolicy.conversationMode, 'off');
 });

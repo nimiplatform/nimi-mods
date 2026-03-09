@@ -43,7 +43,6 @@ function resolveRouteSource(value: unknown): 'local' | 'cloud' {
 function resolveVoiceConversationMode(input: {
   requestedMode?: VoiceConversationMode;
   settings: LocalChatDefaultSettings;
-  interactionProfile: DerivedInteractionProfile;
 }): VoiceConversationMode {
   if (!input.settings.enableVoice) {
     return 'off';
@@ -54,7 +53,7 @@ function resolveVoiceConversationMode(input: {
   if (input.settings.voiceConversationMode === 'on' || input.settings.voiceConversationMode === 'suggested') {
     return input.settings.voiceConversationMode;
   }
-  return input.interactionProfile.voice.voiceAffinity === 'high' ? 'suggested' : 'off';
+  return 'off';
 }
 
 function resolveNsfwPolicy(input: {
@@ -64,10 +63,7 @@ function resolveNsfwPolicy(input: {
   if (input.routeSource === 'cloud') {
     return 'local-only';
   }
-  if (
-    input.settings.visualComfortLevel === 'natural-visuals'
-    && input.settings.relationshipBoundaryPreset === 'close'
-  ) {
+  if (input.settings.visualComfortLevel === 'natural-visuals') {
     return 'allowed';
   }
   return 'disabled';
@@ -93,7 +89,6 @@ export function compileResolvedExperiencePolicy(input: {
       conversationMode: resolveVoiceConversationMode({
         requestedMode: input.requestedVoiceConversationMode,
         settings: input.settings,
-        interactionProfile: input.interactionProfile,
       }),
       autoPlayReplies: input.settings.autoPlayVoiceReplies,
       selectedVoiceId,

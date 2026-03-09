@@ -187,6 +187,52 @@ test('orchestrateBeatModalities prefers voice in voice-first sessions', () => {
   assert.equal(result[0]?.autoPlayVoice, true);
 });
 
+test('orchestrateBeatModalities keeps emotional turns text-first when voice mode is off', () => {
+  const result = orchestrateBeatModalities({
+    beats: [createBeat({
+      text: '别急，我在这里。',
+      intent: 'comfort',
+    })],
+    turnMode: 'emotional',
+    interactionProfile: createInteractionProfile({
+      voice: { voiceAffinity: 'high' },
+    }),
+    snapshot: createSnapshot({ relationshipState: 'warm' }),
+    policy: createResolvedExperiencePolicy({
+      voicePolicy: {
+        enabled: true,
+        autoPlayReplies: true,
+      },
+    }),
+    voiceConversationMode: 'off',
+  });
+
+  assert.equal(result[0]?.modality, 'text');
+});
+
+test('orchestrateBeatModalities allows narrow suggested voice moments instead of full voice-first takeover', () => {
+  const result = orchestrateBeatModalities({
+    beats: [createBeat({
+      text: '那你先靠过来一点，我慢慢说。',
+      intent: 'comfort',
+    })],
+    turnMode: 'emotional',
+    interactionProfile: createInteractionProfile({
+      voice: { voiceAffinity: 'high' },
+    }),
+    snapshot: createSnapshot({ relationshipState: 'warm' }),
+    policy: createResolvedExperiencePolicy({
+      voicePolicy: {
+        enabled: true,
+        autoPlayReplies: true,
+      },
+    }),
+    voiceConversationMode: 'suggested',
+  });
+
+  assert.equal(result[0]?.modality, 'voice');
+});
+
 test('orchestrateBeatModalities keeps explicit voice turns voiced even when visual auto is allowed', () => {
   const result = orchestrateBeatModalities({
     beats: [createBeat({ text: '可以，我直接说给你听。' })],
@@ -221,7 +267,15 @@ test('orchestrateBeatModalities keeps explicit voice turns voiced even when visu
 
 test('orchestrateBeatModalities does not let voice-first mode swallow explicit media turns', () => {
   const result = orchestrateBeatModalities({
-    beats: [createBeat({ text: '发张图给我看看。' })],
+    beats: [createBeat({
+      text: '发张图给我看看。',
+      assetRequest: {
+        kind: 'image',
+        prompt: 'casual portrait',
+        confidence: 0.9,
+        nsfwIntent: 'none',
+      },
+    })],
     turnMode: 'explicit-media',
     interactionProfile: createInteractionProfile({
       voice: { voiceAffinity: 'high' },
@@ -247,7 +301,7 @@ test('orchestrateBeatModalities does not let voice-first mode swallow explicit m
   assert.equal(result[0]?.modality, 'image');
 });
 
-test('orchestrateBeatModalities promotes image beats only under natural media autonomy', () => {
+test('orchestrateBeatModalities keeps non-explicit turns text-first even if a beat carries assetRequest', () => {
   const beat = createBeat({
     text: '我想给你看一眼我现在靠在窗边的样子。',
     assetRequest: {
@@ -264,7 +318,7 @@ test('orchestrateBeatModalities promotes image beats only under natural media au
     },
   });
 
-  const natural = orchestrateBeatModalities({
+  const intimate = orchestrateBeatModalities({
     beats: [beat],
     turnMode: 'intimate',
     interactionProfile: profile,
@@ -280,14 +334,14 @@ test('orchestrateBeatModalities promotes image beats only under natural media au
     }),
     voiceConversationMode: 'off',
   });
-  const explicitOnly = orchestrateBeatModalities({
-    beats: [createBeat({ text: '今晚先好好陪你说话。' })],
-    turnMode: 'intimate',
+  const explicitMedia = orchestrateBeatModalities({
+    beats: [beat],
+    turnMode: 'explicit-media',
     interactionProfile: profile,
     snapshot: createSnapshot({ relationshipState: 'intimate' }),
     policy: createResolvedExperiencePolicy({
       mediaPolicy: {
-        autonomy: 'explicit-only',
+        autonomy: 'off',
         allowVisualAuto: false,
       },
       contentBoundary: {
@@ -297,6 +351,6 @@ test('orchestrateBeatModalities promotes image beats only under natural media au
     voiceConversationMode: 'off',
   });
 
-  assert.equal(natural[0]?.modality, 'image');
-  assert.equal(explicitOnly[0]?.modality, 'text');
+  assert.equal(intimate[0]?.modality, 'text');
+  assert.equal(explicitMedia[0]?.modality, 'image');
 });

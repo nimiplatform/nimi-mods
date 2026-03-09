@@ -446,6 +446,71 @@ test('send-flow explicit media request bypasses planner and delivers image', asy
   });
 });
 
+test('send-flow ignores composer media marker on plain greeting turns', async () => {
+  await withSendFlowHarness(async (harness) => {
+    const result = await harness.execute({
+      userText: '你好',
+      imageDependencySnapshot: createDependencySnapshot({
+        capability: 'image',
+        status: 'missing',
+      }),
+      aiClientOverrides: {
+        generateObject: async (payload: Record<string, unknown>) => {
+          const prompt = String(payload.prompt || '');
+          if (prompt.includes('请规划这轮对话的完整 beat 计划')) {
+            const object = {
+              beats: [{
+                text: '你好，今天过得怎么样？',
+                intent: 'answer',
+                relationMove: 'friendly',
+                sceneMove: '打招呼',
+                pauseMs: 0,
+                assetRequest: {
+                  kind: 'image',
+                  prompt: 'warm greeting portrait',
+                },
+              }],
+            };
+            return {
+              object,
+              text: JSON.stringify(object),
+              traceId: 'trace-plan-greeting',
+              promptTraceId: 'trace-plan-greeting',
+              route: {
+                source: 'local',
+                model: 'chat-model',
+                localModelId: 'chat-model',
+              },
+            };
+          }
+          const object = {
+            turnMode: 'checkin',
+            emotionalState: null,
+            relevantMemoryIds: [],
+            conversationDirective: null,
+          };
+          return {
+            object,
+            text: JSON.stringify(object),
+            traceId: 'trace-perception-greeting',
+            promptTraceId: 'trace-perception-greeting',
+            route: {
+              source: 'local',
+              model: 'chat-model',
+              localModelId: 'chat-model',
+            },
+          };
+        },
+      },
+    });
+
+    const assistantMessages = result.state.messages.filter((message) => message.role === 'assistant');
+    assert.equal(assistantMessages.some((message) => message.kind === 'image'), false);
+    assert.equal(assistantMessages.some((message) => String(message.content || '').includes('图片发送暂时不可用')), false);
+    assert.equal(assistantMessages[0]?.content, '你好，今天过得怎么样？');
+  });
+});
+
 test('send-flow delivers all planned text beats while session id bootstraps from empty state', async () => {
   await withSendFlowHarness(async (harness) => {
     const result = await harness.execute({

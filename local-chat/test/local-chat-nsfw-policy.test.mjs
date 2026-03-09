@@ -36,11 +36,11 @@ test('nsfw policy is local-only on cloud even for close natural visuals', () => 
   );
 });
 
-test('nsfw policy is allowed only for local runtime with close natural visuals', () => {
+test('nsfw policy is allowed for local runtime with natural visuals', () => {
   assert.equal(
     evaluateNsfwMediaPolicy({
       routeSource: 'local',
-      relationshipBoundaryPreset: 'close',
+      relationshipBoundaryPreset: 'balanced',
       visualComfortLevel: 'natural-visuals',
     }),
     'allowed',

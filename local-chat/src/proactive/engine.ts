@@ -300,7 +300,9 @@ export async function runLocalChatProactiveHeartbeatCycle(
           cancellationScope: 'turn',
         }],
       });
-      const firstMarkedBeat = deliveries.find((delivery) => delivery.beat.assetRequest)?.beat || null;
+      const firstMarkedBeat = turnMode === 'explicit-media'
+        ? deliveries.find((delivery) => delivery.beat.assetRequest)?.beat || null
+        : null;
       const markerOverrideIntent = firstMarkedBeat
         ? toMarkerOverrideIntent({ beat: firstMarkedBeat, planId: lockedPlan.planId })
         : null;

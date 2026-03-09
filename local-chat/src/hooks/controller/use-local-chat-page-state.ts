@@ -76,7 +76,7 @@ type AppStoreRuntimeSelectorShape = {
 
 const DEFAULT_TTS_VOICE = 'alloy';
 const DEFAULT_TTS_FORMAT = 'mp3';
-const DEPENDENCY_SNAPSHOT_INITIAL_DELAY_MS = 5_000;
+const DEPENDENCY_SNAPSHOT_INITIAL_DELAY_MS = 30_000;
 const DEPENDENCY_SNAPSHOT_POLL_INTERVAL_MS = 30_000;
 
 function createDependencySnapshotFailure(input: {
@@ -152,6 +152,7 @@ export function useLocalChatPageState() {
   const didPrimeVoiceDefaultsRef = useRef(false);
   const dependencySnapshotRefreshRef = useRef<Promise<void> | null>(null);
   const allDependencySnapshotsRefreshRef = useRef<Promise<void> | null>(null);
+  const stableVoiceIdByTargetIdRef = useRef<Record<string, string>>({});
 
   const currentUserDisplayName = useMemo(
     () =>
@@ -208,7 +209,6 @@ export function useLocalChatPageState() {
     viewerId: currentUserId,
     selectedTargetId: targetsState.selectedTargetId,
     selectedTarget: targetsState.selectedTarget,
-    targets: targetsState.targets,
     setMessages,
     setLatestPromptTrace,
     setLatestTurnAudit,
@@ -574,6 +574,8 @@ export function useLocalChatPageState() {
   const resolvePlayableTtsVoiceId = useCallback(async (selectedModel: string): Promise<string> => {
     const normalizedModel = String(selectedModel || '').trim();
     const currentVoiceId = String(speechSettingsState.inspectSettings.voiceName || '').trim();
+    const targetId = String(targetsState.selectedTarget?.id || '').trim();
+    const stableVoiceId = targetId ? String(stableVoiceIdByTargetIdRef.current[targetId] || '').trim() : '';
     const catalogModelResolved = String(speechSettingsState.speechVoiceCatalogMeta.modelResolved || '').trim();
     let availableVoiceIds = catalogModelResolved === normalizedModel
       ? speechSettingsState.speechVoices.map((voice) => voice.id)
@@ -597,12 +599,18 @@ export function useLocalChatPageState() {
 
     const resolvedVoiceId = resolveSupportedVoiceId({
       selectedVoiceId: currentVoiceId,
+      stableVoiceId,
+      preferredVoiceId: selectedTargetInteractionProfile?.voice.voiceId || undefined,
       availableVoiceIds,
+      availableVoices: speechSettingsState.speechVoices,
       genderGuard: selectedTargetInteractionProfile?.voice.genderGuard,
       voiceAffinity: selectedTargetInteractionProfile?.voice.voiceAffinity,
     });
     if (resolvedVoiceId && resolvedVoiceId !== currentVoiceId) {
       speechSettingsState.handleVoiceIdChange(resolvedVoiceId);
+    }
+    if (targetId && resolvedVoiceId) {
+      stableVoiceIdByTargetIdRef.current[targetId] = resolvedVoiceId;
     }
     return resolvedVoiceId;
   }, [
@@ -613,8 +621,10 @@ export function useLocalChatPageState() {
     speechSettingsState.loadSpeechVoices,
     speechSettingsState.speechVoiceCatalogMeta.modelResolved,
     speechSettingsState.speechVoices,
+    selectedTargetInteractionProfile?.voice.voiceId,
     selectedTargetInteractionProfile?.voice.genderGuard,
     selectedTargetInteractionProfile?.voice.voiceAffinity,
+    targetsState.selectedTarget?.id,
     ttsRouteOptions?.selected?.source,
   ]);
 

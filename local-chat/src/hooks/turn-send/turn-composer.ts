@@ -41,10 +41,72 @@ function clampBeatCount(turnMode: LocalChatTurnMode): number {
   return 4;
 }
 
+function toBigrams(text: string): Set<string> {
+  const chars = text.replace(/\s+/g, '');
+  const bigrams = new Set<string>();
+  for (let i = 0; i < chars.length - 1; i++) {
+    bigrams.add(chars.slice(i, i + 2));
+  }
+  return bigrams;
+}
+
+function bigramOverlap(a: string, b: string): number {
+  const bigramsA = toBigrams(a);
+  const bigramsB = toBigrams(b);
+  if (bigramsA.size === 0 || bigramsB.size === 0) return 0;
+  let intersection = 0;
+  for (const bigram of bigramsA) {
+    if (bigramsB.has(bigram)) intersection++;
+  }
+  const union = new Set([...bigramsA, ...bigramsB]).size;
+  return union === 0 ? 0 : intersection / union;
+}
+
+function isSemanticallyDuplicate(a: string, b: string): boolean {
+  return bigramOverlap(a, b) > 0.6;
+}
+
+function isCrossTurnDuplicate(text: string, recentBeatTexts: string[]): boolean {
+  const normalized = asString(text);
+  if (!normalized || recentBeatTexts.length === 0) return false;
+  return recentBeatTexts.some((candidate) => {
+    const previous = asString(candidate);
+    if (!previous) return false;
+    if (normalized === previous) return true;
+    if (normalized.length < 8 || previous.length < 8) {
+      return bigramOverlap(normalized, previous) > 0.82;
+    }
+    return bigramOverlap(normalized, previous) > 0.7;
+  });
+}
+
+const INTIMACY_RANK: Record<string, number> = {
+  friendly: 1,
+  warm: 2,
+  intimate: 3,
+};
+
+const INTIMATE_RELATION_MOVE_RE = /intimate|kiss|hug|closer|暧昧|亲密|依赖|撒娇|表白/u;
+const WARM_RELATION_MOVE_RE = /warm|comfort|陪伴|温柔|抱抱/u;
+
+function clampRelationMove(relationMove: string, intimacyCeiling?: string): string {
+  if (!intimacyCeiling) return relationMove;
+  const ceilingRank = INTIMACY_RANK[intimacyCeiling] || 1;
+  if (INTIMATE_RELATION_MOVE_RE.test(relationMove) && ceilingRank < 3) {
+    return ceilingRank >= 2 ? 'warm' : 'friendly';
+  }
+  if (WARM_RELATION_MOVE_RE.test(relationMove) && ceilingRank < 2) {
+    return 'friendly';
+  }
+  return relationMove;
+}
+
 function parsePlanObject(input: {
   object: Record<string, unknown>;
   turnId: string;
   turnMode: LocalChatTurnMode;
+  intimacyCeiling?: string;
+  recentBeatTexts?: string[];
 }): InteractionTurnPlan {
   const planId = `plan_${createUlid()}`;
   const rawBeats = Array.isArray(input.object.beats) ? input.object.beats : [];
@@ -59,18 +121,20 @@ function parsePlanObject(input: {
       }
       const kind = asString(asRecord(record.assetRequest).kind);
       const prompt = asString(asRecord(record.assetRequest).prompt);
+      const rawRelationMove = asString(record.relationMove || record.relation_move || input.turnMode);
+      const allowAssetRequest = input.turnMode === 'explicit-media';
       beats.push({
         beatId: `beat_${createUlid()}`,
         turnId: input.turnId,
         beatIndex: index,
         beatCount: list.length || 1,
         intent: normalizeBeatIntent(record.intent),
-        relationMove: asString(record.relationMove || record.relation_move || input.turnMode),
+        relationMove: clampRelationMove(rawRelationMove, input.intimacyCeiling),
         sceneMove: asString(record.sceneMove || record.scene_move || input.turnMode),
         modality: 'text',
         text,
         pauseMs: normalizePauseMs(record.pauseMs || record.pause_ms, index),
-        assetRequest: kind === 'image' || kind === 'video'
+        assetRequest: allowAssetRequest && (kind === 'image' || kind === 'video')
           ? {
             kind,
             prompt: prompt || text,
@@ -82,11 +146,36 @@ function parsePlanObject(input: {
       });
     });
 
-  const normalizedBeats = beats.length > 0
-    ? beats.map((beat, index) => ({
+  // Semantic dedup: skip beats too similar to already accepted ones
+  const dedupedBeats: InteractionBeat[] = [];
+  const recentBeatTexts = (input.recentBeatTexts || []).map((value) => asString(value)).filter(Boolean);
+  for (const beat of beats) {
+    const isDuplicate = dedupedBeats.some((accepted) => isSemanticallyDuplicate(beat.text, accepted.text));
+    const isRepeatedFromRecentTurn = isCrossTurnDuplicate(beat.text, recentBeatTexts);
+    if (!isDuplicate && !isRepeatedFromRecentTurn) {
+      dedupedBeats.push(beat);
+    }
+  }
+
+  // Tail beat pruning: remove low-information-gain trailing beat
+  if (dedupedBeats.length > 1) {
+    const lastBeat = dedupedBeats[dedupedBeats.length - 1]!;
+    const prevBeat = dedupedBeats[dedupedBeats.length - 2]!;
+    const isLowGain = bigramOverlap(lastBeat.text, prevBeat.text) > 0.4;
+    const isInviteOrOpen = /[?？…]/.test(lastBeat.text)
+      || lastBeat.intent === 'comfort'
+      || lastBeat.intent === 'invite'
+      || lastBeat.intent === 'media';
+    if (isLowGain && !isInviteOrOpen) {
+      dedupedBeats.pop();
+    }
+  }
+
+  const normalizedBeats = dedupedBeats.length > 0
+    ? dedupedBeats.map((beat, index) => ({
       ...beat,
       beatIndex: index,
-      beatCount: beats.length,
+      beatCount: dedupedBeats.length,
     }))
     : [];
 
@@ -109,7 +198,27 @@ export async function composeInteractionTurnPlan(input: {
   userText: string;
   turnId: string;
   turnMode: LocalChatTurnMode;
+  emotionalState?: string;
+  directive?: string;
+  intimacyCeiling?: string;
+  recentBeatTexts?: string[];
 }): Promise<InteractionTurnPlan> {
+  const perceptionLines: string[] = [];
+  if (input.emotionalState) {
+    perceptionLines.push(`emotionalState=${input.emotionalState}`);
+  }
+  if (input.directive) {
+    perceptionLines.push(`directive=${input.directive}`);
+  }
+  if (input.intimacyCeiling) {
+    perceptionLines.push(`intimacyCeiling=${input.intimacyCeiling}`);
+  }
+  if (input.recentBeatTexts && input.recentBeatTexts.length > 0) {
+    perceptionLines.push('');
+    perceptionLines.push('以下是最近的回复，新 beat 不要重复类似的内容或句式：');
+    perceptionLines.push(input.recentBeatTexts.join(' | '));
+  }
+
   const prompt = [
     input.invokeInput.prompt,
     '',
@@ -126,13 +235,16 @@ export async function composeInteractionTurnPlan(input: {
     '- relationMove: 描述这句话对关系的推进（如 friendly/warm/comfort/tease/closer）',
     '- sceneMove: 描述场景变化（如 日常/深入/安慰/调侃）',
     '- pauseMs: 这句话前的停顿毫秒数（第 1 条固定 0，后续 300-2000）',
-    '- assetRequest: 可选，仅在需要生图/视频时添加 {"kind":"image|video","prompt":"描述"}',
+    '- assetRequest: 可选，但只允许 explicit-media 模式输出 {"kind":"image|video","prompt":"描述"}',
     '',
     '规则：',
     '- beats 数量 1-4 条，不要超过 4 条',
     '- information 模式默认 1-2 条；emotional/intimate/playful/checkin 可以 2-4 条',
     '- 第 1 条 beat 是最先接住用户的回应，要短、快、完整',
+    '- 第 1 条不要总是落成“怎么了 / 我在 / 跟我说说”这类固定模板，要结合当前语境自然开场',
     '- 后续 beat 逐步展开，不要重复第 1 条的内容',
+    '- 后续 beat 必须带来新信息、新情绪动作或新关系推进，不能只是换个说法重复上一条',
+    '- 非 explicit-media 模式不要输出 assetRequest，也不要暗示系统会自动发图/发视频',
     '- 不要使用 markdown 格式、不要代码块、不要解释',
     '- 整个输出只能是一个 JSON 对象，以 { 开头，以 } 结尾',
     '',
@@ -143,6 +255,7 @@ export async function composeInteractionTurnPlan(input: {
     `deliveryStyle=${input.contextPacket.target.interactionProfile.expression.pacingBias}`,
     `voiceConversationMode=${input.contextPacket.voiceConversationMode || 'off'}`,
     `userText=${input.userText}`,
+    ...perceptionLines,
   ].join('\n');
 
   try {
@@ -163,6 +276,8 @@ export async function composeInteractionTurnPlan(input: {
       object: result.object,
       turnId: input.turnId,
       turnMode: input.turnMode,
+      intimacyCeiling: input.intimacyCeiling,
+      recentBeatTexts: input.recentBeatTexts,
     });
     if (plan.beats.length > 0) {
       console.log('[turn-composer] plan accepted:', plan.beats.length, 'beats');
@@ -194,6 +309,8 @@ export async function composeInteractionTurnPlan(input: {
         pauseMs: segment.delayMs,
       })),
     },
+    intimacyCeiling: input.intimacyCeiling,
+    recentBeatTexts: input.recentBeatTexts,
     turnId: input.turnId,
     turnMode: input.turnMode,
   });

@@ -92,6 +92,34 @@ async function buildTargetsWithLocalPreview(source: LocalChatTarget[], viewerId:
   return enriched;
 }
 
+export function areTargetsRenderEquivalent(
+  previous: ReadonlyArray<LocalChatTarget>,
+  next: ReadonlyArray<LocalChatTarget>,
+): boolean {
+  if (previous.length !== next.length) {
+    return false;
+  }
+  for (let index = 0; index < previous.length; index += 1) {
+    const left = previous[index];
+    const right = next[index];
+    if (!left || !right) {
+      return false;
+    }
+    if (
+      left.id !== right.id
+      || left.displayName !== right.displayName
+      || left.handle !== right.handle
+      || (left.avatarUrl || null) !== (right.avatarUrl || null)
+      || (left.bio || null) !== (right.bio || null)
+      || (left.latestLocalMessage || null) !== (right.latestLocalMessage || null)
+      || (left.latestLocalMessageAt || null) !== (right.latestLocalMessageAt || null)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export function useLocalChatTargets(input: UseLocalChatTargetsInput) {
   const [targets, setTargets] = useState<LocalChatTarget[]>([]);
   const [targetSearchText, setTargetSearchText] = useState('');
@@ -194,6 +222,9 @@ export function useLocalChatTargets(input: UseLocalChatTargetsInput) {
     try {
       const nextTargets = await buildTargetsWithLocalPreview(sourceTargets, input.viewerId);
       if (!mountedRef.current || previewRefreshTokenRef.current !== previewRefreshToken) {
+        return;
+      }
+      if (areTargetsRenderEquivalent(targetsRef.current, nextTargets)) {
         return;
       }
       targetsRef.current = nextTargets;

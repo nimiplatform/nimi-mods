@@ -15,40 +15,29 @@ function inferVoiceAffinity(input: {
   policy: ResolvedExperiencePolicy;
 }): boolean {
   if (!input.policy.voicePolicy.enabled) return false;
-  if (input.voiceConversationMode === 'on') return true;
   if (input.turnMode === 'explicit-voice') return true;
-  if (input.turnMode === 'information') return false;
-  if (input.beat.text.length > 90) return false;
-  return input.interactionProfile.voice.voiceAffinity === 'high';
+  if (input.voiceConversationMode === 'on') return input.turnMode !== 'explicit-media';
+  if (input.voiceConversationMode !== 'suggested') return false;
+  if (input.turnMode === 'information' || input.turnMode === 'explicit-media') return false;
+  if (input.interactionProfile.voice.voiceAffinity !== 'high') return false;
+  if (input.beat.text.length > 48) return false;
+  if (
+    input.beat.intent !== 'comfort'
+    && input.beat.intent !== 'checkin'
+    && input.beat.intent !== 'invite'
+  ) {
+    return false;
+  }
+  return input.turnMode === 'emotional' || input.turnMode === 'checkin';
 }
 
-function shouldSuggestVisual(input: {
+function resolveExplicitVisualModality(input: {
   beat: InteractionBeat;
   turnMode: LocalChatTurnMode;
-  policy: ResolvedExperiencePolicy;
-  interactionProfile: DerivedInteractionProfile;
-  snapshot: InteractionSnapshot | null;
 }): 'image' | 'video' | null {
-  if (!input.policy.mediaPolicy.allowVisualAuto) return null;
-  if (input.beat.assetRequest) {
-    return input.beat.assetRequest.kind;
-  }
-  if (input.turnMode === 'information') return null;
-  if (input.policy.mediaPolicy.autonomy === 'explicit-only') return null;
-  if (input.interactionProfile.visual.imageAffinity === 'low' && input.interactionProfile.visual.videoAffinity === 'low') {
-    return null;
-  }
-  if (input.turnMode === 'playful' && input.interactionProfile.visual.videoAffinity === 'medium') {
-    return 'video';
-  }
-  if (
-    input.turnMode === 'intimate'
-    || input.snapshot?.relationshipState === 'warm'
-    || input.snapshot?.relationshipState === 'intimate'
-  ) {
-    return 'image';
-  }
-  return null;
+  if (input.turnMode !== 'explicit-media') return null;
+  if (!input.beat.assetRequest) return null;
+  return input.beat.assetRequest.kind;
 }
 
 export function orchestrateBeatModalities(input: {
@@ -79,33 +68,29 @@ export function orchestrateBeatModalities(input: {
         autoPlayVoice: input.policy.voicePolicy.autoPlayReplies,
       };
     }
-    // At most one beat per turn can be promoted to visual media.
-    // Beats with explicit assetRequest always get the slot; auto-suggest only
-    // applies to the last beat so text replies are delivered first.
-    const isLastBeat = index === list.length - 1;
-    const canAutoVisual = !visualSlotUsed && (beat.assetRequest || isLastBeat);
-    if (canAutoVisual) {
-      const visual = shouldSuggestVisual({
+    // Non-explicit turns no longer auto-suggest visual beats here.
+    // For normal聊天回合，是否补图/视频只交给 planner 决定。
+    if (!visualSlotUsed) {
+      const explicitVisual = resolveExplicitVisualModality({
         beat,
         turnMode: input.turnMode,
-        policy: input.policy,
-        interactionProfile: input.interactionProfile,
-        snapshot: input.snapshot,
       });
-      if (visual) {
+      if (explicitVisual) {
         visualSlotUsed = true;
         return {
           ...beat,
-          modality: visual,
+          modality: explicitVisual,
           intent: 'media',
-          assetRequest: beat.assetRequest || {
-            kind: visual,
-            prompt: beat.text,
-            confidence: 0.65,
-            nsfwIntent: /暧昧|亲|吻|裸|nsfw/u.test(beat.text) ? 'suggested' : 'none',
-          },
         };
       }
+    }
+    if (input.turnMode === 'explicit-media') {
+      return {
+        ...beat,
+        modality: 'text',
+        beatIndex: index,
+        beatCount: list.length,
+      };
     }
     if (voicePreferred) {
       return {

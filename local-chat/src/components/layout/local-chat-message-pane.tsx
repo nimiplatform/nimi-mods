@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { LocalChatProductSettings } from '../../state/index.js';
 import type { ChatMessage } from '../../types.js';
-import { ChatBubble, TypingBubble } from '../chat-bubbles.js';
+import { ChatBubble } from '../chat-bubbles.js';
 import { buildMessageVisualGroups } from './message-grouping.js';
 import type { LocalChatTargetItem, VoiceInputState } from './types.js';
 
@@ -64,6 +64,47 @@ type MessageListProps = {
   t: (key: string, values?: Record<string, unknown>) => string;
 };
 
+function CurrentTurnTypingBubble(props: {
+  agentAvatarUrl: string | null;
+  agentName: string;
+  t: (key: string, values?: Record<string, unknown>) => string;
+}) {
+  const agentInitial = (String(props.agentName || 'A').trim().charAt(0) || 'A').toUpperCase();
+  return (
+    <div className="flex gap-2">
+      {props.agentAvatarUrl ? (
+        <img
+          src={props.agentAvatarUrl}
+          alt={props.agentName || props.t('ChatBubble.roleAgent')}
+          className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-black/5"
+        />
+      ) : (
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-mint-500 to-mint-700 text-xs font-semibold text-white ring-1 ring-black/5">
+          {agentInitial}
+        </div>
+      )}
+      <div className="max-w-[72%]">
+        <div className="lc-typing-bubble px-4 py-3">
+          <div className="lc-typing-row flex items-center gap-3">
+            <div className="flex items-center gap-1.5" aria-hidden>
+              <span className="lc-typing-dot h-2.5 w-2.5 rounded-full" style={{ animation: 'typing-dot-bounce 1.15s ease-in-out 0ms infinite' }} />
+              <span className="lc-typing-dot h-2.5 w-2.5 rounded-full" style={{ animation: 'typing-dot-bounce 1.15s ease-in-out 120ms infinite' }} />
+              <span className="lc-typing-dot h-2.5 w-2.5 rounded-full" style={{ animation: 'typing-dot-bounce 1.15s ease-in-out 240ms infinite' }} />
+            </div>
+            <span className="lc-typing-label text-sm font-medium">
+              {props.t('Header.presenceThinking')}
+            </span>
+            <span className="lc-typing-trail" aria-hidden>
+              <span />
+              <span />
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const MessageList = React.memo(function MessageList({
   messages,
   selectedTargetAvatarUrl,
@@ -78,6 +119,9 @@ const MessageList = React.memo(function MessageList({
   t,
 }: MessageListProps) {
   const visualGroups = useMemo(() => buildMessageVisualGroups(messages), [messages]);
+  const focusGroupIndex = !isSending && visualGroups.length > 0 && visualGroups[visualGroups.length - 1]?.role === 'assistant'
+    ? visualGroups[visualGroups.length - 1]!.groupIndex
+    : -1;
   const messageElements: React.ReactNode[] = [];
   let lastDate: Date | null = null;
   for (const group of visualGroups) {
@@ -113,20 +157,43 @@ const MessageList = React.memo(function MessageList({
         />,
       );
     }
+    const isFocusedGroup = group.groupIndex === focusGroupIndex;
+    const hasPendingVisual = group.items.some((item) => item.message.kind === 'image-pending' || item.message.kind === 'video-pending');
+    const isVoicePlaying = group.items.some((item) => item.message.id === playingVoiceMessageId);
+    const focusSummary = hasPendingVisual
+      ? t('Header.presencePainting')
+      : isVoicePlaying
+        ? t('Header.presenceSpeaking')
+        : '';
     messageElements.push(
-      <div key={`group-${group.groupIndex}`} className="space-y-2.5">
-        {groupNodes}
-      </div>,
+      <section
+        key={`group-${group.groupIndex}`}
+        className={isFocusedGroup
+          ? 'lc-current-turn-card rounded-[28px] border border-white/85 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(238,247,247,0.9))] px-4 py-4'
+          : 'space-y-2.5'}
+      >
+        {isFocusedGroup && focusSummary ? (
+          <div className="mb-3 flex justify-end">
+            <span className="lc-current-turn-chip text-[11px] font-medium text-mint-700">{focusSummary}</span>
+          </div>
+        ) : null}
+        <div className="space-y-2.5">
+          {groupNodes}
+        </div>
+      </section>,
     );
   }
   return (
     <>
       {messageElements}
       {isSending ? (
-        <TypingBubble
-          agentAvatarUrl={selectedTargetAvatarUrl}
-          agentName={selectedTargetName}
-        />
+        <section className="lc-current-turn-card lc-current-turn-card-pending min-h-[112px] rounded-[26px] border border-dashed border-mint-200/80 bg-white/88 px-4 py-4">
+          <CurrentTurnTypingBubble
+            agentAvatarUrl={selectedTargetAvatarUrl}
+            agentName={selectedTargetName}
+            t={t}
+          />
+        </section>
       ) : null}
     </>
   );
@@ -233,8 +300,12 @@ export const LocalChatMessagePane = React.memo(function LocalChatMessagePane({
   return (
     <>
       <div
-        className="min-h-0 flex-1 overflow-y-auto scroll-smooth px-6 pb-4 pt-6"
-        style={{ background: 'linear-gradient(180deg, rgba(250,252,252,0.88) 0%, rgba(243,247,248,0.92) 100%)' }}
+        data-local-chat-scroll-root="true"
+        className="min-h-0 flex-1 overflow-y-auto px-6 pb-4 pt-6"
+        style={{
+          background: 'linear-gradient(180deg, rgba(250,252,252,0.88) 0%, rgba(243,247,248,0.92) 100%)',
+          overflowAnchor: 'none',
+        }}
       >
         {showLoadingState ? (
           <div className="mx-auto flex h-full max-w-[820px] items-center justify-center">

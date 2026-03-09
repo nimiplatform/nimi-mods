@@ -62,7 +62,7 @@ export const DEFAULT_LOCAL_CHAT_PRODUCT_SETTINGS: LocalChatProductSettings = {
   mediaAutonomy: 'natural',
   voiceConversationMode: 'off',
   relationshipBoundaryPreset: 'balanced',
-  visualComfortLevel: 'soft-visuals',
+  visualComfortLevel: 'natural-visuals',
   enableVoice: false,
   allowProactiveContact: true,
   autoPlayVoiceReplies: false,

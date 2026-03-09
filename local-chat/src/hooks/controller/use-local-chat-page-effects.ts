@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import type { useLocalChatPageState } from './use-local-chat-page-state.js';
 import {
@@ -16,6 +16,27 @@ type VoiceAutoplayMessageLike = {
     autoPlayVoice?: boolean;
   } | null;
 };
+
+type ScrollAnchorMessageLike = {
+  id?: string;
+  kind?: string;
+  content?: string;
+};
+
+type ScrollStateSnapshot = {
+  targetId: string | null;
+  sessionId: string | null;
+  messageTailKey: string;
+  pendingState: 'pending' | 'settled';
+};
+
+function findScrollRoot(anchor: HTMLDivElement | null): HTMLElement | null {
+  if (!anchor) {
+    return null;
+  }
+  const root = anchor.closest('[data-local-chat-scroll-root="true"]');
+  return root instanceof HTMLElement ? root : null;
+}
 
 export function resolveVoiceAutoplayDecision(input: {
   enableVoice: boolean;
@@ -64,6 +85,45 @@ export function findPendingAutoPlayVoiceMessage<T extends VoiceAutoplayMessageLi
   return null;
 }
 
+export function buildMessageTailKey(messages: ReadonlyArray<ScrollAnchorMessageLike>): string {
+  const lastMessage = messages[messages.length - 1];
+  if (!lastMessage) {
+    return 'empty';
+  }
+  return [
+    messages.length,
+    String(lastMessage.id || '').trim(),
+    String(lastMessage.kind || '').trim(),
+    String(lastMessage.content || '').trim().length,
+  ].join(':');
+}
+
+export function resolveAutoScrollBehavior(input: {
+  loadingSessions: boolean;
+  previous: ScrollStateSnapshot | null;
+  next: ScrollStateSnapshot;
+}): 'skip' | 'auto' {
+  if (input.loadingSessions) {
+    return 'skip';
+  }
+  if (!input.previous) {
+    return 'auto';
+  }
+  if (
+    input.previous.targetId !== input.next.targetId
+    || input.previous.sessionId !== input.next.sessionId
+  ) {
+    return 'auto';
+  }
+  if (input.previous.messageTailKey !== input.next.messageTailKey) {
+    return 'auto';
+  }
+  if (input.previous.pendingState !== input.next.pendingState) {
+    return 'auto';
+  }
+  return 'skip';
+}
+
 function buildTurnContextSnapshot(state: LocalChatPageState) {
   return buildLocalChatTurnContextSnapshot({
     targetId: state.targetsState.selectedTargetId,
@@ -77,6 +137,7 @@ export function useLocalChatPageEffects(state: LocalChatPageState) {
   const sessionVoiceHistoryPrimedRef = useRef(false);
   const lastTurnContextRef = useRef<ReturnType<typeof buildTurnContextSnapshot> | null>(null);
   const lastAutoplayDecisionKeyRef = useRef<string>('');
+  const lastScrollStateRef = useRef<ScrollStateSnapshot | null>(null);
 
   useEffect(() => {
     if (!state.voiceContextMenu) return;
@@ -92,9 +153,54 @@ export function useLocalChatPageEffects(state: LocalChatPageState) {
     };
   }, [state.voiceContextMenu, state.setVoiceContextMenu]);
 
-  useEffect(() => {
-    state.messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [state.messages, state.messagesEndRef]);
+  useLayoutEffect(() => {
+    if (state.sessionsState.loadingSessions) {
+      return undefined;
+    }
+    const nextScrollState: ScrollStateSnapshot = {
+      targetId: state.targetsState.selectedTargetId || null,
+      sessionId: state.sessionsState.selectedSessionId || null,
+      messageTailKey: buildMessageTailKey(state.messages),
+      pendingState: state.turnSendState.isSending ? 'pending' : 'settled',
+    };
+    const behavior = resolveAutoScrollBehavior({
+      loadingSessions: false,
+      previous: lastScrollStateRef.current,
+      next: nextScrollState,
+    });
+    lastScrollStateRef.current = nextScrollState;
+    if (behavior === 'skip') {
+      return undefined;
+    }
+    let rafId = 0;
+    let settleRafId = 0;
+    const scrollToBottom = () => {
+      const anchor = state.messagesEndRef.current;
+      const scrollRoot = findScrollRoot(anchor);
+      if (scrollRoot) {
+        scrollRoot.scrollTop = Math.max(0, scrollRoot.scrollHeight - scrollRoot.clientHeight);
+        return;
+      }
+      anchor?.scrollIntoView({ behavior: 'auto', block: 'end' });
+    };
+    rafId = window.requestAnimationFrame(() => {
+      scrollToBottom();
+      settleRafId = window.requestAnimationFrame(() => {
+        scrollToBottom();
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.cancelAnimationFrame(settleRafId);
+    };
+  }, [
+    state.messages,
+    state.messagesEndRef,
+    state.sessionsState.loadingSessions,
+    state.sessionsState.selectedSessionId,
+    state.targetsState.selectedTargetId,
+    state.turnSendState.isSending,
+  ]);
 
   useEffect(() => {
     if (!state.targetsState.selectedTarget) return;

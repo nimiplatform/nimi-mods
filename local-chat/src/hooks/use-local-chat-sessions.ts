@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { createSessionForTarget } from '../services/view/sessions.js';
 import { toChatMessagesFromSession } from '../services/view/messages.js';
 import type { LocalChatTarget } from '../data/index.js';
@@ -18,7 +18,6 @@ type UseLocalChatSessionsInput = {
   viewerId: string;
   selectedTargetId: string;
   selectedTarget: LocalChatTarget | null;
-  targets: LocalChatTarget[];
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   setLatestPromptTrace: (trace: LocalChatPromptTrace | null) => void;
   setLatestTurnAudit: (audit: LocalChatTurnAudit | null) => void;
@@ -40,10 +39,36 @@ async function applySessionArtifacts(input: {
   input.setLatestTurnAudit(latestArtifacts.audit);
 }
 
+export function resolveSessionUpdateRefreshMode(input: {
+  selectedTargetId: string;
+  selectedSessionId: string;
+  eventTargetId?: string | null;
+  eventSessionId?: string | null;
+}): 'skip' | 'artifacts' {
+  const targetId = String(input.eventTargetId || '').trim();
+  if (!targetId || targetId !== String(input.selectedTargetId || '').trim()) {
+    return 'skip';
+  }
+  const selectedSessionId = String(input.selectedSessionId || '').trim();
+  if (!selectedSessionId) {
+    return 'skip';
+  }
+  const eventSessionId = String(input.eventSessionId || '').trim();
+  if (eventSessionId && eventSessionId !== selectedSessionId) {
+    return 'skip';
+  }
+  return 'artifacts';
+}
+
 export function useLocalChatSessions(input: UseLocalChatSessionsInput) {
   const [sessions, setSessions] = useState<LocalChatSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState('');
   const [loadingSessions, setLoadingSessions] = useState(false);
+  const selectedTargetRef = useRef<LocalChatTarget | null>(input.selectedTarget);
+
+  useEffect(() => {
+    selectedTargetRef.current = input.selectedTarget;
+  }, [input.selectedTarget]);
 
   const applySessionToView = useCallback(async (session: LocalChatSession | null) => {
     input.setMessages(toChatMessagesFromSession(session));
@@ -75,7 +100,9 @@ export function useLocalChatSessions(input: UseLocalChatSessionsInput) {
       input.setMessages([]);
       input.setLatestPromptTrace(null);
       input.setLatestTurnAudit(null);
-      const target = input.targets.find((item) => item.id === input.selectedTargetId) || null;
+      const target = selectedTargetRef.current?.id === input.selectedTargetId
+        ? selectedTargetRef.current
+        : null;
       const found = await listLocalChatSessions(input.selectedTargetId, input.viewerId);
       if (cancelled) return;
       if (found.length === 0) {
@@ -99,7 +126,6 @@ export function useLocalChatSessions(input: UseLocalChatSessionsInput) {
     };
   }, [
     input.selectedTargetId,
-    input.targets,
     input.viewerId,
     input.setLatestPromptTrace,
     input.setLatestTurnAudit,
@@ -148,19 +174,33 @@ export function useLocalChatSessions(input: UseLocalChatSessionsInput) {
     const onSessionUpdated = (event: Event) => {
       void (async () => {
         const custom = event as CustomEvent<{ targetId?: string; sessionId?: string }>;
-        const targetId = String(custom.detail?.targetId || '').trim();
-        if (!targetId || targetId !== input.selectedTargetId) return;
-        const session = selectedSessionId
-          ? await getLocalChatSession(selectedSessionId, input.viewerId)
-          : null;
-        await applySessionToView(session);
+        const refreshMode = resolveSessionUpdateRefreshMode({
+          selectedTargetId: input.selectedTargetId,
+          selectedSessionId,
+          eventTargetId: custom.detail?.targetId,
+          eventSessionId: custom.detail?.sessionId,
+        });
+        if (refreshMode === 'skip') return;
+        const session = await getLocalChatSession(selectedSessionId, input.viewerId);
+        await applySessionArtifacts({
+          session,
+          viewerId: input.viewerId,
+          setLatestPromptTrace: input.setLatestPromptTrace,
+          setLatestTurnAudit: input.setLatestTurnAudit,
+        });
       })();
     };
     window.addEventListener(eventName, onSessionUpdated);
     return () => {
       window.removeEventListener(eventName, onSessionUpdated);
     };
-  }, [applySessionToView, input.selectedTargetId, input.viewerId, selectedSessionId]);
+  }, [
+    input.selectedTargetId,
+    input.setLatestPromptTrace,
+    input.setLatestTurnAudit,
+    input.viewerId,
+    selectedSessionId,
+  ]);
 
   const handleClearHistory = useCallback(() => {
     if (!selectedSessionId) return;

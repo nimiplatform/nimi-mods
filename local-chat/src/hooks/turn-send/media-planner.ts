@@ -43,8 +43,8 @@ export type MediaPlannerResult =
       traceId?: string;
     };
 
-const MEDIA_PLANNER_TIMEOUT_MS = 1_200;
-const MEDIA_PLANNER_MAX_TOKENS = 220;
+const MEDIA_PLANNER_TIMEOUT_MS = 2_500;
+const MEDIA_PLANNER_MAX_TOKENS = 420;
 const MEDIA_PLANNER_TEMPERATURE = 0.1;
 
 const mediaPlannerDecisionSchema = z.object({
@@ -144,6 +144,9 @@ function buildMediaPlannerPrompt(input: {
   videoDependencyStatus: string;
   recentMediaSummary: string;
   promptTrace: LocalChatPromptTrace | null;
+  visualAnchorSummary: string;
+  recentTurnSummary: string;
+  continuitySummary: string;
 }): string {
   return [
     '你是 local-chat 的媒体触发 planner。',
@@ -163,8 +166,11 @@ function buildMediaPlannerPrompt(input: {
     '',
     `角色摘要: ${summarizeTarget(input.target)}`,
     `世界摘要: ${summarizeWorld(input.target)}`,
+    `角色视觉锚点: ${input.visualAnchorSummary || '-'}`,
     `用户本轮输入: ${input.userText || '-'}`,
     `助手本轮正文: ${input.assistantText || '-'}`,
+    `最近对话摘要: ${input.recentTurnSummary || '-'}`,
+    `连续性参考: ${input.continuitySummary || '-'}`,
     `对话诊断提示: ${formatPromptTraceHints(input.promptTrace)}`,
     `NSFW 策略: ${input.nsfwPolicy}`,
     `图片可用: ${input.imageReady ? 'yes' : 'no'} (dependency=${input.imageDependencyStatus})`,
@@ -209,6 +215,9 @@ export async function planMediaTurn(input: {
   videoDependencyStatus: string;
   recentMediaSummary: string;
   promptTrace: LocalChatPromptTrace | null;
+  visualAnchorSummary: string;
+  recentTurnSummary: string;
+  continuitySummary: string;
 }): Promise<MediaPlannerResult> {
   const controller = new AbortController();
   const timeout = setTimeout(() => {
@@ -232,6 +241,9 @@ export async function planMediaTurn(input: {
         videoDependencyStatus: input.videoDependencyStatus,
         recentMediaSummary: input.recentMediaSummary,
         promptTrace: input.promptTrace,
+        visualAnchorSummary: input.visualAnchorSummary,
+        recentTurnSummary: input.recentTurnSummary,
+        continuitySummary: input.continuitySummary,
       }),
       maxTokens: MEDIA_PLANNER_MAX_TOKENS,
       temperature: MEDIA_PLANNER_TEMPERATURE,
