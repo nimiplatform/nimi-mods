@@ -68,17 +68,42 @@ export function createTtsClientAdapter(
         model,
       });
 
-      const artifact = result.artifacts.find((item) => item.uri) || null;
-      if (!artifact?.uri) {
+      const artifact = result.artifacts.find((item) =>
+        (item.bytes instanceof Uint8Array && item.bytes.length > 0) || item.uri,
+      ) || null;
+      if (!artifact) {
         throw new Error('AUDIO_BOOK_TTS_ARTIFACT_MISSING');
       }
-      const response = await fetch(artifact.uri);
-      const audioBlob = await response.blob();
+      const audioBlob = await resolveArtifactBlob(artifact);
       const durationMs = estimateDurationMs(audioBlob.size, artifact.mimeType || audioBlob.type || 'audio/mpeg');
 
       return { audioBlob, durationMs };
     },
   };
+}
+
+/**
+ * Resolve artifact to Blob: prefer in-memory bytes, fall back to fetch for http(s) URIs.
+ * Desktop caching may produce file:// URIs that are not fetchable from the WebView,
+ * so we always prefer the bytes path when available.
+ */
+async function resolveArtifactBlob(artifact: {
+  bytes: Uint8Array;
+  uri: string;
+  mimeType: string;
+}): Promise<Blob> {
+  if (artifact.bytes instanceof Uint8Array && artifact.bytes.length > 0) {
+    return new Blob([artifact.bytes], { type: artifact.mimeType || 'audio/mpeg' });
+  }
+  const uri = String(artifact.uri || '').trim();
+  if (!uri) {
+    throw new Error('AUDIO_BOOK_TTS_ARTIFACT_MISSING');
+  }
+  if (uri.startsWith('file://')) {
+    throw new Error('AUDIO_BOOK_TTS_FILE_URI_NOT_SUPPORTED');
+  }
+  const response = await fetch(uri);
+  return response.blob();
 }
 
 /** Fallback duration estimation: MP3 ~128kbps → bytes * 8 / 128000 * 1000 */

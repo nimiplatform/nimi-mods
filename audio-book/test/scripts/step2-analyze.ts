@@ -22,12 +22,13 @@
 //   NIMI_MODEL_ID=cloud/default \
 //     npx tsx test/scripts/step2-analyze.ts
 //
-// Default input: test/samples/short-story.txt
+// Default input: test/test-novel/sant-2.txt
 // Output:        test/output/step2-result-<basename>.json
 //
 // Environment:
 //   NIMI_RUNTIME_ENDPOINT  — runtime gRPC address (default: 127.0.0.1:46371)
 //   NIMI_MODEL_ID          — chat model ID for cloud (default: cloud/default)
+//   NIMI_CONNECTOR_ID      — preferred runtime connector ID (optional)
 //   NIMI_API_KEY            — cloud provider API key (inline key-source)
 //   NIMI_PROVIDER_TYPE      — cloud provider type (default: dashscope)
 //   NIMI_PROVIDER_ENDPOINT  — cloud provider endpoint (optional)
@@ -41,7 +42,6 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { resolve, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Runtime } from '../../../../sdk/src/runtime/index.js';
-import { createNimiAiProvider } from '../../../../sdk/src/ai-provider/index.js';
 import { splitTextIntoChapters, computeTextStats } from '../../src/services/chapter-splitter.js';
 import { analyzeAllChapters } from '../../src/services/analysis-pipeline.js';
 import { classifyAllCharacters } from '../../src/services/character-tier.js';
@@ -55,6 +55,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const RUNTIME_ENDPOINT = process.env.NIMI_RUNTIME_ENDPOINT ?? '127.0.0.1:46371';
 const MODEL_ID = process.env.NIMI_MODEL_ID ?? 'cloud/default';
+const CONNECTOR_ID = process.env.NIMI_CONNECTOR_ID ?? '';
 const API_KEY = process.env.NIMI_API_KEY ?? '';
 const PROVIDER_TYPE = process.env.NIMI_PROVIDER_TYPE ?? 'dashscope';
 const PROVIDER_ENDPOINT = process.env.NIMI_PROVIDER_ENDPOINT ?? '';
@@ -63,10 +64,23 @@ const SUBJECT_USER_ID = 'user-audio-book-test';
 
 const inputPath = process.argv[2]
   ? resolve(process.argv[2])
-  : resolve(__dirname, '../samples/short-story.txt');
+  : resolve(__dirname, '../test-novel/sant-2.txt');
 
 const outputName = `step2-result-${basename(inputPath, '.txt')}.json`;
 const OUTPUT_PATH = resolve(__dirname, '../output', outputName);
+
+type RuntimeConnectorRecord = {
+  connectorId: string;
+  provider: string;
+  label: string;
+  hasCredential: boolean;
+};
+
+type RuntimeConnectorModelRecord = {
+  modelId: string;
+  available: boolean;
+  capabilities: string[];
+};
 
 // ---------------------------------------------------------------------------
 // Build gRPC metadata for inline key-source
@@ -89,8 +103,8 @@ function buildMetadata(): Record<string, string> | undefined {
 // Runtime-backed LLM client (Cloud via gRPC)
 // ---------------------------------------------------------------------------
 
-function createRuntimeLlmClient(endpoint: string, modelId: string): LlmClient {
-  const runtime = new Runtime({
+function createRuntimeInstance(endpoint: string): Runtime {
+  return new Runtime({
     appId: APP_ID,
     transport: {
       type: 'node-grpc',
@@ -104,40 +118,107 @@ function createRuntimeLlmClient(endpoint: string, modelId: string): LlmClient {
       subjectUserId: SUBJECT_USER_ID,
     },
   });
+}
 
-  const provider = createNimiAiProvider({
-    runtime,
-    appId: APP_ID,
-    routePolicy: 'cloud',
-    fallback: 'deny',
-    timeoutMs: 300_000,
-    metadata: buildMetadata(),
+function isPlaceholderModel(modelId: string): boolean {
+  const normalized = String(modelId || '').trim().toLowerCase();
+  return !normalized || normalized === 'cloud/default';
+}
+
+function preferTextModel(models: RuntimeConnectorModelRecord[]): string {
+  const availableTextModels = models
+    .filter((model) => model.available && model.capabilities.includes('text.generate'))
+    .map((model) => model.modelId);
+  if (availableTextModels.length === 0) return 'cloud/default';
+
+  const flash = availableTextModels.find((modelId) => modelId.includes('flash'));
+  if (flash) return flash;
+  return availableTextModels[0]!;
+}
+
+async function resolveRuntimeConnector(runtime: Runtime): Promise<{
+  connectorId: string;
+  modelId: string;
+  provider: string;
+  availableConnectors: RuntimeConnectorRecord[];
+}> {
+  const listResponse = await runtime.connector.listConnectors({});
+  const connectors = Array.isArray((listResponse as { connectors?: unknown[] }).connectors)
+    ? ((listResponse as { connectors?: unknown[] }).connectors ?? []).map((item) => {
+      const record = item as Record<string, unknown>;
+      return {
+        connectorId: String(record.connectorId || ''),
+        provider: String(record.provider || ''),
+        label: String(record.label || ''),
+        hasCredential: Boolean(record.hasCredential),
+      };
+    }).filter((item) => item.connectorId)
+    : [];
+
+  const cloudConnectors = connectors.filter((connector) => connector.provider !== 'local');
+  const exactConnector = CONNECTOR_ID
+    ? cloudConnectors.find((connector) => connector.connectorId === CONNECTOR_ID) || null
+    : null;
+  const providerPreferred = PROVIDER_TYPE
+    ? cloudConnectors.find((connector) => connector.provider === PROVIDER_TYPE && connector.hasCredential) || null
+    : null;
+  const firstReadyCloud = cloudConnectors.find((connector) => connector.hasCredential) || cloudConnectors[0] || null;
+  const selectedConnector = exactConnector || providerPreferred || firstReadyCloud;
+
+  if (!selectedConnector) {
+    return {
+      connectorId: CONNECTOR_ID,
+      modelId: MODEL_ID,
+      provider: PROVIDER_TYPE,
+      availableConnectors: connectors,
+    };
+  }
+
+  const modelResponse = await runtime.connector.listConnectorModels({
+    connectorId: selectedConnector.connectorId,
   });
+  const models = Array.isArray((modelResponse as { models?: unknown[] }).models)
+    ? ((modelResponse as { models?: unknown[] }).models ?? []).map((item) => {
+      const record = item as Record<string, unknown>;
+      return {
+        modelId: String(record.modelId || ''),
+        available: Boolean(record.available),
+        capabilities: Array.isArray(record.capabilities)
+          ? record.capabilities.map((capability) => String(capability || ''))
+          : [],
+      };
+    }).filter((item) => item.modelId)
+    : [];
 
-  const model = provider.text(modelId);
+  const selectedModel = isPlaceholderModel(MODEL_ID)
+    ? preferTextModel(models)
+    : MODEL_ID;
 
   return {
+    connectorId: selectedConnector.connectorId,
+    modelId: selectedModel,
+    provider: selectedConnector.provider,
+    availableConnectors: connectors,
+  };
+}
+
+function createRuntimeLlmClient(runtime: Runtime, modelId: string, connectorId?: string): LlmClient {
+  
+  return {
     async generateText(input) {
-      const generated = await model.doGenerate({
-        prompt: [
-          { role: 'system', content: input.systemPrompt },
-          {
-            role: 'user',
-            content: [{ type: 'text', text: input.userPrompt }],
-          },
-        ],
+      const generated = await runtime.ai.text.generate({
+        model: modelId,
+        input: input.userPrompt,
+        system: input.systemPrompt,
+        route: 'cloud',
+        fallback: 'deny',
+        connectorId: String(connectorId || '').trim() || undefined,
+        metadata: buildMetadata(),
         temperature: input.temperature ?? 0.7,
-        maxOutputTokens: input.maxTokens ?? 4096,
-        providerOptions: {},
+        maxTokens: input.maxTokens ?? 4096,
+        timeoutMs: 300_000,
       });
-
-      const text = generated.content
-        .filter((item) => item.type === 'text')
-        .map((item) => (item as { type: 'text'; text: string }).text)
-        .join('')
-        .trim();
-
-      return { text };
+      return { text: generated.text.trim() };
     },
   };
 }
@@ -149,7 +230,6 @@ function createRuntimeLlmClient(endpoint: string, modelId: string): LlmClient {
 async function main() {
   console.log('=== Audio Book Step 2: Analysis Test (Runtime Cloud) ===');
   console.log(`Runtime:  ${RUNTIME_ENDPOINT}`);
-  console.log(`Model:    ${MODEL_ID}`);
   console.log(`Provider: ${PROVIDER_TYPE}`);
   console.log(`KeyMode:  ${API_KEY ? 'inline' : 'runtime-config'}`);
   console.log(`Input:    ${inputPath}`);
@@ -207,8 +287,16 @@ async function main() {
     }
   }
 
-  // 3. Analyze via runtime Cloud
-  const llm = createRuntimeLlmClient(RUNTIME_ENDPOINT, MODEL_ID);
+  // 3. Analyze via runtime Token API
+  const runtime = createRuntimeInstance(RUNTIME_ENDPOINT);
+  const route = await resolveRuntimeConnector(runtime);
+  console.log(`Connector:${route.connectorId || '(auto)'}`);
+  console.log(`Model:    ${route.modelId}`);
+  if (route.availableConnectors.length > 0) {
+    console.log(`Connectors:${route.availableConnectors.map((connector) => `${connector.connectorId}:${connector.provider}`).join(', ')}`);
+  }
+
+  const llm = createRuntimeLlmClient(runtime, route.modelId, route.connectorId);
 
   console.log('Analyzing chapters...');
   const startedAt = performance.now();
@@ -240,8 +328,9 @@ async function main() {
   const output = {
     meta: {
       inputFile: inputPath,
-      modelId: MODEL_ID,
-      providerType: PROVIDER_TYPE,
+      modelId: route.modelId,
+      connectorId: route.connectorId || undefined,
+      providerType: route.provider || PROVIDER_TYPE,
       keyMode: API_KEY ? 'inline' : 'runtime-config',
       runtimeEndpoint: RUNTIME_ENDPOINT,
       totalTimeSeconds: Number(totalTime),
@@ -262,6 +351,12 @@ async function main() {
   console.log(`Results written to: ${OUTPUT_PATH}`);
   console.log(`Total segments: ${result.segments.length}`);
   console.log(`Total characters: ${classifiedCharacters.length}`);
+  const deterministicChapters = mergedChapterResults.filter((item) => !item.error && (item.chunkCount ?? 0) === 0).length;
+  const llmChapters = mergedChapterResults.filter((item) => !item.error && (item.chunkCount ?? 0) > 0).length;
+  const retriedChapters = mergedChapterResults.filter((item) => (item.retryCount ?? 0) > 0).length;
+  console.log(`Deterministic chapters: ${deterministicChapters}`);
+  console.log(`LLM chapters: ${llmChapters}`);
+  console.log(`Retried chapters: ${retriedChapters}`);
   for (const ch of classifiedCharacters) {
     console.log(`  ${ch.name}: ${ch.tier} (${ch.segmentCount} segments, ${ch.gender}, ${ch.ageGroup})`);
   }

@@ -24,6 +24,7 @@ import {
 } from './analysis-prompts.js';
 import { rebaseChapterSegmentsToSource } from './text-fidelity.js';
 import { splitLongSegments } from './segment-post-processor.js';
+import { regexPreAnalyze } from './regex-pre-analyzer.js';
 
 const VALID_SEGMENT_TYPES = new Set<SegmentType>(['dialogue', 'narration', 'inner_thought', 'sound_effect']);
 const RECENT_SEGMENTS_WINDOW = 3;
@@ -591,77 +592,123 @@ export async function analyzeAllChapters(
     );
 
     try {
-      const chapterRun = await analyzeChapterInChunks(
-        llm,
-        chapter.rawText,
-        i,
-        chapters.length,
-        accCtx,
-      );
-      const { output, retryCount } = chapterRun;
+      // Try regex pre-analysis first — bypass LLM when confidence is high
+      const preAnalysis = regexPreAnalyze(chapter.rawText);
 
-      const rebased = rebaseChapterSegmentsToSource({
-        chapterText: chapter.rawText,
-        chapterIndex: i,
-        segments: output.segments,
-      });
+      if (preAnalysis.canBypassLlm) {
+        // Direct regex path — no LLM call needed for this chapter
+        const rawSegments: ScriptSegment[] = preAnalysis.segments.map((seg, segIdx) => ({
+          id: `seg-${i}-${segIdx}`,
+          chapterIndex: i,
+          index: globalSegmentIndex + segIdx,
+          type: seg.type,
+          speaker: seg.speaker,
+          text: seg.text,
+          startOffset: seg.startOffset,
+          endOffset: seg.endOffset,
+        }));
 
-      // Convert raw segments to ScriptSegments with IDs
-      const rawChapterSegments: ScriptSegment[] = rebased.segments.map((seg, segIdx) => ({
-        id: `seg-${i}-${segIdx}`,
-        chapterIndex: i,
-        index: globalSegmentIndex + segIdx,
-        type: seg.type,
-        speaker: seg.speaker,
-        text: seg.text,
-        startOffset: seg.startOffset,
-        endOffset: seg.endOffset,
-        ...(seg.emotion ? { emotion: seg.emotion } : {}),
-      }));
-
-      // Post-process: split overly long segments at dialogue boundaries
-      const chapterSegments = splitLongSegments(rawChapterSegments);
-      // Re-number indices for this chapter
-      for (let si = 0; si < chapterSegments.length; si++) {
-        chapterSegments[si]!.index = globalSegmentIndex + si;
-      }
-
-      allSegments.push(...chapterSegments);
-      globalSegmentIndex += chapterSegments.length;
-
-      // Update character profiles
-      let newCharCount = 0;
-      for (const ch of output.characters) {
-        const existing = characterMap.get(ch.name);
-        if (existing) {
-          // Update traits if new ones discovered
-          const mergedTraits = Array.from(new Set([...existing.traits, ...ch.traits]));
-          characterMap.set(ch.name, { ...existing, traits: mergedTraits });
-        } else {
-          characterMap.set(ch.name, {
-            name: ch.name,
-            gender: ch.gender,
-            ageGroup: ch.ageGroup,
-            traits: ch.traits,
-            segmentCount: 0,
-            tier: 'minor',
-          });
-          newCharCount++;
+        const chapterSegments = splitLongSegments(rawSegments);
+        for (let si = 0; si < chapterSegments.length; si++) {
+          chapterSegments[si]!.index = globalSegmentIndex + si;
         }
+
+        allSegments.push(...chapterSegments);
+        globalSegmentIndex += chapterSegments.length;
+
+        let newCharCount = 0;
+        for (const name of preAnalysis.characterNames) {
+          if (!characterMap.has(name)) {
+            characterMap.set(name, {
+              name,
+              gender: 'neutral',
+              ageGroup: 'adult',
+              traits: [],
+              segmentCount: 0,
+              tier: 'minor',
+            });
+            newCharCount++;
+          }
+        }
+
+        chapterResults.push({
+          chapterIndex: i,
+          segmentCount: chapterSegments.length,
+          newCharacters: newCharCount,
+          retryCount: 0,
+          chunkCount: 0,
+          durationMs: Math.round(performance.now() - chapterStartedAt),
+        });
+      } else {
+        // LLM analysis path — regex confidence too low
+        const chapterRun = await analyzeChapterInChunks(
+          llm,
+          chapter.rawText,
+          i,
+          chapters.length,
+          accCtx,
+        );
+        const { output, retryCount } = chapterRun;
+
+        const rebased = rebaseChapterSegmentsToSource({
+          chapterText: chapter.rawText,
+          chapterIndex: i,
+          segments: output.segments,
+        });
+
+        const rawChapterSegments: ScriptSegment[] = rebased.segments.map((seg, segIdx) => ({
+          id: `seg-${i}-${segIdx}`,
+          chapterIndex: i,
+          index: globalSegmentIndex + segIdx,
+          type: seg.type,
+          speaker: seg.speaker,
+          text: seg.text,
+          startOffset: seg.startOffset,
+          endOffset: seg.endOffset,
+          ...(seg.emotion ? { emotion: seg.emotion } : {}),
+        }));
+
+        const chapterSegments = splitLongSegments(rawChapterSegments);
+        for (let si = 0; si < chapterSegments.length; si++) {
+          chapterSegments[si]!.index = globalSegmentIndex + si;
+        }
+
+        allSegments.push(...chapterSegments);
+        globalSegmentIndex += chapterSegments.length;
+
+        let newCharCount = 0;
+        for (const ch of output.characters) {
+          const existing = characterMap.get(ch.name);
+          if (existing) {
+            const mergedTraits = Array.from(new Set([...existing.traits, ...ch.traits]));
+            characterMap.set(ch.name, { ...existing, traits: mergedTraits });
+          } else {
+            characterMap.set(ch.name, {
+              name: ch.name,
+              gender: ch.gender,
+              ageGroup: ch.ageGroup,
+              traits: ch.traits,
+              segmentCount: 0,
+              tier: 'minor',
+            });
+            newCharCount++;
+          }
+        }
+
+        chapterResults.push({
+          chapterIndex: i,
+          segmentCount: chapterSegments.length,
+          newCharacters: newCharCount,
+          retryCount,
+          repairCallCount: chapterRun.repairCallCount,
+          strictRepairCount: chapterRun.strictRepairCount,
+          recoveredChunkCount: chapterRun.recoveredChunkCount,
+          chunkCount: chapterRun.chunkCount,
+          chunkSize: chapterRun.chunkSize,
+          durationMs: Math.round(performance.now() - chapterStartedAt),
+        });
       }
 
-      chapterResults.push({
-        chapterIndex: i,
-        segmentCount: chapterSegments.length,
-        newCharacters: newCharCount,
-        retryCount,
-        repairCallCount: chapterRun.repairCallCount,
-        strictRepairCount: chapterRun.strictRepairCount,
-        recoveredChunkCount: chapterRun.recoveredChunkCount,
-        chunkCount: chapterRun.chunkCount,
-        chunkSize: chapterRun.chunkSize,
-        durationMs: Math.round(performance.now() - chapterStartedAt),
-      });
       lastProcessedChapter = i;
 
     } catch (err) {

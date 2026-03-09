@@ -63,6 +63,7 @@ In this mode, don't set `NIMI_API_KEY` — the runtime uses its own env-configur
 |----------|---------|-------------|
 | `NIMI_RUNTIME_ENDPOINT` | `127.0.0.1:46371` | Runtime gRPC address |
 | `NIMI_MODEL_ID` | `cloud/default` | Model ID (use provider prefix for Mode B) |
+| `NIMI_CONNECTOR_ID` | (empty) | Preferred runtime connector ID. If missing or invalid, step2 auto-falls back to a runtime-available cloud connector |
 | `NIMI_API_KEY` | (empty) | API key for inline mode. If set, enables Mode A |
 | `NIMI_PROVIDER_TYPE` | `dashscope` | Provider type for inline mode |
 | `NIMI_PROVIDER_ENDPOINT` | (empty) | Custom provider endpoint (optional) |
@@ -83,7 +84,7 @@ npx tsx test/scripts/step2-analyze.ts /path/to/your-novel.txt
 - Output: `test/output/step2-result-{filename}.json`
 - Contains: segments, characters, chapter analysis results
 
-If no file is provided, uses `test/samples/short-story.txt`.
+If no file is provided, the current default is `test/test-novel/sant-2.txt`, because it is long enough to exercise chapter splitting, dialogue attribution, and runtime-backed model routing under realistic load.
 
 #### Step 3: Voice Casting
 
