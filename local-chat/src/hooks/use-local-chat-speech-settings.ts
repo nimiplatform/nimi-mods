@@ -4,17 +4,17 @@ import { useRuntimeModSettings } from '@nimiplatform/sdk/mod/settings';
 import type { ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import {
   type LocalChatBooleanSettingKey,
-  type LocalChatDeliveryStyle,
   type LocalChatInspectSettings,
   type LocalChatMediaAutonomy,
   type LocalChatProductSettings,
-  type LocalChatRelationshipBoundaryPreset,
   type LocalChatSettings,
   type LocalChatVisualComfortLevel,
+  type LocalChatVoiceAutonomy,
   type LocalChatVoiceConversationMode,
   DEFAULT_LOCAL_CHAT_SETTINGS,
   mergeLocalChatSettings,
   normalizeLocalChatSettings,
+  resolveLocalChatVoiceEnabled,
 } from '../state/index.js';
 import { LOCAL_CHAT_MOD_ID } from '../contracts.js';
 
@@ -81,6 +81,7 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
   const productSettings = settings.product;
   const inspectSettings = settings.inspect;
   const defaultSettings = mergeLocalChatSettings(settings);
+  const voiceEnabled = resolveLocalChatVoiceEnabled(productSettings);
 
   const updateProductSettings = useCallback((updater: (previous: LocalChatProductSettings) => LocalChatProductSettings) => {
     updateSettings((previous) => ({
@@ -112,7 +113,7 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
   ]);
 
   const loadSpeechVoices = useCallback(async (override?: VoiceQueryOverride) => {
-    if (!productSettings.enableVoice) {
+    if (!voiceEnabled) {
       setSpeechVoices([]);
       setSpeechVoiceCatalogMeta(createEmptySpeechVoiceCatalogMeta());
       return [];
@@ -181,18 +182,18 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
       return [];
     }
   }, [
-    productSettings.enableVoice,
+    voiceEnabled,
     input.runtimeClient,
     buildVoiceInput,
   ]);
 
   useEffect(() => {
-    if (productSettings.enableVoice) {
+    if (voiceEnabled) {
       return;
     }
     setSpeechVoices([]);
     setSpeechVoiceCatalogMeta(createEmptySpeechVoiceCatalogMeta());
-  }, [productSettings.enableVoice]);
+  }, [voiceEnabled]);
 
   const loadSpeechCatalog = useCallback(async () => {
     try {
@@ -211,14 +212,14 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
   }, [loadSpeechVoices]);
 
   useEffect(() => {
-    if (!productSettings.enableVoice) {
+    if (!voiceEnabled) {
       return undefined;
     }
     void loadSpeechCatalog();
-  }, [productSettings.enableVoice, loadSpeechCatalog]);
+  }, [voiceEnabled, loadSpeechCatalog]);
 
   useEffect(() => {
-    if (!productSettings.enableVoice) {
+    if (!voiceEnabled) {
       return undefined;
     }
     let cancelled = false;
@@ -229,7 +230,7 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
       cancelled = true;
     };
   }, [
-    productSettings.enableVoice,
+    voiceEnabled,
     loadSpeechVoices,
     inspectSettings.ttsRouteSource,
     inspectSettings.ttsConnectorId,
@@ -237,7 +238,7 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
   ]);
 
   useEffect(() => {
-    if (!productSettings.enableVoice) {
+    if (!voiceEnabled) {
       return undefined;
     }
     if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') {
@@ -250,11 +251,11 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
     return () => {
       window.removeEventListener(MODEL_CATALOG_UPDATED_EVENT, onCatalogUpdated as EventListener);
     };
-  }, [productSettings.enableVoice, loadSpeechVoices]);
+  }, [voiceEnabled, loadSpeechVoices]);
 
   // Keep manual inspect voice in sync with the currently available catalog.
   useEffect(() => {
-    if (!productSettings.enableVoice) {
+    if (!voiceEnabled) {
       return;
     }
     const currentVoice = inspectSettings.voiceName;
@@ -268,7 +269,7 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
         voiceName: speechVoices[0]?.id ?? '',
       }));
     }
-  }, [speechVoices, productSettings.enableVoice, inspectSettings.voiceName, updateInspectSettings]);
+  }, [speechVoices, voiceEnabled, inspectSettings.voiceName, updateInspectSettings]);
 
   const handleVoiceIdChange = useCallback((voiceId: string) => {
     updateInspectSettings((previous) => ({
@@ -287,13 +288,6 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
     }));
   }, [updateProductSettings]);
 
-  const handleDeliveryStyleChange = useCallback((value: LocalChatDeliveryStyle) => {
-    updateProductSettings((previous) => ({
-      ...previous,
-      deliveryStyle: value,
-    }));
-  }, [updateProductSettings]);
-
   const handleMediaAutonomyChange = useCallback((value: LocalChatMediaAutonomy) => {
     updateProductSettings((previous) => ({
       ...previous,
@@ -301,17 +295,17 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
     }));
   }, [updateProductSettings]);
 
+  const handleVoiceAutonomyChange = useCallback((value: LocalChatVoiceAutonomy) => {
+    updateProductSettings((previous) => ({
+      ...previous,
+      voiceAutonomy: value,
+    }));
+  }, [updateProductSettings]);
+
   const handleVoiceConversationModeChange = useCallback((value: LocalChatVoiceConversationMode) => {
     updateProductSettings((previous) => ({
       ...previous,
       voiceConversationMode: value,
-    }));
-  }, [updateProductSettings]);
-
-  const handleRelationshipBoundaryPresetChange = useCallback((value: LocalChatRelationshipBoundaryPreset) => {
-    updateProductSettings((previous) => ({
-      ...previous,
-      relationshipBoundaryPreset: value,
     }));
   }, [updateProductSettings]);
 
@@ -431,10 +425,9 @@ export function useLocalChatSpeechSettings(input: UseLocalChatSpeechSettingsInpu
     loadSpeechVoices,
     handleVoiceIdChange,
     handleDefaultSettingChange,
-    handleDeliveryStyleChange,
     handleMediaAutonomyChange,
+    handleVoiceAutonomyChange,
     handleVoiceConversationModeChange,
-    handleRelationshipBoundaryPresetChange,
     handleVisualComfortLevelChange,
     handleDefaultVoiceNameChange,
     handleTtsRouteSourceChange,

@@ -66,15 +66,22 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
     [state.speechSettingsState],
   );
 
+  const handleVoiceAutonomyChange = useCallback(
+    (value: 'off' | 'explicit-only' | 'natural') => {
+      state.speechSettingsState.handleVoiceAutonomyChange(value);
+    },
+    [state.speechSettingsState],
+  );
+
   const handleVoiceConversationModeChange = useCallback(
-    (value: 'off' | 'suggested' | 'on') => {
+    (value: 'off' | 'on') => {
       state.speechSettingsState.handleVoiceConversationModeChange(value);
     },
     [state.speechSettingsState],
   );
 
   const handleVisualComfortLevelChange = useCallback(
-    (value: 'text-only' | 'soft-visuals' | 'natural-visuals') => {
+    (value: 'text-only' | 'restrained-visuals' | 'natural-visuals') => {
       state.speechSettingsState.handleVisualComfortLevelChange(value);
     },
     [state.speechSettingsState],
@@ -308,7 +315,7 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         videoRouteSource: state.speechSettingsState.defaultSettings.videoRouteSource,
         localTtsRouteAvailable,
         localSttRouteAvailable,
-        enableVoice: state.speechSettingsState.productSettings.enableVoice,
+        enableVoice: state.speechSettingsState.defaultSettings.enableVoice,
         autoBoundSource,
         autoBoundModel: state.runtimeRouteState.chatRouteOptions?.resolvedDefault?.model || '',
         chatRouteReady,
@@ -445,6 +452,7 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
     handleDefaultSettingChange,
     handleDefaultVoiceNameChange,
     handleMediaAutonomyChange,
+    handleVoiceAutonomyChange,
     handleVoiceConversationModeChange,
     handleVisualComfortLevelChange,
     handleVoiceContextMenu,

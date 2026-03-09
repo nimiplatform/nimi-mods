@@ -1,16 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import {
-  getAuthState,
-  canRequest,
-  getCooldownRemaining,
+  readPhotoAuthSnapshot,
   requestPhoto,
   respondToRequest,
   revokeAccess,
 } from '../services/photo-auth.js';
 import { emitMintYouLog } from '../logging.js';
 import { MINTYOU_AUDIT } from '../contracts.js';
-import type { PhotoAuthState } from '../types.js';
+import type { PhotoAuthSnapshot } from '../types.js';
+import { getMintYouHookClient } from '../runtime-mod.js';
 
 type PhotoTrustPanelProps = {
   currentUserId: string;
@@ -32,47 +31,82 @@ export function PhotoTrustPanel({
   otherHasPhoto,
 }: PhotoTrustPanelProps) {
   const { t } = useModTranslation('mint-you');
-  const [authState, setAuthState] = useState<PhotoAuthState>(() =>
-    getAuthState(currentUserId, otherUserId, worldId),
-  );
-  const [cooldown, setCooldown] = useState(0);
+  const [snapshot, setSnapshot] = useState<PhotoAuthSnapshot>({
+    state: 'NONE',
+    requestedBy: null,
+    cooldownRemainingMs: 0,
+    canRequest: true,
+  });
+  const [busy, setBusy] = useState(false);
+
+  const refreshSnapshot = useCallback(async () => {
+    const hookClient = getMintYouHookClient();
+    const next = await readPhotoAuthSnapshot(
+      hookClient.data,
+      currentUserId,
+      otherUserId,
+      worldId,
+    );
+    setSnapshot(next);
+  }, [currentUserId, otherUserId, worldId]);
 
   useEffect(() => {
-    if (authState !== 'DECLINED') return;
-    const remaining = getCooldownRemaining(currentUserId, otherUserId, worldId);
-    setCooldown(remaining);
-    if (remaining <= 0) return;
+    void refreshSnapshot();
+  }, [refreshSnapshot]);
+
+  useEffect(() => {
+    if (snapshot.state !== 'DECLINED' || snapshot.cooldownRemainingMs <= 0) return;
     const interval = setInterval(() => {
-      const r = getCooldownRemaining(currentUserId, otherUserId, worldId);
-      setCooldown(r);
-      if (r <= 0) clearInterval(interval);
+      void refreshSnapshot();
     }, 60000);
     return () => clearInterval(interval);
-  }, [authState, currentUserId, otherUserId, worldId]);
+  }, [refreshSnapshot, snapshot.cooldownRemainingMs, snapshot.state]);
 
-  const handleRequest = () => {
-    const newState = requestPhoto(currentUserId, otherUserId, worldId);
-    setAuthState(newState);
+  const handleRequest = useCallback(async () => {
+    setBusy(true);
+    try {
+      const hookClient = getMintYouHookClient();
+      await requestPhoto(hookClient.data, currentUserId, otherUserId, worldId);
+      await refreshSnapshot();
+    } finally {
+      setBusy(false);
+    }
     emitMintYouLog({ message: MINTYOU_AUDIT.PHOTO_REQUESTED, source: 'PhotoTrustPanel' });
-  };
+  }, [currentUserId, otherUserId, refreshSnapshot, worldId]);
 
-  const handleRespond = (accept: boolean) => {
-    const newState = respondToRequest(currentUserId, otherUserId, worldId, accept);
-    setAuthState(newState);
+  const handleRespond = useCallback(async (accept: boolean) => {
+    setBusy(true);
+    try {
+      const hookClient = getMintYouHookClient();
+      await respondToRequest(hookClient.data, currentUserId, otherUserId, worldId, accept);
+      await refreshSnapshot();
+    } finally {
+      setBusy(false);
+    }
     if (accept) {
       emitMintYouLog({ message: MINTYOU_AUDIT.PHOTO_ACCEPTED, source: 'PhotoTrustPanel' });
     } else {
       emitMintYouLog({ message: MINTYOU_AUDIT.PHOTO_DECLINED, source: 'PhotoTrustPanel' });
     }
-  };
+  }, [currentUserId, otherUserId, refreshSnapshot, worldId]);
 
-  const handleRevoke = () => {
-    const newState = revokeAccess(currentUserId, otherUserId, worldId);
-    setAuthState(newState);
+  const handleRevoke = useCallback(async () => {
+    setBusy(true);
+    try {
+      const hookClient = getMintYouHookClient();
+      await revokeAccess(hookClient.data, currentUserId, otherUserId, worldId);
+      await refreshSnapshot();
+    } finally {
+      setBusy(false);
+    }
     emitMintYouLog({ message: MINTYOU_AUDIT.PHOTO_REVOKED, source: 'PhotoTrustPanel' });
-  };
+  }, [currentUserId, otherUserId, refreshSnapshot, worldId]);
 
-  const requestAllowed = canRequest(currentUserId, otherUserId, worldId);
+  const authState = snapshot.state;
+  const cooldown = snapshot.cooldownRemainingMs;
+  const requestAllowed = snapshot.canRequest;
+  const isPendingIncoming = authState === 'A_REQUESTED' && snapshot.requestedBy !== currentUserId;
+  const isPendingOutgoing = authState === 'A_REQUESTED' && snapshot.requestedBy === currentUserId;
 
   return (
     <div className="rounded-lg border border-gray-200 p-3">
@@ -97,25 +131,31 @@ export function PhotoTrustPanel({
       {otherHasPhoto && authState === 'NONE' && (
         <button
           onClick={handleRequest}
-          disabled={!requestAllowed}
+          disabled={!requestAllowed || busy}
           className="rounded-lg bg-[#4ECCA3] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#3DBB92] disabled:opacity-50"
         >
           {t('PhotoTrust.requestReveal')}
         </button>
       )}
 
-      {authState === 'A_REQUESTED' && (
+      {isPendingOutgoing && (
+        <p className="text-xs text-gray-500">{t('PhotoTrust.pendingRequest')}</p>
+      )}
+
+      {isPendingIncoming && (
         <div className="space-y-2">
           <p className="text-xs text-gray-500">{t('PhotoTrust.pendingRequest')}</p>
           <div className="flex gap-2">
             <button
               onClick={() => handleRespond(true)}
+              disabled={busy}
               className="rounded-lg bg-[#4ECCA3] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#3DBB92]"
             >
               {t('PhotoTrust.accept')}
             </button>
             <button
               onClick={() => handleRespond(false)}
+              disabled={busy}
               className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50"
             >
               {t('PhotoTrust.decline')}
@@ -129,6 +169,7 @@ export function PhotoTrustPanel({
           <p className="text-xs text-green-600">{t('PhotoTrust.mutualAccess')}</p>
           <button
             onClick={handleRevoke}
+            disabled={busy}
             className="rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50"
           >
             {t('PhotoTrust.revoke')}
@@ -145,6 +186,7 @@ export function PhotoTrustPanel({
       {authState === 'DECLINED' && cooldown <= 0 && (
         <button
           onClick={handleRequest}
+          disabled={busy}
           className="rounded-lg bg-[#4ECCA3] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#3DBB92]"
         >
           {t('PhotoTrust.requestAgain')}

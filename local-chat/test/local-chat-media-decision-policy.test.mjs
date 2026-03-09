@@ -11,6 +11,7 @@ function createResolvedPolicy(settings = DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS, ov
     },
     voicePolicy: {
       enabled: settings.enableVoice,
+      autonomy: settings.voiceAutonomy,
       conversationMode: settings.voiceConversationMode,
       autoPlayReplies: settings.autoPlayVoiceReplies,
       selectedVoiceId: settings.voiceName || null,
@@ -49,6 +50,26 @@ function createTarget() {
     worldId: 'world.policy',
     world: { name: 'Night Harbor' },
     worldview: { name: 'Neon Rain' },
+    agentMetadata: {
+      persona: '安静、克制、会在深夜自然陪伴用户',
+    },
+    agentProfile: {
+      persona: '温柔里带一点疏离感',
+      dna: {
+        personality: {
+          summary: '安静、克制、深夜感很强',
+        },
+        appearance: {
+          hairColor: '黑色',
+          hairStyle: '长发',
+          eyeColor: '浅灰色眼睛',
+          bodyType: '偏瘦',
+          defaultOutfit: '宽松家居衬衫',
+          fashionStyle: 'casual-home',
+          artStyle: 'photoreal',
+        },
+      },
+    },
   };
 }
 
@@ -226,4 +247,134 @@ test('media decision policy resolves auto image route via preflight for explicit
   assert.equal(result.resolvedRoute.source, 'local');
   assert.equal(result.promptTracePatch.mediaDecisionSource, 'explicit');
   assert.equal(result.promptTracePatch.mediaRouteResolvedBy, 'preflight');
+});
+
+test('media decision policy enriches explicit image request with visual anchor and continuity cues', async () => {
+  const result = await decideMediaExecution({
+    aiClient: {
+      generateObject: async () => {
+        throw new Error('planner should not run for explicit request');
+      },
+    },
+    turnTxnId: 'txn-explicit-enriched',
+    routeBinding: null,
+    defaultSettings: {
+      ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
+      imageRouteSource: 'local',
+    },
+    resolvedPolicy: createResolvedPolicy({
+      ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
+      imageRouteSource: 'local',
+    }, {
+      mediaPolicy: {
+        routeSource: 'local',
+      },
+    }),
+    userText: '发张照片看看',
+    assistantText: '我刚靠在窗边回你消息。',
+    target: createTarget(),
+    worldId: 'world.policy',
+    messages: [{
+      id: 'assistant-image-1',
+      role: 'assistant',
+      kind: 'image',
+      content: '',
+      timestamp: new Date('2026-03-08T22:00:00.000Z'),
+      meta: {
+        mediaShadow: {
+          kind: 'image',
+          status: 'ready',
+          subject: 'Policy Bot，黑色长发，宽松家居衬衫',
+          scene: '雨夜窗边，暖灯下回消息',
+          styleIntent: '电影感、生活流、私聊自拍感',
+          mood: '安静、亲近',
+          routeSource: 'local',
+          routeModel: 'flux-local',
+          assetOrigin: 'generated',
+          shadowText: '[media:image:ready] subject=Policy Bot，黑色长发，宽松家居衬衫',
+        },
+      },
+    }],
+    promptTrace: null,
+    nsfwPolicy: 'allowed',
+    fallbackRouteSource: 'local',
+    imageDependencySnapshot: createDependencySnapshot('image', 'ready'),
+    videoDependencySnapshot: createDependencySnapshot('video', 'missing'),
+    markerOverrideIntent: null,
+  });
+
+  assert.equal(result.kind, 'execute');
+  if (result.kind !== 'execute') {
+    return;
+  }
+  const compiledPrompt = result.prepared.compiled.compiledPromptText;
+  assert.match(compiledPrompt, /Policy Bot/u);
+  assert.match(compiledPrompt, /黑色.*长发|浅灰色眼睛|宽松家居衬衫/u);
+  assert.match(compiledPrompt, /连续性参考/u);
+  assert.match(compiledPrompt, /最近媒体|固定外观|穿搭延续/u);
+});
+
+test('media decision policy passes visual anchor and recent turn context into planner prompt', async () => {
+  let capturedPrompt = '';
+  const result = await decideMediaExecution({
+    aiClient: {
+      generateObject: async (request) => {
+        capturedPrompt = String(request.prompt || '');
+        return {
+          object: {
+            kind: 'none',
+            trigger: 'none',
+            confidence: 0.15,
+            subject: '',
+            scene: '',
+            styleIntent: '',
+            mood: '',
+            reason: 'no media needed',
+            nsfwIntent: 'none',
+          },
+          traceId: 'trace-media-policy-context',
+          route: {
+            source: 'local',
+            model: 'chat-model',
+          },
+        };
+      },
+    },
+    turnTxnId: 'txn-planner-context',
+    routeBinding: null,
+    defaultSettings: {
+      ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
+      imageRouteSource: 'local',
+    },
+    resolvedPolicy: createResolvedPolicy({
+      ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
+      imageRouteSource: 'local',
+    }, {
+      mediaPolicy: {
+        routeSource: 'local',
+      },
+    }),
+    userText: '刚才那个雨夜窗边回消息的画面很有感觉。',
+    assistantText: '我正靠在窗边回你消息，灯光把侧脸压得很安静。',
+    target: createTarget(),
+    worldId: 'world.policy',
+    messages: [{
+      id: 'user-prev',
+      role: 'user',
+      kind: 'text',
+      content: '你穿着那件宽松衬衫的时候很好看。',
+      timestamp: new Date('2026-03-08T21:58:00.000Z'),
+    }],
+    promptTrace: null,
+    nsfwPolicy: 'allowed',
+    fallbackRouteSource: 'local',
+    imageDependencySnapshot: createDependencySnapshot('image', 'ready'),
+    videoDependencySnapshot: createDependencySnapshot('video', 'missing'),
+    markerOverrideIntent: null,
+  });
+
+  assert.equal(result.kind, 'none');
+  assert.match(capturedPrompt, /角色视觉锚点:/u);
+  assert.match(capturedPrompt, /最近对话摘要:/u);
+  assert.match(capturedPrompt, /连续性参考:/u);
 });

@@ -126,6 +126,38 @@ test('turn-mode regression: high flirt affinity does not upcast neutral question
   assert.equal(beats[0]?.modality, 'text');
 });
 
+test('media regression: non-explicit turns ignore hallucinated beat assetRequest', () => {
+  const interactionProfile = createInteractionProfile();
+  const policy = compileResolvedExperiencePolicy({
+    interactionProfile,
+    interactionSnapshot: createSnapshot({ relationshipState: 'warm' }),
+    settings: {
+      ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
+      mediaAutonomy: 'natural',
+      visualComfortLevel: 'natural-visuals',
+    },
+    routeSource: 'local',
+  });
+  const beats = orchestrateBeatModalities({
+    beats: [{
+      ...createBeat('你好，今天过得怎么样？'),
+      assetRequest: {
+        kind: 'image',
+        prompt: 'warm greeting portrait',
+        confidence: 0.91,
+        nsfwIntent: 'none',
+      },
+    }],
+    turnMode: 'checkin',
+    interactionProfile,
+    snapshot: createSnapshot({ relationshipState: 'warm' }),
+    policy,
+    voiceConversationMode: 'off',
+  });
+
+  assert.equal(beats[0]?.modality, 'text');
+});
+
 test('turn-mode regression: emotional support stays emotional even for flirty personas', () => {
   const interactionProfile = createInteractionProfile();
   assert.equal(resolveTurnMode({

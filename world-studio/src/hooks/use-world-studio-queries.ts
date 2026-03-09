@@ -80,6 +80,7 @@ function toEventSummaryList(payload: unknown): WorldEventSummary[] {
       id: String(item.id || ''),
       worldId: String(item.worldId || ''),
       level: String(item.level || 'PRIMARY') as WorldEventSummary['level'],
+      eventHorizon: String(item.eventHorizon || 'PAST') as WorldEventSummary['eventHorizon'],
       parentEventId: toStringOrNull(item.parentEventId),
       title: String(item.title || 'Untitled Event'),
       summary: toStringOrNull(item.summary),

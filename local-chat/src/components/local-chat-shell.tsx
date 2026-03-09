@@ -63,6 +63,7 @@ export function LocalChatShell(props: LocalChatShellProps) {
     memorySyncStatus,
     onToggleProductSetting,
     onDefaultMediaAutonomyChange,
+    onDefaultVoiceAutonomyChange,
     onDefaultVoiceConversationModeChange,
     onVisualComfortLevelChange,
     onMemoryOverrideChange,
@@ -220,8 +221,10 @@ export function LocalChatShell(props: LocalChatShellProps) {
         open={isSettingsDrawerOpen}
         onClose={closeSettingsDrawer}
         productSettings={productSettings}
+        enableVoice={enableVoice}
         onToggleProductSetting={onToggleProductSetting}
         onMediaAutonomyChange={onDefaultMediaAutonomyChange}
+        onVoiceAutonomyChange={onDefaultVoiceAutonomyChange}
         onVoiceConversationModeChange={onDefaultVoiceConversationModeChange}
         onVisualComfortLevelChange={onVisualComfortLevelChange}
         runtimeSidebarProps={runtimeSidebarProps}

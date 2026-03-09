@@ -1,5 +1,9 @@
 import { asRecord } from '@nimiplatform/sdk/mod/utils';
 import type { EventNodeDraft } from '../contracts.js';
+import {
+  deriveNeedsEvidence,
+  normalizeEventHorizon,
+} from './event-horizon.js';
 
 type WorldEventEvidenceRefPayload = {
   segmentId: string;
@@ -13,6 +17,7 @@ type WorldEventEvidenceRefPayload = {
 export type WorldEventUpsertPayload = {
   id?: string;
   level: 'PRIMARY' | 'SECONDARY';
+  eventHorizon?: 'PAST' | 'ONGOING' | 'FUTURE';
   parentEventId?: string;
   title: string;
   summary?: string;
@@ -87,6 +92,7 @@ export function toWorldEventUpsertPayload(event: EventNodeDraft): WorldEventUpse
   const record = asRecord(event);
   const id = toOptionalString(record.id);
   const level = normalizeEventLevel(record.level);
+  const eventHorizon = normalizeEventHorizon(record.eventHorizon, 'PAST');
   const title = toOptionalString(record.title) || 'Untitled Event';
   const parentEventId = level === 'SECONDARY'
     ? toOptionalString(record.parentEventId)
@@ -111,6 +117,7 @@ export function toWorldEventUpsertPayload(event: EventNodeDraft): WorldEventUpse
   return {
     ...(id ? { id } : {}),
     level,
+    eventHorizon,
     ...(parentEventId ? { parentEventId } : {}),
     title,
     ...(summary ? { summary } : {}),
@@ -123,9 +130,12 @@ export function toWorldEventUpsertPayload(event: EventNodeDraft): WorldEventUpse
     ...(dependsOnEventIds.length > 0 ? { dependsOnEventIds } : {}),
     ...(evidenceRefs.length > 0 ? { evidenceRefs } : {}),
     ...(Number.isFinite(confidence) ? { confidence: clamp01(confidence) } : {}),
-    ...(typeof record.needsEvidence === 'boolean'
-      ? { needsEvidence: Boolean(record.needsEvidence) }
-      : {}),
+    needsEvidence: deriveNeedsEvidence({
+      level,
+      eventHorizon,
+      evidenceRefs,
+      needsEvidence: record.needsEvidence,
+    }),
   };
 }
 

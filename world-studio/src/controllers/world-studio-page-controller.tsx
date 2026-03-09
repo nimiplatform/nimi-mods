@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
-import { createModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import { useAppStore } from '@nimiplatform/sdk/mod/ui';
 import { WORLD_STUDIO_MOD_ID } from '../contracts.js';
@@ -18,6 +17,7 @@ import { useWorldStudioControllerActions } from './use-world-studio-controller-a
 import { buildWorldStudioViewModel } from './world-studio-view-model-builder.js';
 import { buildWorldStudioPanels } from './world-studio-panels.js';
 import { createWorldStudioRuntimeAiClient } from '../runtime-ai-client.js';
+import { getWorldStudioRuntimeClient } from '../runtime-mod.js';
 
 function isRouteConfigBlockingNotice(message: string | null): boolean {
   if (!message) return false;
@@ -41,7 +41,7 @@ type WorldStudioAppStoreState = {
 export function useWorldStudioPageContent() {
   const { t } = useModTranslation('world-studio');
   const hookClient = useMemo(() => createHookClient(WORLD_STUDIO_MOD_ID), []);
-  const runtimeClient = useMemo(() => createModRuntimeClient(WORLD_STUDIO_MOD_ID), []);
+  const runtimeClient = useMemo(() => getWorldStudioRuntimeClient(), []);
   const aiClient = useMemo(() => createWorldStudioRuntimeAiClient(runtimeClient), [runtimeClient]);
   const flowId = useMemo(() => createWorldStudioFlowId('world-studio-page'), []);
   const runtimeUser = useAppStore((state) => (state as WorldStudioAppStoreState).auth.user);

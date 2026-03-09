@@ -1,5 +1,6 @@
 import React from 'react';
 import type { EventNodeDraft } from '../../contracts.js';
+import { countPrimaryEventsMissingEvidence } from '../../services/event-horizon.js';
 import { EventGraphEditor } from '../create/event-graph-editor.js';
 
 type EventGraphMaintenanceProps = {
@@ -23,7 +24,7 @@ type EventGraphMaintenanceProps = {
 
 export function EventGraphMaintenance(props: EventGraphMaintenanceProps) {
   const totalEvents = props.events.primary.length + props.events.secondary.length;
-  const missingPrimaryEvidence = props.events.primary.filter((item) => item.evidenceRefs.length === 0).length;
+  const missingPrimaryEvidence = countPrimaryEventsMissingEvidence(props.events.primary);
   const primaryIds = new Set(props.events.primary.map((item) => String(item.id || '').trim()).filter(Boolean));
   const orphanSecondary = props.events.secondary.filter((item) => {
     const parentId = String(item.parentEventId || '').trim();

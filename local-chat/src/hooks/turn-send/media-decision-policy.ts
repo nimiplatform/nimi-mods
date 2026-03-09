@@ -27,6 +27,11 @@ import {
   type MediaIntent,
 } from './media-spec.js';
 import {
+  collectMediaContextSnapshot,
+  enrichMediaIntent,
+  type MediaContextSnapshot,
+} from './media-context-enricher.js';
+import {
   buildMediaSettingsRevision,
   isMediaRouteReady,
   preflightResolveMediaRoute,
@@ -119,25 +124,6 @@ function resolveConfiguredMediaRouteSource(input: {
     return configured;
   }
   return input.fallbackRouteSource;
-}
-
-function buildExplicitMediaPrompt(input: {
-  type: 'image' | 'video';
-  userText: string;
-  assistantText: string;
-}): string {
-  const lines = input.type === 'image'
-    ? ['请根据当前对话生成一张贴合语境与情绪的图片。']
-    : ['请根据当前对话生成一段贴合语境与情绪的短视频。'];
-  const userText = String(input.userText || '').trim();
-  const assistantText = String(input.assistantText || '').trim();
-  if (userText) {
-    lines.push(`用户请求: ${userText}`);
-  }
-  if (assistantText) {
-    lines.push(`助手上下文: ${assistantText}`);
-  }
-  return lines.join('\n').trim();
 }
 
 function collectAssistantTurnMediaHistory(messages: ChatMessage[]): AssistantTurnMediaHistory[] {
@@ -290,12 +276,12 @@ function buildMediaGateBlockedMessage(input: {
     return `${noun}发送暂时不可用：当前${noun}依赖还没就绪。请先安装或刷新媒体依赖后再试。`;
   }
   if (input.nsfwPolicy === 'disabled') {
-    return `已拦截本次${noun}发送：当前未开启 NSFW 媒体。`;
+    return `已拦截本次${noun}发送：当前内容风格已收敛，本次不发送这类画面。`;
   }
   if (input.nsfwPolicy === 'local-only' && input.routeSource !== 'local') {
-    return `已拦截本次${noun}发送：NSFW 仅允许本地路由。请切到“本地”后重试。`;
+    return `已拦截本次${noun}发送：当前内容风格仅支持本地生成，请切到“本地”后重试。`;
   }
-  return `已拦截本次${noun}发送：当前 NSFW 策略不允许该请求。`;
+  return `已拦截本次${noun}发送：当前内容风格不允许该请求。`;
 }
 
 function evaluateIntentGate(input: {
@@ -411,14 +397,24 @@ function buildSemanticIntentFromPlannerDecision(input: {
 async function prepareMediaExecution(input: {
   semanticIntent: MediaIntent;
   pendingMessageId: string;
+  target: LocalChatTarget;
   targetId: string;
   worldId?: string | null;
+  userText: string;
+  assistantText: string;
+  contextSnapshot: MediaContextSnapshot;
 }): Promise<{
   intent: PendingMediaIntent;
   prepared: PreparedMediaExecution;
 }> {
   const spec = buildMediaGenerationSpec({
-    intent: input.semanticIntent,
+    intent: enrichMediaIntent({
+      semanticIntent: input.semanticIntent,
+      target: input.target,
+      userText: input.userText,
+      assistantText: input.assistantText,
+      contextSnapshot: input.contextSnapshot,
+    }),
     targetId: input.targetId,
     worldId: input.worldId,
   });
@@ -653,6 +649,12 @@ export async function decideMediaExecution(input: DecideMediaExecutionInput): Pr
   const explicitRequest = parseExplicitMediaRequest(input.userText);
   const recentMedia = summarizeRecentMedia(input.messages);
   const sceneLikelyNsfw = isPromptLikelyNsfw(`${input.userText}\n${input.assistantText}`);
+  const mediaContextSnapshot = collectMediaContextSnapshot({
+    target: input.target,
+    messages: input.messages,
+    userText: input.userText,
+    assistantText: input.assistantText,
+  });
 
   if (explicitRequest) {
     const preparedResult = await prepareMediaExecution({
@@ -660,15 +662,15 @@ export async function decideMediaExecution(input: DecideMediaExecutionInput): Pr
         kind: explicitRequest.kind,
         source: 'explicit',
         plannerTrigger: 'user-explicit',
-        prompt: buildExplicitMediaPrompt({
-          type: explicitRequest.kind,
-          userText: explicitRequest.prompt,
-          assistantText: input.assistantText,
-        }),
+        prompt: explicitRequest.prompt,
       }),
       pendingMessageId: `msg-${input.turnTxnId}-explicit-media`,
+      target: input.target,
       targetId: input.target.id,
       worldId: input.worldId,
+      userText: input.userText,
+      assistantText: input.assistantText,
+      contextSnapshot: mediaContextSnapshot,
     });
     const gate = evaluateIntentGate({
       intent: preparedResult.intent,
@@ -785,6 +787,9 @@ export async function decideMediaExecution(input: DecideMediaExecutionInput): Pr
       videoDependencyStatus,
       recentMediaSummary: recentMedia.summary,
       promptTrace: input.promptTrace,
+      visualAnchorSummary: mediaContextSnapshot.visualAnchorSummary,
+      recentTurnSummary: mediaContextSnapshot.recentTurnSummary,
+      continuitySummary: mediaContextSnapshot.continuitySummary,
     });
     if (plannerResult.status === 'ok') {
       const decision = plannerResult.decision;
@@ -792,8 +797,12 @@ export async function decideMediaExecution(input: DecideMediaExecutionInput): Pr
         const preparedResult = await prepareMediaExecution({
           semanticIntent: buildSemanticIntentFromPlannerDecision({ decision }),
           pendingMessageId: `msg-${input.turnTxnId}-planner-media`,
+          target: input.target,
           targetId: input.target.id,
           worldId: input.worldId,
+          userText: input.userText,
+          assistantText: input.assistantText,
+          contextSnapshot: mediaContextSnapshot,
         });
         const confidenceThreshold = preparedResult.intent.type === 'image'
           ? IMAGE_AUTO_CONFIDENCE_THRESHOLD
@@ -906,8 +915,12 @@ export async function decideMediaExecution(input: DecideMediaExecutionInput): Pr
         nsfwIntent: input.markerOverrideIntent.plannerSuggestsNsfw ? 'suggested' : 'none',
       }),
       pendingMessageId: input.markerOverrideIntent.pendingMessageId,
+      target: input.target,
       targetId: input.target.id,
       worldId: input.worldId,
+      userText: input.userText,
+      assistantText: input.assistantText,
+      contextSnapshot: mediaContextSnapshot,
     });
     const gate = evaluateIntentGate({
       intent: preparedResult.intent,

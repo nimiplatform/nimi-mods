@@ -62,6 +62,13 @@ cases:
     context_degraded_warning_only: true
     write_spine: true
     source_rule: N-ACC-002
+  - id: NAR-010-STABLE-STORY-ANCHOR-FALLBACK
+    description: Event-derived story ids may resolve STORY/SUBJECT/RELATION through a stable non-event story anchor, but must not borrow context from another event-derived story id.
+    expected_status: APPROVED
+    expected_reason_code: null
+    stable_story_anchor_fallback: true
+    write_spine: true
+    source_rule: N-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:narrative-engine-kernel-docs
     source_rule: N-ACC-003

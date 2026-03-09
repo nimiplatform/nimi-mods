@@ -84,7 +84,8 @@ phase2_preconditions:
     - selected_start_time_id_present
     - selected_characters_non_empty
     - primary_events_non_empty
-    - primary_evidence_coverage_above_threshold
+    - non_future_primary_evidence_coverage_above_threshold
+  evidence_gate_scope: PRIMARY_AND_EVENT_HORIZON_NOT_FUTURE
   fail_reason_codes:
     - WORLD_STUDIO_PHASE1_QUALITY_GATE_BLOCKED
     - WORLD_STUDIO_START_TIME_PROJECTION_FAILED

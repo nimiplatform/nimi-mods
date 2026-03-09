@@ -17,6 +17,13 @@ import {
   type NarrativeEngineModule,
   type NarrativeEngineModuleInput,
 } from './module.js';
+import {
+  isEventDerivedStoryId,
+  pickNarrativeRelationContextRow,
+  pickNarrativeStoryContextRow,
+  pickNarrativeSubjectContextRow,
+  resolveNarrativeContextStoryAnchor,
+} from './context-anchor.js';
 
 export {
   NARRATIVE_ENGINE_DATA_API_AUDIT_APPEND,
@@ -32,6 +39,11 @@ export {
   NARRATIVE_INITIATIVE_DEFAULTS,
   NARRATIVE_REASON_CODES,
   createNarrativeEngineModule,
+  isEventDerivedStoryId,
+  pickNarrativeRelationContextRow,
+  pickNarrativeStoryContextRow,
+  pickNarrativeSubjectContextRow,
+  resolveNarrativeContextStoryAnchor,
 };
 
 export type {

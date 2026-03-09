@@ -7,7 +7,6 @@ import { createHookClient } from '@nimiplatform/sdk/mod/hook';
 import { createModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import { useAppStore } from '@nimiplatform/sdk/mod/ui';
-import { readRuntimeModSettings } from '@nimiplatform/sdk/mod/settings';
 import type { RuntimeCanonicalCapability } from '@nimiplatform/sdk/mod/runtime-route';
 import { LOCAL_CHAT_MOD_ID } from '../../contracts.js';
 import type { LocalChatPromptTrace, LocalChatTurnAudit, VoiceConversationMode } from '../../session-store.js';
@@ -51,7 +50,6 @@ import {
   createUnsupportedMemorySyncAdapter,
   type MemorySyncStatus,
 } from '../../services/memory/memory-sync-adapter.js';
-import { hasStoredVoicePreference, shouldAutoPrimeVoiceDefaults } from './voice-defaults-policy.js';
 
 type RuntimeFieldsMap = {
   mode?: 'STORY' | 'SCENE_TURN';
@@ -76,7 +74,7 @@ type AppStoreRuntimeSelectorShape = {
 
 const DEFAULT_TTS_VOICE = 'alloy';
 const DEFAULT_TTS_FORMAT = 'mp3';
-const DEPENDENCY_SNAPSHOT_INITIAL_DELAY_MS = 5_000;
+const DEPENDENCY_SNAPSHOT_INITIAL_DELAY_MS = 30_000;
 const DEPENDENCY_SNAPSHOT_POLL_INTERVAL_MS = 30_000;
 
 function createDependencySnapshotFailure(input: {
@@ -149,9 +147,9 @@ export function useLocalChatPageState() {
   const [memorySyncStatus, setMemorySyncStatus] = useState<MemorySyncStatus>({ state: 'unsupported' });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const didPrimeVoiceDefaultsRef = useRef(false);
   const dependencySnapshotRefreshRef = useRef<Promise<void> | null>(null);
   const allDependencySnapshotsRefreshRef = useRef<Promise<void> | null>(null);
+  const stableVoiceIdByTargetIdRef = useRef<Record<string, string>>({});
 
   const currentUserDisplayName = useMemo(
     () =>
@@ -208,7 +206,6 @@ export function useLocalChatPageState() {
     viewerId: currentUserId,
     selectedTargetId: targetsState.selectedTargetId,
     selectedTarget: targetsState.selectedTarget,
-    targets: targetsState.targets,
     setMessages,
     setLatestPromptTrace,
     setLatestTurnAudit,
@@ -536,44 +533,11 @@ export function useLocalChatPageState() {
     [runtimeRouteState.chatRouteOptions?.local?.models, sttRouteOptions?.local?.models],
   );
 
-  useEffect(() => {
-    if (didPrimeVoiceDefaultsRef.current) {
-      return;
-    }
-    const ttsReady = localTtsRouteAvailable || ttsConnectorCandidates.length > 0;
-    const rawSettings = readRuntimeModSettings(LOCAL_CHAT_MOD_ID);
-    const looksFresh =
-      speechSettingsState.productSettings.enableVoice === false
-      && speechSettingsState.productSettings.voiceConversationMode === 'off';
-    if (hasStoredVoicePreference(rawSettings) || !looksFresh) {
-      didPrimeVoiceDefaultsRef.current = true;
-      return;
-    }
-    if (!shouldAutoPrimeVoiceDefaults({
-      alreadyPrimed: didPrimeVoiceDefaultsRef.current,
-      rawSettings,
-      productSettings: speechSettingsState.productSettings,
-      ttsReady,
-    })) {
-      return;
-    }
-    didPrimeVoiceDefaultsRef.current = true;
-    speechSettingsState.updateProductSettings((previous) => ({
-      ...previous,
-      enableVoice: true,
-      voiceConversationMode: 'suggested',
-    }));
-  }, [
-    localTtsRouteAvailable,
-    speechSettingsState.productSettings.enableVoice,
-    speechSettingsState.productSettings.voiceConversationMode,
-    speechSettingsState.updateProductSettings,
-    ttsConnectorCandidates.length,
-  ]);
-
   const resolvePlayableTtsVoiceId = useCallback(async (selectedModel: string): Promise<string> => {
     const normalizedModel = String(selectedModel || '').trim();
     const currentVoiceId = String(speechSettingsState.inspectSettings.voiceName || '').trim();
+    const targetId = String(targetsState.selectedTarget?.id || '').trim();
+    const stableVoiceId = targetId ? String(stableVoiceIdByTargetIdRef.current[targetId] || '').trim() : '';
     const catalogModelResolved = String(speechSettingsState.speechVoiceCatalogMeta.modelResolved || '').trim();
     let availableVoiceIds = catalogModelResolved === normalizedModel
       ? speechSettingsState.speechVoices.map((voice) => voice.id)
@@ -597,12 +561,18 @@ export function useLocalChatPageState() {
 
     const resolvedVoiceId = resolveSupportedVoiceId({
       selectedVoiceId: currentVoiceId,
+      stableVoiceId,
+      preferredVoiceId: selectedTargetInteractionProfile?.voice.voiceId || undefined,
       availableVoiceIds,
+      availableVoices: speechSettingsState.speechVoices,
       genderGuard: selectedTargetInteractionProfile?.voice.genderGuard,
       voiceAffinity: selectedTargetInteractionProfile?.voice.voiceAffinity,
     });
     if (resolvedVoiceId && resolvedVoiceId !== currentVoiceId) {
       speechSettingsState.handleVoiceIdChange(resolvedVoiceId);
+    }
+    if (targetId && resolvedVoiceId) {
+      stableVoiceIdByTargetIdRef.current[targetId] = resolvedVoiceId;
     }
     return resolvedVoiceId;
   }, [
@@ -613,8 +583,10 @@ export function useLocalChatPageState() {
     speechSettingsState.loadSpeechVoices,
     speechSettingsState.speechVoiceCatalogMeta.modelResolved,
     speechSettingsState.speechVoices,
+    selectedTargetInteractionProfile?.voice.voiceId,
     selectedTargetInteractionProfile?.voice.genderGuard,
     selectedTargetInteractionProfile?.voice.voiceAffinity,
+    targetsState.selectedTarget?.id,
     ttsRouteOptions?.selected?.source,
   ]);
 

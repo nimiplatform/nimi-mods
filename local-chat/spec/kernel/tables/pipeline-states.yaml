@@ -2,11 +2,11 @@ version: 1
 session_lifecycle:
   - state: TARGET_SELECTED
     source_rule: LC-PIPE-002
-  - state: SESSION_AUTO_CREATED
+  - state: SOLE_SESSION_RESOLVED
     source_rule: LC-PIPE-002
   - state: SESSION_ACTIVE
     source_rule: LC-PIPE-002
-  - state: SESSION_DELETED
+  - state: THREAD_HISTORY_CLEARED
     source_rule: LC-PIPE-002
 text_turn_chain:
   - step: input-received
@@ -74,14 +74,23 @@ speech_turn_chain:
   - step: speech-input
     order: 1
     source_rule: LC-PIPE-003
-  - step: speech-route-resolve
+  - step: voice-trigger-policy-resolve
     order: 2
     source_rule: LC-PIPE-003
-  - step: speech-stream-or-synthesize
+  - step: voice-session-overlay-resolve
     order: 3
     source_rule: LC-PIPE-003
-  - step: diagnostics-persist
+  - step: voice-availability-derive
     order: 4
+    source_rule: LC-PIPE-003
+  - step: speech-route-resolve
+    order: 5
+    source_rule: LC-PIPE-003
+  - step: speech-stream-or-synthesize
+    order: 6
+    source_rule: LC-PIPE-003
+  - step: diagnostics-persist
+    order: 7
     source_rule: LC-PIPE-004
 proactive_turn_chain:
   - step: heartbeat-tick

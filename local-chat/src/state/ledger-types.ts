@@ -22,7 +22,7 @@ export type LocalChatContextLaneId =
   | 'relationMemory'
   | 'turnMode';
 
-export type VoiceConversationMode = 'off' | 'suggested' | 'on';
+export type VoiceConversationMode = 'off' | 'on';
 
 export type DerivedInteractionProfile = {
   expression: {
@@ -130,6 +130,7 @@ export type InteractionSnapshot = {
   topicThreads: string[];
   lastResolvedTurnId: string | null;
   conversationDirective: string | null;
+  conversationMomentum?: 'accelerating' | 'steady' | 'cooling';
   updatedAt: string;
 };
 
@@ -377,6 +378,14 @@ export type LocalChatContextPacket = {
   turnMode?: LocalChatTurnMode;
   voiceConversationMode?: VoiceConversationMode;
   pacingPlan: LocalChatReplyPacingPlan;
+  perceptionOverlay?: {
+    refinedTurnMode: LocalChatTurnMode;
+    emotionalState: string;
+    emotionalCause: string;
+    suggestedApproach: string;
+    directive: string;
+    intimacyCeiling: string;
+  };
   userInput: string;
   diagnostics: {
     selectedTurnSeqs: number[];

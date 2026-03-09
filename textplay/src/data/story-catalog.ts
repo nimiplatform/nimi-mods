@@ -1,5 +1,11 @@
 import type { HookClient } from '@nimiplatform/sdk/mod/types';
-import type { NarrativeEngineModule } from '../../../narrative-engine/src/index.js';
+import {
+  pickNarrativeRelationContextRow,
+  pickNarrativeStoryContextRow,
+  pickNarrativeSubjectContextRow,
+  resolveNarrativeContextStoryAnchor,
+  type NarrativeEngineModule,
+} from '../../../narrative-engine/src/index.js';
 import {
   TEXTPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY,
   TEXTPLAY_DATA_API_WORLD_EVENTS_LIST,
@@ -31,6 +37,12 @@ import { hashString } from '../utils/hash.js';
 
 const STARTUP_SOURCE = 'textplay:events+scenes+contexts+lorebooks+memory+narrative.turn.latest';
 const ENTITY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{1,}$/;
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
 
 function normalizeKey(value: string): string {
   return value
@@ -499,54 +511,70 @@ async function queryNarrativeLatestTurn(input: {
 function pickContextRow(input: {
   rows: TextplayWorldNarrativeContextRow[];
   scope: 'CANON' | 'STORY' | 'SUBJECT' | 'RELATION';
-  storyId: string;
+  resolvedStoryId: string | null;
   primaryAgentId: string;
   playerId: string;
+  candidateAgentIds?: string[];
 }): TextplayWorldNarrativeContextRow | null {
   const candidates = input.rows.filter((row) => row.scope === input.scope);
   if (candidates.length === 0) {
     return null;
   }
-  const hasExactStoryMatch = (row: TextplayWorldNarrativeContextRow): boolean => toText(row.storyId) === input.storyId;
-  const isStorylessBaseline = (row: TextplayWorldNarrativeContextRow): boolean => !toText(row.storyId);
-  const pickStoryScopedContext = (
-    rows: TextplayWorldNarrativeContextRow[],
-  ): TextplayWorldNarrativeContextRow | null => (
-    rows.find((row) => hasExactStoryMatch(row))
-    || rows.find((row) => isStorylessBaseline(row))
-    || null
-  );
   if (input.scope === 'STORY') {
-    return candidates.find((row) => hasExactStoryMatch(row)) || null;
+    return pickNarrativeStoryContextRow({
+      rows: candidates,
+      resolvedStoryId: input.resolvedStoryId,
+    }) as TextplayWorldNarrativeContextRow | null;
   }
   if (input.scope === 'SUBJECT') {
-    if (!isEntityId(input.primaryAgentId)) {
-      return null;
-    }
-    return pickStoryScopedContext(
-      candidates.filter((row) => toText(row.subjectId) === input.primaryAgentId),
-    );
+    return pickNarrativeSubjectContextRow({
+      rows: candidates,
+      resolvedStoryId: input.resolvedStoryId,
+      primaryAgentId: input.primaryAgentId,
+    }) as TextplayWorldNarrativeContextRow | null;
   }
   if (input.scope === 'RELATION') {
-    if (!isEntityId(input.primaryAgentId) || !isEntityId(input.playerId)) {
-      return null;
-    }
-    return pickStoryScopedContext(
-      candidates.filter((row) => {
-        const subjectId = toText(row.subjectId);
-        const targetSubjectId = toText(row.targetSubjectId);
-        return (
-          (subjectId === input.primaryAgentId && targetSubjectId === input.playerId)
-          || (subjectId === input.playerId && targetSubjectId === input.primaryAgentId)
-        );
-      }),
-    );
+    return pickNarrativeRelationContextRow({
+      rows: candidates,
+      resolvedStoryId: input.resolvedStoryId,
+      primaryAgentId: input.primaryAgentId,
+      playerId: input.playerId,
+      candidateAgentIds: input.candidateAgentIds,
+    }) as TextplayWorldNarrativeContextRow | null;
   }
   return candidates[0] || null;
 }
 
+function collectContextAgentCandidates(input: {
+  detail: TextplayStoryDetail;
+  storyScope: Record<string, unknown>;
+  contexts: TextplayWorldNarrativeContextRow[];
+  primaryAgentId: string;
+  playerId: string;
+}): string[] {
+  const castPolicy = asRecord(input.storyScope.castPolicy) || {};
+  const relationAgentIds = input.contexts
+    .filter((row) => row.scope === 'RELATION')
+    .flatMap((row) => [
+      toText(row.subjectType).toUpperCase() === 'AGENT' ? toText(row.subjectId) : '',
+      toText(row.targetSubjectType).toUpperCase() === 'AGENT' ? toText(row.targetSubjectId) : '',
+    ]);
+  const subjectAgentIds = input.contexts
+    .filter((row) => row.scope === 'SUBJECT' && toText(row.subjectType).toUpperCase() === 'AGENT')
+    .map((row) => toText(row.subjectId));
+  return unique([
+    ...toStringList(castPolicy.mandatorySubjectIds),
+    ...toStringList(castPolicy.optionalSubjectIds),
+    ...input.detail.participants,
+    ...input.detail.characterRefs,
+    ...subjectAgentIds,
+    ...relationAgentIds,
+  ]).filter((candidate) => candidate !== input.primaryAgentId && candidate !== input.playerId);
+}
+
 function resolvePrimaryAgentId(input: {
   detail: TextplayStoryDetail;
+  resolvedStoryId: string | null;
   storyRow: TextplayWorldNarrativeContextRow | null;
   contexts: TextplayWorldNarrativeContextRow[];
   playerId: string;
@@ -563,7 +591,7 @@ function resolvePrimaryAgentId(input: {
   const castPolicy = (storySetting.castPolicy || {}) as Record<string, unknown>;
   const mandatorySubjectIds = toStringList(castPolicy.mandatorySubjectIds);
   const optionalSubjectIds = toStringList(castPolicy.optionalSubjectIds);
-  const exactStoryId = input.detail.storyId;
+  const scopedStoryId = toText(input.resolvedStoryId) || input.detail.storyId;
   const storyParticipantHints = unique([
     ...input.detail.participants,
     ...input.detail.characterRefs,
@@ -575,12 +603,12 @@ function resolvePrimaryAgentId(input: {
   );
 
   const storySubjectAgentIds = input.contexts
-    .filter((row) => row.scope === 'SUBJECT' && toText(row.storyId) === exactStoryId)
+    .filter((row) => row.scope === 'SUBJECT' && toText(row.storyId) === scopedStoryId)
     .filter((row) => toText(row.subjectType).toUpperCase() === 'AGENT')
     .map((row) => toText(row.subjectId));
 
   const storyRelationAgentIds = input.contexts
-    .filter((row) => row.scope === 'RELATION' && toText(row.storyId) === exactStoryId)
+    .filter((row) => row.scope === 'RELATION' && toText(row.storyId) === scopedStoryId)
     .flatMap((row) => [
       toText(row.subjectType).toUpperCase() === 'AGENT' ? toText(row.subjectId) : '',
       toText(row.targetSubjectType).toUpperCase() === 'AGENT' ? toText(row.targetSubjectId) : '',
@@ -693,17 +721,29 @@ export async function loadStoryStartupPackage(input: {
     }),
   ]);
 
+  const contextStoryAnchor = resolveNarrativeContextStoryAnchor({
+    rows: contexts,
+    requestedStoryId: detail.storyId,
+    primaryAgentId: detail.primaryAgentId,
+    participantIds: unique([
+      ...detail.participants,
+      ...detail.characterRefs,
+    ]),
+    locationRefs: detail.locationRefs,
+    entryEventId: detail.entryEventId,
+  });
+
   const canonRow = pickContextRow({
     rows: contexts,
     scope: 'CANON',
-    storyId: detail.storyId,
+    resolvedStoryId: contextStoryAnchor.resolvedStoryId,
     primaryAgentId: detail.primaryAgentId,
     playerId: input.playerId,
   });
   const storyRow = pickContextRow({
     rows: contexts,
     scope: 'STORY',
-    storyId: detail.storyId,
+    resolvedStoryId: contextStoryAnchor.resolvedStoryId,
     primaryAgentId: detail.primaryAgentId,
     playerId: input.playerId,
   });
@@ -714,6 +754,7 @@ export async function loadStoryStartupPackage(input: {
 
   const resolvedPrimaryAgentId = resolvePrimaryAgentId({
     detail,
+    resolvedStoryId: contextStoryAnchor.resolvedStoryId,
     storyRow,
     contexts,
     playerId: input.playerId,
@@ -723,19 +764,27 @@ export async function loadStoryStartupPackage(input: {
     ...storyRow.narrativeSetting,
     ...storyRow.narrativeState,
   } as Record<string, unknown>;
+  const relationCandidateAgentIds = collectContextAgentCandidates({
+    detail,
+    storyScope: storySetting,
+    contexts,
+    primaryAgentId: resolvedPrimaryAgentId,
+    playerId: input.playerId,
+  });
   const subjectRow = pickContextRow({
     rows: contexts,
     scope: 'SUBJECT',
-    storyId: detail.storyId,
+    resolvedStoryId: contextStoryAnchor.resolvedStoryId,
     primaryAgentId: resolvedPrimaryAgentId,
     playerId: input.playerId,
   });
   const relationRow = pickContextRow({
     rows: contexts,
     scope: 'RELATION',
-    storyId: detail.storyId,
+    resolvedStoryId: contextStoryAnchor.resolvedStoryId,
     primaryAgentId: resolvedPrimaryAgentId,
     playerId: input.playerId,
+    candidateAgentIds: relationCandidateAgentIds,
   });
 
   const memoryRecall = await queryMemoryRecall({

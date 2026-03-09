@@ -12,53 +12,9 @@ import { MINTYOU_DATA_API_WORLD_ACCESS_ME, MINTYOU_REASON } from '../contracts.j
 import { emitMintYouLog } from '../logging.js';
 import { createUlid } from '../utils/ulid.js';
 import { getMintYouHookClient } from '../runtime-mod.js';
+import { extractScopeKeyFromWorldAccess } from '../realm-contract.js';
 
 const DEFAULT_SCOPE_KEY = 'anonymous';
-
-function toRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
-}
-
-function toStringOrEmpty(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : '';
-}
-
-function extractUserIdFromRecord(record: Record<string, unknown>): string {
-  const owner = toRecord(record.owner);
-  const user = toRecord(record.user);
-  const candidates = [
-    record.currentUserId,
-    record.userId,
-    record.ownerId,
-    record.accountId,
-    owner.id,
-    owner.userId,
-    user.id,
-    user.userId,
-  ];
-  for (const value of candidates) {
-    const id = toStringOrEmpty(value);
-    if (id) return id;
-  }
-  return '';
-}
-
-function extractScopeKeyFromAccessResponse(response: unknown): string {
-  const root = toRecord(response);
-  const topLevel = extractUserIdFromRecord(root);
-  if (topLevel) return topLevel;
-
-  const itemsRaw = Array.isArray(root.items)
-    ? root.items
-    : (Array.isArray(root.data) ? root.data : (Array.isArray(response) ? response : []));
-
-  for (const item of itemsRaw) {
-    const id = extractUserIdFromRecord(toRecord(item));
-    if (id) return id;
-  }
-
-  return '';
-}
 
 function tryGetHookClient(): HookClient | null {
   try {
@@ -80,7 +36,7 @@ export function useMintYouSession() {
         capability: MINTYOU_DATA_API_WORLD_ACCESS_ME,
         query: {},
       });
-      const userId = extractScopeKeyFromAccessResponse(response);
+      const userId = extractScopeKeyFromWorldAccess(response);
       return userId || DEFAULT_SCOPE_KEY;
     } catch {
       return DEFAULT_SCOPE_KEY;

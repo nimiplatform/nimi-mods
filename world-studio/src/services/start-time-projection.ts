@@ -1,5 +1,9 @@
 import { asRecord } from '@nimiplatform/sdk/mod/utils';
 import type { EventNodeDraft, Phase1Option } from '../contracts.js';
+import {
+  deriveNeedsEvidence,
+  normalizeEventHorizon,
+} from './event-horizon.js';
 import { computeTemporalOrder, parseStartTimeEventOptionId } from './temporal-order.js';
 
 export const START_TIME_PROJECTED_FUTURE_EVENT_KIND = 'world-studio.start-time.future-event';
@@ -119,9 +123,14 @@ function pickPreferredEvent(current: EventNodeDraft, candidate: EventNodeDraft):
 function normalizeEventNode(value: unknown, fallbackLevel: 'PRIMARY' | 'SECONDARY'): EventNodeDraft | null {
   if (!value || typeof value !== 'object') return null;
   const record = asRecord(value);
+  const projectionKind = safeString(record.projectionKind);
+  const isProjectedFutureEvent = projectionKind === START_TIME_PROJECTED_FUTURE_EVENT_KIND;
   const level = String(record.level || fallbackLevel).toUpperCase() === 'SECONDARY'
     ? 'SECONDARY'
     : 'PRIMARY';
+  const eventHorizon = isProjectedFutureEvent
+    ? normalizeEventHorizon(record.projectionOriginalEventHorizon, 'PAST')
+    : normalizeEventHorizon(record.eventHorizon, 'PAST');
   const fallbackId = `${fallbackLevel.toLowerCase()}:${normalizeKey(record.title || record.timeRef || 'event') || 'event'}`;
   const temporalBeforeEventIds = safeStringArray(record.temporalBeforeEventIds || record.beforeEventIds);
   const temporalAfterEventIds = safeStringArray(record.temporalAfterEventIds || record.afterEventIds);
@@ -130,10 +139,26 @@ function normalizeEventNode(value: unknown, fallbackLevel: 'PRIMARY' | 'SECONDAR
     ...temporalBeforeEventIds,
   ]));
   const temporalConfidence = Number(record.temporalConfidence);
+  const evidenceRefs = Array.isArray(record.evidenceRefs)
+    ? record.evidenceRefs
+      .filter((item) => item && typeof item === 'object')
+      .map((item) => {
+        const evidence = asRecord(item);
+        return {
+          segmentId: safeString(evidence.segmentId),
+          offsetStart: Number.isFinite(Number(evidence.offsetStart)) ? Number(evidence.offsetStart) : 0,
+          offsetEnd: Number.isFinite(Number(evidence.offsetEnd)) ? Number(evidence.offsetEnd) : 0,
+          excerpt: safeString(evidence.excerpt),
+          confidence: Number.isFinite(Number(evidence.confidence)) ? Number(evidence.confidence) : 0.5,
+          sourceType: 'chunk' as const,
+        };
+      })
+    : [];
 
   return {
     id: safeString(record.id) || fallbackId,
     level,
+    eventHorizon,
     parentEventId: safeString(record.parentEventId) || null,
     title: safeString(record.title) || 'Untitled Event',
     summary: safeString(record.summary),
@@ -149,31 +174,29 @@ function normalizeEventNode(value: unknown, fallbackLevel: 'PRIMARY' | 'SECONDAR
     ...(Number.isFinite(temporalConfidence)
       ? { temporalConfidence: Math.max(0, Math.min(1, temporalConfidence)) }
       : {}),
-    evidenceRefs: Array.isArray(record.evidenceRefs)
-      ? record.evidenceRefs
-        .filter((item) => item && typeof item === 'object')
-        .map((item) => {
-          const evidence = asRecord(item);
-          return {
-            segmentId: safeString(evidence.segmentId),
-            offsetStart: Number.isFinite(Number(evidence.offsetStart)) ? Number(evidence.offsetStart) : 0,
-            offsetEnd: Number.isFinite(Number(evidence.offsetEnd)) ? Number(evidence.offsetEnd) : 0,
-            excerpt: safeString(evidence.excerpt),
-            confidence: Number.isFinite(Number(evidence.confidence)) ? Number(evidence.confidence) : 0.5,
-            sourceType: 'chunk' as const,
-          };
-        })
-      : [],
+    evidenceRefs,
     confidence: Number.isFinite(Number(record.confidence)) ? Number(record.confidence) : 0.5,
-    needsEvidence: Boolean(record.needsEvidence),
+    needsEvidence: deriveNeedsEvidence({
+      level,
+      eventHorizon,
+      evidenceRefs,
+      needsEvidence: record.needsEvidence,
+    }),
   };
 }
 
 function asProjectedFutureEventRecord(event: EventNodeDraft, selectedStartTimeId: string): Record<string, unknown> {
+  const projectionOriginalEventHorizon = normalizeEventHorizon(event.eventHorizon, 'PAST');
   return {
     ...event,
+    eventHorizon: 'FUTURE',
+    needsEvidence: deriveNeedsEvidence({
+      ...event,
+      eventHorizon: 'FUTURE',
+    }),
     projectionKind: START_TIME_PROJECTED_FUTURE_EVENT_KIND,
     projectionSelectedStartTimeId: selectedStartTimeId,
+    projectionOriginalEventHorizon,
   };
 }
 

@@ -11,6 +11,10 @@ import type {
 import { buildRepairPrompt, parseJsonRecord, summarizeModelError } from './json-repair.js';
 import { isSyntheticEntityName } from './errors.js';
 import { emitWorldStudioLog } from '../logging.js';
+import {
+  deriveNeedsEvidence,
+  normalizeEventHorizon,
+} from '../services/event-horizon.js';
 
 function diagLog(message: string, details?: Record<string, unknown>) {
   try {
@@ -57,6 +61,7 @@ function normalizeEvent(value: unknown, level: 'PRIMARY' | 'SECONDARY', index: n
   const normalizedLevel = String(record.level || level).trim().toUpperCase() === 'SECONDARY'
     ? 'SECONDARY'
     : 'PRIMARY';
+  const eventHorizon = normalizeEventHorizon(record.eventHorizon, 'PAST');
   const temporalBeforeEventIds = toStringArray(record.temporalBeforeEventIds || record.beforeEventIds);
   const temporalAfterEventIds = toStringArray(record.temporalAfterEventIds || record.afterEventIds);
   const dependsOnEventIds = Array.from(new Set([
@@ -67,6 +72,7 @@ function normalizeEvent(value: unknown, level: 'PRIMARY' | 'SECONDARY', index: n
   return {
     id: String(record.id || `${normalizedLevel.toLowerCase()}-${index + 1}`),
     level: normalizedLevel,
+    eventHorizon,
     parentEventId: String(record.parentEventId || '').trim() || null,
     title: String(record.title || record.name || `Event ${index + 1}`).trim(),
     summary: String(record.summary || record.description || '').trim(),
@@ -82,7 +88,12 @@ function normalizeEvent(value: unknown, level: 'PRIMARY' | 'SECONDARY', index: n
     ...(Number.isFinite(temporalConfidence) ? { temporalConfidence: clamp01(temporalConfidence, 0.6) } : {}),
     evidenceRefs,
     confidence: clamp01(record.confidence, 0.6),
-    needsEvidence: normalizedLevel === 'PRIMARY' ? evidenceRefs.length === 0 : false,
+    needsEvidence: deriveNeedsEvidence({
+      level: normalizedLevel,
+      eventHorizon,
+      evidenceRefs,
+      needsEvidence: record.needsEvidence,
+    }),
   };
 }
 
@@ -329,7 +340,7 @@ function buildFinePrompt(input: {
 }): string {
   const focusTargets: string[] = [];
   if (!input.seed || input.seed.events.primary.length === 0) {
-    focusTargets.push('PRIMARY events with explicit cause/process/result and evidenceRefs.');
+    focusTargets.push('PRIMARY events with explicit cause/process/result, explicit eventHorizon, and evidenceRefs when non-FUTURE.');
   }
   if (!input.seed || input.seed.events.secondary.length === 0) {
     focusTargets.push('SECONDARY events linked to PRIMARY via parentEventId.');
@@ -360,6 +371,7 @@ function buildFinePrompt(input: {
     '- dependsOnEventIds should encode temporal prerequisites (events that happen earlier).',
     '- beforeEventIds means event IDs that happen BEFORE current event (same direction as dependsOnEventIds).',
     '- afterEventIds means event IDs that happen AFTER current event.',
+    '- extraction.events.*[].eventHorizon must be one of PAST, ONGOING, FUTURE.',
     '',
     'Top-level schema:',
     '{',
@@ -368,7 +380,7 @@ function buildFinePrompt(input: {
     '}',
     '',
     'Extraction event item schema:',
-    '{"id":"...","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":[],"characterRefs":[],"dependsOnEventIds":[],"beforeEventIds":[],"afterEventIds":[],"temporalConfidence":0.0,"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}',
+    '{"id":"...","eventHorizon":"PAST","title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":[],"characterRefs":[],"dependsOnEventIds":[],"beforeEventIds":[],"afterEventIds":[],"temporalConfidence":0.0,"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"chunk"}],"confidence":0.0}',
     '',
     'Agent draft patch schema (partial allowed):',
     '{"characterName":"...","handle":"","concept":"","backstory":"","coreValues":"","relationshipStyle":"","description":"","scenario":"","greeting":"","exampleDialogue":"","systemPromptBase":"","rules":{"format":"rule-lines-v1","lines":[],"text":""},"postHistoryInstructions":"","alternateGreetings":[],"agentLorebooks":[],"dna":{}}',

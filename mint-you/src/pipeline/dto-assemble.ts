@@ -118,8 +118,11 @@ export function assembleCreateAgentDto(input: {
     scenario: dnaSynthesis.scenario,
     agentLorebooks: [...HARDCODED_AGENT.agentLorebooks],
     alternateGreetings: [...HARDCODED_AGENT.alternateGreetings],
-    postHistoryInstructions: HARDCODED_AGENT.postHistoryInstructions,
   };
+
+  if (HARDCODED_AGENT.postHistoryInstructions) {
+    dto.postHistoryInstructions = HARDCODED_AGENT.postHistoryInstructions;
+  }
 
   // Only include referenceImageUrl if it's a persistent URL (not blob: or data:).
   // Local previews use data: URLs which are not valid for server-side storage.

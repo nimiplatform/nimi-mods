@@ -237,7 +237,7 @@ export const mediaDecisionRegressionCases = [
     nsfwPolicy: 'local-only',
     expected: {
       kind: 'none',
-      plannerBlockedReason: '已拦截本次图片发送：NSFW 仅允许本地路由。请切到“本地”后重试。',
+      plannerBlockedReason: '已拦截本次图片发送：当前内容风格仅支持本地生成，请切到“本地”后重试。',
     },
   },
 ];

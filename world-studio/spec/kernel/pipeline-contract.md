@@ -24,7 +24,8 @@ Phase1 supports full rerun and failed-subset rerun with logical chunk index mapp
 
 ## WS-PIPE-005 Phase2 Preconditions
 
-Phase2 requires valid start-time projection, non-empty selected characters, and non-block quality gate.
+Phase2 requires valid start-time projection, non-empty selected characters, non-empty primary events, and non-block quality gate.
+The evidence gate applies only to `PRIMARY` events whose `eventHorizon != FUTURE`.
 
 ## WS-PIPE-006 Maintain Operations
 

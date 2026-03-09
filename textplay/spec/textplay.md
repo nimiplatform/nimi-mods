@@ -41,7 +41,7 @@
 - `TXT-024`: Runtime binding uses single primary agent id for turn execution and keeps other participants as context-only metadata.
 - `TXT-025`: Story startup package must include `startupPolicy` and snapshot `contextCoverage/gapWarnings` diagnostics.
 - `TXT-026`: Frontend auto tick may trigger `AgentInitiative` only when presence/cooldown/maxConsecutive policies are satisfied.
-- `TXT-027`: Missing `CANON/STORY` context is fail-close; missing `SUBJECT/RELATION/scene` is degraded with warnings. `SUBJECT/RELATION` lookup may use exact-story match or storyless baseline only; cross-story fallback is forbidden.
+- `TXT-027`: Missing `CANON/STORY` context is fail-close; missing `SUBJECT/RELATION/scene` is degraded with warnings. `SUBJECT/RELATION` lookup may use exact-story match, resolved stable non-event story anchor, or storyless baseline only; cross-story fallback is forbidden.
 - `TXT-028`: Story selection is world-scoped and requires selecting account world first.
 - `TXT-029`: Fresh story requires explicit Start action that triggers one opening `SystemEvent` render before player input is accepted; fresh entry starts from the selected target event's pre-threshold rather than treating canonical event details as already happened opening facts.
 - `TXT-030`: Left context panel must be independently scrollable to preserve access to session controls on small viewports.

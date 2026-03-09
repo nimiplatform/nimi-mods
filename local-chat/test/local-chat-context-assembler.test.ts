@@ -122,6 +122,15 @@ test('context assembler derives interaction profile, pacing plan, and prompt lan
       value: 'short-beats',
       confidence: 0.94,
       updatedAt: '2026-03-07T10:01:00.000Z',
+    }, {
+      id: 'slot-2',
+      targetId: target.id,
+      viewerId: 'viewer.test',
+      slotType: 'rapport',
+      key: 'comfort-style',
+      value: '用户累的时候先轻声接住，再慢慢展开',
+      confidence: 0.81,
+      updatedAt: '2026-03-08T08:30:00.000Z',
     }],
   });
   await replaceLocalChatRecallIndex({
@@ -152,7 +161,7 @@ test('context assembler derives interaction profile, pacing plan, and prompt lan
 
   assert.equal(packet.target.interactionProfile.expression.firstBeatStyle, 'gentle');
   assert.equal(packet.interactionSnapshot?.relationshipState, 'warm');
-  assert.equal(packet.relationMemorySlots?.[0]?.key, 'preferred-rhythm');
+  assert.equal(packet.relationMemorySlots?.[0]?.key, 'comfort-style');
   assert.equal(packet.sessionRecall[0]?.text, '用户期待和助手一起看烟花。');
   assert.equal(packet.pacingPlan.mode, 'answer-followup');
   assert.ok(compiled.layerOrder.includes('interactionProfile'));

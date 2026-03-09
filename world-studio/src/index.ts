@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import { registerModTranslations } from '@nimiplatform/sdk/mod/i18n';
 import { type RuntimeModRegistration } from '@nimiplatform/sdk/mod/types';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
+import { createModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import enLocale from './locales/en.js';
 import zhLocale from './locales/zh.js';
 import {
@@ -14,6 +15,10 @@ import {
 import { WORLD_STUDIO_MANIFEST } from './manifest.js';
 import { createWorldStudioFlowId, emitWorldStudioLog } from './logging.js';
 import { worldStudioMessage } from './i18n/messages.js';
+import {
+  getWorldStudioRuntimeClient,
+  initializeWorldStudioRuntimeClient,
+} from './runtime-mod.js';
 
 registerModTranslations('world-studio', 'en', enLocale as Record<string, unknown>);
 registerModTranslations('world-studio', 'zh', zhLocale as Record<string, unknown>);
@@ -27,6 +32,7 @@ const LazyWorldStudioPage = React.lazy(async () => {
 
 export * from './contracts.js';
 export * from './data.js';
+export { getWorldStudioRuntimeClient } from './runtime-mod.js';
 export {
   runPhase1Extraction,
   runPhase1ExtractionFromChunks,
@@ -40,6 +46,8 @@ export function createWorldStudioRuntimeMod(): RuntimeModRegistration {
     isDefaultPrivateExecution: false,
     setup: async ({ sdkRuntimeContext }) => {
       const hookClient = createHookClient(WORLD_STUDIO_MOD_ID, sdkRuntimeContext);
+      const runtimeClient = createModRuntimeClient(WORLD_STUDIO_MOD_ID, sdkRuntimeContext);
+      initializeWorldStudioRuntimeClient(runtimeClient);
       const flowId = createWorldStudioFlowId('world-studio-setup');
       const startedAt = performance.now();
 

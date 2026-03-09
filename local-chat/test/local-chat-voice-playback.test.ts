@@ -273,3 +273,37 @@ test('gender guard biases automatic voice selection when no manual voice is pinn
     'onyx',
   );
 });
+
+test('stable voice is preferred ahead of profile fallback when it remains available', () => {
+  assert.equal(
+    resolveSupportedVoiceId({
+      stableVoiceId: 'serena',
+      preferredVoiceId: 'onyx',
+      availableVoiceIds: ['serena', 'onyx', 'alloy'],
+      availableVoices: [
+        { id: 'serena', name: 'Serena Female' },
+        { id: 'onyx', name: 'Onyx Male' },
+        { id: 'alloy', name: 'Alloy Neutral' },
+      ],
+      genderGuard: 'female',
+      voiceAffinity: 'high',
+    }),
+    'serena',
+  );
+});
+
+test('known mismatched voices are filtered when gender guard is set', () => {
+  assert.equal(
+    resolveSupportedVoiceId({
+      availableVoiceIds: ['arthur', 'serena', 'alloy'],
+      availableVoices: [
+        { id: 'arthur', name: 'Arthur Male' },
+        { id: 'serena', name: 'Serena Female' },
+        { id: 'alloy', name: 'Alloy Neutral' },
+      ],
+      genderGuard: 'female',
+      voiceAffinity: 'high',
+    }),
+    'serena',
+  );
+});

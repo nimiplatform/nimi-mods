@@ -92,6 +92,7 @@ export function useLocalChatPageController(): LocalChatShellProps {
     memorySyncStatus: state.memorySyncStatus,
     onToggleProductSetting: actions.handleDefaultSettingChange,
     onDefaultMediaAutonomyChange: actions.handleMediaAutonomyChange,
+    onDefaultVoiceAutonomyChange: actions.handleVoiceAutonomyChange,
     onDefaultVoiceConversationModeChange: actions.handleVoiceConversationModeChange,
     onVisualComfortLevelChange: actions.handleVisualComfortLevelChange,
     onMemoryOverrideChange,

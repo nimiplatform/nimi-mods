@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Phase1Result } from '../../generation/pipeline.js';
 import type { EventNodeDraft } from '../../contracts.js';
+import { countPrimaryEventsMissingEvidence } from '../../services/event-horizon.js';
 import { EventGraphEditor } from './event-graph-editor.js';
 
 type CheckpointsPanelProps = {
@@ -35,7 +36,7 @@ export function CheckpointsPanel(props: CheckpointsPanelProps) {
     );
   }
 
-  const primaryMissingEvidence = props.events.primary.filter((item) => item.evidenceRefs.length === 0).length;
+  const primaryMissingEvidence = countPrimaryEventsMissingEvidence(props.events.primary);
   const canRunSynthesize = !props.working
     && Boolean(props.selectedStartTimeId)
     && props.selectedCharacters.length > 0
@@ -105,7 +106,7 @@ export function CheckpointsPanel(props: CheckpointsPanelProps) {
           <div>
             <h3 className="text-sm font-semibold text-gray-900">Run Synthesis</h3>
             <p className="mt-1 text-xs text-gray-600">
-              Requires a start time, selected characters, and complete primary evidence.
+              Requires a start time, selected characters, and complete non-future primary evidence.
             </p>
           </div>
           <button

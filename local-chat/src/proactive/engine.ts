@@ -116,7 +116,7 @@ function bindMediaDecisionToDelivery(
 function buildPreparedDeliveries(input: {
   planId: string;
   turnMode: 'checkin' | 'information' | 'emotional' | 'playful' | 'intimate' | 'explicit-media' | 'explicit-voice';
-  voiceConversationMode: 'off' | 'suggested' | 'on';
+  voiceConversationMode: 'off' | 'on';
   beats: OrchestratedBeat[];
 }): PreparedAssistantDelivery[] {
   return input.beats.map((beat, index) => ({
@@ -233,7 +233,6 @@ export async function runLocalChatProactiveHeartbeatCycle(
       const turnMode = resolveTurnMode({
         userText: '',
         interactionProfile,
-        voiceConversationMode,
         proactive: true,
       });
       const prepared = await buildTurnRequestInput({
@@ -274,14 +273,13 @@ export async function runLocalChatProactiveHeartbeatCycle(
           beatCount: list.length,
         })),
       };
-      const orchestratedBeats = orchestrateBeatModalities({
-        beats: lockedPlan.beats,
-        turnMode,
-        interactionProfile: prepared.contextPacket.target.interactionProfile,
-        snapshot: prepared.contextPacket.interactionSnapshot || null,
-        policy: resolvedExperiencePolicy,
-        voiceConversationMode: effectiveVoiceConversationMode,
-      });
+    const orchestratedBeats = orchestrateBeatModalities({
+      beats: lockedPlan.beats,
+      turnMode,
+      interactionProfile: prepared.contextPacket.target.interactionProfile,
+      snapshot: prepared.contextPacket.interactionSnapshot || null,
+      policy: resolvedExperiencePolicy,
+    });
       const deliveries = buildPreparedDeliveries({
         planId: lockedPlan.planId,
         turnMode,
@@ -300,7 +298,9 @@ export async function runLocalChatProactiveHeartbeatCycle(
           cancellationScope: 'turn',
         }],
       });
-      const firstMarkedBeat = deliveries.find((delivery) => delivery.beat.assetRequest)?.beat || null;
+      const firstMarkedBeat = turnMode === 'explicit-media'
+        ? deliveries.find((delivery) => delivery.beat.assetRequest)?.beat || null
+        : null;
       const markerOverrideIntent = firstMarkedBeat
         ? toMarkerOverrideIntent({ beat: firstMarkedBeat, planId: lockedPlan.planId })
         : null;

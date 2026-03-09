@@ -10,15 +10,13 @@ test('nsfw policy keeps cloud on safe boundary by default', () => {
   assert.equal(
     evaluateNsfwMediaPolicy({
       routeSource: 'local',
-      relationshipBoundaryPreset: 'balanced',
-      visualComfortLevel: 'soft-visuals',
+      visualComfortLevel: 'restrained-visuals',
     }),
     'disabled',
   );
   assert.equal(
     evaluateNsfwMediaPolicy({
       routeSource: 'cloud',
-      relationshipBoundaryPreset: 'close',
       visualComfortLevel: 'natural-visuals',
     }),
     'local-only',
@@ -29,18 +27,16 @@ test('nsfw policy is local-only on cloud even for close natural visuals', () => 
   assert.equal(
     evaluateNsfwMediaPolicy({
       routeSource: 'cloud',
-      relationshipBoundaryPreset: 'close',
       visualComfortLevel: 'natural-visuals',
     }),
     'local-only',
   );
 });
 
-test('nsfw policy is allowed only for local runtime with close natural visuals', () => {
+test('nsfw policy is allowed for local runtime with natural visuals', () => {
   assert.equal(
     evaluateNsfwMediaPolicy({
       routeSource: 'local',
-      relationshipBoundaryPreset: 'close',
       visualComfortLevel: 'natural-visuals',
     }),
     'allowed',

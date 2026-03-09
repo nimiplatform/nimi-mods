@@ -21,21 +21,24 @@
 
 ## 2. Domain Increments
 
-- `LC-DOM-010`: Session entry uses target-scoped sessions and supports create/switch/delete.
+- `LC-DOM-010`: Each viewer-target relation owns one recoverable session thread; entry auto-creates or reuses that sole session, and Local-Chat does not expose multi-session create/switch/delete UX.
 - `LC-DOM-011`: Prompt and route resolution are controller-layer concerns, not view-layer logic.
 - `LC-DOM-012`: TTS route source is explicit (`local|cloud|auto`).
 - `LC-DOM-013`: Agent voice style prompt is auto-locked and not user-editable.
 - `LC-DOM-014`: `allowProactiveContact` is opt-in and driven by heartbeat scheduling.
 - `LC-DOM-015`: Proactive heartbeat policy emits deterministic reason codes for gate/audit outcomes.
 - `LC-DOM-016`: Core social/world/memory read dependencies are explicit capability declarations.
-- `LC-DOM-017`: `enableVoice=false` is strict-off; Local-Chat MUST NOT synthesize speech, transcribe audio, or query preset voices while disabled.
+- `LC-DOM-017`: Derived voice availability is strict-off only when `voiceAutonomy=off` and `voiceConversationMode=off`; in that state Local-Chat MUST NOT synthesize speech, transcribe audio, or query preset voices.
 - `LC-DOM-018`: Voice catalog resolution is binding-and-model scoped; Local-Chat MUST NOT maintain a second provider-level voice truth.
 - `LC-DOM-019`: TTS playback accepts either artifact `uri` or bytes-backed audio payload; bytes-only success is not a playback failure.
 - `LC-DOM-023`: Mod-facing dependency snapshots consumed by Local-Chat MUST expose runtime canonical capability tokens, not legacy short aliases.
 - `LC-DOM-024`: `interactionProfile` is derived locally from `agentProfile.dna + agentMetadata + world/worldview`; Local-Chat MUST NOT require a closed-source realm projection for this layer.
 - `LC-DOM-025`: User-facing assistant delivery is beat-first: first beat lands as a finalized message, later beats are scheduled by delivery director, and streaming placeholders are fallback-only.
-- `LC-DOM-026`: `voiceConversationMode` is session-scoped; `enableVoice` is a capability gate, not a guarantee that every reply becomes voice.
-- `LC-DOM-027`: Image/video/voice are natural response modalities selected by orchestration policy, not fixed output modes driven only by settings toggles.
+- `LC-DOM-026`: `voiceAutonomy` and `mediaAutonomy` are the user-facing trigger policies, both using `off | explicit-only | natural` semantics.
+- `LC-DOM-027`: `voiceConversationMode` is a session-scoped on/off overlay for pure voice conversation; when enabled, subsequent non-explicit-media replies stay in voice until disabled.
+- `LC-DOM-028`: `enableVoice` is an internal derived gate computed from `voiceAutonomy + voiceConversationMode`; it is not a persisted product setting and does not guarantee that every reply becomes voice.
+- `LC-DOM-029`: Visual content style is expressed as `restrained | natural` user language; NSFW allowance derives from route source plus visual style, not from a direct NSFW toggle.
+- `LC-DOM-030`: `deliveryStyle` and `relationshipBoundaryPreset` are internal strategy inputs owned by agent/persona and interaction state; they are not product settings exposed to the user.
 
 ## 3. No Over-Design Guard
 

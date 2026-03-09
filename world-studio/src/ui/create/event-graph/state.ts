@@ -1,4 +1,9 @@
 import type { EventNodeDraft } from '../../../contracts.js';
+import {
+  deriveNeedsEvidence,
+  isEvidenceRequiredForEvent,
+  normalizeEventHorizon,
+} from '../../../services/event-horizon.js';
 
 export function makeEventId(prefix: 'primary' | 'secondary'): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -13,18 +18,20 @@ export function toValidation(event: EventNodeDraft) {
   return {
     titleComplete: event.title.trim().length > 0,
     timeRefComplete: event.timeRef.trim().length > 0,
-    evidenceComplete: event.level === 'SECONDARY' || event.evidenceRefs.length > 0,
+    evidenceComplete: !isEvidenceRequiredForEvent(event) || event.evidenceRefs.length > 0,
   };
 }
 
 export function normalizeEvent(value: Partial<EventNodeDraft>, fallbackLevel: 'PRIMARY' | 'SECONDARY'): EventNodeDraft {
   const level = value.level === 'SECONDARY' ? 'SECONDARY' : fallbackLevel;
   const evidenceRefs = Array.isArray(value.evidenceRefs) ? value.evidenceRefs : [];
+  const eventHorizon = normalizeEventHorizon(value.eventHorizon, 'PAST');
   const temporalBeforeEventIds = toStringList(value.temporalBeforeEventIds);
   const temporalAfterEventIds = toStringList(value.temporalAfterEventIds);
   const base: EventNodeDraft = {
     id: String(value.id || makeEventId(level === 'PRIMARY' ? 'primary' : 'secondary')),
     level,
+    eventHorizon,
     parentEventId: typeof value.parentEventId === 'string' && value.parentEventId.trim()
       ? value.parentEventId
       : null,
@@ -53,7 +60,12 @@ export function normalizeEvent(value: Partial<EventNodeDraft>, fallbackLevel: 'P
       sourceType: item.sourceType === 'file' || item.sourceType === 'text' ? item.sourceType : 'chunk',
     })),
     confidence: Number.isFinite(Number(value.confidence)) ? Number(value.confidence) : 0.5,
-    needsEvidence: Boolean(value.needsEvidence) || (level === 'PRIMARY' && evidenceRefs.length === 0),
+    needsEvidence: deriveNeedsEvidence({
+      level,
+      eventHorizon,
+      evidenceRefs,
+      needsEvidence: value.needsEvidence,
+    }),
     editableCause: String(value.editableCause || value.cause || ''),
     editableProcess: String(value.editableProcess || value.process || ''),
     editableResult: String(value.editableResult || value.result || ''),

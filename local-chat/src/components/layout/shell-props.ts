@@ -47,8 +47,9 @@ export type LocalChatShellProps = {
   activeInteractionSnapshot: InteractionSnapshot | null;
   activeRelationMemorySlots: RelationMemorySlot[];
   memorySyncStatus: MemorySyncStatus;
-  onToggleProductSetting: (key: 'enableVoice' | 'allowProactiveContact' | 'autoPlayVoiceReplies', value: boolean) => void;
+  onToggleProductSetting: (key: 'allowProactiveContact' | 'autoPlayVoiceReplies', value: boolean) => void;
   onDefaultMediaAutonomyChange: (value: LocalChatProductSettings['mediaAutonomy']) => void;
+  onDefaultVoiceAutonomyChange: (value: LocalChatProductSettings['voiceAutonomy']) => void;
   onDefaultVoiceConversationModeChange: (value: VoiceConversationMode) => void;
   onVisualComfortLevelChange: (value: LocalChatProductSettings['visualComfortLevel']) => void;
   onMemoryOverrideChange: (slotId: string, override: RelationMemorySlot['userOverride']) => void;

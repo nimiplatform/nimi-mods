@@ -7,7 +7,7 @@
 version: 1
 cases:
   - id: LC-001-SESSION-FIRST-CREATE
-    description: First enter on target auto-creates default session.
+    description: First enter on target auto-creates the sole target-viewer session.
     expected_ok: true
     reason_code: null
     source_rule: LC-ACC-002
@@ -27,7 +27,7 @@ cases:
     reason_code: LOCAL_CHAT_TTS_FAILED
     source_rule: LC-ACC-002
   - id: LC-005-SESSION-DELETE-RECOVER
-    description: Deleting active session recovers to latest remaining session or auto-creates one.
+    description: Re-entering target or clearing history keeps the target-viewer pair bound to one recoverable session.
     expected_ok: true
     reason_code: null
     source_rule: LC-ACC-002
@@ -74,7 +74,7 @@ cases:
     test_reference: local-chat-media-delivery-lifecycle.test.mjs
     source_rule: LC-ACC-002
   - id: LC-013-MEDIA-GENERATION-SOFT-CANCEL
-    description: Switching session/context discards in-flight media result without polluting active session.
+    description: Thread/context change discards in-flight media result without polluting the active thread.
     expected_ok: true
     reason_code: LOCAL_CHAT_MEDIA_SOFT_CANCELLED
     test_reference: local-chat-media-soft-cancel.test.mjs
@@ -138,11 +138,11 @@ cases:
     reason_code: null
     test_reference: local-chat-interaction-regression.test.ts
     source_rule: LC-ACC-002
-  - id: LC-024-VOICE-DEFAULT-AUTOPRIME-GUARD
-    description: Voice default auto-prime applies only to untouched fresh settings and never overrides stored explicit voice-off preference.
+  - id: LC-024-VOICE-AVAILABILITY-DERIVATION
+    description: Derived voice availability is strict-off only when both voice trigger and voice session are off, and pure voice session can re-enable voice even if trigger policy stays off.
     expected_ok: true
     reason_code: null
-    test_reference: local-chat-voice-defaults-policy.test.ts
+    test_reference: local-chat-voice-settings-derivation.test.ts
     source_rule: LC-ACC-002
   - id: LC-025-MULTI-TURN-CONTINUITY-PERSISTENCE
     description: Multi-turn send-flow preserves preference/promise continuity through later neutral turns and feeds it back into next-turn context assembly.
@@ -161,6 +161,24 @@ cases:
     expected_ok: true
     reason_code: LOCAL_CHAT_PROACTIVE_ALLOWED
     test_reference: local-chat-proactive-heartbeat.e2e.test.ts
+    source_rule: LC-ACC-002
+  - id: LC-028-TRIGGER-POLICY-SYMMETRY
+    description: Voice and visual trigger policies both use the same off/explicit-only/natural semantics at the product setting layer.
+    expected_ok: true
+    reason_code: null
+    test_reference: local-chat-resolved-experience-policy.test.ts
+    source_rule: LC-ACC-002
+  - id: LC-029-VOICE-SESSION-PRESERVES-EXPLICIT-MEDIA
+    description: Pure voice session mode keeps explicit media requests on image/video delivery instead of hijacking them into voice-only output.
+    expected_ok: true
+    reason_code: null
+    test_reference: local-chat-media-trigger-planner.e2e.test.ts
+    source_rule: LC-ACC-002
+  - id: LC-030-VISUAL-COMFORT-NSFW-BOUNDARY
+    description: Restrained visual style disables NSFW generation, while natural visual style may allow it only on local routes and downgrades to local-only on cloud routes.
+    expected_ok: true
+    reason_code: LOCAL_CHAT_NSFW_POLICY_GUARDRAIL_OK
+    test_reference: local-chat-nsfw-policy.test.mjs
     source_rule: LC-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:local-chat-kernel-docs

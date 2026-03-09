@@ -5,6 +5,7 @@
 ## WS-QG-001 Quality Metrics Schema
 
 Quality gate computes deterministic extraction metrics from event graph and chunk outcomes.
+Primary evidence coverage is scoped to `PRIMARY` events whose `eventHorizon != FUTURE`.
 
 ## WS-QG-002 Threshold Policy
 

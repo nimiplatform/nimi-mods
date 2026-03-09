@@ -12,7 +12,7 @@ export const MINTYOU_MANIFEST = {
   id: MINTYOU_MOD_ID,
   name: 'Mint-You',
   version: '1.0.0',
-  description: 'Personality-driven social persona agent creator with conversational AI interview',
+  description: 'Conversational social persona agent creator for OASIS-bound master-owned agents',
   icon: 'mint-you',
   author: { name: 'Nimi', url: 'https://nimi.xyz' },
   license: 'MIT',

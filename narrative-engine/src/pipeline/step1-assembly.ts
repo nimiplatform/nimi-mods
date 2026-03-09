@@ -1,4 +1,10 @@
 import { asRecord } from '@nimiplatform/sdk/mod/utils';
+import {
+  pickNarrativeRelationContextRow,
+  pickNarrativeStoryContextRow,
+  pickNarrativeSubjectContextRow,
+  resolveNarrativeContextStoryAnchor,
+} from '../context-anchor.js';
 import { NARRATIVE_REASON_CODES } from '../contracts.js';
 import { NarrativeContextSnapshotSchema } from '../schemas.js';
 import type {
@@ -280,6 +286,7 @@ function pickLatestScopeRow(input: {
 function resolveNarrativeScopes(input: {
   rows: Array<Record<string, unknown>>;
   turn: NarrativeTurnInputNormalized;
+  worldEvents: Array<Record<string, unknown>>;
 }): {
   scopes: NarrativeContextScopes;
   coverage: NarrativeContextSnapshot['contextCoverage'];
@@ -288,45 +295,45 @@ function resolveNarrativeScopes(input: {
     rows: input.rows,
     scope: 'CANON',
   });
-  const storyExact = pickLatestScopeRow({
+  const entryEventId = extractStoryEntryEventId(input.turn.storyId);
+  const anchorResolution = resolveNarrativeContextStoryAnchor({
     rows: input.rows,
-    scope: 'STORY',
-    score: (row) => (toString(row.storyId) === input.turn.storyId ? 1 : -1),
-    minimumScore: 1,
+    requestedStoryId: input.turn.storyId,
+    primaryAgentId: input.turn.agentId,
+    participantIds: uniqueStrings(input.worldEvents.flatMap((event) => toStringArray(event.characterRefs))),
+    locationRefs: uniqueStrings(input.worldEvents.flatMap((event) => toStringArray(event.locationRefs))),
+    entryEventId,
   });
-  const storyFallback = storyExact
-    ? null
-    : pickLatestScopeRow({
-      rows: input.rows,
-      scope: 'STORY',
-    });
-  const story = storyExact || storyFallback;
-  const subject = pickLatestScopeRow({
+  const story = pickNarrativeStoryContextRow({
     rows: input.rows,
-    scope: 'SUBJECT',
-    score: (row) => (toString(row.subjectId) === input.turn.agentId ? 1 : -1),
-    minimumScore: 1,
+    resolvedStoryId: anchorResolution.resolvedStoryId,
   });
-  const relation = pickLatestScopeRow({
+  const storyScope = {
+    ...asRecord(story?.narrativeSetting),
+    ...asRecord(story?.narrativeState),
+  };
+  const castPolicy = asRecord(storyScope.castPolicy);
+  const relationCandidateAgentIds = uniqueStrings([
+    ...toStringArray(castPolicy.mandatorySubjectIds),
+    ...toStringArray(castPolicy.optionalSubjectIds),
+    ...input.worldEvents.flatMap((event) => toStringArray(event.characterRefs)),
+  ]).filter((candidate) => candidate !== input.turn.agentId);
+  const subject = pickNarrativeSubjectContextRow({
     rows: input.rows,
-    scope: 'RELATION',
-    score: (row) => {
-      const subjectId = toString(row.subjectId);
-      const targetSubjectId = toString(row.targetSubjectId);
-      const direct = subjectId === input.turn.agentId && targetSubjectId === input.turn.playerId;
-      const reverse = subjectId === input.turn.playerId && targetSubjectId === input.turn.agentId;
-      return direct || reverse ? 1 : -1;
-    },
-    minimumScore: 1,
+    resolvedStoryId: anchorResolution.resolvedStoryId,
+    primaryAgentId: input.turn.agentId,
+  });
+  const relation = pickNarrativeRelationContextRow({
+    rows: input.rows,
+    resolvedStoryId: anchorResolution.resolvedStoryId,
+    primaryAgentId: input.turn.agentId,
+    playerId: input.turn.playerId,
+    candidateAgentIds: relationCandidateAgentIds,
   });
 
   const canonScope = {
     ...asRecord(canon?.narrativeSetting),
     ...asRecord(canon?.narrativeState),
-  };
-  const storyScope = {
-    ...asRecord(story?.narrativeSetting),
-    ...asRecord(story?.narrativeState),
   };
   const subjectScope = {
     ...asRecord(subject?.narrativeSetting),
@@ -338,7 +345,7 @@ function resolveNarrativeScopes(input: {
   };
 
   const warnings: string[] = [];
-  if (!storyExact && storyFallback) {
+  if (story && anchorResolution.strategy !== 'exact') {
     warnings.push('NARRATIVE_CONTEXT_STORY_SCOPE_FALLBACK_WARN');
   }
   if (!subject) {
@@ -1030,6 +1037,7 @@ export async function runNarrativeStep1Assembly(input: {
     const resolved = resolveNarrativeScopes({
       rows: narrativeContexts,
       turn: input.turn,
+      worldEvents,
     });
 
     const scene = resolveScene({

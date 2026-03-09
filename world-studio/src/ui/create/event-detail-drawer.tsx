@@ -1,5 +1,9 @@
 import React from 'react';
 import type { EventNodeDraft } from '../../contracts.js';
+import {
+  deriveNeedsEvidence,
+  isEvidenceRequiredForEvent,
+} from '../../services/event-horizon.js';
 import { EvidenceEditor } from '../shared/evidence-editor.js';
 import { RelationEditor } from '../shared/relation-editor.js';
 
@@ -11,7 +15,7 @@ type EventDetailDrawerProps = {
 };
 
 export function EventDetailDrawer(props: EventDetailDrawerProps) {
-  const missingEvidence = props.event.level === 'PRIMARY' && props.event.evidenceRefs.length === 0;
+  const missingEvidence = isEvidenceRequiredForEvent(props.event) && props.event.evidenceRefs.length === 0;
   const autoEvidenceExcerpt = [
     props.event.summary,
     props.event.cause,
@@ -42,7 +46,10 @@ export function EventDetailDrawer(props: EventDetailDrawerProps) {
     props.onChange({
       ...props.event,
       evidenceRefs: nextEvidence,
-      needsEvidence: props.event.level === 'PRIMARY' && nextEvidence.length === 0,
+      needsEvidence: deriveNeedsEvidence({
+        ...props.event,
+        evidenceRefs: nextEvidence,
+      }),
     });
   };
 
@@ -60,7 +67,7 @@ export function EventDetailDrawer(props: EventDetailDrawerProps) {
           Delete
         </button>
       </div>
-      <div className="mt-2 grid gap-2 lg:grid-cols-2">
+      <div className="mt-2 grid gap-2 lg:grid-cols-3">
         <label className="text-xs text-gray-700">
           <span className="mb-1 block font-medium">Level</span>
           <select
@@ -69,10 +76,40 @@ export function EventDetailDrawer(props: EventDetailDrawerProps) {
             onChange={(event) => props.onChange({
               ...props.event,
               level: event.target.value === 'SECONDARY' ? 'SECONDARY' : 'PRIMARY',
+              needsEvidence: deriveNeedsEvidence({
+                ...props.event,
+                level: event.target.value === 'SECONDARY' ? 'SECONDARY' : 'PRIMARY',
+              }),
             })}
           >
             <option value="PRIMARY">PRIMARY</option>
             <option value="SECONDARY">SECONDARY</option>
+          </select>
+        </label>
+        <label className="text-xs text-gray-700">
+          <span className="mb-1 block font-medium">Horizon</span>
+          <select
+            className="h-9 w-full rounded-md border border-gray-300 px-2 text-xs"
+            value={props.event.eventHorizon}
+            onChange={(event) => {
+              const eventHorizon = event.target.value === 'FUTURE'
+                ? 'FUTURE'
+                : event.target.value === 'ONGOING'
+                  ? 'ONGOING'
+                  : 'PAST';
+              props.onChange({
+                ...props.event,
+                eventHorizon,
+                needsEvidence: deriveNeedsEvidence({
+                  ...props.event,
+                  eventHorizon,
+                }),
+              });
+            }}
+          >
+            <option value="PAST">PAST</option>
+            <option value="ONGOING">ONGOING</option>
+            <option value="FUTURE">FUTURE</option>
           </select>
         </label>
         <label className="text-xs text-gray-700">
@@ -191,13 +228,16 @@ export function EventDetailDrawer(props: EventDetailDrawerProps) {
           onChange={(next) => props.onChange({
             ...props.event,
             evidenceRefs: next,
-            needsEvidence: props.event.level === 'PRIMARY' && next.length === 0,
+            needsEvidence: deriveNeedsEvidence({
+              ...props.event,
+              evidenceRefs: next,
+            }),
           })}
         />
       </div>
       {missingEvidence ? (
         <p className="ui-sync-alert ui-sync-alert-danger mt-2 px-2 py-1 text-[11px] text-red-700">
-          Primary events require evidence refs.
+          PRIMARY events with `PAST` or `ONGOING` horizon require evidence refs.
         </p>
       ) : null}
     </aside>

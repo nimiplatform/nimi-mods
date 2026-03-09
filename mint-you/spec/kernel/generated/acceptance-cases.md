@@ -78,7 +78,7 @@ cases:
     reason_code: MINTYOU_INPUT_INVALID
     source_rule: MY-ACC-002
   - id: MY-015-TRAIT-EXTRACTION-FAILED
-    description: Corrupted or inconsistent scenario data causes trait extraction to fail with blocking error.
+    description: Corrupted or inconsistent interview signal data causes trait extraction to fail with blocking error.
     expected_ok: false
     reason_code: MINTYOU_TRAIT_EXTRACTION_FAILED
     source_rule: MY-ACC-002

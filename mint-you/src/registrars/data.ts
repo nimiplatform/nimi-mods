@@ -1,6 +1,7 @@
 import type { HookClient } from '@nimiplatform/sdk/mod/types';
 import { createMintYouFlowId, emitMintYouLog } from '../logging.js';
 import { canSeePhoto } from '../services/photo-auth.js';
+import { extractPhotoOwnerId } from '../realm-contract.js';
 
 export async function registerMintYouDataCapabilities(input: {
   hookClient: HookClient;
@@ -27,7 +28,7 @@ export async function registerMintYouDataCapabilities(input: {
         return { referenceImageUrl: null };
       }
       const viewer = String(viewerUserId || '').trim();
-      const owner = String(ownerAgentId || '').trim();
+      const owner = extractPhotoOwnerId(profile, String(ownerAgentId || '').trim());
       const resolvedWorldId = String(worldId || profile.worldId || '').trim();
       if (!viewer || !owner) {
         return { referenceImageUrl: null };
@@ -39,7 +40,7 @@ export async function registerMintYouDataCapabilities(input: {
         return { referenceImageUrl: null };
       }
       return {
-        referenceImageUrl: canSeePhoto(viewer, owner, resolvedWorldId)
+        referenceImageUrl: await canSeePhoto(input.hookClient.data, viewer, owner, resolvedWorldId)
           ? referenceImageUrl
           : null,
       };
