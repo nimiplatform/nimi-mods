@@ -172,6 +172,136 @@ test('context assembler derives interaction profile, pacing plan, and prompt lan
   assert.match(compiled.prompt, /用户期待和助手一起看烟花/u);
 });
 
+test('context assembler keeps first-beat profile lightweight and continuity-aware', async () => {
+  await resetLocalChatConversationLedgerForTests();
+  const target = createTarget();
+  const session = await createLocalChatSession({
+    targetId: target.id,
+    viewerId: 'viewer.test',
+    worldId: target.worldId,
+    title: 'Aki',
+  });
+
+  await appendTurnsToSession(session.id, [
+    {
+      id: 'turn-user-1',
+      role: 'user',
+      kind: 'text',
+      content: '昨天你说会提醒我一起去散步。',
+      contextText: '昨天你说会提醒我一起去散步。',
+      semanticSummary: '用户提到之前的约定',
+      timestamp: '2026-03-07T10:00:00.000Z',
+      bundleId: '',
+      bundleSeq: 0,
+    },
+    {
+      id: 'turn-assistant-1',
+      role: 'assistant',
+      kind: 'text',
+      content: '我记得，晚一点我再把那件事接回来。',
+      contextText: '我记得，晚一点我再把那件事接回来。',
+      semanticSummary: '助手承接约定',
+      timestamp: '2026-03-07T10:00:05.000Z',
+      bundleId: '',
+      bundleSeq: 0,
+    },
+    {
+      id: 'turn-user-2',
+      role: 'user',
+      kind: 'text',
+      content: '今天有点委屈。',
+      contextText: '今天有点委屈。',
+      semanticSummary: '用户表达委屈',
+      timestamp: '2026-03-07T10:01:00.000Z',
+      bundleId: '',
+      bundleSeq: 0,
+    },
+    {
+      id: 'turn-assistant-2',
+      role: 'assistant',
+      kind: 'text',
+      content: '我在，你慢慢说。',
+      contextText: '我在，你慢慢说。',
+      semanticSummary: '助手先接住情绪',
+      timestamp: '2026-03-07T10:01:05.000Z',
+      bundleId: '',
+      bundleSeq: 0,
+    },
+    {
+      id: 'turn-user-3',
+      role: 'user',
+      kind: 'text',
+      content: '你还记得吗？',
+      contextText: '你还记得吗？',
+      semanticSummary: '用户继续追问',
+      timestamp: '2026-03-07T10:02:00.000Z',
+      bundleId: '',
+      bundleSeq: 0,
+    },
+  ]);
+
+  await upsertLocalChatInteractionSnapshot({
+    conversationId: session.id,
+    relationshipState: 'warm',
+    activeScene: ['night-walk', 'late-chat'],
+    emotionalTemperature: 'warm',
+    assistantCommitments: ['提醒用户一起去散步', '继续陪用户把话说完'],
+    userPrefs: ['喜欢短句和停顿', '不喜欢被催'],
+    openLoops: ['还没一起去散步', '用户刚才那点委屈还没说完'],
+    topicThreads: ['散步', '委屈', '夜聊'],
+    lastResolvedTurnId: 'turn-assistant-2',
+    conversationDirective: '先接住，再往里聊。',
+    conversationMomentum: 'steady',
+    updatedAt: '2026-03-07T10:02:10.000Z',
+  });
+  await replaceLocalChatRelationMemorySlots({
+    targetId: target.id,
+    viewerId: 'viewer.test',
+    entries: [{
+      id: 'slot-1',
+      targetId: target.id,
+      viewerId: 'viewer.test',
+      slotType: 'promise',
+      key: 'walk-promise',
+      value: '之后提醒用户一起去散步',
+      confidence: 0.92,
+      updatedAt: '2026-03-07T10:02:10.000Z',
+    }],
+  });
+  await replaceLocalChatRecallIndex({
+    conversationId: session.id,
+    docs: [{
+      id: 'recall-1',
+      conversationId: session.id,
+      sourceTurnId: 'turn-assistant-1',
+      text: '助手之前答应过要提醒用户一起去散步。',
+      createdAt: '2026-03-07T10:02:10.000Z',
+      updatedAt: '2026-03-07T10:02:10.000Z',
+    }],
+  });
+
+  const packet = await assembleLocalChatContextPacket({
+    text: '我刚刚那句其实有点不知道怎么讲。',
+    viewerId: 'viewer.test',
+    viewerDisplayName: 'Viewer',
+    selectedTarget: target,
+    selectedSessionId: session.id,
+    allowMultiReply: true,
+    turnMode: 'emotional',
+    voiceConversationMode: 'off',
+    profile: 'first-beat',
+  });
+
+  assert.equal(packet.sessionRecall.length, 0);
+  assert.equal(packet.relationMemorySlots?.length ?? 0, 0);
+  assert.equal(packet.recallIndex?.length ?? 0, 0);
+  assert.equal(packet.platformWarmStart, null);
+  assert.ok(packet.recentTurns.length <= 4);
+  assert.equal(packet.interactionSnapshot?.assistantCommitments.length, 1);
+  assert.equal(packet.interactionSnapshot?.openLoops.length, 1);
+  assert.equal(packet.interactionSnapshot?.topicThreads.length, 2);
+});
+
 test('context assembler prioritizes unresolved continuity and trims session recall to top-k', async () => {
   await resetLocalChatConversationLedgerForTests();
   const target = createTarget();

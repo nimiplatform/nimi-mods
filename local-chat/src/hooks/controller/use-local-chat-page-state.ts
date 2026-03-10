@@ -50,6 +50,7 @@ import {
   createUnsupportedMemorySyncAdapter,
   type MemorySyncStatus,
 } from '../../services/memory/memory-sync-adapter.js';
+import { useLocalChatConversationViewMode } from './use-local-chat-conversation-view-mode.js';
 
 type RuntimeFieldsMap = {
   mode?: 'STORY' | 'SCENE_TURN';
@@ -176,6 +177,14 @@ export function useLocalChatPageState() {
     runtimeAgentId: String(runtimeFields.agentId || '').trim(),
     setStatusBanner,
   });
+  const {
+    conversationViewMode,
+    setConversationViewMode,
+  } = useLocalChatConversationViewMode({
+    viewerId: currentUserId,
+    targetId: targetsState.selectedTargetId,
+  });
+  const [isTranscriptNearBottom, setIsTranscriptNearBottom] = useState(true);
   const currentUserAvatarUrl = useMemo(() => {
     const raw = (currentUser as Record<string, unknown> | null)?.avatarUrl;
     return typeof raw === 'string' && raw.trim() ? raw : null;
@@ -215,6 +224,14 @@ export function useLocalChatPageState() {
     runtimeClient: runtimeClient.route,
     setStatusBanner,
   });
+
+  useEffect(() => {
+    setIsTranscriptNearBottom(true);
+  }, [
+    conversationViewMode,
+    sessionsState.selectedSessionId,
+    targetsState.selectedTargetId,
+  ]);
 
   const ttsRouteOptions = runtimeRouteState.ttsRouteOptions;
   const sttRouteOptions = runtimeRouteState.sttRouteOptions;
@@ -937,6 +954,10 @@ export function useLocalChatPageState() {
     selectedTargetAvatarUrl,
     selectedTargetInitial,
     selectedTargetInteractionProfile,
+    conversationViewMode,
+    setConversationViewMode,
+    isTranscriptNearBottom,
+    setIsTranscriptNearBottom,
     activeVoiceConversationMode,
     setVoiceConversationMode,
     effectiveTtsConnectorId,

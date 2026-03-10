@@ -59,6 +59,14 @@ function extractStablePreview(value: string): string {
   return normalizePreview(String(value || '').slice(0, -prefixSize));
 }
 
+function extractUnmarkedCompleteFirstBeat(value: string): string {
+  const normalized = normalizePreview(value);
+  if (!normalized) return '';
+  if (/[，,、：:；;（(]$/u.test(normalized)) return '';
+  if (/(?:\.\.\.|…)$/.test(normalized)) return '';
+  return normalized;
+}
+
 function buildFirstBeatRepairPrompt(input: {
   prompt: string;
   contextPacket: LocalChatContextPacket;
@@ -109,10 +117,13 @@ function buildFirstBeatPrompt(input: {
     '规则：',
     '- 只输出一句完整、自然、已经说完的话，并在句子结束后立刻追加结束标记。',
     '- 目标是先接住用户，不要急着把整轮信息说完。',
+    '- 如果你还没拿到完整深度判断，就先做保守承接，不要抢着下结论。',
     '- 不要分段，不要 JSON，不要项目符号，不要解释。',
     '- 不要输出系统词、动作标签、括号舞台提示。',
     '- 不要总是落成“怎么了 / 我在 / 跟我说说”这种固定模板。',
     '- 即使用户显式要语音，也先用文字把首句说完。',
+    '- 不要主动推进关系，不要做承诺，不要承诺马上发图或发视频。',
+    '- 不要引用你没把握的记忆；拿不准时，只顺着用户当前这句话自然接住。',
     `- 结束标记固定为 ${FIRST_BEAT_END_MARKER}，必须原样输出在首句最后。`,
     `- 除了首拍正文和结束标记 ${FIRST_BEAT_END_MARKER} 之外，不要输出任何别的内容。`,
     `- 示例：我还在听${FIRST_BEAT_END_MARKER}`,
@@ -211,7 +222,8 @@ export async function runFirstBeatReactor(input: {
       maxTokens: FIRST_BEAT_REPAIR_MAX_TOKENS,
       temperature: 0.55,
     });
-    const repairedText = extractMarkedFirstBeat(String(repaired.text || ''));
+    const repairedText = extractMarkedFirstBeat(String(repaired.text || ''))
+      || extractUnmarkedCompleteFirstBeat(String(repaired.text || ''));
     if (repairedText) {
       return {
         text: repairedText,
@@ -239,7 +251,8 @@ export async function runFirstBeatReactor(input: {
       maxTokens: FIRST_BEAT_FALLBACK_MAX_TOKENS,
       temperature: 0.45,
     });
-    const regeneratedText = extractMarkedFirstBeat(String(regenerated.text || ''));
+    const regeneratedText = extractMarkedFirstBeat(String(regenerated.text || ''))
+      || extractUnmarkedCompleteFirstBeat(String(regenerated.text || ''));
     if (regeneratedText) {
       return {
         text: regeneratedText,

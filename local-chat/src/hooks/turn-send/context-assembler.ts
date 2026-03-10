@@ -1,5 +1,6 @@
 import type { LocalChatMemoryRecallResult, LocalChatTarget } from '../../data/index.js';
 import { recallLocalChatMemoryForPrompt } from '../../data/index.js';
+import type { LocalChatPromptProfile } from '../../prompt/index.js';
 import {
   getLocalChatInteractionSnapshot,
   listLocalChatExactHistoryTurns,
@@ -25,6 +26,7 @@ export type AssembleLocalChatContextPacketInput = {
   allowMultiReply?: boolean;
   turnMode?: LocalChatTurnMode;
   voiceConversationMode?: VoiceConversationMode;
+  profile?: LocalChatPromptProfile;
 };
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -347,6 +349,24 @@ function trimEchoedCurrentUserTurn(input: {
   return turns;
 }
 
+function toFirstBeatRecentTurns(turns: LocalChatContextRecentTurn[]): LocalChatContextRecentTurn[] {
+  return turns.slice(-4);
+}
+
+function toFirstBeatSnapshot(
+  snapshot: LocalChatContextPacket['interactionSnapshot'],
+): LocalChatContextPacket['interactionSnapshot'] {
+  if (!snapshot) return snapshot;
+  return {
+    ...snapshot,
+    activeScene: snapshot.activeScene.slice(0, 1),
+    assistantCommitments: snapshot.assistantCommitments.slice(0, 1),
+    userPrefs: snapshot.userPrefs.slice(0, 1),
+    openLoops: snapshot.openLoops.slice(0, 1),
+    topicThreads: snapshot.topicThreads.slice(0, 2),
+  };
+}
+
 function continuityReferenceBoost(input: {
   text: string;
   snapshot: LocalChatContextPacket['interactionSnapshot'];
@@ -518,14 +538,20 @@ function toWarmStartMemory(result: LocalChatMemoryRecallResult | null): LocalCha
 }
 
 export async function assembleLocalChatContextPacket(input: AssembleLocalChatContextPacketInput): Promise<LocalChatContextPacket> {
-  const [recentTurnsRaw, interactionSnapshot, relationMemorySlots, recallIndex] = await Promise.all([
+  const profile = input.profile || 'full-turn';
+  const isFirstBeatProfile = profile === 'first-beat';
+  const [recentTurnsRaw, interactionSnapshotRaw, relationMemorySlots, recallIndex] = await Promise.all([
     listLocalChatExactHistoryTurns(input.selectedSessionId, input.viewerId),
     getLocalChatInteractionSnapshot(input.selectedSessionId),
-    listLocalChatRelationMemorySlots({
-      targetId: input.selectedTarget.id,
-      viewerId: input.viewerId,
-    }),
-    listLocalChatRecallIndex(input.selectedSessionId),
+    isFirstBeatProfile
+      ? Promise.resolve([])
+      : listLocalChatRelationMemorySlots({
+        targetId: input.selectedTarget.id,
+        viewerId: input.viewerId,
+      }),
+    isFirstBeatProfile
+      ? Promise.resolve([])
+      : listLocalChatRecallIndex(input.selectedSessionId),
   ]);
 
   const interactionProfile = deriveInteractionProfile(input.selectedTarget);
@@ -533,7 +559,13 @@ export async function assembleLocalChatContextPacket(input: AssembleLocalChatCon
     recentTurns: buildRecentTurns(recentTurnsRaw),
     userInput: input.text,
   });
-  const warmStart = !interactionSnapshot && recentTurns.length <= 1
+  const interactionSnapshot = isFirstBeatProfile
+    ? toFirstBeatSnapshot(interactionSnapshotRaw)
+    : interactionSnapshotRaw;
+  const selectedRecentTurns = isFirstBeatProfile
+    ? toFirstBeatRecentTurns(recentTurns)
+    : recentTurns;
+  const warmStart = !isFirstBeatProfile && !interactionSnapshot && recentTurns.length <= 1
     ? await recallLocalChatMemoryForPrompt({
       target: input.selectedTarget,
       viewerId: input.viewerId,
@@ -548,12 +580,16 @@ export async function assembleLocalChatContextPacket(input: AssembleLocalChatCon
     allowMultiReply: Boolean(input.allowMultiReply),
     turnMode: input.turnMode,
   });
-  const selectedRelationMemory = selectRelationMemorySlots(
-    relationMemorySlots,
-    input.text,
-    interactionSnapshot,
-  );
-  const selectedSessionRecall = selectSessionRecall(recallIndex, input.text, interactionSnapshot);
+  const selectedRelationMemory = isFirstBeatProfile
+    ? []
+    : selectRelationMemorySlots(
+      relationMemorySlots,
+      input.text,
+      interactionSnapshot,
+    );
+  const selectedSessionRecall = isFirstBeatProfile
+    ? []
+    : selectSessionRecall(recallIndex, input.text, interactionSnapshot);
 
   return {
     conversationId: input.selectedSessionId,
@@ -578,16 +614,16 @@ export async function assembleLocalChatContextPacket(input: AssembleLocalChatCon
     },
     platformWarmStart: toWarmStartMemory(warmStart),
     sessionRecall: selectedSessionRecall,
-    recentTurns,
+    recentTurns: selectedRecentTurns,
     interactionSnapshot,
     relationMemorySlots: selectedRelationMemory,
-    recallIndex,
+    recallIndex: isFirstBeatProfile ? [] : recallIndex,
     turnMode: input.turnMode,
     voiceConversationMode: input.voiceConversationMode,
     pacingPlan,
     userInput: input.text,
     diagnostics: {
-      selectedTurnSeqs: recentTurns.map((turn) => turn.seq),
+      selectedTurnSeqs: selectedRecentTurns.map((turn) => turn.seq),
       sessionRecallCount: selectedSessionRecall.length,
     },
   };

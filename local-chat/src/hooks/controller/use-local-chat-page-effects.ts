@@ -26,6 +26,7 @@ type ScrollAnchorMessageLike = {
 type ScrollStateSnapshot = {
   targetId: string | null;
   sessionId: string | null;
+  viewMode: 'stage' | 'chat';
   messageTailKey: string;
   pendingState: 'pending' | 'settled';
 };
@@ -100,6 +101,7 @@ export function buildMessageTailKey(messages: ReadonlyArray<ScrollAnchorMessageL
 
 export function resolveAutoScrollBehavior(input: {
   loadingSessions: boolean;
+  isNearBottom: boolean;
   previous: ScrollStateSnapshot | null;
   next: ScrollStateSnapshot;
 }): 'skip' | 'auto' {
@@ -115,11 +117,14 @@ export function resolveAutoScrollBehavior(input: {
   ) {
     return 'auto';
   }
-  if (input.previous.messageTailKey !== input.next.messageTailKey) {
+  if (input.previous.viewMode !== input.next.viewMode) {
     return 'auto';
   }
+  if (input.previous.messageTailKey !== input.next.messageTailKey) {
+    return input.next.viewMode === 'stage' || input.isNearBottom ? 'auto' : 'skip';
+  }
   if (input.previous.pendingState !== input.next.pendingState) {
-    return 'auto';
+    return input.next.viewMode === 'stage' || input.isNearBottom ? 'auto' : 'skip';
   }
   return 'skip';
 }
@@ -160,11 +165,13 @@ export function useLocalChatPageEffects(state: LocalChatPageState) {
     const nextScrollState: ScrollStateSnapshot = {
       targetId: state.targetsState.selectedTargetId || null,
       sessionId: state.sessionsState.selectedSessionId || null,
+      viewMode: state.conversationViewMode,
       messageTailKey: buildMessageTailKey(state.messages),
       pendingState: state.turnSendState.isSending ? 'pending' : 'settled',
     };
     const behavior = resolveAutoScrollBehavior({
       loadingSessions: false,
+      isNearBottom: state.isTranscriptNearBottom,
       previous: lastScrollStateRef.current,
       next: nextScrollState,
     });
@@ -199,6 +206,8 @@ export function useLocalChatPageEffects(state: LocalChatPageState) {
     state.sessionsState.loadingSessions,
     state.sessionsState.selectedSessionId,
     state.targetsState.selectedTargetId,
+    state.conversationViewMode,
+    state.isTranscriptNearBottom,
     state.turnSendState.isSending,
   ]);
 

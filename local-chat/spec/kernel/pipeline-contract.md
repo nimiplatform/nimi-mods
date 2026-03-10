@@ -6,10 +6,10 @@
 
 Text turn pipeline is beat-first, deterministic, and auditable from input to persistence:
 
-1. resolve turn mode before generation
-2. compile one `ContextPacket` before prompt rendering and reuse it across perception, first beat, and tail planning
+1. resolve a local fast turn hint before first-beat generation
+2. compile a lightweight `first-beat` `ContextPacket` for first-beat generation and a full `ContextPacket` for deep perception / tail planning
 3. persist user turn immediately after session resolution, before assistant generation
-4. run turn perception before first-beat generation so first beat and tail plan share one intent judgment
+4. start `firstBeat` before turn perception blocks the user-visible path; turn perception may run in parallel or after first-beat seal, but tail planning must still consume its result
 5. deliver assistant `firstBeat` as a finalized message before tail beats are planned or scheduled
 6. schedule later beats through a single delivery director within the same assistant turn
 
@@ -51,7 +51,7 @@ After policy allow:
 
 Successful text turns may use multiple model calls on the critical path:
 
-1. `FirstBeatReactor` must build a dedicated `first-beat` prompt from the resolved `ContextPacket` plus turn perception result
+1. `FirstBeatReactor` must build a dedicated `first-beat` prompt from the lightweight `first-beat` `ContextPacket` without waiting for turn perception to finish
 2. `FirstBeatReactor` may use a streaming text call, but it must seal to one complete finalized sentence before persistence
 3. `TurnComposer` must receive `sealedFirstBeatText` and only plan later tail beats
 4. `TurnComposer` must not repeat, revise, or explain the already sealed first beat
@@ -100,16 +100,17 @@ Media planner failure must silently degrade to text-only:
 
 ## LC-PIPE-011 Context Compile Pipeline
 
-Send path must compile a single `ContextPacket` before prompt rendering:
+Send path must compile prompt context by profile:
 
 1. `viewerId` must be passed explicitly from page state
 2. target identity must be normalized before prompt rendering
 3. `interactionProfile` must be derived locally from target DNA / metadata / world context
 4. recent exact history must be selected by bundle, not by flat message count
-5. context packet must expose `interactionSnapshot`, `relationMemorySlots`, `recallIndex`, and platform warm-start data when available
-6. unresolved `openLoops / assistantCommitments / stable userPrefs` must receive continuity-aware priority during relation-memory selection
-7. prompt-injected `sessionRecall` must be a continuity-aware top-K subset, not a full dump of the stored recall index
-8. if the current user turn has already been persisted before prompt compile, `recentTurns` must not repeat that same input when `userInput` already carries it explicitly
+5. `first-beat` context must stay lightweight: it keeps identity / interaction profile / compact recent turns / compact interaction snapshot, and must not depend on `recallIndex`, `sessionRecall`, or platform warm-start data
+6. full-turn context must expose `interactionSnapshot`, `relationMemorySlots`, `recallIndex`, and platform warm-start data when available
+7. unresolved `openLoops / assistantCommitments / stable userPrefs` must receive continuity-aware priority during relation-memory selection for full-turn context
+8. prompt-injected `sessionRecall` must be a continuity-aware top-K subset, not a full dump of the stored recall index
+9. if the current user turn has already been persisted before prompt compile, `recentTurns` must not repeat that same input when `userInput` already carries it explicitly
 
 ## LC-PIPE-012 Turn Bundle Persistence Pipeline
 

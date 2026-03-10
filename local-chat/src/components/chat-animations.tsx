@@ -159,6 +159,24 @@ const KEYFRAMES = `
     opacity: 0.28;
   }
 }
+@keyframes lc-stage-breathe {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-2px) scale(1.015);
+  }
+}
+@keyframes lc-stage-aura-glow {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 0.82;
+    transform: scale(1.03);
+  }
+}
 .local-chat-root .lc-pane-stage {
   animation: pane-fade-up var(--lc-pane-enter-dur) cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
@@ -217,6 +235,15 @@ const KEYFRAMES = `
   background: #ffffff;
   color: #0f766e;
   box-shadow: var(--lc-shadow-button);
+}
+.local-chat-root .lc-stage-dialogue-shell {
+  animation: panel-expand 280ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.local-chat-root .lc-stage-avatar-frame {
+  animation: lc-stage-breathe 5.4s ease-in-out infinite;
+}
+.local-chat-root .lc-stage-aura {
+  animation: lc-stage-aura-glow 6s ease-in-out infinite;
 }
 .local-chat-root .lc-btn-primary {
   border-color: rgba(20, 184, 166, 0.15);

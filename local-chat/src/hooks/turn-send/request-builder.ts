@@ -3,7 +3,7 @@ import {
   buildLocalChatCompiledPrompt,
   type LocalChatTarget,
 } from '../../data/index.js';
-import type { LocalChatCompiledPrompt } from '../../prompt/index.js';
+import type { LocalChatCompiledPrompt, LocalChatPromptProfile } from '../../prompt/index.js';
 import type { LocalChatContextPacket, LocalChatTurnMode, VoiceConversationMode } from '../../state/index.js';
 import { assembleLocalChatContextPacket } from './context-assembler.js';
 
@@ -20,6 +20,7 @@ type BuildTurnRequestInput = {
   allowMultiReply: boolean;
   turnMode?: LocalChatTurnMode;
   voiceConversationMode?: VoiceConversationMode;
+  profile?: LocalChatPromptProfile;
 };
 
 export type TurnInvokeInput = {
@@ -45,6 +46,7 @@ export async function buildTurnRequestInput(input: BuildTurnRequestInput): Promi
   const contextPacket = await assembleLocalChatContextPacket(input);
   const compiledPrompt = buildLocalChatCompiledPrompt({
     contextPacket,
+    profile: input.profile,
   });
   const prompt = compiledPrompt.prompt;
   const invokeInput: TurnInvokeInput = {

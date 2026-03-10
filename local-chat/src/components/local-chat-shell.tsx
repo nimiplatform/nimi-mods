@@ -1,24 +1,19 @@
 import React from 'react';
 import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import { ChatAnimationStyles } from './chat-animations.js';
-import { LocalChatHeader } from './layout/local-chat-header.js';
-import { LocalChatMessagePane } from './layout/local-chat-message-pane.js';
+import { ChatTranscriptView } from './layout/chat-transcript-view.js';
+import { ConversationComposer } from './layout/conversation-composer.js';
+import { CompactConversationHeader } from './layout/local-chat-header.js';
 import { LocalChatProfileDrawer } from './layout/local-chat-profile-drawer.js';
 import { LocalChatRightSidebar } from './layout/local-chat-right-sidebar.js';
 import { LocalChatSettingsDrawer } from './layout/local-chat-settings-drawer.js';
+import { StageConversationView } from './layout/stage-conversation-view.js';
 import { LocalChatTargetPane } from './layout/local-chat-target-pane.js';
 import { ICON_SEARCH } from './layout/icons.js';
 import { resolvePresenceTheme } from './layout/presence-theme.js';
 import type { LocalChatShellProps } from './layout/shell-props.js';
 
 export type { LocalChatShellProps } from './layout/shell-props.js';
-
-const ICON_SETTINGS = (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="3" />
-    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01A1.65 1.65 0 0 0 10.91 3H11a2 2 0 1 1 4 0h.09a1.65 1.65 0 0 0 1.51 1 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-  </svg>
-);
 
 export function LocalChatShell(props: LocalChatShellProps) {
   const { t } = useModTranslation('local-chat');
@@ -32,7 +27,6 @@ export function LocalChatShell(props: LocalChatShellProps) {
     setSelectedTargetId,
     targetSearchText,
     setTargetSearchText,
-    onRefresh,
     selectedTarget,
     selectedTargetAvatarUrl,
     selectedTargetInitial,
@@ -75,6 +69,9 @@ export function LocalChatShell(props: LocalChatShellProps) {
     onToggleVoiceInput,
     onCancelVoiceInput,
     enableVoice,
+    conversationViewMode,
+    setConversationViewMode,
+    setIsTranscriptNearBottom,
     onSend,
     canSend,
     voiceContextMenu,
@@ -86,104 +83,164 @@ export function LocalChatShell(props: LocalChatShellProps) {
     seed: selectedTarget?.id || selectedTarget?.displayName || 'local-chat',
     emotionalTemperature: activeInteractionSnapshot?.emotionalTemperature || 'low',
   });
+  const focusComposer = React.useCallback(() => {
+    requestAnimationFrame(() => {
+      props.inputRef.current?.focus();
+    });
+  }, [props.inputRef]);
+  const seedFirstTurnComposer = React.useCallback(() => {
+    if (!selectedTarget) {
+      return;
+    }
+    if (!inputTextRef.current.trim()) {
+      setInputText(t('MessagePane.onboardingStarterPrompt', { name: selectedTarget.displayName }));
+    }
+    focusComposer();
+  }, [focusComposer, inputTextRef, selectedTarget, setInputText, t]);
+
+  React.useEffect(() => {
+    if (!selectedTarget || conversationViewMode !== 'stage' || loadingTargetDetail || messages.length > 0) {
+      return;
+    }
+    focusComposer();
+  }, [conversationViewMode, focusComposer, loadingTargetDetail, messages.length, selectedTarget]);
 
   return (
     <div className="local-chat-root relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.14),_transparent_38%),linear-gradient(180deg,_rgba(248,250,252,0.98),_rgba(241,245,249,0.94))]" data-ui-version="v5-room">
       <ChatAnimationStyles />
 
-      <div className="mx-auto flex min-h-0 w-full max-w-[1580px] min-w-0 flex-1 px-3 py-3 sm:px-4 sm:py-4">
+      <div className="flex min-h-0 w-full min-w-0 flex-1">
         <div
-          className="relative flex min-h-0 flex-1 overflow-hidden rounded-[32px] border border-white/70 bg-white/78 shadow-[0_12px_40px_rgba(15,23,42,0.08)]"
+          className="relative flex min-h-0 flex-1 overflow-hidden"
           style={selectedTarget ? { background: selectedTheme.roomSurface } : undefined}
         >
           {!selectedTarget ? (
-            <>
-              <div className="absolute right-5 top-5 z-20">
-                <button
-                  type="button"
-                  onClick={() => setIsSettingsDrawerOpen(true)}
-                  className="lc-btn lc-btn-secondary h-10 rounded-full px-4 text-sm font-semibold text-slate-700"
-                  aria-label={t('Header.openSettings')}
-                  title={t('Header.openSettings')}
-                >
-                  {ICON_SETTINGS}
-                  <span>{t('Header.openSettings')}</span>
-                </button>
-              </div>
-              <LocalChatTargetPane
-                visibleTargets={visibleTargets}
-                loadingTargets={loadingTargets}
-                selectedTargetId={selectedTargetId}
-                setSelectedTargetId={setSelectedTargetId}
-                targetSearchText={targetSearchText}
-                setTargetSearchText={setTargetSearchText}
-                onRefresh={onRefresh}
-                searchIcon={ICON_SEARCH}
-              />
-            </>
+            <LocalChatTargetPane
+              visibleTargets={visibleTargets}
+              loadingTargets={loadingTargets}
+              selectedTargetId={selectedTargetId}
+              setSelectedTargetId={setSelectedTargetId}
+              targetSearchText={targetSearchText}
+              setTargetSearchText={setTargetSearchText}
+              onOpenSettings={() => setIsSettingsDrawerOpen(true)}
+              searchIcon={ICON_SEARCH}
+            />
           ) : (
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-              <LocalChatHeader
-                selectedTarget={selectedTarget}
-                selectedTargetAvatarUrl={selectedTargetAvatarUrl}
-                selectedTargetInitial={selectedTargetInitial}
-                loadingTargetDetail={loadingTargetDetail}
-                interactionSnapshot={activeInteractionSnapshot}
-                hasInputText={hasInputText}
-                isSending={isSending}
-                sendPhase={sendPhase}
-                messages={messages}
-                playingVoiceMessageId={playingVoiceMessageId}
-                onBackToTargetStage={() => {
-                  setSelectedTargetId('');
-                  setIsSettingsDrawerOpen(false);
-                  setIsProfileDrawerOpen(false);
-                  if (isRuntimeSidebarOpen) {
-                    setIsRuntimeSidebarOpen(() => false);
-                  }
-                }}
-                onOpenSelectedTargetProfile={() => {
-                  setIsProfileDrawerOpen(true);
-                  setIsSettingsDrawerOpen(false);
-                  if (isRuntimeSidebarOpen) {
-                    setIsRuntimeSidebarOpen(() => false);
-                  }
-                }}
-                onOpenSettings={() => {
-                  setIsSettingsDrawerOpen(true);
-                  setIsProfileDrawerOpen(false);
-                  if (isRuntimeSidebarOpen) {
-                    setIsRuntimeSidebarOpen(() => false);
-                  }
-                }}
-                onClearChatHistory={onClearChatHistory}
-              />
+              {conversationViewMode === 'chat' ? (
+                <CompactConversationHeader
+                  selectedTarget={selectedTarget}
+                  selectedTargetAvatarUrl={selectedTargetAvatarUrl}
+                  selectedTargetInitial={selectedTargetInitial}
+                  loadingTargetDetail={loadingTargetDetail}
+                  interactionSnapshot={activeInteractionSnapshot}
+                  hasInputText={hasInputText}
+                  isSending={isSending}
+                  sendPhase={sendPhase}
+                  messages={messages}
+                  playingVoiceMessageId={playingVoiceMessageId}
+                  onBackToTargetStage={() => {
+                    setSelectedTargetId('');
+                    setIsSettingsDrawerOpen(false);
+                    setIsProfileDrawerOpen(false);
+                    if (isRuntimeSidebarOpen) {
+                      setIsRuntimeSidebarOpen(() => false);
+                    }
+                  }}
+                  onOpenSelectedTargetProfile={() => {
+                    setIsProfileDrawerOpen(true);
+                    setIsSettingsDrawerOpen(false);
+                    if (isRuntimeSidebarOpen) {
+                      setIsRuntimeSidebarOpen(() => false);
+                    }
+                  }}
+                  onOpenSettings={() => {
+                    setIsSettingsDrawerOpen(true);
+                    setIsProfileDrawerOpen(false);
+                    if (isRuntimeSidebarOpen) {
+                      setIsRuntimeSidebarOpen(() => false);
+                    }
+                  }}
+                  onReturnToStage={() => setConversationViewMode('stage')}
+                />
+              ) : null}
 
-              <LocalChatMessagePane
+              {conversationViewMode === 'stage' ? (
+                <StageConversationView
+                  selectedTarget={selectedTarget}
+                  selectedTargetAvatarUrl={selectedTargetAvatarUrl}
+                  selectedTargetInitial={selectedTargetInitial}
+                  loadingTargetDetail={loadingTargetDetail}
+                  interactionSnapshot={activeInteractionSnapshot}
+                  hasInputText={hasInputText}
+                  isSending={isSending}
+                  sendPhase={sendPhase}
+                  messages={messages}
+                  currentUserDisplayName={currentUserDisplayName}
+                  currentUserAvatarUrl={currentUserAvatarUrl}
+                  playingVoiceMessageId={playingVoiceMessageId}
+                  voiceTranscriptVisibleById={voiceTranscriptVisibleById}
+                  onPlayVoiceMessage={onPlayVoiceMessage}
+                  onVoiceContextMenu={onVoiceContextMenu}
+                  messagesEndRef={messagesEndRef}
+                  onBackToTargetStage={() => {
+                    setSelectedTargetId('');
+                    setIsSettingsDrawerOpen(false);
+                    setIsProfileDrawerOpen(false);
+                    if (isRuntimeSidebarOpen) {
+                      setIsRuntimeSidebarOpen(() => false);
+                    }
+                  }}
+                  onOpenSelectedTargetProfile={() => {
+                    setIsProfileDrawerOpen(true);
+                    setIsSettingsDrawerOpen(false);
+                    if (isRuntimeSidebarOpen) {
+                      setIsRuntimeSidebarOpen(() => false);
+                    }
+                  }}
+                  onOpenSettings={() => {
+                    setIsSettingsDrawerOpen(true);
+                    setIsProfileDrawerOpen(false);
+                    if (isRuntimeSidebarOpen) {
+                      setIsRuntimeSidebarOpen(() => false);
+                    }
+                  }}
+                  onOpenHistory={() => setConversationViewMode('chat')}
+                />
+              ) : (
+                <ChatTranscriptView
+                  selectedTarget={selectedTarget}
+                  selectedTargetAvatarUrl={selectedTargetAvatarUrl}
+                  loadingTargetDetail={loadingTargetDetail}
+                  messages={messages}
+                  loadingSessions={loadingSessions}
+                  sendPhase={sendPhase}
+                  currentUserDisplayName={currentUserDisplayName}
+                  currentUserAvatarUrl={currentUserAvatarUrl}
+                  playingVoiceMessageId={playingVoiceMessageId}
+                  voiceTranscriptVisibleById={voiceTranscriptVisibleById}
+                  onPlayVoiceMessage={onPlayVoiceMessage}
+                  onVoiceContextMenu={onVoiceContextMenu}
+                  messagesEndRef={messagesEndRef}
+                  hasConversationHistory={hasConversationHistory}
+                  onSeedFirstTurnComposer={seedFirstTurnComposer}
+                  onTranscriptNearBottomChange={setIsTranscriptNearBottom}
+                />
+              )}
+
+              <ConversationComposer
+                mode={conversationViewMode}
                 selectedTarget={selectedTarget}
-                selectedTargetAvatarUrl={selectedTargetAvatarUrl}
-                loadingTargetDetail={loadingTargetDetail}
-                messages={messages}
-                loadingSessions={loadingSessions}
-                isSending={isSending}
-                sendPhase={sendPhase}
-                currentUserDisplayName={currentUserDisplayName}
-                currentUserAvatarUrl={currentUserAvatarUrl}
-                playingVoiceMessageId={playingVoiceMessageId}
-                voiceTranscriptVisibleById={voiceTranscriptVisibleById}
-                onPlayVoiceMessage={onPlayVoiceMessage}
-                onVoiceContextMenu={onVoiceContextMenu}
-                messagesEndRef={messagesEndRef}
                 inputRef={inputRef}
                 inputTextRef={inputTextRef}
+                hasInputText={hasInputText}
                 setInputText={setInputText}
-                productSettings={productSettings}
-                hasConversationHistory={hasConversationHistory}
                 onInputKeyDown={onInputKeyDown}
                 voiceInputState={voiceInputState}
                 onToggleVoiceInput={onToggleVoiceInput}
                 onCancelVoiceInput={onCancelVoiceInput}
                 enableVoice={enableVoice}
+                isSending={isSending}
                 onSend={onSend}
                 canSend={canSend}
                 runtimeReady={runtimeSidebarProps.chatRouteReady}
@@ -244,6 +301,7 @@ export function LocalChatShell(props: LocalChatShellProps) {
         memorySyncStatus={memorySyncStatus}
         onClose={() => setIsProfileDrawerOpen(false)}
         onOpenSelectedTargetProfile={onOpenSelectedTargetProfile}
+        onClearChatHistory={onClearChatHistory}
         onMemoryOverrideChange={onMemoryOverrideChange}
         onDeleteMemorySlot={onDeleteMemorySlot}
       />

@@ -18,6 +18,7 @@ import { isMediaRouteReady } from './media-route.js';
 import { createPersistableVoicePlaybackCacheMeta } from '../../services/voice/playback-source.js';
 import { deriveInteractionProfile } from './interaction-profile.js';
 import { resolveTurnMode } from './turn-mode-resolver.js';
+import { resolveFastTurnPerception } from './fast-turn-perception.js';
 import { perceiveTurn } from './turn-perception.js';
 import { composeInteractionTurnPlan } from './turn-composer.js';
 import { runFirstBeatReactor } from './first-beat-reactor.js';
@@ -381,7 +382,7 @@ export async function runLocalChatTurnSend(input: {
       userText: text,
       interactionProfile,
     });
-    const prepared = await buildTurnRequestInput({
+    const firstBeatPrepared = await buildTurnRequestInput({
       text,
       viewerId: context.viewerId,
       viewerDisplayName: context.viewerDisplayName,
@@ -392,73 +393,92 @@ export async function runLocalChatTurnSend(input: {
       allowMultiReply: context.defaultSettings.deliveryStyle === 'natural',
       turnMode: regexTurnMode,
       voiceConversationMode,
+      profile: 'first-beat',
     });
     ensureNotAborted(input.abortSignal);
 
-    const recentTurnsForPerception = prepared.contextPacket.recentTurns
-      .slice(-5)
-      .map((turn) => ({ role: turn.role, text: turn.lines.join(' ') }));
-    const perception = await perceiveTurn({
-      aiClient: context.aiClient,
-      invokeInput: prepared.invokeInput,
+    const fastPerception = resolveFastTurnPerception({
       userText: text,
-      snapshot: prepared.contextPacket.interactionSnapshot || null,
-      memorySlots: prepared.contextPacket.relationMemorySlots || [],
-      recentTurns: recentTurnsForPerception,
-      regexFallbackTurnMode: regexTurnMode,
+      interactionProfile: firstBeatPrepared.contextPacket.target.interactionProfile,
+      snapshot: firstBeatPrepared.contextPacket.interactionSnapshot || null,
+      recentTurns: firstBeatPrepared.contextPacket.recentTurns,
     });
-    ensureNotAborted(input.abortSignal);
-
-    const turnMode = perception.turnMode;
-    if (perception.relevantMemoryIds.length > 0 && prepared.contextPacket.relationMemorySlots) {
-      const relevantSet = new Set(perception.relevantMemoryIds);
-      prepared.contextPacket.relationMemorySlots = prepared.contextPacket.relationMemorySlots
-        .filter((slot) => relevantSet.has(slot.id));
-    }
-    const perceptionDirective = perception.conversationDirective;
-    const activeDirective = perception.conversationDirective
-      || prepared.contextPacket.interactionSnapshot?.conversationDirective
-      || null;
-
-    prepared.contextPacket.perceptionOverlay = {
-      refinedTurnMode: turnMode,
-      emotionalState: perception.emotionalState?.detected || '',
-      emotionalCause: perception.emotionalState?.cause || '',
-      suggestedApproach: perception.emotionalState?.suggestedApproach || '',
-      directive: activeDirective || '',
-      intimacyCeiling: perception.intimacyCeiling,
-    };
-    prepared.contextPacket.turnMode = turnMode;
-
     const resolvedExperiencePolicy = compileResolvedExperiencePolicy({
-      interactionProfile: prepared.contextPacket.target.interactionProfile,
-      interactionSnapshot: prepared.contextPacket.interactionSnapshot || null,
+      interactionProfile: firstBeatPrepared.contextPacket.target.interactionProfile,
+      interactionSnapshot: firstBeatPrepared.contextPacket.interactionSnapshot || null,
       settings: context.defaultSettings,
       requestedVoiceConversationMode: voiceConversationMode,
-      routeSource: prepared.invokeInput.routeBinding?.source || context.routeSnapshot?.source || 'local',
+      routeSource: firstBeatPrepared.invokeInput.routeBinding?.source || context.routeSnapshot?.source || 'local',
     });
-    prepared.contextPacket.pacingPlan = derivePacingPlan({
+    const shouldSerializeDeepPerception = resolvedExperiencePolicy.mediaPolicy.routeSource === 'local';
+    let turnMode = fastPerception.turnMode;
+    firstBeatPrepared.contextPacket.perceptionOverlay = {
+      refinedTurnMode: fastPerception.turnMode,
+      emotionalState: fastPerception.emotionalState?.detected || '',
+      emotionalCause: fastPerception.emotionalState?.cause || '',
+      suggestedApproach: fastPerception.emotionalState?.suggestedApproach || '',
+      directive: fastPerception.conversationDirective || '',
+      intimacyCeiling: fastPerception.intimacyCeiling,
+    };
+    firstBeatPrepared.contextPacket.turnMode = fastPerception.turnMode;
+    firstBeatPrepared.contextPacket.pacingPlan = derivePacingPlan({
       text,
-      interactionProfile: prepared.contextPacket.target.interactionProfile,
+      interactionProfile: firstBeatPrepared.contextPacket.target.interactionProfile,
       allowMultiReply: resolvedExperiencePolicy.deliveryPolicy.allowMultiReply,
       turnMode,
-      emotionalHint: perception.emotionalState?.detected,
-      suggestedApproach: perception.emotionalState?.suggestedApproach,
-      momentum: prepared.contextPacket.interactionSnapshot?.conversationMomentum,
+      emotionalHint: fastPerception.emotionalState?.detected,
+      suggestedApproach: fastPerception.emotionalState?.suggestedApproach,
+      momentum: firstBeatPrepared.contextPacket.interactionSnapshot?.conversationMomentum,
     });
     const effectiveVoiceConversationMode = resolvedExperiencePolicy.voicePolicy.conversationMode;
+    const deepPreparedPromise = buildTurnRequestInput({
+      text,
+      viewerId: context.viewerId,
+      viewerDisplayName: context.viewerDisplayName,
+      selectedTarget,
+      selectedSessionId: sessionId,
+      runtimeMode: context.runtimeMode,
+      routeBinding,
+      allowMultiReply: resolvedExperiencePolicy.deliveryPolicy.allowMultiReply,
+      turnMode,
+      voiceConversationMode,
+      profile: 'full-turn',
+    });
+    const createPerceptionStatePromise = async () => {
+      try {
+        const prepared = await deepPreparedPromise;
+        const recentTurnsForPerception = prepared.contextPacket.recentTurns
+          .slice(-5)
+          .map((turn) => ({ role: turn.role, text: turn.lines.join(' ') }));
+        const perception = await perceiveTurn({
+          aiClient: context.aiClient,
+          invokeInput: prepared.invokeInput,
+          userText: text,
+          snapshot: prepared.contextPacket.interactionSnapshot || null,
+          memorySlots: prepared.contextPacket.relationMemorySlots || [],
+          recentTurns: recentTurnsForPerception,
+          regexFallbackTurnMode: regexTurnMode,
+        });
+        return { ok: true as const, perception, prepared };
+      } catch (error) {
+        return { ok: false as const, error };
+      }
+    };
+    let perceptionStatePromise = shouldSerializeDeepPerception
+      ? null as ReturnType<typeof createPerceptionStatePromise> | null
+      : createPerceptionStatePromise();
 
     const firstBeatCompiledPrompt = buildLocalChatCompiledPrompt({
-      contextPacket: prepared.contextPacket,
+      contextPacket: firstBeatPrepared.contextPacket,
       profile: 'first-beat',
     });
     const firstBeatResult = await runFirstBeatReactor({
       aiClient: context.aiClient,
       invokeInput: {
-        ...prepared.invokeInput,
+        ...firstBeatPrepared.invokeInput,
         prompt: firstBeatCompiledPrompt.prompt,
       },
-      contextPacket: prepared.contextPacket,
+      contextPacket: firstBeatPrepared.contextPacket,
       userText: text,
       transientMessageId: firstBeatMessageId,
       abortSignal: input.abortSignal,
@@ -527,6 +547,44 @@ export async function runLocalChatTurnSend(input: {
     firstBeatCommitted = true;
 
     input.setSendPhase('planning-tail');
+    perceptionStatePromise = perceptionStatePromise || createPerceptionStatePromise();
+    const perceptionState = await perceptionStatePromise;
+    if (!perceptionState.ok) {
+      throw perceptionState.error;
+    }
+    const perception = perceptionState.perception;
+    const prepared = perceptionState.prepared;
+    ensureNotAborted(input.abortSignal);
+
+    turnMode = perception.turnMode;
+    if (perception.relevantMemoryIds.length > 0 && prepared.contextPacket.relationMemorySlots) {
+      const relevantSet = new Set(perception.relevantMemoryIds);
+      prepared.contextPacket.relationMemorySlots = prepared.contextPacket.relationMemorySlots
+        .filter((slot) => relevantSet.has(slot.id));
+    }
+    const activeDirective = perception.conversationDirective
+      || fastPerception.conversationDirective
+      || prepared.contextPacket.interactionSnapshot?.conversationDirective
+      || null;
+
+    prepared.contextPacket.perceptionOverlay = {
+      refinedTurnMode: turnMode,
+      emotionalState: perception.emotionalState?.detected || '',
+      emotionalCause: perception.emotionalState?.cause || '',
+      suggestedApproach: perception.emotionalState?.suggestedApproach || '',
+      directive: activeDirective || '',
+      intimacyCeiling: perception.intimacyCeiling,
+    };
+    prepared.contextPacket.turnMode = turnMode;
+    prepared.contextPacket.pacingPlan = derivePacingPlan({
+      text,
+      interactionProfile: prepared.contextPacket.target.interactionProfile,
+      allowMultiReply: resolvedExperiencePolicy.deliveryPolicy.allowMultiReply,
+      turnMode,
+      emotionalHint: perception.emotionalState?.detected,
+      suggestedApproach: perception.emotionalState?.suggestedApproach,
+      momentum: prepared.contextPacket.interactionSnapshot?.conversationMomentum,
+    });
     const recompiledResult = buildLocalChatCompiledPrompt({
       contextPacket: prepared.contextPacket,
       profile: 'full-turn',
@@ -740,6 +798,11 @@ export async function runLocalChatTurnSend(input: {
       ...firstBeatMessage,
       meta: {
         ...(firstBeatMessage.meta || {}),
+        relationMove: turnMode,
+        sceneMove: turnMode,
+        turnMode,
+        voiceConversationMode: effectiveVoiceConversationMode,
+        intent: resolveFirstBeatIntent(turnMode),
         interactionPlanId: plan.planId,
         planId: plan.planId,
         beatCount: totalBeatCount,
@@ -814,7 +877,7 @@ export async function runLocalChatTurnSend(input: {
         deliveredBeats,
         aiClient: context.aiClient,
         routeBinding,
-        conversationDirective: perceptionDirective,
+        conversationDirective: activeDirective,
       });
       logTurnSendDone({
         flowId,
@@ -969,7 +1032,7 @@ export async function runLocalChatTurnSend(input: {
           deliveredBeats: deliveredBeats.filter((beat) => deliveredBeatIds.has(beat.beatId)),
           aiClient: context.aiClient,
           routeBinding,
-          conversationDirective: perceptionDirective,
+          conversationDirective: activeDirective,
         });
       })
       .catch((scheduleError) => {

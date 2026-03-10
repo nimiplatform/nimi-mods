@@ -11,6 +11,7 @@ import type { ChatMessage } from '../../types.js';
 import type { RuntimeStatusSidebar } from '../runtime-status-sidebar.js';
 import type { LocalChatTargetItem, VoiceContextMenu, VoiceInputState } from './types.js';
 import type { MemorySyncStatus } from '../../services/memory/memory-sync-adapter.js';
+import type { LocalChatConversationViewMode } from '../../hooks/controller/use-local-chat-conversation-view-mode.js';
 
 export type LocalChatShellProps = {
   visibleTargets: LocalChatTargetItem[];
@@ -19,7 +20,6 @@ export type LocalChatShellProps = {
   setSelectedTargetId: (value: string) => void;
   targetSearchText: string;
   setTargetSearchText: (value: string) => void;
-  onRefresh: () => void;
   selectedTarget: LocalChatTargetItem | null;
   selectedTargetAvatarUrl: string | null;
   selectedTargetInitial: string;
@@ -64,6 +64,10 @@ export type LocalChatShellProps = {
   enableVoice: boolean;
   voiceConversationMode: VoiceConversationMode;
   onVoiceConversationModeChange: (mode: VoiceConversationMode) => void;
+  conversationViewMode: LocalChatConversationViewMode;
+  setConversationViewMode: (mode: LocalChatConversationViewMode) => void;
+  isTranscriptNearBottom: boolean;
+  setIsTranscriptNearBottom: (value: boolean) => void;
   onSend: () => void;
   canSend: boolean;
   voiceContextMenu: VoiceContextMenu | null;

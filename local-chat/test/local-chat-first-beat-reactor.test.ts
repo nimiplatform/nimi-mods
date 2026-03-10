@@ -200,6 +200,50 @@ test('first-beat reactor regenerates a fresh first beat before failing the turn'
   assert.deepEqual(previews, []);
 });
 
+test('first-beat reactor accepts an unmarked complete fallback sentence from generateText', async () => {
+  let generateCalls = 0;
+  const result = await runFirstBeatReactor({
+    aiClient: {
+      ...createAiClientFromChunks([
+        '我先想想',
+      ], 'trace-unmarked', 'length'),
+      generateText: async () => {
+        generateCalls += 1;
+        return {
+          text: '我还在，慢一点说也没关系。',
+          traceId: 'trace-unmarked-fallback',
+          promptTraceId: 'trace-unmarked-fallback',
+          route: {
+            capability: 'text.generate',
+            source: 'local',
+            provider: 'local',
+            model: 'model-a',
+            connectorId: '',
+            endpoint: '',
+            localOpenAiEndpoint: '',
+            localProviderEndpoint: '',
+            localModelId: '',
+            adapter: 'test',
+          },
+        };
+      },
+    } as unknown as LocalChatTurnAiClient,
+    invokeInput: {
+      capability: 'text.generate',
+      prompt: 'raw prompt',
+      mode: 'STORY',
+      agentId: 'agent-1',
+    },
+    contextPacket: createContextPacket(),
+    userText: '我现在有点乱，不知道该怎么讲。',
+    transientMessageId: 'transient-unmarked',
+  });
+
+  assert.equal(generateCalls, 1);
+  assert.equal(result.text, '我还在，慢一点说也没关系。');
+  assert.equal(result.traceId, 'trace-unmarked-fallback');
+});
+
 test('first-beat reactor accepts a complete first sentence even when the provider reports finishReason=length', async () => {
   let fallbackCalls = 0;
   const result = await runFirstBeatReactor({

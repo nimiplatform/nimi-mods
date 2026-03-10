@@ -74,6 +74,7 @@ export async function registerLocalChatUiExtensions(input: {
     extension: {
       type: 'tab-page',
       tabId: 'mod:local-chat',
+      shellMode: 'immersive',
       strategy: 'append',
       component: () => React.createElement(
         Suspense,

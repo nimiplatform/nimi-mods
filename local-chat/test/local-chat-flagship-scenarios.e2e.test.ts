@@ -102,6 +102,147 @@ test('flagship scenario: comfort turn keeps text first beat and lands a natural 
   });
 });
 
+test('flagship scenario: first beat becomes visible before perception finishes', async () => {
+  const target = createTestTarget({
+    id: 'agent.local-chat.flagship.fast-first-beat',
+    handle: '~fast-first-beat',
+    displayName: 'Fast First Beat',
+  });
+
+  await withLocalChatTestEnv({ targets: [target] }, async () => {
+    const harness = createSendFlowHarness({
+      target,
+      defaultSettings: {
+        mediaAutonomy: 'off',
+        visualComfortLevel: 'text-only',
+        voiceAutonomy: 'off',
+      },
+    });
+    const scripted = createScriptedAiClient({
+      perceptionResult: {
+        turnMode: 'emotional',
+        emotionalState: {
+          detected: '委屈',
+          cause: '用户需要先被接住',
+          suggestedApproach: 'empathize-first',
+        },
+        relevantMemoryIds: [],
+        conversationDirective: '先接住，再继续往里聊。',
+        intimacyCeiling: 'warm',
+      },
+      firstBeatText: '先别急，我先在。',
+      planBeats: [
+        {
+          text: '你慢一点说，我跟着你。',
+          intent: 'comfort',
+          relationMove: 'warm',
+          sceneMove: '安慰',
+          pauseMs: 320,
+        },
+      ],
+    });
+
+    let releasePerception: (() => void) | null = null;
+    const perceptionGate = new Promise<void>((resolve) => {
+      releasePerception = resolve;
+    });
+    const gatedClient: Pick<
+      LocalChatAiClient,
+      'generateText' | 'generateObject' | 'streamText' | 'generateImage' | 'generateVideo' | 'resolveRoute'
+    > = {
+      ...scripted.client,
+      async generateObject(payload) {
+        if (String(payload.prompt || '').includes('你是一个对话感知模块。')) {
+          await perceptionGate;
+        }
+        return scripted.client.generateObject(payload);
+      },
+    };
+
+    let finished = false;
+    const executionPromise = harness.executeTurn({
+      userText: '我现在有点委屈，但不知道怎么开口。',
+      aiClient: gatedClient,
+    }).finally(() => {
+      finished = true;
+    });
+
+    await waitForCondition(() => assistantMessages(harness.state.messages).some((message) => message.content === '先别急，我先在。'));
+    assert.equal(finished, false);
+
+    releasePerception?.();
+    const result = await executionPromise;
+    const assistants = assistantMessages(result.messages);
+
+    assert.equal(scripted.counters.perception, 1);
+    assert.equal(assistants[0]?.content, '先别急，我先在。');
+    assert.equal(assistants[1]?.content, '你慢一点说，我跟着你。');
+  });
+});
+
+test('flagship scenario: local route starts first beat before deep perception', async () => {
+  const target = createTestTarget({
+    id: 'agent.local-chat.flagship.serial-local',
+    handle: '~serial-local',
+    displayName: 'Serial Local',
+  });
+
+  await withLocalChatTestEnv({ targets: [target] }, async () => {
+    const harness = createSendFlowHarness({
+      target,
+      defaultSettings: {
+        mediaAutonomy: 'off',
+        visualComfortLevel: 'text-only',
+        voiceAutonomy: 'off',
+      },
+    });
+    const scripted = createScriptedAiClient({
+      perceptionResult: {
+        turnMode: 'information',
+        emotionalState: null,
+        relevantMemoryIds: [],
+        conversationDirective: null,
+        intimacyCeiling: 'friendly',
+      },
+      firstBeatText: '我在，你继续说。',
+      planBeats: [{
+        text: '我先顺着你刚刚那句话接下去。',
+        intent: 'answer',
+        relationMove: 'friendly',
+        sceneMove: 'chat',
+        pauseMs: 220,
+      }],
+    });
+    const order: string[] = [];
+    const orderedClient: Pick<
+      LocalChatAiClient,
+      'generateText' | 'generateObject' | 'streamText' | 'generateImage' | 'generateVideo' | 'resolveRoute'
+    > = {
+      ...scripted.client,
+      async *streamText(payload) {
+        order.push(`stream:${String(payload.prompt || '').includes('你现在只负责生成首拍 firstBeat。') ? 'first-beat' : 'other'}`);
+        yield* scripted.client.streamText(payload);
+      },
+      async generateObject(payload) {
+        if (String(payload.prompt || '').includes('你是一个对话感知模块。')) {
+          order.push('perception');
+        }
+        return scripted.client.generateObject(payload);
+      },
+    };
+
+    const result = await harness.executeTurn({
+      userText: '我们刚刚聊到哪了？',
+      aiClient: orderedClient,
+    });
+
+    const assistants = assistantMessages(result.messages);
+    assert.equal(order[0], 'stream:first-beat');
+    assert.equal(order.includes('perception'), true);
+    assert.equal(assistants[0]?.content, '我在，你继续说。');
+  });
+});
+
 test('flagship scenario: remembered promise changes the next turn into continuity-aware followup', async () => {
   const target = createTestTarget({
     id: 'agent.local-chat.flagship.promise',

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS } from '../src/default-settings-store.ts';
+import { resolveFastTurnPerception } from '../src/hooks/turn-send/fast-turn-perception.ts';
 import { orchestrateBeatModalities } from '../src/hooks/turn-send/modality-orchestrator.ts';
 import { compileResolvedExperiencePolicy } from '../src/hooks/turn-send/resolved-experience-policy.ts';
 import { resolveTurnMode } from '../src/hooks/turn-send/turn-mode-resolver.ts';
@@ -165,6 +166,38 @@ test('turn-mode regression: emotional support stays emotional even for flirty pe
     interactionProfile,
     voiceConversationMode: 'off',
   }), 'emotional');
+});
+
+test('fast-turn-perception provides a conservative emotional first-beat hint', () => {
+  const interactionProfile = createInteractionProfile();
+  const result = resolveFastTurnPerception({
+    userText: '我今天真的有点委屈，只想你先抱抱我。',
+    interactionProfile,
+    snapshot: createSnapshot({
+      relationshipState: 'friendly',
+      conversationDirective: '顺着上一轮继续聊。',
+      openLoops: ['用户刚才还没把委屈讲完'],
+    }),
+  });
+
+  assert.equal(result.turnMode, 'intimate');
+  assert.equal(result.emotionalState?.detected, '委屈');
+  assert.equal(result.emotionalState?.suggestedApproach, 'empathize-first');
+  assert.equal(result.intimacyCeiling, 'friendly');
+  assert.match(result.conversationDirective || '', /不要越过当前边界/u);
+});
+
+test('fast-turn-perception keeps explicit media requests as setup-first followups', () => {
+  const interactionProfile = createInteractionProfile();
+  const result = resolveFastTurnPerception({
+    userText: '给我发张你现在的照片',
+    interactionProfile,
+    snapshot: createSnapshot({ relationshipState: 'warm' }),
+  });
+
+  assert.equal(result.turnMode, 'explicit-media');
+  assert.equal(result.intimacyCeiling, 'warm');
+  assert.match(result.conversationDirective || '', /媒体相关内容留到后续补充/u);
 });
 
 test('turn-mode regression: explicit intimate cue still resolves to intimate after guard tightening', () => {

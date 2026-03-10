@@ -4,7 +4,17 @@ import type { InteractionSnapshot, LocalChatTurnSendPhase } from '../../state/in
 import { resolvePresenceTheme } from './presence-theme.js';
 import type { LocalChatTargetItem } from './types.js';
 
-type LocalChatHeaderProps = {
+type PresenceStatusInput = {
+  loadingTargetDetail: boolean;
+  hasInputText: boolean;
+  isSending: boolean;
+  sendPhase: LocalChatTurnSendPhase;
+  messages: ChatMessage[];
+  playingVoiceMessageId: string | null;
+  t: (key: string) => string;
+};
+
+export type CompactConversationHeaderProps = {
   selectedTarget: LocalChatTargetItem;
   selectedTargetAvatarUrl: string | null;
   selectedTargetInitial: string;
@@ -18,7 +28,7 @@ type LocalChatHeaderProps = {
   onBackToTargetStage: () => void;
   onOpenSelectedTargetProfile: () => void;
   onOpenSettings: () => void;
-  onClearChatHistory: () => void;
+  onReturnToStage: () => void;
 };
 
 const ICON_ARROW_LEFT = (
@@ -34,23 +44,15 @@ const ICON_SETTINGS = (
   </svg>
 );
 
-const ICON_CLEAR_CHAT = (
+const ICON_STAGE = (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 6h18" />
-    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+    <rect x="3" y="4" width="18" height="14" rx="2" />
+    <path d="M8 20h8" />
+    <path d="M12 18v2" />
   </svg>
 );
 
-function resolvePresenceStatus(input: {
-  loadingTargetDetail: boolean;
-  hasInputText: boolean;
-  isSending: boolean;
-  sendPhase: LocalChatTurnSendPhase;
-  messages: ChatMessage[];
-  playingVoiceMessageId: string | null;
-  t: (key: string) => string;
-}): { label: string; busy: boolean } {
+export function resolvePresenceStatus(input: PresenceStatusInput): { label: string; busy: boolean } {
   if (input.loadingTargetDetail) {
     return { label: input.t('Header.presenceArriving'), busy: false };
   }
@@ -75,7 +77,7 @@ function resolvePresenceStatus(input: {
   return { label: input.t('Header.presenceIdle'), busy: false };
 }
 
-export function LocalChatHeader({
+export function CompactConversationHeader({
   selectedTarget,
   selectedTargetAvatarUrl,
   selectedTargetInitial,
@@ -89,8 +91,8 @@ export function LocalChatHeader({
   onBackToTargetStage,
   onOpenSelectedTargetProfile,
   onOpenSettings,
-  onClearChatHistory,
-}: LocalChatHeaderProps) {
+  onReturnToStage,
+}: CompactConversationHeaderProps) {
   const { t } = useModTranslation('local-chat');
   const theme = resolvePresenceTheme({
     seed: selectedTarget.id || selectedTarget.displayName,
@@ -105,98 +107,74 @@ export function LocalChatHeader({
     playingVoiceMessageId,
     t,
   });
-  const supportingCopy = String(selectedTarget.bio || '').trim() || selectedTarget.handle || t('Header.noBio');
 
   return (
-    <div className="relative overflow-hidden border-b border-white/70 px-6 pb-4 pt-4">
+    <div className="relative overflow-hidden border-b border-white/70 px-6 py-3">
       <div className="absolute inset-0 opacity-95" style={{ background: theme.roomAura }} />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-white/70" />
 
       <div className="relative z-10 flex items-center justify-between gap-4">
-        <button
-          type="button"
-          onClick={onBackToTargetStage}
-          className="lc-btn lc-btn-secondary h-9 rounded-full px-3.5 text-sm font-semibold text-slate-700"
-          aria-label={t('Header.backToTargets')}
-          title={t('Header.backToTargets')}
-        >
-          {ICON_ARROW_LEFT}
-          <span>{t('Header.backToTargets')}</span>
-        </button>
-
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-3">
           <button
             type="button"
-            onClick={onClearChatHistory}
-            title={t('Header.clearChatHistory')}
-            aria-label={t('Header.clearChatHistory')}
+            onClick={onBackToTargetStage}
             className="lc-btn lc-btn-secondary h-9 w-9 rounded-full text-slate-700"
+            aria-label={t('Header.backToTargets')}
+            title={t('Header.backToTargets')}
           >
-            {ICON_CLEAR_CHAT}
+            {ICON_ARROW_LEFT}
           </button>
+
           <button
             type="button"
-            onClick={onOpenSettings}
-            title={t('Header.openSettings')}
-            aria-label={t('Header.openSettings')}
-            className="lc-btn lc-btn-secondary h-9 w-9 rounded-full text-slate-700"
+            onClick={onOpenSelectedTargetProfile}
+            className="flex min-w-0 items-center gap-3 rounded-full bg-white/76 px-2.5 py-1.5 text-left shadow-[0_10px_26px_rgba(15,23,42,0.08)] transition-transform duration-200 hover:translate-y-[-1px]"
+            aria-label={t('Header.openProfileDrawer')}
+            title={t('Header.openProfileDrawer')}
           >
-            {ICON_SETTINGS}
-          </button>
-        </div>
-      </div>
-
-      <div className="relative z-10 mt-3 flex flex-col items-center text-center">
-        <button
-          type="button"
-          onClick={onOpenSelectedTargetProfile}
-          className="group relative rounded-full outline-none transition-transform duration-300 hover:scale-[1.02] focus-visible:ring-4 focus-visible:ring-white/80"
-          aria-label={t('Header.openProfileDrawer')}
-          title={t('Header.openProfileDrawer')}
-        >
-          <span
-            className="absolute inset-[-6px] rounded-full opacity-60"
-            style={{ background: theme.accentSoft }}
-          />
-          <span
-            className="absolute inset-[-3px] rounded-full border border-white/80"
-            style={{ boxShadow: `0 12px 28px ${theme.accentSoft}` }}
-          />
-          <span className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-white/80 bg-white/70 shadow-[0_12px_32px_rgba(15,23,42,0.10)]">
             {selectedTargetAvatarUrl ? (
               <img
                 src={selectedTargetAvatarUrl}
                 alt={selectedTarget.displayName}
-                className="h-full w-full object-cover"
+                className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-black/5"
               />
             ) : (
-              <span className="text-xl font-black" style={{ color: theme.text }}>
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-sm font-black ring-1 ring-black/5" style={{ color: theme.text }}>
                 {selectedTargetInitial}
               </span>
             )}
-          </span>
-        </button>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold text-slate-900">{selectedTarget.displayName}</span>
+              <span className="mt-0.5 inline-flex items-center gap-1.5 text-xs text-slate-500">
+                <span
+                  className={`inline-block h-2 w-2 rounded-full ${presenceState.busy ? 'animate-pulse' : ''}`}
+                  style={{ background: theme.accentStrong }}
+                />
+                <span className="truncate">{presenceState.label}</span>
+              </span>
+            </span>
+          </button>
+        </div>
 
-        <p className="mt-2.5 text-lg font-black tracking-tight text-slate-950">
-          {selectedTarget.displayName}
-        </p>
-        <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
-          {supportingCopy}
-        </p>
-
-        <div
-          className="mt-2.5 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-[0_8px_18px_rgba(15,23,42,0.06)]"
-          style={{
-            borderColor: theme.border,
-            background: 'rgba(255,255,255,0.78)',
-            color: theme.text,
-          }}
-        >
-          <span
-            className={`inline-block h-2 w-2 rounded-full ${presenceState.busy ? 'animate-pulse' : ''}`}
-            style={{ background: theme.accentStrong }}
-          />
-          <span>{presenceState.label}</span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onReturnToStage}
+            className="lc-btn lc-btn-secondary h-9 w-9 rounded-full text-slate-700"
+            aria-label={t('Header.returnToStage')}
+            title={t('Header.returnToStage')}
+          >
+            {ICON_STAGE}
+          </button>
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            className="lc-btn lc-btn-secondary h-9 w-9 rounded-full text-slate-700"
+            aria-label={t('Header.openSettings')}
+            title={t('Header.openSettings')}
+          >
+            {ICON_SETTINGS}
+          </button>
         </div>
       </div>
     </div>

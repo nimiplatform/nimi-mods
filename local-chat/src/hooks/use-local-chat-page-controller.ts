@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { LocalChatShellProps } from '../components/index.js';
 import type { ChatMessage } from '../types.js';
 import { useLocalChatPageActions } from './controller/use-local-chat-page-actions.js';
@@ -24,6 +24,19 @@ export function useLocalChatPageController(): LocalChatShellProps {
       void s.refreshAllDependencySnapshots();
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') {
+      return undefined;
+    }
+    const handleWindowFocus = () => {
+      void onRefresh();
+    };
+    window.addEventListener('focus', handleWindowFocus);
+    return () => {
+      window.removeEventListener('focus', handleWindowFocus);
+    };
+  }, [onRefresh]);
 
   const onOpenSelectedTargetProfile = useCallback(() => {
     const s = stateRef.current;
@@ -61,7 +74,6 @@ export function useLocalChatPageController(): LocalChatShellProps {
     setSelectedTargetId: state.targetsState.setSelectedTargetId,
     targetSearchText: state.targetsState.targetSearchText,
     setTargetSearchText: state.targetsState.setTargetSearchText,
-    onRefresh,
     selectedTarget: state.targetsState.selectedTarget,
     selectedTargetAvatarUrl: state.selectedTargetAvatarUrl,
     selectedTargetInitial: state.selectedTargetInitial,
@@ -106,6 +118,10 @@ export function useLocalChatPageController(): LocalChatShellProps {
     enableVoice: state.speechSettingsState.defaultSettings.enableVoice,
     voiceConversationMode: state.activeVoiceConversationMode,
     onVoiceConversationModeChange: state.setVoiceConversationMode,
+    conversationViewMode: state.conversationViewMode,
+    setConversationViewMode: state.setConversationViewMode,
+    isTranscriptNearBottom: state.isTranscriptNearBottom,
+    setIsTranscriptNearBottom: state.setIsTranscriptNearBottom,
     onSend,
     canSend: actions.canSend,
     voiceContextMenu: state.voiceContextMenu,
