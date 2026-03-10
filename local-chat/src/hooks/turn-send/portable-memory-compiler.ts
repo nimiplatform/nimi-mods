@@ -4,37 +4,40 @@ import type { LocalChatTurnAiClient } from './types.js';
 
 type GovernanceResult = Pick<RelationMemorySlot, 'portability' | 'sensitivity'>;
 
-function fallbackGovernance(slot: RelationMemorySlot): GovernanceResult {
+function isExplicitMemory(slot: Pick<RelationMemorySlot, 'key' | 'value'>): boolean {
   const text = `${slot.key} ${slot.value}`.toLowerCase();
-  if (/sex|nude|nsfw|裸体|做爱|胸|私密|情色|explicit|porn|fetish/u.test(text)) {
+  return /sex|nude|nsfw|裸体|做爱|胸|私密|情色|explicit|porn|fetish/u.test(text);
+}
+
+function fallbackGovernance(slot: RelationMemorySlot): GovernanceResult {
+  if (isExplicitMemory(slot)) {
     return {
       portability: 'blocked',
       sensitivity: 'intimate',
     };
   }
-  if (slot.slotType === 'taboo' || slot.slotType === 'boundary') {
-    return {
-      portability: 'local-only',
-      sensitivity: 'personal',
-    };
-  }
-  if (slot.slotType === 'promise' || slot.slotType === 'rapport') {
-    return {
-      portability: 'local-only',
-      sensitivity: 'personal',
-    };
-  }
   return {
-    portability: 'portable',
-    sensitivity: 'safe',
+    portability: 'local-only',
+    sensitivity: slot.slotType === 'boundary' || slot.slotType === 'taboo'
+      ? 'personal'
+      : slot.slotType === 'preference'
+      ? 'safe'
+      : 'personal',
   };
 }
 
 function applyGovernance(slot: RelationMemorySlot, governance: GovernanceResult | null | undefined): RelationMemorySlot {
+  const fallback = fallbackGovernance(slot);
+  const resolvedGovernance = isExplicitMemory(slot)
+    ? {
+      portability: 'blocked' as const,
+      sensitivity: 'intimate' as const,
+    }
+    : governance || fallback;
   return {
     ...slot,
-    portability: governance?.portability || fallbackGovernance(slot).portability,
-    sensitivity: governance?.sensitivity || fallbackGovernance(slot).sensitivity,
+    portability: resolvedGovernance.portability,
+    sensitivity: resolvedGovernance.sensitivity,
   };
 }
 

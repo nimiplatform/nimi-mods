@@ -302,6 +302,40 @@ test('context assembler keeps first-beat profile lightweight and continuity-awar
   assert.equal(packet.interactionSnapshot?.topicThreads.length, 2);
 });
 
+test('compiled prompt renders restrained content boundary when hint is present', async () => {
+  await resetLocalChatConversationLedgerForTests();
+  const target = createTarget();
+  const session = await createLocalChatSession({
+    targetId: target.id,
+    viewerId: 'viewer.test',
+    worldId: target.worldId,
+    title: 'Aki',
+  });
+
+  const packet = await assembleLocalChatContextPacket({
+    text: '你刚刚那句话也太撩了。',
+    viewerId: 'viewer.test',
+    viewerDisplayName: 'Viewer',
+    selectedTarget: target,
+    selectedSessionId: session.id,
+    allowMultiReply: true,
+    turnMode: 'playful',
+    voiceConversationMode: 'on',
+  });
+  packet.contentBoundaryHint = {
+    visualComfortLevel: 'restrained-visuals',
+    relationshipBoundaryPreset: 'reserved',
+  };
+
+  const compiled = buildLocalChatCompiledPrompt({
+    contextPacket: packet,
+  });
+
+  assert.equal(compiled.layerOrder.includes('contentBoundary'), true);
+  assert.match(compiled.prompt, /用户当前选择克制风格/u);
+  assert.match(compiled.prompt, /不要主动调情/u);
+});
+
 test('context assembler prioritizes unresolved continuity and trims session recall to top-k', async () => {
   await resetLocalChatConversationLedgerForTests();
   const target = createTarget();

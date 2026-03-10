@@ -97,6 +97,7 @@ export async function runVideoTurn(input: {
   durationSeconds?: number;
   aspectRatio?: string;
   cameraMotion?: string;
+  referenceImageUrl?: string | null;
 }): Promise<VideoTurnRunnerResult> {
   const normalizedPrompt = String(input.prompt || '').trim();
   if (!normalizedPrompt) {
@@ -161,14 +162,20 @@ export async function runVideoTurn(input: {
     }
 
     const pinnedRouteBinding = toPinnedRouteBinding(resolvedRoute);
+    const referenceImageUrl = String(input.referenceImageUrl || '').trim();
     const generated = await input.aiClient.generateVideo({
       capability: 'video.generate',
       routeBinding: pinnedRouteBinding,
       model: pinnedRouteBinding.model || routeConfig.model,
       prompt: normalizedPrompt,
       negativePrompt: input.negativePrompt,
-      mode: 't2v',
-      content: [{ type: 'text', text: normalizedPrompt }],
+      mode: referenceImageUrl ? 'i2v-reference' : 't2v',
+      content: [
+        { type: 'text', role: 'prompt', text: normalizedPrompt },
+        ...(referenceImageUrl
+          ? [{ type: 'image_url' as const, role: 'reference_image' as const, imageUrl: referenceImageUrl }]
+          : []),
+      ],
       options: {
         ...(typeof input.durationSeconds === 'number' ? { durationSec: input.durationSeconds } : {}),
         ...(input.aspectRatio ? { ratio: input.aspectRatio } : {}),

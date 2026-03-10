@@ -1,4 +1,5 @@
 import type { PromptLayerId } from '../prompt/types.js';
+import type { LocalChatDefaultSettings } from '../default-settings-store.js';
 import type {
   LocalChatBeatModality,
   ChatMessageKind,
@@ -391,6 +392,10 @@ export type LocalChatContextPacket = {
   recallIndex?: InteractionRecallDoc[];
   turnMode?: LocalChatTurnMode;
   voiceConversationMode?: VoiceConversationMode;
+  contentBoundaryHint?: {
+    visualComfortLevel: LocalChatDefaultSettings['visualComfortLevel'];
+    relationshipBoundaryPreset: LocalChatDefaultSettings['relationshipBoundaryPreset'];
+  };
   pacingPlan: LocalChatReplyPacingPlan;
   perceptionOverlay?: {
     refinedTurnMode: LocalChatTurnMode;

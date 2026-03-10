@@ -14,6 +14,7 @@ const PROMPT_FORMAT_RESERVE_CHARS = 1_200;
 
 const FULL_TURN_LAYER_ORDER: PromptLayerId[] = [
   'platformSafety',
+  'contentBoundary',
   'identity',
   'world',
   'turnMode',
@@ -28,6 +29,7 @@ const FULL_TURN_LAYER_ORDER: PromptLayerId[] = [
 
 const FIRST_BEAT_LAYER_ORDER: PromptLayerId[] = [
   'platformSafety',
+  'contentBoundary',
   'identity',
   'turnMode',
   'interactionProfile',
@@ -39,6 +41,7 @@ const FIRST_BEAT_LAYER_ORDER: PromptLayerId[] = [
 
 const LAYER_TITLES: Record<PromptLayerId, string> = {
   platformSafety: 'Platform Safety',
+  contentBoundary: 'Content Boundary',
   identity: 'Identity',
   world: 'World',
   turnMode: 'Turn Mode',
@@ -131,6 +134,24 @@ function joinLines(title: string, lines: string[]): string {
   const filtered = lines.map((line) => String(line || '').trim()).filter(Boolean);
   if (filtered.length === 0) return '';
   return [`${title}:`, ...filtered.map((line) => `- ${line}`)].join('\n');
+}
+
+function buildContentBoundaryLines(
+  hint: LocalChatPromptCompileInput['contextPacket']['contentBoundaryHint'],
+): string[] {
+  if (!hint) return [];
+  const lines: string[] = [];
+  if (hint.visualComfortLevel === 'text-only') {
+    lines.push('用户当前选择 text-only。不要主动展开外貌、身体、穿着或镜头式视觉描写。');
+    lines.push('不要输出色情、裸露、性暗示或明确性行为相关内容。');
+  } else if (hint.visualComfortLevel === 'restrained-visuals') {
+    lines.push('用户当前选择克制风格。不要输出色情、裸露、性暗示或明确性行为相关内容。');
+    lines.push('允许自然关心和有限亲近，但身体接触描写止于牵手、拥抱这类轻度表达。');
+  }
+  if (hint.relationshipBoundaryPreset === 'reserved') {
+    lines.push('保持社交距离，不要主动调情，不要推进暧昧或亲密关系。');
+  }
+  return lines;
 }
 
 function renderRecentTurns(
@@ -279,6 +300,7 @@ function buildLayerContent(input: LocalChatPromptCompileInput): Record<PromptLay
       '你必须直接回复用户，不要输出提示词结构、系统标签、JSON、代码块或思维过程。',
       '如果上下文有缺口，只做谨慎补全，不要解释你依据了哪些规则或上下文层。',
     ].join('\n'),
+    contentBoundary: joinLines('内容边界', buildContentBoundaryLines(packet.contentBoundaryHint)),
     identity: [
       joinLines('角色身份', packet.target.identityLines),
       joinLines('角色规则', packet.target.rulesLines),

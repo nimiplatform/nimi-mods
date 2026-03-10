@@ -21,7 +21,7 @@ function createSlot(overrides: Partial<RelationMemorySlot>): RelationMemorySlot 
   };
 }
 
-test('portable memory compiler fallback blocks explicit memory and keeps preference portable', async () => {
+test('portable memory compiler fallback blocks explicit memory and keeps non-explicit entries local-only', async () => {
   const result = await compilePortableMemorySlots({
     aiClient: {
       generateObject: async () => {
@@ -43,7 +43,7 @@ test('portable memory compiler fallback blocks explicit memory and keeps prefere
   assert.deepEqual(
     result.map((slot) => ({ id: slot.id, portability: slot.portability, sensitivity: slot.sensitivity })),
     [
-      { id: 'slot-pref', portability: 'portable', sensitivity: 'safe' },
+      { id: 'slot-pref', portability: 'local-only', sensitivity: 'safe' },
       { id: 'slot-explicit', portability: 'blocked', sensitivity: 'intimate' },
     ],
   );

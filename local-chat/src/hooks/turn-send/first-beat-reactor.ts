@@ -110,6 +110,22 @@ function buildFirstBeatPrompt(input: {
   contextPacket: LocalChatContextPacket;
   userText: string;
 }): string {
+  const restrainedLines = (() => {
+    const hint = input.contextPacket.contentBoundaryHint;
+    if (!hint) return [];
+    if (hint.visualComfortLevel === 'text-only') {
+      return [
+        '- 用户当前选择 text-only。不要展开外貌、身体、穿着或镜头式视觉描写。',
+        '- 不要输出色情、裸露、性暗示或明确性行为相关内容。',
+      ];
+    }
+    if (hint.visualComfortLevel === 'restrained-visuals') {
+      return [
+        '- 用户当前选择克制风格。不要输出色情、裸露、性暗示或明确性行为相关内容。',
+      ];
+    }
+    return [];
+  })();
   return [
     input.prompt,
     '',
@@ -124,6 +140,7 @@ function buildFirstBeatPrompt(input: {
     '- 即使用户显式要语音，也先用文字把首句说完。',
     '- 不要主动推进关系，不要做承诺，不要承诺马上发图或发视频。',
     '- 不要引用你没把握的记忆；拿不准时，只顺着用户当前这句话自然接住。',
+    ...restrainedLines,
     `- 结束标记固定为 ${FIRST_BEAT_END_MARKER}，必须原样输出在首句最后。`,
     `- 除了首拍正文和结束标记 ${FIRST_BEAT_END_MARKER} 之外，不要输出任何别的内容。`,
     `- 示例：我还在听${FIRST_BEAT_END_MARKER}`,

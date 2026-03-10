@@ -55,12 +55,8 @@ export function useLocalChatPageController(): LocalChatShellProps {
     void stateRef.current.speechPlaybackState.playVoiceMessage(message);
   }, []);
 
-  const onMemoryOverrideChange = useCallback((slotId: string, override: Parameters<LocalChatShellProps['onMemoryOverrideChange']>[1]) => {
-    void stateRef.current.updateRelationMemorySlotOverride(slotId, override);
-  }, []);
-
-  const onDeleteMemorySlot = useCallback((slotId: string) => {
-    void stateRef.current.deleteRelationMemorySlot(slotId);
+  const onClearMemory = useCallback(() => {
+    void stateRef.current.clearHiddenMemory();
   }, []);
 
   const onSend = useCallback(() => {
@@ -101,15 +97,12 @@ export function useLocalChatPageController(): LocalChatShellProps {
     setInputText: state.setInputText,
     productSettings: state.speechSettingsState.productSettings,
     activeInteractionSnapshot: state.activeInteractionSnapshot,
-    activeRelationMemorySlots: state.activeRelationMemorySlots,
-    memorySyncStatus: state.memorySyncStatus,
     onToggleProductSetting: actions.handleDefaultSettingChange,
     onDefaultMediaAutonomyChange: actions.handleMediaAutonomyChange,
     onDefaultVoiceAutonomyChange: actions.handleVoiceAutonomyChange,
     onDefaultVoiceConversationModeChange: actions.handleVoiceConversationModeChange,
     onVisualComfortLevelChange: actions.handleVisualComfortLevelChange,
-    onMemoryOverrideChange,
-    onDeleteMemorySlot,
+    onClearMemory,
     hasConversationHistory: state.messages.length > 0,
     onInputKeyDown: actions.handleKeyDown,
     voiceInputState: state.speechTranscribeState.voiceInputState,

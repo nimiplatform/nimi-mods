@@ -10,6 +10,7 @@ import {
   setTargetsListCache,
   setTargetsListInFlight,
 } from './cache-store.js';
+import { readLocalChatReferenceImageUrl } from './reference-image.js';
 import { asNullableString, asString, withReadContext } from './read-context.js';
 import type { LocalChatReadContext, LocalChatTarget } from './types.js';
 
@@ -69,6 +70,7 @@ function toBaseTargetFromFriend(friend: Record<string, unknown>): LocalChatTarge
     handle,
     displayName: asString(friend.displayName) || handle,
     avatarUrl: asNullableString(friend.avatarUrl),
+    referenceImageUrl: readLocalChatReferenceImageUrl(friend),
     bio: asNullableString(friend.bio),
     friendsSince: asNullableString(friend.friendsSince),
     isAgent: true,

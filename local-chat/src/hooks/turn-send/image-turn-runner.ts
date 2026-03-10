@@ -99,6 +99,7 @@ export async function runImageTurn(input: {
   quality?: string;
   style?: string;
   count?: number;
+  referenceImages?: string[];
 }): Promise<ImageTurnRunnerResult> {
   const normalizedPrompt = String(input.prompt || '').trim();
   if (!normalizedPrompt) {
@@ -169,6 +170,7 @@ export async function runImageTurn(input: {
       model: pinnedRouteBinding.model || routeConfig.model,
       prompt: normalizedPrompt,
       negativePrompt: input.negativePrompt,
+      referenceImages: input.referenceImages,
       extensions: {
         ...(input.size ? { size: input.size } : {}),
         ...(input.aspectRatio ? { aspectRatio: input.aspectRatio } : {}),

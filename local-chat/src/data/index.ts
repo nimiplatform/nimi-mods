@@ -22,6 +22,10 @@ export {
   listLocalChatTargets,
 } from './targets-list-query.js';
 export { resolveLocalChatTargetDetail } from './target-detail-query.js';
+export {
+  readLocalChatReferenceImageUrl,
+  resolveLocalChatTargetReferenceImageUrl,
+} from './reference-image.js';
 export { buildLocalChatCompiledPrompt, buildLocalChatPrompt } from './prompt-builder.js';
 export {
   recallLocalChatMemoryForPrompt,

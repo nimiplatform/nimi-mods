@@ -1,14 +1,8 @@
 import { createLocalChatFlowId } from '../logging.js';
 import {
   createLocalChatTurnRecord,
-  getLocalChatInteractionSnapshot,
-  getLocalChatSession,
   listAllLocalChatSessions,
-  listLocalChatMediaAssets,
   loadLocalChatDefaultSettings,
-  replaceLocalChatRecallIndex,
-  replaceLocalChatRelationMemorySlots,
-  upsertLocalChatInteractionSnapshot,
 } from '../state/index.js';
 import {
   buildLocalChatCompiledPrompt,
@@ -34,12 +28,14 @@ import { orchestrateBeatModalities } from '../hooks/turn-send/modality-orchestra
 import { decideMediaExecution } from '../hooks/turn-send/media-decision-policy.js';
 import { executeMediaDecision } from '../hooks/turn-send/media-execution-pipeline.js';
 import { isMediaRouteReady } from '../hooks/turn-send/media-route.js';
-import { compileInteractionState } from '../hooks/turn-send/interaction-state-compiler.js';
-import { compilePortableMemorySlots } from '../hooks/turn-send/portable-memory-compiler.js';
-import { compileResolvedExperiencePolicy } from '../hooks/turn-send/resolved-experience-policy.js';
+import {
+  applyResolvedContentBoundaryHint,
+  compileResolvedExperiencePolicy,
+} from '../hooks/turn-send/resolved-experience-policy.js';
 import { deriveInteractionProfile } from '../hooks/turn-send/interaction-profile.js';
 import { derivePacingPlan } from '../hooks/turn-send/context-assembler.js';
 import { resolveTurnMode } from '../hooks/turn-send/turn-mode-resolver.js';
+import { persistLocalChatInteractionArtifacts } from '../hooks/turn-send/interaction-artifact-persistence.js';
 import { toChatMessagesFromSession } from '../services/view/messages.js';
 import { createUlid } from '../utils/ulid.js';
 import {
@@ -258,6 +254,10 @@ export async function runLocalChatProactiveHeartbeatCycle(
         settings,
         requestedVoiceConversationMode: voiceConversationMode,
         routeSource: prepared.invokeInput.routeBinding?.source || 'local',
+      });
+      applyResolvedContentBoundaryHint({
+        contextPacket: prepared.contextPacket,
+        policy: resolvedExperiencePolicy,
       });
       const effectiveVoiceConversationMode = resolvedExperiencePolicy.voicePolicy.conversationMode;
       const proactiveDirective = '请自然地主动联系用户，像刚刚想起对方一样发起问候，不要解释理由。';
@@ -592,6 +592,7 @@ export async function runLocalChatProactiveHeartbeatCycle(
               nsfwPolicy,
               fallbackRouteSource: prepared.invokeInput.routeBinding?.source === 'cloud' ? 'cloud' : 'local',
               sessionId: session.id,
+              target,
               targetId: target.id,
               viewerId: session.viewerId,
               assistantTurnId,
@@ -616,44 +617,14 @@ export async function runLocalChatProactiveHeartbeatCycle(
       });
       await schedule.done;
 
-      const [nextSession, mediaAssets, previousSnapshot] = await Promise.all([
-        getLocalChatSession(session.id, session.viewerId),
-        listLocalChatMediaAssets({
-          conversationId: session.id,
-          turnId,
-        }),
-        getLocalChatInteractionSnapshot(session.id),
-      ]);
-      const compiled = compileInteractionState({
-        conversationId: session.id,
+      await persistLocalChatInteractionArtifacts({
+        aiClient: input.aiClient,
+        sessionId: session.id,
         targetId: target.id,
         viewerId: session.viewerId,
-        session: nextSession,
+        assistantTurnId: turnId,
         deliveredBeats: deliveredBeats.filter((beat) => deliveredBeatIds.has(beat.beatId)),
-        mediaAssets,
-        previousSnapshot,
       });
-      const portableMemorySlots = await compilePortableMemorySlots({
-        aiClient: input.aiClient,
-        relationMemorySlots: compiled.relationMemorySlots,
-        interactionSnapshot: compiled.snapshot,
-        recentSummaries: [
-          firstBeatText,
-          ...deliveries.map((delivery) => normalizeBeatText(delivery.content)).filter(Boolean),
-        ],
-      });
-      await Promise.all([
-        upsertLocalChatInteractionSnapshot(compiled.snapshot),
-        replaceLocalChatRelationMemorySlots({
-          targetId: target.id,
-          viewerId: session.viewerId,
-          entries: portableMemorySlots,
-        }),
-        replaceLocalChatRecallIndex({
-          conversationId: session.id,
-          docs: compiled.recallDocs,
-        }),
-      ]);
       recordLocalChatProactiveContact({
         targetId: target.id,
         atMs: nowMs,

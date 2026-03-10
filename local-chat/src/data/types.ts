@@ -29,6 +29,7 @@ export type LocalChatTarget = {
   handle: string;
   displayName: string;
   avatarUrl: string | null;
+  referenceImageUrl?: string | null;
   bio: string | null;
   friendsSince: string | null;
   isAgent: boolean;

@@ -74,4 +74,7 @@ test('nsfw media generation gate follows strict tri-state policy', () => {
 test('nsfw prompt detector keeps explicit prompts only', () => {
   assert.equal(isPromptLikelyNsfw('A detailed city skyline at sunset.'), false);
   assert.equal(isPromptLikelyNsfw('nsfw lingerie portrait, 18+'), true);
+  assert.equal(isPromptLikelyNsfw('topless explicit adult portrait'), true);
+  assert.equal(isPromptLikelyNsfw('半裸情色写真，带呻吟和高潮暗示'), true);
+  assert.equal(isPromptLikelyNsfw('今晚一起散步吧，抱一下就好。'), false);
 });

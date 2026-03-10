@@ -6,6 +6,8 @@ import type {
   LocalChatSession,
   LocalChatTurnAudit,
 } from '../../state/index.js';
+import type { LocalChatTarget } from '../../data/index.js';
+import { resolveLocalChatTargetReferenceImageUrl } from '../../data/index.js';
 import {
   getLocalChatCachedMediaAsset,
   putLocalChatCachedMediaAsset,
@@ -34,6 +36,7 @@ export type ExecuteMediaDecisionInput = {
   nsfwPolicy: 'disabled' | 'local-only' | 'allowed';
   fallbackRouteSource: MediaRouteSource;
   sessionId: string;
+  target: LocalChatTarget;
   targetId: string;
   viewerId: string;
   assistantTurnId: string;
@@ -147,6 +150,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
   }
 
   const { prepared, intent, resolvedRoute } = input.decision;
+  const referenceImageUrl = resolveLocalChatTargetReferenceImageUrl(input.target);
   const executionCacheKey = await createMediaExecutionCacheKey({
     specHash: prepared.specHash,
     compiled: prepared.compiled,
@@ -232,6 +236,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
       quality: prepared.compiled.runtimePayload.quality,
       style: prepared.compiled.runtimePayload.style,
       count: prepared.compiled.runtimePayload.n,
+      referenceImages: referenceImageUrl ? [referenceImageUrl] : undefined,
     });
     if (input.getCurrentContextKey() !== input.sendContextKey) {
       input.setMessages((prev) => prev.filter((message) => message.id !== intent.pendingMessageId));
@@ -399,6 +404,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
       durationSeconds: prepared.compiled.runtimePayload.durationSeconds,
       aspectRatio: prepared.compiled.runtimePayload.aspectRatio,
       cameraMotion: prepared.compiled.runtimePayload.cameraMotion,
+      referenceImageUrl,
     });
   if (input.getCurrentContextKey() !== input.sendContextKey) {
     input.setMessages((prev) => prev.filter((message) => message.id !== intent.pendingMessageId));

@@ -54,15 +54,12 @@ export function LocalChatShell(props: LocalChatShellProps) {
     setInputText,
     productSettings,
     activeInteractionSnapshot,
-    activeRelationMemorySlots,
-    memorySyncStatus,
     onToggleProductSetting,
     onDefaultMediaAutonomyChange,
     onDefaultVoiceAutonomyChange,
     onDefaultVoiceConversationModeChange,
     onVisualComfortLevelChange,
-    onMemoryOverrideChange,
-    onDeleteMemorySlot,
+    onClearMemory,
     hasConversationHistory,
     onInputKeyDown,
     voiceInputState,
@@ -297,13 +294,10 @@ export function LocalChatShell(props: LocalChatShellProps) {
         selectedTargetInitial={selectedTargetInitial}
         interactionProfile={selectedTargetInteractionProfile}
         interactionSnapshot={activeInteractionSnapshot}
-        relationMemorySlots={activeRelationMemorySlots}
-        memorySyncStatus={memorySyncStatus}
         onClose={() => setIsProfileDrawerOpen(false)}
         onOpenSelectedTargetProfile={onOpenSelectedTargetProfile}
         onClearChatHistory={onClearChatHistory}
-        onMemoryOverrideChange={onMemoryOverrideChange}
-        onDeleteMemorySlot={onDeleteMemorySlot}
+        onClearMemory={onClearMemory}
       />
     </div>
   );

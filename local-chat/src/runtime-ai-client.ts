@@ -23,6 +23,7 @@ export type LocalChatAiImageRequest = LocalChatAiRouteInput & {
   prompt: string;
   negativePrompt?: string;
   model?: string;
+  referenceImages?: string[];
   extensions?: Record<string, unknown>;
 };
 
@@ -454,6 +455,7 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
         prompt: input.prompt,
         negativePrompt: input.negativePrompt,
         model: input.model || route.model || undefined,
+        referenceImages: input.referenceImages,
         binding: input.routeBinding,
         extensions: input.extensions,
       });

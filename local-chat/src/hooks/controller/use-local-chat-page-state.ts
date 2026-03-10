@@ -39,17 +39,11 @@ import {
 } from '../../services/tts/recovery.js';
 import { ReasonCode } from '@nimiplatform/sdk/types';
 import { createLocalChatAiClient } from '../../runtime-ai-client.js';
-import type { InteractionSnapshot, RelationMemorySlot } from '../../state/index.js';
+import type { InteractionSnapshot } from '../../state/index.js';
 import {
-  deleteLocalChatRelationMemorySlot,
+  clearLocalChatHiddenMemoryState,
   getLocalChatInteractionSnapshot,
-  listLocalChatRelationMemorySlots,
-  updateLocalChatRelationMemorySlot,
 } from '../../state/index.js';
-import {
-  createUnsupportedMemorySyncAdapter,
-  type MemorySyncStatus,
-} from '../../services/memory/memory-sync-adapter.js';
 import { useLocalChatConversationViewMode } from './use-local-chat-conversation-view-mode.js';
 
 type RuntimeFieldsMap = {
@@ -114,7 +108,6 @@ export function useLocalChatPageState() {
   const runtimeClient = useMemo(() => createModRuntimeClient(LOCAL_CHAT_MOD_ID), []);
   const aiClient = useMemo(() => createLocalChatAiClient(runtimeClient), [runtimeClient]);
   const runtimeInspector = useMemo(() => createModRuntimeInspector(LOCAL_CHAT_MOD_ID), []);
-  const memorySyncAdapter = useMemo(() => createUnsupportedMemorySyncAdapter(), []);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const inputTextRef = useRef('');
@@ -144,8 +137,6 @@ export function useLocalChatPageState() {
   const [videoDependencySnapshot, setVideoDependencySnapshot] = useState<ModRuntimeDependencySnapshot | null>(null);
   const [voiceConversationModeBySessionId, setVoiceConversationModeBySessionId] = useState<Record<string, VoiceConversationMode>>({});
   const [activeInteractionSnapshot, setActiveInteractionSnapshot] = useState<InteractionSnapshot | null>(null);
-  const [activeRelationMemorySlots, setActiveRelationMemorySlots] = useState<RelationMemorySlot[]>([]);
-  const [memorySyncStatus, setMemorySyncStatus] = useState<MemorySyncStatus>({ state: 'unsupported' });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const dependencySnapshotRefreshRef = useRef<Promise<void> | null>(null);
@@ -803,71 +794,34 @@ export function useLocalChatPageState() {
   }, [sessionsState.selectedSessionId]);
 
   const refreshMemorySurface = useCallback(async () => {
-    const targetId = String(targetsState.selectedTargetId || '').trim();
     const conversationId = String(sessionsState.selectedSessionId || '').trim();
-    if (!targetId || !conversationId) {
+    if (!conversationId) {
       setActiveInteractionSnapshot(null);
-      setActiveRelationMemorySlots([]);
-      setMemorySyncStatus({ state: 'unsupported' });
       return;
     }
-    const [snapshot, slots, syncStatus] = await Promise.all([
-      getLocalChatInteractionSnapshot(conversationId),
-      listLocalChatRelationMemorySlots({
-        targetId,
-        viewerId: currentUserId,
-      }),
-      memorySyncAdapter.status({
-        viewerId: currentUserId,
-        targetId,
-        worldId: targetsState.selectedTarget?.worldId || null,
-      }),
-    ]);
+    const snapshot = await getLocalChatInteractionSnapshot(conversationId);
     setActiveInteractionSnapshot(snapshot);
-    setActiveRelationMemorySlots(slots);
-    setMemorySyncStatus(syncStatus);
   }, [
-    currentUserId,
-    memorySyncAdapter,
     sessionsState.selectedSessionId,
-    targetsState.selectedTarget?.worldId,
-    targetsState.selectedTargetId,
   ]);
 
   useEffect(() => {
     void refreshMemorySurface();
   }, [refreshMemorySurface, messages.length]);
 
-  const updateRelationMemorySlotOverride = useCallback(async (slotId: string, userOverride: RelationMemorySlot['userOverride']) => {
+  const clearHiddenMemory = useCallback(async () => {
     const targetId = String(targetsState.selectedTargetId || '').trim();
-    if (!slotId || !targetId) {
+    const conversationId = String(sessionsState.selectedSessionId || '').trim();
+    if (!targetId || !conversationId) {
       return;
     }
-    await updateLocalChatRelationMemorySlot({
-      id: slotId,
-      targetId,
-      viewerId: currentUserId,
-      updater: (previous) => ({
-        ...previous,
-        userOverride,
-        updatedAt: new Date().toISOString(),
-      }),
-    });
-    await refreshMemorySurface();
-  }, [currentUserId, refreshMemorySurface, targetsState.selectedTargetId]);
-
-  const deleteRelationMemorySlot = useCallback(async (slotId: string) => {
-    const targetId = String(targetsState.selectedTargetId || '').trim();
-    if (!slotId || !targetId) {
-      return;
-    }
-    await deleteLocalChatRelationMemorySlot({
-      id: slotId,
+    await clearLocalChatHiddenMemoryState({
+      conversationId,
       targetId,
       viewerId: currentUserId,
     });
-    await refreshMemorySurface();
-  }, [currentUserId, refreshMemorySurface, targetsState.selectedTargetId]);
+    setActiveInteractionSnapshot(null);
+  }, [currentUserId, sessionsState.selectedSessionId, targetsState.selectedTargetId]);
 
   const turnSendState = useLocalChatTurnSend({
     aiClient,
@@ -942,11 +896,8 @@ export function useLocalChatPageState() {
     refreshAllDependencySnapshots,
     refreshMediaDependencySnapshots,
     activeInteractionSnapshot,
-    activeRelationMemorySlots,
-    memorySyncStatus,
     refreshMemorySurface,
-    updateRelationMemorySlotOverride,
-    deleteRelationMemorySlot,
+    clearHiddenMemory,
     inputRef,
     messagesEndRef,
     currentUserDisplayName,

@@ -23,24 +23,20 @@ import { perceiveTurn } from './turn-perception.js';
 import { composeInteractionTurnPlan } from './turn-composer.js';
 import { runFirstBeatReactor } from './first-beat-reactor.js';
 import { orchestrateBeatModalities } from './modality-orchestrator.js';
-import { compilePortableMemorySlots } from './portable-memory-compiler.js';
-import { compileResolvedExperiencePolicy } from './resolved-experience-policy.js';
+import {
+  applyResolvedContentBoundaryHint,
+  compileResolvedExperiencePolicy,
+} from './resolved-experience-policy.js';
 import { buildPromptTrace, buildTurnAudit } from './diagnostics.js';
 import { derivePacingPlan } from './context-assembler.js';
 import { buildLocalChatCompiledPrompt } from '../../data/index.js';
 import {
   appendTurnsToSession,
   createLocalChatTurnRecord,
-  getLocalChatInteractionSnapshot,
-  getLocalChatSession,
-  listLocalChatMediaAssets,
   listLocalChatSessions,
-  replaceLocalChatRecallIndex,
-  replaceLocalChatRelationMemorySlots,
-  upsertLocalChatInteractionSnapshot,
 } from '../../state/index.js';
 import type { LocalChatTurnSendPhase } from '../../state/index.js';
-import { compileInteractionState } from './interaction-state-compiler.js';
+import { persistLocalChatInteractionArtifacts } from './interaction-artifact-persistence.js';
 import { createUlid } from '../../utils/ulid.js';
 import { createSessionTurn } from '../../services/view/messages.js';
 import type { MediaExecutionDecision } from './media-decision-types.js';
@@ -240,55 +236,6 @@ function upsertTransientFirstBeatMessage(input: {
   });
 }
 
-async function persistInteractionState(input: {
-  aiClient: UseLocalChatTurnSendInput['aiClient'];
-  sessionId: string;
-  targetId: string;
-  viewerId: string;
-  assistantTurnId: string;
-  deliveredBeats: OrchestratedBeat[];
-  routeBinding: UseLocalChatTurnSendInput['routeBinding'];
-  conversationDirective?: string | null;
-}): Promise<void> {
-  const [session, mediaAssets, previousSnapshot] = await Promise.all([
-    getLocalChatSession(input.sessionId, input.viewerId),
-    listLocalChatMediaAssets({ conversationId: input.sessionId, turnId: input.assistantTurnId }),
-    getLocalChatInteractionSnapshot(input.sessionId),
-  ]);
-  const compiled = compileInteractionState({
-    conversationId: input.sessionId,
-    targetId: input.targetId,
-    viewerId: input.viewerId,
-    session,
-    deliveredBeats: input.deliveredBeats,
-    mediaAssets,
-    conversationDirective: input.conversationDirective,
-    previousSnapshot,
-  });
-  const portableMemorySlots = await compilePortableMemorySlots({
-    aiClient: input.aiClient,
-    relationMemorySlots: compiled.relationMemorySlots,
-    interactionSnapshot: compiled.snapshot,
-    routeBinding: input.routeBinding || undefined,
-    recentSummaries: [
-      ...input.deliveredBeats.map((beat) => normalizeBeatText(beat.text)),
-      ...mediaAssets.map((asset) => normalizeBeatText(`${asset.kind} ${asset.model || ''} ${asset.renderUri || ''}`)),
-    ].filter(Boolean),
-  });
-  await Promise.all([
-    upsertLocalChatInteractionSnapshot(compiled.snapshot),
-    replaceLocalChatRelationMemorySlots({
-      targetId: input.targetId,
-      viewerId: input.viewerId,
-      entries: portableMemorySlots,
-    }),
-    replaceLocalChatRecallIndex({
-      conversationId: input.sessionId,
-      docs: compiled.recallDocs,
-    }),
-  ]);
-}
-
 export async function runLocalChatTurnSend(input: {
   context: UseLocalChatTurnSendInput;
   abortSignal?: AbortSignal;
@@ -409,6 +356,10 @@ export async function runLocalChatTurnSend(input: {
       settings: context.defaultSettings,
       requestedVoiceConversationMode: voiceConversationMode,
       routeSource: firstBeatPrepared.invokeInput.routeBinding?.source || context.routeSnapshot?.source || 'local',
+    });
+    applyResolvedContentBoundaryHint({
+      contextPacket: firstBeatPrepared.contextPacket,
+      policy: resolvedExperiencePolicy,
     });
     const shouldSerializeDeepPerception = resolvedExperiencePolicy.mediaPolicy.routeSource === 'local';
     let turnMode = fastPerception.turnMode;
@@ -575,6 +526,10 @@ export async function runLocalChatTurnSend(input: {
       directive: activeDirective || '',
       intimacyCeiling: perception.intimacyCeiling,
     };
+    applyResolvedContentBoundaryHint({
+      contextPacket: prepared.contextPacket,
+      policy: resolvedExperiencePolicy,
+    });
     prepared.contextPacket.turnMode = turnMode;
     prepared.contextPacket.pacingPlan = derivePacingPlan({
       text,
@@ -869,7 +824,7 @@ export async function runLocalChatTurnSend(input: {
     }
 
     if (deliveries.length === 0) {
-      await persistInteractionState({
+      await persistLocalChatInteractionArtifacts({
         sessionId,
         targetId: selectedTarget.id,
         viewerId: context.viewerId,
@@ -878,6 +833,7 @@ export async function runLocalChatTurnSend(input: {
         aiClient: context.aiClient,
         routeBinding,
         conversationDirective: activeDirective,
+        userText: text,
       });
       logTurnSendDone({
         flowId,
@@ -968,6 +924,7 @@ export async function runLocalChatTurnSend(input: {
             nsfwPolicy,
             fallbackRouteSource: prepared.invokeInput.routeBinding?.source === 'cloud' ? 'cloud' : 'local',
             sessionId,
+            target: selectedTarget,
             targetId: selectedTarget.id,
             viewerId: context.viewerId,
             assistantTurnId,
@@ -1024,7 +981,7 @@ export async function runLocalChatTurnSend(input: {
     handedOffToSchedule = true;
     void schedule.done
       .then(async () => {
-        await persistInteractionState({
+        await persistLocalChatInteractionArtifacts({
           sessionId,
           targetId: selectedTarget.id,
           viewerId: context.viewerId,
@@ -1033,6 +990,7 @@ export async function runLocalChatTurnSend(input: {
           aiClient: context.aiClient,
           routeBinding,
           conversationDirective: activeDirective,
+          userText: text,
         });
       })
       .catch((scheduleError) => {

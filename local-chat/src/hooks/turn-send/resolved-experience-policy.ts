@@ -1,6 +1,7 @@
 import type {
   DerivedInteractionProfile,
   InteractionSnapshot,
+  LocalChatContextPacket,
   LocalChatDefaultSettings,
   LocalChatInspectSettings,
   VoiceConversationMode,
@@ -170,5 +171,15 @@ export function compileResolvedExperiencePolicy(input: {
       diagnosticsVisible: input.settings.diagnosticsVisible,
       runtimeInspectorVisible: input.settings.runtimeInspectorVisible,
     },
+  };
+}
+
+export function applyResolvedContentBoundaryHint(input: {
+  contextPacket: Pick<LocalChatContextPacket, 'contentBoundaryHint'>;
+  policy: ResolvedExperiencePolicy;
+}): void {
+  input.contextPacket.contentBoundaryHint = {
+    visualComfortLevel: input.policy.contentBoundary.visualComfortLevel,
+    relationshipBoundaryPreset: input.policy.contentBoundary.relationshipBoundaryPreset,
   };
 }

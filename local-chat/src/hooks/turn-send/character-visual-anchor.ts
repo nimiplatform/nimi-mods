@@ -1,4 +1,5 @@
 import type { LocalChatTarget } from '../../data/index.js';
+import { resolveLocalChatTargetReferenceImageUrl } from '../../data/index.js';
 import { deriveInteractionProfile } from './interaction-profile.js';
 
 export type CharacterVisualAnchor = {
@@ -6,6 +7,7 @@ export type CharacterVisualAnchor = {
   styleHints: string[];
   continuityRefs: string[];
   plannerSummary: string;
+  referenceImageUrl: string | null;
 };
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -134,5 +136,6 @@ export function buildCharacterVisualAnchor(target: LocalChatTarget): CharacterVi
     styleHints,
     continuityRefs,
     plannerSummary,
+    referenceImageUrl: resolveLocalChatTargetReferenceImageUrl(target),
   };
 }

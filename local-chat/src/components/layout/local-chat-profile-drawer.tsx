@@ -1,7 +1,6 @@
 import React from 'react';
 import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
-import type { DerivedInteractionProfile, InteractionSnapshot, RelationMemorySlot } from '../../state/index.js';
-import type { MemorySyncStatus } from '../../services/memory/memory-sync-adapter.js';
+import type { DerivedInteractionProfile, InteractionSnapshot } from '../../state/index.js';
 import type { LocalChatTargetItem } from './types.js';
 
 type LocalChatProfileDrawerProps = {
@@ -11,24 +10,11 @@ type LocalChatProfileDrawerProps = {
   selectedTargetInitial: string;
   interactionProfile: DerivedInteractionProfile | null;
   interactionSnapshot: InteractionSnapshot | null;
-  relationMemorySlots: RelationMemorySlot[];
-  memorySyncStatus: MemorySyncStatus;
   onClose: () => void;
   onOpenSelectedTargetProfile: () => void;
   onClearChatHistory: () => void;
-  onMemoryOverrideChange: (slotId: string, override: RelationMemorySlot['userOverride']) => void;
-  onDeleteMemorySlot: (slotId: string) => void;
+  onClearMemory: () => void;
 };
-
-function badgeClass(value: string): string {
-  if (value === 'portable' || value === 'safe' || value === 'warm') {
-    return 'border-mint-200 bg-mint-50 text-mint-700';
-  }
-  if (value === 'blocked' || value === 'intimate') {
-    return 'border-rose-200 bg-rose-50 text-rose-700';
-  }
-  return 'border-gray-200 bg-gray-100 text-gray-600';
-}
 
 function relationshipBadgeClass(
   value: InteractionSnapshot['relationshipState'] | 'new',
@@ -55,29 +41,6 @@ function relationshipStateLabel(
   return t('ProfileDrawer.relationshipStateNew');
 }
 
-function syncStatusLabel(
-  value: MemorySyncStatus['state'],
-  t: (key: string) => string,
-): string {
-  if (value === 'ready') return t('ProfileDrawer.syncReady');
-  if (value === 'syncing') return t('ProfileDrawer.syncSyncing');
-  if (value === 'idle') return t('ProfileDrawer.syncIdle');
-  return t('ProfileDrawer.syncUnsupported');
-}
-
-function slotTypeLabel(
-  value: string,
-  t: (key: string) => string,
-): string {
-  if (value === 'preference') return t('ProfileDrawer.slotTypePreference');
-  if (value === 'boundary') return t('ProfileDrawer.slotTypeBoundary');
-  if (value === 'rapport') return t('ProfileDrawer.slotTypeRapport');
-  if (value === 'promise') return t('ProfileDrawer.slotTypePromise');
-  if (value === 'recurringCue') return t('ProfileDrawer.slotTypeRecurringCue');
-  if (value === 'taboo') return t('ProfileDrawer.slotTypeTaboo');
-  return value;
-}
-
 export function LocalChatProfileDrawer(props: LocalChatProfileDrawerProps) {
   const { t } = useModTranslation('local-chat');
   const {
@@ -86,12 +49,10 @@ export function LocalChatProfileDrawer(props: LocalChatProfileDrawerProps) {
     selectedTargetAvatarUrl,
     selectedTargetInitial,
     interactionSnapshot,
-    relationMemorySlots,
-    memorySyncStatus,
     onClose,
     onOpenSelectedTargetProfile,
     onClearChatHistory,
-    onDeleteMemorySlot,
+    onClearMemory,
   } = props;
 
   return (
@@ -181,44 +142,25 @@ export function LocalChatProfileDrawer(props: LocalChatProfileDrawerProps) {
           </section>
 
           <section className="space-y-3 rounded-[24px] border border-white/80 bg-white/88 p-4 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">{t('ProfileDrawer.memoryTitle')}</p>
-                <p className="mt-1 text-sm text-gray-600">{t('ProfileDrawer.memoryHint')}</p>
-              </div>
-              <span className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${badgeClass(memorySyncStatus.state === 'unsupported' ? 'blocked' : 'portable')}`}>
-                {t('ProfileDrawer.syncStatus')}: {syncStatusLabel(memorySyncStatus.state, t)}
-              </span>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">{t('ProfileDrawer.memoryTitle')}</p>
+              <p className="mt-1 text-sm text-gray-600">{t('ProfileDrawer.memoryHint')}</p>
             </div>
-            {memorySyncStatus.detail ? (
-              <p className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500">
-                {memorySyncStatus.detail}
-              </p>
-            ) : null}
-            {relationMemorySlots.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-sm text-gray-500">
-                {t('ProfileDrawer.memoryEmpty')}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {relationMemorySlots.map((slot) => (
-                  <div key={slot.id} className="rounded-[20px] border border-gray-200 bg-white px-4 py-3">
-                    <span className="rounded-full border border-gray-200 bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-600">{slotTypeLabel(slot.slotType, t)}</span>
-                    <p className="mt-3 text-sm font-semibold text-gray-900">{slot.key}</p>
-                    <p className="mt-1 text-sm leading-6 text-gray-600">{slot.value}</p>
-                    <div className="mt-3">
-                      <button
-                        type="button"
-                        onClick={() => onDeleteMemorySlot(slot.id)}
-                        className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100"
-                      >
-                        {t('ProfileDrawer.deleteMemory')}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <p className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-4 text-sm leading-6 text-gray-500">
+              {t('ProfileDrawer.memoryBody')}
+            </p>
+            <button
+              type="button"
+              onClick={onClearMemory}
+              className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 6h18" />
+                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+              </svg>
+              {t('ProfileDrawer.clearMemoryAction')}
+            </button>
           </section>
         </div>
       </div>

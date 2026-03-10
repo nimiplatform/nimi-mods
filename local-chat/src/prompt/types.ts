@@ -6,6 +6,7 @@ import type {
 
 export type PromptLayerId =
   | 'platformSafety'
+  | 'contentBoundary'
   | 'identity'
   | 'world'
   | 'turnMode'

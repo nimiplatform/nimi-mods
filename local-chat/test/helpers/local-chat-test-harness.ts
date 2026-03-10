@@ -206,6 +206,7 @@ export function createScriptedAiClient(input: {
   fallbackText?: string;
   perceptionResult?: Record<string, unknown> | null;
   planBeats?: Array<Record<string, unknown>>;
+  memoryExtractionMemories?: Array<Record<string, unknown>>;
   governanceSlots?: Array<Record<string, unknown>>;
   mediaPlannerDecision?: Record<string, unknown> | null;
 }): {
@@ -224,6 +225,7 @@ export function createScriptedAiClient(input: {
   const counters = {
     perception: 0,
     plan: 0,
+    memoryExtraction: 0,
     governance: 0,
     planner: 0,
     image: 0,
@@ -278,6 +280,19 @@ export function createScriptedAiClient(input: {
             text: JSON.stringify(object),
             traceId: 'trace-plan',
             promptTraceId: 'trace-plan',
+            route: localRoute('chat-model'),
+          };
+        }
+        if (prompt.includes('你是 local-chat 的关系记忆提取器。')) {
+          counters.memoryExtraction += 1;
+          const object = {
+            memories: input.memoryExtractionMemories || [],
+          };
+          return {
+            object,
+            text: JSON.stringify(object),
+            traceId: 'trace-memory-extraction',
+            promptTraceId: 'trace-memory-extraction',
             route: localRoute('chat-model'),
           };
         }

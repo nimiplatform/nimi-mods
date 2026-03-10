@@ -739,6 +739,8 @@ test('send-flow delivers all planned text beats while session id bootstraps from
 
 test('send-flow planner auto path generates image when gate passes', async () => {
   await withSendFlowHarness(async (harness) => {
+    harness.target.referenceImageUrl = 'https://example.com/reference-image.png';
+    let capturedImagePayload: Record<string, unknown> | null = null;
     const result = await harness.execute({
       userText: '刚刚那个画面太有电影感了',
       aiClientOverrides: {
@@ -793,6 +795,18 @@ test('send-flow planner auto path generates image when gate passes', async () =>
             },
           };
         },
+        generateImage: async (payload: Record<string, unknown>) => {
+          capturedImagePayload = payload;
+          return {
+            images: [{ uri: 'data:image/png;base64,ZmFrZQ==', mimeType: 'image/png' }],
+            traceId: 'trace-image-with-reference',
+            route: {
+              source: 'local',
+              model: 'image-model',
+              localModelId: 'image-model',
+            },
+          };
+        },
       },
     });
 
@@ -805,6 +819,170 @@ test('send-flow planner auto path generates image when gate passes', async () =>
     assert.equal(imageMessage?.meta?.mediaPlannerTrigger, 'scene-enhancement');
     assert.equal(result.state.latestPromptTrace?.plannerUsed, true);
     assert.equal(result.state.latestPromptTrace?.plannerKind, 'image');
+    assert.deepEqual(capturedImagePayload?.referenceImages, ['https://example.com/reference-image.png']);
+  });
+});
+
+test('send-flow injects restrained content boundary into first-beat and tail prompts', async () => {
+  await withSendFlowHarness(async (harness) => {
+    let firstBeatPrompt = '';
+    let tailPrompt = '';
+    const result = await harness.execute({
+      userText: '你刚刚那句也太撩了',
+      defaultSettings: {
+        visualComfortLevel: 'restrained-visuals',
+      },
+      aiClientOverrides: {
+        streamText: async function* (payload: Record<string, unknown>) {
+          firstBeatPrompt = String(payload.prompt || '');
+          yield {
+            type: 'text_delta' as const,
+            textDelta: `我先接住你这句。${FIRST_BEAT_END_MARKER}`,
+          };
+          yield {
+            type: 'done' as const,
+          };
+        },
+        generateObject: async (payload: Record<string, unknown>) => {
+          const prompt = String(payload.prompt || '');
+          if (prompt.includes('你是一个对话感知模块')) {
+            const object = defaultPerceptionObject(prompt);
+            return {
+              object,
+              text: JSON.stringify(object),
+              traceId: 'trace-perception-restrained',
+              promptTraceId: 'trace-perception-restrained',
+              route: {
+                source: 'local',
+                model: 'chat-model',
+                localModelId: 'chat-model',
+              },
+            };
+          }
+          if (prompt.includes('请规划这轮对话在首拍之后的 tail beat 计划')) {
+            tailPrompt = prompt;
+            const object = defaultTailPlanObject(prompt);
+            return {
+              object,
+              text: JSON.stringify(object),
+              traceId: 'trace-plan-restrained',
+              promptTraceId: 'trace-plan-restrained',
+              route: {
+                source: 'local',
+                model: 'chat-model',
+                localModelId: 'chat-model',
+              },
+            };
+          }
+          throw new Error('PLANNER_SHOULD_NOT_RUN');
+        },
+      },
+    });
+
+    const assistantMessages = result.state.messages.filter((message) => message.role === 'assistant');
+    assert.equal(assistantMessages.some((message) => message.kind === 'text'), true);
+    assert.match(firstBeatPrompt, /用户当前选择克制风格/u);
+    assert.match(firstBeatPrompt, /不要输出色情、裸露、性暗示/u);
+    assert.match(tailPrompt, /## Content Boundary/u);
+    assert.match(tailPrompt, /用户当前选择克制风格/u);
+  });
+});
+
+test('send-flow planner auto path generates video with reference image content when available', async () => {
+  await withSendFlowHarness(async (harness) => {
+    harness.target.referenceImageUrl = 'https://example.com/reference-video.png';
+    let capturedVideoPayload: Record<string, unknown> | null = null;
+    const result = await harness.execute({
+      userText: '这个片段要是能动起来就更有感觉了',
+      aiClientOverrides: {
+        generateObject: async (payload: Record<string, unknown>) => {
+          const prompt = String(payload.prompt || '');
+          if (prompt.includes('你是一个对话感知模块')) {
+            const object = defaultPerceptionObject(prompt);
+            return {
+              object,
+              text: JSON.stringify(object),
+              traceId: 'trace-perception-video-auto',
+              promptTraceId: 'trace-perception-video-auto',
+              route: {
+                source: 'local',
+                model: 'chat-model',
+                localModelId: 'chat-model',
+              },
+            };
+          }
+          if (prompt.includes('请规划这轮对话在首拍之后的 tail beat 计划')) {
+            const object = defaultTailPlanObject(prompt);
+            return {
+              object,
+              text: JSON.stringify(object),
+              traceId: 'trace-plan-video-auto',
+              promptTraceId: 'trace-plan-video-auto',
+              route: {
+                source: 'local',
+                model: 'chat-model',
+                localModelId: 'chat-model',
+              },
+            };
+          }
+          const raw = JSON.stringify({
+            version: 'v1',
+            kind: 'video',
+            trigger: 'scene-enhancement',
+            confidence: 0.95,
+            prompt: 'cinematic harbor at night, rain, neon reflections, subtle motion',
+            reason: 'motion enhancement',
+            nsfwIntent: 'none',
+          });
+          return {
+            object: (payload.parse as (text: string) => Record<string, unknown>)(raw),
+            text: raw,
+            traceId: 'trace-video-planner-auto',
+            promptTraceId: 'trace-video-planner-auto',
+            route: {
+              source: 'local',
+              model: 'chat-model',
+              localModelId: 'chat-model',
+            },
+          };
+        },
+        generateVideo: async (payload: Record<string, unknown>) => {
+          capturedVideoPayload = payload;
+          return {
+            videos: [{ uri: 'file:///tmp/reference-video.mp4', mimeType: 'video/mp4' }],
+            traceId: 'trace-video-with-reference',
+            route: {
+              source: 'local',
+              model: 'video-model',
+              localModelId: 'video-model',
+            },
+          };
+        },
+      },
+    });
+
+    await waitFor(() => result.state.messages.some((message) => message.kind === 'video'));
+    const videoMessage = result.state.messages.find((message) => message.kind === 'video');
+
+    assert.equal(result.counters.generateObject, 1);
+    assert.equal(result.counters.generateVideo, 1);
+    assert.equal(videoMessage?.meta?.mediaIntentSource, 'planner');
+    assert.equal(videoMessage?.meta?.mediaPlannerTrigger, 'scene-enhancement');
+    assert.equal(result.state.latestPromptTrace?.plannerUsed, true);
+    assert.equal(result.state.latestPromptTrace?.plannerKind, 'video');
+    assert.equal(capturedVideoPayload?.mode, 'i2v-reference');
+    assert.equal(Array.isArray(capturedVideoPayload?.content), true);
+    assert.equal(capturedVideoPayload?.content?.[0]?.type, 'text');
+    assert.equal(capturedVideoPayload?.content?.[0]?.role, 'prompt');
+    assert.equal(
+      String(capturedVideoPayload?.content?.[0]?.text || '').includes('请生成一段延续当前聊天场景'),
+      true,
+    );
+    assert.deepEqual(capturedVideoPayload?.content?.[1], {
+      type: 'image_url',
+      role: 'reference_image',
+      imageUrl: 'https://example.com/reference-video.png',
+    });
   });
 });
 

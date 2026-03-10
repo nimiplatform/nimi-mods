@@ -4,13 +4,11 @@ import type {
   InteractionSnapshot,
   LocalChatProductSettings,
   LocalChatTurnSendPhase,
-  RelationMemorySlot,
   VoiceConversationMode,
 } from '../../state/index.js';
 import type { ChatMessage } from '../../types.js';
 import type { RuntimeStatusSidebar } from '../runtime-status-sidebar.js';
 import type { LocalChatTargetItem, VoiceContextMenu, VoiceInputState } from './types.js';
-import type { MemorySyncStatus } from '../../services/memory/memory-sync-adapter.js';
 import type { LocalChatConversationViewMode } from '../../hooks/controller/use-local-chat-conversation-view-mode.js';
 
 export type LocalChatShellProps = {
@@ -47,15 +45,12 @@ export type LocalChatShellProps = {
   setInputText: (value: string) => void;
   productSettings: LocalChatProductSettings;
   activeInteractionSnapshot: InteractionSnapshot | null;
-  activeRelationMemorySlots: RelationMemorySlot[];
-  memorySyncStatus: MemorySyncStatus;
   onToggleProductSetting: (key: 'allowProactiveContact' | 'autoPlayVoiceReplies', value: boolean) => void;
   onDefaultMediaAutonomyChange: (value: LocalChatProductSettings['mediaAutonomy']) => void;
   onDefaultVoiceAutonomyChange: (value: LocalChatProductSettings['voiceAutonomy']) => void;
   onDefaultVoiceConversationModeChange: (value: VoiceConversationMode) => void;
   onVisualComfortLevelChange: (value: LocalChatProductSettings['visualComfortLevel']) => void;
-  onMemoryOverrideChange: (slotId: string, override: RelationMemorySlot['userOverride']) => void;
-  onDeleteMemorySlot: (slotId: string) => void;
+  onClearMemory: () => void;
   hasConversationHistory: boolean;
   onInputKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   voiceInputState: VoiceInputState;
