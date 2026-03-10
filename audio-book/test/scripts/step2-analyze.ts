@@ -82,6 +82,23 @@ type RuntimeConnectorModelRecord = {
   capabilities: string[];
 };
 
+const DEFAULT_LIST_CONNECTORS_REQUEST = {
+  pageSize: 0,
+  pageToken: '',
+  kindFilter: 0,
+  statusFilter: 0,
+  providerFilter: '',
+} as const;
+
+function createListConnectorModelsRequest(connectorId: string) {
+  return {
+    connectorId,
+    forceRefresh: false,
+    pageSize: 0,
+    pageToken: '',
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Build gRPC metadata for inline key-source
 // ---------------------------------------------------------------------------
@@ -142,7 +159,7 @@ async function resolveRuntimeConnector(runtime: Runtime): Promise<{
   provider: string;
   availableConnectors: RuntimeConnectorRecord[];
 }> {
-  const listResponse = await runtime.connector.listConnectors({});
+  const listResponse = await runtime.connector.listConnectors(DEFAULT_LIST_CONNECTORS_REQUEST);
   const connectors = Array.isArray((listResponse as { connectors?: unknown[] }).connectors)
     ? ((listResponse as { connectors?: unknown[] }).connectors ?? []).map((item) => {
       const record = item as Record<string, unknown>;
@@ -174,9 +191,9 @@ async function resolveRuntimeConnector(runtime: Runtime): Promise<{
     };
   }
 
-  const modelResponse = await runtime.connector.listConnectorModels({
-    connectorId: selectedConnector.connectorId,
-  });
+  const modelResponse = await runtime.connector.listConnectorModels(
+    createListConnectorModelsRequest(selectedConnector.connectorId),
+  );
   const models = Array.isArray((modelResponse as { models?: unknown[] }).models)
     ? ((modelResponse as { models?: unknown[] }).models ?? []).map((item) => {
       const record = item as Record<string, unknown>;

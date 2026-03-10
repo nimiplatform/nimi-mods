@@ -93,7 +93,8 @@ async function resolveArtifactBlob(artifact: {
   mimeType: string;
 }): Promise<Blob> {
   if (artifact.bytes instanceof Uint8Array && artifact.bytes.length > 0) {
-    return new Blob([artifact.bytes], { type: artifact.mimeType || 'audio/mpeg' });
+    const bytes = new Uint8Array(artifact.bytes);
+    return new Blob([bytes.buffer], { type: artifact.mimeType || 'audio/mpeg' });
   }
   const uri = String(artifact.uri || '').trim();
   if (!uri) {
