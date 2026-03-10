@@ -25,13 +25,14 @@ import {
   createDialogueHistory,
   type ChatMessage,
 } from '../services/dialogue-engine.js';
+import { buildBuddySystemPrompt, getBuddyPromptProfile } from '../services/prompt-template.js';
 import {
   playAudioSource,
   detectMimeType,
   recordVoice,
   concatBytes,
 } from '../services/voice-engine.js';
-import { logBuddyConsole } from '../services/debug-log.js';
+import { isBuddyDebugEnabled, logBuddyConsole } from '../services/debug-log.js';
 import { loadBuddySession, saveBuddySession } from '../services/session-store.js';
 
 const TEXT_ROUTE_CAPABILITY: RuntimeCanonicalCapability = 'text.generate';
@@ -130,6 +131,8 @@ interface AssistantAudioCacheEntry {
   mimeType?: string;
 }
 
+const MAX_AUDIO_CACHE_MESSAGES = 12;
+
 function firstArtifactWithAudio(
   artifacts: Array<{ bytes?: Uint8Array; uri?: string; mimeType?: string }>,
 ): { bytes?: Uint8Array; uri?: string; mimeType?: string } | null {
@@ -209,6 +212,7 @@ export function useBuddyController(
   const [activeAudioMessageId, setActiveAudioMessageId] = useState<string | null>(null);
   const [audioStatusByMessageId, setAudioStatusByMessageId] = useState<Record<string, AudioStatus>>({});
   const [audioErrorByMessageId, setAudioErrorByMessageId] = useState<Record<string, string>>({});
+  const buddyDebugEnabled = isBuddyDebugEnabled();
 
   const managerRef = useRef<ReturnType<typeof createModelManager> | null>(null);
   const historyRef = useRef(createDialogueHistory());
@@ -220,6 +224,7 @@ export function useBuddyController(
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playbackCtxRef = useRef<AudioContext | null>(null);
   const playbackStopRef = useRef<(() => Promise<void>) | null>(null);
+  const sessionSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hydratedRef = useRef(false);
   const textBindingRef = useRef<RuntimeRouteBinding | null>(null);
   const ttsBindingRef = useRef<RuntimeRouteBinding | null>(null);
@@ -285,15 +290,21 @@ export function useBuddyController(
 
   useEffect(() => {
     if (!hydratedRef.current) return;
-    void saveBuddySession(hookRef.current, {
-      messages: historyRef.current.messages,
-      selectedModelId,
-      voiceModeEnabled,
-      selectedTtsVoiceId,
-      textBinding: textBindingRef.current,
-      ttsBinding: ttsBindingRef.current,
-      sttBinding: sttBindingRef.current,
-    });
+    if (sessionSaveTimerRef.current) {
+      clearTimeout(sessionSaveTimerRef.current);
+    }
+    sessionSaveTimerRef.current = setTimeout(() => {
+      void saveBuddySession(hookRef.current, {
+        messages: historyRef.current.messages,
+        selectedModelId,
+        voiceModeEnabled,
+        selectedTtsVoiceId,
+        textBinding: textBindingRef.current,
+        ttsBinding: ttsBindingRef.current,
+        sttBinding: sttBindingRef.current,
+      });
+      sessionSaveTimerRef.current = null;
+    }, 180);
   }, [
     messages,
     selectedModelId,
@@ -325,12 +336,14 @@ export function useBuddyController(
       managerRef.current?.destroy();
       void playbackStopRef.current?.();
       playbackCtxRef.current?.close();
+      if (sessionSaveTimerRef.current) clearTimeout(sessionSaveTimerRef.current);
       if (restTimerRef.current) clearTimeout(restTimerRef.current);
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     };
   }, []);
 
   const mountCanvas = useCallback((canvas: HTMLCanvasElement) => {
+    managerRef.current?.destroy();
     const mgr = createModelManager((state, error) => {
       setModelState(state);
       setModelError(error ?? null);
@@ -338,6 +351,31 @@ export function useBuddyController(
     mgr.mount(canvas);
     managerRef.current = mgr;
   }, []);
+
+  useEffect(() => {
+    const assistantMessageIds = historyRef.current.messages
+      .filter((message) => message.role === 'assistant')
+      .slice(-MAX_AUDIO_CACHE_MESSAGES)
+      .map((message) => message.id);
+    const keepIds = new Set(assistantMessageIds);
+    audioCacheRef.current.forEach((_value, key) => {
+      if (!keepIds.has(key)) {
+        audioCacheRef.current.delete(key);
+      }
+    });
+    setAudioStatusByMessageId((current) => {
+      const next = Object.fromEntries(
+        Object.entries(current).filter(([key]) => keepIds.has(key)),
+      );
+      return Object.keys(next).length === Object.keys(current).length ? current : next;
+    });
+    setAudioErrorByMessageId((current) => {
+      const next = Object.fromEntries(
+        Object.entries(current).filter(([key]) => keepIds.has(key)),
+      );
+      return Object.keys(next).length === Object.keys(current).length ? current : next;
+    });
+  }, [messages]);
 
   const loadModel = useCallback(async (url: string) => {
     lastModelUrlRef.current = url;
@@ -456,6 +494,9 @@ export function useBuddyController(
     messageId: string;
     details?: Record<string, unknown>;
   }) => {
+    if ((input.level || 'info') === 'debug' && !buddyDebugEnabled) {
+      return;
+    }
     logBuddyConsole(input.level || 'info', input.message, {
       messageId: input.messageId,
       ...(input.details || {}),
@@ -467,7 +508,7 @@ export function useBuddyController(
       flowId: `buddy-audio:${input.messageId}`,
       details: input.details,
     });
-  }, []);
+  }, [buddyDebugEnabled]);
 
   useEffect(() => {
     const runtimeClient = runtimeRef.current;
@@ -481,22 +522,24 @@ export function useBuddyController(
 
     let cancelled = false;
     setTtsVoicesLoading(true);
-    logBuddyConsole('debug', 'buddy:tts:voices-load-start', {
-      routeSource: binding.source,
-      connectorId: binding.connectorId || '',
-      model: binding.model,
-    });
-    logRendererEvent({
-      level: 'debug',
-      area: 'buddy',
-      message: 'buddy:tts:voices-load-start',
-      flowId: `buddy-tts-voices:${binding.model}`,
-      details: {
+    if (buddyDebugEnabled) {
+      logBuddyConsole('debug', 'buddy:tts:voices-load-start', {
         routeSource: binding.source,
         connectorId: binding.connectorId || '',
         model: binding.model,
-      },
-    });
+      });
+      logRendererEvent({
+        level: 'debug',
+        area: 'buddy',
+        message: 'buddy:tts:voices-load-start',
+        flowId: `buddy-tts-voices:${binding.model}`,
+        details: {
+          routeSource: binding.source,
+          connectorId: binding.connectorId || '',
+          model: binding.model,
+        },
+      });
+    }
 
     void runtimeClient.media.tts.listVoices({
       binding,
@@ -517,26 +560,28 @@ export function useBuddyController(
       });
       setTtsVoicesLoading(false);
       audioCacheRef.current.clear();
-      logBuddyConsole('debug', 'buddy:tts:voices-loaded', {
-        routeSource: binding.source,
-        connectorId: binding.connectorId || '',
-        model: binding.model,
-        voiceCount: voices.length,
-        firstVoiceId: voices[0]?.id || '',
-      });
-      logRendererEvent({
-        level: 'debug',
-        area: 'buddy',
-        message: 'buddy:tts:voices-loaded',
-        flowId: `buddy-tts-voices:${binding.model}`,
-        details: {
+      if (buddyDebugEnabled) {
+        logBuddyConsole('debug', 'buddy:tts:voices-loaded', {
           routeSource: binding.source,
           connectorId: binding.connectorId || '',
           model: binding.model,
           voiceCount: voices.length,
           firstVoiceId: voices[0]?.id || '',
-        },
-      });
+        });
+        logRendererEvent({
+          level: 'debug',
+          area: 'buddy',
+          message: 'buddy:tts:voices-loaded',
+          flowId: `buddy-tts-voices:${binding.model}`,
+          details: {
+            routeSource: binding.source,
+            connectorId: binding.connectorId || '',
+            model: binding.model,
+            voiceCount: voices.length,
+            firstVoiceId: voices[0]?.id || '',
+          },
+        });
+      }
     }).catch((error) => {
       if (cancelled) return;
       setTtsVoiceOptions([]);
@@ -566,7 +611,7 @@ export function useBuddyController(
     return () => {
       cancelled = true;
     };
-  }, [sdkRuntimeContext, ttsRouteBinding]);
+  }, [buddyDebugEnabled, sdkRuntimeContext, ttsRouteBinding]);
 
   const synthesizeAssistantAudio = useCallback(async (message: ChatMessage): Promise<AssistantAudioCacheEntry | null> => {
     const cached = audioCacheRef.current.get(message.id) || null;
@@ -704,6 +749,15 @@ export function useBuddyController(
         mimeType: mimeType || (audioBytes ? detectMimeType(audioBytes.slice().buffer) : undefined),
       };
       audioCacheRef.current.set(message.id, entry);
+      const recentAssistantIds = historyRef.current.messages
+        .filter((item) => item.role === 'assistant')
+        .slice(-MAX_AUDIO_CACHE_MESSAGES)
+        .map((item) => item.id);
+      for (const cachedId of Array.from(audioCacheRef.current.keys())) {
+        if (!recentAssistantIds.includes(cachedId)) {
+          audioCacheRef.current.delete(cachedId);
+        }
+      }
       setAudioStatusByMessageId((current) => ({ ...current, [message.id]: 'ready' }));
       setAudioErrorByMessageId((current) => ({ ...current, [message.id]: '' }));
       logAudioEvent({
@@ -761,6 +815,7 @@ export function useBuddyController(
       playbackStopRef.current = playback.stop;
       managerRef.current?.feedAudio(playback.analyser, playback.lipSyncStream);
       await playback.finished;
+      await playback.audioContext.close().catch(() => {});
       logAudioEvent({
         message: 'buddy:tts:playback-done',
         messageId: message.id,
@@ -781,6 +836,9 @@ export function useBuddyController(
         managerRef.current?.stopAudio();
         managerRef.current?.stopSpeaking();
         playbackStopRef.current = null;
+        if (playbackCtxRef.current) {
+          await playbackCtxRef.current.close().catch(() => {});
+        }
         playbackCtxRef.current = null;
         setActiveAudioMessageId(null);
       }
@@ -802,7 +860,10 @@ export function useBuddyController(
     setMessages([...historyRef.current.messages]);
 
     try {
-      const compiled = compileMessages(historyRef.current.messages);
+      const compiled = compileMessages(
+        historyRef.current.messages,
+        buildBuddySystemPrompt(getBuddyPromptProfile(selectedModelId)),
+      );
       const system = compiled[0]?.role === 'system' ? compiled[0].content : undefined;
       const input = compiled[0]?.role === 'system' ? compiled.slice(1) : compiled;
       let fullText = '';
@@ -827,11 +888,12 @@ export function useBuddyController(
 
       // BD-PIPE-004: extract emotion
       const { text: cleanText, emotion } = extractEmotion(fullText);
+      const assistantText = cleanText.trim() || '我在这里，换个说法再和我聊聊吧。';
       setCurrentEmotion(emotion);
       managerRef.current?.setEmotion(emotion);
 
       // Add assistant message (clean)
-      historyRef.current.addAssistant(cleanText, emotion);
+      historyRef.current.addAssistant(assistantText, emotion);
       setMessages([...historyRef.current.messages]);
       setStreamingText('');
       const assistantMessage = historyRef.current.messages[historyRef.current.messages.length - 1] || null;
@@ -847,7 +909,7 @@ export function useBuddyController(
     } finally {
       setIsGenerating(false);
     }
-  }, [isGenerating, playAssistantMessageAudio, resetRestTimer, voiceModeEnabled]);
+  }, [isGenerating, playAssistantMessageAudio, resetRestTimer, selectedModelId, voiceModeEnabled]);
 
   const startRecording = useCallback(async () => {
     if (isRecording) return;

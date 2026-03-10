@@ -6,10 +6,12 @@ node_modules/
 # 开发者需从 https://www.live2d.com/zh-CHS/learn/sample/ 自行下载
 assets/models/haru/**
 assets/models/haru_greeter/**
+assets/models/hiyori/**
 assets/live2d-core/*
 
 # 保留目录结构的占位文件
 !assets/models/haru/.gitkeep
 !assets/models/haru_greeter/.gitkeep
+!assets/models/hiyori/.gitkeep
 !assets/live2d-core/.gitkeep
 !assets/live2d-core/README.md

@@ -3,6 +3,7 @@ import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 import {
   BUDDY_SESSION_VERSION,
   DEFAULT_BUDDY_MODEL_ID,
+  BUDDY_MODELS,
   type BuddyModelId,
 } from '../contracts.js';
 import type { ChatMessage } from './dialogue-engine.js';
@@ -36,8 +37,10 @@ function extractStateAck(response: unknown): boolean {
   return typeof record.ok === 'boolean' ? record.ok : true;
 }
 
+const BUDDY_MODEL_ID_SET = new Set<string>(BUDDY_MODELS.map((model) => model.id));
+
 function isBuddyModelId(value: unknown): value is BuddyModelId {
-  return value === 'haru' || value === 'haru_greeter';
+  return typeof value === 'string' && BUDDY_MODEL_ID_SET.has(value);
 }
 
 function isChatMessage(value: unknown): value is ChatMessage {

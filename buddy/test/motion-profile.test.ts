@@ -16,4 +16,11 @@ describe('getBuddyMotionProfile', () => {
     assert.deepEqual(profile.tap, ['']);
     assert.deepEqual(profile.emotion.happy, ['']);
   });
+
+  it('uses hiyori motion groups when hiyori is selected', () => {
+    const profile = getBuddyMotionProfile('hiyori');
+    assert.ok(profile.idle.includes('Idle'));
+    assert.ok(profile.tap.includes('Tap@Body'));
+    assert.ok(profile.emotion.surprised.includes('FlickUp'));
+  });
 });

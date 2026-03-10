@@ -11,7 +11,7 @@ import type { BuddyModelId, EmotionType } from '../contracts.js';
 import { DEFAULT_BUDDY_MODEL_ID } from '../contracts.js';
 import { getBuddyMotionProfile } from './motion-profile.js';
 import type { LipSyncStream } from '../services/voice-engine.js';
-import { logBuddyConsole } from '../services/debug-log.js';
+import { isBuddyDebugEnabled, logBuddyConsole } from '../services/debug-log.js';
 
 export type ModelState = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -49,6 +49,14 @@ export function createModelManager(
   let currentMotionProfile = getBuddyMotionProfile(DEFAULT_BUDDY_MODEL_ID);
   let currentEmotion: EmotionType = 'happy';
   let speaking = false;
+  const debugEnabled = isBuddyDebugEnabled();
+
+  function getViewportSize() {
+    const parent = canvasEl?.parentElement;
+    const width = parent?.clientWidth || canvasEl?.clientWidth || app?.screen.width || 0;
+    const height = parent?.clientHeight || canvasEl?.clientHeight || app?.screen.height || 0;
+    return { width, height };
+  }
 
   function buildEmotionMotionQueue(emotion: EmotionType, mode: 'idle' | 'speak' | 'tap' | 'greet'): string[] {
     if (mode === 'tap') {
@@ -96,13 +104,16 @@ export function createModelManager(
 
   function applyModelLayout(viewWidth: number, viewHeight: number) {
     if (!model) return;
+    const bounds = model.getLocalBounds();
+    const naturalWidth = Math.max(bounds.width || 0, 1);
+    const naturalHeight = Math.max(bounds.height || 0, 1);
     model.anchor.set(0.5, 1);
-    const widthScale = (viewWidth * 0.58) / model.width;
-    const heightScale = (viewHeight * 0.8) / model.height;
+    const widthScale = (viewWidth * 0.5) / naturalWidth;
+    const heightScale = (viewHeight * 0.86) / naturalHeight;
     const scale = Math.min(widthScale, heightScale);
     model.scale.set(scale);
-    model.x = viewWidth * 0.5;
-    model.y = viewHeight * 0.98;
+    model.x = viewWidth * 0.43;
+    model.y = viewHeight * 1.0;
   }
 
   function clearIdleMotionLoop() {
@@ -164,6 +175,9 @@ export function createModelManager(
       view: canvas,
       autoStart: true,
       backgroundAlpha: 0,
+      antialias: true,
+      autoDensity: true,
+      resolution: Math.min((typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1), 2),
       resizeTo: canvas.parentElement ?? undefined,
     });
   }
@@ -201,7 +215,7 @@ export function createModelManager(
 
       const coreModel = (loaded.internalModel as any)?.coreModel;
       if (coreModel) {
-      const details = {
+        const details = {
           modelId: currentModelId,
           modelUrl,
           hasPARAM_MOUTH_OPEN_Y: coreModel.getParameterIndex('PARAM_MOUTH_OPEN_Y') >= 0,
@@ -213,32 +227,38 @@ export function createModelManager(
           hasPARAM_BODY_ANGLE_X: coreModel.getParameterIndex('PARAM_BODY_ANGLE_X') >= 0,
           hasParamBodyAngleX: coreModel.getParameterIndex('ParamBodyAngleX') >= 0,
         };
-        logBuddyConsole('debug', 'buddy:model:mouth-params', details);
-        logRendererEvent({
-          level: 'debug',
-          area: 'buddy',
-          message: 'buddy:model:mouth-params',
-          details,
-        });
+        if (debugEnabled) {
+          logBuddyConsole('debug', 'buddy:model:mouth-params', details);
+          logRendererEvent({
+            level: 'debug',
+            area: 'buddy',
+            message: 'buddy:model:mouth-params',
+            details,
+          });
+        }
       }
 
       // Scale and position model to fit canvas
-      const { width, height } = app.renderer;
+      const { width, height } = getViewportSize();
       applyModelLayout(width, height);
 
       app.stage.addChild(model as unknown as PIXI.DisplayObject);
 
       // Initialize animation plugins
       lipSyncPlugin = createLipSyncPlugin();
-      lipSyncPlugin.setDiagnosticsReporter((payload) => {
-        logBuddyConsole('debug', 'buddy:lipsync:frame', payload);
-        logRendererEvent({
-          level: 'debug',
-          area: 'buddy',
-          message: 'buddy:lipsync:frame',
-          details: payload,
+      if (debugEnabled) {
+        lipSyncPlugin.setDiagnosticsReporter((payload) => {
+          logBuddyConsole('debug', 'buddy:lipsync:frame', payload);
+          logRendererEvent({
+            level: 'debug',
+            area: 'buddy',
+            message: 'buddy:lipsync:frame',
+            details: payload,
+          });
         });
-      });
+      } else {
+        lipSyncPlugin.setDiagnosticsReporter(null);
+      }
       expressionPlugin = createExpressionDriverPlugin();
 
       animCtrl = new AnimationController(model);
@@ -310,8 +330,11 @@ export function createModelManager(
 
   function resize(width: number, height: number) {
     if (!app || !model) return;
+    const resolution = Math.min((typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1), 2);
+    app.renderer.resolution = resolution;
     app.renderer.resize(width, height);
-    applyModelLayout(width, height);
+    const viewport = getViewportSize();
+    applyModelLayout(viewport.width || width, viewport.height || height);
   }
 
   function destroy() {

@@ -1,5 +1,11 @@
 import type { EmotionType } from '../contracts.js';
-import { EMOTION_TAG_REGEX, DEFAULT_EMOTION, MAX_HISTORY_TURNS } from '../contracts.js';
+import {
+  EMOTION_TAG_REGEX,
+  DEFAULT_EMOTION,
+  MAX_HISTORY_TURNS,
+  DEFAULT_BUDDY_MODEL_ID,
+} from '../contracts.js';
+import { buildBuddySystemPrompt, getBuddyPromptProfile } from './prompt-template.js';
 
 export interface ChatMessage {
   id: string;
@@ -13,16 +19,7 @@ export interface DialogueResult {
   emotion: EmotionType;
 }
 
-const SYSTEM_PROMPT = `你是一个友善、温暖的儿童伙伴。请遵守以下规则：
-
-1. 使用简单、温暖、积极的语言，适合儿童理解
-2. 回复控制在 2-3 句以内，简短有趣
-3. 每次回复开头加情绪标签，格式: [emotion:xxx]，可选值: happy, sad, surprised, thinking, excited, sleepy
-4. 绝对禁止讨论暴力、恐怖、色情或任何不适合儿童的内容
-5. 禁止提供医疗、法律或财务建议
-6. 遇到敏感话题时温和地引导转向积极方向
-7. 不模拟或鼓励任何危险行为
-8. 保持好奇和热情，像一个可爱的朋友一样交流`;
+const DEFAULT_SYSTEM_PROMPT = buildBuddySystemPrompt(getBuddyPromptProfile(DEFAULT_BUDDY_MODEL_ID));
 
 /**
  * BD-PIPE-004 情绪提取
@@ -45,10 +42,11 @@ function createMessageId(): string {
  */
 export function compileMessages(
   history: ChatMessage[],
+  systemPrompt = DEFAULT_SYSTEM_PROMPT,
 ): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
   const trimmed = history.slice(-MAX_HISTORY_TURNS * 2);
   return [
-    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: systemPrompt },
     ...trimmed,
   ];
 }

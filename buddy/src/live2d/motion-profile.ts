@@ -41,9 +41,28 @@ const HARU_GREETER_PROFILE: BuddyMotionProfile = {
   ambient: [''],
 };
 
+const HIYORI_PROFILE: BuddyMotionProfile = {
+  idle: ['Idle'],
+  greet: ['Tap', 'Flick', 'FlickUp'],
+  tap: ['Tap', 'Tap@Body', 'Flick'],
+  speak: ['Tap', 'Tap@Body', 'FlickUp'],
+  emotion: {
+    happy: ['Tap', 'Flick'],
+    excited: ['Tap@Body', 'FlickUp', 'Tap'],
+    sad: ['Idle', 'FlickDown'],
+    surprised: ['FlickUp', 'Tap@Body'],
+    thinking: ['Idle', 'Flick', 'FlickDown'],
+    sleepy: ['Idle'],
+  },
+  ambient: ['Flick', 'FlickDown', 'FlickUp', 'Tap@Body'],
+};
+
 export function getBuddyMotionProfile(modelId: BuddyModelId): BuddyMotionProfile {
   if (modelId === 'haru_greeter') {
     return HARU_GREETER_PROFILE;
+  }
+  if (modelId === 'hiyori') {
+    return HIYORI_PROFILE;
   }
   return HARU_PROFILE;
 }

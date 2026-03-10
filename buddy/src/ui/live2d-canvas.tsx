@@ -20,7 +20,7 @@ export function Live2DCanvas({ onReady, onTap }: Live2DCanvasProps) {
     <canvas
       ref={canvasRef}
       className="h-full w-full"
-      style={{ touchAction: 'none' }}
+      style={{ touchAction: 'none', imageRendering: 'auto' }}
       onPointerUp={onTap}
     />
   );

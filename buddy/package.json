@@ -8,6 +8,8 @@
     "watch": "node ../scripts/build-mod.mjs --mod buddy --watch",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
     "test": "npx tsx --test test/*.test.ts",
+    "model:validate": "node ./scripts/model-admin.mjs validate",
+    "model:add": "node ./scripts/model-admin.mjs add",
     "verify": "pnpm run typecheck && pnpm run test && pnpm run build",
     "clean": "rm -rf dist"
   },

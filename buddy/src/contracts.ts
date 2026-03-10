@@ -32,6 +32,11 @@ export const BUDDY_MODELS = [
     label: '春・接待版',
     relativePath: 'haru_greeter/haru_greeter_t05.model3.json',
   },
+  {
+    id: 'hiyori',
+    label: '日和（Hiyori）',
+    relativePath: 'hiyori/hiyori_pro_t11.model3.json',
+  },
 ] as const;
 
 export type BuddyModelId = typeof BUDDY_MODELS[number]['id'];

@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { extractEmotion, compileMessages, createDialogueHistory } from '../src/services/dialogue-engine.js';
+import { buildBuddySystemPrompt, getBuddyPromptProfile } from '../src/services/prompt-template.js';
 
 describe('extractEmotion (BD-PIPE-004)', () => {
   it('extracts happy emotion tag', () => {
@@ -60,7 +61,7 @@ describe('compileMessages (BD-PIPE-001)', () => {
     const result = compileMessages([]);
     assert.equal(result.length, 1);
     assert.equal(result[0].role, 'system');
-    assert.ok(result[0].content.includes('儿童伙伴'));
+    assert.ok(result[0].content.includes('情绪标签'));
   });
 
   it('includes message history', () => {
@@ -89,6 +90,21 @@ describe('compileMessages (BD-PIPE-001)', () => {
     const result = compileMessages([{ id: 'm1', role: 'user', content: '你好' }]);
     assert.equal(result[0]?.role, 'system');
     assert.equal(result[1]?.role, 'user');
+  });
+
+  it('supports explicit prompt templates for different character profiles', () => {
+    const systemPrompt = buildBuddySystemPrompt(getBuddyPromptProfile('haru_greeter'));
+    const result = compileMessages([], systemPrompt);
+    assert.ok(result[0]?.content.includes('春・接待版'));
+    assert.ok(result[0]?.content.includes('[emotion:happy]'));
+  });
+
+  it('supports explicit prompt templates for hiyori', () => {
+    const systemPrompt = buildBuddySystemPrompt(getBuddyPromptProfile('hiyori'));
+    const result = compileMessages([], systemPrompt);
+    assert.ok(result[0]?.content.includes('日和（Hiyori）'));
+    assert.ok(result[0]?.content.includes('[emotion:excited]'));
+    assert.ok(result[0]?.content.includes('元气系 Live2D 陪伴角色'));
   });
 });
 
