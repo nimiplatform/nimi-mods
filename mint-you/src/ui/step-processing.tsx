@@ -36,6 +36,8 @@ export function StepProcessing() {
     interviewValidTurnCount,
     basicInfo,
     selectedInterests,
+    selfReportedMbti,
+    currentFocus,
     loading,
     error,
     routeBinding,
@@ -84,6 +86,8 @@ export function StepProcessing() {
           basicInfo,
           traitResult,
           interests: selectedInterests,
+          selfReportedMbti,
+          currentFocus,
           binding: routeBinding,
         });
 
@@ -128,7 +132,7 @@ export function StepProcessing() {
         store.setError(lastError);
       }
     }
-  }, [isExtracting, isSynthesizing, basicInfo, interviewSignals, interviewTurnCount, interviewValidTurnCount, selectedInterests, routeBinding, store]);
+  }, [isExtracting, isSynthesizing, basicInfo, interviewSignals, interviewTurnCount, interviewValidTurnCount, selectedInterests, selfReportedMbti, currentFocus, routeBinding, store]);
 
   useEffect(() => {
     runPipeline();

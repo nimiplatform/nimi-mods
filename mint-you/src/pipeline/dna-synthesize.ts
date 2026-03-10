@@ -1,6 +1,9 @@
 import type { ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
-import { MINTYOU_REASON } from '../contracts.js';
+import {
+  MINTYOU_REASON,
+  type MbtiValue,
+} from '../contracts.js';
 import { DnaSynthesisOutputSchema } from '../schemas.js';
 import type {
   BasicInfo,
@@ -43,6 +46,7 @@ Rules:
 - All text fields must be non-empty strings.
 - The greeting must reflect the persona's communication style (formality + sentiment).
 - The MBTI must be a valid 4-letter code: [E|I][N|S][T|F][J|P].
+- When Self Reported MBTI is provided, you MUST set personality.mbti to that exact value.
 - The "rules" field must be an array of rule line strings.
 - Output ONLY the JSON object. No markdown, no explanation.`;
 }
@@ -51,8 +55,16 @@ function buildUserPrompt(input: {
   basicInfo: BasicInfo;
   traitResult: TraitExtractionResult;
   interests: string[];
+  selfReportedMbti?: MbtiValue | null;
+  currentFocus?: string;
 }): string {
-  const { basicInfo, traitResult, interests } = input;
+  const {
+    basicInfo,
+    traitResult,
+    interests,
+    selfReportedMbti,
+    currentFocus,
+  } = input;
   return `Generate a social persona with the following profile:
 
 Display Name: ${basicInfo.displayName}
@@ -67,6 +79,8 @@ Formality: ${traitResult.formality}
 Sentiment: ${traitResult.sentiment}
 
 Interests: ${interests.join(', ')}
+Self Reported MBTI: ${selfReportedMbti || 'not provided'}
+Current Focus Topic: ${currentFocus?.trim() || 'not provided'}
 
 Generate the complete persona JSON now.`;
 }
@@ -91,6 +105,8 @@ export async function synthesizeDna(input: {
   basicInfo: BasicInfo;
   traitResult: TraitExtractionResult;
   interests: string[];
+  selfReportedMbti?: MbtiValue | null;
+  currentFocus?: string;
   binding?: RuntimeRouteBinding | null;
 }): Promise<MintYouResult<DnaSynthesisOutput>> {
   const {
@@ -98,11 +114,19 @@ export async function synthesizeDna(input: {
     basicInfo,
     traitResult,
     interests,
+    selfReportedMbti,
+    currentFocus,
     binding,
   } = input;
 
   const systemPrompt = buildSystemPrompt();
-  const prompt = buildUserPrompt({ basicInfo, traitResult, interests });
+  const prompt = buildUserPrompt({
+    basicInfo,
+    traitResult,
+    interests,
+    selfReportedMbti,
+    currentFocus,
+  });
   const actionHint = mintYouMessage(
     'Errors.dnaActionHint',
     'Check LLM route availability and retry synthesis.',

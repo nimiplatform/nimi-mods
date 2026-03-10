@@ -30,6 +30,7 @@ export function StepInterview() {
     interviewStatus,
     memoryDigest,
     selectedInterests,
+    currentFocus,
     routeBinding,
     currentRequestId,
     sessionPersistWarning,
@@ -101,6 +102,7 @@ export function StepInterview() {
         turnCount: state.interviewTurnCount,
         validTurnCount: state.interviewValidTurnCount,
         interests: state.selectedInterests,
+        currentFocus: state.currentFocus,
         language,
         binding: state.routeBinding || undefined,
       });
@@ -171,7 +173,7 @@ export function StepInterview() {
         };
       }
     }
-  }, [store, language, t]);
+  }, [store, language, t, currentFocus]);
 
   const handleTypingDone = useCallback(() => {
     const state = useMintYouStore.getState();

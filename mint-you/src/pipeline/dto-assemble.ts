@@ -4,6 +4,7 @@ import type {
   RelationshipMode,
   FormalityValue,
   SentimentValue,
+  MbtiValue,
 } from '../contracts.js';
 import type { AgentRules } from '../types.js';
 import {
@@ -37,6 +38,7 @@ export function assembleCreateAgentDto(input: {
   interests: string[];
   worldId: string;
   referenceImageUrl?: string | null;
+  selfReportedMbti?: MbtiValue | null;
   traitOverrides?: {
     dnaPrimary?: DnaPrimaryType;
     dnaSecondary?: DnaSecondaryTrait[];
@@ -53,6 +55,7 @@ export function assembleCreateAgentDto(input: {
     interests,
     worldId,
     referenceImageUrl,
+    selfReportedMbti,
     traitOverrides,
   } = input;
 
@@ -87,7 +90,7 @@ export function assembleCreateAgentDto(input: {
     },
     personality: {
       summary: dnaSynthesis.personality.summary,
-      mbti: dnaSynthesis.personality.mbti,
+      mbti: selfReportedMbti ?? dnaSynthesis.personality.mbti,
       interests,
       goals: [basicInfo.socialIntent],
       relationshipMode: effectiveRelationshipMode,

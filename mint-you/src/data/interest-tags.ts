@@ -8,27 +8,19 @@ type TagCategoryDef = {
 const TAG_CATEGORIES: readonly TagCategoryDef[] = [
   {
     category: 'lifestyle',
-    tags: ['travel', 'fitness', 'cooking', 'photography', 'fashion', 'gardening', 'pets', 'outdoors'],
+    tags: ['travel', 'fitness', 'cooking', 'photography', 'pets', 'outdoors'],
   },
   {
     category: 'entertainment',
-    tags: ['movies', 'anime', 'music', 'gaming', 'reading', 'podcasts', 'concerts', 'theater'],
+    tags: ['movies', 'music', 'gaming', 'reading', 'anime', 'podcasts'],
   },
   {
     category: 'intellectual',
-    tags: ['technology', 'science', 'philosophy', 'history', 'politics', 'economics', 'psychology', 'languages'],
+    tags: ['technology', 'science', 'psychology', 'history', 'philosophy', 'languages'],
   },
   {
     category: 'creative',
     tags: ['writing', 'painting', 'design', 'filmmaking', 'crafts', 'music-production'],
-  },
-  {
-    category: 'social',
-    tags: ['volunteering', 'mentoring', 'community', 'networking', 'debate', 'public-speaking'],
-  },
-  {
-    category: 'wellness',
-    tags: ['meditation', 'yoga', 'mental-health', 'nutrition', 'skincare', 'self-improvement'],
   },
 ] as const;
 
@@ -53,8 +45,6 @@ export const INTEREST_CATEGORIES: readonly InterestCategory[] = [
   'entertainment',
   'intellectual',
   'creative',
-  'social',
-  'wellness',
 ];
 
 export function getTagsByCategory(category: InterestCategory): InterestTag[] {

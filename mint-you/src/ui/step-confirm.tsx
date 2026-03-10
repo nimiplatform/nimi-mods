@@ -14,7 +14,7 @@ export function StepConfirm() {
   const store = useMintYouStore();
   const {
     basicInfo, traitResult, dnaSynthesis, selectedInterests,
-    traitOverrides, referenceImageUrl, worldId, error, loading,
+    selfReportedMbti, traitOverrides, referenceImageUrl, worldId, error, loading,
   } = store;
   const { world: oasisWorld, loading: oasisLoading, error: oasisError } = useOasisWorldQuery();
 
@@ -25,6 +25,7 @@ export function StepConfirm() {
   const effectiveRelationshipMode = traitOverrides?.relationshipMode ?? traitResult.relationshipMode;
   const effectiveFormality = traitOverrides?.formality ?? traitResult.formality;
   const effectiveSentiment = traitOverrides?.sentiment ?? traitResult.sentiment;
+  const effectiveMbti = selfReportedMbti ?? dnaSynthesis.personality.mbti;
   const oasisWorldId = oasisWorld?.id ?? '';
   const oasisWorldName = oasisWorld?.name || 'OASIS';
 
@@ -61,6 +62,7 @@ export function StepConfirm() {
       interests: selectedInterests,
       worldId: oasisWorldId,
       referenceImageUrl,
+      selfReportedMbti,
       traitOverrides,
       existingAgentId: store.createdAgentId,
     });
@@ -74,7 +76,7 @@ export function StepConfirm() {
       store.setError(result.error);
       emitMintYouLog({ level: 'error', message: MINTYOU_AUDIT.AGENT_CREATE_FAILED, flowId, source: 'StepConfirm', details: { reasonCode: result.error.reasonCode } });
     }
-  }, [oasisWorldId, basicInfo, traitResult, dnaSynthesis, selectedInterests, referenceImageUrl, traitOverrides, store]);
+  }, [oasisWorldId, basicInfo, traitResult, dnaSynthesis, selectedInterests, selfReportedMbti, referenceImageUrl, traitOverrides, store]);
 
   return (
     <div className="mx-auto my-4 max-w-lg space-y-4 p-4">
@@ -85,7 +87,7 @@ export function StepConfirm() {
         displayName={basicInfo.displayName}
         dnaPrimary={effectivePrimary}
         dnaSecondary={effectiveSecondary}
-        mbti={dnaSynthesis.personality.mbti}
+        mbti={effectiveMbti}
         greeting={dnaSynthesis.greeting}
         personalitySummary={dnaSynthesis.personality.summary}
         formality={effectiveFormality}

@@ -105,12 +105,23 @@ function buildSystemPrompt(input: {
   signals: InterviewTurnSignal[];
   turnCount: number;
   validTurnCount: number;
+  currentFocus?: string;
   language: string;
 }): string {
-  const { interests, signals, turnCount, validTurnCount, language } = input;
+  const {
+    interests,
+    signals,
+    turnCount,
+    validTurnCount,
+    currentFocus,
+    language,
+  } = input;
 
   const coverageNote = buildCoverageNote(computeCoverage(signals));
   const phaseGuidance = buildPhaseGuidance(turnCount, validTurnCount);
+  const socialContext = [
+    currentFocus ? `CURRENT FOCUS TOPIC: ${currentFocus}` : '',
+  ].filter(Boolean).join('\n');
 
   const langInstruction = language.startsWith('zh')
     ? 'Respond to the user in Chinese (中文). All trait signal keys must remain in English.'
@@ -119,6 +130,8 @@ function buildSystemPrompt(input: {
   return `You are a friendly, empathetic interviewer getting to know someone through natural conversation. Your goal is to understand their personality through their stories, opinions, and reactions — not through direct personality questions.
 
 USER INTERESTS: ${interests.join(', ')}
+
+${socialContext}
 
 ${coverageNote}
 
@@ -133,6 +146,7 @@ HARD RULES:
 6. Only set suggestedEnd=true when validTurnCount >= ${MIN_VALID_TURNS}.
 7. When validTurnCount >= ${MIN_VALID_TURNS} and turnCount >= ${SOFT_MAX_TURNS}, you must wrap up naturally in your reply.
 8. Keep assistantReply concise (within 220 Chinese characters or 500 English characters).
+9. Use the current focus hint to pick a warmer opening when it fits, but never mention it like a checklist.
 
 ${langInstruction}
 
@@ -238,6 +252,7 @@ export type InterviewTurnInput = {
   turnCount: number;
   validTurnCount: number;
   interests: string[];
+  currentFocus?: string;
   language: string;
   binding?: RuntimeRouteBinding | null;
 };
@@ -263,6 +278,7 @@ export async function processInterviewTurn(
     turnCount,
     validTurnCount,
     interests,
+    currentFocus,
     language,
     binding,
   } = input;
@@ -279,6 +295,7 @@ export async function processInterviewTurn(
         signals,
         turnCount,
         validTurnCount,
+        currentFocus,
         language,
       });
 

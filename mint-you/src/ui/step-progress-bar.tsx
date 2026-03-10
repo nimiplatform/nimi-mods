@@ -35,14 +35,15 @@ function getVisibleIndex(step: MintYouPipelineStep): number {
 
 type StepProgressBarProps = {
   currentStep: MintYouPipelineStep;
+  className?: string;
 };
 
-export function StepProgressBar({ currentStep }: StepProgressBarProps) {
+export function StepProgressBar({ currentStep, className = '' }: StepProgressBarProps) {
   const { t } = useModTranslation('mint-you');
   const currentVisibleIdx = getVisibleIndex(currentStep);
 
   return (
-    <div className="ui-sync-card mx-4 mt-4 flex items-center gap-1 px-4 py-3">
+    <div className={`ui-sync-card flex w-full min-w-0 items-center gap-1 px-4 py-3 ${className}`}>
       {VISIBLE_STEPS.map((step, idx) => {
         const isCompleted = idx < currentVisibleIdx;
         const isCurrent = idx === currentVisibleIdx;

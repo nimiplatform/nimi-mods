@@ -7,7 +7,7 @@
 version: 1
 cases:
   - id: MY-001-FULL-INTAKE-SUCCESS
-    description: Complete intake flow (basic-info + interests + interview) produces a valid persona card.
+    description: Complete intake flow (basic-info + social-profile + interview) produces a valid persona card.
     expected_ok: true
     reason_code: null
     source_rule: MY-ACC-002
@@ -99,6 +99,11 @@ cases:
     source_rule: MY-ACC-002
   - id: MY-019-PHOTO-DECLINE-REREQUEST
     description: After cooldown expires following a decline, requester can send a new photo reveal request.
+    expected_ok: true
+    reason_code: null
+    source_rule: MY-ACC-002
+  - id: MY-027-SELF-REPORTED-MBTI-PRECEDENCE
+    description: When user provides MBTI in the social-profile step, final persona.mbti preserves that exact value while the rest of the persona remains driven by interview signals and synthesis.
     expected_ok: true
     reason_code: null
     source_rule: MY-ACC-002

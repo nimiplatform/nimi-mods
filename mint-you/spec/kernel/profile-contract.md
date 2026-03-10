@@ -16,7 +16,7 @@ The synthesized DNA object must conform to the nimi-realm `AgentDna` 5-dimension
 
 ## MY-PROF-004 LLM Synthesis Scope
 
-LLM synthesis generates all fields marked `provenance: llm-synthesis` in `tables/field-provenance.yaml`. Input context includes: resolved trait scores, basic info, interest tags, and deterministic extraction results. LLM must not override user-provided basic info (name, gender, age) or deterministic results (dnaPrimary, dnaSecondary, formality, sentiment, relationshipMode).
+LLM synthesis generates all fields marked `provenance: llm-synthesis` in `tables/field-provenance.yaml`. Input context includes: resolved trait scores, basic info, selected interests, optional current-focus opener text, and deterministic extraction results. LLM must not override user-provided basic info (name, gender, age), user-provided MBTI when present, or deterministic results (dnaPrimary, dnaSecondary, formality, sentiment, relationshipMode).
 
 ## MY-PROF-005 Hard-Coded Defaults
 
@@ -33,3 +33,7 @@ Agent `handle` is auto-generated: `slug(displayName)` + random 4-character alpha
 ## MY-PROF-008 User Override Propagation
 
 When a user modifies a trait in the preview phase, only dependent LLM-generated fields are re-synthesized. User-provided basic info, deterministic extraction results, and hard-coded defaults remain unchanged.
+
+## MY-PROF-009 User MBTI Precedence
+
+When `selfReportedMbti` is provided in the social-profile intake phase, final `AgentDna.personality.mbti` must use that exact value. When `selfReportedMbti` is omitted, `personality.mbti` falls back to LLM synthesis from the resolved trait profile.

@@ -28,6 +28,8 @@ export function StepPreviewCard() {
     dnaSynthesis,
     basicInfo,
     selectedInterests,
+    selfReportedMbti,
+    currentFocus,
     traitOverrides,
     referenceImageUrl,
     error,
@@ -44,6 +46,7 @@ export function StepPreviewCard() {
   const effectiveRelationship = traitOverrides?.relationshipMode ?? traitResult.relationshipMode;
   const effectiveFormality = traitOverrides?.formality ?? traitResult.formality;
   const effectiveSentiment = traitOverrides?.sentiment ?? traitResult.sentiment;
+  const effectiveMbti = selfReportedMbti ?? dnaSynthesis.personality.mbti;
 
   const handlePrimaryChange = (primary: DnaPrimaryType) => {
     store.setTraitOverrides({
@@ -121,6 +124,8 @@ export function StepPreviewCard() {
       basicInfo,
       traitResult: effectiveTraitResult,
       interests: selectedInterests,
+      selfReportedMbti,
+      currentFocus,
       binding: routeBinding,
     });
 
@@ -131,7 +136,7 @@ export function StepPreviewCard() {
     } else {
       store.setError(result.error);
     }
-  }, [basicInfo, traitResult, traitOverrides, selectedInterests, routeBinding, store]);
+  }, [basicInfo, traitResult, traitOverrides, selectedInterests, selfReportedMbti, currentFocus, routeBinding, store]);
 
   const hasOverrides = traitOverrides && (
     traitOverrides.dnaPrimary !== undefined
@@ -168,7 +173,7 @@ export function StepPreviewCard() {
         displayName={basicInfo.displayName}
         dnaPrimary={effectivePrimary}
         dnaSecondary={effectiveSecondary}
-        mbti={dnaSynthesis.personality.mbti}
+        mbti={effectiveMbti}
         greeting={dnaSynthesis.greeting}
         personalitySummary={dnaSynthesis.personality.summary}
         formality={effectiveFormality}

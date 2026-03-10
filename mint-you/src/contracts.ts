@@ -119,3 +119,30 @@ export type FormalityValue = (typeof FORMALITY_VALUES)[number];
 
 export const SENTIMENT_VALUES = ['positive', 'neutral', 'cynical'] as const;
 export type SentimentValue = (typeof SENTIMENT_VALUES)[number];
+
+export const MBTI_VALUES = [
+  'INTJ',
+  'INTP',
+  'ENTJ',
+  'ENTP',
+  'INFJ',
+  'INFP',
+  'ENFJ',
+  'ENFP',
+  'ISTJ',
+  'ISFJ',
+  'ESTJ',
+  'ESFJ',
+  'ISTP',
+  'ISFP',
+  'ESTP',
+  'ESFP',
+] as const;
+
+export type MbtiValue = (typeof MBTI_VALUES)[number];
+
+export const SOCIAL_PROFILE_LIMITS = {
+  minInterests: 3,
+  maxInterests: 8,
+  currentFocusMaxLength: 40,
+} as const;

@@ -79,7 +79,17 @@ export function useMintYouSession() {
         store.goToStep(resumeStep);
 
         if (existing.basicInfo) store.setBasicInfo(existing.basicInfo);
-        if (existing.selectedInterests.length > 0) store.setSelectedInterests(existing.selectedInterests);
+        if (
+          existing.selectedInterests.length > 0
+          || existing.selfReportedMbti
+          || existing.currentFocus
+        ) {
+          store.applySocialProfile({
+            selectedInterests: existing.selectedInterests,
+            selfReportedMbti: existing.selfReportedMbti ?? null,
+            currentFocus: existing.currentFocus || '',
+          });
+        }
 
         // Restore interview state
         if (existing.interviewMessages.length > 0) {
@@ -129,6 +139,8 @@ export function useMintYouSession() {
   const sessionId = useMintYouStore((s) => s.sessionId);
   const basicInfo = useMintYouStore((s) => s.basicInfo);
   const selectedInterests = useMintYouStore((s) => s.selectedInterests);
+  const selfReportedMbti = useMintYouStore((s) => s.selfReportedMbti);
+  const currentFocus = useMintYouStore((s) => s.currentFocus);
   const interviewMessages = useMintYouStore((s) => s.interviewMessages);
   const interviewSignals = useMintYouStore((s) => s.interviewSignals);
   const interviewTurnCount = useMintYouStore((s) => s.interviewTurnCount);
@@ -157,6 +169,8 @@ export function useMintYouSession() {
         currentStep: state.currentStep,
         basicInfo: state.basicInfo,
         selectedInterests: state.selectedInterests,
+        selfReportedMbti: state.selfReportedMbti,
+        currentFocus: state.currentFocus,
         interviewMessages: state.interviewMessages,
         interviewSignals: state.interviewSignals,
         interviewTurnCount: state.interviewTurnCount,
@@ -186,6 +200,8 @@ export function useMintYouSession() {
     currentStep,
     basicInfo,
     selectedInterests,
+    selfReportedMbti,
+    currentFocus,
     interviewMessages,
     interviewSignals,
     interviewTurnCount,

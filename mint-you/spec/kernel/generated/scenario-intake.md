@@ -47,6 +47,36 @@ intake_phases:
     max_select: 8
     maps_to: personality.interests
     source_rule: MY-INT-001
+    supplemental_fields:
+      - field: selfReportedMbti
+        type: optional-enum
+        values:
+          - INTJ
+          - INTP
+          - ENTJ
+          - ENTP
+          - INFJ
+          - INFP
+          - ENFJ
+          - ENFP
+          - ISTJ
+          - ISFJ
+          - ESTJ
+          - ESFJ
+          - ISTP
+          - ISFP
+          - ESTP
+          - ESFP
+        required: false
+        maps_to: personality.mbti
+        precedence: user-input when provided
+        source_rule: MY-INT-008
+      - field: currentFocus
+        type: short-text
+        required: false
+        max_length: 40
+        usage: interview opener and synthesis context
+        source_rule: MY-INT-007
   - phase: interview
     order: 3
     min_valid_turns: 7
@@ -68,29 +98,23 @@ interest_tag_pool:
         - fitness
         - cooking
         - photography
-        - fashion
-        - gardening
         - pets
         - outdoors
     - category: entertainment
       tags:
         - movies
-        - anime
         - music
         - gaming
         - reading
+        - anime
         - podcasts
-        - concerts
-        - theater
     - category: intellectual
       tags:
         - technology
         - science
-        - philosophy
-        - history
-        - politics
-        - economics
         - psychology
+        - history
+        - philosophy
         - languages
     - category: creative
       tags:
@@ -100,22 +124,6 @@ interest_tag_pool:
         - filmmaking
         - crafts
         - music-production
-    - category: social
-      tags:
-        - volunteering
-        - mentoring
-        - community
-        - networking
-        - debate
-        - public-speaking
-    - category: wellness
-      tags:
-        - meditation
-        - yoga
-        - mental-health
-        - nutrition
-        - skincare
-        - self-improvement
 trait_weight_key_format:
   source_rule: MY-INT-003
   description: |
@@ -182,4 +190,23 @@ interview_neutrality_policy:
   description: |
     The AI interviewer must not ask direct personality meta-questions. Trait signals are inferred from conversational content, not self-assessment.
   source_rule: MY-INT-005
+mbti_pool:
+  source_rule: MY-INT-008
+  values:
+    - INTJ
+    - INTP
+    - ENTJ
+    - ENTP
+    - INFJ
+    - INFP
+    - ENFJ
+    - ENFP
+    - ISTJ
+    - ISFJ
+    - ESTJ
+    - ESFJ
+    - ISTP
+    - ISFP
+    - ESTP
+    - ESFP
 ```

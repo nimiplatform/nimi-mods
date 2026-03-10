@@ -9,6 +9,7 @@ import type {
   FormalityValue,
   SentimentValue,
   MintYouPipelineStep,
+  MbtiValue,
 } from './contracts.js';
 
 // ── Basic Info ──
@@ -30,14 +31,18 @@ export type InterestCategory =
   | 'lifestyle'
   | 'entertainment'
   | 'intellectual'
-  | 'creative'
-  | 'social'
-  | 'wellness';
+  | 'creative';
 
 export type InterestTag = {
   id: string;
   label: string;
   category: InterestCategory;
+};
+
+export type SocialProfile = {
+  selectedInterests: string[];
+  selfReportedMbti: MbtiValue | null;
+  currentFocus: string;
 };
 
 // ── Interview ──
@@ -112,7 +117,7 @@ export type DnaSynthesisOutput = {
   };
   personality: {
     summary: string;
-    mbti: string;
+    mbti: MbtiValue;
   };
   communication: {
     summary: string;
@@ -137,6 +142,8 @@ export type MintYouSession = {
   currentStep: MintYouPipelineStep;
   basicInfo: BasicInfo | null;
   selectedInterests: string[];
+  selfReportedMbti: MbtiValue | null;
+  currentFocus: string;
   interviewMessages: InterviewMessage[];
   interviewSignals: InterviewTurnSignal[];
   interviewTurnCount: number;

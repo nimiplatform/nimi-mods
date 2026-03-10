@@ -7,6 +7,7 @@ import type {
   RelationshipMode,
   FormalityValue,
   SentimentValue,
+  MbtiValue,
 } from '../contracts.js';
 import type {
   BasicInfo,
@@ -16,6 +17,7 @@ import type {
   InterviewTurnSignal,
   InterviewStatus,
   MintYouError,
+  SocialProfile,
 } from '../types.js';
 
 type TraitOverrides = {
@@ -34,6 +36,8 @@ type MintYouStore = {
   // Step data
   basicInfo: BasicInfo | null;
   selectedInterests: string[];
+  selfReportedMbti: MbtiValue | null;
+  currentFocus: string;
 
   // Interview state
   interviewMessages: InterviewMessage[];
@@ -70,6 +74,7 @@ type MintYouStore = {
   goBack: () => void;
   setBasicInfo: (info: BasicInfo) => void;
   setSelectedInterests: (interests: string[]) => void;
+  applySocialProfile: (profile: SocialProfile) => void;
   addInterviewMessage: (message: InterviewMessage) => void;
   addInterviewSignals: (signals: InterviewTurnSignal[]) => void;
   setInterviewTurnCount: (count: number) => void;
@@ -112,6 +117,8 @@ const INITIAL_STATE = {
   currentStep: 'basic-info' as MintYouPipelineStep,
   basicInfo: null as BasicInfo | null,
   selectedInterests: [] as string[],
+  selfReportedMbti: null as MbtiValue | null,
+  currentFocus: '',
   interviewMessages: [] as InterviewMessage[],
   interviewSignals: [] as InterviewTurnSignal[],
   interviewTurnCount: 0,
@@ -157,6 +164,11 @@ export const useMintYouStore = create<MintYouStore>((set) => ({
 
   setBasicInfo: (info) => set({ basicInfo: info }),
   setSelectedInterests: (interests) => set({ selectedInterests: interests }),
+  applySocialProfile: (profile) => set({
+    selectedInterests: profile.selectedInterests,
+    selfReportedMbti: profile.selfReportedMbti,
+    currentFocus: profile.currentFocus,
+  }),
   addInterviewMessage: (message) => set((state) => ({
     interviewMessages: [...state.interviewMessages, message],
   })),

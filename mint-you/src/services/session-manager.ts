@@ -6,6 +6,7 @@ import type {
   DnaSynthesisOutput,
   InterviewMessage,
   InterviewTurnSignal,
+  SocialProfile,
 } from '../types.js';
 import type {
   MintYouPipelineStep,
@@ -22,7 +23,7 @@ import {
   writeModState,
 } from './mod-state.js';
 
-export const SESSION_VERSION = 2;
+export const SESSION_VERSION = 4;
 
 const SESSION_KEY_PREFIX = 'mint-you:session:';
 const SESSION_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -154,6 +155,8 @@ export function buildSessionSnapshot(input: {
   currentStep: MintYouPipelineStep;
   basicInfo: BasicInfo | null;
   selectedInterests: string[];
+  selfReportedMbti: SocialProfile['selfReportedMbti'];
+  currentFocus: string;
   interviewMessages: InterviewMessage[];
   interviewSignals: InterviewTurnSignal[];
   interviewTurnCount: number;
@@ -181,6 +184,8 @@ export function buildSessionSnapshot(input: {
     currentStep: input.currentStep,
     basicInfo: input.basicInfo,
     selectedInterests: input.selectedInterests,
+    selfReportedMbti: input.selfReportedMbti,
+    currentFocus: input.currentFocus,
     interviewMessages: input.interviewMessages,
     interviewSignals: input.interviewSignals,
     interviewTurnCount: input.interviewTurnCount,

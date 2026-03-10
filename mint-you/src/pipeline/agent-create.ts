@@ -17,6 +17,7 @@ import type {
   RelationshipMode,
   FormalityValue,
   SentimentValue,
+  MbtiValue,
 } from '../contracts.js';
 import { assembleCreateAgentDto } from './dto-assemble.js';
 import { generateHandle } from '../utils/slug.js';
@@ -31,6 +32,7 @@ type AgentCreateInput = {
   interests: string[];
   worldId: string;
   referenceImageUrl?: string | null;
+  selfReportedMbti?: MbtiValue | null;
   traitOverrides?: {
     dnaPrimary?: DnaPrimaryType;
     dnaSecondary?: DnaSecondaryTrait[];
@@ -121,6 +123,7 @@ export async function createAgent(
     interests,
     worldId,
     referenceImageUrl,
+    selfReportedMbti,
     traitOverrides,
     existingAgentId,
   } = input;
@@ -148,6 +151,7 @@ export async function createAgent(
       interests,
       worldId,
       referenceImageUrl,
+      selfReportedMbti,
       traitOverrides,
     });
 

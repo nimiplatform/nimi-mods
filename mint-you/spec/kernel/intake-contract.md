@@ -4,7 +4,7 @@
 
 ## MY-INT-001 Three-Phase Intake
 
-Intake flow is fixed: `basic-info -> interest-tags -> interview`. Phases execute sequentially; earlier phases provide context for later ones. The interview phase replaces the former scenario-based intake with a conversational AI interview.
+Intake flow is fixed: `basic-info -> interest-tags -> interview`. Phases execute sequentially; earlier phases provide context for later ones. The `interest-tags` phase is a lightweight social-profile step: selected interests plus optional MBTI/current-focus hints. The interview phase replaces the former scenario-based intake with a conversational AI interview.
 
 ## MY-INT-002 Conversational Interview Structure
 
@@ -28,8 +28,16 @@ The AI interviewer is guided by a dynamic coverage note that softly steers follo
 
 ## MY-INT-005 Interview Neutrality
 
-The AI interviewer must not ask direct personality meta-questions (e.g. "what kind of personality do you think you have?"). Trait signals are inferred from conversational content, not from self-assessment.
+The AI interviewer must not ask direct personality meta-questions (e.g. "what kind of personality do you think you have?"). Trait signals are inferred from conversational content, not from self-assessment. This restriction applies to interview turns; explicit pre-interview social-profile fields are allowed.
 
 ## MY-INT-006 Interest Tag Pool
 
 The predefined interest tag pool is defined in `tables/scenario-intake.yaml#interest_tag_pool`. Tags are grouped by category for UI presentation. The pool is a static dataset within the mod. Interest tags are also used to seed the opening interview topic.
+
+## MY-INT-007 Lightweight Opener Context
+
+The second intake phase may collect one lightweight opener field alongside interest tags: a current focus topic the user is likely to talk about right now. This field is used to shape interview openings and final persona synthesis, but does not replace trait extraction from interview turns.
+
+## MY-INT-008 Self-Reported MBTI
+
+Self-reported MBTI is optional and is collected in the second intake phase. When provided, the final persona must preserve that exact MBTI value. When omitted, MBTI falls back to synthesis from the interview-derived trait profile.

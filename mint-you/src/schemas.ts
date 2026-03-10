@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  MBTI_VALUES,
+  SOCIAL_PROFILE_LIMITS,
+} from './contracts.js';
 
 export const BasicInfoSchema = z.object({
   displayName: z.string().min(1).max(50),
@@ -7,7 +11,15 @@ export const BasicInfoSchema = z.object({
   socialIntent: z.enum(['dating', 'friendship', 'social-explore', 'professional']),
 });
 
-export const InterestSelectionSchema = z.array(z.string().min(1)).min(3).max(8);
+export const InterestSelectionSchema = z.array(z.string().min(1))
+  .min(SOCIAL_PROFILE_LIMITS.minInterests)
+  .max(SOCIAL_PROFILE_LIMITS.maxInterests);
+
+export const SocialProfileSchema = z.object({
+  selectedInterests: InterestSelectionSchema,
+  selfReportedMbti: z.enum(MBTI_VALUES).nullable(),
+  currentFocus: z.string().trim().max(SOCIAL_PROFILE_LIMITS.currentFocusMaxLength),
+});
 
 export const InterviewTurnOutputSchema = z.object({
   assistantReply: z.string().min(1),
@@ -39,7 +51,7 @@ export const DnaSynthesisOutputSchema = z.object({
   }),
   personality: z.object({
     summary: z.string().min(1),
-    mbti: z.string().regex(/^[EI][NS][TF][JP]$/),
+    mbti: z.enum(MBTI_VALUES),
   }),
   communication: z.object({
     summary: z.string().min(1),

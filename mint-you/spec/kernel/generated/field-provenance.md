@@ -204,10 +204,11 @@ agent_dna_personality:
     required: false
     source_rule: MY-PROF-004
   - field: personality.mbti
-    provenance: llm-synthesis
-    source: inferred from dnaPrimary + dnaSecondary + communication scores
+    provenance: user-input
+    source: social-profile.selfReportedMbti
+    fallback: inferred from dnaPrimary + dnaSecondary + communication scores when user omits MBTI
     required: true
-    source_rule: MY-PROF-004
+    source_rule: MY-PROF-009
   - field: personality.interests
     provenance: user-input
     source: interest-tags phase selections
