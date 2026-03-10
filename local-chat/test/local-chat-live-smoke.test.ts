@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import net from 'node:net';
-import { dirname, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
@@ -25,6 +26,8 @@ type RuntimeRunResult = {
 
 const APP_ID = 'nimi.mods.local-chat.live';
 const SUBJECT_USER_ID = 'mods-local-chat-live-user';
+const DEFAULT_RUNTIME_READY_TIMEOUT_MS = 120_000;
+const DEFAULT_RUNTIME_READY_POLL_INTERVAL_MS = 250;
 
 async function allocatePort(): Promise<number> {
   return await new Promise((resolvePromise, reject) => {
@@ -79,13 +82,14 @@ async function waitForRuntimeReady(endpoint: string): Promise<void> {
   });
 
   let lastError: unknown = null;
-  for (let attempt = 0; attempt < 120; attempt += 1) {
+  const deadline = Date.now() + resolveRuntimeReadyTimeoutMs();
+  while (Date.now() < deadline) {
     try {
       await client.local.listLocalModels({});
       return;
     } catch (error) {
       lastError = error;
-      await new Promise((resolvePromise) => setTimeout(resolvePromise, 250));
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, DEFAULT_RUNTIME_READY_POLL_INTERVAL_MS));
     }
   }
 
@@ -124,6 +128,7 @@ async function withRuntimeDaemon(
   run: (endpoint: string) => Promise<void>,
 ): Promise<RuntimeRunResult> {
   const runtimeDir = resolveRuntimeDir();
+  const stateRoot = mkdtempSync(join(tmpdir(), 'nimi-mod-local-chat-runtime-'));
   const grpcPort = await allocatePort();
   const httpPort = await allocatePort();
   const endpoint = `127.0.0.1:${grpcPort}`;
@@ -136,6 +141,13 @@ async function withRuntimeDaemon(
       NIMI_RUNTIME_GRPC_ADDR: endpoint,
       NIMI_RUNTIME_HTTP_ADDR: `127.0.0.1:${httpPort}`,
       NIMI_RUNTIME_ENABLE_WORKERS: '0',
+      NIMI_RUNTIME_LOCK_PATH: join(stateRoot, 'runtime.lock'),
+      NIMI_RUNTIME_CONFIG_PATH: join(stateRoot, 'config.json'),
+      NIMI_RUNTIME_MODEL_REGISTRY_PATH: join(stateRoot, 'model-registry.json'),
+      NIMI_RUNTIME_LOCAL_STATE_PATH: join(stateRoot, 'local-state.json'),
+      NIMI_RUNTIME_CONNECTOR_STORE_PATH: join(stateRoot, 'connector-store.json'),
+      XDG_DATA_HOME: join(stateRoot, 'xdg-data'),
+      XDG_CACHE_HOME: join(stateRoot, 'xdg-cache'),
       ...runtimeEnv,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -166,9 +178,21 @@ async function withRuntimeDaemon(
 
     await run(endpoint);
     return { stdout, stderr };
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error || '');
+    throw new Error(`${detail}\nstdout=${stdout}\nstderr=${stderr}`);
   } finally {
     await terminateDaemon(daemon);
+    rmSync(stateRoot, { recursive: true, force: true });
   }
+}
+
+function resolveRuntimeReadyTimeoutMs(): number {
+  const configured = Number(process.env.NIMI_RUNTIME_READY_TIMEOUT_MS || '');
+  if (Number.isFinite(configured) && configured > 0) {
+    return configured;
+  }
+  return DEFAULT_RUNTIME_READY_TIMEOUT_MS;
 }
 
 function requiredEnv(name: string): string {
