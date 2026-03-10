@@ -65,14 +65,22 @@ AnimationController 采用插件式帧更新管线，每帧按优先级顺序执
 
 口型同步插件将音频分析结果映射到嘴型参数：
 
-1. wLipSync MFCC 分析输出 6 类音素权重: A, E, I, O, U, S (silence)
-2. 取最大权重音素，映射到 ParamMouthOpenY:
-   - A: 1.0, E: 0.7, I: 0.5, O: 0.8, U: 0.6, S: 0.0
-3. 平滑窗口: 攻击 50ms, 释放 80ms（指数插值）
-4. 音量归一化: 低于阈值时 MouthOpenY 强制为 0（消除噪声）
-5. 无音频输入时自动归零
+1. 优先从 `AudioWorkletProcessor` 获取音频帧的 MFCC / 频带能量特征
+2. 特征映射为 `A/E/I/O/U/S` 音素权重，再映射到 `ParamMouthOpenY`
+3. 当 `AudioWorklet` 不可用时，回退到 `AnalyserNode` 的 RMS 音量驱动
+4. 平滑窗口: 攻击 50ms, 释放 80ms（指数插值）
+5. 低于阈值时 MouthOpenY 强制为 0（消除噪声）
+6. 无音频输入时自动归零
 
-## BD-ANIM-007 物理模拟委托
+## BD-ANIM-007 播报状态反馈
+
+角色播放语音时必须有独立于 idle 的 speaking 反馈：
+
+1. TTS 播放开始时进入 speaking 状态
+2. speaking 状态优先播放 `speak` motion，并允许叠加当前情绪对应动作
+3. 播放结束后退出 speaking 状态并恢复 idle motion loop
+
+## BD-ANIM-008 物理模拟委托
 
 头发/配饰物理由 Live2D Cubism SDK 内置物理引擎驱动：
 

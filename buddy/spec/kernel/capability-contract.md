@@ -36,8 +36,9 @@ Live2D 渲染在 mod 内部完成，使用 bundled 的 `pixi.js` + `pixi-live2d-
 
 ## BD-CAP-006 口型同步能力边界
 
-口型同步在 mod 内部完成，使用 bundled 的 wLipSync（WASM + AudioWorklet）：
-1. 音频源为 TTS 输出的 AudioBuffer/MediaStream
-2. MFCC 分析在 AudioWorklet 中实时执行
-3. 音素检测结果（A/E/I/O/U/S）映射到 `ParamMouthOpenY`
-4. 不依赖外部口型同步服务
+口型同步在 mod 内部完成，优先使用 `AudioWorklet` 做本地音频特征提取：
+1. 音频源为 TTS 输出的 AudioBuffer / MediaElement / MediaStream
+2. `AudioWorkletProcessor` 对播放中的音频帧提取 MFCC / 频带能量特征
+3. 特征进一步映射为 `A/E/I/O/U/S` 音素权重，并驱动 `ParamMouthOpenY`
+4. 当 `AudioWorklet` 不可用时，允许回退到 `AnalyserNode` 的 RMS 音量驱动
+5. 不依赖外部口型同步服务

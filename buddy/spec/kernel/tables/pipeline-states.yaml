@@ -62,16 +62,28 @@ text_turn_chain:
     order: 6
     description: 情绪标签驱动 AnimationController 表情切换
     source_rule: BD-PIPE-004
-  - step: tts-synthesize
+  - step: tts-voice-resolve
     order: 7
+    description: 根据当前 TTS route/model 查询 voice 目录并解析可用 voice
+    source_rule: BD-PIPE-002
+  - step: tts-synthesize
+    order: 8
     description: 回复文本提交 TTS 合成（与文字显示并行）
     source_rule: BD-PIPE-002
+  - step: audio-playback-start
+    order: 9
+    description: TTS 返回可播放音频后立即开始播报
+    source_rule: BD-PIPE-002
+  - step: speaking-state-drive
+    order: 10
+    description: 播放期间角色进入 speaking 动作并叠加当前情绪反馈
+    source_rule: BD-PIPE-002
   - step: lip-sync-drive
-    order: 8
-    description: TTS 音频流实时驱动口型同步
+    order: 11
+    description: 播放中的音频经 AudioWorklet 音素分析实时驱动口型；不可用时回退到 analyser
     source_rule: BD-PIPE-002
   - step: turn-persist
-    order: 9
+    order: 12
     description: 对话轮次持久化到 mod-state
     source_rule: BD-PIPE-006
 voice_input_chain:

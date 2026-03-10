@@ -17,11 +17,15 @@
 
 TTS 合成与口型同步并行执行：
 
-1. 助手回复文本提交到 `runtime.media.tts.stream()`
-2. TTS 返回音频流开始播放
-3. 音频流同时喂入 wLipSync AudioWorklet 分析
-4. MFCC 音素结果实时驱动 `ParamMouthOpenY`
-5. TTS 失败不阻塞文字显示（静默降级为纯文字）
+1. 在当前 TTS route / model 上查询 voice 目录，解析一个可用 voice（用户显式选择优先）
+2. 助手回复文本提交到 `runtime.media.tts.stream()`；流式失败时回退到 `tts.synthesize()`
+3. TTS 返回可播放音频后立即开始播放
+4. 播放期间角色进入 speaking 状态，优先播放 speaking + emotion motion
+5. 音频播放同时喂入 `AudioWorkletProcessor` 做 MFCC / 频带能量分析
+6. Worklet 输出 `A/E/I/O/U/S` 音素权重，并实时驱动 `ParamMouthOpenY`
+7. 当 Worklet 不可用时，允许回退到 `AnalyserNode` RMS 音量驱动
+8. 播放结束后退出 speaking 状态并回到 idle
+9. TTS 失败不阻塞文字显示（静默降级为纯文字）
 
 ## BD-PIPE-003 语音输入管线
 

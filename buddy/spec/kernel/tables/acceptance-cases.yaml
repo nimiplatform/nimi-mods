@@ -67,6 +67,16 @@ cases:
     expected_ok: true
     reason_code: BUDDY_TTS_STREAM_OK
     source_rule: BD-ACC-002
+  - id: BD-019-TTS-VOICE-RESOLVE
+    description: 当前 TTS model 需要显式 voice 时，Buddy 能查询 voice 列表并使用有效 voice 发起播报。
+    expected_ok: true
+    reason_code: BUDDY_TTS_STREAM_OK
+    source_rule: BD-ACC-002
+  - id: BD-020-TTS-SPEAKING-EMOTION
+    description: 语音播放期间角色进入 speaking 状态，口型和当前情绪动作同时生效，播放结束后回到 idle。
+    expected_ok: true
+    reason_code: BUDDY_TTS_STREAM_OK
+    source_rule: BD-ACC-002
   - id: BD-013-TTS-FAIL-DEGRADE
     description: TTS 失败时静默降级为纯文字显示，不阻塞对话。
     expected_ok: true

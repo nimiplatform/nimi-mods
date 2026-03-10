@@ -3,12 +3,154 @@
  * 封装 TTS 播放 + 口型同步接入 和 STT 录制 + 转写。
  */
 
+import type { LipSyncFrame } from '../contracts.js';
+import {
+  getBuddyLipSyncProcessorName,
+  getBuddyLipSyncWorkletUrl,
+} from './lip-sync-worklet.js';
+import { logBuddyConsole } from './debug-log.js';
+
+export interface LipSyncStream {
+  subscribe(listener: (frame: LipSyncFrame) => void): () => void;
+  dispose(): void;
+}
+
 export interface VoicePlaybackResult {
   audioContext: AudioContext;
   analyser: AnalyserNode;
+  lipSyncStream: LipSyncStream | null;
   /** 音频播放完毕的 Promise */
   finished: Promise<void>;
   stop: () => Promise<void>;
+}
+
+class LipSyncStreamEmitter implements LipSyncStream {
+  private listeners = new Set<(frame: LipSyncFrame) => void>();
+
+  emit(frame: LipSyncFrame) {
+    for (const listener of this.listeners) {
+      listener(frame);
+    }
+  }
+
+  subscribe(listener: (frame: LipSyncFrame) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  dispose() {
+    this.listeners.clear();
+  }
+}
+
+function normalizeLipSyncFrame(raw: unknown): LipSyncFrame | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const record = raw as Record<string, unknown>;
+  const phonemesRaw = record.phonemes;
+  if (!phonemesRaw || typeof phonemesRaw !== 'object') return null;
+  const phonemesRecord = phonemesRaw as Record<string, unknown>;
+  const dominantPhoneme = String(record.dominantPhoneme || 'S').trim().toUpperCase();
+  if (!['A', 'E', 'I', 'O', 'U', 'S'].includes(dominantPhoneme)) return null;
+  const mfcc = Array.isArray(record.mfcc)
+    ? record.mfcc.map((value) => Number(value || 0))
+    : [];
+  return {
+    rms: Number(record.rms || 0),
+    dominantPhoneme: dominantPhoneme as LipSyncFrame['dominantPhoneme'],
+    phonemes: {
+      A: Number(phonemesRecord.A || 0),
+      E: Number(phonemesRecord.E || 0),
+      I: Number(phonemesRecord.I || 0),
+      O: Number(phonemesRecord.O || 0),
+      U: Number(phonemesRecord.U || 0),
+      S: Number(phonemesRecord.S || 0),
+    },
+    mfcc,
+  };
+}
+
+async function createAudioAnalysisChain(
+  audioContext: AudioContext,
+  sourceNode: AudioNode,
+): Promise<{
+  analyser: AnalyserNode;
+  lipSyncStream: LipSyncStream | null;
+  cleanup: () => void;
+}> {
+  const analyser = audioContext.createAnalyser();
+  analyser.fftSize = 1024;
+  analyser.smoothingTimeConstant = 0.65;
+
+  let cleanup = () => {
+    try {
+      analyser.disconnect();
+    } catch {
+      // Ignore disconnect races.
+    }
+  };
+
+  if (
+    typeof AudioWorkletNode !== 'undefined'
+    && audioContext.audioWorklet
+  ) {
+    try {
+      await audioContext.audioWorklet.addModule(getBuddyLipSyncWorkletUrl());
+      const workletNode = new AudioWorkletNode(
+        audioContext,
+        getBuddyLipSyncProcessorName(),
+      );
+      const emitter = new LipSyncStreamEmitter();
+      workletNode.port.onmessage = (event) => {
+        const frame = normalizeLipSyncFrame(event.data);
+        if (frame) {
+          emitter.emit(frame);
+        }
+      };
+      sourceNode.connect(workletNode);
+      workletNode.connect(analyser);
+      analyser.connect(audioContext.destination);
+      cleanup = () => {
+        workletNode.port.onmessage = null;
+        emitter.dispose();
+        try {
+          sourceNode.disconnect(workletNode);
+        } catch {
+          // Ignore disconnect races.
+        }
+        try {
+          workletNode.disconnect();
+        } catch {
+          // Ignore disconnect races.
+        }
+        try {
+          analyser.disconnect();
+        } catch {
+          // Ignore disconnect races.
+        }
+      };
+      return {
+        analyser,
+        lipSyncStream: emitter,
+        cleanup,
+      };
+    } catch (error) {
+      logBuddyConsole('warn', 'buddy:lipsync:worklet-fallback', {
+        error: error instanceof Error ? error.message : String(error || ''),
+      });
+      // Fallback to raw analyser-only path below.
+    }
+  }
+
+  logBuddyConsole('info', 'buddy:lipsync:using-analyser-fallback');
+  sourceNode.connect(analyser);
+  analyser.connect(audioContext.destination);
+  return {
+    analyser,
+    lipSyncStream: null,
+    cleanup,
+  };
 }
 
 function toUint8Array(audioBytes: ArrayBuffer | Uint8Array): Uint8Array {
@@ -35,23 +177,23 @@ export async function playAudioBytes(
   mimeType: string,
 ): Promise<VoicePlaybackResult> {
   const audioContext = new AudioContext();
-  const analyser = audioContext.createAnalyser();
-  analyser.fftSize = 256;
-
   const audioBuffer = await audioContext.decodeAudioData(toArrayBuffer(audioBytes));
   const source = audioContext.createBufferSource();
   source.buffer = audioBuffer;
-  source.connect(analyser);
-  analyser.connect(audioContext.destination);
+  const analysis = await createAudioAnalysisChain(audioContext, source);
 
   const finished = new Promise<void>((resolve) => {
-    source.onended = () => resolve();
+    source.onended = () => {
+      analysis.cleanup();
+      resolve();
+    };
   });
 
   let stopped = false;
   const stop = async () => {
     if (stopped) return;
     stopped = true;
+    analysis.cleanup();
     try {
       source.stop(0);
     } catch {
@@ -61,7 +203,13 @@ export async function playAudioBytes(
 
   source.start(0);
 
-  return { audioContext, analyser, finished, stop };
+  return {
+    audioContext,
+    analyser: analysis.analyser,
+    lipSyncStream: analysis.lipSyncStream,
+    finished,
+    stop,
+  };
 }
 
 export interface AudioPlaybackSource {
@@ -81,23 +229,30 @@ export async function playAudioSource(source: AudioPlaybackSource): Promise<Voic
   }
 
   const mimeType = String(source.mimeType || '').trim() || (bytes ? detectMimeType(bytes.slice().buffer) : 'audio/mpeg');
+  if (bytes) {
+    logBuddyConsole('debug', 'buddy:tts:playback-source', {
+      kind: 'audio-bytes',
+      bytesLength: bytes.length,
+      mimeType,
+    });
+    return playAudioBytes(bytes, mimeType);
+  }
+
   const audioContext = new AudioContext();
-  const analyser = audioContext.createAnalyser();
-  analyser.fftSize = 256;
 
   let objectUrl = '';
-  const playbackUrl = bytes
-    ? (() => {
-      objectUrl = URL.createObjectURL(new Blob([bytes], { type: mimeType }));
-      return objectUrl;
-    })()
-    : audioUri;
+  const playbackUrl = audioUri;
+
+  logBuddyConsole('debug', 'buddy:tts:playback-source', {
+    kind: 'audio-uri',
+    audioUri,
+    mimeType,
+  });
 
   const audio = new Audio(playbackUrl);
   audio.preload = 'auto';
   const mediaSource = audioContext.createMediaElementSource(audio);
-  mediaSource.connect(analyser);
-  analyser.connect(audioContext.destination);
+  const analysis = await createAudioAnalysisChain(audioContext, mediaSource);
 
   let finishedResolve: (() => void) | null = null;
   let finishedReject: ((reason?: unknown) => void) | null = null;
@@ -109,6 +264,8 @@ export async function playAudioSource(source: AudioPlaybackSource): Promise<Voic
     audio.onerror = null;
     audio.pause();
     audio.src = '';
+    analysis.cleanup();
+    analysis.lipSyncStream?.dispose();
     if (objectUrl) {
       URL.revokeObjectURL(objectUrl);
       objectUrl = '';
@@ -137,7 +294,13 @@ export async function playAudioSource(source: AudioPlaybackSource): Promise<Voic
   await audioContext.resume();
   await audio.play();
 
-  return { audioContext, analyser, finished, stop };
+  return {
+    audioContext,
+    analyser: analysis.analyser,
+    lipSyncStream: analysis.lipSyncStream,
+    finished,
+    stop,
+  };
 }
 
 /**

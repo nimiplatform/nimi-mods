@@ -47,6 +47,19 @@ export type EmotionType = 'happy' | 'sad' | 'surprised' | 'thinking' | 'excited'
 /** 默认情绪（儿童陪伴场景应默认积极） */
 export const DEFAULT_EMOTION: EmotionType = 'happy';
 
+export const LIP_SYNC_PHONEMES = ['A', 'E', 'I', 'O', 'U', 'S'] as const;
+
+export type LipSyncPhoneme = typeof LIP_SYNC_PHONEMES[number];
+
+export type LipSyncPhonemeWeights = Record<LipSyncPhoneme, number>;
+
+export interface LipSyncFrame {
+  rms: number;
+  dominantPhoneme: LipSyncPhoneme;
+  phonemes: LipSyncPhonemeWeights;
+  mfcc: number[];
+}
+
 /** 对话历史最大保留轮数 */
 export const MAX_HISTORY_TURNS = 20;
 

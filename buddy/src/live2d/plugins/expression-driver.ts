@@ -13,6 +13,7 @@ export function createExpressionDriverPlugin() {
   let targetParams: EmotionParams = { ...currentParams };
   let transitionProgress = 1;
   let transientTimer: number | null = null;
+  let speaking = false;
 
   const TRANSITION_DURATION = 0.3; // 300ms
 
@@ -40,10 +41,18 @@ export function createExpressionDriverPlugin() {
     }
   }
 
-  const plugin: AnimationPlugin & { setEmotion: typeof setEmotion } = {
+  function setSpeaking(next: boolean) {
+    speaking = next;
+  }
+
+  const plugin: AnimationPlugin & {
+    setEmotion: typeof setEmotion;
+    setSpeaking: typeof setSpeaking;
+  } = {
     id: 'expression-driver',
     priority: 20,
     setEmotion,
+    setSpeaking,
     update(dt: number, setParam: ParamSetter) {
       // Advance transition
       if (transitionProgress < 1) {
@@ -68,7 +77,10 @@ export function createExpressionDriverPlugin() {
       // Apply params
       setParam('PARAM_EYE_L_SMILE', currentParams.PARAM_EYE_L_SMILE);
       setParam('PARAM_EYE_R_SMILE', currentParams.PARAM_EYE_R_SMILE);
-      setParam('PARAM_MOUTH_FORM', currentParams.PARAM_MOUTH_FORM);
+      if (!speaking) {
+        setParam('PARAM_MOUTH_FORM', currentParams.PARAM_MOUTH_FORM);
+        setParam('ParamMouthForm', currentParams.PARAM_MOUTH_FORM);
+      }
       setParam('PARAM_TERE', currentParams.PARAM_TERE ?? 0);
       setParam('PARAM_BROW_L_Y', currentParams.PARAM_BROW_L_Y);
       setParam('PARAM_BROW_R_Y', currentParams.PARAM_BROW_R_Y);

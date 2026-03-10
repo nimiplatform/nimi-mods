@@ -10,13 +10,12 @@ plugins:
         range: [0, 1]
         default: 0
         description: 嘴巴张合程度
-    phoneme_map:
-      A: 1.0
-      E: 0.7
-      I: 0.5
-      O: 0.8
-      U: 0.6
-      S: 0.0
+    signal:
+      primary_source: audio-worklet-mfcc
+      fallback_source: analyser-node-time-domain
+      metric: phoneme-weights-or-rms
+      threshold: 0.015
+      gain: 10
     smoothing:
       attack_ms: 50
       release_ms: 80

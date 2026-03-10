@@ -31,6 +31,7 @@ import {
   recordVoice,
   concatBytes,
 } from '../services/voice-engine.js';
+import { logBuddyConsole } from '../services/debug-log.js';
 import { loadBuddySession, saveBuddySession } from '../services/session-store.js';
 
 const TEXT_ROUTE_CAPABILITY: RuntimeCanonicalCapability = 'text.generate';
@@ -455,6 +456,10 @@ export function useBuddyController(
     messageId: string;
     details?: Record<string, unknown>;
   }) => {
+    logBuddyConsole(input.level || 'info', input.message, {
+      messageId: input.messageId,
+      ...(input.details || {}),
+    });
     logRendererEvent({
       level: input.level || 'info',
       area: 'buddy',
@@ -476,6 +481,11 @@ export function useBuddyController(
 
     let cancelled = false;
     setTtsVoicesLoading(true);
+    logBuddyConsole('debug', 'buddy:tts:voices-load-start', {
+      routeSource: binding.source,
+      connectorId: binding.connectorId || '',
+      model: binding.model,
+    });
     logRendererEvent({
       level: 'debug',
       area: 'buddy',
@@ -507,6 +517,13 @@ export function useBuddyController(
       });
       setTtsVoicesLoading(false);
       audioCacheRef.current.clear();
+      logBuddyConsole('debug', 'buddy:tts:voices-loaded', {
+        routeSource: binding.source,
+        connectorId: binding.connectorId || '',
+        model: binding.model,
+        voiceCount: voices.length,
+        firstVoiceId: voices[0]?.id || '',
+      });
       logRendererEvent({
         level: 'debug',
         area: 'buddy',
@@ -526,6 +543,12 @@ export function useBuddyController(
       setSelectedTtsVoiceIdState('');
       setTtsVoicesLoading(false);
       audioCacheRef.current.clear();
+      logBuddyConsole('warn', 'buddy:tts:voices-failed', {
+        routeSource: binding.source,
+        connectorId: binding.connectorId || '',
+        model: binding.model,
+        error: error instanceof Error ? error.message : String(error || ''),
+      });
       logRendererEvent({
         level: 'warn',
         area: 'buddy',
@@ -736,7 +759,7 @@ export function useBuddyController(
       const playback = await playAudioSource(audio);
       playbackCtxRef.current = playback.audioContext;
       playbackStopRef.current = playback.stop;
-      managerRef.current?.feedAudio(playback.analyser);
+      managerRef.current?.feedAudio(playback.analyser, playback.lipSyncStream);
       await playback.finished;
       logAudioEvent({
         message: 'buddy:tts:playback-done',

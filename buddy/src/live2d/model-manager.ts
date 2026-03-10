@@ -1,4 +1,5 @@
 import * as PIXI from 'pixi.js';
+import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import { Live2DModel, config as live2dConfig } from 'pixi-live2d-display/cubism4';
 import { AnimationController } from './animation-controller.js';
 import { createAutoBlinkPlugin } from './plugins/auto-blink.js';
@@ -9,6 +10,8 @@ import { createLipSyncPlugin } from './plugins/lip-sync.js';
 import type { BuddyModelId, EmotionType } from '../contracts.js';
 import { DEFAULT_BUDDY_MODEL_ID } from '../contracts.js';
 import { getBuddyMotionProfile } from './motion-profile.js';
+import type { LipSyncStream } from '../services/voice-engine.js';
+import { logBuddyConsole } from '../services/debug-log.js';
 
 export type ModelState = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -23,7 +26,7 @@ export interface ModelManager {
   setEmotion(emotion: EmotionType): void;
   startSpeaking(emotion?: EmotionType): void;
   stopSpeaking(): void;
-  feedAudio(analyser: AnalyserNode): void;
+  feedAudio(analyser: AnalyserNode, lipSyncStream?: LipSyncStream | null): void;
   stopAudio(): void;
   handleTap(clientX: number, clientY: number): void;
   resize(width: number, height: number): void;
@@ -41,9 +44,39 @@ export function createModelManager(
   let expressionPlugin: ReturnType<typeof createExpressionDriverPlugin> | null = null;
   let canvasEl: HTMLCanvasElement | null = null;
   let idleMotionTimer: ReturnType<typeof setInterval> | null = null;
+  let speakingMotionTimer: ReturnType<typeof setInterval> | null = null;
   let currentModelId: BuddyModelId = DEFAULT_BUDDY_MODEL_ID;
   let currentMotionProfile = getBuddyMotionProfile(DEFAULT_BUDDY_MODEL_ID);
   let currentEmotion: EmotionType = 'happy';
+  let speaking = false;
+
+  function buildEmotionMotionQueue(emotion: EmotionType, mode: 'idle' | 'speak' | 'tap' | 'greet'): string[] {
+    if (mode === 'tap') {
+      return [
+        ...(currentMotionProfile.tap || []),
+        ...(currentMotionProfile.emotion[emotion] || []),
+        ...(currentMotionProfile.idle || []),
+      ];
+    }
+    if (mode === 'greet') {
+      return [
+        ...(currentMotionProfile.greet || []),
+        ...(currentMotionProfile.emotion[emotion] || []),
+        ...(currentMotionProfile.idle || []),
+      ];
+    }
+    if (mode === 'speak') {
+      return [
+        ...(currentMotionProfile.speak || []),
+        ...(currentMotionProfile.emotion[emotion] || []),
+        ...(currentMotionProfile.idle || []),
+      ];
+    }
+    return [
+      ...(currentMotionProfile.emotion[emotion] || []),
+      ...(currentMotionProfile.idle || []),
+    ];
+  }
 
   async function playFirstAvailableMotion(groups: string[]): Promise<boolean> {
     const activeModel = model;
@@ -79,16 +112,36 @@ export function createModelManager(
     }
   }
 
+  function clearSpeakingMotionLoop() {
+    if (speakingMotionTimer) {
+      clearInterval(speakingMotionTimer);
+      speakingMotionTimer = null;
+    }
+  }
+
   function restartIdleMotionLoop() {
     clearIdleMotionLoop();
-    if (!model) return;
-    void playFirstAvailableMotion(currentMotionProfile.idle);
+    if (!model || speaking) return;
+    void playFirstAvailableMotion(buildEmotionMotionQueue(currentEmotion, 'idle'));
     idleMotionTimer = setInterval(() => {
-      if (!model) return;
+      if (!model || speaking) return;
       const ambientGroups = currentMotionProfile.ambient;
       const selectedGroup = ambientGroups[Math.floor(Math.random() * ambientGroups.length)] || '';
-      void playFirstAvailableMotion([selectedGroup, ...currentMotionProfile.idle]);
+      void playFirstAvailableMotion([
+        selectedGroup,
+        ...buildEmotionMotionQueue(currentEmotion, 'idle'),
+      ]);
     }, 10_000);
+  }
+
+  function restartSpeakingMotionLoop(emotion: EmotionType) {
+    clearSpeakingMotionLoop();
+    if (!model) return;
+    void playFirstAvailableMotion(buildEmotionMotionQueue(emotion, 'speak'));
+    speakingMotionTimer = setInterval(() => {
+      if (!model || !speaking) return;
+      void playFirstAvailableMotion(buildEmotionMotionQueue(currentEmotion, 'speak'));
+    }, 2_400);
   }
 
   function setState(s: ModelState, error?: string) {
@@ -132,6 +185,8 @@ export function createModelManager(
         model = null;
       }
       clearIdleMotionLoop();
+      clearSpeakingMotionLoop();
+      speaking = false;
       if (animCtrl) {
         animCtrl.destroy();
         animCtrl = null;
@@ -144,6 +199,29 @@ export function createModelManager(
       } as any);
       model = loaded;
 
+      const coreModel = (loaded.internalModel as any)?.coreModel;
+      if (coreModel) {
+      const details = {
+          modelId: currentModelId,
+          modelUrl,
+          hasPARAM_MOUTH_OPEN_Y: coreModel.getParameterIndex('PARAM_MOUTH_OPEN_Y') >= 0,
+          hasParamMouthOpenY: coreModel.getParameterIndex('ParamMouthOpenY') >= 0,
+          hasPARAM_MOUTH_FORM: coreModel.getParameterIndex('PARAM_MOUTH_FORM') >= 0,
+          hasParamMouthForm: coreModel.getParameterIndex('ParamMouthForm') >= 0,
+          hasPARAM_ANGLE_X: coreModel.getParameterIndex('PARAM_ANGLE_X') >= 0,
+          hasParamAngleX: coreModel.getParameterIndex('ParamAngleX') >= 0,
+          hasPARAM_BODY_ANGLE_X: coreModel.getParameterIndex('PARAM_BODY_ANGLE_X') >= 0,
+          hasParamBodyAngleX: coreModel.getParameterIndex('ParamBodyAngleX') >= 0,
+        };
+        logBuddyConsole('debug', 'buddy:model:mouth-params', details);
+        logRendererEvent({
+          level: 'debug',
+          area: 'buddy',
+          message: 'buddy:model:mouth-params',
+          details,
+        });
+      }
+
       // Scale and position model to fit canvas
       const { width, height } = app.renderer;
       applyModelLayout(width, height);
@@ -152,6 +230,15 @@ export function createModelManager(
 
       // Initialize animation plugins
       lipSyncPlugin = createLipSyncPlugin();
+      lipSyncPlugin.setDiagnosticsReporter((payload) => {
+        logBuddyConsole('debug', 'buddy:lipsync:frame', payload);
+        logRendererEvent({
+          level: 'debug',
+          area: 'buddy',
+          message: 'buddy:lipsync:frame',
+          details: payload,
+        });
+      });
       expressionPlugin = createExpressionDriverPlugin();
 
       animCtrl = new AnimationController(model);
@@ -161,7 +248,9 @@ export function createModelManager(
       animCtrl.register(createEyeSaccadePlugin(canvasEl));
       animCtrl.register(createIdleBreathPlugin());
       animCtrl.start();
-      void playFirstAvailableMotion(currentMotionProfile.greet);
+      expressionPlugin?.setEmotion(currentEmotion);
+      expressionPlugin?.setSpeaking(false);
+      void playFirstAvailableMotion(buildEmotionMotionQueue(currentEmotion, 'greet'));
       restartIdleMotionLoop();
 
       setState('ready');
@@ -174,27 +263,35 @@ export function createModelManager(
   function setEmotion(emotion: EmotionType) {
     currentEmotion = emotion;
     expressionPlugin?.setEmotion(emotion);
-    void playFirstAvailableMotion([
-      ...(currentMotionProfile.emotion[emotion] || []),
-      ...currentMotionProfile.idle,
-    ]);
+    if (speaking) {
+      expressionPlugin?.setSpeaking(true);
+      restartSpeakingMotionLoop(emotion);
+      return;
+    }
+    void playFirstAvailableMotion(buildEmotionMotionQueue(emotion, 'idle'));
   }
 
   function startSpeaking(emotion?: EmotionType) {
     const activeEmotion = emotion || currentEmotion;
-    void playFirstAvailableMotion([
-      ...(currentMotionProfile.emotion[activeEmotion] || []),
-      ...currentMotionProfile.speak,
-      ...currentMotionProfile.idle,
-    ]);
+    speaking = true;
+    currentEmotion = activeEmotion;
+    expressionPlugin?.setEmotion(activeEmotion);
+    expressionPlugin?.setSpeaking(true);
+    clearIdleMotionLoop();
+    restartSpeakingMotionLoop(activeEmotion);
   }
 
   function stopSpeaking() {
-    void playFirstAvailableMotion(currentMotionProfile.idle);
+    speaking = false;
+    expressionPlugin?.setSpeaking(false);
+    clearSpeakingMotionLoop();
+    void playFirstAvailableMotion(buildEmotionMotionQueue(currentEmotion, 'idle'));
+    restartIdleMotionLoop();
   }
 
-  function feedAudio(analyser: AnalyserNode) {
+  function feedAudio(analyser: AnalyserNode, lipSyncStream?: LipSyncStream | null) {
     lipSyncPlugin?.feedAnalyser(analyser);
+    lipSyncPlugin?.attachLipSyncStream(lipSyncStream);
   }
 
   function stopAudio() {
@@ -208,10 +305,7 @@ export function createModelManager(
     const x = clientX - rect.left;
     const y = clientY - rect.top;
     activeModel.tap(x, y);
-    void playFirstAvailableMotion([
-      ...currentMotionProfile.tap,
-      ...currentMotionProfile.idle,
-    ]);
+    void playFirstAvailableMotion(buildEmotionMotionQueue(currentEmotion, 'tap'));
   }
 
   function resize(width: number, height: number) {
@@ -222,6 +316,8 @@ export function createModelManager(
 
   function destroy() {
     clearIdleMotionLoop();
+    clearSpeakingMotionLoop();
+    speaking = false;
     animCtrl?.destroy();
     animCtrl = null;
     if (model && app) {
