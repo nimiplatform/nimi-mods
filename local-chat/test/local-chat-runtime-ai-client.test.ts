@@ -126,7 +126,7 @@ test('local-chat runtime ai client: text calls pass timeoutMs through to runtime
   } as unknown as ModRuntimeClient;
 
   const aiClient = createLocalChatAiClient(runtimeClient);
-  const streamEvents: Array<{ type: string; traceId?: string }> = [];
+  const streamEvents: Array<{ type: string; traceId?: string; finishReason?: string }> = [];
 
   await aiClient.generateText({
     prompt: '你好',
@@ -145,6 +145,7 @@ test('local-chat runtime ai client: text calls pass timeoutMs through to runtime
   assert.equal(captured.streamTimeoutMs, 8765);
   assert.equal(streamEvents.at(-1)?.type, 'done');
   assert.equal(streamEvents.at(-1)?.traceId, 'trace-stream');
+  assert.equal(streamEvents.at(-1)?.finishReason, 'stop');
 });
 
 test('local-chat runtime ai client: generateObject repairs missing closing containers', async () => {

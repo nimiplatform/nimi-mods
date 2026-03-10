@@ -5,7 +5,7 @@ import { DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS } from '../src/default-settings-sto
 import { compileResolvedExperiencePolicy } from '../src/hooks/turn-send/resolved-experience-policy.ts';
 import type { DerivedInteractionProfile, InteractionSnapshot } from '../src/state/ledger-types.ts';
 
-function createInteractionProfile(): DerivedInteractionProfile {
+function createInteractionProfile(overrides: Partial<DerivedInteractionProfile> = {}): DerivedInteractionProfile {
   return {
     expression: {
       responseLength: 'medium',
@@ -14,6 +14,7 @@ function createInteractionProfile(): DerivedInteractionProfile {
       pacingBias: 'balanced',
       firstBeatStyle: 'gentle',
       infoAnswerStyle: 'balanced',
+      ...(overrides.expression || {}),
     },
     relationship: {
       defaultDistance: 'friendly',
@@ -21,6 +22,7 @@ function createInteractionProfile(): DerivedInteractionProfile {
       flirtAffinity: 'light',
       proactiveStyle: 'gentle',
       intimacyGuard: 'balanced',
+      ...(overrides.relationship || {}),
     },
     voice: {
       voiceId: 'alloy',
@@ -30,6 +32,7 @@ function createInteractionProfile(): DerivedInteractionProfile {
       pitchRange: 'mid',
       emotionEnabled: true,
       voiceAffinity: 'high',
+      ...(overrides.voice || {}),
     },
     visual: {
       artStyle: 'anime',
@@ -38,6 +41,7 @@ function createInteractionProfile(): DerivedInteractionProfile {
       nsfwLevel: 'suggestive',
       imageAffinity: 'medium',
       videoAffinity: 'low',
+      ...(overrides.visual || {}),
     },
     modalityTraits: {
       textBias: 'medium',
@@ -45,8 +49,9 @@ function createInteractionProfile(): DerivedInteractionProfile {
       imageBias: 'medium',
       videoBias: 'low',
       latencyTolerance: 'medium',
+      ...(overrides.modalityTraits || {}),
     },
-    signals: [],
+    signals: [...(overrides.signals || [])],
   };
 }
 
@@ -61,6 +66,8 @@ function createSnapshot(overrides: Partial<InteractionSnapshot> = {}): Interacti
     openLoops: [],
     topicThreads: [],
     lastResolvedTurnId: 'turn-1',
+    conversationDirective: null,
+    conversationMomentum: 'steady',
     updatedAt: '2026-03-08T00:00:00.000Z',
     ...overrides,
   };
@@ -125,4 +132,86 @@ test('resolved experience policy keeps voice conversation off unless explicitly 
   });
 
   assert.equal(policy.voicePolicy.conversationMode, 'off');
+});
+
+test('resolved experience policy derives natural delivery when unresolved continuity exists', () => {
+  const policy = compileResolvedExperiencePolicy({
+    interactionProfile: createInteractionProfile({
+      expression: {
+        responseLength: 'medium',
+        formality: 'casual',
+        sentiment: 'positive',
+        pacingBias: 'reserved',
+        firstBeatStyle: 'gentle',
+        infoAnswerStyle: 'balanced',
+      },
+    }),
+    interactionSnapshot: createSnapshot({
+      relationshipState: 'friendly',
+      openLoops: ['说好了今晚去散步'],
+      assistantCommitments: [],
+      conversationMomentum: 'cooling',
+    }),
+    settings: {
+      ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
+    },
+    routeSource: 'local',
+  });
+
+  assert.equal(policy.deliveryPolicy.style, 'natural');
+  assert.equal(policy.deliveryPolicy.allowMultiReply, true);
+});
+
+test('resolved experience policy derives compact delivery for cooling low-intimacy chats without unresolved continuity', () => {
+  const policy = compileResolvedExperiencePolicy({
+    interactionProfile: createInteractionProfile({
+      expression: {
+        responseLength: 'medium',
+        formality: 'casual',
+        sentiment: 'positive',
+        pacingBias: 'balanced',
+        firstBeatStyle: 'gentle',
+        infoAnswerStyle: 'balanced',
+      },
+    }),
+    interactionSnapshot: createSnapshot({
+      relationshipState: 'friendly',
+      openLoops: [],
+      assistantCommitments: [],
+      conversationMomentum: 'cooling',
+    }),
+    settings: {
+      ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
+    },
+    routeSource: 'local',
+  });
+
+  assert.equal(policy.deliveryPolicy.style, 'compact');
+  assert.equal(policy.deliveryPolicy.allowMultiReply, false);
+});
+
+test('resolved experience policy derives close boundary only for open high-flirt intimate relations', () => {
+  const policy = compileResolvedExperiencePolicy({
+    interactionProfile: createInteractionProfile({
+      relationship: {
+        defaultDistance: 'friendly',
+        warmth: 'intimate',
+        flirtAffinity: 'high',
+        proactiveStyle: 'playful',
+        intimacyGuard: 'open',
+      },
+    }),
+    interactionSnapshot: createSnapshot({
+      relationshipState: 'intimate',
+    }),
+    settings: {
+      ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
+      visualComfortLevel: 'natural-visuals',
+      mediaAutonomy: 'natural',
+    },
+    routeSource: 'local',
+  });
+
+  assert.equal(policy.contentBoundary.relationshipBoundaryPreset, 'close');
+  assert.equal(policy.mediaPolicy.allowAutoVisualHighRisk, true);
 });

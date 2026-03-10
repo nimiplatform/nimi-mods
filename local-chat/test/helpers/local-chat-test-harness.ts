@@ -1,6 +1,7 @@
 import { clearModSdkHost, setModSdkHost } from '@nimiplatform/sdk/mod/host';
 import type { ModRuntimeDependencySnapshot } from '@nimiplatform/sdk/mod/runtime';
 import type { LocalChatAiClient } from '../../src/runtime-ai-client.ts';
+import { FIRST_BEAT_END_MARKER } from '../../src/hooks/turn-send/first-beat-reactor.ts';
 import {
   configureLocalChatCoreQueryBridge,
   CORE_DATA_API_AGENT_MEMORY_CORE_LIST,
@@ -203,6 +204,7 @@ export function createScriptedAiClient(input: {
   firstBeatText?: string;
   streamText?: string;
   fallbackText?: string;
+  perceptionResult?: Record<string, unknown> | null;
   planBeats?: Array<Record<string, unknown>>;
   governanceSlots?: Array<Record<string, unknown>>;
   mediaPlannerDecision?: Record<string, unknown> | null;
@@ -220,6 +222,7 @@ export function createScriptedAiClient(input: {
   };
 } {
   const counters = {
+    perception: 0,
     plan: 0,
     governance: 0,
     planner: 0,
@@ -240,16 +243,33 @@ export function createScriptedAiClient(input: {
       },
       async generateObject(payload: Record<string, unknown>) {
         const prompt = String(payload.prompt || '');
-        if (prompt.includes('请规划这轮对话的完整 beat 计划')) {
+        if (prompt.includes('你是一个对话感知模块。')) {
+          counters.perception += 1;
+          const object = input.perceptionResult || {
+            turnMode: 'information',
+            emotionalState: null,
+            relevantMemoryIds: [],
+            conversationDirective: null,
+            intimacyCeiling: 'friendly',
+          };
+          return {
+            object,
+            text: JSON.stringify(object),
+            traceId: 'trace-perception',
+            promptTraceId: 'trace-perception',
+            route: localRoute('chat-model'),
+          };
+        }
+        if (prompt.includes('请规划这轮对话在首拍之后的 tail beat 计划')) {
           counters.plan += 1;
           const object = {
             beats: input.planBeats || [
               {
-                text: '__FIRST_BEAT_LOCKED__',
-                intent: 'answer',
-                relationMove: 'friendly',
+                text: '如果你愿意，我就顺着你刚刚那句话继续陪你聊。',
+                intent: 'invite',
+                relationMove: 'warm',
                 sceneMove: 'chat',
-                pauseMs: 0,
+                pauseMs: 650,
               },
             ],
           };
@@ -292,7 +312,7 @@ export function createScriptedAiClient(input: {
       async *streamText() {
         yield {
           type: 'text_delta' as const,
-          textDelta: String(input.streamText || 'fallback stream text'),
+          textDelta: `${String(input.streamText ?? input.firstBeatText ?? 'fallback stream text')}${FIRST_BEAT_END_MARKER}`,
           route: localRoute('chat-model'),
         };
         yield {
@@ -458,6 +478,7 @@ export function createSendFlowHarness(input: {
     latestPromptTrace: null as Record<string, unknown> | null,
     latestTurnAudit: null as Record<string, unknown> | null,
     isSending: false,
+    sendPhase: 'idle' as 'idle' | 'awaiting-first-beat' | 'streaming-first-beat' | 'planning-tail' | 'delivering-tail',
     scheduleDone: null as Promise<void> | null,
     activeScheduleContext: null as { targetId: string; sessionId: string; routeBindingSource: string; routeBindingConnector: string; routeBindingModel: string } | null,
   };
@@ -485,6 +506,7 @@ export function createSendFlowHarness(input: {
       state.latestPromptTrace = null;
       state.latestTurnAudit = null;
       state.isSending = false;
+      state.sendPhase = 'idle';
       state.scheduleDone = null;
       state.activeScheduleContext = null;
       statusBanners.length = 0;
@@ -549,9 +571,9 @@ export function createSendFlowHarness(input: {
           isTranscribing: false,
           onOpenRuntimeSetup: () => undefined,
         } as never,
-        isSending: false,
-        setIsSending: (next) => {
-          state.isSending = next;
+        setSendPhase: (next) => {
+          state.sendPhase = next;
+          state.isSending = next !== 'idle';
         },
         getCurrentContextKey: () => buildLocalChatTurnContextKey({
           targetId: input.target.id,

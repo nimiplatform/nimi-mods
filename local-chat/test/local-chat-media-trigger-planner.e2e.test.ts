@@ -7,6 +7,7 @@ import {
   CORE_DATA_API_AGENT_MEMORY_RECALL_FOR_ENTITY,
   type LocalChatTarget,
 } from '../src/data/index.ts';
+import { FIRST_BEAT_END_MARKER } from '../src/hooks/turn-send/first-beat-reactor.ts';
 import { DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS } from '../src/state/index.ts';
 import { buildLocalChatTurnContextKey } from '../src/hooks/turn-send/context-key.ts';
 import { runLocalChatTurnSend } from '../src/hooks/turn-send/send-flow.ts';
@@ -107,7 +108,7 @@ function createTextStream(text: string) {
   return async function* streamText() {
     yield {
       type: 'text_delta' as const,
-      textDelta: text,
+      textDelta: `${text}${FIRST_BEAT_END_MARKER}`,
       route: {
         source: 'local' as const,
         model: 'chat-model',
@@ -122,6 +123,128 @@ function createTextStream(text: string) {
         localModelId: 'chat-model',
       },
     };
+  };
+}
+
+function parsePromptUserText(prompt: string): string {
+  const match = prompt.match(/userText=(.+)/);
+  if (match?.[1]) {
+    return match[1].trim();
+  }
+  const legacyMatch = prompt.match(/用户输入=(.+)/);
+  return legacyMatch?.[1]?.trim() || '';
+}
+
+function defaultPerceptionObject(prompt: string): Record<string, unknown> {
+  const userText = parsePromptUserText(prompt);
+  if (/语音/u.test(userText)) {
+    return {
+      turnMode: 'explicit-voice',
+      emotionalState: null,
+      relevantMemoryIds: [],
+      conversationDirective: null,
+    };
+  }
+  if (/图片|发图|来一张|看看/u.test(userText)) {
+    return {
+      turnMode: 'explicit-media',
+      emotionalState: null,
+      relevantMemoryIds: [],
+      conversationDirective: null,
+    };
+  }
+  if (/你好|在吗/u.test(userText)) {
+    return {
+      turnMode: 'checkin',
+      emotionalState: null,
+      relevantMemoryIds: [],
+      conversationDirective: null,
+    };
+  }
+  if (/累|辛苦/u.test(userText)) {
+    return {
+      turnMode: 'emotional',
+      emotionalState: null,
+      relevantMemoryIds: [],
+      conversationDirective: null,
+    };
+  }
+  return {
+    turnMode: 'information',
+    emotionalState: null,
+    relevantMemoryIds: [],
+    conversationDirective: null,
+  };
+}
+
+function defaultTailPlanObject(prompt: string): Record<string, unknown> {
+  const turnMode = prompt.match(/turnMode=([^\n]+)/)?.[1]?.trim() || 'information';
+  const userText = parsePromptUserText(prompt);
+  if (turnMode === 'explicit-media') {
+    return {
+      beats: [{
+        text: '我给你挑一张最贴现在气氛的。',
+        intent: 'media',
+        relationMove: 'friendly',
+        sceneMove: 'visual',
+        pauseMs: 520,
+        assetRequest: {
+          kind: 'image',
+          prompt: 'cinematic night harbor portrait',
+        },
+      }],
+    };
+  }
+  if (turnMode === 'explicit-voice') {
+    return {
+      beats: [{
+        text: '那我用语音慢慢跟你说。',
+        intent: 'invite',
+        relationMove: 'friendly',
+        sceneMove: 'voice',
+        pauseMs: 320,
+      }],
+    };
+  }
+  if (/你好/u.test(userText)) {
+    return {
+      beats: [{
+        text: '你好，今天过得怎么样？',
+        intent: 'answer',
+        relationMove: 'friendly',
+        sceneMove: '打招呼',
+        pauseMs: 260,
+      }],
+    };
+  }
+  if (/累/u.test(userText)) {
+    return {
+      beats: [
+        {
+          text: '真的辛苦你了，先让我接住你。',
+          intent: 'comfort',
+          relationMove: 'warm',
+          sceneMove: '安慰',
+          pauseMs: 260,
+        },
+        {
+          text: '别急着扛，我们慢慢把今天最重的那口气放下来。',
+          intent: 'invite',
+          relationMove: 'closer',
+          sceneMove: '深入',
+          pauseMs: 260,
+        },
+      ],
+    };
+  }
+  return {
+    beats: [{
+      text: '我把刚刚那个感觉接着往下说给你。',
+      intent: 'answer',
+      relationMove: 'friendly',
+      sceneMove: 'chat',
+      pauseMs: 260,
+    }],
   };
 }
 
@@ -230,6 +353,7 @@ function createHarness() {
     latestPromptTrace: null as Record<string, unknown> | null,
     latestTurnAudit: null as Record<string, unknown> | null,
     isSending: false,
+    sendPhase: 'idle' as 'idle' | 'awaiting-first-beat' | 'streaming-first-beat' | 'planning-tail' | 'delivering-tail',
     scheduleDone: null as Promise<void> | null,
     activeScheduleContext: null as { targetId: string; sessionId: string; routeBindingSource: string; routeBindingConnector: string; routeBindingModel: string } | null,
   };
@@ -260,6 +384,7 @@ function createHarness() {
       state.latestPromptTrace = null;
       state.latestTurnAudit = null;
       state.isSending = false;
+      state.sendPhase = 'idle';
       state.scheduleDone = null;
       state.activeScheduleContext = null;
       statusBanners.length = 0;
@@ -279,6 +404,10 @@ function createHarness() {
       };
       const isMediaPlannerPrompt = (payload: Record<string, unknown>) =>
         String(payload.prompt || '').includes('媒体触发 planner');
+      const isPerceptionPrompt = (payload: Record<string, unknown>) =>
+        String(payload.prompt || '').includes('你是一个对话感知模块');
+      const isTailPlanPrompt = (payload: Record<string, unknown>) =>
+        String(payload.prompt || '').includes('请规划这轮对话在首拍之后的 tail beat 计划');
       const context = {
         aiClient: {
           streamText: input.aiClientOverrides?.streamText
@@ -287,7 +416,7 @@ function createHarness() {
           generateText: input.aiClientOverrides?.generateText
             ? input.aiClientOverrides.generateText
             : async () => ({
-              text: 'fallback text reply',
+              text: `fallback text reply${FIRST_BEAT_END_MARKER}`,
               traceId: 'trace-fallback',
               promptTraceId: 'trace-fallback',
               route: {
@@ -306,6 +435,32 @@ function createHarness() {
             : async (payload: Record<string, unknown>) => {
               if (isMediaPlannerPrompt(payload)) {
                 counters.generateObject += 1;
+              } else if (isPerceptionPrompt(payload)) {
+                const object = defaultPerceptionObject(String(payload.prompt || ''));
+                return {
+                  object,
+                  text: JSON.stringify(object),
+                  traceId: 'trace-perception-default',
+                  promptTraceId: 'trace-perception-default',
+                  route: {
+                    source: 'local',
+                    model: 'chat-model',
+                    localModelId: 'chat-model',
+                  },
+                };
+              } else if (isTailPlanPrompt(payload)) {
+                const object = defaultTailPlanObject(String(payload.prompt || ''));
+                return {
+                  object,
+                  text: JSON.stringify(object),
+                  traceId: 'trace-plan-default',
+                  promptTraceId: 'trace-plan-default',
+                  route: {
+                    source: 'local',
+                    model: 'chat-model',
+                    localModelId: 'chat-model',
+                  },
+                };
               }
               throw new Error('PLANNER_SHOULD_NOT_RUN');
             },
@@ -403,9 +558,9 @@ function createHarness() {
 
       await runLocalChatTurnSend({
         context: context as never,
-        isSending: false,
-        setIsSending: (next) => {
-          state.isSending = next;
+        setSendPhase: (next) => {
+          state.sendPhase = next;
+          state.isSending = next !== 'idle';
         },
         getCurrentContextKey: () => buildLocalChatTurnContextKey({
           targetId: target.id,
@@ -459,9 +614,10 @@ test('send-flow ignores composer media marker on plain greeting turns', async ()
         status: 'missing',
       }),
       aiClientOverrides: {
+        streamText: createTextStream('你好，今天过得怎么样？'),
         generateObject: async (payload: Record<string, unknown>) => {
           const prompt = String(payload.prompt || '');
-          if (prompt.includes('请规划这轮对话的完整 beat 计划')) {
+          if (prompt.includes('请规划这轮对话在首拍之后的 tail beat 计划')) {
             const object = {
               beats: [{
                 text: '你好，今天过得怎么样？',
@@ -520,18 +676,12 @@ test('send-flow delivers all planned text beats while session id bootstraps from
     const result = await harness.execute({
       userText: '我今天真的很累',
       aiClientOverrides: {
+        streamText: createTextStream('真的辛苦你了，先让我接住你。'),
         generateObject: async (payload: Record<string, unknown>) => {
           const prompt = String(payload.prompt || '');
-          if (prompt.includes('请规划这轮对话的完整 beat 计划')) {
+          if (prompt.includes('请规划这轮对话在首拍之后的 tail beat 计划')) {
             const object = {
               beats: [
-                {
-                  text: '真的辛苦你了，先让我接住你。',
-                  intent: 'comfort',
-                  relationMove: 'warm',
-                  sceneMove: '安慰',
-                  pauseMs: 0,
-                },
                 {
                   text: '别急着扛，我们慢慢把今天最重的那口气放下来。',
                   intent: 'invite',
@@ -593,6 +743,35 @@ test('send-flow planner auto path generates image when gate passes', async () =>
       userText: '刚刚那个画面太有电影感了',
       aiClientOverrides: {
         generateObject: async (payload: Record<string, unknown>) => {
+          const prompt = String(payload.prompt || '');
+          if (prompt.includes('你是一个对话感知模块')) {
+            const object = defaultPerceptionObject(prompt);
+            return {
+              object,
+              text: JSON.stringify(object),
+              traceId: 'trace-perception-auto',
+              promptTraceId: 'trace-perception-auto',
+              route: {
+                source: 'local',
+                model: 'chat-model',
+                localModelId: 'chat-model',
+              },
+            };
+          }
+          if (prompt.includes('请规划这轮对话在首拍之后的 tail beat 计划')) {
+            const object = defaultTailPlanObject(prompt);
+            return {
+              object,
+              text: JSON.stringify(object),
+              traceId: 'trace-plan-auto',
+              promptTraceId: 'trace-plan-auto',
+              route: {
+                source: 'local',
+                model: 'chat-model',
+                localModelId: 'chat-model',
+              },
+            };
+          }
           const raw = JSON.stringify({
             version: 'v1',
             kind: 'image',
@@ -638,7 +817,8 @@ test('send-flow planner does not hijack explicit voice delivery into image', asy
       },
       aiClientOverrides: {
         generateObject: async (payload: Record<string, unknown>) => {
-          if (String(payload.prompt || '').includes('媒体触发 planner')) {
+          const prompt = String(payload.prompt || '');
+          if (prompt.includes('媒体触发 planner')) {
             const raw = JSON.stringify({
               version: 'v1',
               kind: 'image',
@@ -653,6 +833,34 @@ test('send-flow planner does not hijack explicit voice delivery into image', asy
               text: raw,
               traceId: 'trace-planner-auto',
               promptTraceId: 'trace-planner-auto',
+              route: {
+                source: 'local',
+                model: 'chat-model',
+                localModelId: 'chat-model',
+              },
+            };
+          }
+          if (prompt.includes('你是一个对话感知模块')) {
+            const object = defaultPerceptionObject(prompt);
+            return {
+              object,
+              text: JSON.stringify(object),
+              traceId: 'trace-perception-voice',
+              promptTraceId: 'trace-perception-voice',
+              route: {
+                source: 'local',
+                model: 'chat-model',
+                localModelId: 'chat-model',
+              },
+            };
+          }
+          if (prompt.includes('请规划这轮对话在首拍之后的 tail beat 计划')) {
+            const object = defaultTailPlanObject(prompt);
+            return {
+              object,
+              text: JSON.stringify(object),
+              traceId: 'trace-plan-voice',
+              promptTraceId: 'trace-plan-voice',
               route: {
                 source: 'local',
                 model: 'chat-model',
@@ -708,8 +916,37 @@ test('send-flow cooldown gate skips planner invocation', async () => {
         },
       }],
       aiClientOverrides: {
-        generateObject: async () => {
-          throw new Error('planner should have been gated');
+        generateObject: async (payload: Record<string, unknown>) => {
+          const prompt = String(payload.prompt || '');
+          if (prompt.includes('媒体触发 planner')) {
+            throw new Error('planner should have been gated');
+          }
+          if (prompt.includes('你是一个对话感知模块')) {
+            const object = defaultPerceptionObject(prompt);
+            return {
+              object,
+              text: JSON.stringify(object),
+              traceId: 'trace-perception-cooldown',
+              promptTraceId: 'trace-perception-cooldown',
+              route: {
+                source: 'local',
+                model: 'chat-model',
+                localModelId: 'chat-model',
+              },
+            };
+          }
+          const object = defaultTailPlanObject(prompt);
+          return {
+            object,
+            text: JSON.stringify(object),
+            traceId: 'trace-plan-cooldown',
+            promptTraceId: 'trace-plan-cooldown',
+            route: {
+              source: 'local',
+              model: 'chat-model',
+              localModelId: 'chat-model',
+            },
+          };
         },
       },
     });
@@ -732,8 +969,37 @@ test('send-flow explicit request still calls runtime media image generate when d
         status: 'missing',
       }),
       aiClientOverrides: {
-        generateObject: async () => {
-          throw new Error('planner should not run for explicit request');
+        generateObject: async (payload: Record<string, unknown>) => {
+          const prompt = String(payload.prompt || '');
+          if (prompt.includes('媒体触发 planner')) {
+            throw new Error('planner should not run for explicit request');
+          }
+          if (prompt.includes('你是一个对话感知模块')) {
+            const object = defaultPerceptionObject(prompt);
+            return {
+              object,
+              text: JSON.stringify(object),
+              traceId: 'trace-perception-explicit',
+              promptTraceId: 'trace-perception-explicit',
+              route: {
+                source: 'local',
+                model: 'chat-model',
+                localModelId: 'chat-model',
+              },
+            };
+          }
+          const object = defaultTailPlanObject(prompt);
+          return {
+            object,
+            text: JSON.stringify(object),
+            traceId: 'trace-plan-explicit',
+            promptTraceId: 'trace-plan-explicit',
+            route: {
+              source: 'local',
+              model: 'chat-model',
+              localModelId: 'chat-model',
+            },
+          };
         },
       },
     });
@@ -753,8 +1019,37 @@ test('send-flow planner failure silently degrades to text-only', async () => {
     const result = await harness.execute({
       userText: '这个场景挺有画面感',
       aiClientOverrides: {
-        generateObject: async () => {
-          throw new Error('planner exploded');
+        generateObject: async (payload: Record<string, unknown>) => {
+          const prompt = String(payload.prompt || '');
+          if (prompt.includes('媒体触发 planner')) {
+            throw new Error('planner exploded');
+          }
+          if (prompt.includes('你是一个对话感知模块')) {
+            const object = defaultPerceptionObject(prompt);
+            return {
+              object,
+              text: JSON.stringify(object),
+              traceId: 'trace-perception-planner-fail',
+              promptTraceId: 'trace-perception-planner-fail',
+              route: {
+                source: 'local',
+                model: 'chat-model',
+                localModelId: 'chat-model',
+              },
+            };
+          }
+          const object = defaultTailPlanObject(prompt);
+          return {
+            object,
+            text: JSON.stringify(object),
+            traceId: 'trace-plan-planner-fail',
+            promptTraceId: 'trace-plan-planner-fail',
+            route: {
+              source: 'local',
+              model: 'chat-model',
+              localModelId: 'chat-model',
+            },
+          };
         },
       },
     });

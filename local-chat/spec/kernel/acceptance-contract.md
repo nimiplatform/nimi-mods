@@ -18,8 +18,8 @@ Minimum acceptance coverage must include:
 6. proactive policy guard when user setting disables proactive contact
 7. proactive policy allow path when wake strategy and idle window are eligible
 8. fallback stream parser deterministic segmentation (explicit delimiter + double newline fallback + max 4)
-9. first-beat delivery lifecycle (successful path has no streaming placeholder; fallback placeholder must still be replaced and never persist)
-10. NSFW guardrail policy (default disabled + local-only enforcement)
+9. first-beat delivery lifecycle (generic pending only before firstBeat text appears; transient firstBeat stream must seal into finalized text and never persist)
+10. NSFW guardrail policy (restrained disables + natural local allow + non-local local-only enforcement)
 11. media intent parser coverage (explicit tag + marker-only cleanup/fallback)
 12. media async delivery lifecycle (text first, media appended later)
 13. media soft-cancel behavior on thread/context change
@@ -40,3 +40,9 @@ Minimum acceptance coverage must include:
 28. voice trigger policy and visual trigger policy must remain symmetrical (`off | explicit-only | natural`)
 29. `voiceConversationMode=on` must preserve explicit media requests instead of hijacking them into voice-only turns
 30. `restrained` visual style must disable NSFW media while `natural` visual style may allow it on local routes only
+31. incremental snapshot merge must preserve unresolved continuity and prevent neutral follow-up turns from regressing relationship warmth
+32. context compile must select continuity-relevant top-K recall instead of injecting the full recall index
+33. internal delivery style must derive from interaction profile plus snapshot continuity and drive `allowMultiReply`
+34. derived relationship boundary must block automatic high-risk visual planner paths without altering explicit media hard-gate behavior
+35. tail planner failure must degrade to firstBeat-only success without reviving legacy full-text post-segmentation
+36. context compile must not duplicate the just-persisted current user turn across both `recentTurns` and the dedicated `userInput` lane

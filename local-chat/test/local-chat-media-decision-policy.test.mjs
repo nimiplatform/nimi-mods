@@ -195,6 +195,71 @@ test('media decision policy returns planner execution decision when auto gate pa
   assert.equal(result.promptTracePatch.mediaExecutionStatus, 'pending');
 });
 
+test('media decision policy blocks automatic high-risk visuals when relationship boundary is not close', async () => {
+  const result = await decideMediaExecution({
+    aiClient: {
+      generateObject: async () => ({
+        object: {
+          version: 'v1',
+          kind: 'image',
+          trigger: 'scene-enhancement',
+          confidence: 0.95,
+          prompt: '贴身、半裸、暧昧靠近的卧室近景',
+          reason: 'intimate close-up with clearly sexualized framing',
+          subject: '靠得很近、衣料松开的她',
+          scene: '卧室里暧昧贴近、几乎半裸的近景画面',
+          styleIntent: '高风险亲密视觉表达',
+          nsfwIntent: 'suggested',
+        },
+        traceId: 'trace-media-boundary',
+        route: {
+          source: 'local',
+          model: 'chat-model',
+        },
+      }),
+    },
+    turnTxnId: 'txn-planner-boundary-blocked',
+    routeBinding: null,
+    defaultSettings: {
+      ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
+      imageRouteSource: 'local',
+      mediaAutonomy: 'natural',
+      visualComfortLevel: 'natural-visuals',
+    },
+    resolvedPolicy: createResolvedPolicy({
+      ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
+      imageRouteSource: 'local',
+      mediaAutonomy: 'natural',
+      visualComfortLevel: 'natural-visuals',
+    }, {
+      mediaPolicy: {
+        routeSource: 'local',
+        nsfwPolicy: 'allowed',
+        allowVisualAuto: true,
+        allowAutoVisualHighRisk: false,
+      },
+      contentBoundary: {
+        relationshipBoundaryPreset: 'balanced',
+        relationshipState: 'warm',
+      },
+    }),
+    userText: '我想象你把衬衫滑到肩头，贴得很近。',
+    assistantText: '我靠得很近，衣料松开了一点，呼吸都变得暧昧。',
+    target: createTarget(),
+    worldId: 'world.policy',
+    messages: [],
+    promptTrace: null,
+    nsfwPolicy: 'allowed',
+    fallbackRouteSource: 'local',
+    imageDependencySnapshot: createDependencySnapshot('image', 'ready'),
+    videoDependencySnapshot: createDependencySnapshot('video', 'ready'),
+    markerOverrideIntent: null,
+  });
+
+  assert.equal(result.kind, 'none');
+  assert.equal(result.promptTracePatch.plannerBlockedReason, 'relationship-boundary-blocked');
+});
+
 test('media decision policy resolves auto image route via preflight for explicit request', async () => {
   const result = await decideMediaExecution({
     aiClient: {

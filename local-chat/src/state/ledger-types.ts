@@ -112,12 +112,26 @@ export type InteractionTurnPlan = {
   planId: string;
   turnId: string;
   turnMode: LocalChatTurnMode;
-  firstBeatLocked: boolean;
-  planFirstBeatText: string;
   beats: InteractionBeat[];
-  fallbackPolicy: 'legacy-stream-text';
+  fallbackPolicy: 'first-beat-only';
   expiresAt: string;
 };
+
+export type FirstBeatResult = {
+  text: string;
+  transientMessageId: string;
+  traceId: string | null;
+  latencyMs: number;
+  streamDeltaCount: number;
+  streamDurationMs: number;
+};
+
+export type LocalChatTurnSendPhase =
+  | 'idle'
+  | 'awaiting-first-beat'
+  | 'streaming-first-beat'
+  | 'planning-tail'
+  | 'delivering-tail';
 
 export type InteractionSnapshot = {
   conversationId: string;
@@ -194,7 +208,7 @@ export type LocalChatContextTrace = {
     truncated: boolean;
   };
   laneBudgets: Partial<Record<LocalChatContextLaneId, LocalChatPromptLaneBudget>>;
-  compilerVersion: 'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6';
+  compilerVersion: 'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7';
   planner?: 'stream';
   turnMode?: LocalChatTurnMode;
   interactionProfile?: DerivedInteractionProfile;

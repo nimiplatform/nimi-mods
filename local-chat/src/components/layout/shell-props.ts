@@ -3,6 +3,7 @@ import type {
   DerivedInteractionProfile,
   InteractionSnapshot,
   LocalChatProductSettings,
+  LocalChatTurnSendPhase,
   RelationMemorySlot,
   VoiceConversationMode,
 } from '../../state/index.js';
@@ -32,6 +33,7 @@ export type LocalChatShellProps = {
   runtimeSidebarProps: React.ComponentProps<typeof RuntimeStatusSidebar>;
   messages: ChatMessage[];
   isSending: boolean;
+  sendPhase: LocalChatTurnSendPhase;
   currentUserDisplayName: string;
   currentUserAvatarUrl: string | null;
   playingVoiceMessageId: string | null;

@@ -24,29 +24,41 @@ text_turn_chain:
   - step: context-compile
     order: 3
     source_rule: LC-PIPE-011
-  - step: first-beat-react
+  - step: user-turn-persist
     order: 4
-    source_rule: LC-PIPE-006
-  - step: turn-compose
+    source_rule: LC-PIPE-001
+  - step: turn-perception
     order: 5
+    source_rule: LC-PIPE-001
+  - step: first-beat-prompt-compile
+    order: 6
+    source_rule: LC-PIPE-006
+  - step: first-beat-react
+    order: 7
+    source_rule: LC-PIPE-006
+  - step: assistant-turn-record-create
+    order: 8
+    source_rule: LC-PIPE-012
+  - step: tail-turn-compose
+    order: 9
     source_rule: LC-PIPE-006
   - step: modality-orchestrate
-    order: 6
+    order: 10
     source_rule: LC-PIPE-009
-  - step: turn-bundle-persist
-    order: 7
-    source_rule: LC-PIPE-012
+  - step: tail-delivery-schedule
+    order: 11
+    source_rule: LC-PIPE-007
   - step: interaction-snapshot-compile
-    order: 8
+    order: 12
     source_rule: LC-PIPE-013
   - step: relation-memory-compile
-    order: 9
+    order: 13
     source_rule: LC-PIPE-014
   - step: recall-index-refresh
-    order: 10
+    order: 14
     source_rule: LC-PIPE-014
   - step: context-trace-emit
-    order: 11
+    order: 15
     source_rule: LC-PIPE-004
 media_turn_chain:
   - step: explicit-request-parse
@@ -111,23 +123,26 @@ proactive_turn_chain:
   - step: checkin-turn-mode
     order: 4
     source_rule: LC-PIPE-005
-  - step: first-beat-react
+  - step: first-beat-prompt-compile
     order: 5
     source_rule: LC-PIPE-005
-  - step: turn-compose
+  - step: first-beat-react
     order: 6
     source_rule: LC-PIPE-005
-  - step: modality-orchestrate
+  - step: tail-turn-compose
     order: 7
     source_rule: LC-PIPE-005
-  - step: proactive-turn-persist
+  - step: modality-orchestrate
     order: 8
     source_rule: LC-PIPE-005
-  - step: interaction-state-compile
+  - step: proactive-turn-persist
     order: 9
     source_rule: LC-PIPE-005
-  - step: proactive-audit-persist
+  - step: interaction-state-compile
     order: 10
+    source_rule: LC-PIPE-005
+  - step: proactive-audit-persist
+    order: 11
     source_rule: LC-PIPE-005
 route_scope_policy:
   override_scope: local-chat-only

@@ -70,13 +70,6 @@ test('proactive heartbeat persists assistant turn, prompt trace, and continuity 
       firstBeatText: '在吗，我刚刚想起你了。',
       planBeats: [
         {
-          text: '__FIRST_BEAT_LOCKED__',
-          intent: 'checkin',
-          relationMove: 'checkin',
-          sceneMove: 'idle-reachout',
-          pauseMs: 0,
-        },
-        {
           text: '晚点我也可以继续陪你，把刚刚那点情绪接住。',
           intent: 'comfort',
           relationMove: 'comfort-warm',

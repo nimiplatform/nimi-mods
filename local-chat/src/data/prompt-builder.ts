@@ -9,6 +9,7 @@ export function buildLocalChatCompiledPrompt(input: LocalChatPromptInput): Local
   const compiled = compileLocalChatPrompt({
     contextPacket: input.contextPacket,
     maxPromptChars: input.maxPromptChars,
+    profile: input.profile,
   });
 
   emitLocalChatLog({

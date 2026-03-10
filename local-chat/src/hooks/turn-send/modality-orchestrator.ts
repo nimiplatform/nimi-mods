@@ -46,7 +46,7 @@ export function orchestrateBeatModalities(input: {
   policy: ResolvedExperiencePolicy;
 }): InteractionBeat[] {
   let visualSlotUsed = false;
-  return input.beats.map((beat, index, list) => {
+  return input.beats.map((beat) => {
     const voicePreferred = inferVoiceAffinity({
       beat,
       turnMode: input.turnMode,
@@ -89,8 +89,6 @@ export function orchestrateBeatModalities(input: {
         ...(input.policy.voicePolicy.enabled && input.policy.voicePolicy.conversationMode === 'on'
           ? { autoPlayVoice: input.policy.voicePolicy.autoPlayReplies }
           : {}),
-        beatIndex: index,
-        beatCount: list.length,
       };
     }
     if (voicePreferred) {
@@ -103,8 +101,6 @@ export function orchestrateBeatModalities(input: {
     return {
       ...beat,
       modality: 'text',
-      beatIndex: index,
-      beatCount: list.length,
     };
   });
 }

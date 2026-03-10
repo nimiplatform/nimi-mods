@@ -357,10 +357,10 @@ export const ChatBubble = React.memo(function ChatBubble(props: {
                 <p className="text-xs italic opacity-70">{message.meta?.mediaError || t('ChatBubble.videoPlaceholder')}</p>
               )
             ) : isStreaming ? (
-              <span className={message.content ? '' : 'italic opacity-70'}>
-                {message.content || t('ChatBubble.streamingPlaceholder')}
-                <span className="ml-0.5 inline-block animate-pulse text-mint-600">|</span>
-              </span>
+              <div className={`space-y-1 ${message.content ? '' : 'italic opacity-70'}`}>
+                {message.content ? parseMarkdownBlocks(message.content) : t('ChatBubble.streamingPlaceholder')}
+                <span className="inline-block animate-pulse text-mint-600">|</span>
+              </div>
             ) : (
               <div className="space-y-1">{parseMarkdownBlocks(message.content)}</div>
             )}

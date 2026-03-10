@@ -1,5 +1,7 @@
 import { createLocalChatFlowId } from '../logging.js';
 import {
+  createLocalChatTurnRecord,
+  getLocalChatInteractionSnapshot,
   getLocalChatSession,
   listAllLocalChatSessions,
   listLocalChatMediaAssets,
@@ -9,6 +11,7 @@ import {
   upsertLocalChatInteractionSnapshot,
 } from '../state/index.js';
 import {
+  buildLocalChatCompiledPrompt,
   listLocalChatTargets,
   resolveLocalChatTargetDetail,
 } from '../data/index.js';
@@ -26,6 +29,7 @@ import { ReasonCode } from '@nimiplatform/sdk/types';
 import { buildTurnRequestInput } from '../hooks/turn-send/request-builder.js';
 import { buildPromptTrace, buildTurnAudit } from '../hooks/turn-send/diagnostics.js';
 import { composeInteractionTurnPlan } from '../hooks/turn-send/turn-composer.js';
+import { runFirstBeatReactor } from '../hooks/turn-send/first-beat-reactor.js';
 import { orchestrateBeatModalities } from '../hooks/turn-send/modality-orchestrator.js';
 import { decideMediaExecution } from '../hooks/turn-send/media-decision-policy.js';
 import { executeMediaDecision } from '../hooks/turn-send/media-execution-pipeline.js';
@@ -34,6 +38,7 @@ import { compileInteractionState } from '../hooks/turn-send/interaction-state-co
 import { compilePortableMemorySlots } from '../hooks/turn-send/portable-memory-compiler.js';
 import { compileResolvedExperiencePolicy } from '../hooks/turn-send/resolved-experience-policy.js';
 import { deriveInteractionProfile } from '../hooks/turn-send/interaction-profile.js';
+import { derivePacingPlan } from '../hooks/turn-send/context-assembler.js';
 import { resolveTurnMode } from '../hooks/turn-send/turn-mode-resolver.js';
 import { toChatMessagesFromSession } from '../services/view/messages.js';
 import { createUlid } from '../utils/ulid.js';
@@ -119,11 +124,11 @@ function buildPreparedDeliveries(input: {
   voiceConversationMode: 'off' | 'on';
   beats: OrchestratedBeat[];
 }): PreparedAssistantDelivery[] {
-  return input.beats.map((beat, index) => ({
+  return input.beats.map((beat) => ({
     id: beat.beatId,
     kind: beat.modality,
     content: normalizeBeatText(beat.text),
-    delayMs: index === 0 ? 0 : beat.pauseMs,
+    delayMs: beat.beatIndex === 0 ? 0 : beat.pauseMs,
     beat,
     meta: {
       interactionPlanId: input.planId,
@@ -256,7 +261,73 @@ export async function runLocalChatProactiveHeartbeatCycle(
       });
       const effectiveVoiceConversationMode = resolvedExperiencePolicy.voicePolicy.conversationMode;
       const proactiveDirective = '请自然地主动联系用户，像刚刚想起对方一样发起问候，不要解释理由。';
+      prepared.contextPacket.pacingPlan = derivePacingPlan({
+        text: proactiveDirective,
+        interactionProfile: prepared.contextPacket.target.interactionProfile,
+        allowMultiReply: resolvedExperiencePolicy.deliveryPolicy.allowMultiReply,
+        turnMode,
+        momentum: prepared.contextPacket.interactionSnapshot?.conversationMomentum,
+      });
       const turnId = `turn_${createUlid()}`;
+      const firstBeatId = `beat_${createUlid()}`;
+      const firstBeatCompiledPrompt = buildLocalChatCompiledPrompt({
+        contextPacket: prepared.contextPacket,
+        profile: 'first-beat',
+      });
+      const firstBeatResult = await runFirstBeatReactor({
+        aiClient: input.aiClient,
+        invokeInput: {
+          ...prepared.invokeInput,
+          prompt: firstBeatCompiledPrompt.prompt,
+        },
+        contextPacket: prepared.contextPacket,
+        userText: proactiveDirective,
+        transientMessageId: firstBeatId,
+      });
+      const firstBeatText = normalizeBeatText(firstBeatResult.text);
+      if (!firstBeatText) {
+        throw new Error('LOCAL_CHAT_FIRST_BEAT_EMPTY');
+      }
+      await createLocalChatTurnRecord({
+        conversationId: session.id,
+        role: 'assistant',
+        turnTxnId: turnId,
+        turnId,
+        beatCount: 1,
+      });
+      const firstBeatIntent: OrchestratedBeat['intent'] = 'checkin';
+      const firstBeatMessage: ChatMessage = {
+        id: firstBeatId,
+        role: 'assistant',
+        kind: 'text',
+        content: firstBeatText,
+        timestamp: new Date(nowMs),
+        latencyMs: firstBeatResult.latencyMs,
+        meta: {
+          turnId,
+          beatId: firstBeatId,
+          beatIndex: 0,
+          beatCount: 1,
+          beatModality: 'text',
+          pauseMs: 0,
+          relationMove: 'checkin',
+          sceneMove: 'idle-reachout',
+          turnMode,
+          voiceConversationMode: effectiveVoiceConversationMode,
+          channelDecision: 'text',
+          intent: firstBeatIntent,
+          segmentId: firstBeatId,
+          segmentIndex: 1,
+          segmentCount: 1,
+        },
+      };
+
+      const recompiledPrompt = buildLocalChatCompiledPrompt({
+        contextPacket: prepared.contextPacket,
+        profile: 'full-turn',
+      });
+      prepared.invokeInput.prompt = recompiledPrompt.prompt;
+      prepared.compiledPrompt = recompiledPrompt;
       const plan = await composeInteractionTurnPlan({
         aiClient: input.aiClient,
         invokeInput: prepared.invokeInput,
@@ -264,45 +335,39 @@ export async function runLocalChatProactiveHeartbeatCycle(
         userText: proactiveDirective,
         turnId,
         turnMode,
+        deliveryStyle: resolvedExperiencePolicy.deliveryPolicy.style,
+        sealedFirstBeatText: firstBeatText,
       });
-      const lockedPlan = {
-        ...plan,
-        beats: plan.beats.map((beat, index, list) => ({
-          ...beat,
-          beatIndex: index,
-          beatCount: list.length,
-        })),
-      };
-    const orchestratedBeats = orchestrateBeatModalities({
-      beats: lockedPlan.beats,
-      turnMode,
-      interactionProfile: prepared.contextPacket.target.interactionProfile,
-      snapshot: prepared.contextPacket.interactionSnapshot || null,
-      policy: resolvedExperiencePolicy,
-    });
+      const orchestratedBeats = orchestrateBeatModalities({
+        beats: plan.beats,
+        turnMode,
+        interactionProfile: prepared.contextPacket.target.interactionProfile,
+        snapshot: prepared.contextPacket.interactionSnapshot || null,
+        policy: resolvedExperiencePolicy,
+      });
       const deliveries = buildPreparedDeliveries({
-        planId: lockedPlan.planId,
+        planId: plan.planId,
         turnMode,
         voiceConversationMode: effectiveVoiceConversationMode,
-        beats: orchestratedBeats.length > 0 ? orchestratedBeats : [{
-          beatId: `beat_${createUlid()}`,
-          turnId,
-          beatIndex: 0,
-          beatCount: 1,
-          intent: 'checkin',
-          relationMove: 'checkin',
-          sceneMove: 'idle-reachout',
-          modality: 'text',
-          text: '在吗，我刚刚想起你。',
-          pauseMs: 0,
-          cancellationScope: 'turn',
-        }],
+        beats: orchestratedBeats,
+      });
+      const totalBeatCount = 1 + deliveries.length;
+      deliveries.forEach((delivery) => {
+        delivery.beat = {
+          ...delivery.beat,
+          beatCount: totalBeatCount,
+        };
+        delivery.meta = {
+          ...(delivery.meta || {}),
+          beatCount: totalBeatCount,
+          segmentCount: totalBeatCount,
+        };
       });
       const firstMarkedBeat = turnMode === 'explicit-media'
         ? deliveries.find((delivery) => delivery.beat.assetRequest)?.beat || null
         : null;
       const markerOverrideIntent = firstMarkedBeat
-        ? toMarkerOverrideIntent({ beat: firstMarkedBeat, planId: lockedPlan.planId })
+        ? toMarkerOverrideIntent({ beat: firstMarkedBeat, planId: plan.planId })
         : null;
       const mediaRouteReady = {
         image: isMediaRouteReady({ kind: 'image', settings }),
@@ -316,12 +381,12 @@ export async function runLocalChatProactiveHeartbeatCycle(
         routeBinding: null,
         chatRouteOptions: null,
         planner: 'stream',
-        planSegments: deliveries.length,
+        planSegments: totalBeatCount,
         voiceSegments: deliveries.filter((delivery) => delivery.kind === 'voice').length,
-        textSegments: deliveries.filter((delivery) => delivery.kind === 'text').length,
+        textSegments: 1 + deliveries.filter((delivery) => delivery.kind === 'text').length,
         schedulerTotalDelayMs: deliveries.reduce((sum, delivery) => sum + delivery.delayMs, 0),
-        streamDeltaCount: 0,
-        streamDurationMs: 0,
+        streamDeltaCount: firstBeatResult.streamDeltaCount,
+        streamDurationMs: firstBeatResult.streamDurationMs,
         segmentParseMode: 'single-message',
         nsfwPolicy,
         plannerUsed: markerOverrideIntent !== null,
@@ -345,10 +410,11 @@ export async function runLocalChatProactiveHeartbeatCycle(
       promptTrace.voiceConversationMode = effectiveVoiceConversationMode;
       const turnAudit = buildTurnAudit({
         selectedTarget: target,
-        latencyMs: 0,
+        latencyMs: firstBeatResult.latencyMs,
       });
 
-      const assistantText = deliveries.map((delivery) => normalizeBeatText(delivery.content)).filter(Boolean).join('\n\n');
+      const assistantText = [firstBeatText, ...deliveries.map((delivery) => normalizeBeatText(delivery.content)).filter(Boolean)]
+        .join('\n\n');
       let latestPromptTrace = {
         ...promptTrace,
       };
@@ -384,7 +450,8 @@ export async function runLocalChatProactiveHeartbeatCycle(
       let mediaDeliveryId: string | null = null;
       if (rawMediaDecision.kind !== 'none') {
         const mediaDelivery = deliveries.find((item) => item.kind === 'image' || item.kind === 'video')
-          || deliveries[0]
+          || deliveries.find((item) => item.kind === 'text')
+          || deliveries.find((item) => item.kind === 'voice')
           || null;
         if (mediaDelivery) {
           mediaDeliveryId = mediaDelivery.id;
@@ -406,12 +473,59 @@ export async function runLocalChatProactiveHeartbeatCycle(
               kind: boundMediaDecision.intent.type,
               prompt: boundMediaDecision.intent.prompt,
               confidence: boundMediaDecision.intent.plannerConfidence ?? 0.65,
-              nsfwIntent: boundMediaDecision.intent.plannerSuggestsNsfw ? 'suggested' : 'none',
-            },
-          };
-          orchestratedBeats[mediaDelivery.beat.beatIndex] = mediaDelivery.beat;
+            nsfwIntent: boundMediaDecision.intent.plannerSuggestsNsfw ? 'suggested' : 'none',
+          },
+        };
+          const mediaBeatIndex = orchestratedBeats.findIndex((beat) => beat.beatId === mediaDelivery.beat.beatId);
+          if (mediaBeatIndex >= 0) {
+            orchestratedBeats[mediaBeatIndex] = mediaDelivery.beat;
+          }
         }
       }
+
+      const finalizedFirstBeatMessage: ChatMessage = {
+        ...firstBeatMessage,
+        meta: {
+          ...(firstBeatMessage.meta || {}),
+          interactionPlanId: plan.planId,
+          planId: plan.planId,
+          beatCount: totalBeatCount,
+          segmentCount: totalBeatCount,
+        },
+      };
+      await commitAssistantMessage({
+        sessionId: session.id,
+        targetId: target.id,
+        viewerId: session.viewerId,
+        assistantTurnId: turnId,
+        messageId: firstBeatId,
+        setMessages: () => undefined,
+        setSessions: () => undefined,
+        promptTrace: latestPromptTrace,
+        turnAudit,
+        message: finalizedFirstBeatMessage,
+      });
+
+      const deliveredBeats: OrchestratedBeat[] = [
+        {
+          beatId: firstBeatId,
+          turnId,
+          beatIndex: 0,
+          beatCount: totalBeatCount,
+          intent: firstBeatIntent,
+          relationMove: 'checkin',
+          sceneMove: 'idle-reachout',
+          modality: 'text',
+          text: firstBeatText,
+          pauseMs: 0,
+          cancellationScope: 'turn',
+        },
+        ...orchestratedBeats.map((beat) => ({
+          ...beat,
+          beatCount: totalBeatCount,
+        })),
+      ];
+      const deliveredBeatIds = new Set<string>([firstBeatId]);
 
       const schedule = await scheduleAssistantTurnDeliveries({
         sessionId: session.id,
@@ -419,7 +533,7 @@ export async function runLocalChatProactiveHeartbeatCycle(
         viewerId: session.viewerId,
         turnTxnId: turnId,
         assistantTurnId: turnId,
-        assistantBeatCount: deliveries.length,
+        assistantBeatCount: totalBeatCount,
         deliveries: deliveries.map((delivery) => ({
           id: delivery.id,
           delayMs: delivery.delayMs,
@@ -433,8 +547,8 @@ export async function runLocalChatProactiveHeartbeatCycle(
                 messageId: delivery.id,
                 setMessages: () => undefined,
                 setSessions: () => undefined,
-                promptTrace: index === 0 ? latestPromptTrace : null,
-                turnAudit: index === 0 ? turnAudit : null,
+                promptTrace: null,
+                turnAudit: null,
                 message: {
                   id: delivery.id,
                   role: 'assistant',
@@ -444,6 +558,7 @@ export async function runLocalChatProactiveHeartbeatCycle(
                   meta: delivery.meta,
                 },
               });
+              deliveredBeatIds.add(delivery.beat.beatId);
               return;
             }
             const decision = mediaDeliveryId === delivery.id ? mediaDecision : null;
@@ -456,8 +571,8 @@ export async function runLocalChatProactiveHeartbeatCycle(
                 messageId: delivery.id,
                 setMessages: () => undefined,
                 setSessions: () => undefined,
-                promptTrace: index === 0 ? latestPromptTrace : null,
-                turnAudit: index === 0 ? turnAudit : null,
+                promptTrace: null,
+                turnAudit: null,
                 message: {
                   id: delivery.id,
                   role: 'assistant',
@@ -467,6 +582,7 @@ export async function runLocalChatProactiveHeartbeatCycle(
                   meta: delivery.meta,
                 },
               });
+              deliveredBeatIds.add(delivery.beat.beatId);
               return;
             }
             const executionTracePatch = await executeMediaDecision({
@@ -481,8 +597,8 @@ export async function runLocalChatProactiveHeartbeatCycle(
               assistantTurnId,
               setMessages: () => undefined,
               setSessions: () => undefined,
-              promptTrace: index === 0 ? latestPromptTrace : null,
-              turnAudit: index === 0 ? turnAudit : null,
+              promptTrace: null,
+              turnAudit: null,
               sendContextKey: `proactive-${session.id}`,
               getCurrentContextKey: () => `proactive-${session.id}`,
             });
@@ -492,30 +608,39 @@ export async function runLocalChatProactiveHeartbeatCycle(
                 ...executionTracePatch,
               };
             }
+            deliveredBeatIds.add(delivery.beat.beatId);
           },
         })),
         setSessions: () => undefined,
+        skipCreateAssistantTurnRecord: true,
       });
       await schedule.done;
 
-      const nextSession = await getLocalChatSession(session.id, session.viewerId);
-      const mediaAssets = await listLocalChatMediaAssets({
-        conversationId: session.id,
-        turnId,
-      });
+      const [nextSession, mediaAssets, previousSnapshot] = await Promise.all([
+        getLocalChatSession(session.id, session.viewerId),
+        listLocalChatMediaAssets({
+          conversationId: session.id,
+          turnId,
+        }),
+        getLocalChatInteractionSnapshot(session.id),
+      ]);
       const compiled = compileInteractionState({
         conversationId: session.id,
         targetId: target.id,
         viewerId: session.viewerId,
         session: nextSession,
-        deliveredBeats: deliveries.map((delivery) => delivery.beat),
+        deliveredBeats: deliveredBeats.filter((beat) => deliveredBeatIds.has(beat.beatId)),
         mediaAssets,
+        previousSnapshot,
       });
       const portableMemorySlots = await compilePortableMemorySlots({
         aiClient: input.aiClient,
         relationMemorySlots: compiled.relationMemorySlots,
         interactionSnapshot: compiled.snapshot,
-        recentSummaries: deliveries.map((delivery) => normalizeBeatText(delivery.content)).filter(Boolean),
+        recentSummaries: [
+          firstBeatText,
+          ...deliveries.map((delivery) => normalizeBeatText(delivery.content)).filter(Boolean),
+        ],
       });
       await Promise.all([
         upsertLocalChatInteractionSnapshot(compiled.snapshot),

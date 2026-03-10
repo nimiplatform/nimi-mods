@@ -444,7 +444,6 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
   );
 
   const canSend = Boolean(state.targetsState.selectedTarget)
-    && !state.turnSendState.isSending
     && state.speechTranscribeState.voiceInputState !== 'transcribing';
 
   return {

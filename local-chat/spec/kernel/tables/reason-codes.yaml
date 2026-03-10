@@ -108,7 +108,7 @@ codes:
   - code: LOCAL_CHAT_STREAM_FINALIZE_OK
     stage: turn-bundle-persist
     blocking: false
-    action_hint: streaming-placeholder-finalized
+    action_hint: first-beat-stream-sealed-and-finalized
     source_rule: LC-ERR-001
   - code: LOCAL_CHAT_RUNNING_SUMMARY_UPDATE_OK
     stage: running-summary-update
