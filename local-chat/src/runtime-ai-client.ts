@@ -1,6 +1,12 @@
 import type { ModRuntimeClient, ModRuntimeResolvedBinding } from '@nimiplatform/sdk/mod/runtime';
 import type { RuntimeCanonicalCapability, RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
-import type { NimiFinishReason } from '@nimiplatform/sdk/runtime';
+
+type LocalChatFinishReason =
+  | 'stop'
+  | 'length'
+  | 'content-filter'
+  | 'tool-calls'
+  | 'error';
 
 export type LocalChatAiRouteInput = {
   capability?: RuntimeCanonicalCapability;
@@ -89,7 +95,7 @@ export type LocalChatAiClient = {
   }>;
   streamText(input: LocalChatAiTextRequest): AsyncIterable<
     | { type: 'text_delta'; textDelta: string }
-    | { type: 'done'; traceId?: string; finishReason?: NimiFinishReason }
+    | { type: 'done'; traceId?: string; finishReason?: LocalChatFinishReason }
   >;
   generateImage(input: LocalChatAiImageRequest): Promise<{
     images: Array<{ uri?: string; b64Json?: string; mimeType?: string }>;
