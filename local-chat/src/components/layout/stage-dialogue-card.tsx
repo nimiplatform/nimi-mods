@@ -4,10 +4,12 @@ import type { LocalChatTurnSendPhase } from '../../state/index.js';
 import type { ChatMessage } from '../../types.js';
 import { ChatBubble } from '../chat-bubbles.js';
 import { ConversationTypingBubble } from './conversation-typing-bubble.js';
+import type { LocalChatPresenceTheme } from './presence-theme.js';
 
 type StageDialogueCardProps = {
   agentAvatarUrl: string | null;
   agentName: string;
+  theme: LocalChatPresenceTheme;
   currentUserDisplayName: string;
   currentUserAvatarUrl: string | null;
   messages: ChatMessage[];
@@ -25,6 +27,41 @@ type StageConversationSlice = {
   assistantMessages: ChatMessage[];
   pendingFirstBeat: boolean;
 };
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const normalized = hex.replace('#', '');
+  const full = normalized.length === 3
+    ? normalized.split('').map((char) => `${char}${char}`).join('')
+    : normalized;
+  const parsed = Number.parseInt(full, 16);
+  return {
+    r: (parsed >> 16) & 255,
+    g: (parsed >> 8) & 255,
+    b: parsed & 255,
+  };
+}
+
+function withAlpha(hex: string, alpha: number): string {
+  const { r, g, b } = hexToRgb(hex);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+const STAGE_CARD_MINT_SOFT = '#d1fae5';
+const STAGE_CARD_MINT = '#86efac';
+const STAGE_CARD_MINT_STRONG = '#34d399';
+
+function resolveStageDialogueBreathingDurationMs(sendPhase: LocalChatTurnSendPhase): number {
+  if (sendPhase === 'streaming-first-beat') {
+    return 3400;
+  }
+  if (sendPhase === 'delivering-tail') {
+    return 3800;
+  }
+  if (sendPhase === 'awaiting-first-beat' || sendPhase === 'planning-tail') {
+    return 4300;
+  }
+  return 5400;
+}
 
 export function resolveStageConversationSlice(input: {
   messages: ChatMessage[];
@@ -80,6 +117,7 @@ export function resolveStageConversationSlice(input: {
 export const StageDialogueCard = React.memo(function StageDialogueCard({
   agentAvatarUrl,
   agentName,
+  theme: _theme,
   currentUserDisplayName,
   currentUserAvatarUrl,
   messages,
@@ -101,13 +139,23 @@ export const StageDialogueCard = React.memo(function StageDialogueCard({
   );
   const showPendingFirstBeat = pendingFirstBeat && assistantMessages.length === 0;
   const showEmptyState = !userMessage && assistantMessages.length === 0 && !showPendingFirstBeat;
+  const shellStyle = React.useMemo(() => ({
+    '--lc-stage-card-breathe-duration': `${resolveStageDialogueBreathingDurationMs(sendPhase)}ms`,
+    '--lc-stage-card-glow-soft': withAlpha(STAGE_CARD_MINT_SOFT, 0.96),
+    '--lc-stage-card-glow-strong': withAlpha(STAGE_CARD_MINT_STRONG, 0.28),
+    '--lc-stage-card-border-idle': withAlpha(STAGE_CARD_MINT, 0.36),
+    '--lc-stage-card-border-peak': withAlpha(STAGE_CARD_MINT_STRONG, 0.44),
+  }) as React.CSSProperties, [sendPhase]);
 
   return (
-    <div className="lc-stage-dialogue-shell rounded-[30px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(244,249,249,0.82))] p-3 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+    <div
+      className="lc-stage-dialogue-shell w-full rounded-[30px] border border-emerald-100/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.97),rgba(248,250,252,0.92))] p-4 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl"
+      style={shellStyle}
+    >
       <div className="mb-3 flex items-center justify-between gap-3 px-2">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-mint-700/70">
-            {t('MessagePane.stageLabel')}
+            {t('MessagePane.stageMomentLabel')}
           </p>
           <p className="mt-1 text-xs text-slate-500">
             {assistantMessages.length > 0
@@ -120,7 +168,7 @@ export const StageDialogueCard = React.memo(function StageDialogueCard({
       <div
         ref={scrollRootRef}
         data-local-chat-scroll-root="true"
-        className="max-h-[38vh] overflow-y-auto overscroll-contain rounded-[24px] border border-white/70 bg-white/72 px-3 py-3"
+        className="max-h-[44vh] overflow-y-auto overscroll-contain rounded-[24px] border border-slate-200/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.95))] px-4 py-4 backdrop-blur-sm"
       >
         {showEmptyState ? (
           <div className="flex min-h-[180px] flex-col items-center justify-center gap-3 px-6 text-center">
@@ -150,6 +198,7 @@ export const StageDialogueCard = React.memo(function StageDialogueCard({
                 showAvatar
                 showTimestamp
                 position="single"
+                displayContext="stage"
               />
             ) : null}
 
@@ -168,6 +217,7 @@ export const StageDialogueCard = React.memo(function StageDialogueCard({
                 showAvatar={index === 0 || index === assistantMessages.length - 1}
                 showTimestamp={index === assistantMessages.length - 1}
                 position={assistantMessages.length <= 1 ? 'single' : index === 0 ? 'start' : index === assistantMessages.length - 1 ? 'end' : 'middle'}
+                displayContext="stage"
               />
             ))}
 

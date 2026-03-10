@@ -600,6 +600,7 @@ export async function runLocalChatProactiveHeartbeatCycle(
               setSessions: () => undefined,
               promptTrace: null,
               turnAudit: null,
+              messageMeta: delivery.meta,
               sendContextKey: `proactive-${session.id}`,
               getCurrentContextKey: () => `proactive-${session.id}`,
             });

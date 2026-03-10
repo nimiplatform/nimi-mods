@@ -5,7 +5,7 @@ import type { InteractionSnapshot, LocalChatTurnSendPhase } from '../../state/in
 import { resolvePresenceTheme } from './presence-theme.js';
 import type { LocalChatTargetItem } from './types.js';
 import { StageDialogueCard } from './stage-dialogue-card.js';
-import { resolvePresenceStatus } from './local-chat-header.js';
+import { resolvePresenceStatus } from './local-chat-presence-status.js';
 
 type StageConversationViewProps = {
   selectedTarget: LocalChatTargetItem;
@@ -209,6 +209,7 @@ export const StageConversationView = React.memo(function StageConversationView({
         <StageDialogueCard
           agentAvatarUrl={selectedTargetAvatarUrl}
           agentName={selectedTarget.displayName}
+          theme={theme}
           currentUserDisplayName={currentUserDisplayName}
           currentUserAvatarUrl={currentUserAvatarUrl}
           messages={messages}

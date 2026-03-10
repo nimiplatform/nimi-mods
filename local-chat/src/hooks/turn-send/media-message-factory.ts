@@ -10,6 +10,7 @@ import type { LocalChatMediaArtifactShadow, LocalChatResolvedMediaRoute } from '
 function createBaseMediaMeta(input: {
   intent: PendingMediaIntent;
   prepared?: PreparedMediaExecution;
+  messageMeta?: ChatMessage['meta'];
   status: Extract<MediaExecutionStatus, 'pending' | 'ready' | 'failed' | 'blocked'>;
   routeSource?: MediaRouteSource;
   routeModel?: string;
@@ -22,6 +23,8 @@ function createBaseMediaMeta(input: {
   const routeSource = input.routeSource || input.resolvedRoute?.source;
   const routeModel = input.routeModel || input.resolvedRoute?.model;
   return {
+    ...(input.messageMeta || {}),
+    beatModality: input.intent.type,
     mediaType: input.intent.type,
     mediaStatus: input.status,
     mediaPrompt: input.intent.prompt,
@@ -45,6 +48,7 @@ function createBaseMediaMeta(input: {
 export function createPendingMediaMessage(input: {
   intent: PendingMediaIntent;
   prepared?: PreparedMediaExecution;
+  messageMeta?: ChatMessage['meta'];
   resolvedRoute?: LocalChatResolvedMediaRoute | null;
 }): ChatMessage {
   const isImage = input.intent.type === 'image';
@@ -57,6 +61,7 @@ export function createPendingMediaMessage(input: {
     meta: createBaseMediaMeta({
       intent: input.intent,
       prepared: input.prepared,
+      messageMeta: input.messageMeta,
       status: 'pending',
       resolvedRoute: input.resolvedRoute,
       cacheStatus: 'none',
@@ -67,6 +72,7 @@ export function createPendingMediaMessage(input: {
 export function createMediaFailureMessage(input: {
   intent: PendingMediaIntent;
   prepared?: PreparedMediaExecution;
+  messageMeta?: ChatMessage['meta'];
   reason: string;
   routeSource?: MediaRouteSource;
   resolvedRoute?: LocalChatResolvedMediaRoute | null;
@@ -82,6 +88,7 @@ export function createMediaFailureMessage(input: {
     meta: createBaseMediaMeta({
       intent: input.intent,
       prepared: input.prepared,
+      messageMeta: input.messageMeta,
       status: 'failed',
       routeSource: input.routeSource,
       resolvedRoute: input.resolvedRoute,
@@ -96,6 +103,7 @@ export function createMediaFailureMessage(input: {
 export function createMediaBlockedMessage(input: {
   intent: PendingMediaIntent;
   prepared?: PreparedMediaExecution;
+  messageMeta?: ChatMessage['meta'];
   reason: string;
   routeSource: MediaRouteSource;
   resolvedRoute?: LocalChatResolvedMediaRoute | null;
@@ -111,6 +119,7 @@ export function createMediaBlockedMessage(input: {
     meta: createBaseMediaMeta({
       intent: input.intent,
       prepared: input.prepared,
+      messageMeta: input.messageMeta,
       status: 'blocked',
       routeSource: input.routeSource,
       resolvedRoute: input.resolvedRoute,
@@ -125,6 +134,7 @@ export function createMediaBlockedMessage(input: {
 export function createReadyMediaMessage(input: {
   intent: PendingMediaIntent;
   prepared?: PreparedMediaExecution;
+  messageMeta?: ChatMessage['meta'];
   uri: string;
   mimeType: string;
   routeSource: MediaRouteSource;
@@ -149,6 +159,7 @@ export function createReadyMediaMessage(input: {
       ...createBaseMediaMeta({
         intent: input.intent,
         prepared: input.prepared,
+        messageMeta: input.messageMeta,
         status: 'ready',
         routeSource: input.routeSource,
         routeModel: input.routeModel,

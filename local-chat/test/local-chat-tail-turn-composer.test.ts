@@ -112,3 +112,53 @@ test('tail turn composer passes sealed first beat into planner and prunes duplic
   assert.equal(plan.beats[0]?.beatCount, 2);
   assert.equal(plan.fallbackPolicy, 'first-beat-only');
 });
+
+test('tail turn composer logs structured failure stage for generateObject errors', async () => {
+  const originalConsoleError = console.error;
+  const captured: unknown[] = [];
+  console.error = (...args: unknown[]) => {
+    captured.push(args);
+  };
+
+  try {
+    const plan = await composeInteractionTurnPlan({
+      aiClient: {
+        generateObject: async () => {
+          const error = new Error('LOCAL_CHAT_AI_GENERATE_OBJECT_PARSE_FAILED') as Error & Record<string, unknown>;
+          error.failureStage = 'parse';
+          error.reasonCode = 'LOCAL_CHAT_AI_GENERATE_OBJECT_INVALID_JSON_OBJECT';
+          error.traceId = 'trace-composer-parse';
+          error.rawTextPreview = '{"beats":[';
+          error.rawTextChars = 10;
+          error.errorName = 'Error';
+          throw error;
+        },
+      } as unknown as LocalChatTurnAiClient,
+      invokeInput: {
+        capability: 'text.generate',
+        prompt: 'raw prompt',
+        mode: 'STORY',
+        agentId: 'agent-1',
+      },
+      contextPacket: createContextPacket(),
+      userText: '给我发张图',
+      turnId: 'turn-log-1',
+      turnMode: 'explicit-media',
+      deliveryStyle: 'natural',
+      sealedFirstBeatText: '我这就给你准备。',
+    });
+
+    assert.equal(plan.beats.length, 0);
+    const failureLog = captured.find((entry) =>
+      Array.isArray(entry)
+      && entry[0] === '[turn-composer] generateObject: FAILED',
+    ) as [string, Record<string, unknown>] | undefined;
+    assert.equal(Boolean(failureLog), true);
+    assert.equal(failureLog?.[1]?.failureStage, 'parse');
+    assert.equal(failureLog?.[1]?.reasonCode, 'LOCAL_CHAT_AI_GENERATE_OBJECT_INVALID_JSON_OBJECT');
+    assert.equal(failureLog?.[1]?.traceId, 'trace-composer-parse');
+    assert.equal(failureLog?.[1]?.rawTextPreview, '{"beats":[');
+  } finally {
+    console.error = originalConsoleError;
+  }
+});

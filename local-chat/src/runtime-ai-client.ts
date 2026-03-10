@@ -122,6 +122,26 @@ export type LocalChatAiClient = {
   }>;
 };
 
+export type LocalChatGenerateObjectFailureStage = 'call' | 'parse' | 'unknown';
+
+type LocalChatGenerateObjectFailureError = Error & {
+  failureStage: Exclude<LocalChatGenerateObjectFailureStage, 'unknown'>;
+  reasonCode: string;
+  traceId: string | null;
+  rawTextPreview: string | null;
+  rawTextChars: number;
+  errorName: string | null;
+};
+
+export type LocalChatGenerateObjectFailureDetails = {
+  failureStage: LocalChatGenerateObjectFailureStage;
+  reasonCode: string;
+  traceId: string | null;
+  rawTextPreview: string | null;
+  rawTextChars: number;
+  errorName: string | null;
+};
+
 export type LocalChatAudioPlaybackSource = {
   audioUri?: string;
   audioBytes?: Uint8Array;
@@ -133,6 +153,58 @@ function resolveCapability(
   fallback: RuntimeCanonicalCapability = 'text.generate',
 ): RuntimeCanonicalCapability {
   return capability || fallback;
+}
+
+function createRawTextPreview(text: string): string | null {
+  const normalized = String(text || '').replace(/\s+/g, ' ').trim();
+  return normalized ? normalized.slice(0, 280) : null;
+}
+
+function createGenerateObjectFailureError(input: {
+  failureStage: Exclude<LocalChatGenerateObjectFailureStage, 'unknown'>;
+  reasonCode: string;
+  traceId?: string | null;
+  rawText?: string;
+  error: unknown;
+}): LocalChatGenerateObjectFailureError {
+  const wrapped = new Error(
+    input.failureStage === 'call'
+      ? 'LOCAL_CHAT_AI_GENERATE_OBJECT_CALL_FAILED'
+      : 'LOCAL_CHAT_AI_GENERATE_OBJECT_PARSE_FAILED',
+  ) as LocalChatGenerateObjectFailureError;
+  const rawText = String(input.rawText || '');
+  wrapped.failureStage = input.failureStage;
+  wrapped.reasonCode = String(input.reasonCode || wrapped.message);
+  wrapped.traceId = String(input.traceId || '').trim() || null;
+  wrapped.rawTextPreview = createRawTextPreview(rawText);
+  wrapped.rawTextChars = rawText.length;
+  wrapped.errorName = input.error instanceof Error ? input.error.name : null;
+  return wrapped;
+}
+
+export function describeLocalChatGenerateObjectFailure(error: unknown): LocalChatGenerateObjectFailureDetails {
+  if (error && typeof error === 'object') {
+    const record = error as Record<string, unknown>;
+    const failureStage = record.failureStage;
+    if (failureStage === 'call' || failureStage === 'parse' || failureStage === 'unknown') {
+      return {
+        failureStage,
+        reasonCode: String(record.reasonCode || (error instanceof Error ? error.message : 'UNKNOWN_ERROR')),
+        traceId: String(record.traceId || '').trim() || null,
+        rawTextPreview: String(record.rawTextPreview || '').trim() || null,
+        rawTextChars: Number.isFinite(Number(record.rawTextChars)) ? Math.max(0, Number(record.rawTextChars)) : 0,
+        errorName: String(record.errorName || (error instanceof Error ? error.name : '')).trim() || null,
+      };
+    }
+  }
+  return {
+    failureStage: 'unknown',
+    reasonCode: error instanceof Error ? error.message : String(error || 'UNKNOWN_ERROR'),
+    traceId: null,
+    rawTextPreview: null,
+    rawTextChars: 0,
+    errorName: error instanceof Error ? error.name : null,
+  };
 }
 
 function extractJsonFromText(text: string): string {
@@ -406,18 +478,39 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
     },
     generateObject: async (input) => {
       const parser = input.parse || parseJsonObject;
-      const textResult = await runtimeClient.ai.text.generate({
-        input: input.prompt,
-        system: input.systemPrompt,
-        maxTokens: input.maxTokens,
-        timeoutMs: input.timeoutMs,
-        temperature: input.temperature,
-        binding: input.routeBinding,
-      });
+      let textResult;
+      try {
+        textResult = await runtimeClient.ai.text.generate({
+          input: input.prompt,
+          system: input.systemPrompt,
+          maxTokens: input.maxTokens,
+          timeoutMs: input.timeoutMs,
+          temperature: input.temperature,
+          binding: input.routeBinding,
+        });
+      } catch (error) {
+        throw createGenerateObjectFailureError({
+          failureStage: 'call',
+          reasonCode: error instanceof Error ? error.message : String(error || 'LOCAL_CHAT_AI_GENERATE_OBJECT_CALL_FAILED'),
+          error,
+        });
+      }
       const text = String(textResult.text || '');
       const traceId = String(textResult.trace?.traceId || '').trim();
+      let object: Record<string, unknown>;
+      try {
+        object = parser(text);
+      } catch (error) {
+        throw createGenerateObjectFailureError({
+          failureStage: 'parse',
+          reasonCode: error instanceof Error ? error.message : String(error || 'LOCAL_CHAT_AI_GENERATE_OBJECT_PARSE_FAILED'),
+          traceId,
+          rawText: text,
+          error,
+        });
+      }
       return {
-        object: parser(text),
+        object,
         text,
         traceId,
         promptTraceId: traceId,

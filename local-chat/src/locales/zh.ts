@@ -188,6 +188,7 @@ const zhLocale = {
     today: '今天',
     yesterday: '昨天',
     stageLabel: '当前舞台',
+    stageMomentLabel: '此刻',
     stageFallback: 'Agent',
     stageWithBeats: '这一轮已展开 {{count}} 个回应拍点',
     stageHint: '这一轮的回应会优先在这里展开，历史记录会退到下方。',

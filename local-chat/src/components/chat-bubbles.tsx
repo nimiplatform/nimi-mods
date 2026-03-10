@@ -3,6 +3,9 @@ import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { ChatMessage } from '../types.js';
 import type { MessageVisualPosition } from './layout/message-grouping.js';
 
+export type ChatBubbleDisplayContext = 'transcript' | 'stage';
+type StageMediaPreviewKind = 'image' | 'video' | 'image-pending' | 'video-pending';
+
 function sanitizeLinkHref(href: string): string | null {
   const raw = String(href || '').trim();
   if (!raw) return null;
@@ -203,6 +206,69 @@ function entryAnimationFor(message: ChatMessage): string {
   return 'chat-slide-up';
 }
 
+function readPositiveDimension(value: unknown): number | null {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
+export function resolveStageMediaPreviewMetrics(input: {
+  kind: 'image' | 'video' | 'image-pending' | 'video-pending';
+  width?: number;
+  height?: number;
+}): {
+  aspectRatio: number;
+  previewWidthPx: number;
+  previewHeightPx: number;
+} {
+  const sourceWidth = readPositiveDimension(input.width);
+  const sourceHeight = readPositiveDimension(input.height);
+  const fallbackSource = (
+    input.kind === 'video' || input.kind === 'video-pending'
+      ? { width: 1280, height: 720 }
+      : { width: 1024, height: 1024 }
+  );
+  const effectiveWidth = sourceWidth || fallbackSource.width;
+  const effectiveHeight = sourceHeight || fallbackSource.height;
+  const aspectRatio = effectiveWidth / effectiveHeight;
+
+  const bounds = aspectRatio >= 1.45
+    ? { maxWidth: 560, maxHeight: 280, minWidth: 300, minHeight: 170 }
+    : aspectRatio <= 0.8
+      ? { maxWidth: 320, maxHeight: 360, minWidth: 220, minHeight: 240 }
+      : { maxWidth: 420, maxHeight: 320, minWidth: 260, minHeight: 220 };
+
+  let scale = Math.min(bounds.maxWidth / effectiveWidth, bounds.maxHeight / effectiveHeight);
+  let previewWidth = Math.round(effectiveWidth * scale);
+  let previewHeight = Math.round(effectiveHeight * scale);
+
+  if (previewWidth < bounds.minWidth) {
+    const widthScale = bounds.minWidth / effectiveWidth;
+    const widthScaledHeight = effectiveHeight * widthScale;
+    if (widthScaledHeight <= bounds.maxHeight) {
+      scale = widthScale;
+      previewWidth = Math.round(effectiveWidth * scale);
+      previewHeight = Math.round(widthScaledHeight);
+    }
+  }
+
+  if (previewHeight < bounds.minHeight) {
+    const heightScale = bounds.minHeight / effectiveHeight;
+    const heightScaledWidth = effectiveWidth * heightScale;
+    if (heightScaledWidth <= bounds.maxWidth) {
+      scale = heightScale;
+      previewWidth = Math.round(heightScaledWidth);
+      previewHeight = Math.round(effectiveHeight * scale);
+    }
+  }
+
+  return {
+    aspectRatio,
+    previewWidthPx: Math.min(bounds.maxWidth, Math.max(bounds.minWidth, previewWidth)),
+    previewHeightPx: Math.min(bounds.maxHeight, Math.max(bounds.minHeight, previewHeight)),
+  };
+}
+
 export const ChatBubble = React.memo(function ChatBubble(props: {
   message: ChatMessage;
   agentAvatarUrl: string | null;
@@ -216,6 +282,7 @@ export const ChatBubble = React.memo(function ChatBubble(props: {
   showAvatar?: boolean;
   showTimestamp?: boolean;
   position?: MessageVisualPosition;
+  displayContext?: ChatBubbleDisplayContext;
 }) {
   const { t } = useModTranslation('local-chat');
   const {
@@ -231,6 +298,7 @@ export const ChatBubble = React.memo(function ChatBubble(props: {
     showAvatar = true,
     showTimestamp = true,
     position = 'single',
+    displayContext = 'transcript',
   } = props;
   const isUser = message.role === 'user';
   const isVoice = message.kind === 'voice';
@@ -249,10 +317,12 @@ export const ChatBubble = React.memo(function ChatBubble(props: {
   const [imagePreviewOpen, setImagePreviewOpen] = React.useState(false);
   const [imageLoadError, setImageLoadError] = React.useState(false);
   const [videoLoadError, setVideoLoadError] = React.useState(false);
+  const [resolvedMediaSize, setResolvedMediaSize] = React.useState<{ width: number; height: number } | null>(null);
 
   React.useEffect(() => {
     setImageLoadError(false);
     setVideoLoadError(false);
+    setResolvedMediaSize(null);
   }, [message.id, message.media?.uri]);
 
   React.useEffect(() => {
@@ -290,6 +360,34 @@ export const ChatBubble = React.memo(function ChatBubble(props: {
   );
 
   const mediaUri = String(message.media?.uri || '').trim();
+  const stageMediaKind: StageMediaPreviewKind | null = isImage
+    ? 'image'
+    : isVideo
+      ? 'video'
+      : isImagePending
+        ? 'image-pending'
+        : isVideoPending
+          ? 'video-pending'
+          : null;
+  const stageMediaMetrics = displayContext === 'stage' && stageMediaKind
+    ? resolveStageMediaPreviewMetrics({
+      kind: stageMediaKind,
+      width: message.media?.width ?? resolvedMediaSize?.width,
+      height: message.media?.height ?? resolvedMediaSize?.height,
+    })
+    : null;
+  const stageMediaFrameStyle: React.CSSProperties | undefined = stageMediaMetrics
+    ? {
+      width: `min(100%, ${stageMediaMetrics.previewWidthPx}px)`,
+      maxHeight: `${stageMediaMetrics.previewHeightPx}px`,
+      aspectRatio: stageMediaMetrics.aspectRatio,
+    }
+    : undefined;
+  const mediaContainerClassName = isMediaCard
+    ? displayContext === 'stage'
+      ? 'max-w-full'
+      : 'max-w-[78%]'
+    : 'max-w-[72%]';
 
   return (
     <>
@@ -299,7 +397,7 @@ export const ChatBubble = React.memo(function ChatBubble(props: {
       >
         {showAvatar ? avatarNode : <span className="h-8 w-8 shrink-0" aria-hidden />}
 
-        <div className={isMediaCard ? 'max-w-[78%]' : 'max-w-[72%]'}>
+        <div className={mediaContainerClassName}>
           <div
             className={`${bubbleShapeClass} text-sm leading-[1.6] ${
               isMediaCard
@@ -319,7 +417,14 @@ export const ChatBubble = React.memo(function ChatBubble(props: {
               />
             ) : isImagePending || isVideoPending ? (
               <div className="space-y-3">
-                <div className="lc-media-skeleton h-[220px] w-[min(420px,70vw)] rounded-[22px]" />
+                <div
+                  className={`lc-media-skeleton rounded-[22px] ${
+                    displayContext === 'stage'
+                      ? 'mx-0'
+                      : 'h-[220px] w-[min(420px,70vw)]'
+                  }`}
+                  style={stageMediaFrameStyle}
+                />
                 <div className="flex items-center gap-2 text-xs text-gray-600">
                   <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-mint-600" />
                   <span>{message.content || (isImagePending ? t('ChatBubble.generatingImage') : t('ChatBubble.generatingVideo'))}</span>
@@ -330,13 +435,29 @@ export const ChatBubble = React.memo(function ChatBubble(props: {
                 <button
                   type="button"
                   onClick={() => setImagePreviewOpen(true)}
-                  className="group block overflow-hidden rounded-[22px] border border-gray-200 bg-gray-50 shadow-[0_12px_24px_rgba(15,23,42,0.08)]"
+                  className={`group block overflow-hidden rounded-[22px] border border-gray-200 shadow-[0_12px_24px_rgba(15,23,42,0.08)] ${
+                    displayContext === 'stage'
+                      ? 'bg-[radial-gradient(circle_at_center,_rgba(248,250,252,0.98),_rgba(226,232,240,0.84))]'
+                      : 'bg-gray-50'
+                  }`}
+                  style={stageMediaFrameStyle}
                 >
                   <img
                     src={mediaUri}
                     alt={message.content || t('ChatBubble.imagePlaceholder')}
-                    className="max-h-[360px] w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                    className={`transition-transform duration-300 group-hover:scale-[1.02] ${
+                      displayContext === 'stage'
+                        ? 'h-full w-full object-contain'
+                        : 'max-h-[360px] w-full object-cover'
+                    }`}
                     loading="lazy"
+                    onLoad={(event) => {
+                      const target = event.currentTarget;
+                      setResolvedMediaSize({
+                        width: target.naturalWidth,
+                        height: target.naturalHeight,
+                      });
+                    }}
                     onError={() => setImageLoadError(true)}
                   />
                 </button>
@@ -349,8 +470,20 @@ export const ChatBubble = React.memo(function ChatBubble(props: {
                   src={mediaUri}
                   controls
                   preload="metadata"
-                  className="max-h-[360px] w-full rounded-[22px] border border-gray-200 bg-black shadow-[0_12px_24px_rgba(15,23,42,0.08)]"
+                  className={`rounded-[22px] border border-gray-200 shadow-[0_12px_24px_rgba(15,23,42,0.08)] ${
+                    displayContext === 'stage'
+                      ? 'h-full w-full object-contain bg-slate-950'
+                      : 'max-h-[360px] w-full bg-black'
+                  }`}
+                  style={stageMediaFrameStyle}
                   poster={message.media?.previewUri}
+                  onLoadedMetadata={(event) => {
+                    const target = event.currentTarget;
+                    setResolvedMediaSize({
+                      width: target.videoWidth,
+                      height: target.videoHeight,
+                    });
+                  }}
                   onError={() => setVideoLoadError(true)}
                 />
               ) : (

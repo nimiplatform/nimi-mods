@@ -5,6 +5,7 @@ import type {
   LocalChatContextPacket,
   LocalChatTurnMode,
 } from '../../state/index.js';
+import { describeLocalChatGenerateObjectFailure } from '../../runtime-ai-client.js';
 import { createUlid } from '../../utils/ulid.js';
 import type { LocalChatTurnAiClient } from './types.js';
 import type { TurnInvokeInput } from './request-builder.js';
@@ -288,8 +289,15 @@ export async function composeInteractionTurnPlan(input: {
     }
     console.warn('[turn-composer] generateObject: parsed but 0 valid tail beats', { turnMode: input.turnMode });
   } catch (err) {
+    const failure = describeLocalChatGenerateObjectFailure(err);
     console.error('[turn-composer] generateObject: FAILED', {
       error: err instanceof Error ? err.message : String(err),
+      failureStage: failure.failureStage,
+      reasonCode: failure.reasonCode,
+      traceId: failure.traceId,
+      rawTextPreview: failure.rawTextPreview,
+      rawTextChars: failure.rawTextChars,
+      errorName: failure.errorName,
       turnMode: input.turnMode,
     });
   }

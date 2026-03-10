@@ -2,17 +2,8 @@ import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { ChatMessage } from '../../types.js';
 import type { InteractionSnapshot, LocalChatTurnSendPhase } from '../../state/index.js';
 import { resolvePresenceTheme } from './presence-theme.js';
+import { resolvePresenceStatus } from './local-chat-presence-status.js';
 import type { LocalChatTargetItem } from './types.js';
-
-type PresenceStatusInput = {
-  loadingTargetDetail: boolean;
-  hasInputText: boolean;
-  isSending: boolean;
-  sendPhase: LocalChatTurnSendPhase;
-  messages: ChatMessage[];
-  playingVoiceMessageId: string | null;
-  t: (key: string) => string;
-};
 
 export type CompactConversationHeaderProps = {
   selectedTarget: LocalChatTargetItem;
@@ -51,31 +42,6 @@ const ICON_STAGE = (
     <path d="M12 18v2" />
   </svg>
 );
-
-export function resolvePresenceStatus(input: PresenceStatusInput): { label: string; busy: boolean } {
-  if (input.loadingTargetDetail) {
-    return { label: input.t('Header.presenceArriving'), busy: false };
-  }
-  if (input.playingVoiceMessageId) {
-    return { label: input.t('Header.presenceSpeaking'), busy: true };
-  }
-  const lastAssistantMessage = [...input.messages]
-    .reverse()
-    .find((message) => message.role === 'assistant') || null;
-  if (lastAssistantMessage?.kind === 'image-pending') {
-    return { label: input.t('Header.presencePainting'), busy: true };
-  }
-  if (lastAssistantMessage?.kind === 'video-pending') {
-    return { label: input.t('Header.presenceFilming'), busy: true };
-  }
-  if (input.sendPhase === 'awaiting-first-beat' || input.sendPhase === 'streaming-first-beat') {
-    return { label: input.t('Header.presenceThinking'), busy: true };
-  }
-  if (input.hasInputText) {
-    return { label: input.t('Header.presenceListening'), busy: false };
-  }
-  return { label: input.t('Header.presenceIdle'), busy: false };
-}
 
 export function CompactConversationHeader({
   selectedTarget,

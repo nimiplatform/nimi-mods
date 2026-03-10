@@ -2,7 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 import type { ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
-import { createLocalChatAiClient } from '../src/runtime-ai-client.ts';
+import {
+  createLocalChatAiClient,
+  describeLocalChatGenerateObjectFailure,
+} from '../src/runtime-ai-client.ts';
 
 function createBinding(): RuntimeRouteBinding {
   return {
@@ -231,6 +234,78 @@ test('local-chat runtime ai client: generateObject repairs broken strings with r
   const beats = result.object.beats as Array<Record<string, unknown>>;
   assert.equal(beats.length, 1);
   assert.equal(String(beats[0]?.text || '').includes('再慢慢说'), true);
+});
+
+test('local-chat runtime ai client: generateObject exposes call failure metadata', async () => {
+  const runtimeClient = {
+    ai: {
+      text: {
+        generate: async () => {
+          throw new Error('AI_PROVIDER_TIMEOUT');
+        },
+      },
+    },
+  } as unknown as ModRuntimeClient;
+
+  const aiClient = createLocalChatAiClient(runtimeClient);
+
+  let failure: ReturnType<typeof describeLocalChatGenerateObjectFailure> | null = null;
+  await assert.rejects(async () => {
+    try {
+      await aiClient.generateObject({
+        prompt: '需要结构化返回',
+        routeBinding: createBinding(),
+      });
+    } catch (error) {
+      failure = describeLocalChatGenerateObjectFailure(error);
+      throw error;
+    }
+  }, /LOCAL_CHAT_AI_GENERATE_OBJECT_CALL_FAILED/);
+
+  assert.equal(failure?.failureStage, 'call');
+  assert.equal(failure?.reasonCode, 'AI_PROVIDER_TIMEOUT');
+  assert.equal(failure?.traceId, null);
+  assert.equal(failure?.rawTextPreview, null);
+  assert.equal(failure?.rawTextChars, 0);
+});
+
+test('local-chat runtime ai client: generateObject exposes parse failure metadata and raw text preview', async () => {
+  const runtimeClient = {
+    ai: {
+      text: {
+        generate: async () => ({
+          text: '先随便说一句，再给你 JSON',
+          trace: {
+            traceId: 'trace-invalid-json',
+          },
+        }),
+      },
+    },
+  } as unknown as ModRuntimeClient;
+
+  const aiClient = createLocalChatAiClient(runtimeClient);
+
+  let failure: ReturnType<typeof describeLocalChatGenerateObjectFailure> | null = null;
+  await assert.rejects(async () => {
+    try {
+      await aiClient.generateObject({
+        prompt: '需要结构化返回',
+        parse: () => {
+          throw new Error('LOCAL_CHAT_AI_GENERATE_OBJECT_INVALID_JSON_OBJECT');
+        },
+        routeBinding: createBinding(),
+      });
+    } catch (error) {
+      failure = describeLocalChatGenerateObjectFailure(error);
+      throw error;
+    }
+  }, /LOCAL_CHAT_AI_GENERATE_OBJECT_PARSE_FAILED/);
+
+  assert.equal(failure?.failureStage, 'parse');
+  assert.equal(failure?.reasonCode, 'LOCAL_CHAT_AI_GENERATE_OBJECT_INVALID_JSON_OBJECT');
+  assert.equal(failure?.traceId, 'trace-invalid-json');
+  assert.equal(failure?.rawTextPreview, '先随便说一句，再给你 JSON');
+  assert.equal(failure?.rawTextChars, '先随便说一句，再给你 JSON'.length);
 });
 
 test('local-chat runtime ai client: synthesizeSpeech prefers stream and falls back to bytes', async () => {

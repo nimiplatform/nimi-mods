@@ -12,6 +12,7 @@ import { DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS } from '../src/state/index.ts';
 import { buildLocalChatTurnContextKey } from '../src/hooks/turn-send/context-key.ts';
 import { runLocalChatTurnSend } from '../src/hooks/turn-send/send-flow.ts';
 import { resetTextTurnStreamHealthForTests } from '../src/hooks/turn-send/text-turn-runner.ts';
+import { resolveStageConversationSlice } from '../src/components/layout/stage-dialogue-card.tsx';
 import { resetLocalChatConversationLedgerForTests } from '../src/session-store.ts';
 
 class MemoryStorage implements Storage {
@@ -1072,6 +1073,75 @@ test('send-flow explicit media request still delivers image when voice-first mod
     const assistantMessages = result.state.messages.filter((message) => message.role === 'assistant');
     assert.equal(assistantMessages.some((message) => message.kind === 'image'), true);
     assert.equal(result.counters.generateImage, 1);
+  });
+});
+
+test('send-flow explicit media request still delivers image when turn composer fails', async () => {
+  await withSendFlowHarness(async (harness) => {
+    const result = await harness.execute({
+      userText: '发张图给我看看',
+      aiClientOverrides: {
+        generateObject: async (payload: Record<string, unknown>) => {
+          const prompt = String(payload.prompt || '');
+          if (prompt.includes('你是一个对话感知模块')) {
+            const object = defaultPerceptionObject(prompt);
+            return {
+              object,
+              text: JSON.stringify(object),
+              traceId: 'trace-perception-explicit-media',
+              promptTraceId: 'trace-perception-explicit-media',
+              route: {
+                source: 'local',
+                model: 'chat-model',
+                localModelId: 'chat-model',
+              },
+            };
+          }
+          if (prompt.includes('请规划这轮对话在首拍之后的 tail beat 计划')) {
+            const error = new Error('LOCAL_CHAT_AI_GENERATE_OBJECT_PARSE_FAILED') as Error & Record<string, unknown>;
+            error.failureStage = 'parse';
+            error.reasonCode = 'LOCAL_CHAT_AI_GENERATE_OBJECT_INVALID_JSON_OBJECT';
+            error.traceId = 'trace-plan-explicit-media';
+            error.rawTextPreview = '{"beats":[';
+            error.rawTextChars = 10;
+            error.errorName = 'Error';
+            throw error;
+          }
+          throw new Error('PLANNER_SHOULD_NOT_RUN');
+        },
+      },
+    });
+
+    await waitFor(() => result.state.messages.some((message) => message.kind === 'image'));
+    const imageMessage = result.state.messages.find((message) => message.kind === 'image');
+
+    assert.equal(imageMessage?.meta?.mediaIntentSource, 'explicit');
+    assert.equal(imageMessage?.meta?.mediaPlannerTrigger, 'user-explicit');
+    assert.equal(result.counters.generateImage, 1);
+    assert.equal(result.state.latestPromptTrace?.mediaDecisionSource, 'explicit');
+    assert.equal(result.state.latestPromptTrace?.mediaExecutionStatus, 'ready');
+  });
+});
+
+test('send-flow explicit media image keeps turn metadata so stage slice includes it', async () => {
+  await withSendFlowHarness(async (harness) => {
+    const result = await harness.execute({
+      userText: '给我发张你那边的照片',
+    });
+
+    await waitFor(() => result.state.messages.some((message) => message.kind === 'image'));
+    const imageMessage = result.state.messages.find((message) => message.kind === 'image');
+    const slice = resolveStageConversationSlice({
+      messages: result.state.messages as never,
+      sendPhase: 'idle',
+    });
+
+    assert.equal(Boolean(imageMessage?.meta?.turnId), true);
+    assert.equal(Boolean(imageMessage?.meta?.beatIndex !== undefined), true);
+    assert.equal(
+      slice.assistantMessages.some((message) => message.id === imageMessage?.id),
+      true,
+    );
   });
 });
 

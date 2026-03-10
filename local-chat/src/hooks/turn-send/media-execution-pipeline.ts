@@ -44,6 +44,7 @@ export type ExecuteMediaDecisionInput = {
   setSessions: (sessions: LocalChatSession[]) => void;
   promptTrace?: LocalChatPromptTrace | null;
   turnAudit?: LocalChatTurnAudit | null;
+  messageMeta?: ChatMessage['meta'];
   sendContextKey: string;
   getCurrentContextKey: () => string;
 };
@@ -130,6 +131,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
       message: createMediaBlockedMessage({
         intent: input.decision.intent,
         prepared: input.decision.prepared,
+        messageMeta: input.messageMeta,
         reason: input.decision.blockedReason,
         routeSource: input.decision.routeSource,
         resolvedRoute: input.decision.resolvedRoute,
@@ -180,6 +182,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
       message: createReadyMediaMessage({
         intent,
         prepared,
+        messageMeta: input.messageMeta,
         uri: cached.renderUri,
         mimeType: cached.mimeType,
         routeSource: cached.routeSource,
@@ -219,6 +222,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
   input.setMessages((prev) => [...prev, createPendingMediaMessage({
     intent,
     prepared,
+    messageMeta: input.messageMeta,
     resolvedRoute,
   })]);
 
@@ -276,6 +280,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
         message: createReadyMediaMessage({
           intent,
           prepared,
+          messageMeta: input.messageMeta,
           uri: result.uri,
           mimeType: result.mimeType,
           routeSource: result.routeSource,
@@ -333,6 +338,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
         message: createMediaBlockedMessage({
           intent,
           prepared,
+          messageMeta: input.messageMeta,
           reason: result.message,
           routeSource: result.routeSource,
           resolvedRoute,
@@ -373,6 +379,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
       message: createMediaFailureMessage({
         intent,
         prepared,
+        messageMeta: input.messageMeta,
         reason: result.message,
         routeSource: result.routeSource,
         resolvedRoute,
@@ -444,6 +451,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
       message: createReadyMediaMessage({
         intent,
         prepared,
+        messageMeta: input.messageMeta,
         uri: result.uri,
         mimeType: result.mimeType,
         routeSource: result.routeSource,
@@ -501,6 +509,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
       message: createMediaBlockedMessage({
         intent,
         prepared,
+        messageMeta: input.messageMeta,
         reason: result.message,
         routeSource: result.routeSource,
         resolvedRoute,
@@ -541,6 +550,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
     message: createMediaFailureMessage({
       intent,
       prepared,
+      messageMeta: input.messageMeta,
       reason: result.message,
       routeSource: result.routeSource,
       resolvedRoute,

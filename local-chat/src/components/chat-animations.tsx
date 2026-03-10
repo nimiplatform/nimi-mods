@@ -177,6 +177,42 @@ const KEYFRAMES = `
     transform: scale(1.03);
   }
 }
+@keyframes lc-stage-card-glow {
+  0%, 100% {
+    border-color: var(--lc-stage-card-border-idle, rgba(20, 184, 166, 0.14));
+    box-shadow:
+      0 24px 60px -18px rgba(15, 23, 42, 0.12),
+      0 0 0 1px var(--lc-stage-card-border-idle, rgba(20, 184, 166, 0.14)),
+      0 0 64px -18px var(--lc-stage-card-glow-soft, rgba(204, 251, 241, 0.78)),
+      0 0 120px -30px var(--lc-stage-card-glow-strong, rgba(20, 184, 166, 0.22));
+  }
+  50% {
+    border-color: var(--lc-stage-card-border-peak, rgba(20, 184, 166, 0.26));
+    box-shadow:
+      0 30px 82px -18px rgba(15, 23, 42, 0.18),
+      0 0 0 1px var(--lc-stage-card-border-peak, rgba(20, 184, 166, 0.26)),
+      0 0 110px -10px var(--lc-stage-card-glow-soft, rgba(209, 250, 229, 0.9)),
+      0 0 176px -20px var(--lc-stage-card-glow-strong, rgba(52, 211, 153, 0.28));
+  }
+}
+@keyframes lc-stage-card-core-breathe {
+  0%, 100% {
+    opacity: 0.26;
+    transform: scale(0.985);
+  }
+  50% {
+    opacity: 0.56;
+    transform: scale(1.03);
+  }
+}
+@keyframes lc-stage-card-sheen {
+  0%, 100% {
+    opacity: 0.08;
+  }
+  50% {
+    opacity: 0.24;
+  }
+}
 .local-chat-root .lc-pane-stage {
   animation: pane-fade-up var(--lc-pane-enter-dur) cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
@@ -237,7 +273,30 @@ const KEYFRAMES = `
   box-shadow: var(--lc-shadow-button);
 }
 .local-chat-root .lc-stage-dialogue-shell {
-  animation: panel-expand 280ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  position: relative;
+  overflow: hidden;
+  animation:
+    panel-expand 280ms cubic-bezier(0.2, 0.7, 0.2, 1) both,
+    lc-stage-card-glow var(--lc-stage-card-breathe-duration, 5.4s) cubic-bezier(0.45, 0, 0.55, 1) infinite 280ms;
+  will-change: box-shadow, border-color, background;
+}
+.local-chat-root .lc-stage-dialogue-shell::before {
+  content: none;
+}
+.local-chat-root .lc-stage-dialogue-shell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 14%, rgba(255,255,255,0.38) 0%, transparent 48%),
+    linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0));
+  animation: lc-stage-card-sheen var(--lc-stage-card-breathe-duration, 5.4s) cubic-bezier(0.45, 0, 0.55, 1) infinite 280ms;
+}
+.local-chat-root .lc-stage-dialogue-shell > * {
+  position: relative;
+  z-index: 1;
 }
 .local-chat-root .lc-stage-avatar-frame {
   animation: lc-stage-breathe 5.4s ease-in-out infinite;

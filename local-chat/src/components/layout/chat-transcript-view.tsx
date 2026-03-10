@@ -3,6 +3,7 @@ import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { LocalChatTurnSendPhase } from '../../state/index.js';
 import type { ChatMessage } from '../../types.js';
 import { ChatBubble } from '../chat-bubbles.js';
+import { LOCAL_CHAT_CONVERSATION_WIDTH_CLASS } from './chat-layout-width.js';
 import { buildMessageVisualGroups } from './message-grouping.js';
 import { ConversationTypingBubble } from './conversation-typing-bubble.js';
 import type { LocalChatTargetItem } from './types.js';
@@ -224,7 +225,7 @@ export const ChatTranscriptView = React.memo(function ChatTranscriptView({
       }}
     >
       {showLoadingState ? (
-        <div className="mx-auto flex h-full max-w-[820px] items-center justify-center">
+        <div className={`mx-auto flex h-full ${LOCAL_CHAT_CONVERSATION_WIDTH_CLASS} items-center justify-center`}>
           <div className="w-full rounded-[30px] border border-white/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(237,247,247,0.86))] px-6 py-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
             <div className="lc-skeleton-pill h-4 w-28" />
             <div className="mt-4 lc-skeleton-card h-24 w-full" />
@@ -232,7 +233,7 @@ export const ChatTranscriptView = React.memo(function ChatTranscriptView({
           </div>
         </div>
       ) : (
-        <div className="mx-auto max-w-[820px] space-y-5">
+        <div className={`mx-auto ${LOCAL_CHAT_CONVERSATION_WIDTH_CLASS} space-y-5`}>
           {welcomeTarget ? (
             <section className="lc-card rounded-[30px] border border-white/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(239,247,247,0.88))] px-6 py-7 text-center shadow-[0_20px_52px_rgba(15,23,42,0.08)]">
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-mint-700/70">

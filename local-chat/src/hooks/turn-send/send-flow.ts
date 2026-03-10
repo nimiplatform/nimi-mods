@@ -129,6 +129,66 @@ function bindMediaDecisionToDelivery(
   };
 }
 
+function createStandaloneMediaDelivery(input: {
+  decision: ConcreteMediaDecision;
+  turnId: string;
+  turnMode: ReturnType<typeof resolveTurnMode>;
+  planId: string;
+  voiceConversationMode: NonNullable<UseLocalChatTurnSendInput['voiceConversationMode']>;
+  beatIndex: number;
+}): PreparedAssistantDelivery {
+  const beatId = input.decision.intent.pendingMessageId;
+  const beat: OrchestratedBeat = {
+    beatId,
+    turnId: input.turnId,
+    beatIndex: input.beatIndex,
+    beatCount: input.beatIndex + 1,
+    intent: 'media',
+    relationMove: input.turnMode,
+    sceneMove: 'media',
+    modality: input.decision.intent.type,
+    text: '',
+    pauseMs: 420,
+    cancellationScope: 'tail',
+    assetRequest: {
+      kind: input.decision.intent.type,
+      prompt: input.decision.intent.prompt,
+      confidence: input.decision.intent.plannerConfidence ?? 0.65,
+      nsfwIntent: input.decision.intent.plannerSuggestsNsfw ? 'suggested' : 'none',
+    },
+  };
+  return {
+    id: beatId,
+    kind: input.decision.intent.type,
+    content: '',
+    delayMs: beat.pauseMs,
+    beat,
+    meta: {
+      interactionPlanId: input.planId,
+      planId: input.planId,
+      turnId: input.turnId,
+      beatId,
+      beatIndex: beat.beatIndex,
+      beatCount: beat.beatCount,
+      beatModality: input.decision.intent.type,
+      pauseMs: beat.pauseMs,
+      relationMove: beat.relationMove,
+      sceneMove: beat.sceneMove,
+      turnMode: input.turnMode,
+      voiceConversationMode: input.voiceConversationMode,
+      segmentId: beatId,
+      segmentIndex: beat.beatIndex + 1,
+      segmentCount: beat.beatCount,
+      intent: beat.intent,
+      mediaType: input.decision.intent.type,
+      mediaPrompt: input.decision.intent.prompt,
+      mediaPlannerTrigger: input.decision.intent.plannerTrigger,
+      mediaPlannerConfidence: input.decision.intent.plannerConfidence,
+      mediaIntentSource: input.decision.intent.source,
+    },
+  };
+}
+
 function buildAssistantDeliveries(input: {
   beats: OrchestratedBeat[];
   planId: string;
@@ -586,18 +646,6 @@ export async function runLocalChatTurnSend(input: {
       voiceConversationMode: effectiveVoiceConversationMode,
     });
 
-    const totalBeatCount = 1 + deliveries.length;
-    deliveries.forEach((delivery) => {
-      delivery.beat = {
-        ...delivery.beat,
-        beatCount: totalBeatCount,
-      };
-      delivery.meta = {
-        ...(delivery.meta || {}),
-        beatCount: totalBeatCount,
-        segmentCount: totalBeatCount,
-      };
-    });
     const latencyMs = firstBeatResult.latencyMs;
     const nsfwPolicy = resolvedExperiencePolicy.mediaPolicy.nsfwPolicy;
     const mediaRouteReady = {
@@ -614,6 +662,7 @@ export async function runLocalChatTurnSend(input: {
         routeOptionsRevision: context.videoRouteOptionsRevision,
       }),
     };
+    const plannedBeatCount = 1 + deliveries.length;
     const firstMediaBeat = deliveries.find((delivery) => delivery.kind === 'image' || delivery.kind === 'video')?.beat || null;
     const firstMediaIntent = firstMediaBeat
       ? toMarkerOverrideIntent({
@@ -628,7 +677,7 @@ export async function runLocalChatTurnSend(input: {
       routeBinding,
       chatRouteOptions: context.chatRouteOptions,
       planner: 'stream',
-      planSegments: totalBeatCount,
+      planSegments: plannedBeatCount,
       voiceSegments: deliveries.filter((delivery) => delivery.kind === 'voice').length,
       textSegments: 1 + deliveries.filter((delivery) => delivery.kind === 'text').length,
       schedulerTotalDelayMs: deliveries.reduce((sum, delivery) => sum + (Number(delivery.delayMs) || 0), 0),
@@ -712,12 +761,24 @@ export async function runLocalChatTurnSend(input: {
     let mediaDecision: MediaExecutionDecision = rawMediaDecision;
     let mediaDeliveryId: string | null = null;
     if (rawMediaDecision.kind !== 'none') {
-      const mediaDelivery = deliveries.find((item) => item.kind === 'image' || item.kind === 'video')
+      let mediaDelivery = deliveries.find((item) => item.kind === 'image' || item.kind === 'video')
         || deliveries.find((item) => item.kind === 'text')
         || (rawMediaDecision.intent.source === 'explicit'
           ? deliveries.find((item) => item.kind === 'voice') || null
           : null)
         || null;
+      if (!mediaDelivery && deliveries.length === 0) {
+        mediaDelivery = createStandaloneMediaDelivery({
+          decision: rawMediaDecision,
+          turnId,
+          turnMode,
+          planId: plan.planId,
+          voiceConversationMode: effectiveVoiceConversationMode,
+          beatIndex: 1,
+        });
+        deliveries.push(mediaDelivery);
+        orchestratedTailBeats.push(mediaDelivery.beat);
+      }
       if (mediaDelivery) {
         mediaDeliveryId = mediaDelivery.id;
         const boundMediaDecision = bindMediaDecisionToDelivery(rawMediaDecision, mediaDelivery.id);
@@ -747,6 +808,25 @@ export async function runLocalChatTurnSend(input: {
         }
       }
     }
+    const totalBeatCount = 1 + deliveries.length;
+    deliveries.forEach((delivery) => {
+      delivery.beat = {
+        ...delivery.beat,
+        beatCount: totalBeatCount,
+      };
+      delivery.meta = {
+        ...(delivery.meta || {}),
+        beatCount: totalBeatCount,
+        segmentCount: totalBeatCount,
+      };
+    });
+    latestPromptTrace = {
+      ...latestPromptTrace,
+      planSegments: totalBeatCount,
+      voiceSegments: deliveries.filter((delivery) => delivery.kind === 'voice').length,
+      textSegments: 1 + deliveries.filter((delivery) => delivery.kind === 'text').length,
+      schedulerTotalDelayMs: deliveries.reduce((sum, delivery) => sum + (Number(delivery.delayMs) || 0), 0),
+    };
     context.setLatestPromptTrace(latestPromptTrace);
 
     const finalizedFirstBeatMessage: ChatMessage = {
@@ -932,6 +1012,7 @@ export async function runLocalChatTurnSend(input: {
             setSessions: context.setSessions,
             promptTrace: null,
             turnAudit: null,
+            messageMeta: delivery.meta,
             sendContextKey,
             getCurrentContextKey: input.getCurrentContextKey,
           });

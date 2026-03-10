@@ -189,6 +189,7 @@ const enLocale = {
     today: 'Today',
     yesterday: 'Yesterday',
     stageLabel: 'Live Stage',
+    stageMomentLabel: 'This Moment',
     stageFallback: 'Agent',
     stageWithBeats: '{{count}} reply beats in this turn',
     stageHint: 'The current turn plays here first, while history stays below.',

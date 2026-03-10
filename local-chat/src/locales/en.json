@@ -163,6 +163,7 @@
     "voiceTranscribing": "Transcribing voice...",
     "voiceFailed": "Voice transcription failed. Check STT route and retry.",
     "stageLabel": "Live Stage",
+    "stageMomentLabel": "This Moment",
     "stageFallback": "Agent",
     "stageWithBeats": "{{count}} reply beats in this turn",
     "stageHint": "The current turn plays here first, while history stays below.",

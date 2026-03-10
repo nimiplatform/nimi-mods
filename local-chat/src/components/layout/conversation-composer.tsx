@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { LocalChatConversationViewMode } from '../../hooks/controller/use-local-chat-conversation-view-mode.js';
+import { LOCAL_CHAT_CONVERSATION_WIDTH_CLASS } from './chat-layout-width.js';
 import type { LocalChatTargetItem, VoiceInputState } from './types.js';
 
 type ConversationComposerProps = {
@@ -19,6 +20,7 @@ type ConversationComposerProps = {
   onSend: () => void;
   canSend: boolean;
   runtimeReady: boolean;
+  widthClassName?: string;
 };
 
 const MIN_TEXTAREA_HEIGHT_PX = 48;
@@ -40,6 +42,7 @@ export const ConversationComposer = React.memo(function ConversationComposer({
   onSend,
   canSend,
   runtimeReady,
+  widthClassName = LOCAL_CHAT_CONVERSATION_WIDTH_CLASS,
 }: ConversationComposerProps) {
   const { t } = useModTranslation('local-chat');
   const isRecording = voiceInputState === 'recording';
@@ -111,7 +114,7 @@ export const ConversationComposer = React.memo(function ConversationComposer({
 
   return (
     <div className={`shrink-0 px-5 pb-5 ${mode === 'stage' ? 'pt-1' : 'pt-2'}`}>
-      <div className={`mx-auto max-w-[860px] ${isRecording ? 'rounded-[28px] border border-rose-200/80 bg-[linear-gradient(180deg,rgba(255,241,242,0.96),rgba(255,255,255,0.94))] shadow-[0_18px_40px_rgba(244,63,94,0.12)]' : ''}`}>
+      <div className={`mx-auto ${widthClassName} ${isRecording ? 'rounded-[28px] border border-rose-200/80 bg-[linear-gradient(180deg,rgba(255,241,242,0.96),rgba(255,255,255,0.94))] shadow-[0_18px_40px_rgba(244,63,94,0.12)]' : ''}`}>
         {showRuntimeInlineHint ? (
           <div className="mb-3 rounded-2xl border border-amber-200/80 bg-amber-50/90 px-4 py-2 text-sm text-amber-800 shadow-[0_12px_24px_rgba(217,119,6,0.08)]">
             {t('MessagePane.runtimeInlinePending')}
