@@ -11,7 +11,7 @@
   - `local-chat/spec/**`
   - `re-life/spec/**`
   - `mint-you/spec/**`
-  - `test-chat-tts/spec/**`
+  - `test-ai/spec/**`
   - `narrative-engine/spec/**`
   - `textplay/spec/**`
   - `videoplay/spec/**`
