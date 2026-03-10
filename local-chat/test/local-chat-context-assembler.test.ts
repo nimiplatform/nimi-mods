@@ -171,3 +171,232 @@ test('context assembler derives interaction profile, pacing plan, and prompt lan
   assert.match(compiled.prompt, /关系槽位记忆/u);
   assert.match(compiled.prompt, /用户期待和助手一起看烟花/u);
 });
+
+test('context assembler prioritizes unresolved continuity and trims session recall to top-k', async () => {
+  await resetLocalChatConversationLedgerForTests();
+  const target = createTarget();
+  const session = await createLocalChatSession({
+    targetId: target.id,
+    viewerId: 'viewer.test',
+    worldId: target.worldId,
+    title: 'Aki',
+  });
+
+  await upsertLocalChatInteractionSnapshot({
+    conversationId: session.id,
+    relationshipState: 'warm',
+    activeScene: ['night-walk'],
+    emotionalTemperature: 'warm',
+    assistantCommitments: ['我会提醒你去散步'],
+    userPrefs: ['喜欢短句和停顿'],
+    openLoops: ['说好了今晚去散步'],
+    topicThreads: ['夜聊', '散步'],
+    lastResolvedTurnId: 'turn-last',
+    conversationDirective: null,
+    conversationMomentum: 'steady',
+    updatedAt: '2026-03-08T00:00:00.000Z',
+  });
+  await replaceLocalChatRelationMemorySlots({
+    targetId: target.id,
+    viewerId: 'viewer.test',
+    entries: [
+      {
+        id: 'slot-promise',
+        targetId: target.id,
+        viewerId: 'viewer.test',
+        slotType: 'promise',
+        key: 'walk-promise',
+        value: '说好了今晚去散步',
+        confidence: 0.76,
+        portability: 'local-only',
+        sensitivity: 'personal',
+        userOverride: 'inherit',
+        updatedAt: '2026-03-08T00:00:00.000Z',
+      },
+      {
+        id: 'slot-preference',
+        targetId: target.id,
+        viewerId: 'viewer.test',
+        slotType: 'preference',
+        key: 'preferred-rhythm',
+        value: '喜欢短句和停顿',
+        confidence: 0.92,
+        portability: 'portable',
+        sensitivity: 'safe',
+        userOverride: 'inherit',
+        updatedAt: '2026-03-08T00:00:00.000Z',
+      },
+    ],
+  });
+  await replaceLocalChatRecallIndex({
+    conversationId: session.id,
+    docs: Array.from({ length: 8 }, (_, index) => ({
+      id: `recall-${index + 1}`,
+      conversationId: session.id,
+      sourceTurnId: index === 0 ? 'turn-last' : null,
+      text: index === 0
+        ? '你们说好了今晚去散步。'
+        : `普通历史片段 ${index + 1}`,
+      createdAt: `2026-03-0${Math.min(index + 1, 8)}T00:00:00.000Z`,
+      updatedAt: `2026-03-0${Math.min(index + 1, 8)}T00:00:00.000Z`,
+    })),
+  });
+
+  const packet = await assembleLocalChatContextPacket({
+    text: '你还记得我们说好的那个安排吗？',
+    viewerId: 'viewer.test',
+    viewerDisplayName: 'Viewer',
+    selectedTarget: target,
+    selectedSessionId: session.id,
+    allowMultiReply: true,
+    turnMode: 'information',
+    voiceConversationMode: 'off',
+  });
+
+  assert.equal(packet.relationMemorySlots.some((slot) => slot.id === 'slot-promise'), true);
+  assert.equal(packet.sessionRecall.length, 6);
+  assert.equal(packet.sessionRecall[0]?.text, '你们说好了今晚去散步。');
+  assert.equal(packet.diagnostics.sessionRecallCount, 6);
+});
+
+test('context assembler omits the just-persisted user turn from recent turns so userInput is not duplicated', async () => {
+  await resetLocalChatConversationLedgerForTests();
+  const target = createTarget();
+  const session = await createLocalChatSession({
+    targetId: target.id,
+    viewerId: 'viewer.test',
+    worldId: target.worldId,
+    title: 'Aki',
+  });
+
+  await appendTurnsToSession(session.id, [
+    {
+      id: 'turn-user-current',
+      role: 'user',
+      kind: 'text',
+      content: '今晚也想和你慢慢聊。',
+      contextText: '今晚也想和你慢慢聊。',
+      semanticSummary: '',
+      timestamp: '2026-03-08T09:00:00.000Z',
+      bundleId: '',
+      bundleSeq: 0,
+    },
+  ]);
+
+  const packet = await assembleLocalChatContextPacket({
+    text: '今晚也想和你慢慢聊。',
+    viewerId: 'viewer.test',
+    viewerDisplayName: 'Viewer',
+    selectedTarget: target,
+    selectedSessionId: session.id,
+    allowMultiReply: true,
+    turnMode: 'checkin',
+    voiceConversationMode: 'off',
+  });
+  const compiled = buildLocalChatCompiledPrompt({
+    contextPacket: packet,
+    profile: 'first-beat',
+  });
+
+  assert.equal(packet.recentTurns.length, 0);
+  assert.match(compiled.prompt, /用户这次说：今晚也想和你慢慢聊。/u);
+  assert.doesNotMatch(compiled.prompt, /Assistant #/u);
+  assert.doesNotMatch(compiled.prompt, /User #1[\s\S]*今晚也想和你慢慢聊。/u);
+});
+
+test('first-beat prompt profile excludes warm-start and session recall while keeping continuity lanes', async () => {
+  await resetLocalChatConversationLedgerForTests();
+  const target = createTarget();
+  const session = await createLocalChatSession({
+    targetId: target.id,
+    viewerId: 'viewer.test',
+    worldId: target.worldId,
+    title: 'Aki',
+  });
+
+  const packet = await assembleLocalChatContextPacket({
+    text: '今晚还是有点想继续聊下去。',
+    viewerId: 'viewer.test',
+    viewerDisplayName: 'Viewer',
+    selectedTarget: target,
+    selectedSessionId: session.id,
+    allowMultiReply: true,
+    turnMode: 'emotional',
+    voiceConversationMode: 'off',
+  });
+
+  const enrichedPacket = {
+    ...packet,
+    interactionSnapshot: {
+      conversationId: session.id,
+      relationshipState: 'warm' as const,
+      activeScene: ['night-walk'],
+      emotionalTemperature: 'warm' as const,
+      assistantCommitments: ['今晚继续陪着你'],
+      userPrefs: ['喜欢短句和停顿'],
+      openLoops: ['今晚还想继续聊'],
+      topicThreads: ['夜聊'],
+      lastResolvedTurnId: 'turn-last',
+      conversationDirective: null,
+      conversationMomentum: 'steady' as const,
+      updatedAt: '2026-03-08T00:00:00.000Z',
+    },
+    relationMemorySlots: [
+      {
+        id: 'slot-1',
+        targetId: target.id,
+        viewerId: 'viewer.test',
+        slotType: 'preference' as const,
+        key: 'preferred-rhythm',
+        value: '喜欢短句和停顿',
+        confidence: 0.92,
+        portability: 'portable' as const,
+        sensitivity: 'safe' as const,
+        userOverride: 'inherit' as const,
+        updatedAt: '2026-03-08T00:00:00.000Z',
+      },
+    ],
+    platformWarmStart: {
+      core: ['平台预热 core 记忆'],
+      e2e: ['平台预热 e2e 记忆'],
+      recallSource: 'local-index+remote-backfill' as const,
+      entityId: target.id,
+    },
+    sessionRecall: [
+      {
+        id: 'recall-a',
+        text: '这条历史召回不应该进入 first-beat prompt。',
+        sourceKind: 'recall-index' as const,
+        sourceTurnId: 'turn-a',
+      },
+    ],
+    recentTurns: Array.from({ length: 6 }, (_, index) => ({
+      id: `recent-${index + 1}`,
+      seq: index + 1,
+      role: index % 2 === 0 ? 'user' as const : 'assistant' as const,
+      lines: [`最近对话 ${index + 1}`],
+    })),
+  };
+
+  const fullTurnCompiled = buildLocalChatCompiledPrompt({
+    contextPacket: enrichedPacket,
+    profile: 'full-turn',
+  });
+  const firstBeatCompiled = buildLocalChatCompiledPrompt({
+    contextPacket: enrichedPacket,
+    profile: 'first-beat',
+  });
+
+  assert.equal(fullTurnCompiled.profile, 'full-turn');
+  assert.equal(firstBeatCompiled.profile, 'first-beat');
+  assert.match(fullTurnCompiled.prompt, /平台预热 core 记忆/u);
+  assert.match(fullTurnCompiled.prompt, /这条历史召回不应该进入 first-beat prompt/u);
+  assert.doesNotMatch(firstBeatCompiled.prompt, /平台预热 core 记忆/u);
+  assert.doesNotMatch(firstBeatCompiled.prompt, /这条历史召回不应该进入 first-beat prompt/u);
+  assert.equal(firstBeatCompiled.retrieval.sessionRecallCount, 0);
+  assert.equal(firstBeatCompiled.retrieval.recentTurnCount, 4);
+  assert.equal(firstBeatCompiled.layers.find((layer) => layer.layer === 'interactionState')?.applied, true);
+  assert.equal(firstBeatCompiled.layers.find((layer) => layer.layer === 'relationMemory')?.applied, true);
+  assert.equal(firstBeatCompiled.layerOrder.includes('platformWarmStart'), false);
+  assert.equal(firstBeatCompiled.layerOrder.includes('sessionRecall'), false);
+});

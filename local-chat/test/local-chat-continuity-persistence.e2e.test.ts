@@ -40,13 +40,6 @@ test('send-flow continuity persists preference and promise across a neutral foll
       firstBeatText: '好，我记住了。',
       planBeats: [
         {
-          text: '__FIRST_BEAT_LOCKED__',
-          intent: 'answer',
-          relationMove: 'comfort-warm',
-          sceneMove: 'rainy-night',
-          pauseMs: 0,
-        },
-        {
           text: '等我一下，之后我会提醒你一起去散步。',
           intent: 'invite',
           relationMove: 'invite-closer',
@@ -85,13 +78,6 @@ test('send-flow continuity persists preference and promise across a neutral foll
     const secondAi = createScriptedAiClient({
       firstBeatText: '嗯，今天天气还挺安静的。',
       planBeats: [
-        {
-          text: '__FIRST_BEAT_LOCKED__',
-          intent: 'answer',
-          relationMove: 'friendly',
-          sceneMove: 'weather-chat',
-          pauseMs: 0,
-        },
         {
           text: '不过我还记得你喜欢那种雨夜里慢慢聊的感觉。',
           intent: 'clarify',
@@ -167,13 +153,6 @@ test('relation-memory override survives automatic slot regeneration on later tur
       firstBeatText: '我记住了。',
       planBeats: [
         {
-          text: '__FIRST_BEAT_LOCKED__',
-          intent: 'answer',
-          relationMove: 'friendly',
-          sceneMove: 'chat',
-          pauseMs: 0,
-        },
-        {
           text: '你喜欢短句这件事，我会一直照顾到。',
           intent: 'clarify',
           relationMove: 'friendly',
@@ -214,15 +193,7 @@ test('relation-memory override survives automatic slot regeneration on later tur
 
     const secondAi = createScriptedAiClient({
       firstBeatText: '嗯，我在调整节奏。',
-      planBeats: [
-        {
-          text: '__FIRST_BEAT_LOCKED__',
-          intent: 'answer',
-          relationMove: 'friendly',
-          sceneMove: 'chat',
-          pauseMs: 0,
-        },
-      ],
+      planBeats: [],
     });
     await harness.executeTurn({
       userText: '那我们继续。',

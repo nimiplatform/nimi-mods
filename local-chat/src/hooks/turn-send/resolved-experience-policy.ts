@@ -25,7 +25,7 @@ export type ResolvedExperiencePolicy = {
     routeSource: 'local' | 'cloud';
     nsfwPolicy: 'disabled' | 'local-only' | 'allowed';
     allowVisualAuto: boolean;
-    allowAutoVisualHighRisk: false;
+    allowAutoVisualHighRisk: boolean;
   };
   contentBoundary: {
     relationshipBoundaryPreset: LocalChatDefaultSettings['relationshipBoundaryPreset'];
@@ -69,6 +69,52 @@ function resolveNsfwPolicy(input: {
   return 'disabled';
 }
 
+function deriveDeliveryStyle(input: {
+  interactionProfile: DerivedInteractionProfile;
+  interactionSnapshot: InteractionSnapshot | null;
+}): LocalChatDefaultSettings['deliveryStyle'] {
+  const snapshot = input.interactionSnapshot;
+  if (
+    snapshot
+    && (
+      snapshot.openLoops.length > 0
+      || snapshot.assistantCommitments.length > 0
+      || snapshot.relationshipState === 'warm'
+      || snapshot.relationshipState === 'intimate'
+    )
+  ) {
+    return 'natural';
+  }
+  if (
+    snapshot
+    && snapshot.conversationMomentum === 'cooling'
+    && (snapshot.relationshipState === 'new' || snapshot.relationshipState === 'friendly')
+    && snapshot.openLoops.length === 0
+    && snapshot.assistantCommitments.length === 0
+  ) {
+    return 'compact';
+  }
+  return input.interactionProfile.expression.pacingBias === 'reserved'
+    ? 'compact'
+    : 'natural';
+}
+
+function deriveRelationshipBoundaryPreset(input: {
+  interactionProfile: DerivedInteractionProfile;
+  interactionSnapshot: InteractionSnapshot | null;
+}): LocalChatDefaultSettings['relationshipBoundaryPreset'] {
+  const relationshipState = input.interactionSnapshot?.relationshipState || 'new';
+  const intimacyGuard = input.interactionProfile.relationship.intimacyGuard;
+  const flirtAffinity = input.interactionProfile.relationship.flirtAffinity;
+  if (intimacyGuard === 'strict' || flirtAffinity === 'none' || relationshipState === 'new') {
+    return 'reserved';
+  }
+  if (intimacyGuard === 'open' && flirtAffinity === 'high' && relationshipState === 'intimate') {
+    return 'close';
+  }
+  return 'balanced';
+}
+
 export function compileResolvedExperiencePolicy(input: {
   interactionProfile: DerivedInteractionProfile;
   interactionSnapshot: InteractionSnapshot | null;
@@ -79,10 +125,18 @@ export function compileResolvedExperiencePolicy(input: {
   const routeSource = resolveRouteSource(input.routeSource);
   const relationshipState = input.interactionSnapshot?.relationshipState || 'new';
   const selectedVoiceId = String(input.settings.voiceName || input.interactionProfile.voice.voiceId || '').trim() || null;
+  const deliveryStyle = deriveDeliveryStyle({
+    interactionProfile: input.interactionProfile,
+    interactionSnapshot: input.interactionSnapshot,
+  });
+  const relationshipBoundaryPreset = deriveRelationshipBoundaryPreset({
+    interactionProfile: input.interactionProfile,
+    interactionSnapshot: input.interactionSnapshot,
+  });
   return {
     deliveryPolicy: {
-      style: input.settings.deliveryStyle,
-      allowMultiReply: input.settings.deliveryStyle === 'natural',
+      style: deliveryStyle,
+      allowMultiReply: deliveryStyle === 'natural',
     },
     voicePolicy: {
       enabled: input.settings.enableVoice,
@@ -104,10 +158,10 @@ export function compileResolvedExperiencePolicy(input: {
         settings: input.settings,
       }),
       allowVisualAuto: input.settings.mediaAutonomy === 'natural' && input.settings.visualComfortLevel !== 'text-only',
-      allowAutoVisualHighRisk: false,
+      allowAutoVisualHighRisk: relationshipBoundaryPreset === 'close',
     },
     contentBoundary: {
-      relationshipBoundaryPreset: input.settings.relationshipBoundaryPreset,
+      relationshipBoundaryPreset,
       visualComfortLevel: input.settings.visualComfortLevel,
       routeSource,
       relationshipState,

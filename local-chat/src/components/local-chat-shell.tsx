@@ -46,6 +46,7 @@ export function LocalChatShell(props: LocalChatShellProps) {
     runtimeSidebarProps,
     messages,
     isSending,
+    sendPhase,
     currentUserDisplayName,
     currentUserAvatarUrl,
     playingVoiceMessageId,
@@ -130,6 +131,7 @@ export function LocalChatShell(props: LocalChatShellProps) {
                 interactionSnapshot={activeInteractionSnapshot}
                 hasInputText={hasInputText}
                 isSending={isSending}
+                sendPhase={sendPhase}
                 messages={messages}
                 playingVoiceMessageId={playingVoiceMessageId}
                 onBackToTargetStage={() => {
@@ -164,6 +166,7 @@ export function LocalChatShell(props: LocalChatShellProps) {
                 messages={messages}
                 loadingSessions={loadingSessions}
                 isSending={isSending}
+                sendPhase={sendPhase}
                 currentUserDisplayName={currentUserDisplayName}
                 currentUserAvatarUrl={currentUserAvatarUrl}
                 playingVoiceMessageId={playingVoiceMessageId}

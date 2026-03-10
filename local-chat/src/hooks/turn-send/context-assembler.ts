@@ -5,14 +5,15 @@ import {
   listLocalChatExactHistoryTurns,
   listLocalChatRecallIndex,
   listLocalChatRelationMemorySlots,
-  type DerivedInteractionProfile,
-  type LocalChatContextRecentTurn,
-  type LocalChatContextPacket,
-  type LocalChatReplyPacingPlan,
-  type LocalChatTurn,
-  type LocalChatTurnMode,
-  type VoiceConversationMode,
-} from '../../state/index.js';
+    type DerivedInteractionProfile,
+    type LocalChatContextRecentTurn,
+    type LocalChatContextPacket,
+    type LocalChatReplyPacingPlan,
+    type RelationMemorySlot,
+    type LocalChatTurn,
+    type LocalChatTurnMode,
+    type VoiceConversationMode,
+  } from '../../state/index.js';
 import { deriveInteractionProfile } from './interaction-profile.js';
 
 export type AssembleLocalChatContextPacketInput = {
@@ -43,6 +44,11 @@ function asStringArray(value: unknown): string[] {
 
 function lexicalScore(haystack: string, query: string): number {
   const normalizedHaystack = haystack.toLowerCase();
+  const normalizedQuery = query.toLowerCase().trim();
+  if (!normalizedHaystack || !normalizedQuery) return 0;
+  if (normalizedHaystack.includes(normalizedQuery) || normalizedQuery.includes(normalizedHaystack)) {
+    return 1;
+  }
   const tokens = query
     .toLowerCase()
     .split(/[\s,.;:!?/\\|()[\]{}"'`]+/)
@@ -56,6 +62,11 @@ function lexicalScore(haystack: string, query: string): number {
     if (normalizedHaystack.includes(token)) hits += 1;
   }
   return hits / tokens.length;
+}
+
+function referenceScore(haystack: string, query: string): number {
+  const score = lexicalScore(haystack, query);
+  return score > 0 ? score : 0;
 }
 
 function recencyScore(updatedAt: string): number {
@@ -103,6 +114,8 @@ const EMOTIONAL_RE = /难过|好累|很累|烦|崩溃|想哭|孤单|害怕|抱�
 const EXCITED_RE = /(?:[!！]{2,}|哈哈|hh+|lol|好耶|太好了|天啊|卧槽|真的耶|笑死)/iu;
 
 const HIGH_EMOTION_RE = /难过|崩溃|想哭|害怕|焦虑|孤单|委屈|绝望|恐惧|暴怒/u;
+const CONTINUATION_RE = /继续|还记得|刚才|说好的|上次|之前那个|那件事|remember|continue|we said|earlier|last time/iu;
+const PREFERENCE_QUERY_RE = /喜欢|偏好|风格|节奏|语气|短句|交流|怎么聊|prefer|style|pace|tone|voice|image/iu;
 
 type ApproachPacingHint = {
   energyOverride?: LocalChatReplyPacingPlan['energy'];
@@ -307,12 +320,167 @@ function buildRecentTurns(turns: LocalChatTurn[]): LocalChatContextRecentTurn[] 
   return [...grouped.values()].sort((left, right) => left.seq - right.seq);
 }
 
+function normalizeComparableTurnText(value: string): string {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function trimEchoedCurrentUserTurn(input: {
+  recentTurns: LocalChatContextRecentTurn[];
+  userInput: string;
+}): LocalChatContextRecentTurn[] {
+  const turns = [...input.recentTurns];
+  if (!turns.length) return turns;
+  const lastTurn = turns[turns.length - 1];
+  if (!lastTurn || lastTurn.role !== 'user') {
+    return turns;
+  }
+  const userInput = normalizeComparableTurnText(input.userInput);
+  if (!userInput) {
+    return turns;
+  }
+  const lastTurnText = normalizeComparableTurnText(lastTurn.lines.join(' '));
+  if (lastTurnText && lastTurnText === userInput) {
+    turns.pop();
+  }
+  return turns;
+}
+
+function continuityReferenceBoost(input: {
+  text: string;
+  snapshot: LocalChatContextPacket['interactionSnapshot'];
+  continuationLike: boolean;
+}): number {
+  if (!input.snapshot) return 0;
+  const openLoopScore = Math.max(
+    0,
+    ...input.snapshot.openLoops.map((value) => referenceScore(input.text, value)),
+  );
+  const commitmentScore = Math.max(
+    0,
+    ...input.snapshot.assistantCommitments.map((value) => referenceScore(input.text, value)),
+  );
+  const topicScore = Math.max(
+    0,
+    ...input.snapshot.topicThreads.map((value) => referenceScore(input.text, value)),
+  );
+  const strongBoost = input.continuationLike ? 0.52 : 0.2;
+  const topicBoost = input.continuationLike ? 0.18 : 0.08;
+  return (
+    Math.max(openLoopScore, commitmentScore) * strongBoost
+    + topicScore * topicBoost
+  );
+}
+
+function pushUniqueById<T extends { id: string }>(target: T[], item: T | null | undefined): void {
+  if (!item) return;
+  if (target.some((entry) => entry.id === item.id)) return;
+  target.push(item);
+}
+
+function selectSessionRecall(
+  docs: LocalChatContextPacket['recallIndex'],
+  query: string,
+  snapshot: LocalChatContextPacket['interactionSnapshot'],
+): LocalChatContextPacket['sessionRecall'] {
+  const entries = docs || [];
+  if (entries.length === 0) return [];
+  const continuationLike = CONTINUATION_RE.test(query);
+  const strongReferences = [
+    ...(snapshot?.openLoops || []),
+    ...(snapshot?.assistantCommitments || []),
+  ];
+  const mustCarry = continuationLike
+    ? [...entries]
+      .map((doc, index) => ({
+        doc,
+        score: Math.max(
+          ...strongReferences.map((value) => referenceScore(doc.text, value)),
+          0,
+        ) + ((snapshot?.lastResolvedTurnId && doc.sourceTurnId === snapshot.lastResolvedTurnId) ? 0.25 : 0),
+        index,
+      }))
+      .filter((item) => item.score > 0.12)
+      .sort((left, right) => right.score - left.score || right.index - left.index)
+      .slice(0, 2)
+      .map((item) => item.doc)
+    : [];
+  const selected: typeof mustCarry = [];
+  mustCarry.forEach((doc) => pushUniqueById(selected, doc));
+  [...entries]
+    .map((doc, index) => ({
+      doc,
+      score: (
+        lexicalScore(doc.text, query) * 1.45
+        + continuityReferenceBoost({
+          text: doc.text,
+          snapshot,
+          continuationLike,
+        })
+        + ((snapshot?.lastResolvedTurnId && doc.sourceTurnId === snapshot.lastResolvedTurnId) ? 0.28 : 0)
+        + ((entries.length - index) / Math.max(1, entries.length)) * 0.18
+      ),
+      index,
+    }))
+    .sort((left, right) => right.score - left.score || right.index - left.index)
+    .forEach((item) => {
+      if (selected.length >= 6) return;
+      pushUniqueById(selected, item.doc);
+    });
+  return selected
+    .slice(0, 6)
+    .map((doc) => ({
+      id: doc.id,
+      text: doc.text,
+      sourceKind: doc.sourceTurnId ? 'turn' as const : 'recall-index' as const,
+      sourceTurnId: doc.sourceTurnId,
+    }));
+}
+
 function selectRelationMemorySlots(
   slots: LocalChatContextPacket['relationMemorySlots'],
   query: string,
+  snapshot: LocalChatContextPacket['interactionSnapshot'],
 ): LocalChatContextPacket['relationMemorySlots'] {
   const entries = slots || [];
-  return [...entries]
+  const continuationLike = CONTINUATION_RE.test(query);
+  const preferenceLike = PREFERENCE_QUERY_RE.test(query);
+  const mustCarry: RelationMemorySlot[] = [];
+  if (continuationLike && snapshot) {
+    [...entries]
+      .filter((entry) => entry.slotType === 'promise' || entry.slotType === 'rapport' || entry.slotType === 'preference')
+      .map((entry) => ({
+        entry,
+        score: Math.max(
+          ...[
+            ...snapshot.openLoops,
+            ...snapshot.assistantCommitments,
+          ].map((value) => referenceScore(`${entry.key} ${entry.value}`, value)),
+          0,
+        ),
+      }))
+      .filter((item) => item.score > 0.12)
+      .sort((left, right) => right.score - left.score || right.entry.updatedAt.localeCompare(left.entry.updatedAt))
+      .slice(0, 2)
+      .forEach((item) => pushUniqueById(mustCarry, item.entry));
+  }
+  if (preferenceLike) {
+    [...entries]
+      .filter((entry) => entry.slotType === 'preference')
+      .map((entry) => ({
+        entry,
+        score: (
+          lexicalScore(`${entry.key} ${entry.value}`, query) * 1.4
+          + entry.confidence
+          + relationSlotTypeBoost(entry.slotType, query)
+        ),
+      }))
+      .sort((left, right) => right.score - left.score || right.entry.updatedAt.localeCompare(left.entry.updatedAt))
+      .slice(0, 1)
+      .forEach((item) => pushUniqueById(mustCarry, item.entry));
+  }
+  const ranked = [...entries]
     .map((entry) => ({
       entry,
       score: (
@@ -320,11 +488,22 @@ function selectRelationMemorySlots(
         + entry.confidence
         + recencyScore(entry.updatedAt)
         + relationSlotTypeBoost(entry.slotType, query)
+        + continuityReferenceBoost({
+          text: `${entry.key} ${entry.value}`,
+          snapshot,
+          continuationLike,
+        })
       ),
     }))
     .sort((left, right) => right.score - left.score || right.entry.updatedAt.localeCompare(left.entry.updatedAt))
-    .slice(0, 8)
     .map((item) => item.entry);
+  const selected: RelationMemorySlot[] = [];
+  mustCarry.forEach((entry) => pushUniqueById(selected, entry));
+  ranked.forEach((entry) => {
+    if (selected.length >= 8) return;
+    pushUniqueById(selected, entry);
+  });
+  return selected.slice(0, 8);
 }
 
 function toWarmStartMemory(result: LocalChatMemoryRecallResult | null): LocalChatContextPacket['platformWarmStart'] {
@@ -350,7 +529,10 @@ export async function assembleLocalChatContextPacket(input: AssembleLocalChatCon
   ]);
 
   const interactionProfile = deriveInteractionProfile(input.selectedTarget);
-  const recentTurns = buildRecentTurns(recentTurnsRaw);
+  const recentTurns = trimEchoedCurrentUserTurn({
+    recentTurns: buildRecentTurns(recentTurnsRaw),
+    userInput: input.text,
+  });
   const warmStart = !interactionSnapshot && recentTurns.length <= 1
     ? await recallLocalChatMemoryForPrompt({
       target: input.selectedTarget,
@@ -366,7 +548,12 @@ export async function assembleLocalChatContextPacket(input: AssembleLocalChatCon
     allowMultiReply: Boolean(input.allowMultiReply),
     turnMode: input.turnMode,
   });
-  const selectedRelationMemory = selectRelationMemorySlots(relationMemorySlots, input.text);
+  const selectedRelationMemory = selectRelationMemorySlots(
+    relationMemorySlots,
+    input.text,
+    interactionSnapshot,
+  );
+  const selectedSessionRecall = selectSessionRecall(recallIndex, input.text, interactionSnapshot);
 
   return {
     conversationId: input.selectedSessionId,
@@ -390,12 +577,7 @@ export async function assembleLocalChatContextPacket(input: AssembleLocalChatCon
       lines: summarizeWorld(input.selectedTarget),
     },
     platformWarmStart: toWarmStartMemory(warmStart),
-    sessionRecall: recallIndex.map((doc) => ({
-      id: doc.id,
-      text: doc.text,
-      sourceKind: doc.sourceTurnId ? 'turn' : 'recall-index',
-      sourceTurnId: doc.sourceTurnId,
-    })),
+    sessionRecall: selectedSessionRecall,
     recentTurns,
     interactionSnapshot,
     relationMemorySlots: selectedRelationMemory,
@@ -406,7 +588,7 @@ export async function assembleLocalChatContextPacket(input: AssembleLocalChatCon
     userInput: input.text,
     diagnostics: {
       selectedTurnSeqs: recentTurns.map((turn) => turn.seq),
-      sessionRecallCount: recallIndex.length,
+      sessionRecallCount: selectedSessionRecall.length,
     },
   };
 }

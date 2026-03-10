@@ -17,6 +17,8 @@ export type PromptLayerId =
   | 'recentTurns'
   | 'userInput';
 
+export type LocalChatPromptProfile = 'full-turn' | 'first-beat';
+
 export type PromptLayerTrace = {
   layer: PromptLayerId;
   applied: boolean;
@@ -41,16 +43,18 @@ export type PromptRetrievalTrace = {
 
 export type LocalChatCompiledPrompt = {
   prompt: string;
+  profile: LocalChatPromptProfile;
   layerOrder: PromptLayerId[];
   layers: PromptLayerTrace[];
   laneChars: Partial<Record<LocalChatContextLaneId, number>>;
   truncationByLane: Partial<Record<LocalChatContextLaneId, boolean>>;
   budget: PromptBudgetTrace;
   retrieval: PromptRetrievalTrace;
-  compilerVersion: 'v6';
+  compilerVersion: 'v7';
 };
 
 export type LocalChatPromptCompileInput = {
   contextPacket: LocalChatContextPacket;
   maxPromptChars?: number;
+  profile?: LocalChatPromptProfile;
 };

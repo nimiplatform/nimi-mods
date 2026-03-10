@@ -741,6 +741,13 @@ export async function decideMediaExecution(input: DecideMediaExecutionInput): Pr
     if (!canAutoImage && !canAutoVideo) return 'no-ready-media-route';
     if (
       sceneLikelyNsfw
+      && input.nsfwPolicy === 'allowed'
+      && !input.resolvedPolicy.mediaPolicy.allowAutoVisualHighRisk
+    ) {
+      return 'relationship-boundary-blocked';
+    }
+    if (
+      sceneLikelyNsfw
       && !(
         (canAutoImage && isMediaGenerationAllowed({
           policy: input.nsfwPolicy,
@@ -836,6 +843,16 @@ export async function decideMediaExecution(input: DecideMediaExecutionInput): Pr
             return 'scene-signal-too-weak';
           }
           if (preparedResult.intent.type === 'video' && recentMedia.autoVideoCooling) return 'video-cooldown-active';
+          if (
+            input.nsfwPolicy === 'allowed'
+            && (
+              preparedResult.intent.plannerSuggestsNsfw
+              || isPromptLikelyNsfw(preparedResult.intent.prompt)
+            )
+            && !input.resolvedPolicy.mediaPolicy.allowAutoVisualHighRisk
+          ) {
+            return 'relationship-boundary-blocked';
+          }
           const gate = evaluateIntentGate({
             intent: preparedResult.intent,
             defaultSettings: input.defaultSettings,

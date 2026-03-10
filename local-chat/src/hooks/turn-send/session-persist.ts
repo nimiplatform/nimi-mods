@@ -65,6 +65,24 @@ async function refreshSessions(input: {
   input.setSessions(await listLocalChatSessions(input.targetId, input.viewerId));
 }
 
+export async function persistUserTurns(input: {
+  sessionId: string;
+  targetId: string;
+  viewerId: string;
+  userTurns: LocalChatTurn[];
+  setSessions: (sessions: LocalChatSession[]) => void;
+}): Promise<void> {
+  if (!input.userTurns.length) {
+    return;
+  }
+  await appendTurnsToSession(input.sessionId, input.userTurns);
+  await refreshSessions({
+    targetId: input.targetId,
+    viewerId: input.viewerId,
+    setSessions: input.setSessions,
+  });
+}
+
 function buildSegmentContextText(message: ChatMessage): string {
   if (message.kind === 'image' || message.kind === 'video') {
     const shadowText = String(message.meta?.mediaShadow?.shadowText || '').trim();
@@ -112,6 +130,7 @@ export async function scheduleAssistantTurnDeliveries(input: {
   assistantBeatCount?: number;
   deliveries: ScheduledAssistantDelivery[];
   setSessions: (sessions: LocalChatSession[]) => void;
+  skipCreateAssistantTurnRecord?: boolean;
   onScheduleCancelled?: (input: {
     turnTxnId: string;
     reason: LocalChatScheduleCancelReason;
@@ -120,21 +139,24 @@ export async function scheduleAssistantTurnDeliveries(input: {
   }) => void;
 }): Promise<TurnDeliveryScheduleHandle> {
   if (input.userTurns?.length) {
-    await appendTurnsToSession(input.sessionId, input.userTurns);
-    await refreshSessions({
+    await persistUserTurns({
+      sessionId: input.sessionId,
       targetId: input.targetId,
       viewerId: input.viewerId,
+      userTurns: input.userTurns,
       setSessions: input.setSessions,
     });
   }
 
-  await createLocalChatTurnRecord({
-    conversationId: input.sessionId,
-    role: input.assistantRole || 'assistant',
-    turnTxnId: input.turnTxnId,
-    turnId: input.assistantTurnId,
-    beatCount: input.assistantBeatCount || input.deliveries.length,
-  });
+  if (!input.skipCreateAssistantTurnRecord) {
+    await createLocalChatTurnRecord({
+      conversationId: input.sessionId,
+      role: input.assistantRole || 'assistant',
+      turnTxnId: input.turnTxnId,
+      turnId: input.assistantTurnId,
+      beatCount: input.assistantBeatCount || input.deliveries.length,
+    });
+  }
 
   const abortController = new AbortController();
   let cancelReason: LocalChatScheduleCancelReason | null = null;
@@ -227,9 +249,7 @@ export async function commitAssistantMessage(input: {
   turnAudit?: LocalChatTurnAudit | null;
 }) {
   const kind = input.message.kind;
-  console.log(`[commitAssistantMessage] id=${input.messageId}, kind=${kind}, content=${input.message.content?.slice(0, 30)}`);
   if (kind === 'streaming' || kind === 'image-pending' || kind === 'video-pending') {
-    console.log(`[commitAssistantMessage] SKIPPED: kind=${kind} is transient`);
     return;
   }
   input.setMessages((prev) => {
@@ -241,9 +261,7 @@ export async function commitAssistantMessage(input: {
       replaced = true;
       return input.message;
     });
-    const result = replaced ? next : [...prev, input.message];
-    console.log(`[commitAssistantMessage] setMessages: replaced=${replaced}, prevLen=${prev.length}, nextLen=${result.length}`);
-    return result;
+    return replaced ? next : [...prev, input.message];
   });
   await appendBeatToLocalChatTurn({
     conversationId: input.sessionId,

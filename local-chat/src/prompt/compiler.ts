@@ -3,14 +3,16 @@ import type { LocalChatContextLaneId } from '../state/ledger-types.js';
 import type {
   LocalChatCompiledPrompt,
   LocalChatPromptCompileInput,
+  LocalChatPromptProfile,
   PromptLayerId,
   PromptLayerTrace,
 } from './types.js';
 
 const DEFAULT_MAX_PROMPT_CHARS = 24_000;
+const DEFAULT_FIRST_BEAT_MAX_PROMPT_CHARS = 10_000;
 const PROMPT_FORMAT_RESERVE_CHARS = 1_200;
 
-const LAYER_ORDER: PromptLayerId[] = [
+const FULL_TURN_LAYER_ORDER: PromptLayerId[] = [
   'platformSafety',
   'identity',
   'world',
@@ -20,6 +22,17 @@ const LAYER_ORDER: PromptLayerId[] = [
   'relationMemory',
   'platformWarmStart',
   'sessionRecall',
+  'recentTurns',
+  'userInput',
+];
+
+const FIRST_BEAT_LAYER_ORDER: PromptLayerId[] = [
+  'platformSafety',
+  'identity',
+  'turnMode',
+  'interactionProfile',
+  'interactionState',
+  'relationMemory',
   'recentTurns',
   'userInput',
 ];
@@ -120,10 +133,14 @@ function joinLines(title: string, lines: string[]): string {
   return [`${title}:`, ...filtered.map((line) => `- ${line}`)].join('\n');
 }
 
-function renderRecentTurns(input: LocalChatPromptCompileInput['contextPacket']['recentTurns']): string {
-  if (!input.length) return '';
+function renderRecentTurns(
+  turns: LocalChatPromptCompileInput['contextPacket']['recentTurns'],
+  limit = turns.length,
+): string {
+  const recentTurns = turns.slice(-Math.max(0, limit));
+  if (!recentTurns.length) return '';
   const lines: string[] = ['最近精确回合（按时间顺序，只用于 continuity，不要逐条复述）:'];
-  for (const turn of input) {
+  for (const turn of recentTurns) {
     lines.push(`${turn.role === 'assistant' ? 'Assistant' : 'User'} #${turn.seq}`);
     turn.lines.forEach((line: string) => {
       lines.push(`- ${line}`);
@@ -254,6 +271,8 @@ function renderRelationMemory(input: LocalChatPromptCompileInput['contextPacket'
 
 function buildLayerContent(input: LocalChatPromptCompileInput): Record<PromptLayerId, string> {
   const packet = input.contextPacket;
+  const profile = input.profile || 'full-turn';
+  const recentTurnLimit = profile === 'first-beat' ? 4 : packet.recentTurns.length;
   return {
     platformSafety: [
       `你现在扮演 ${packet.target.displayName}（${packet.target.handle}）。请始终保持该角色语气与人设。`,
@@ -304,7 +323,7 @@ function buildLayerContent(input: LocalChatPromptCompileInput): Record<PromptLay
     sessionRecall: renderSessionRecall(packet.sessionRecall)
       ? `历史召回:\n${renderSessionRecall(packet.sessionRecall)}`
       : '',
-    recentTurns: renderRecentTurns(packet.recentTurns),
+    recentTurns: renderRecentTurns(packet.recentTurns, recentTurnLimit),
     userInput: `用户这次说：${packet.userInput || '(empty)'}`,
   };
 }
@@ -359,9 +378,13 @@ function fitLaneBudgets(input: {
 }
 
 export function compileLocalChatPrompt(input: LocalChatPromptCompileInput): LocalChatCompiledPrompt {
+  const profile: LocalChatPromptProfile = input.profile || 'full-turn';
   const maxPromptChars = Number.isFinite(input.maxPromptChars)
     ? Math.max(512, Number(input.maxPromptChars))
-    : DEFAULT_MAX_PROMPT_CHARS;
+    : profile === 'first-beat'
+      ? DEFAULT_FIRST_BEAT_MAX_PROMPT_CHARS
+      : DEFAULT_MAX_PROMPT_CHARS;
+  const layerOrder = profile === 'first-beat' ? FIRST_BEAT_LAYER_ORDER : FULL_TURN_LAYER_ORDER;
   const layerContent = buildLayerContent(input);
   const sections: string[] = [];
   const layers: PromptLayerTrace[] = [];
@@ -371,7 +394,7 @@ export function compileLocalChatPrompt(input: LocalChatPromptCompileInput): Loca
   const truncatedLayers: PromptLayerId[] = [];
   let usedChars = 0;
 
-  for (const layerId of LAYER_ORDER) {
+  for (const layerId of layerOrder) {
     const content = String(layerContent[layerId] || '').trim();
     if (!content) {
       layers.push({
@@ -455,7 +478,8 @@ export function compileLocalChatPrompt(input: LocalChatPromptCompileInput): Loca
   const prompt = sections.join('\n\n');
   const compiled: LocalChatCompiledPrompt = {
     prompt,
-    layerOrder: [...LAYER_ORDER],
+    profile,
+    layerOrder: [...layerOrder],
     layers,
     laneChars,
     truncationByLane,
@@ -467,11 +491,13 @@ export function compileLocalChatPrompt(input: LocalChatPromptCompileInput): Loca
     },
     retrieval: {
       durableMemoryCount: (input.contextPacket.relationMemorySlots || []).length,
-      sessionRecallCount: input.contextPacket.sessionRecall.length,
+      sessionRecallCount: profile === 'first-beat' ? 0 : input.contextPacket.sessionRecall.length,
       worldContextCount: input.contextPacket.world.lines.length,
-      recentTurnCount: input.contextPacket.recentTurns.length,
+      recentTurnCount: profile === 'first-beat'
+        ? Math.min(4, input.contextPacket.recentTurns.length)
+        : input.contextPacket.recentTurns.length,
     },
-    compilerVersion: 'v6',
+    compilerVersion: 'v7',
   };
 
   emitLocalChatLog({

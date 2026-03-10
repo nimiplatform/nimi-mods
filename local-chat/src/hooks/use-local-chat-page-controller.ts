@@ -75,6 +75,7 @@ export function useLocalChatPageController(): LocalChatShellProps {
     runtimeSidebarProps: actions.runtimeSidebarProps,
     messages: state.messages,
     isSending: state.turnSendState.isSending,
+    sendPhase: state.turnSendState.sendPhase,
     currentUserDisplayName: state.currentUserDisplayName,
     currentUserAvatarUrl: state.currentUserAvatarUrl,
     playingVoiceMessageId: state.speechPlaybackState.playingVoiceMessageId,

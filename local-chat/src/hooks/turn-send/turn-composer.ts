@@ -8,7 +8,6 @@ import type {
 import { createUlid } from '../../utils/ulid.js';
 import type { LocalChatTurnAiClient } from './types.js';
 import type { TurnInvokeInput } from './request-builder.js';
-import { runTextTurn } from './text-turn-runner.js';
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -29,9 +28,8 @@ function normalizeBeatIntent(value: unknown): InteractionBeat['intent'] {
 }
 
 function normalizePauseMs(value: unknown, index: number): number {
-  if (index === 0) return 0;
   const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return 600;
+  if (!Number.isFinite(numeric)) return index === 0 ? 650 : 600;
   return Math.max(180, Math.min(2400, Math.round(numeric)));
 }
 
@@ -107,6 +105,7 @@ function parsePlanObject(input: {
   turnMode: LocalChatTurnMode;
   intimacyCeiling?: string;
   recentBeatTexts?: string[];
+  sealedFirstBeatText: string;
 }): InteractionTurnPlan {
   const planId = `plan_${createUlid()}`;
   const rawBeats = Array.isArray(input.object.beats) ? input.object.beats : [];
@@ -119,6 +118,9 @@ function parsePlanObject(input: {
       if (!text) {
         return;
       }
+      if (isSemanticallyDuplicate(text, input.sealedFirstBeatText)) {
+        return;
+      }
       const kind = asString(asRecord(record.assetRequest).kind);
       const prompt = asString(asRecord(record.assetRequest).prompt);
       const rawRelationMove = asString(record.relationMove || record.relation_move || input.turnMode);
@@ -126,7 +128,7 @@ function parsePlanObject(input: {
       beats.push({
         beatId: `beat_${createUlid()}`,
         turnId: input.turnId,
-        beatIndex: index,
+        beatIndex: index + 1,
         beatCount: list.length || 1,
         intent: normalizeBeatIntent(record.intent),
         relationMove: clampRelationMove(rawRelationMove, input.intimacyCeiling),
@@ -142,7 +144,7 @@ function parsePlanObject(input: {
             nsfwIntent: /nsfw|暧昧|亲密|裸|吻/u.test(prompt || text) ? 'suggested' : 'none',
           }
           : undefined,
-        cancellationScope: index === 0 ? 'turn' : 'tail',
+        cancellationScope: 'tail',
       });
     });
 
@@ -174,8 +176,8 @@ function parsePlanObject(input: {
   const normalizedBeats = dedupedBeats.length > 0
     ? dedupedBeats.map((beat, index) => ({
       ...beat,
-      beatIndex: index,
-      beatCount: dedupedBeats.length,
+      beatIndex: index + 1,
+      beatCount: dedupedBeats.length + 1,
     }))
     : [];
 
@@ -183,10 +185,8 @@ function parsePlanObject(input: {
     planId,
     turnId: input.turnId,
     turnMode: input.turnMode,
-    firstBeatLocked: false,
-    planFirstBeatText: normalizedBeats[0]?.text || '',
     beats: normalizedBeats,
-    fallbackPolicy: 'legacy-stream-text',
+    fallbackPolicy: 'first-beat-only',
     expiresAt: new Date(Date.now() + 60_000).toISOString(),
   };
 }
@@ -198,10 +198,12 @@ export async function composeInteractionTurnPlan(input: {
   userText: string;
   turnId: string;
   turnMode: LocalChatTurnMode;
+  deliveryStyle?: 'natural' | 'compact';
   emotionalState?: string;
   directive?: string;
   intimacyCeiling?: string;
   recentBeatTexts?: string[];
+  sealedFirstBeatText: string;
 }): Promise<InteractionTurnPlan> {
   const perceptionLines: string[] = [];
   if (input.emotionalState) {
@@ -222,7 +224,7 @@ export async function composeInteractionTurnPlan(input: {
   const prompt = [
     input.invokeInput.prompt,
     '',
-    '请规划这轮对话的完整 beat 计划，仅返回一个 JSON 对象，不要有任何其它文字。',
+    '请规划这轮对话在首拍之后的 tail beat 计划，仅返回一个 JSON 对象，不要有任何其它文字。',
     '',
     '严格按照以下 JSON 格式：',
     '```json',
@@ -234,25 +236,25 @@ export async function composeInteractionTurnPlan(input: {
     '- intent: 只能是 answer/clarify/checkin/comfort/tease/invite/media 之一',
     '- relationMove: 描述这句话对关系的推进（如 friendly/warm/comfort/tease/closer）',
     '- sceneMove: 描述场景变化（如 日常/深入/安慰/调侃）',
-    '- pauseMs: 这句话前的停顿毫秒数（第 1 条固定 0，后续 300-2000）',
+    '- pauseMs: 这条 tail beat 相对上一拍的停顿毫秒数（建议 300-2000）',
     '- assetRequest: 可选，但只允许 explicit-media 模式输出 {"kind":"image|video","prompt":"描述"}',
     '',
     '规则：',
-    '- beats 数量 1-4 条，不要超过 4 条',
-    '- information 模式默认 1-2 条；emotional/intimate/playful/checkin 可以 2-4 条',
-    '- 第 1 条 beat 是最先接住用户的回应，要短、快、完整',
-    '- 第 1 条不要总是落成“怎么了 / 我在 / 跟我说说”这类固定模板，要结合当前语境自然开场',
-    '- 后续 beat 逐步展开，不要重复第 1 条的内容',
-    '- 后续 beat 必须带来新信息、新情绪动作或新关系推进，不能只是换个说法重复上一条',
+    '- beats 数量 0-4 条，不要超过 4 条',
+    '- information 模式可以直接返回空 beats',
+    '- 这些都是首拍之后的补充 beat，不要重写、重复、解释或微调首拍',
+    '- 后续 beat 必须带来新信息、新情绪动作或新关系推进，不能只是换个说法重复首拍或上一条',
     '- 非 explicit-media 模式不要输出 assetRequest，也不要暗示系统会自动发图/发视频',
     '- 不要使用 markdown 格式、不要代码块、不要解释',
     '- 整个输出只能是一个 JSON 对象，以 { 开头，以 } 结尾',
     '',
+    `已经封口的首拍：${input.sealedFirstBeatText}`,
+    '',
     '示例（emotional 模式，用户说"好累"）：',
-    '{"beats":[{"text":"怎么了，今天很辛苦吗？","intent":"comfort","relationMove":"warm","sceneMove":"安慰","pauseMs":0},{"text":"跟我说说，我听着呢。","intent":"invite","relationMove":"closer","sceneMove":"深入","pauseMs":800}]}',
+    '{"beats":[{"text":"先别一个人硬撑，把最压你的那件事丢给我。","intent":"invite","relationMove":"warm","sceneMove":"深入","pauseMs":750}]}',
     '',
     `turnMode=${input.turnMode}`,
-    `deliveryStyle=${input.contextPacket.target.interactionProfile.expression.pacingBias}`,
+    `deliveryStyle=${input.deliveryStyle || 'natural'}`,
     `voiceConversationMode=${input.contextPacket.voiceConversationMode || 'off'}`,
     `userText=${input.userText}`,
     ...perceptionLines,
@@ -278,40 +280,25 @@ export async function composeInteractionTurnPlan(input: {
       turnMode: input.turnMode,
       intimacyCeiling: input.intimacyCeiling,
       recentBeatTexts: input.recentBeatTexts,
+      sealedFirstBeatText: input.sealedFirstBeatText,
     });
     if (plan.beats.length > 0) {
       console.log('[turn-composer] plan accepted:', plan.beats.length, 'beats');
       return plan;
     }
-    console.warn('[turn-composer] generateObject: parsed but 0 valid beats', { turnMode: input.turnMode });
+    console.warn('[turn-composer] generateObject: parsed but 0 valid tail beats', { turnMode: input.turnMode });
   } catch (err) {
     console.error('[turn-composer] generateObject: FAILED', {
       error: err instanceof Error ? err.message : String(err),
       turnMode: input.turnMode,
     });
   }
-  const fallback = await runTextTurn({
-    flowId: `fallback_${input.turnId}`,
-    aiClient: input.aiClient,
-    invokeInput: input.invokeInput,
-    prompt: input.invokeInput.prompt,
-    allowMultiReply: input.turnMode !== 'information',
-    segmentationMode: 'adaptive',
-    pacingPlan: input.contextPacket.pacingPlan,
-  });
-  return parsePlanObject({
-    object: {
-      beats: fallback.segments.map((segment) => ({
-        text: segment.content,
-        intent: 'answer',
-        relationMove: input.turnMode,
-        sceneMove: input.turnMode,
-        pauseMs: segment.delayMs,
-      })),
-    },
-    intimacyCeiling: input.intimacyCeiling,
-    recentBeatTexts: input.recentBeatTexts,
+  return {
+    planId: `plan_${createUlid()}`,
     turnId: input.turnId,
     turnMode: input.turnMode,
-  });
+    beats: [],
+    fallbackPolicy: 'first-beat-only',
+    expiresAt: new Date(Date.now() + 60_000).toISOString(),
+  };
 }

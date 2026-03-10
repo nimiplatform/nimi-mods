@@ -1,4 +1,5 @@
 import type { LocalChatContextPacket } from '../state/ledger-types.js';
+import type { LocalChatPromptProfile } from '../prompt/types.js';
 
 export type FetchImpl = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -45,4 +46,5 @@ export type LocalChatTarget = {
 export type LocalChatPromptInput = {
   contextPacket: LocalChatContextPacket;
   maxPromptChars?: number;
+  profile?: LocalChatPromptProfile;
 };

@@ -1,6 +1,6 @@
 import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { ChatMessage } from '../../types.js';
-import type { InteractionSnapshot } from '../../state/index.js';
+import type { InteractionSnapshot, LocalChatTurnSendPhase } from '../../state/index.js';
 import { resolvePresenceTheme } from './presence-theme.js';
 import type { LocalChatTargetItem } from './types.js';
 
@@ -12,6 +12,7 @@ type LocalChatHeaderProps = {
   interactionSnapshot: InteractionSnapshot | null;
   hasInputText: boolean;
   isSending: boolean;
+  sendPhase: LocalChatTurnSendPhase;
   messages: ChatMessage[];
   playingVoiceMessageId: string | null;
   onBackToTargetStage: () => void;
@@ -45,6 +46,7 @@ function resolvePresenceStatus(input: {
   loadingTargetDetail: boolean;
   hasInputText: boolean;
   isSending: boolean;
+  sendPhase: LocalChatTurnSendPhase;
   messages: ChatMessage[];
   playingVoiceMessageId: string | null;
   t: (key: string) => string;
@@ -64,7 +66,7 @@ function resolvePresenceStatus(input: {
   if (lastAssistantMessage?.kind === 'video-pending') {
     return { label: input.t('Header.presenceFilming'), busy: true };
   }
-  if (input.isSending) {
+  if (input.sendPhase === 'awaiting-first-beat' || input.sendPhase === 'streaming-first-beat') {
     return { label: input.t('Header.presenceThinking'), busy: true };
   }
   if (input.hasInputText) {
@@ -81,6 +83,7 @@ export function LocalChatHeader({
   interactionSnapshot,
   hasInputText,
   isSending,
+  sendPhase,
   messages,
   playingVoiceMessageId,
   onBackToTargetStage,
@@ -97,6 +100,7 @@ export function LocalChatHeader({
     loadingTargetDetail,
     hasInputText,
     isSending,
+    sendPhase,
     messages,
     playingVoiceMessageId,
     t,

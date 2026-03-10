@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
-import type { LocalChatProductSettings } from '../../state/index.js';
+import type { LocalChatProductSettings, LocalChatTurnSendPhase } from '../../state/index.js';
 import type { ChatMessage } from '../../types.js';
 import { ChatBubble } from '../chat-bubbles.js';
 import { buildMessageVisualGroups } from './message-grouping.js';
@@ -13,6 +13,7 @@ type LocalChatMessagePaneProps = {
   messages: ChatMessage[];
   loadingSessions: boolean;
   isSending: boolean;
+  sendPhase: LocalChatTurnSendPhase;
   currentUserDisplayName: string;
   currentUserAvatarUrl: string | null;
   playingVoiceMessageId: string | null;
@@ -64,6 +65,7 @@ type MessageListProps = {
   onPlayVoiceMessage: (message: ChatMessage) => void;
   onVoiceContextMenu: (message: ChatMessage, event: React.MouseEvent<HTMLButtonElement>) => void;
   isSending: boolean;
+  sendPhase: LocalChatTurnSendPhase;
   t: (key: string, values?: Record<string, unknown>) => string;
 };
 
@@ -119,10 +121,12 @@ const MessageList = React.memo(function MessageList({
   onPlayVoiceMessage,
   onVoiceContextMenu,
   isSending,
+  sendPhase,
   t,
 }: MessageListProps) {
   const visualGroups = useMemo(() => buildMessageVisualGroups(messages), [messages]);
-  const focusGroupIndex = !isSending && visualGroups.length > 0 && visualGroups[visualGroups.length - 1]?.role === 'assistant'
+  const showPendingCard = sendPhase === 'awaiting-first-beat';
+  const focusGroupIndex = !showPendingCard && visualGroups.length > 0 && visualGroups[visualGroups.length - 1]?.role === 'assistant'
     ? visualGroups[visualGroups.length - 1]!.groupIndex
     : -1;
   const messageElements: React.ReactNode[] = [];
@@ -130,6 +134,7 @@ const MessageList = React.memo(function MessageList({
   for (const group of visualGroups) {
     const groupNodes: React.ReactNode[] = [];
     for (const item of group.items) {
+      const inFocusedAssistantGroup = group.groupIndex === focusGroupIndex;
       if (!lastDate || !isSameDay(lastDate, item.message.timestamp)) {
         groupNodes.push(
           <div key={`date-${item.message.id}`} className="flex items-center gap-3 py-4">
@@ -154,9 +159,9 @@ const MessageList = React.memo(function MessageList({
           isVoiceTranscriptVisible={Boolean(voiceTranscriptVisibleById[item.message.id])}
           onPlayVoiceMessage={onPlayVoiceMessage}
           onVoiceContextMenu={onVoiceContextMenu}
-          showAvatar={item.showAvatar}
-          showTimestamp={item.showTimestamp}
-          position={item.position}
+          showAvatar={inFocusedAssistantGroup ? true : item.showAvatar}
+          showTimestamp={inFocusedAssistantGroup ? true : item.showTimestamp}
+          position={inFocusedAssistantGroup ? 'single' : item.position}
         />,
       );
     }
@@ -199,7 +204,7 @@ const MessageList = React.memo(function MessageList({
   return (
     <>
       {messageElements}
-      {isSending ? (
+      {showPendingCard ? (
         <section className="lc-message-group lc-current-turn-shell">
           <div className="lc-current-turn-halo lc-current-turn-halo-pending" aria-hidden />
           <div className="lc-current-turn-card lc-current-turn-card-pending min-h-[112px] rounded-[26px] border border-dashed border-mint-200/80 bg-white/88 px-4 py-4">
@@ -222,6 +227,7 @@ export const LocalChatMessagePane = React.memo(function LocalChatMessagePane({
   messages,
   loadingSessions,
   isSending,
+  sendPhase,
   currentUserDisplayName,
   currentUserAvatarUrl,
   playingVoiceMessageId,
@@ -401,6 +407,7 @@ export const LocalChatMessagePane = React.memo(function LocalChatMessagePane({
                 onPlayVoiceMessage={onPlayVoiceMessage}
                 onVoiceContextMenu={onVoiceContextMenu}
                 isSending={isSending}
+                sendPhase={sendPhase}
                 t={t}
               />
               <div ref={messagesEndRef} />

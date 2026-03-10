@@ -7,10 +7,11 @@
 Text turn pipeline is beat-first, deterministic, and auditable from input to persistence:
 
 1. resolve turn mode before generation
-2. compile one `ContextPacket` and one prompt budget before any model call
-3. persist user turn immediately
-4. deliver assistant first beat as a finalized message, not a placeholder
-5. schedule later beats through a single delivery director
+2. compile one `ContextPacket` before prompt rendering and reuse it across perception, first beat, and tail planning
+3. persist user turn immediately after session resolution, before assistant generation
+4. run turn perception before first-beat generation so first beat and tail plan share one intent judgment
+5. deliver assistant `firstBeat` as a finalized message before tail beats are planned or scheduled
+6. schedule later beats through a single delivery director within the same assistant turn
 
 ## LC-PIPE-002 Session Lifecycle Pipeline
 
@@ -50,28 +51,30 @@ After policy allow:
 
 Successful text turns may use multiple model calls on the critical path:
 
-1. `FirstBeatReactor` may use a short low-token text call
-2. `TurnComposer` may use a second structured planning call
-3. `TurnComposer` may fall back to legacy stream-text segmentation only when structured planning fails
-4. the successful path MUST NOT depend on full-text generation followed by forced post-splitting
+1. `FirstBeatReactor` must build a dedicated `first-beat` prompt from the resolved `ContextPacket` plus turn perception result
+2. `FirstBeatReactor` may use a streaming text call, but it must seal to one complete finalized sentence before persistence
+3. `TurnComposer` must receive `sealedFirstBeatText` and only plan later tail beats
+4. `TurnComposer` must not repeat, revise, or explain the already sealed first beat
+5. planner failure must degrade to `firstBeat`-only success
+6. the successful path MUST NOT depend on full-text generation followed by forced post-splitting
 
 ## LC-PIPE-007 Delivery Director Pipeline
 
 Delivery director owns beat persistence and cancellation:
 
-1. successful path has no mandatory `streaming` placeholder
-2. any fallback placeholder path must replace the placeholder with the first finalized message
-3. `streaming` kind must never persist in session store
-4. new user input, thread reset, target switch, or route invalidation must cancel undispatched beats
+1. generic pending UI may appear only while awaiting the first visible `firstBeat` text
+2. transient `streaming` kind is allowed only for first-beat UI preview and must never persist in session store
+3. once `firstBeat` seals, the transient preview must be replaced in place by the finalized text beat and the generic pending card must disappear
+4. new user input, thread reset, target switch, or route invalidation must cancel both in-flight `firstBeat` streaming and all undispatched tail beats
 
 ## LC-PIPE-008 NSFW Media Guardrail Pipeline
 
 NSFW media policy is settings + route-source gated:
 
-1. default policy is disabled
-2. `visualComfortLevel=natural-visuals` on `local` allows NSFW media generation
-3. `visualComfortLevel=restrained-visuals | text-only` disables NSFW media generation
-4. non-local routes must downgrade to `local-only` policy state
+1. `visualComfortLevel=natural-visuals` on `local` allows NSFW media generation
+2. `visualComfortLevel=restrained-visuals | text-only` disables NSFW media generation
+3. non-local routes must downgrade to `local-only` policy state
+4. there must be no direct user-facing NSFW toggle in Local-Chat
 
 Policy decision must be recorded in assistant turn diagnostics/audit metadata even when no media generation is executed.
 
@@ -83,7 +86,7 @@ Image/video/voice generation must follow one beat-level orchestration policy:
 2. explicit user requests outrank automatic modality choices
 3. `voiceAutonomy` and `mediaAutonomy` both use `off | explicit-only | natural` trigger semantics
 4. `voiceConversationMode=on` forces non-explicit-media assistant beats to voice, but must not override explicit image/video beats
-5. automatic media still passes explicit gate, cooldown, route readiness, dependency readiness, and NSFW policy
+5. automatic media still passes explicit gate, cooldown, route readiness, dependency readiness, derived relationship boundary, and NSFW policy
 6. text beat success must not be blocked by media failure
 
 ## LC-PIPE-010 Media Planner Failure Pipeline
@@ -104,6 +107,9 @@ Send path must compile a single `ContextPacket` before prompt rendering:
 3. `interactionProfile` must be derived locally from target DNA / metadata / world context
 4. recent exact history must be selected by bundle, not by flat message count
 5. context packet must expose `interactionSnapshot`, `relationMemorySlots`, `recallIndex`, and platform warm-start data when available
+6. unresolved `openLoops / assistantCommitments / stable userPrefs` must receive continuity-aware priority during relation-memory selection
+7. prompt-injected `sessionRecall` must be a continuity-aware top-K subset, not a full dump of the stored recall index
+8. if the current user turn has already been persisted before prompt compile, `recentTurns` must not repeat that same input when `userInput` already carries it explicitly
 
 ## LC-PIPE-012 Turn Bundle Persistence Pipeline
 
@@ -121,7 +127,9 @@ Conversation continuity is compiled after delivery:
 
 1. interaction snapshot update must be asynchronous and must not block first-beat persistence
 2. snapshot must track at least `relationshipState / activeScene / emotionalTemperature / assistantCommitments / userPrefs / openLoops / topicThreads / lastResolvedTurnId`
-3. snapshot compiler input is exact turns/beats/media, not realm-side hidden memory payloads
+3. snapshot compiler input is exact turns/beats/media plus previous local snapshot, not realm-side hidden memory payloads
+4. neutral follow-up turns must not regress `relationshipState` within the same session
+5. `assistantCommitments` and `openLoops` must merge incrementally and only clear when completion cues resolve the prior item
 
 ## LC-PIPE-014 Relation Memory Pipeline
 

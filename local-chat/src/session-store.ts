@@ -7,6 +7,7 @@ import type {
 } from './types.js';
 import type {
   DerivedInteractionProfile,
+  FirstBeatResult,
   InteractionBeat,
   InteractionRecallDoc,
   InteractionSnapshot,
@@ -21,6 +22,7 @@ import type {
   LocalChatPromptTrace,
   LocalChatReplyPacingPlan,
   LocalChatReplyStyleProfile,
+  LocalChatTurnSendPhase,
   LocalChatStoredBeat,
   LocalChatMediaAssetRecord,
   LocalChatSession,
@@ -35,6 +37,7 @@ import { createUlid } from './utils/ulid.js';
 
 export type {
   DerivedInteractionProfile,
+  FirstBeatResult,
   InteractionBeat,
   InteractionRecallDoc,
   InteractionSnapshot,
@@ -49,6 +52,7 @@ export type {
   LocalChatPromptTrace,
   LocalChatReplyPacingPlan,
   LocalChatReplyStyleProfile,
+  LocalChatTurnSendPhase,
   LocalChatStoredBeat,
   LocalChatMediaAssetRecord,
   LocalChatSession,

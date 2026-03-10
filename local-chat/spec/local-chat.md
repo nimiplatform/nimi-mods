@@ -33,12 +33,12 @@
 - `LC-DOM-019`: TTS playback accepts either artifact `uri` or bytes-backed audio payload; bytes-only success is not a playback failure.
 - `LC-DOM-023`: Mod-facing dependency snapshots consumed by Local-Chat MUST expose runtime canonical capability tokens, not legacy short aliases.
 - `LC-DOM-024`: `interactionProfile` is derived locally from `agentProfile.dna + agentMetadata + world/worldview`; Local-Chat MUST NOT require a closed-source realm projection for this layer.
-- `LC-DOM-025`: User-facing assistant delivery is beat-first: first beat lands as a finalized message, later beats are scheduled by delivery director, and streaming placeholders are fallback-only.
+- `LC-DOM-025`: User-facing assistant delivery is `firstBeat`-first: Local-Chat may show a generic pending state only before firstBeat text appears, may use a transient first-beat streaming preview, and must replace that preview in place with the finalized first beat before later beats are scheduled by the delivery director.
 - `LC-DOM-026`: `voiceAutonomy` and `mediaAutonomy` are the user-facing trigger policies, both using `off | explicit-only | natural` semantics.
 - `LC-DOM-027`: `voiceConversationMode` is a session-scoped on/off overlay for pure voice conversation; when enabled, subsequent non-explicit-media replies stay in voice until disabled.
 - `LC-DOM-028`: `enableVoice` is an internal derived gate computed from `voiceAutonomy + voiceConversationMode`; it is not a persisted product setting and does not guarantee that every reply becomes voice.
 - `LC-DOM-029`: Visual content style is expressed as `restrained | natural` user language; NSFW allowance derives from route source plus visual style, not from a direct NSFW toggle.
-- `LC-DOM-030`: `deliveryStyle` and `relationshipBoundaryPreset` are internal strategy inputs owned by agent/persona and interaction state; they are not product settings exposed to the user.
+- `LC-DOM-030`: `deliveryStyle` and `relationshipBoundaryPreset` are internal strategy outputs derived from `interactionProfile + interactionSnapshot`; they are not product settings exposed to the user and MUST NOT be persisted as user-facing preferences.
 
 ## 3. No Over-Design Guard
 

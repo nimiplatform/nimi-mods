@@ -50,13 +50,13 @@ cases:
     test_reference: local-chat-stream-segment-parser.test.mjs
     source_rule: LC-ACC-002
   - id: LC-009-STREAM-LIFECYCLE-FINALIZE
-    description: Successful turn path delivers first finalized beat directly; any fallback streaming placeholder must still be replaced and never persist.
+    description: Awaiting-first-beat may show a generic pending card, but once firstBeat streaming begins the transient stream must replace it in place, seal into the finalized first beat, and never persist as `streaming`.
     expected_ok: true
     reason_code: LOCAL_CHAT_STREAM_FINALIZE_OK
     test_reference: local-chat-turn-stream-lifecycle.test.mjs
     source_rule: LC-ACC-002
   - id: LC-010-NSFW-POLICY-GUARDRAIL
-    description: NSFW policy defaults to disabled and only resolves to allowed on local when explicitly enabled.
+    description: "NSFW policy derives from visual style plus route source: restrained disables it, natural may allow it on local, and non-local routes downgrade to local-only."
     expected_ok: true
     reason_code: LOCAL_CHAT_NSFW_POLICY_GUARDRAIL_OK
     test_reference: local-chat-nsfw-policy.test.mjs
@@ -179,6 +179,42 @@ cases:
     expected_ok: true
     reason_code: LOCAL_CHAT_NSFW_POLICY_GUARDRAIL_OK
     test_reference: local-chat-nsfw-policy.test.mjs
+    source_rule: LC-ACC-002
+  - id: LC-031-SNAPSHOT-MERGE-INERTIA
+    description: Incremental snapshot compilation preserves warm/intimate continuity and unresolved commitments or loops through neutral follow-up turns.
+    expected_ok: true
+    reason_code: null
+    test_reference: local-chat-interaction-state-compiler.test.ts
+    source_rule: LC-ACC-002
+  - id: LC-032-CONTINUITY-AWARE-RECALL-SELECTION
+    description: Context compilation prioritizes unresolved continuity and trims session recall to selected top-k entries instead of injecting the full recall index.
+    expected_ok: true
+    reason_code: LOCAL_CHAT_CONTEXT_ASSEMBLE_OK
+    test_reference: local-chat-context-assembler.test.ts
+    source_rule: LC-ACC-002
+  - id: LC-033-DERIVED-DELIVERY-STYLE
+    description: Internal delivery style is derived from interaction profile and snapshot continuity, and changes allowMultiReply without introducing a user setting.
+    expected_ok: true
+    reason_code: null
+    test_reference: local-chat-resolved-experience-policy.test.ts
+    source_rule: LC-ACC-002
+  - id: LC-034-AUTO-VISUAL-BOUNDARY-GATE
+    description: Derived relationship boundary blocks automatic high-risk visual planner paths while leaving explicit media requests to the existing hard gates.
+    expected_ok: true
+    reason_code: null
+    test_reference: local-chat-media-decision-policy.test.mjs
+    source_rule: LC-ACC-002
+  - id: LC-035-FIRST-BEAT-ONLY-DEGRADE
+    description: Tail planner failure must degrade to firstBeat-only success without reviving legacy full-text post-segmentation.
+    expected_ok: true
+    reason_code: null
+    test_reference: local-chat-tail-turn-composer.test.ts
+    source_rule: LC-ACC-002
+  - id: LC-036-CURRENT-USER-TURN-NO-DUP-PROMPT
+    description: Context compile must not duplicate the just-persisted current user turn in recent exact turns when the same input is already carried by the dedicated userInput lane.
+    expected_ok: true
+    reason_code: LOCAL_CHAT_CONTEXT_ASSEMBLE_OK
+    test_reference: local-chat-context-assembler.test.ts
     source_rule: LC-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:local-chat-kernel-docs
