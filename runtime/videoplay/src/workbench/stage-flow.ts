@@ -1,4 +1,5 @@
 import {
+  VIDEOPLAY_PIPELINE_CHAIN,
   VIDEOPLAY_OPERATION_TYPE,
   VIDEOPLAY_REASON,
   VIDEOPLAY_WORKBENCH_STAGE,
@@ -327,6 +328,10 @@ export function buildRebuildImpactPreview(input: {
     confirmed: false,
     createdAt: new Date().toISOString(),
   };
+}
+
+export function listManualRerunSteps(): readonly VideoPlayPipelineStep[] {
+  return VIDEOPLAY_PIPELINE_CHAIN;
 }
 
 export function workbenchStageSteps(stage: VideoPlayWorkbenchStage): readonly VideoPlayPipelineStep[] {

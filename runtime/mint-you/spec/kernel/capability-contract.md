@@ -30,3 +30,10 @@ The hook dispatch point lives in the desktop/runtime agent profile read path. Th
 ## MY-CAP-006 Capability Drift Gate
 
 Capability changes must update table source and pass kernel consistency checks in the same change.
+
+## MY-CAP-007 Route Override Must Fail Closed
+
+Mint-You route overrides are bounded by the current `runtime.route.list.options` snapshot.
+If a selected source / connector / model disappears, or the user enters a model not advertised by the snapshot, the mod must clamp back to an advertised binding or clear the override and use the runtime default.
+
+Mint-You must not issue AI interview or DNA synthesis calls with stale or unknown route override values.

@@ -9,6 +9,7 @@ import {
   buildRebuildImpactPreview,
   computeStageAdvancePlan,
   deriveWorkbenchStageProgress,
+  listManualRerunSteps,
 } from '../src/workbench/stage-flow.ts';
 
 function makeStageProgress(overrides = {}) {
@@ -109,4 +110,8 @@ test('rebuild preview maps operation scope to rerun step and stage', () => {
   assert.equal(preview.stage, VIDEOPLAY_WORKBENCH_STAGE.VOICE);
   assert.equal(preview.recommendedRerunStep, 'asset-render');
   assert.equal(preview.confirmed, false);
+});
+
+test('manual rerun control covers the full canonical pipeline chain', () => {
+  assert.deepEqual(listManualRerunSteps(), VIDEOPLAY_PIPELINE_CHAIN);
 });

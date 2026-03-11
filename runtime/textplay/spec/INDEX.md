@@ -55,8 +55,15 @@
 3. `spec/kernel/tables/reason-codes.yaml`
 4. `spec/kernel/tables/acceptance-cases.yaml`
 
+### Change desktop host / page shell integration
+
+1. `spec/kernel/acceptance-contract.md`
+2. `spec/kernel/tables/acceptance-cases.yaml`
+3. `spec/textplay.md`
+
 ## Verification
 
 1. `pnpm -C nimi-mods run generate:spec:textplay-kernel-docs`
 2. `pnpm -C nimi-mods run check:spec:textplay-kernel-docs-drift`
 3. `pnpm -C nimi-mods run check:spec:textplay-kernel-consistency`
+4. `pnpm -C nimi-mods --filter @nimiplatform/mod-textplay run test:smoke`

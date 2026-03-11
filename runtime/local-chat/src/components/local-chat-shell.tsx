@@ -13,7 +13,6 @@ import { LocalChatSettingsDrawer } from './layout/local-chat-settings-drawer.js'
 import { StageConversationView } from './layout/stage-conversation-view.js';
 import { resolveStageCardAnchorOffset } from './layout/stage-card-anchor.js';
 import { LocalChatTargetPane } from './layout/local-chat-target-pane.js';
-import { ICON_SEARCH } from './layout/icons.js';
 import { resolvePresenceTheme } from './layout/presence-theme.js';
 import type { LocalChatShellProps } from './layout/shell-props.js';
 
@@ -199,7 +198,7 @@ export function LocalChatShell(props: LocalChatShellProps) {
   }, [conversationViewMode, isDesktopConversationLayout, selectedTarget, syncStageCardAnchor]);
 
   return (
-    <div className="local-chat-root relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.14),_transparent_38%),linear-gradient(180deg,_rgba(248,250,252,0.98),_rgba(241,245,249,0.94))]" data-ui-version="v5-room">
+    <div className="local-chat-root relative flex h-full min-h-0 min-w-0 w-full flex-1 overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.14),_transparent_38%),linear-gradient(180deg,_rgba(248,250,252,0.98),_rgba(241,245,249,0.94))]" data-ui-version="v5-room">
       <ChatAnimationStyles />
 
       <div className="flex min-h-0 w-full min-w-0 flex-1">
@@ -215,8 +214,6 @@ export function LocalChatShell(props: LocalChatShellProps) {
               setSelectedTargetId={setSelectedTargetId}
               targetSearchText={targetSearchText}
               setTargetSearchText={setTargetSearchText}
-              onOpenSettings={() => setIsSettingsDrawerOpen(true)}
-              searchIcon={ICON_SEARCH}
             />
           ) : isDesktopConversationLayout ? (
             <div className="flex min-h-0 min-w-0 flex-1">

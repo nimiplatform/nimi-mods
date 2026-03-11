@@ -48,6 +48,7 @@
 - `TXT-031`: Tension pacing constraints are injected into render prompt based on `pacingContext.tensionBand` (HIGH/MODERATE/LOW).
 - `TXT-032`: Event type rendering guidance is appended per-event as `Rendering hint` when the event carries a recognized `type` field.
 - `TXT-033`: Unknown or missing event `type` degrades gracefully — no rendering hint appended, event renders with visibility tag only.
+- `TXT-034`: Desktop route registration must request `immersive` shell mode so the three-pane TextPlay workspace renders without nested host chrome collapse after the zero-bundle mod host split.
 
 ## 3. No Over-Design Guard
 

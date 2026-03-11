@@ -4,7 +4,7 @@
 
 ## WS-CAP-001 Manifest Identity Is Fixed
 
-`modId`, `entry`, `tabId`, and UI slots are fixed by table and must match runtime registration.
+`modId`, `entry`, `styles`, `tabId`, and UI slots are fixed by table and must match runtime registration.
 
 ## WS-CAP-002 Capability List Is Explicit
 
@@ -20,4 +20,4 @@ World-Studio reads/writes world data only through declared `data.query.*` capabi
 
 ## WS-CAP-005 Manifest Validation Is Mandatory
 
-Manifest shape validation must pass before runtime exposure.
+Manifest shape validation must pass before runtime exposure. Because World-Studio is a UI runtime mod, `styles[]` is required.

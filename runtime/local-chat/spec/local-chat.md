@@ -39,6 +39,9 @@
 - `LC-DOM-028`: `enableVoice` is an internal derived gate computed from `voiceAutonomy + voiceConversationMode`; it is not a persisted product setting and does not guarantee that every reply becomes voice.
 - `LC-DOM-029`: Visual content style is expressed as `restrained | natural` user language; NSFW allowance derives from route source plus visual style, not from a direct NSFW toggle.
 - `LC-DOM-030`: `deliveryStyle` and `relationshipBoundaryPreset` are internal strategy outputs derived from `interactionProfile + interactionSnapshot`; they are not product settings exposed to the user and MUST NOT be persisted as user-facing preferences.
+- `LC-DOM-031`: Desktop route shell must remain full-height and self-contained: target space, stage view, chat view, and overlay drawers MUST size against the host content viewport and keep scrolling inside their own panels instead of leaking to the page root.
+- `LC-DOM-032`: Settings and profile drawers are independent scroll surfaces; opening a drawer MUST NOT horizontally shift or vertically resize the underlying target, stage, or chat shell.
+- `LC-DOM-033`: Target-space landing shell is intentionally minimal: the desktop entry state shows only the bubble field surface, and does not require a top hero, search field, or settings control row.
 
 ## 3. No Over-Design Guard
 

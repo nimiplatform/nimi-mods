@@ -267,7 +267,7 @@ export const LocalChatSettingsDrawer = React.memo(function LocalChatSettingsDraw
       }`}
       aria-hidden={!open}
     >
-      <div className="flex h-full flex-col">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden">
         <div className="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 px-4">
           <div>
             <p className="text-sm font-semibold text-gray-900">{t('SettingsDrawer.title')}</p>
@@ -286,7 +286,7 @@ export const LocalChatSettingsDrawer = React.memo(function LocalChatSettingsDraw
           </button>
         </div>
 
-        <div className="flex-1 space-y-5 overflow-y-auto px-4 py-4" style={{ willChange: 'transform' }}>
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4" style={{ willChange: 'transform' }}>
           {/* ── Chat Model ── */}
           <section className="space-y-3 rounded-[24px] border border-white/80 bg-white/88 p-4 shadow-[0_4px_16px_rgba(15,23,42,0.04)]">
             <div>

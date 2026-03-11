@@ -11,8 +11,6 @@ type LocalChatTargetPaneProps = {
   setSelectedTargetId: (value: string) => void;
   targetSearchText: string;
   setTargetSearchText: (value: string) => void;
-  onOpenSettings: () => void;
-  searchIcon: React.ReactNode;
 };
 
 type BubbleLayout = {
@@ -47,13 +45,6 @@ const PUSH_STRENGTH = 26;
 const FISHEYE_RADIUS = CELL * 3.5;
 const FISHEYE_MIN_SCALE = 0.78;
 const FISHEYE_IDLE_SCALE = 0.88;
-
-const ICON_SETTINGS = (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="3" />
-    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01A1.65 1.65 0 0 0 10.91 3H11a2 2 0 1 1 4 0h.09a1.65 1.65 0 0 0 1.51 1 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-  </svg>
-);
 
 function hashSeed(seed: string): number {
   let hash = 0;
@@ -170,8 +161,6 @@ export function LocalChatTargetPane({
   setSelectedTargetId,
   targetSearchText,
   setTargetSearchText,
-  onOpenSettings,
-  searchIcon,
 }: LocalChatTargetPaneProps) {
   const { t } = useModTranslation('local-chat');
   const [transitioningTargetId, setTransitioningTargetId] = React.useState<string | null>(null);
@@ -213,6 +202,12 @@ export function LocalChatTargetPane({
       observer.disconnect();
     };
   }, []);
+
+  React.useEffect(() => {
+    if (targetSearchText) {
+      setTargetSearchText('');
+    }
+  }, [setTargetSearchText, targetSearchText]);
 
   const bubbleLayout = React.useMemo(() => buildBubbleSpaceLayout({
     targets: visibleTargets,
@@ -343,56 +338,16 @@ export function LocalChatTargetPane({
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(94,234,212,0.18),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(125,211,252,0.12),_transparent_28%),linear-gradient(180deg,_rgba(248,250,252,0.96),_rgba(239,246,247,0.92))]" />
 
       <div
-        className={`relative z-10 flex min-h-0 flex-1 flex-col gap-6 px-6 pb-6 pt-7 transition-opacity duration-200 ${
+        className={`relative z-10 flex min-h-0 flex-1 flex-col px-6 pb-6 pt-6 transition-opacity duration-200 ${
           transitioningTargetId ? 'opacity-0' : 'opacity-100'
         }`}
       >
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-xl">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-mint-700/80">
-              {t('TargetPane.heroEyebrow')}
-            </p>
-            <h1 className="mt-3 text-[42px] font-black tracking-tight text-slate-900 sm:text-[56px] sm:leading-[1.02]">
-              {t('TargetPane.heroTitle')}
-            </h1>
-            <p className="mt-3 max-w-xl text-sm leading-7 text-slate-600 sm:text-base">
-              {t('TargetPane.heroDescription')}
-            </p>
-            {t('TargetPane.heroHint') ? (
-              <p className="mt-4 inline-flex rounded-full border border-white/80 bg-white/78 px-3 py-1 text-xs font-medium text-slate-500 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
-                {t('TargetPane.heroHint')}
-              </p>
-            ) : null}
-          </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="flex h-12 min-w-[240px] items-center rounded-full border border-white/80 bg-white/90 px-4 shadow-[0_12px_28px_rgba(15,23,42,0.06)] sm:min-w-[320px]">
-              <span className="text-slate-400">{searchIcon}</span>
-              <input
-                className="ml-3 flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
-                placeholder={t('TargetPane.searchPlaceholder')}
-                value={targetSearchText}
-                onChange={(event) => setTargetSearchText(event.target.value)}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={onOpenSettings}
-              className="lc-btn lc-btn-secondary h-12 w-12 rounded-full text-slate-700"
-              aria-label={t('Header.openSettings')}
-              title={t('Header.openSettings')}
-            >
-              {ICON_SETTINGS}
-            </button>
-          </div>
-        </div>
-
         <div className="relative min-h-0 flex-1 overflow-hidden rounded-[34px] border border-white/80 bg-white/44 shadow-[0_8px_28px_rgba(15,23,42,0.06)]">
           <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-24 bg-[linear-gradient(180deg,rgba(255,255,255,0.42),transparent)]" />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-20 bg-[linear-gradient(0deg,rgba(255,255,255,0.42),transparent)]" />
           <div
             ref={stageViewportRef}
-            className="h-full overflow-y-scroll overflow-x-hidden overscroll-contain px-4 py-6"
+            className="h-full overflow-y-scroll overflow-x-hidden overscroll-contain px-4 py-5"
             onMouseMove={handleStageMouseMove}
             onMouseLeave={handleStageMouseLeave}
           >

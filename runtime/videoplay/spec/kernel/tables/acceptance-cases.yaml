@@ -260,6 +260,23 @@ cases:
     gate: audio_completeness
     min: 0.85
     source_rule: V-ACC-002
+  - id: VID-043-MANUAL-RERUN-FULL-CHAIN
+    description: Manual rerun selector exposes the full canonical pipeline chain, including newly added industrial stages.
+    expected_ok: true
+    rerun_step_options:
+      - narrative-ingest
+      - character-casting
+      - scene-planning
+      - episode-segmentation
+      - screenplay
+      - storyboard
+      - asset-render
+      - candidate-selection
+      - audio-design
+      - edit-compose
+      - qc-gate
+      - release-package
+    source_rule: V-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:videoplay-kernel-docs
     source_rule: V-ACC-003

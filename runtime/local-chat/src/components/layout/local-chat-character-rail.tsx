@@ -83,7 +83,7 @@ export const LocalChatCharacterRail = React.memo(function LocalChatCharacterRail
   const supportingCopy = String(selectedTarget.bio || '').trim() || t('Header.noBio');
 
   return (
-    <aside className="relative flex min-h-0 w-[clamp(320px,35vw,420px)] shrink-0 flex-col overflow-hidden border-r border-white/70 bg-[linear-gradient(180deg,rgba(250,252,252,0.98),rgba(244,247,248,0.96))]">
+    <aside className="relative flex min-h-0 w-[clamp(360px,30vw,600px)] shrink-0 flex-col overflow-hidden border-r border-white/70 bg-[linear-gradient(180deg,rgba(250,252,252,0.98),rgba(244,247,248,0.96))]">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute left-[-64px] top-[-52px] h-48 w-48 rounded-full bg-mint-100/70 blur-3xl" />
         <div className="absolute bottom-16 right-[-56px] h-56 w-56 rounded-full bg-sky-100/70 blur-3xl" />

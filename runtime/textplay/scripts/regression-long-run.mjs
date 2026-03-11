@@ -507,7 +507,7 @@ function assertTurnInvariants(input) {
 async function writeReport(report) {
   const currentFile = fileURLToPath(import.meta.url);
   const scriptsDir = path.dirname(currentFile);
-  const reportDir = path.resolve(scriptsDir, '../../dev/report');
+  const reportDir = path.resolve(scriptsDir, '../../../dev/report');
   await fs.mkdir(reportDir, { recursive: true });
   const reportPath = path.join(reportDir, 'textplay-long-run-regression.latest.json');
   await fs.writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');

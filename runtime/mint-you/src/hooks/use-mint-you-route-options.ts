@@ -1,23 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseRuntimeRouteOptions, type RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
 import { emitMintYouLog } from '../logging.js';
+import { ensureMintYouRouteOptionsSnapshotShape } from '../route-binding.js';
 import { getMintYouRuntimeClient } from '../runtime-mod.js';
-
-function ensureRouteOptionsSnapshotShape(
-  snapshot: RuntimeRouteOptionsSnapshot | null,
-): RuntimeRouteOptionsSnapshot | null {
-  if (!snapshot) {
-    return null;
-  }
-  return {
-    ...snapshot,
-    local: {
-      models: snapshot.local?.models || [],
-      defaultEndpoint: snapshot.local?.defaultEndpoint,
-    },
-    connectors: Array.isArray(snapshot.connectors) ? snapshot.connectors : [],
-  };
-}
 
 export function useMintYouRouteOptions() {
   const [routeOptions, setRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
@@ -38,7 +23,7 @@ export function useMintYouRouteOptions() {
 
       try {
         const runtimeClient = getMintYouRuntimeClient();
-        const snapshot = ensureRouteOptionsSnapshotShape(
+        const snapshot = ensureMintYouRouteOptionsSnapshotShape(
           parseRuntimeRouteOptions(await runtimeClient.route.listOptions({
             capability: 'text.generate',
           }), {

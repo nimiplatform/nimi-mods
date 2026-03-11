@@ -11,12 +11,17 @@ import type {
   VideoStoryPackage,
   VideoStorySummary,
 } from '../types.js';
-import type {
-  VideoPlayOperationType,
-  VideoPlayPipelineStep,
-  VideoPlayWorkbenchStage,
-  VideoStorySourceMode,
+import {
+  VIDEOPLAY_PIPELINE_CHAIN,
+  type VideoPlayOperationType,
+  type VideoPlayPipelineStep,
+  type VideoPlayWorkbenchStage,
+  type VideoStorySourceMode,
 } from '../contracts.js';
+import {
+  listManualRerunSteps,
+  workbenchStageSteps,
+} from '../workbench/stage-flow.js';
 
 type RouteStatusView = {
   capability: 'chat' | 'image' | 'video' | 'tts';
@@ -144,6 +149,24 @@ function packageCoverageText(pkg: VideoStoryPackage): string {
   return `CANON=${c.canon ? 'Y' : 'N'} STORY=${c.story ? 'Y' : 'N'} SUBJECT=${c.subject ? 'Y' : 'N'} RELATION=${c.relation ? 'Y' : 'N'} SCENE=${c.scene ? 'Y' : 'N'}`;
 }
 
+function formatStageStepList(stage: VideoPlayWorkbenchStage): string {
+  return workbenchStageSteps(stage).join(' -> ');
+}
+
+function formatStageStepStatuses(stage: VideoPlayWorkbenchStageProgress): string {
+  return workbenchStageSteps(stage.stage)
+    .map((step) => `${step}:${stage.stepStatuses[step] || 'PENDING'}`)
+    .join(' · ');
+}
+
+function pipelineStepLabel(step: VideoPlayPipelineStep): string {
+  return step;
+}
+
+function isPipelineStep(step: string): step is VideoPlayPipelineStep {
+  return VIDEOPLAY_PIPELINE_CHAIN.includes(step as VideoPlayPipelineStep);
+}
+
 export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
   const canPublish = Boolean(
     props.selectedReleaseCandidate
@@ -162,23 +185,27 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
   const renderQueueEvents = props.runEvents.filter(
     (event) => event.step === 'asset-render' && event.details?.phase === 'batch-queue-execute',
   );
+  const manualRerunSteps = listManualRerunSteps();
+  const selectedStageRow = props.workbenchStages.find(
+    (stage) => stage.stage === props.selectedWorkbenchStage,
+  ) || null;
   const renderCoverageEvent = [...props.runEvents]
     .reverse()
     .find((event) => event.step === 'asset-render' && typeof event.details?.coverage === 'number');
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-gray-50">
-      <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4">
+    <div className="ui-sync-root flex h-full min-h-0 flex-col overflow-hidden">
+      <header className="ui-sync-shell-header flex shrink-0 flex-col gap-3 border-b border-gray-200 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">{props.title}</h2>
-          <p className="text-xs text-gray-500">{props.subtitle}</p>
+          <h2 className="ui-sync-shell-title text-xl font-semibold text-gray-900">{props.title}</h2>
+          <p className="ui-sync-shell-subtitle text-xs text-gray-500">{props.subtitle}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={props.onRunPipeline}
             disabled={!canRun}
-            className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="ui-sync-btn ui-sync-btn-primary rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Run Pipeline
           </button>
@@ -186,7 +213,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
             type="button"
             onClick={props.onRerunStep}
             disabled={!canRerun}
-            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+            className="ui-sync-btn ui-sync-btn-secondary rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Rerun Step
           </button>
@@ -194,21 +221,21 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
             type="button"
             onClick={props.onAdvanceStage}
             disabled={!canAdvance}
-            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+            className="ui-sync-btn ui-sync-btn-secondary rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Advance Stage
           </button>
           <button
             type="button"
             onClick={props.onCancelRun}
-            className="rounded-md border border-rose-300 bg-white px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50"
+            className="ui-sync-btn rounded-md border border-rose-300 bg-white px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50"
           >
             Cancel Run
           </button>
         </div>
       </header>
-      <div className="grid min-h-0 flex-1 grid-cols-[340px_minmax(0,1fr)_380px]">
-        <aside className="min-h-0 overflow-y-auto border-r border-gray-200 bg-white p-3">
+      <div className="ui-sync-shell-main flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 xl:grid xl:grid-cols-[minmax(280px,320px)_minmax(0,1fr)_minmax(300px,360px)] xl:grid-rows-[minmax(0,1fr)] xl:overflow-hidden">
+        <aside className="ui-sync-pane ui-sync-pane-side min-h-[220px] overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 xl:min-h-0">
           <section className="space-y-2 rounded-lg border border-gray-200 p-3">
             <h3 className="text-sm font-semibold text-gray-900">Story Source</h3>
             <label className="block text-xs text-gray-600">
@@ -342,7 +369,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
           </section>
         </aside>
 
-        <main className="min-h-0 overflow-y-auto p-3">
+        <main className="ui-sync-pane ui-sync-pane-main min-h-[320px] overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 xl:min-h-0">
           <section className="rounded-lg border border-gray-200 bg-white p-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-gray-900">Pipeline Flow</h3>
@@ -352,13 +379,13 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
               Next step: <span className="font-medium text-gray-700">{props.nextStep || 'none'}</span>
               {props.lastRebuildScope ? ` · last rebuild scope: ${props.lastRebuildScope}` : ''}
             </p>
-            <div className="mt-2 grid grid-cols-2 gap-2">
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
               {props.workbenchStages.map((stage) => (
                 <button
                   key={stage.stage}
                   type="button"
                   onClick={() => props.onSelectWorkbenchStage(stage.stage)}
-                  className={`rounded-md border px-2 py-1 text-left text-xs ${
+                  className={`ui-sync-btn rounded-md border px-2 py-1 text-left text-xs ${
                     props.selectedWorkbenchStage === stage.stage
                       ? 'border-blue-400 bg-blue-50'
                       : 'border-gray-200 bg-white hover:bg-gray-50'
@@ -368,22 +395,25 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
                   <p className={stage.status === 'ready' ? 'text-emerald-600' : stage.status === 'blocked' ? 'text-rose-600' : 'text-slate-500'}>
                     {stage.status}
                   </p>
+                  <p className="mt-1 text-[11px] text-gray-500">{formatStageStepList(stage.stage)}</p>
                 </button>
               ))}
             </div>
             <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700">
               <p>Selected stage: <span className="font-medium">{workbenchStageLabel(props.selectedWorkbenchStage)}</span></p>
+              <p>mapped steps: <span className="font-medium">{formatStageStepList(props.selectedWorkbenchStage)}</span></p>
               <p>
                 advance: {props.stageAdvancePlan.allowed ? 'allowed' : 'blocked'}
                 {props.stageAdvancePlan.allowed ? ` · stepBudget=${props.stageAdvancePlan.stepBudget}` : ''}
               </p>
+              {selectedStageRow ? <p className="text-gray-500">{formatStageStepStatuses(selectedStageRow)}</p> : null}
               {!props.stageAdvancePlan.allowed && props.stageAdvancePlan.actionHint ? (
                 <p className="text-rose-600">
                   {props.stageAdvancePlan.reasonCode}: {props.stageAdvancePlan.actionHint}
                 </p>
               ) : null}
             </div>
-            <div className="mt-2 grid grid-cols-2 gap-2">
+            <div className="mt-2 grid grid-cols-1 gap-2 lg:grid-cols-2">
               {props.stageProgress.map((stage) => (
                 <div key={stage.step} className="rounded-md border border-gray-200 px-2 py-1 text-xs">
                   <p className="font-medium text-gray-900">{stage.step}</p>
@@ -400,13 +430,13 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
 
           <section className="mt-3 rounded-lg border border-gray-200 bg-white p-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-900">Shot/Clip Workbench</h3>
+              <h3 className="text-sm font-semibold text-gray-900">Stage Workbench</h3>
               <p className="text-xs text-gray-500">
                 Active branch: <span className="font-medium text-gray-700">{props.activeBranchName}</span>
               </p>
             </div>
             <p className="mt-1 text-xs text-gray-500">
-              Use rerun-step after editing to recompose downstream outputs.
+              Creator edits stay stage-scoped. Use rerun-step to re-enter any pipeline step after confirming rebuild impact.
             </p>
             {props.rebuildPreview ? (
               <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800">
@@ -414,6 +444,9 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
                 <p>operation={props.rebuildPreview.operationType}</p>
                 <p>scope={props.rebuildPreview.scope}</p>
                 <p>recommended rerun={props.rebuildPreview.recommendedRerunStep}</p>
+                {isPipelineStep(props.rebuildPreview.recommendedRerunStep) ? (
+                  <p>recommended chain step is available in manual rerun control.</p>
+                ) : null}
                 <p>confirmed={props.rebuildPreview.confirmed ? 'yes' : 'no'}</p>
                 {!props.rebuildPreview.confirmed ? (
                   <button
@@ -426,7 +459,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
                 ) : null}
               </div>
             ) : null}
-            <div className="mt-3 grid grid-cols-3 gap-2">
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
               <label className="text-xs text-gray-600">
                 Rerun Step
                 <select
@@ -434,14 +467,9 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
                   onChange={(event) => props.onRerunStepChange(event.target.value as VideoPlayPipelineStep)}
                   className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-xs"
                 >
-                  <option value="narrative-ingest">narrative-ingest</option>
-                  <option value="episode-segmentation">episode-segmentation</option>
-                  <option value="screenplay">screenplay</option>
-                  <option value="storyboard">storyboard</option>
-                  <option value="asset-render">asset-render</option>
-                  <option value="edit-compose">edit-compose</option>
-                  <option value="qc-gate">qc-gate</option>
-                  <option value="release-package">release-package</option>
+                  {manualRerunSteps.map((step) => (
+                    <option key={step} value={step}>{pipelineStepLabel(step)}</option>
+                  ))}
                 </select>
               </label>
               <label className="text-xs text-gray-600">
@@ -493,7 +521,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
           </section>
         </main>
 
-        <aside className="min-h-0 overflow-y-auto border-l border-gray-200 bg-white p-3">
+        <aside className="ui-sync-pane ui-sync-pane-right min-h-[220px] overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 xl:min-h-0">
           <section className="space-y-2 rounded-lg border border-gray-200 p-3">
             <h3 className="text-sm font-semibold text-gray-900">Route Status</h3>
             <p className={`text-xs font-medium ${props.routeReady ? 'text-emerald-600' : 'text-rose-600'}`}>

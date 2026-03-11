@@ -9,6 +9,8 @@ manifest_identity:
   mod_id: world.nimi.world-studio
   tab_id: mod:world-studio
   entry: ./dist/mods/world-studio/index.js
+  styles:
+    - ./dist/mods/world-studio/index.css
   version: 1.0.0
   kind: capability-mod
   nav_slot: ui-extension.app.sidebar.mods
@@ -72,6 +74,7 @@ manifest_validation:
   required_fields:
     - id
     - entry
+    - styles
     - capabilities
   source_rule: WS-CAP-005
 ```

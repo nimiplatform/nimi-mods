@@ -129,12 +129,20 @@ cases:
     trigger_source: SystemEvent
     reason_code: null
     source_rule: T-ACC-002
+  - id: TXT-017-IMMERSIVE-WORKSPACE-SHELL
+    description: Desktop route registration requests immersive shell mode so TextPlay keeps its three-pane workspace without nested host chrome.
+    expected_ok: true
+    immersive_shell_mode: true
+    test_reference: textplay-ui-registration.test.mjs
+    source_rule: T-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:textplay-kernel-docs
     source_rule: T-ACC-003
   - command: pnpm -C nimi-mods run check:spec:textplay-kernel-docs-drift
     source_rule: T-ACC-003
   - command: pnpm -C nimi-mods run check:spec:textplay-kernel-consistency
+    source_rule: T-ACC-003
+  - command: pnpm -C nimi-mods --filter @nimiplatform/mod-textplay run test:smoke
     source_rule: T-ACC-003
   - command: pnpm -C nimi-mods run check
     source_rule: T-ACC-003

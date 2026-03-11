@@ -108,3 +108,7 @@ Each stage must allow creator edits before advancing downstream. `advance` actio
 ## V-PIPE-022 Rebuild Impact Preview Before Rerun
 
 When a stage edit triggers downstream rebuild, UI must display rebuild impact scope preview (`shot|adjacent-shots-plus-compose|clip-plus-compose|post-segmentation-full-chain`) before rerun execution.
+
+## V-PIPE-023 Manual Rerun Coverage
+
+Manual rerun controls must expose the full canonical pipeline chain so creator can target any checkpointed step from `narrative-ingest` through `release-package`.

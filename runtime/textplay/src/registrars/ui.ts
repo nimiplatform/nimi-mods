@@ -38,6 +38,7 @@ export async function registerTextplayUiExtensions(input: {
     extension: {
       type: 'tab-page',
       tabId: TEXTPLAY_TAB_ID,
+      shellMode: 'immersive',
       strategy: 'append',
       modId: TEXTPLAY_MOD_ID,
       component: () => React.createElement(

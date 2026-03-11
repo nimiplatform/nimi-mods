@@ -102,6 +102,11 @@ cases:
     expected_ok: true
     reason_code: null
     source_rule: MY-ACC-002
+  - id: MY-028-ROUTE-OVERRIDE-AUTO-FALLBACK
+    description: When a selected route override references a removed connector or model, Mint-You falls back to an advertised binding or the runtime default before AI calls execute.
+    expected_ok: true
+    reason_code: null
+    source_rule: MY-ACC-002
   - id: MY-026-PHOTO-REQUEST-DECLINED
     description: When User B declines a photo reveal request, requester receives non-blocking declined status.
     expected_ok: true

@@ -5,6 +5,11 @@ import {
   normalizeRuntimeRouteSource,
   type RuntimeRouteBinding,
 } from '@nimiplatform/sdk/mod/runtime-route';
+import { emitMintYouLog } from '../logging.js';
+import {
+  areMintYouRouteBindingsEqual,
+  sanitizeMintYouRouteBinding,
+} from '../route-binding.js';
 import { useMintYouStore } from '../state/mint-you-store.js';
 import { useMintYouRouteOptions } from '../hooks/use-mint-you-route-options.js';
 
@@ -52,7 +57,11 @@ export function MintYouSettingsDrawer({
     reloadRouteOptions,
   } = useMintYouRouteOptions();
 
-  const effectiveBinding = toDefaultBinding(routeBinding, routeOptions);
+  const sanitizedOverride = useMemo(
+    () => sanitizeMintYouRouteBinding(routeBinding, routeOptions),
+    [routeBinding, routeOptions],
+  );
+  const effectiveBinding = toDefaultBinding(sanitizedOverride, routeOptions);
   const activeSource = effectiveBinding.source;
   const connectors = routeOptions?.connectors || [];
   const activeConnectorId = activeSource === 'cloud'
@@ -72,6 +81,35 @@ export function MintYouSettingsDrawer({
   useEffect(() => {
     setModelQuery(effectiveBinding.model || '');
   }, [effectiveBinding.model]);
+
+  useEffect(() => {
+    if (!routeBinding) {
+      return;
+    }
+    if (areMintYouRouteBindingsEqual(routeBinding, sanitizedOverride)) {
+      return;
+    }
+    setRouteBinding(sanitizedOverride);
+    emitMintYouLog({
+      level: 'warn',
+      message: 'action:route-binding:auto-corrected',
+      source: 'MintYouSettingsDrawer',
+      details: {
+        from: {
+          source: routeBinding.source,
+          connectorId: routeBinding.connectorId || '',
+          model: routeBinding.model || '',
+        },
+        to: sanitizedOverride
+          ? {
+            source: sanitizedOverride.source,
+            connectorId: sanitizedOverride.connectorId || '',
+            model: sanitizedOverride.model || '',
+          }
+          : null,
+      },
+    });
+  }, [routeBinding, sanitizedOverride, setRouteBinding]);
 
   useEffect(() => {
     if (!open) {
@@ -94,6 +132,11 @@ export function MintYouSettingsDrawer({
   const applyModel = (model: string) => {
     const normalized = String(model || '').trim();
     if (!normalized) {
+      setModelQuery(effectiveBinding.model || '');
+      return;
+    }
+    if (!modelOptions.includes(normalized)) {
+      setModelQuery(effectiveBinding.model || '');
       return;
     }
     const matchedLocalModel = routeOptions?.local?.models.find((item) => item.model === normalized) || null;
