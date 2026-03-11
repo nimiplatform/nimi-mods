@@ -1,4 +1,5 @@
 import React, { Suspense } from 'react';
+import { getPromptLocale } from '@nimiplatform/sdk/mod/i18n';
 import type { HookClient } from '@nimiplatform/sdk/mod/types';
 import {
   LOCAL_CHAT_DATA_API_CHAT_TARGETS_LIST,
@@ -7,6 +8,8 @@ import {
   LOCAL_CHAT_ROUTE_SLOT,
   LOCAL_CHAT_UI_SLOT,
 } from '../contracts.js';
+import enLocale from '../locales/en.js';
+import zhLocale from '../locales/zh.js';
 
 const LazyLocalChatPage = React.lazy(async () => {
   const module = await import('../local-chat-page.js');
@@ -19,18 +22,19 @@ export async function registerLocalChatUiExtensions(input: {
   hookClient: HookClient;
 }): Promise<void> {
   const { hookClient } = input;
+  const locale = getPromptLocale() === 'zh' ? zhLocale : enLocale;
   await hookClient.ui.register({
     slot: LOCAL_CHAT_UI_SLOT,
     priority: 100,
     extension: {
       type: 'query-panel',
       modId: LOCAL_CHAT_MOD_ID,
-      title: 'Local Chat',
-      description: 'Agent friend target picker for chat route driven local-chat',
+      title: locale.QueryPanel.title,
+      description: locale.QueryPanel.description,
       queries: [
         {
           id: 'chat-targets',
-          label: 'Load Chat Targets',
+          label: locale.QueryPanel.loadTargets,
           capability: LOCAL_CHAT_DATA_API_CHAT_TARGETS_LIST,
           query: {},
           autoload: true,
@@ -39,7 +43,7 @@ export async function registerLocalChatUiExtensions(input: {
       actions: [
         {
           id: 'select-chat-target',
-          label: 'Use Selected Chat Target',
+          label: locale.QueryPanel.useSelectedTarget,
           type: 'set-fields-from-query-selection',
           queryId: 'chat-targets',
           defaults: {
@@ -61,7 +65,7 @@ export async function registerLocalChatUiExtensions(input: {
     extension: {
       type: 'nav-item',
       tabId: 'mod:local-chat',
-      label: 'Local Chat',
+      label: locale.nav.label,
       badge: 'MOD',
       icon: 'local-chat',
       strategy: 'append',
@@ -84,7 +88,7 @@ export async function registerLocalChatUiExtensions(input: {
             {
               className: 'm-4 rounded-xl border border-gray-200 bg-white p-3 text-xs text-gray-600',
             },
-            'Local Chat loading...',
+            locale.nav.loading,
           ),
         },
         React.createElement(LazyLocalChatPage),

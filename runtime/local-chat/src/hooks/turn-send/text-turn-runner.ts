@@ -1,4 +1,5 @@
 import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
+import { localChatMessage } from '../../i18n/messages.js';
 import {
   isDegenerateAssistantReply,
   isPromptEchoReply,
@@ -79,7 +80,10 @@ function splitIntoSegments(
   const normalizedText = normalizeSegmentText(text);
   if (!normalizedText) {
     return {
-      segments: ['抱歉，我现在没有可用回复。请再试一次。'],
+      segments: [localChatMessage(
+        'TurnFeedback.noReplyAvailable',
+        'Sorry, I do not have a usable reply right now. Please try again.',
+      )],
       parseMode: 'single-message',
     };
   }
@@ -295,7 +299,10 @@ function splitByPacingPlan(input: {
   const normalizedText = normalizeSegmentText(input.text);
   if (!normalizedText) {
     return {
-      segments: ['抱歉，我现在没有可用回复。请再试一次。'],
+      segments: [localChatMessage(
+        'TurnFeedback.noReplyAvailable',
+        'Sorry, I do not have a usable reply right now. Please try again.',
+      )],
       parseMode: 'single-message',
     };
   }

@@ -4,6 +4,7 @@ import {
   isPromptLikelyNsfw,
   type NsfwMediaPolicy,
 } from '../../services/policy/nsfw-media-policy.js';
+import { localChatMessage } from '../../i18n/messages.js';
 import { resolveMediaRouteConfig, toPinnedRouteBinding } from './media-route.js';
 import type { LocalChatAiClient } from '../../runtime-ai-client.js';
 import type { LocalChatResolvedMediaRoute } from '../../types.js';
@@ -43,12 +44,21 @@ function buildNsfwBlockedMessage(input: {
   routeSource: 'local' | 'cloud';
 }): string {
   if (input.policy === 'disabled') {
-    return '已拦截本次图片生成：当前内容风格已收敛，本次不发送这类画面。';
+    return localChatMessage(
+      'MediaFeedback.imageBlockedDisabled',
+      'Image generation was blocked: current content style is restrained, so this kind of visual will not be sent.',
+    );
   }
   if (input.policy === 'local-only' && input.routeSource !== 'local') {
-    return '已拦截本次图片生成：当前内容风格仅支持本地生成，请切到“本地”后重试。';
+    return localChatMessage(
+      'MediaFeedback.imageBlockedLocalOnly',
+      'Image generation was blocked: current content style only allows local generation. Switch to Local and try again.',
+    );
   }
-  return '已拦截本次图片生成：当前内容风格不允许该请求。';
+  return localChatMessage(
+    'MediaFeedback.imageBlockedGeneric',
+    'Image generation was blocked: current content style does not allow this request.',
+  );
 }
 
 function normalizeReasonCode(error: unknown): string {
@@ -78,10 +88,16 @@ function resolveIntendedRouteSource(input: {
 function toFriendlyImageErrorMessage(error: unknown): string {
   const reasonCode = normalizeReasonCode(error);
   if (reasonCode === 'AI_CONNECTOR_ID_REQUIRED') {
-    return '图片生成失败：当前还没有配置媒体路由。请在右侧“媒体路由配置”里选择连接器后重试。';
+    return localChatMessage(
+      'MediaFeedback.imageConnectorRequired',
+      'Image generation failed: no media route is configured yet. Choose a connector in Media Route Config and try again.',
+    );
   }
   if (reasonCode === 'AI_MODEL_REQUIRED') {
-    return '图片生成失败：当前媒体路由缺少模型配置。请在右侧“媒体路由配置”里补充模型后重试。';
+    return localChatMessage(
+      'MediaFeedback.imageModelRequired',
+      'Image generation failed: the current media route is missing a model. Add a model in Media Route Config and try again.',
+    );
   }
   return toErrorMessage(error);
 }
@@ -106,7 +122,7 @@ export async function runImageTurn(input: {
     return {
       status: 'failed',
       reasonCode: 'LOCAL_CHAT_MEDIA_GENERATE_FAILED',
-      message: 'image prompt is empty',
+      message: localChatMessage('MediaFeedback.imagePromptEmpty', 'Image prompt is empty.'),
     };
   }
 
@@ -126,7 +142,10 @@ export async function runImageTurn(input: {
     return {
       status: 'failed',
       reasonCode: 'LOCAL_CHAT_MEDIA_GENERATE_FAILED',
-      message: '图片生成失败：请先在右侧“媒体路由配置”中选择图片连接器。',
+      message: localChatMessage(
+        'MediaFeedback.imageCloudConnectorMissing',
+        'Image generation failed: select an image connector in Media Route Config first.',
+      ),
       routeSource: 'cloud',
     };
   }
@@ -189,7 +208,10 @@ export async function runImageTurn(input: {
       return {
         status: 'failed',
         reasonCode: 'LOCAL_CHAT_MEDIA_GENERATE_FAILED',
-        message: 'image response does not contain artifact data',
+        message: localChatMessage(
+          'MediaFeedback.imageResponseMissingArtifact',
+          'Image response does not contain artifact data.',
+        ),
         traceId: String(generated.traceId || '').trim() || undefined,
         routeSource: finalRouteSource,
       };
@@ -201,7 +223,10 @@ export async function runImageTurn(input: {
       return {
         status: 'failed',
         reasonCode: 'LOCAL_CHAT_MEDIA_GENERATE_FAILED',
-        message: 'image artifact uri is empty',
+        message: localChatMessage(
+          'MediaFeedback.imageArtifactEmpty',
+          'Image artifact URI is empty.',
+        ),
         traceId: String(generated.traceId || '').trim() || undefined,
         routeSource: finalRouteSource,
       };

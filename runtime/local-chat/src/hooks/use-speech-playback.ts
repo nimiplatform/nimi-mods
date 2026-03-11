@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import type { ChatMessage } from '../types.js';
 import type { LocalChatTarget } from '../data/index.js';
+import { localChatMessage } from '../i18n/messages.js';
 import type { LocalChatAudioPlaybackSource } from '../runtime-ai-client.js';
 import {
   isDirectVoicePlaybackUri,
@@ -228,7 +229,9 @@ export function useSpeechPlayback(input: {
       setPlayingVoiceMessageId(null);
       input.setStatusBanner({
         kind: 'warn',
-        message: `Voice playback failed: ${TTS_PLAYBACK_ERROR_CODE}`,
+        message: localChatMessage('VoiceFeedback.playbackFailed', 'Voice playback failed: {{code}}', {
+          code: TTS_PLAYBACK_ERROR_CODE,
+        }),
       });
       logRendererEvent({
         level: 'warn',
@@ -251,7 +254,7 @@ export function useSpeechPlayback(input: {
     if (!input.enableVoice) {
       input.setStatusBanner({
         kind: 'info',
-        message: 'Voice is disabled in Default Settings.',
+        message: localChatMessage('VoiceFeedback.disabled', 'Voice is disabled in Default Settings.'),
       });
       return;
     }
@@ -406,14 +409,21 @@ export function useSpeechPlayback(input: {
       if (isVoiceUnsupportedTtsFailure(reasonCode, actionHint)) {
         input.setStatusBanner({
           kind: 'warn',
-          message: 'Current voice is not supported by the selected TTS model. Please choose another voice or refresh voice list.',
-          actionLabel: input.onVoiceUnsupported ? 'Refresh Voice List' : undefined,
+          message: localChatMessage(
+            'VoiceFeedback.unsupported',
+            'Current voice is not supported by the selected TTS model. Please choose another voice or refresh voice list.',
+          ),
+          actionLabel: input.onVoiceUnsupported
+            ? localChatMessage('VoiceFeedback.refreshVoiceList', 'Refresh Voice List')
+            : undefined,
           onAction: input.onVoiceUnsupported,
         });
       } else {
         input.setStatusBanner({
           kind: 'warn',
-          message: `Voice playback failed: ${TTS_PLAYBACK_ERROR_CODE}`,
+          message: localChatMessage('VoiceFeedback.playbackFailed', 'Voice playback failed: {{code}}', {
+            code: TTS_PLAYBACK_ERROR_CODE,
+          }),
         });
       }
       logRendererEvent({

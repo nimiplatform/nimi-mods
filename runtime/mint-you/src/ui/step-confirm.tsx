@@ -39,8 +39,8 @@ export function StepConfirm() {
     if (!oasisWorldId) {
       store.setError({
         reasonCode: MINTYOU_REASON.WORLD_NOT_SELECTED,
-        message: 'OASIS world is unavailable.',
-        actionHint: 'Retry after runtime world data is ready.',
+        message: t('Messages.oasisWorldUnavailable'),
+        actionHint: t('Messages.oasisWorldRetryHint'),
       });
       return;
     }

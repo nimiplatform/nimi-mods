@@ -1,4 +1,5 @@
 import { createRendererFlowId } from '@nimiplatform/sdk/mod/logging';
+import { localChatMessage } from '../../i18n/messages.js';
 import type { ChatMessage, LocalChatBeatModality } from '../../types.js';
 import { buildErrorTurnPayload } from './error-handler.js';
 import { createUserMessage, ensureWorkingSession } from './session.js';
@@ -315,7 +316,10 @@ export async function runLocalChatTurnSend(input: {
   if (!context.selectedTarget) {
     context.setStatusBanner({
       kind: 'warn',
-      message: 'No Agent friend available. Please add an Agent friend in Contacts first.',
+      message: localChatMessage(
+        'TurnFeedback.noAgentAvailable',
+        'No Agent friend available. Please add an Agent friend in Contacts first.',
+      ),
     });
     return;
   }

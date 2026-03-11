@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getMintYouHookClient } from '../runtime-mod.js';
 import { MINTYOU_DATA_API_WORLD_OASIS_GET } from '../contracts.js';
+import { mintYouMessage } from '../i18n/messages.js';
 import { emitMintYouLog } from '../logging.js';
 import {
   type OasisWorld,
@@ -27,7 +28,7 @@ export function useOasisWorldQuery() {
         const normalized = parseOasisWorld(response);
         if (!normalized) {
           setWorld(null);
-          setError('OASIS world is unavailable.');
+          setError(mintYouMessage('Messages.oasisWorldUnavailable', 'OASIS world is unavailable.'));
           return;
         }
         setWorld(normalized);
@@ -35,7 +36,7 @@ export function useOasisWorldQuery() {
         if (cancelled) return;
         const msg = err instanceof Error ? err.message : String(err || '');
         setWorld(null);
-        setError(msg || 'OASIS world is unavailable.');
+        setError(msg || mintYouMessage('Messages.oasisWorldUnavailable', 'OASIS world is unavailable.'));
         emitMintYouLog({
           level: 'warn',
           message: 'action:oasis-world-query:failed',

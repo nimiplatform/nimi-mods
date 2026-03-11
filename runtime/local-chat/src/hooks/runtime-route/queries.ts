@@ -7,6 +7,7 @@ import {
 } from '@nimiplatform/sdk/mod/runtime-route';
 import { createRendererFlowId, logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import { emitLocalChatLog } from '../../logging.js';
+import { localChatMessage } from '../../i18n/messages.js';
 import type { ChatRouteSnapshot, UseLocalChatRuntimeRouteInput } from './types.js';
 
 const ROUTE_OPTIONS_QUERY_TIMEOUT_MS = 6000;
@@ -196,9 +197,23 @@ export async function runRouteHealthCheck(input: {
     const actionHint = String(record.actionHint || '').trim();
     input.setHealthStatus(status === 'healthy' ? 'healthy' : 'unreachable');
     if (status !== 'healthy' && input.setStatusBanner) {
+      const actionSuffix = actionHint
+        ? localChatMessage(
+          'TurnFeedback.routeHealthActionSuffix',
+          ' · action: {{actionHint}}',
+          { actionHint },
+        )
+        : '';
       input.setStatusBanner({
         kind: 'warn',
-        message: `Route health degraded (${reasonCode || 'RUNTIME_ROUTE_UNAVAILABLE'})${actionHint ? ` · action: ${actionHint}` : ''}`,
+        message: localChatMessage(
+          'TurnFeedback.routeHealthDegraded',
+          'Route health degraded ({{reasonCode}}){{actionSuffix}}',
+          {
+            reasonCode: reasonCode || 'RUNTIME_ROUTE_UNAVAILABLE',
+            actionSuffix,
+          },
+        ),
       });
     }
     logRendererEvent({

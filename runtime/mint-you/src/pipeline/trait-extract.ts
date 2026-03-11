@@ -8,6 +8,7 @@ import {
   type DnaPrimaryType,
   type DnaSecondaryTrait,
 } from '../contracts.js';
+import { mintYouMessage } from '../i18n/messages.js';
 import type { InterviewTurnSignal, TraitExtractionResult, MintYouResult } from '../types.js';
 
 export function createScoreMap<T extends string>(keys: readonly T[]): Record<string, number> {
@@ -140,8 +141,15 @@ export function extractTraitsFromInterview(
       ok: false,
       error: {
         reasonCode: MINTYOU_REASON.INTERVIEW_INCOMPLETE,
-        message: `Only ${validTurnCount} valid interview turns completed. At least 7 are required.`,
-        actionHint: 'Continue the interview conversation.',
+        message: mintYouMessage(
+          'Messages.interviewIncomplete',
+          'Only {{count}} valid interview turns completed. At least 7 are required.',
+          { count: validTurnCount },
+        ),
+        actionHint: mintYouMessage(
+          'Messages.continueInterview',
+          'Continue the interview conversation.',
+        ),
       },
     };
   }

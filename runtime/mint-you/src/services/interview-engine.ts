@@ -17,6 +17,7 @@ import type {
   InterviewStatus,
   MintYouResult,
 } from '../types.js';
+import { mintYouMessage } from '../i18n/messages.js';
 import { emitMintYouLog } from '../logging.js';
 import { createUlid } from '../utils/ulid.js';
 
@@ -325,8 +326,15 @@ export async function processInterviewTurn(
           ok: false,
           error: {
             reasonCode: MINTYOU_REASON.INTERVIEW_TURN_FAILED,
-            message: `Interview turn validation failed: ${issues}`,
-            actionHint: 'Try sending your message again.',
+            message: mintYouMessage(
+              'Messages.interviewValidationFailed',
+              'Interview turn validation failed: {{issues}}',
+              { issues },
+            ),
+            actionHint: mintYouMessage(
+              'Messages.interviewRetryHint',
+              'Try sending your message again.',
+            ),
           },
         };
       }
@@ -386,8 +394,15 @@ export async function processInterviewTurn(
         ok: false,
         error: {
           reasonCode: MINTYOU_REASON.INTERVIEW_TURN_FAILED,
-          message: `Interview turn failed: ${msg}`,
-          actionHint: 'Try sending your message again.',
+          message: mintYouMessage(
+            'Messages.interviewTurnFailed',
+            'Interview turn failed: {{detail}}',
+            { detail: msg },
+          ),
+          actionHint: mintYouMessage(
+            'Messages.interviewRetryHint',
+            'Try sending your message again.',
+          ),
         },
       };
     }
@@ -398,8 +413,14 @@ export async function processInterviewTurn(
     ok: false,
     error: {
       reasonCode: MINTYOU_REASON.INTERVIEW_TURN_FAILED,
-      message: 'Interview turn failed after retries.',
-      actionHint: 'Try sending your message again.',
+      message: mintYouMessage(
+        'Messages.interviewTurnFailedAfterRetries',
+        'Interview turn failed after retries.',
+      ),
+      actionHint: mintYouMessage(
+        'Messages.interviewRetryHint',
+        'Try sending your message again.',
+      ),
     },
   };
 }

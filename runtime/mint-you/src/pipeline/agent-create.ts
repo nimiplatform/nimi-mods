@@ -19,6 +19,7 @@ import type {
   SentimentValue,
   MbtiValue,
 } from '../contracts.js';
+import { mintYouMessage } from '../i18n/messages.js';
 import { assembleCreateAgentDto } from './dto-assemble.js';
 import { generateHandle } from '../utils/slug.js';
 
@@ -73,8 +74,14 @@ async function tryCreateAgent(
         ok: false,
         error: {
           reasonCode: MINTYOU_REASON.AGENT_CREATE_FAILED,
-          message: 'Agent creation failed: creator.agents.create returned no agent id.',
-          actionHint: 'Check backend response shape and runtime capability wiring.',
+          message: mintYouMessage(
+            'Messages.agentCreateMissingId',
+            'Agent creation failed: creator.agents.create returned no agent id.',
+          ),
+          actionHint: mintYouMessage(
+            'Messages.agentCreateMissingIdHint',
+            'Check backend response shape and runtime capability wiring.',
+          ),
         },
       };
     }
@@ -85,8 +92,8 @@ async function tryCreateAgent(
         ok: false,
         error: {
           reasonCode: MINTYOU_REASON.HANDLE_UNAVAILABLE,
-          message: 'Handle is already taken.',
-          actionHint: 'Retrying automatically with a new handle.',
+          message: mintYouMessage('Messages.handleTaken', 'Handle is already taken.'),
+          actionHint: mintYouMessage('Messages.handleRetrying', 'Retrying automatically with a new handle.'),
         },
       };
     }
@@ -95,8 +102,14 @@ async function tryCreateAgent(
         ok: false,
         error: {
           reasonCode: MINTYOU_REASON.AGENT_LIMIT_REACHED,
-          message: 'You have reached the maximum number of agents (5).',
-          actionHint: 'Remove an existing agent before creating a new one.',
+          message: mintYouMessage(
+            'Messages.agentLimitReached',
+            'You have reached the maximum number of agents (5).',
+          ),
+          actionHint: mintYouMessage(
+            'Messages.agentLimitReachedHint',
+            'Remove an existing agent before creating a new one.',
+          ),
         },
       };
     }
@@ -105,8 +118,15 @@ async function tryCreateAgent(
       ok: false,
       error: {
         reasonCode: MINTYOU_REASON.AGENT_CREATE_FAILED,
-        message: `Agent creation failed: ${msg}`,
-        actionHint: 'Check agent creation payload and backend availability.',
+        message: mintYouMessage(
+          'Messages.agentCreateFailed',
+          'Agent creation failed: {{detail}}',
+          { detail: msg },
+        ),
+        actionHint: mintYouMessage(
+          'Messages.agentCreateFailedHint',
+          'Check agent creation payload and backend availability.',
+        ),
       },
     };
   }
@@ -193,8 +213,15 @@ export async function createAgent(
     ok: false,
     error: {
       reasonCode: MINTYOU_REASON.HANDLE_UNAVAILABLE,
-      message: `Failed to generate a unique handle after ${MAX_HANDLE_RETRIES} attempts.`,
-      actionHint: 'Retry creation. The system will generate a new handle automatically.',
+      message: mintYouMessage(
+        'Messages.uniqueHandleFailed',
+        'Failed to generate a unique handle after {{attempts}} attempts.',
+        { attempts: MAX_HANDLE_RETRIES },
+      ),
+      actionHint: mintYouMessage(
+        'Messages.uniqueHandleRetryHint',
+        'Retry creation. The system will generate a new handle automatically.',
+      ),
     },
   };
 }

@@ -9,6 +9,7 @@ import {
   buildSessionSnapshot,
 } from '../services/session-manager.js';
 import { MINTYOU_DATA_API_WORLD_ACCESS_ME, MINTYOU_REASON } from '../contracts.js';
+import { mintYouMessage } from '../i18n/messages.js';
 import { emitMintYouLog } from '../logging.js';
 import { createUlid } from '../utils/ulid.js';
 import { getMintYouHookClient } from '../runtime-mod.js';
@@ -55,8 +56,11 @@ export function useMintYouSession() {
         await clearSession(scopeKey, { hookClient });
         store.setError({
           reasonCode: MINTYOU_REASON.SESSION_EXPIRED_WARN,
-          message: 'Session data expired after 7 days of inactivity.',
-          actionHint: 'Restart intake flow.',
+          message: mintYouMessage(
+            'Messages.sessionExpired',
+            'Session data expired after 7 days of inactivity.',
+          ),
+          actionHint: mintYouMessage('Messages.restartIntakeFlow', 'Restart intake flow.'),
         });
         emitMintYouLog({
           level: 'warn',

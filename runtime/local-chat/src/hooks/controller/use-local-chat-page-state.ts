@@ -18,6 +18,7 @@ import { useLocalChatTargets } from '../use-local-chat-targets.js';
 import { useLocalChatTurnSend } from '../use-local-chat-turn-send.js';
 import { useSpeechPlayback } from '../use-speech-playback.js';
 import { useSpeechTranscribe } from '../use-speech-transcribe.js';
+import { localChatMessage } from '../../i18n/messages.js';
 import { buildAgentVoiceStylePrompt } from '../../services/voice/agent-voice-style.js';
 import { resolveSupportedVoiceId } from '../../services/voice/voice-selection.js';
 import { deriveInteractionProfile } from '../turn-send/interaction-profile.js';
@@ -686,8 +687,11 @@ export function useLocalChatPageState() {
       if (isVoiceUnsupportedTtsFailure(reasonCode, actionHint)) {
         setStatusBanner({
           kind: 'warn',
-          message: 'Current voice is not supported by the selected TTS model. Please choose another voice or refresh voice list.',
-          actionLabel: 'Refresh Voice List',
+          message: localChatMessage(
+            'VoiceFeedback.unsupported',
+            'Current voice is not supported by the selected TTS model. Please choose another voice or refresh voice list.',
+          ),
+          actionLabel: localChatMessage('VoiceFeedback.refreshVoiceList', 'Refresh Voice List'),
           onAction: () => {
             void speechSettingsState.loadSpeechCatalog();
           },

@@ -162,8 +162,8 @@ export function StepInterview() {
       store.setInterviewStatus('error');
       store.setError({
         reasonCode: 'MINTYOU_INTERVIEW_TURN_FAILED',
-        message: err instanceof Error ? err.message : 'Unknown error',
-        actionHint: t('Interview.retryHint'),
+        message: err instanceof Error ? err.message : t('Messages.unknownError'),
+        actionHint: t('Messages.interviewRetryHint'),
       });
 
       if (userText) {

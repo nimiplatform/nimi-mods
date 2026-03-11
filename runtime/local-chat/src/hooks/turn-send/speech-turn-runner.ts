@@ -1,4 +1,5 @@
 import type { ChatMessageMeta } from '../../types.js';
+import { localChatMessage } from '../../i18n/messages.js';
 import { resolveAssistantSegmentKind } from './channel-policy.js';
 import type { AssistantPlanSegment } from './types.js';
 
@@ -37,7 +38,10 @@ export function buildAssistantMessagesAndTurns(input: BuildAssistantMessagesInpu
 } {
   const fallbackSegment: AssistantPlanSegment = {
     id: `seg-${Date.now().toString(36)}-0`,
-    content: '抱歉，我现在没有可用回复。请再试一次。',
+    content: localChatMessage(
+      'TurnFeedback.noReplyAvailable',
+      'Sorry, I do not have a usable reply right now. Please try again.',
+    ),
     delayMs: 0,
     channel: 'text',
     intent: 'answer',
