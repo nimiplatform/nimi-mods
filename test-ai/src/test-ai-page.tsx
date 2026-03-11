@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import {
   buildLocalImageWorkflowExtensions,
 } from '@nimiplatform/sdk/mod/runtime';
@@ -1100,7 +1100,7 @@ function DiagnosticsPanel(props: DiagnosticsPanelProps) {
               return (
                 <div key={k} className="mb-1">
                   <span className="text-gray-400">{k}</span>
-                  <pre className="mt-0.5 max-h-24 overflow-auto rounded bg-gray-50 px-2 py-1 font-mono text-xs text-gray-900">{displayValue}</pre>
+                  <pre className="mt-0.5 whitespace-pre-wrap break-all rounded bg-gray-50 px-2 py-1 font-mono text-xs text-gray-900">{displayValue}</pre>
                 </div>
               );
             }
@@ -1221,11 +1221,20 @@ function RunButton(props: { busy: boolean; busyLabel?: string; label: string; on
   return (
     <button
       type="button"
-      className="self-start rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+      className="inline-flex self-start items-center gap-2 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
       disabled={props.busy}
       onClick={props.onClick}
     >
-      {props.busy ? (asString(props.busyLabel) || 'Running...') : props.label}
+      {props.busy ? (
+        <>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white/90 [animation-delay:-0.2s]" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white/90 [animation-delay:-0.1s]" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white/90" />
+          </span>
+          <span>{(asString(props.busyLabel) || 'Running...').replace(/\.{3}$/, '')}</span>
+        </>
+      ) : props.label}
     </button>
   );
 }
@@ -1270,19 +1279,186 @@ type TextGeneratePanelProps = {
   onRouteReload: () => void;
 };
 
+type RouteSelectOption = {
+  value: string;
+  label: string;
+  disabled?: boolean;
+};
+
+function RouteSelect(props: {
+  value: string;
+  options: RouteSelectOption[];
+  disabled?: boolean;
+  onChange: (value: string) => void;
+}) {
+  const { value, options, disabled = false, onChange } = props;
+  const [open, setOpen] = React.useState(false);
+  const rootRef = React.useRef<HTMLDivElement | null>(null);
+  const selected = options.find((option) => option.value === value) || options[0] || null;
+
+  React.useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (rootRef.current && !rootRef.current.contains(target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, []);
+
+  return (
+    <div className="relative" ref={rootRef}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex w-full items-center justify-between rounded-[18px] border border-gray-200 bg-white px-4 py-3 text-left text-gray-900 transition hover:border-gray-300 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
+      >
+        <span className="truncate">{selected?.label || 'Select'}</span>
+        <svg
+          className={`ml-3 h-4 w-4 shrink-0 text-gray-700 transition ${open ? 'rotate-180' : ''}`}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+
+      {open ? (
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-40 overflow-hidden rounded-[20px] border border-gray-200 bg-white shadow-[0_20px_40px_rgba(15,23,42,0.14)]">
+          <div className="max-h-64 overflow-y-auto p-1.5">
+            {options.map((option) => {
+              const active = option.value === value;
+              return (
+                <button
+                  key={`${option.value}-${option.label}`}
+                  type="button"
+                  disabled={option.disabled}
+                  onClick={() => {
+                    if (option.disabled) return;
+                    onChange(option.value);
+                    setOpen(false);
+                  }}
+                  className={
+                    active
+                      ? 'flex w-full items-center justify-between rounded-[14px] bg-[#4ECCA3]/14 px-3 py-2.5 text-left text-sm text-[#2E8D73]'
+                      : 'flex w-full items-center justify-between rounded-[14px] px-3 py-2.5 text-left text-sm text-gray-800 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-300'
+                  }
+                >
+                  <span className="truncate">{option.label}</span>
+                  <span className={active ? 'text-[#2E8D73]' : 'text-transparent'}>✓</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function TextGeneratePanel(props: TextGeneratePanelProps) {
   const { state, runtimeClient, onStateChange, onRouteReload } = props;
   const [prompt, setPrompt] = React.useState('你好，请用两句话介绍你自己。');
   const [system, setSystem] = React.useState('');
-  const [temperature, setTemperature] = React.useState('');
+  const [temperature, setTemperature] = React.useState('1');
   const [maxTokens, setMaxTokens] = React.useState('');
   const [showAdvanced, setShowAdvanced] = React.useState(false);
+  const [showModelMenu, setShowModelMenu] = React.useState(false);
+  const [showRouteDialog, setShowRouteDialog] = React.useState(false);
+  const [showConversation, setShowConversation] = React.useState(false);
+  const [showDeveloperDetails, setShowDeveloperDetails] = React.useState(false);
+  const promptRef = React.useRef<HTMLTextAreaElement | null>(null);
+  const advancedRef = React.useRef<HTMLDivElement | null>(null);
+  const modelMenuRef = React.useRef<HTMLDivElement | null>(null);
+
+  const {
+    effectiveBinding,
+    activeSource,
+    activeConnectorId,
+    activeModel,
+    modelOptions,
+    cloudCatalogMissing,
+    activeModelInOptions,
+  } = resolveRouteModelPickerState(state.snapshot, state.binding);
+  const tokenConnectors = state.snapshot?.connectors || [];
+  const activeConnector = tokenConnectors.find((item) => item.id === activeConnectorId) || null;
+  const [manualModelDraft, setManualModelDraft] = React.useState(activeModel);
+  const temperatureValue = Number.isFinite(Number(temperature))
+    ? Math.max(0, Math.min(2, Number(temperature)))
+    : 1;
+  const quickTokenOptions = ['Auto', '1024', '2048', '4096'] as const;
+  const modelMenuOptions = modelOptions.length > 0 ? modelOptions : (activeModel ? [activeModel] : []);
+  const modelDisplayName = activeModel || effectiveBinding?.model || effectiveBinding?.modelId || 'Select model';
+  const sourceOptions: RouteSelectOption[] = [
+    { value: 'local', label: 'local' },
+    { value: 'cloud', label: 'cloud' },
+  ];
+  const connectorOptions: RouteSelectOption[] = [
+    { value: '', label: '--' },
+    ...tokenConnectors.map((connector) => ({
+      value: connector.id,
+      label: connector.label || connector.id,
+    })),
+  ];
+  const modelSelectOptions: RouteSelectOption[] = modelOptions.length === 0
+    ? [{
+        value: '',
+        label: activeSource === 'cloud' ? 'Connector catalog missing models' : 'No local models',
+        disabled: true,
+      }]
+    : [
+        { value: '', label: 'Select model' },
+        ...modelOptions.map((model) => ({ value: model, label: model })),
+      ];
+
+  React.useEffect(() => {
+    setManualModelDraft(activeModel);
+  }, [activeModel]);
+
+  React.useEffect(() => {
+    const node = promptRef.current;
+    if (!node) return;
+    node.style.height = '0px';
+    node.style.height = `${Math.min(Math.max(node.scrollHeight, 56), 240)}px`;
+  }, [prompt]);
+
+  React.useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (showAdvanced && advancedRef.current && !advancedRef.current.contains(target)) {
+        setShowAdvanced(false);
+      }
+      if (showModelMenu && modelMenuRef.current && !modelMenuRef.current.contains(target)) {
+        setShowModelMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [showAdvanced, showModelMenu]);
+
+  React.useEffect(() => {
+    if (state.output) {
+      setShowConversation(true);
+    }
+  }, [state.output]);
+
+  React.useEffect(() => {
+    if (showDeveloperDetails) {
+      setShowConversation(false);
+    }
+  }, [showDeveloperDetails]);
 
   const handleRun = React.useCallback(async () => {
     if (!asString(prompt)) {
       onStateChange((prev) => ({ ...prev, error: 'Prompt is empty.' }));
       return;
     }
+    setShowAdvanced(false);
+    setShowModelMenu(false);
     onStateChange((prev) => ({ ...prev, busy: true, busyLabel: 'Preparing route...', error: '', diagnostics: makeEmptyDiagnostics() }));
     const t0 = Date.now();
     const binding = resolveEffectiveBinding(state.snapshot, state.binding) || undefined;
@@ -1348,78 +1524,463 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
     }
   }, [prompt, system, temperature, maxTokens, state.snapshot, state.binding, runtimeClient, onStateChange]);
 
+  const selectModel = React.useCallback((model: string) => {
+    if (!asString(model)) return;
+    onStateChange((prev) => ({
+      ...prev,
+      binding: bindingForModel(prev.snapshot, model, resolveEffectiveBinding(prev.snapshot, prev.binding)),
+    }));
+    setShowModelMenu(false);
+  }, [onStateChange]);
+
+  const applySource = React.useCallback((source: RuntimeRouteSource) => {
+    onStateChange((prev) => ({
+      ...prev,
+      binding: bindingForSource(prev.snapshot, source),
+    }));
+  }, [onStateChange]);
+
+  const applyConnector = React.useCallback((connectorId: string) => {
+    onStateChange((prev) => ({
+      ...prev,
+      binding: bindingForConnector(prev.snapshot, connectorId, resolveEffectiveBinding(prev.snapshot, prev.binding)),
+    }));
+  }, [onStateChange]);
+
+  const applyManualModel = React.useCallback((model: string) => {
+    setManualModelDraft(model);
+    onStateChange((prev) => ({
+      ...prev,
+      binding: bindingForModel(prev.snapshot, model, resolveEffectiveBinding(prev.snapshot, prev.binding)),
+    }));
+  }, [onStateChange]);
+
+  const isEmptyState = !state.output && !state.busy && !state.error;
+  const titleHero = (
+    <div className="mb-5 flex flex-col items-center text-center">
+      <h1 className="text-[58px] font-black uppercase tracking-[0.08em] text-[#0f172a] sm:text-[72px]">
+        Test AI
+      </h1>
+    </div>
+  );
+  const composer = (
+    <div className="mx-auto w-full max-w-4xl">
+      <div className="relative rounded-[34px] border border-gray-200 bg-white px-5 pb-14 pt-3 shadow-[0_20px_70px_rgba(15,23,42,0.08)] transition-all focus-within:border-[#4ECCA3]/50 focus-within:shadow-[0_20px_70px_rgba(78,204,163,0.16)]">
+              <textarea
+                ref={promptRef}
+                className="min-h-[56px] w-full resize-none overflow-y-auto border-0 bg-transparent pr-2 text-[16px] leading-7 text-gray-900 outline-none placeholder:text-gray-400"
+                value={prompt}
+                onChange={(event) => setPrompt(event.target.value)}
+                placeholder="Ask away. Long-form writing, summaries, and structured answers all work well here."
+              />
+
+              <div className="absolute bottom-4 left-4 flex items-center gap-2">
+                <div className="relative" ref={advancedRef}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAdvanced((prev) => !prev);
+                      setShowModelMenu(false);
+                    }}
+                    className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition hover:border-gray-300 hover:text-gray-800"
+                    title="Advanced settings"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 3v4" />
+                      <path d="M12 17v4" />
+                      <path d="M3 12h4" />
+                      <path d="M17 12h4" />
+                      <path d="m5.64 5.64 2.83 2.83" />
+                      <path d="m15.53 15.53 2.83 2.83" />
+                      <path d="m5.64 18.36 2.83-2.83" />
+                      <path d="m15.53 8.47 2.83-2.83" />
+                      <circle cx="12" cy="12" r="3.5" />
+                    </svg>
+                  </button>
+
+                  {showAdvanced ? (
+                    <div className="absolute bottom-14 left-0 z-20 w-[360px] rounded-[26px] border border-gray-200 bg-white p-4 shadow-[0_22px_55px_rgba(15,23,42,0.16)]">
+                      <div className="mb-4 text-sm font-semibold text-gray-900">Advanced Parameters</div>
+                      <div className="space-y-4">
+                        <label className="block">
+                          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">System Prompt</div>
+                          <textarea
+                            className="h-24 w-full resize-none rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 text-sm leading-6 text-gray-800 outline-none focus:border-[#4ECCA3] focus:bg-white"
+                            value={system}
+                            onChange={(event) => setSystem(event.target.value)}
+                            placeholder="Optional system instructions..."
+                          />
+                        </label>
+                        <div>
+                          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">Temperature</div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="2"
+                            step="0.1"
+                            value={temperatureValue}
+                            onChange={(event) => setTemperature(event.target.value)}
+                            className="h-2 w-full cursor-pointer appearance-none rounded-full bg-gray-200 accent-[#4ECCA3]"
+                          />
+                          <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+                            <span>Precise</span>
+                            <span>{temperatureValue.toFixed(1)}</span>
+                            <span>Creative</span>
+                          </div>
+                        </div>
+                        <div>
+                          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">Max Tokens</div>
+                          <div className="flex flex-wrap gap-2">
+                            {quickTokenOptions.map((option) => {
+                              const active = option === 'Auto' ? !asString(maxTokens) : maxTokens === option;
+                              return (
+                                <button
+                                  key={option}
+                                  type="button"
+                                  onClick={() => setMaxTokens(option === 'Auto' ? '' : option)}
+                                  className={active
+                                    ? 'rounded-full bg-[#111827] px-3 py-1.5 text-xs text-white'
+                                    : 'rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 transition hover:border-gray-300 hover:text-gray-900'}
+                                >
+                                  {option}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="absolute bottom-4 right-4 flex items-center gap-2">
+                <div className="relative" ref={modelMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowModelMenu((prev) => !prev);
+                      setShowAdvanced(false);
+                    }}
+                    className="inline-flex h-11 items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-4 text-sm text-gray-700 transition hover:border-gray-300 hover:bg-white"
+                  >
+                    <span className="max-w-[170px] truncate">{modelDisplayName}</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </button>
+
+                  {showModelMenu ? (
+                    <div className="absolute bottom-14 right-0 z-20 w-[320px] rounded-[26px] border border-gray-200 bg-white p-2 shadow-[0_22px_55px_rgba(15,23,42,0.16)]">
+                      <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">Models</div>
+                      <div className="max-h-80 overflow-y-auto py-1">
+                        {modelMenuOptions.length > 0 ? modelMenuOptions.map((model) => {
+                          const active = model === activeModel;
+                          return (
+                            <button
+                              key={model}
+                              type="button"
+                              onClick={() => selectModel(model)}
+                              className="flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left text-sm text-gray-700 transition hover:bg-gray-50"
+                            >
+                              <span className="truncate">{model}</span>
+                              <span className={active ? 'text-[#4ECCA3]' : 'text-transparent'}>{active ? '\u2713' : ''}</span>
+                            </button>
+                          );
+                        }) : (
+                          <div className="px-3 py-3 text-sm text-gray-400">
+                            {cloudCatalogMissing ? 'Connector catalog is missing model data.' : 'No model options available yet.'}
+                          </div>
+                        )}
+                      </div>
+                      <div className="my-1 h-px bg-gray-100" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowModelMenu(false);
+                          setShowAdvanced(false);
+                          setShowRouteDialog(true);
+                        }}
+                        className="flex w-full items-center rounded-2xl px-3 py-2.5 text-left text-sm text-gray-700 transition hover:bg-gray-50"
+                      >
+                        Manual Override / Custom Route
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+
+                <button
+                  type="button"
+                  disabled={state.busy || !asString(prompt)}
+                  onClick={() => { void handleRun(); }}
+                  className="flex h-11 w-11 items-center justify-center rounded-full bg-[#111827] text-white transition hover:bg-[#1f2937] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+                  title="Send"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 19V5" />
+                    <path d="m5 12 7-7 7 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+    </div>
+  );
+
   return (
-    <div className="flex flex-col gap-3">
-      <RouteBindingEditor
-        capabilityId="text.generate"
-        snapshot={state.snapshot}
-        binding={state.binding}
-        loading={state.routeLoading}
-        error={state.routeError}
-        onReload={onRouteReload}
-        onBindingChange={(binding) => onStateChange((prev) => ({ ...prev, binding }))}
-      />
-      <textarea
-        className="h-28 w-full resize-y rounded-lg border border-gray-300 bg-white p-2 font-mono text-xs"
-        value={prompt}
-        onChange={(event) => setPrompt(event.target.value)}
-        placeholder="User message / prompt"
-      />
-      <button
-        type="button"
-        className="self-start text-xs text-blue-600 hover:underline"
-        onClick={() => setShowAdvanced(!showAdvanced)}
-      >
-        {showAdvanced ? '▼ Hide advanced' : '▶ Advanced options'}
-      </button>
-      {showAdvanced ? (
-        <div className="grid grid-cols-1 gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 md:grid-cols-3">
-          <label className="flex flex-col gap-1 text-xs">
-            <span className="text-gray-500">System prompt</span>
-            <textarea
-              className="h-16 resize-y rounded-md border border-gray-300 bg-white p-2 font-mono text-xs"
-              value={system}
-              onChange={(event) => setSystem(event.target.value)}
-              placeholder="(optional)"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-xs">
-            <span className="text-gray-500">Temperature</span>
-            <input
-              type="number" min="0" max="2" step="0.1"
-              className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
-              value={temperature}
-              onChange={(event) => setTemperature(event.target.value)}
-              placeholder="default"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-xs">
-            <span className="text-gray-500">Max tokens</span>
-            <input
-              type="number" min="1"
-              className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
-              value={maxTokens}
-              onChange={(event) => setMaxTokens(event.target.value)}
-              placeholder="default"
-            />
-          </label>
+    <div className="test-ai-scroll-shell relative flex h-full min-h-[720px] flex-col overflow-y-auto overflow-x-hidden bg-[#f8fafc]">
+      <style>{`
+        .test-ai-scroll-shell,
+        .test-ai-scroll-shell * {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+        }
+        .test-ai-scroll-shell *::-webkit-scrollbar {
+          width: 10px;
+          height: 10px;
+        }
+        .test-ai-scroll-shell *::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .test-ai-scroll-shell *::-webkit-scrollbar-thumb {
+          background: rgba(148, 163, 184, 0.55);
+          border-radius: 9999px;
+          border: 2px solid transparent;
+          background-clip: content-box;
+        }
+        .test-ai-scroll-shell *::-webkit-scrollbar-thumb:hover {
+          background: rgba(100, 116, 139, 0.7);
+          border-radius: 9999px;
+          border: 2px solid transparent;
+          background-clip: content-box;
+        }
+        .test-ai-scroll-shell *::-webkit-scrollbar-button {
+          display: none;
+          width: 0;
+          height: 0;
+        }
+        .test-ai-scroll-shell *::-webkit-scrollbar-corner {
+          background: transparent;
+        }
+      `}</style>
+      <div className="mx-auto flex min-h-full w-full max-w-5xl flex-1 flex-col px-8 pb-10 pt-6">
+        {isEmptyState ? (
+          <div className="flex min-h-[calc(100vh-180px)] flex-1 items-center justify-center">
+            <div className="flex w-full max-w-4xl flex-col items-center">
+              {titleHero}
+              {composer}
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-1 flex-col">
+            <div className="mx-auto mb-4 flex w-full max-w-4xl justify-end">
+              {state.output ? (
+                <button
+                  type="button"
+                  onClick={() => setShowConversation((prev) => !prev)}
+                  className="inline-flex items-center gap-2 rounded-full border border-[#4ECCA3]/20 bg-[#4ECCA3]/10 px-4 py-2 text-sm text-[#2E8D73] transition hover:bg-[#4ECCA3]/14"
+                >
+                  <span>{showConversation ? 'Hide conversation' : 'Show conversation'}</span>
+                  <svg
+                    className={`h-4 w-4 transition-transform ${showConversation ? 'rotate-180' : ''}`}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </button>
+              ) : null}
+            </div>
+
+            {showConversation && state.output ? (
+              <div className="mx-auto mb-6 flex w-full max-w-4xl flex-col gap-5">
+                <div className="self-end rounded-[26px] bg-[#eef8f4] px-5 py-3 text-[15px] leading-7 text-gray-900 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
+                  {prompt}
+                </div>
+                <div className="rounded-[30px] border border-gray-200 bg-white px-6 py-5 shadow-[0_20px_45px_rgba(15,23,42,0.06)]">
+                  <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+                    <span>Assistant</span>
+                    {state.result === 'passed' ? (
+                      <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] tracking-normal text-green-700">Ready</span>
+                    ) : null}
+                  </div>
+                  <div className="whitespace-pre-wrap text-[15px] leading-8 text-gray-800">{asString(state.output)}</div>
+                </div>
+              </div>
+            ) : null}
+
+            {state.busy && !state.output ? (
+              <div className="mx-auto mb-6 w-full max-w-4xl rounded-[28px] border border-gray-200 bg-white px-6 py-5 text-sm text-gray-600 shadow-[0_20px_45px_rgba(15,23,42,0.06)]">
+                <div className="inline-flex items-center gap-3">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-emerald-400 [animation-delay:-0.2s]" />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-emerald-400 [animation-delay:-0.1s]" />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-emerald-400" />
+                  </span>
+                  <span>{(state.busyLabel || 'Running...').replace(/\.{3}$/, '')}</span>
+                </div>
+              </div>
+            ) : null}
+
+            {state.error ? (
+              <div className="mx-auto mb-6 w-full max-w-4xl rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {state.error}
+              </div>
+            ) : null}
+
+            <div className="mx-auto mt-2 w-full max-w-4xl shrink-0">
+              {titleHero}
+              {composer}
+            </div>
+
+            {state.busy && state.busyLabel === 'Warming local model...' ? (
+              <div className="mt-4">
+                <InfoBox message="Local runtime is prewarming the selected model before sending your prompt." />
+              </div>
+            ) : null}
+
+            {(state.rawResponse || state.diagnostics.requestParams || state.diagnostics.resolvedRoute || state.diagnostics.responseMetadata) ? (
+              <div className="mt-4 pb-8">
+                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                  <button
+                    type="button"
+                    onClick={() => setShowDeveloperDetails((prev) => !prev)}
+                    className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium text-gray-700"
+                  >
+                    <svg
+                      className={`h-4 w-4 transition-transform ${showDeveloperDetails ? 'rotate-90' : ''}`}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path d="m9 6 6 6-6 6" />
+                    </svg>
+                    <span>Developer details</span>
+                  </button>
+                  {showDeveloperDetails ? (
+                    <div className="border-t border-gray-200 p-4">
+                    <div className="space-y-4 pb-4">
+                      <DiagnosticsPanel diagnostics={state.diagnostics} />
+                      {state.rawResponse ? <RawJsonSection content={state.rawResponse} /> : null}
+                    </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
+      </div>
+
+      {showRouteDialog ? (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/25 px-6">
+          <div className="w-full max-w-2xl rounded-[30px] bg-white p-6 shadow-[0_30px_80px_rgba(15,23,42,0.2)]">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <div className="text-lg font-semibold text-gray-950">Manual Override / Custom Route</div>
+                <div className="mt-1 text-sm text-gray-500">
+                  Use advanced routing controls when you need to pin source, connector, or a custom model.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRouteDialog(false)}
+                className="rounded-full border border-gray-200 p-2 text-gray-500 transition hover:border-gray-300 hover:text-gray-700"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {state.routeError ? (
+              <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                {state.routeError}
+              </div>
+            ) : null}
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <label className="flex flex-col gap-2 text-sm">
+                <span className="text-gray-500">Source</span>
+                <RouteSelect
+                  value={activeSource}
+                  options={sourceOptions}
+                  onChange={(value) => applySource(value as RuntimeRouteSource)}
+                  disabled={!state.snapshot}
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm">
+                <span className="text-gray-500">Connector</span>
+                <RouteSelect
+                  value={activeSource === 'cloud' ? activeConnectorId : ''}
+                  options={connectorOptions}
+                  onChange={applyConnector}
+                  disabled={!state.snapshot || activeSource !== 'cloud'}
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm">
+                <span className="text-gray-500">Model</span>
+                <RouteSelect
+                  value={activeModelInOptions ? activeModel : ''}
+                  options={modelSelectOptions}
+                  onChange={applyManualModel}
+                  disabled={!state.snapshot || modelOptions.length === 0}
+                />
+              </label>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+              {activeSource === 'cloud'
+                ? `Provider: ${activeConnector?.label || activeConnector?.id || 'unknown'}`
+                : 'Using local runtime model catalog'}
+            </div>
+
+            <label className="mt-4 flex flex-col gap-2 text-sm">
+              <span className="text-gray-500">Manual model override</span>
+              <input
+                className="rounded-2xl border border-gray-200 bg-white px-3 py-3 outline-none focus:border-[#4ECCA3]"
+                value={manualModelDraft}
+                onChange={(event) => setManualModelDraft(event.target.value)}
+                onBlur={() => applyManualModel(manualModelDraft)}
+                placeholder="model id"
+              />
+            </label>
+
+            <div className="mt-6 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={onRouteReload}
+                disabled={state.routeLoading}
+                className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 transition hover:border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {state.routeLoading ? 'Refreshing...' : 'Refresh'}
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onStateChange((prev) => ({ ...prev, binding: null }))}
+                  className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 transition hover:border-gray-300 hover:bg-gray-50"
+                >
+                  Use default
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    applyManualModel(manualModelDraft);
+                    setShowRouteDialog(false);
+                  }}
+                  className="rounded-full bg-[#111827] px-4 py-2 text-sm text-white transition hover:bg-[#1f2937]"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       ) : null}
-      <RunButton
-        busy={state.busy}
-        busyLabel={state.busyLabel}
-        label="Run Text Generate"
-        onClick={() => { void handleRun(); }}
-      />
-      {state.busy && state.busyLabel === 'Warming local model...' ? (
-        <InfoBox message="Local runtime is prewarming the selected model before sending your prompt." />
-      ) : null}
-      {state.error ? <ErrorBox message={state.error} /> : null}
-      {state.output ? (
-        <pre className="max-h-60 overflow-auto rounded-md bg-gray-50 p-2 text-xs">{asString(state.output)}</pre>
-      ) : null}
-      <DiagnosticsPanel diagnostics={state.diagnostics} />
-      {state.rawResponse ? <RawJsonSection content={state.rawResponse} /> : null}
     </div>
   );
 }
@@ -1436,19 +1997,123 @@ type TextEmbedPanelProps = {
 function TextEmbedPanel(props: TextEmbedPanelProps) {
   const { state, runtimeClient, onStateChange, onRouteReload } = props;
   const [text, setText] = React.useState('Hello, world.');
+  const [showModelMenu, setShowModelMenu] = React.useState(false);
+  const [showRouteDialog, setShowRouteDialog] = React.useState(false);
+  const [manualModelDraft, setManualModelDraft] = React.useState('');
+  const [copiedVector, setCopiedVector] = React.useState(false);
+  const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
+  const modelMenuRef = React.useRef<HTMLDivElement | null>(null);
+
+  const {
+    effectiveBinding,
+    activeSource,
+    activeConnectorId,
+    activeModel,
+    modelOptions,
+    cloudCatalogMissing,
+    activeModelInOptions,
+  } = resolveRouteModelPickerState(state.snapshot, state.binding);
+  const tokenConnectors = state.snapshot?.connectors || [];
+  const activeConnector = tokenConnectors.find((item) => item.id === activeConnectorId) || null;
+  const modelMenuOptions = modelOptions.length > 0 ? modelOptions : (activeModel ? [activeModel] : []);
+  const modelDisplayName = activeModel || effectiveBinding?.model || effectiveBinding?.modelId || 'Select model';
+  const textLength = text.length;
+  const lineCount = Math.max(1, text.split(/\r?\n/g).length);
+  const estimatedTokens = Math.max(1, Math.ceil(asString(text).length / 4));
+  const sourceSelectOptions: RouteSelectOption[] = [
+    { value: 'local', label: 'local' },
+    { value: 'cloud', label: 'cloud' },
+  ];
+  const connectorSelectOptions: RouteSelectOption[] = [
+    { value: '', label: '--', disabled: true },
+    ...tokenConnectors.map((connector) => ({
+      value: connector.id,
+      label: connector.label || connector.id,
+    })),
+  ];
+  const modelSelectOptions: RouteSelectOption[] = [
+    {
+      value: '',
+      label: modelOptions.length === 0
+        ? (activeSource === 'cloud' ? 'Connector catalog missing models' : 'No local models')
+        : 'Select model',
+      disabled: true,
+    },
+    ...modelOptions.map((model) => ({ value: model, label: model })),
+  ];
+
+  React.useEffect(() => {
+    setManualModelDraft(activeModel);
+  }, [activeModel]);
+
+  React.useEffect(() => {
+    const node = textareaRef.current;
+    if (!node) return;
+    node.style.height = '0px';
+    node.style.height = `${Math.min(Math.max(node.scrollHeight, 280), 560)}px`;
+  }, [text]);
+
+  React.useEffect(() => {
+    if (cloudCatalogMissing || (asString(activeModel) && !activeModelInOptions)) {
+      setShowRouteDialog(true);
+    }
+  }, [cloudCatalogMissing, activeModel, activeModelInOptions]);
+
+  React.useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (showModelMenu && modelMenuRef.current && !modelMenuRef.current.contains(target)) {
+        setShowModelMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [showModelMenu]);
+
+  const applySource = React.useCallback((source: RuntimeRouteSource) => {
+    onStateChange((prev) => ({
+      ...prev,
+      binding: bindingForSource(prev.snapshot, source),
+    }));
+  }, [onStateChange]);
+
+  const applyConnector = React.useCallback((connectorId: string) => {
+    onStateChange((prev) => ({
+      ...prev,
+      binding: bindingForConnector(prev.snapshot, connectorId, resolveEffectiveBinding(prev.snapshot, prev.binding)),
+    }));
+  }, [onStateChange]);
+
+  const applyManualModel = React.useCallback((model: string) => {
+    onStateChange((prev) => ({
+      ...prev,
+      binding: bindingForModel(prev.snapshot, model, prev.binding),
+    }));
+  }, [onStateChange]);
 
   const handleRun = React.useCallback(async () => {
     if (!asString(text)) {
       onStateChange((prev) => ({ ...prev, error: 'Input text is empty.' }));
       return;
     }
-    onStateChange((prev) => ({ ...prev, busy: true, error: '', diagnostics: makeEmptyDiagnostics() }));
+    onStateChange((prev) => ({
+      ...prev,
+      busy: true,
+      busyLabel: 'Preparing route...',
+      error: '',
+      diagnostics: makeEmptyDiagnostics(),
+    }));
     const t0 = Date.now();
     const binding = resolveEffectiveBinding(state.snapshot, state.binding) || undefined;
     const requestParams: Record<string, unknown> = { input: text, ...(binding ? { binding } : {}) };
     let resolved: ModRuntimeResolvedBinding | undefined;
     try {
       resolved = await runtimeClient.route.resolve({ capability: 'text.embed' as RuntimeCanonicalCapability, binding });
+      onStateChange((prev) => ({
+        ...prev,
+        busy: true,
+        busyLabel: resolved?.source === 'local' ? 'Warming local embedding model...' : 'Generating embedding...',
+      }));
       const result = await runtimeClient.ai.embedding.generate({ input: text, binding });
       const elapsed = Date.now() - t0;
       const vec = result.vectors[0] || [];
@@ -1457,8 +2122,15 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
       onStateChange((prev) => ({
         ...prev,
         busy: false,
+        busyLabel: undefined,
         result: 'passed',
-        output: { dimensions: vec.length, vectors: result.vectors.length, preview: `[${preview}${vec.length > 8 ? ', …' : ''}]` },
+        output: {
+          dimensions: vec.length,
+          vectors: result.vectors.length,
+          preview: `[${preview}${vec.length > 8 ? ', …' : ''}]`,
+          values: vec,
+          vectorText: `[${vec.join(', ')}]`,
+        },
         rawResponse: toPrettyJson({ request: requestParams, resolved, response: result }),
         diagnostics: {
           requestParams,
@@ -1479,6 +2151,7 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
       onStateChange((prev) => ({
         ...prev,
         busy: false,
+        busyLabel: undefined,
         result: 'failed',
         error: message,
         rawResponse: toPrettyJson({ request: requestParams, resolved, error: message }),
@@ -1487,34 +2160,320 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
     }
   }, [text, state.snapshot, state.binding, runtimeClient, onStateChange]);
 
-  const embedOutput = state.output as { dimensions?: number; vectors?: number; preview?: string } | null;
+  const embedOutput = state.output as {
+    dimensions?: number;
+    vectors?: number;
+    preview?: string;
+    values?: number[];
+    vectorText?: string;
+  } | null;
+  const responseMeta = state.diagnostics.responseMetadata;
+  const outputText = embedOutput?.vectorText || '';
+
+  const handleCopyVector = React.useCallback(() => {
+    if (!outputText) return;
+    void navigator.clipboard.writeText(outputText).then(() => {
+      setCopiedVector(true);
+      setTimeout(() => setCopiedVector(false), 1500);
+    });
+  }, [outputText]);
 
   return (
-    <div className="flex flex-col gap-3">
-      <RouteBindingEditor
-        capabilityId="text.embed"
-        snapshot={state.snapshot}
-        binding={state.binding}
-        loading={state.routeLoading}
-        error={state.routeError}
-        onReload={onRouteReload}
-        onBindingChange={(binding) => onStateChange((prev) => ({ ...prev, binding }))}
-      />
-      <input
-        className="w-full rounded-lg border border-gray-300 bg-white p-2 font-mono text-xs"
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        placeholder="Input text to embed"
-      />
-      <RunButton busy={state.busy} label="Run Text Embed" onClick={() => { void handleRun(); }} />
+    <div className="relative flex flex-col gap-5">
+      <div className="grid gap-4 bg-[#f8fafc] lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+          <div className="flex min-h-[440px] flex-col overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+            {showRouteDialog ? (
+              <div className="border-b border-gray-100 bg-[#fbfcfd] px-5 py-5">
+                <div className="mb-5 flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-lg font-semibold text-gray-950">Advanced Routing Configuration</div>
+                    <div className="mt-1 text-sm text-gray-500">
+                      Pin source, connector, or model when you need to inspect a specific embedding path.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowRouteDialog(false)}
+                    className="rounded-full border border-gray-200 p-2 text-gray-500 transition hover:border-gray-300 hover:text-gray-700"
+                    title="Collapse"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="m18 15-6-6-6 6" />
+                    </svg>
+                  </button>
+                </div>
+
+                {state.routeError ? (
+                  <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                    {state.routeError}
+                  </div>
+                ) : null}
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <label className="flex flex-col gap-2 text-sm">
+                    <span className="text-gray-500">Source</span>
+                    <RouteSelect
+                      value={activeSource}
+                      options={sourceSelectOptions}
+                      onChange={(value) => applySource(value as RuntimeRouteSource)}
+                      disabled={!state.snapshot}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-2 text-sm">
+                    <span className="text-gray-500">Connector</span>
+                    <RouteSelect
+                      value={activeSource === 'cloud' ? activeConnectorId : ''}
+                      options={connectorSelectOptions}
+                      onChange={applyConnector}
+                      disabled={!state.snapshot || activeSource !== 'cloud'}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-2 text-sm">
+                    <span className="text-gray-500">Model Override</span>
+                    <RouteSelect
+                      value={activeModelInOptions ? activeModel : ''}
+                      options={modelSelectOptions}
+                      onChange={(value) => {
+                        applyManualModel(value);
+                        setManualModelDraft(value);
+                      }}
+                      disabled={!state.snapshot || modelOptions.length === 0}
+                    />
+                  </label>
+                </div>
+
+                <div className="mt-4 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                  {activeSource === 'cloud'
+                    ? `Provider: ${activeConnector?.label || activeConnector?.id || 'unknown'}`
+                    : 'Using local runtime model catalog'}
+                </div>
+
+                <label className="mt-4 flex flex-col gap-2 text-sm">
+                  <span className="text-gray-500">Manual model id</span>
+                  <input
+                    className="rounded-2xl border border-gray-200 bg-white px-3 py-3 outline-none focus:border-emerald-400"
+                    value={manualModelDraft}
+                    onChange={(event) => setManualModelDraft(event.target.value)}
+                    onBlur={() => applyManualModel(manualModelDraft)}
+                    placeholder="model id"
+                  />
+                </label>
+
+                <div className="mt-6 flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => onStateChange((prev) => ({ ...prev, binding: null }))}
+                    className="rounded-full border border-gray-200 px-4 py-2 text-sm text-gray-600 transition hover:border-gray-300 hover:text-gray-900"
+                  >
+                    Use default route
+                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={onRouteReload}
+                      className="rounded-full border border-gray-200 px-4 py-2 text-sm text-gray-600 transition hover:border-gray-300 hover:text-gray-900"
+                    >
+                      {state.routeLoading ? 'Refreshing...' : 'Refresh route'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        applyManualModel(manualModelDraft);
+                        setShowRouteDialog(false);
+                      }}
+                      className="rounded-full bg-[#111827] px-4 py-2 text-sm text-white transition hover:bg-[#1f2937]"
+                    >
+                      Save configuration
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            <textarea
+              ref={textareaRef}
+              className="min-h-[220px] flex-1 resize-none border-0 bg-transparent px-5 py-5 text-[17px] leading-8 text-gray-900 outline-none placeholder:text-gray-400"
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              placeholder="Enter text to embed..."
+            />
+
+            <div className="border-t border-gray-100 bg-[#fbfcfd] px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="relative" ref={modelMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowModelMenu((prev) => !prev)}
+                    className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-600 transition hover:border-gray-300 hover:text-gray-900"
+                  >
+                    <span className="max-w-[220px] truncate font-mono text-[11px]">{modelDisplayName}</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </button>
+
+                  {showModelMenu ? (
+                    <div className="absolute bottom-[calc(100%+10px)] left-0 z-30 w-72 rounded-[24px] border border-gray-200 bg-white p-2 shadow-[0_20px_50px_rgba(15,23,42,0.16)]">
+                      <div className="mb-1 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">
+                        Route Model
+                      </div>
+                      {modelMenuOptions.map((model) => (
+                        <button
+                          key={model}
+                          type="button"
+                          onClick={() => {
+                            applyManualModel(model);
+                            setShowModelMenu(false);
+                          }}
+                          className="flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-left text-sm text-gray-700 transition hover:bg-gray-50"
+                        >
+                          <span className="truncate font-mono text-[12px]">{model}</span>
+                          {activeModel === model ? (
+                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Active</span>
+                          ) : null}
+                        </button>
+                      ))}
+                      <div className="my-2 border-t border-gray-100" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowModelMenu(false);
+                          setShowRouteDialog(true);
+                        }}
+                        className="flex w-full items-center rounded-2xl px-3 py-2.5 text-left text-sm text-gray-700 transition hover:bg-gray-50"
+                      >
+                        Manual Override / Custom Route
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+
+                <button
+                  type="button"
+                  disabled={state.busy || !asString(text)}
+                  onClick={() => { void handleRun(); }}
+                  className="flex h-11 w-11 items-center justify-center rounded-full bg-[#111827] text-white transition hover:bg-[#1f2937] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+                  title="Run Text Embed"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M5 12h14" />
+                    <path d="m12 5 7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+                <span className="rounded-full bg-gray-100 px-2.5 py-1 font-medium">
+                  Source: <span className="font-mono text-gray-700">{activeSource}</span>
+                </span>
+                <span className="rounded-full bg-gray-100 px-2.5 py-1 font-medium">
+                  Chars: <span className="font-mono text-gray-700">{textLength}</span>
+                </span>
+                <span className="rounded-full bg-gray-100 px-2.5 py-1 font-medium">
+                  Lines: <span className="font-mono text-gray-700">{lineCount}</span>
+                </span>
+                <span className="rounded-full bg-gray-100 px-2.5 py-1 font-medium">
+                  Est. tokens: <span className="font-mono text-gray-700">~{estimatedTokens}</span>
+                </span>
+                {activeSource === 'cloud' && activeConnectorId ? (
+                  <span className="rounded-full bg-gray-100 px-2.5 py-1 font-medium">
+                    Connector: <span className="font-mono text-gray-700">{activeConnector?.label || activeConnectorId}</span>
+                  </span>
+                ) : null}
+                {responseMeta?.modelResolved ? (
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700">
+                    Resolved: <span className="font-mono">{responseMeta.modelResolved}</span>
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex min-h-[440px] flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-[linear-gradient(180deg,_rgba(248,250,252,0.96)_0%,_rgba(241,245,249,0.96)_100%)] shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-white/70 px-4 py-3">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Vector Output</div>
+                <div className="mt-1 text-xs text-slate-500">Structured numeric response for the first vector.</div>
+              </div>
+              {embedOutput ? (
+                <div className="flex items-center gap-2">
+                  <div className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+                    Dim {embedOutput.dimensions ?? 0}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyVector}
+                    className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+                  >
+                    {copiedVector ? 'Copied' : 'Copy'}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="grid gap-3 border-b border-slate-200 px-4 py-3 sm:grid-cols-3">
+              <div className="rounded-2xl bg-white/75 px-3 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Vectors</div>
+                <div className="mt-1 font-mono text-sm text-slate-800">{embedOutput?.vectors ?? 0}</div>
+              </div>
+              <div className="rounded-2xl bg-white/75 px-3 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Dimensions</div>
+                <div className="mt-1 font-mono text-sm text-slate-800">{embedOutput?.dimensions ?? '—'}</div>
+              </div>
+              <div className="rounded-2xl bg-white/75 px-3 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Elapsed</div>
+                <div className="mt-1 font-mono text-sm text-slate-800">{responseMeta?.elapsed !== undefined ? `${responseMeta.elapsed} ms` : '—'}</div>
+              </div>
+            </div>
+
+            <div className="grid gap-3 border-b border-slate-200 px-4 py-3 sm:grid-cols-2">
+              <div className="rounded-2xl bg-white/75 px-3 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Resolved Model</div>
+                <div className="mt-1 truncate font-mono text-sm text-slate-800">{responseMeta?.modelResolved || modelDisplayName}</div>
+              </div>
+              <div className="rounded-2xl bg-white/75 px-3 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Trace Id</div>
+                <div className="mt-1 truncate font-mono text-sm text-slate-800">{responseMeta?.traceId || '—'}</div>
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 font-mono text-[13px] leading-7 text-slate-700">
+              {embedOutput?.vectorText ? (
+                <pre className="whitespace-pre-wrap break-all">{embedOutput.vectorText}</pre>
+              ) : state.busy ? (
+                <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-slate-400">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full border border-slate-200 bg-white">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 3v4" />
+                      <path d="M12 17v4" />
+                      <path d="M3 12h4" />
+                      <path d="M17 12h4" />
+                      <path d="m5.6 5.6 2.8 2.8" />
+                      <path d="m15.6 15.6 2.8 2.8" />
+                      <path d="m5.6 18.4 2.8-2.8" />
+                      <path d="m15.6 8.4 2.8-2.8" />
+                    </svg>
+                  </div>
+                  <div className="text-sm">{state.busyLabel || 'Embedding text...'}</div>
+                </div>
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-slate-400">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full border border-slate-200 bg-white">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M4 7h16" />
+                      <path d="M4 12h16" />
+                      <path d="M4 17h10" />
+                    </svg>
+                  </div>
+                  <div className="text-sm italic">Output will appear here...</div>
+                </div>
+              )}
+            </div>
+          </div>
+      </div>
+
       {state.error ? <ErrorBox message={state.error} /> : null}
-      {embedOutput ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-3 text-xs">
-          <div className="text-gray-500">Vectors: <span className="font-mono font-semibold text-gray-900">{embedOutput.vectors ?? 1}</span></div>
-          <div className="mt-1 text-gray-500">Dimensions: <span className="font-mono font-semibold text-gray-900">{embedOutput.dimensions ?? '—'}</span></div>
-          <div className="mt-1 text-gray-500">Preview: <span className="font-mono text-gray-700 break-all">{embedOutput.preview ?? '—'}</span></div>
-        </div>
-      ) : null}
+      {embedOutput?.preview ? <InfoBox message={`Preview: ${embedOutput.preview}`} /> : null}
       <DiagnosticsPanel diagnostics={state.diagnostics} />
       {state.rawResponse ? <RawJsonSection content={state.rawResponse} /> : null}
     </div>
@@ -3066,9 +4025,8 @@ export function TestAiPage() {
         onSelect={setActiveCapability}
       />
       <div className="flex min-w-0 flex-1 flex-col overflow-y-auto p-4">
-        <div className="mb-3 rounded-xl border border-gray-200 bg-white p-3">
-          <h2 className="text-sm font-semibold">{activeMeta.label}</h2>
-          <p className="mt-0.5 text-xs text-gray-500">{activeMeta.description}</p>
+        <div className="mb-3 px-1">
+          <h2 className="text-sm font-semibold text-gray-900">{activeMeta.label}</h2>
         </div>
         {renderPanel()}
       </div>
