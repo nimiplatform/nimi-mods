@@ -1,6 +1,6 @@
 import * as PIXI from 'pixi.js';
 import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
-import { Live2DModel, config as live2dConfig } from 'pixi-live2d-display/cubism4';
+import type { Live2DModel } from 'pixi-live2d-display/cubism4';
 import { AnimationController } from './animation-controller.js';
 import { createAutoBlinkPlugin } from './plugins/auto-blink.js';
 import { createEyeSaccadePlugin } from './plugins/eye-saccade.js';
@@ -12,6 +12,19 @@ import { DEFAULT_BUDDY_MODEL_ID } from '../contracts.js';
 import { getBuddyMotionProfile } from './motion-profile.js';
 import type { LipSyncStream } from '../services/voice-engine.js';
 import { isBuddyDebugEnabled, logBuddyConsole } from '../services/debug-log.js';
+import { ensureCubismCore } from '../cubism-core-loader.js';
+
+type Live2DModule = typeof import('pixi-live2d-display/cubism4');
+
+let live2dModulePromise: Promise<Live2DModule> | null = null;
+
+async function loadLive2DModule(): Promise<Live2DModule> {
+  await ensureCubismCore();
+  if (!live2dModulePromise) {
+    live2dModulePromise = import('pixi-live2d-display/cubism4');
+  }
+  return live2dModulePromise;
+}
 
 export type ModelState = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -165,12 +178,6 @@ export function createModelManager(
     if (app) {
       app.destroy(true);
     }
-    // pixi-live2d-display 0.4 reads motion sound from a global config flag
-    // instead of per-model options. Disable it so Buddy only speaks through TTS.
-    live2dConfig.sound = false;
-    // pixi-live2d-display requires an explicit ticker registration when PIXI
-    // isn't exposed as a global on window.
-    Live2DModel.registerTicker(PIXI.Ticker);
     app = new PIXI.Application({
       view: canvas,
       autoStart: true,
@@ -192,6 +199,10 @@ export function createModelManager(
     setState('loading');
 
     try {
+      const { Live2DModel, config: live2dConfig } = await loadLive2DModule();
+      live2dConfig.sound = false;
+      Live2DModel.registerTicker(PIXI.Ticker);
+
       // Remove previous model
       if (model) {
         app.stage.removeChild(model as unknown as PIXI.DisplayObject);

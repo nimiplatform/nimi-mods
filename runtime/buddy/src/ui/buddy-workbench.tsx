@@ -5,18 +5,9 @@ import { ChatOverlay } from './chat-overlay.js';
 import { VoiceButton } from './voice-button.js';
 import { BUDDY_MODELS } from '../contracts.js';
 import { RouteSelector } from './route-selector.js';
+import { resolveBuddyAssetUrl } from '../mod-asset-url.js';
 
 type Props = BuddyControllerState & BuddyControllerActions;
-
-declare const __NIMI_MOD_DIR__: string;
-
-function resolveModelAssetUrl(relativePath: string): string {
-  const absPath = `${__NIMI_MOD_DIR__}/assets/models/${relativePath}`;
-  if (typeof window !== 'undefined' && /^https?:\/\//.test(window.location.origin)) {
-    return `${window.location.origin}/@fs${absPath}`;
-  }
-  return `file://${absPath}`;
-}
 
 const DEFAULT_MODEL_PATH = 'haru/haru.model3.json';
 
@@ -82,7 +73,7 @@ export function BuddyWorkbench(props: Props) {
   useEffect(() => {
     if (!canvasMounted.current) return;
     const relativePath = selectedModel?.relativePath || DEFAULT_MODEL_PATH;
-    void loadModel(resolveModelAssetUrl(relativePath));
+    void loadModel(resolveBuddyAssetUrl(`models/${relativePath}`));
   }, [loadModel, selectedModel]);
 
   const handleSubmit = (event: React.FormEvent) => {

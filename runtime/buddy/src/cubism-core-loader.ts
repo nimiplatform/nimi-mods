@@ -1,4 +1,4 @@
-declare const __NIMI_MOD_DIR__: string;
+import { resolveBuddyAssetUrl } from './mod-asset-url.js';
 
 declare global {
   interface Window {
@@ -31,11 +31,7 @@ export function ensureCubismCore(): Promise<void> {
 }
 
 function buildLocalCoreUrl(): string {
-  const absPath = `${__NIMI_MOD_DIR__}/assets/live2d-core/live2dcubismcore.min.js`;
-  if (/^https?:\/\//.test(window.location.origin)) {
-    return `${window.location.origin}/@fs${absPath}`;
-  }
-  return `file://${absPath}`;
+  return resolveBuddyAssetUrl('live2d-core/live2dcubismcore.min.js');
 }
 
 function tryLoadScript(src: string): Promise<void> {
