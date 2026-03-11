@@ -1,7 +1,7 @@
 export const MOD_SPEC_CONFIG = {
   'audio-book': {
     modId: 'world.nimi.audio-book',
-    specRoot: 'audio-book/spec',
+    specRoot: 'runtime/audio-book/spec',
     domainDoc: 'INDEX.md',
     rulePrefix: 'VS',
     requiredKernelDocs: [
@@ -40,7 +40,7 @@ export const MOD_SPEC_CONFIG = {
   },
   buddy: {
     modId: 'world.nimi.buddy',
-    specRoot: 'buddy/spec',
+    specRoot: 'runtime/buddy/spec',
     domainDoc: 'buddy.md',
     rulePrefix: 'BD',
     requiredKernelDocs: [
@@ -78,7 +78,7 @@ export const MOD_SPEC_CONFIG = {
   },
   'daily-outfit': {
     modId: 'world.nimi.daily-outfit',
-    specRoot: 'daily-outfit/spec',
+    specRoot: 'runtime/daily-outfit/spec',
     domainDoc: 'daily-outfit.md',
     rulePrefix: 'DO',
     requiredKernelDocs: [
@@ -116,7 +116,7 @@ export const MOD_SPEC_CONFIG = {
   },
   cashbook: {
     modId: 'world.nimi.cashbook',
-    specRoot: 'cashbook/spec',
+    specRoot: 'audit/cashbook/spec',
     domainDoc: 'cashbook.md',
     rulePrefix: 'CSB',
     requiredKernelDocs: [
@@ -158,7 +158,7 @@ export const MOD_SPEC_CONFIG = {
   },
   kismet: {
     modId: 'world.nimi.kismet',
-    specRoot: 'kismet/spec',
+    specRoot: 'runtime/kismet/spec',
     domainDoc: 'kismet.md',
     rulePrefix: 'KIS',
     requiredKernelDocs: [
@@ -207,7 +207,7 @@ export const MOD_SPEC_CONFIG = {
   },
   'local-chat': {
     modId: 'world.nimi.local-chat',
-    specRoot: 'local-chat/spec',
+    specRoot: 'runtime/local-chat/spec',
     domainDoc: 'local-chat.md',
     rulePrefix: 'LC',
     requiredKernelDocs: [
@@ -240,7 +240,7 @@ export const MOD_SPEC_CONFIG = {
   },
   'knowledge-base': {
     modId: 'world.nimi.knowledge-base',
-    specRoot: 'knowledge-base/spec',
+    specRoot: 'runtime/knowledge-base/spec',
     domainDoc: 'INDEX.md',
     rulePrefix: 'KB',
     requiredKernelDocs: [
@@ -278,7 +278,7 @@ export const MOD_SPEC_CONFIG = {
   },
   'mint-you': {
     modId: 'world.nimi.mint-you',
-    specRoot: 'mint-you/spec',
+    specRoot: 'runtime/mint-you/spec',
     domainDoc: 'mint-you.md',
     rulePrefix: 'MY',
     requiredKernelDocs: [
@@ -338,7 +338,7 @@ export const MOD_SPEC_CONFIG = {
   },
   're-life': {
     modId: 'world.nimi.relife',
-    specRoot: 're-life/spec',
+    specRoot: 'audit/re-life/spec',
     domainDoc: 're-life.md',
     rulePrefix: 'RL',
     requiredKernelDocs: [
@@ -371,7 +371,7 @@ export const MOD_SPEC_CONFIG = {
   },
   'test-ai': {
     modId: 'world.nimi.test-ai',
-    specRoot: 'test-ai/spec',
+    specRoot: 'runtime/test-ai/spec',
     domainDoc: 'test-ai.md',
     rulePrefix: 'TAI',
     requiredKernelDocs: [
@@ -405,7 +405,7 @@ export const MOD_SPEC_CONFIG = {
   },
   'narrative-engine': {
     modId: 'world.nimi.narrative-engine',
-    specRoot: 'narrative-engine/spec',
+    specRoot: 'modules/narrative-engine/spec',
     domainDoc: 'narrative-engine.md',
     rulePrefix: 'N',
     requiredKernelDocs: [
@@ -448,7 +448,7 @@ export const MOD_SPEC_CONFIG = {
   },
   textplay: {
     modId: 'world.nimi.textplay',
-    specRoot: 'textplay/spec',
+    specRoot: 'runtime/textplay/spec',
     domainDoc: 'textplay.md',
     rulePrefix: 'T',
     requiredKernelDocs: [
@@ -489,7 +489,7 @@ export const MOD_SPEC_CONFIG = {
   },
   videoplay: {
     modId: 'world.nimi.videoplay',
-    specRoot: 'videoplay/spec',
+    specRoot: 'runtime/videoplay/spec',
     domainDoc: 'videoplay.md',
     rulePrefix: 'V',
     requiredKernelDocs: [
@@ -564,7 +564,7 @@ export const MOD_SPEC_CONFIG = {
   },
   'world-studio': {
     modId: 'world.nimi.world-studio',
-    specRoot: 'world-studio/spec',
+    specRoot: 'runtime/world-studio/spec',
     domainDoc: 'world-studio.md',
     rulePrefix: 'WS',
     requiredKernelDocs: [

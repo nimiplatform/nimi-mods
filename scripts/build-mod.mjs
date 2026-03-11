@@ -6,6 +6,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { parse as parseYaml } from 'yaml';
+import { modSlugFromPath, normalizeWorkspaceEntry, resolveWorkspaceEntries, resolveWorkspaceModDir } from './workspace-mods.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const modsRoot = path.resolve(__dirname, '..');
@@ -35,7 +36,7 @@ function parseArgs(argv) {
       if (!value || value.startsWith('--')) {
         throw new Error('Missing value after --mod');
       }
-      args.mods.push(value);
+      args.mods.push(normalizeWorkspaceEntry(value));
       i += 1;
       continue;
     }
@@ -43,7 +44,7 @@ function parseArgs(argv) {
   }
 
   if (args.all && args.mods.length > 0) {
-    throw new Error('Use either --all or --mod <name>, not both.');
+    throw new Error('Use either --all or --mod <relative-path>, not both.');
   }
 
   return args;
@@ -87,38 +88,12 @@ function parseManifest(modDir) {
 }
 
 function listAvailableMods() {
-  const workspacePath = path.join(modsRoot, 'pnpm-workspace.yaml');
-  const workspaceRaw = readFileSync(workspacePath, 'utf8');
-  const workspace = parseYaml(workspaceRaw);
-  const packageEntries = Array.isArray(workspace?.packages) ? workspace.packages : [];
-  const modNames = [];
-
-  for (const entry of packageEntries) {
-    if (typeof entry !== 'string') {
-      continue;
-    }
-    const normalized = entry.trim().replace(/\/+$/, '').replace(/^\.\//, '');
-    if (!normalized || normalized.includes('*')) {
-      continue;
-    }
-    if (normalized.includes('/')) {
-      throw new Error(
-        `Unsupported workspace package entry "${entry}". Expected top-level mod directories only.`,
-      );
-    }
-    const modDir = path.join(modsRoot, normalized);
-    if (!existsSync(modDir)) {
-      throw new Error(`Workspace package directory does not exist: ${normalized}`);
-    }
-    modNames.push(normalized);
-  }
-
-  return [...new Set(modNames)].sort((a, b) => a.localeCompare(b));
+  return resolveWorkspaceEntries(modsRoot);
 }
 
-function listRuntimeMods(modNames) {
-  return modNames.filter((modName) => {
-    const modDir = path.join(modsRoot, modName);
+function listRuntimeMods(modPaths) {
+  return modPaths.filter((modPath) => {
+    const modDir = resolveWorkspaceModDir(modsRoot, modPath);
     return Boolean(findManifestFile(modDir));
   });
 }
@@ -144,7 +119,7 @@ function resolveTargetMods(args) {
     }
     return deduped;
   }
-  throw new Error('No target mod selected. Use --mod <name> or --all.');
+  throw new Error('No target mod selected. Use --mod <relative-path> or --all.');
 }
 
 function getExternalList() {
@@ -204,7 +179,8 @@ function createPreferTypeScriptSourcesPlugin(modDir) {
 }
 
 function buildConfig(modName) {
-  const modDir = path.join(modsRoot, modName);
+  const modDir = resolveWorkspaceModDir(modsRoot, modName);
+  const modSlug = modSlugFromPath(modName);
   const entryPoint = path.join(modDir, 'index.ts');
   if (!existsSync(entryPoint)) {
     throw new Error(`Missing entry file: ${entryPoint}`);
@@ -214,10 +190,10 @@ function buildConfig(modName) {
   const outFile = path.resolve(modDir, manifest.entry);
   const outDir = path.dirname(outFile);
   const distRoot = path.join(modDir, 'dist');
-  const expectedOutFile = path.join(modDir, 'dist', 'mods', modName, 'index.js');
+  const expectedOutFile = path.join(modDir, 'dist', 'mods', modSlug, 'index.js');
   if (path.resolve(outFile) !== path.resolve(expectedOutFile)) {
     throw new Error(
-      `Manifest entry mismatch for ${modName}. Expected ./dist/mods/${modName}/index.js, got ${manifest.entry}`,
+      `Manifest entry mismatch for ${modName}. Expected ./dist/mods/${modSlug}/index.js, got ${manifest.entry}`,
     );
   }
 

@@ -1,0 +1,23 @@
+{
+  "name": "@nimiplatform/mod-narrative-engine",
+  "version": "1.0.0",
+  "private": true,
+  "nimiPackageKind": "capability-module",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json --noEmit",
+    "watch": "tsc -p tsconfig.build.json --noEmit --watch",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "test": "npx tsx --test test/*.mjs",
+    "verify:code": "pnpm run typecheck && pnpm run test",
+    "verify": "pnpm run verify:code",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@nimiplatform/sdk": "file:../../../sdk"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "^5.9.3"
+  }
+}

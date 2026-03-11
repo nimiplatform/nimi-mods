@@ -1,0 +1,22 @@
+# Kismet Spec AGENTS
+
+> Conventions for AI agents working under `nimi-mods/runtime/kismet/spec/`.
+
+## Authoritative Structure
+
+- `kernel/*.md`: Kismet cross-domain contracts (`KIS-*`).
+- `kernel/tables/*.yaml`: authoritative fact sources.
+- `kernel/generated/*.md`: generated views from YAML.
+- `kismet.md`: domain increments only.
+
+## Editing Rules
+
+- Do not manually edit `kernel/generated/*.md`.
+- Edit `kernel/tables/*.yaml` first, then align kernel/domain docs in the same change.
+- Keep no-legacy mode and no compatibility shim.
+
+## Mandatory Verification
+
+1. `pnpm -C nimi-mods run generate:spec:kismet-kernel-docs`
+2. `pnpm -C nimi-mods run check:spec:kismet-kernel-docs-drift`
+3. `pnpm -C nimi-mods run check:spec:kismet-kernel-consistency`

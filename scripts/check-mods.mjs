@@ -5,35 +5,14 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { parse as parseYaml } from 'yaml';
+import { modSlugFromPath, resolveWorkspaceEntries, resolveWorkspaceModDir } from './workspace-mods.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const modsRoot = path.resolve(__dirname, '..');
 const requireDist = process.argv.includes('--require-dist');
 
 function loadWorkspaceMods() {
-  const workspacePath = path.join(modsRoot, 'pnpm-workspace.yaml');
-  const content = readFileSync(workspacePath, 'utf8');
-  const workspace = parseYaml(content);
-  const packageEntries = Array.isArray(workspace?.packages) ? workspace.packages : [];
-  const mods = [];
-
-  for (const entry of packageEntries) {
-    if (typeof entry !== 'string') {
-      continue;
-    }
-    const normalized = entry.trim().replace(/\/+$/, '').replace(/^\.\//, '');
-    if (!normalized || normalized.includes('*')) {
-      continue;
-    }
-    if (normalized.includes('/')) {
-      throw new Error(
-        `Unsupported workspace package entry "${entry}". Expected top-level mod directories only.`,
-      );
-    }
-    mods.push(normalized);
-  }
-
-  return [...new Set(mods)].sort((a, b) => a.localeCompare(b));
+  return resolveWorkspaceEntries(modsRoot);
 }
 
 function findManifestPath(modDir) {
@@ -113,7 +92,8 @@ function validateRuntimeModPackage(modName, modDir, packageJson, errors) {
 }
 
 function validateMod(modName) {
-  const modDir = path.join(modsRoot, modName);
+  const modDir = resolveWorkspaceModDir(modsRoot, modName);
+  const modSlug = modSlugFromPath(modName);
   const errors = [];
   const packageJson = parsePackageJson(modDir);
   const packageKind = String(packageJson?.nimiPackageKind || '').trim();
@@ -143,7 +123,7 @@ function validateMod(modName) {
       return errors;
     }
 
-    const expectedEntry = `./dist/mods/${modName}/index.js`;
+    const expectedEntry = `./dist/mods/${modSlug}/index.js`;
     const manifestEntry = String(manifest.entry || '').trim();
     if (!manifestEntry) {
       errors.push('manifest.entry is required');
@@ -166,7 +146,7 @@ function validateMod(modName) {
         errors.push('UI runtime mod manifest must declare styles[]');
       }
       for (const stylePath of stylePaths) {
-        const expectedStylePath = `./dist/mods/${modName}/index.css`;
+        const expectedStylePath = `./dist/mods/${modSlug}/index.css`;
         if (stylePath !== expectedStylePath) {
           errors.push(`manifest.styles[] must be ["${expectedStylePath}"] (received "${stylePath}")`);
         }

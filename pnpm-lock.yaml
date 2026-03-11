@@ -72,10 +72,23 @@ importers:
         specifier: ^5.0.11
         version: 5.0.11(@types/react@19.2.14)(react@19.2.3)(use-sync-external-store@1.6.0(react@19.2.3))
 
-  audio-book:
+  modules/narrative-engine:
     dependencies:
       '@nimiplatform/sdk':
-        specifier: file:../../sdk
+        specifier: file:../../../sdk
+        version: file:../sdk(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(typescript@5.9.3)
+    devDependencies:
+      '@types/node':
+        specifier: ^24.10.1
+        version: 24.10.13
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  runtime/audio-book:
+    dependencies:
+      '@nimiplatform/sdk':
+        specifier: file:../../../sdk
         version: file:../sdk(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(typescript@5.9.3)
       '@radix-ui/react-dialog':
         specifier: ^1.1.6
@@ -97,7 +110,7 @@ importers:
         version: 19.2.3
     devDependencies:
       '@nimiplatform/dev-tools':
-        specifier: file:../../dev-tools
+        specifier: file:../../../dev-tools
         version: file:../dev-tools
       '@types/node':
         specifier: ^24.10.1
@@ -112,10 +125,10 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@24.10.13)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2)
 
-  buddy:
+  runtime/buddy:
     dependencies:
       '@nimiplatform/sdk':
-        specifier: file:../../sdk
+        specifier: file:../../../sdk
         version: file:../sdk(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(typescript@5.9.3)
       pixi-live2d-display:
         specifier: ^0.4.0
@@ -128,7 +141,7 @@ importers:
         version: 19.2.3
     devDependencies:
       '@nimiplatform/dev-tools':
-        specifier: file:../../dev-tools
+        specifier: file:../../../dev-tools
         version: file:../dev-tools
       '@types/node':
         specifier: ^24.10.1
@@ -140,12 +153,32 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  daily-outfit: {}
-
-  kismet:
+  runtime/daily-outfit:
     dependencies:
       '@nimiplatform/sdk':
-        specifier: file:../../sdk
+        specifier: file:../../../sdk
+        version: file:../sdk(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(typescript@5.9.3)
+      react:
+        specifier: 19.2.3
+        version: 19.2.3
+    devDependencies:
+      '@nimiplatform/dev-tools':
+        specifier: file:../../../dev-tools
+        version: file:../dev-tools
+      '@types/node':
+        specifier: ^24.10.1
+        version: 24.10.13
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.14
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  runtime/kismet:
+    dependencies:
+      '@nimiplatform/sdk':
+        specifier: file:../../../sdk
         version: file:../sdk(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(typescript@5.9.3)
       lightweight-charts:
         specifier: ^5.1.0
@@ -155,7 +188,7 @@ importers:
         version: 19.2.3
     devDependencies:
       '@nimiplatform/dev-tools':
-        specifier: file:../../dev-tools
+        specifier: file:../../../dev-tools
         version: file:../dev-tools
       '@types/node':
         specifier: ^24.10.1
@@ -167,10 +200,10 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  knowledge-base:
+  runtime/knowledge-base:
     dependencies:
       '@nimiplatform/sdk':
-        specifier: file:../../sdk
+        specifier: file:../../../sdk
         version: file:../sdk(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(typescript@5.9.3)
       '@radix-ui/react-dialog':
         specifier: ^1.1.6
@@ -186,7 +219,7 @@ importers:
         version: 19.2.3
     devDependencies:
       '@nimiplatform/dev-tools':
-        specifier: file:../../dev-tools
+        specifier: file:../../../dev-tools
         version: file:../dev-tools
       '@types/node':
         specifier: ^24.10.1
@@ -201,17 +234,17 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@24.10.13)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2)
 
-  local-chat:
+  runtime/local-chat:
     dependencies:
       '@nimiplatform/sdk':
-        specifier: file:../../sdk
+        specifier: file:../../../sdk
         version: file:../sdk(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(typescript@5.9.3)
       react:
         specifier: 19.2.3
         version: 19.2.3
     devDependencies:
       '@nimiplatform/dev-tools':
-        specifier: file:../../dev-tools
+        specifier: file:../../../dev-tools
         version: file:../dev-tools
       '@types/node':
         specifier: ^24.10.1
@@ -223,17 +256,17 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  mint-you:
+  runtime/mint-you:
     dependencies:
       '@nimiplatform/sdk':
-        specifier: file:../../sdk
+        specifier: file:../../../sdk
         version: file:../sdk(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(typescript@5.9.3)
       react:
         specifier: 19.2.3
         version: 19.2.3
     devDependencies:
       '@nimiplatform/dev-tools':
-        specifier: file:../../dev-tools
+        specifier: file:../../../dev-tools
         version: file:../dev-tools
       '@types/node':
         specifier: ^24.10.1
@@ -245,30 +278,17 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  narrative-engine:
+  runtime/test-ai:
     dependencies:
       '@nimiplatform/sdk':
-        specifier: file:../../sdk
-        version: file:../sdk(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(typescript@5.9.3)
-    devDependencies:
-      '@types/node':
-        specifier: ^24.10.1
-        version: 24.10.13
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-
-  test-ai:
-    dependencies:
-      '@nimiplatform/sdk':
-        specifier: file:../../sdk
+        specifier: file:../../../sdk
         version: file:../sdk(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(typescript@5.9.3)
       react:
         specifier: 19.2.3
         version: 19.2.3
     devDependencies:
       '@nimiplatform/dev-tools':
-        specifier: file:../../dev-tools
+        specifier: file:../../../dev-tools
         version: file:../dev-tools
       '@types/node':
         specifier: ^24.10.1
@@ -280,17 +300,17 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  textplay:
+  runtime/textplay:
     dependencies:
       '@nimiplatform/sdk':
-        specifier: file:../../sdk
+        specifier: file:../../../sdk
         version: file:../sdk(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(typescript@5.9.3)
       react:
         specifier: 19.2.3
         version: 19.2.3
     devDependencies:
       '@nimiplatform/dev-tools':
-        specifier: file:../../dev-tools
+        specifier: file:../../../dev-tools
         version: file:../dev-tools
       '@types/node':
         specifier: ^24.10.1
@@ -305,17 +325,17 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  videoplay:
+  runtime/videoplay:
     dependencies:
       '@nimiplatform/sdk':
-        specifier: file:../../sdk
+        specifier: file:../../../sdk
         version: file:../sdk(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(typescript@5.9.3)
       react:
         specifier: 19.2.3
         version: 19.2.3
     devDependencies:
       '@nimiplatform/dev-tools':
-        specifier: file:../../dev-tools
+        specifier: file:../../../dev-tools
         version: file:../dev-tools
       '@types/node':
         specifier: ^24.10.1
@@ -327,17 +347,17 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  world-studio:
+  runtime/world-studio:
     dependencies:
       '@nimiplatform/sdk':
-        specifier: file:../../sdk
+        specifier: file:../../../sdk
         version: file:../sdk(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(typescript@5.9.3)
       react:
         specifier: 19.2.3
         version: 19.2.3
     devDependencies:
       '@nimiplatform/dev-tools':
-        specifier: file:../../dev-tools
+        specifier: file:../../../dev-tools
         version: file:../dev-tools
       '@types/node':
         specifier: ^24.10.1

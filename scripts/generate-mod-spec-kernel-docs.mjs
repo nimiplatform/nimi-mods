@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
 import { getConfig } from './spec-kernel-config.mjs';
+import { modSlugFromPath, normalizeWorkspaceEntry, resolveWorkspaceModDir } from './workspace-mods.mjs';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const modsRoot = path.resolve(scriptDir, '..');
@@ -34,6 +35,7 @@ function parseArgs(argv) {
   if (!args.mod) {
     throw new Error('missing --mod');
   }
+  args.mod = normalizeWorkspaceEntry(args.mod);
   return args;
 }
 
@@ -80,10 +82,12 @@ async function readYaml(filePath) {
 
 async function main() {
   const { mod, check } = parseArgs(process.argv.slice(2));
-  const config = getConfig(mod);
+  const modSlug = modSlugFromPath(mod);
+  const config = getConfig(modSlug);
 
-  const tablesDir = path.join(modsRoot, config.specRoot, 'kernel', 'tables');
-  const generatedDir = path.join(modsRoot, config.specRoot, 'kernel', 'generated');
+  const specRoot = resolveWorkspaceModDir(modsRoot, config.specRoot);
+  const tablesDir = path.join(specRoot, 'kernel', 'tables');
+  const generatedDir = path.join(specRoot, 'kernel', 'generated');
   await fs.mkdir(generatedDir, { recursive: true });
 
   const generatedEntries = [];
@@ -134,7 +138,7 @@ async function main() {
       for (const file of drifted) {
         process.stderr.write(`  - ${path.relative(modsRoot, file)}\n`);
       }
-      process.stderr.write(`run \`pnpm -C nimi-mods run generate:spec:${mod}-kernel-docs\`\n`);
+      process.stderr.write(`run \`pnpm -C nimi-mods run generate:spec:${modSlug}-kernel-docs\`\n`);
       process.exitCode = 1;
       return;
     }

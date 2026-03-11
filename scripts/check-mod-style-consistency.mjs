@@ -5,30 +5,14 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { parse as parseYaml } from 'yaml';
+import { modSlugFromPath, resolveWorkspaceEntries, resolveWorkspaceModDir } from './workspace-mods.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const modsRoot = path.resolve(__dirname, '..');
 const requireDist = process.argv.includes('--require-dist');
 
 function loadWorkspaceMods() {
-  const workspacePath = path.join(modsRoot, 'pnpm-workspace.yaml');
-  const content = readFileSync(workspacePath, 'utf8');
-  const workspace = parseYaml(content);
-  const packageEntries = Array.isArray(workspace?.packages) ? workspace.packages : [];
-  const mods = [];
-
-  for (const entry of packageEntries) {
-    if (typeof entry !== 'string') {
-      continue;
-    }
-    const normalized = entry.trim().replace(/\/+$/, '').replace(/^\.\//, '');
-    if (!normalized || normalized.includes('*') || normalized.includes('/')) {
-      continue;
-    }
-    mods.push(normalized);
-  }
-
-  return [...new Set(mods)].sort((a, b) => a.localeCompare(b));
+  return resolveWorkspaceEntries(modsRoot);
 }
 
 function findManifestPath(modDir) {
@@ -112,7 +96,8 @@ function readJoinedContent(filePaths) {
 }
 
 function validateModStyles(modName) {
-  const modDir = path.join(modsRoot, modName);
+  const modDir = resolveWorkspaceModDir(modsRoot, modName);
+  const modSlug = modSlugFromPath(modName);
   const errors = [];
   const manifestPath = findManifestPath(modDir);
   if (!manifestPath) {
@@ -126,13 +111,13 @@ function validateModStyles(modName) {
 
   const sourceFiles = listSourceFiles(modDir);
   const source = readJoinedContent(sourceFiles);
-  const rootMarker = `data-nimi-mod-root="${modName}"`;
+  const rootMarker = `data-nimi-mod-root="${modSlug}"`;
   if (!source.includes(rootMarker)) {
     errors.push(`UI runtime mod source must declare ${rootMarker}`);
   }
 
   const portalUsed = /(?:DialogPrimitive|TooltipPrimitive|SelectPrimitive)\.Portal|<DialogPortal\b|<DialogPrimitive\.Portal\b|<TooltipPrimitive\.Portal\b|<SelectPrimitive\.Portal\b/.test(source);
-  const portalMarker = `data-nimi-mod-portal="${modName}"`;
+  const portalMarker = `data-nimi-mod-portal="${modSlug}"`;
   if (portalUsed && !source.includes(portalMarker)) {
     errors.push(`portalled UI surfaces must declare ${portalMarker}`);
   }

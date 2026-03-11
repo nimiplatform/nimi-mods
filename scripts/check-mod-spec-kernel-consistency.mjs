@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse as parseYaml } from 'yaml';
 import { getConfig } from './spec-kernel-config.mjs';
+import { modSlugFromPath, normalizeWorkspaceEntry, resolveWorkspaceModDir } from './workspace-mods.mjs';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const modsRoot = path.resolve(scriptDir, '..');
@@ -21,7 +22,7 @@ function parseArgs(argv) {
   if (!mod) {
     throw new Error('missing --mod');
   }
-  return { mod };
+  return { mod: normalizeWorkspaceEntry(mod) };
 }
 
 function fail(message) {
@@ -385,10 +386,11 @@ function checkWorldStudio(tables, reasonCodeSet, config) {
 
 function main() {
   const { mod } = parseArgs(process.argv.slice(2));
-  const config = getConfig(mod);
-  const modDir = path.join(modsRoot, mod);
+  const modSlug = modSlugFromPath(mod);
+  const config = getConfig(modSlug);
+  const modDir = resolveWorkspaceModDir(modsRoot, mod);
 
-  const specDir = path.join(modsRoot, config.specRoot);
+  const specDir = resolveWorkspaceModDir(modsRoot, config.specRoot);
   const kernelDir = path.join(specDir, 'kernel');
   const tablesDir = path.join(kernelDir, 'tables');
 

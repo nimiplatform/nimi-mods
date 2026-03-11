@@ -1,0 +1,32 @@
+{
+  "name": "@nimiplatform/mod-local-chat",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nimi-mod build",
+    "dev": "nimi-mod dev",
+    "doctor": "nimi-mod doctor",
+    "pack": "nimi-mod pack",
+    "watch": "nimi-mod dev",
+    "test": "tsx --test --test-concurrency=1 test/*.mjs test/*.test.ts test/*.e2e.test.ts",
+    "test:continuity": "tsx --test --test-concurrency=1 test/local-chat-continuity-persistence.e2e.test.ts test/local-chat-proactive-heartbeat.e2e.test.ts",
+    "test:behavior": "tsx --test --test-concurrency=1 test/local-chat-context-assembler.test.ts test/local-chat-continuity-persistence.e2e.test.ts test/local-chat-conversation-quality.test.ts test/local-chat-flagship-scenarios.e2e.test.ts test/local-chat-interaction-orchestration.test.ts test/local-chat-interaction-regression.test.ts test/local-chat-interaction-state-compiler.test.ts test/local-chat-media-decision-policy.test.mjs test/local-chat-media-regression.test.mjs test/local-chat-media-trigger-planner.e2e.test.ts test/local-chat-nsfw-policy.test.mjs test/local-chat-page-effects.test.ts test/local-chat-proactive-heartbeat.e2e.test.ts test/local-chat-resolved-experience-policy.test.ts test/local-chat-run-text-turn.e2e.test.ts test/local-chat-sessions-refresh.test.ts test/local-chat-targets-preview.test.ts test/local-chat-voice-defaults-policy.test.ts test/local-chat-voice-disabled.test.mjs test/local-chat-voice-playback.test.ts",
+    "test:flagship": "tsx --test --test-concurrency=1 test/local-chat-flagship-scenarios.e2e.test.ts",
+    "test:e2e": "tsx --test --test-concurrency=1 test/*.e2e.test.ts",
+    "test:live-smoke": "tsx --test --test-concurrency=1 test/local-chat-live-smoke.test.ts",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "verify": "pnpm run typecheck && pnpm run test && pnpm run build",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@nimiplatform/sdk": "file:../../../sdk",
+    "react": "19.2.3"
+  },
+  "devDependencies": {
+    "@nimiplatform/dev-tools": "file:../../../dev-tools",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.14",
+    "typescript": "^5.9.3"
+  }
+}
