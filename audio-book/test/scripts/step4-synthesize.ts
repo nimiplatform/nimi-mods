@@ -44,7 +44,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Runtime } from '../../../../sdk/src/runtime/index.js';
+import { Runtime } from '@nimiplatform/sdk/runtime';
 import { runSynthesisJob } from '../../src/services/synthesis-scheduler.js';
 import type { ScriptSegment, TtsClient, VoiceCasting } from '../../src/types.js';
 

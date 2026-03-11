@@ -28,7 +28,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Runtime } from '../../../../sdk/src/runtime/index.js';
+import { Runtime } from '@nimiplatform/sdk/runtime';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

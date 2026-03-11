@@ -35,8 +35,8 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Runtime } from '../../../../sdk/src/runtime/index.js';
-import { createNimiAiProvider } from '../../../../sdk/src/ai-provider/index.js';
+import { createNimiAiProvider } from '@nimiplatform/sdk/ai-provider';
+import { Runtime } from '@nimiplatform/sdk/runtime';
 import { classifyAllCharacters } from '../../src/services/character-tier.js';
 import { recommendAllVoices } from '../../src/services/voice-recommender.js';
 import type { CharacterProfile, LlmClient } from '../../src/types.js';

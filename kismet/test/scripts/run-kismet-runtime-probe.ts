@@ -5,8 +5,8 @@ import {
   FallbackPolicy,
   Modal,
   type GenerateResponse,
-} from '../../../../sdk/src/runtime/index.js';
-import { extractGenerateText } from '../../../../sdk/src/runtime/helpers.js';
+  extractGenerateText,
+} from '@nimiplatform/sdk/runtime';
 import { deriveCanonicalProfile } from '../../src/services/bazi/derive-profile.js';
 import { buildLocationContext } from '../../src/services/city-affinity.js';
 import { buildDailyDefaults } from '../../src/services/daily-context.js';

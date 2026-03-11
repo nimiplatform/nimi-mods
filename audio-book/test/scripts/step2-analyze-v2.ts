@@ -17,7 +17,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { resolve, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Runtime } from '../../../../sdk/src/runtime/index.js';
+import { Runtime } from '@nimiplatform/sdk/runtime';
 import { splitTextIntoChapters, computeTextStats } from '../../src/services/chapter-splitter.js';
 import { regexPreAnalyze, type PreAnalyzedSegment } from '../../src/services/regex-pre-analyzer.js';
 import { splitLongSegments } from '../../src/services/segment-post-processor.js';

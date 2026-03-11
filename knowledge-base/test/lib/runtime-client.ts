@@ -15,8 +15,8 @@
 //   NIMI_CHAT_MODEL_ID       — chat model (default: cloud/default)
 // ---------------------------------------------------------------------------
 
-import { Runtime } from '../../../../sdk/src/runtime/index.js';
-import { createNimiAiProvider } from '../../../../sdk/src/ai-provider/index.js';
+import { createNimiAiProvider } from '@nimiplatform/sdk/ai-provider';
+import { Runtime } from '@nimiplatform/sdk/runtime';
 
 // ---------------------------------------------------------------------------
 // Config
