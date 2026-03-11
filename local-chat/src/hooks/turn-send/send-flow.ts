@@ -5,7 +5,6 @@ import { createUserMessage, ensureWorkingSession } from './session.js';
 import { buildTurnRequestInput } from './request-builder.js';
 import {
   commitAssistantMessage,
-  persistFailedTurn,
   persistUserTurns,
   scheduleAssistantTurnDeliveries,
   type TurnDeliveryScheduleHandle,
@@ -1123,60 +1122,20 @@ export async function runLocalChatTurnSend(input: {
     });
     context.setLatestPromptTrace(null);
     context.setLatestTurnAudit(errorPayload.turnAudit);
-    if (assistantTurnRecordCreated) {
-      await commitAssistantMessage({
-        sessionId,
-        targetId: selectedTarget.id,
-        viewerId: context.viewerId,
-        assistantTurnId: turnId,
-        messageId: firstBeatMessageId,
-        message: {
-          ...errorPayload.errorMessage,
-          id: firstBeatMessageId,
-          meta: {
-            turnId,
-            beatId: firstBeatMessageId,
-            beatIndex: 0,
-            beatCount: 1,
-            beatModality: 'text',
-            turnMode: 'information',
-            voiceConversationMode,
-            channelDecision: 'text',
-            intent: 'answer',
-            segmentId: firstBeatMessageId,
-            segmentIndex: 1,
-            segmentCount: 1,
-          },
-        },
-        setMessages: context.setMessages,
-        setSessions: context.setSessions,
-        turnAudit: errorPayload.turnAudit,
-      });
-    } else if (hasWorkingSession && userTurnPersisted) {
-      context.setMessages((prev) => {
-        const withoutTransient = prev.filter((message) => message.id !== firstBeatMessageId);
-        return [...withoutTransient, errorPayload.errorMessage];
-      });
+    // Errors must NOT appear as assistant chat bubbles — remove the transient
+    // first-beat placeholder from the UI.  The status banner below is the sole
+    // user-visible notification; turnAudit preserves technical detail for the
+    // diagnostics inspector.
+    context.setMessages((prev) => prev.filter((message) => message.id !== firstBeatMessageId));
+
+    if (hasWorkingSession && !userTurnPersisted) {
+      // User turn was never persisted — save it now so it survives reload.
+      // Only persist the user message; do NOT write the error as an assistant
+      // turn so the ledger stays free of hardcoded error text.
       await appendTurnsToSession(sessionId, [
-        createSessionTurn({
-          message: errorPayload.errorMessage,
-          audit: errorPayload.turnAudit,
-        }),
+        createSessionTurn({ message: userMessage }),
       ]);
       context.setSessions(await listLocalChatSessions(selectedTarget.id, context.viewerId));
-    } else if (hasWorkingSession) {
-      await persistFailedTurn({
-        sessionId,
-        targetId: selectedTarget.id,
-        viewerId: context.viewerId,
-        userMessage,
-        errorMessage: errorPayload.errorMessage,
-        turnAudit: errorPayload.turnAudit,
-        setMessages: context.setMessages,
-        setSessions: context.setSessions,
-      });
-    } else {
-      context.setMessages((prev) => [...prev, errorPayload.errorMessage]);
     }
     context.setStatusBanner({ kind: 'error', message: errorPayload.message });
     logTurnSendFailed(flowId, errorPayload.message);
