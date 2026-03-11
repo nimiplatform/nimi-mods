@@ -1,4 +1,5 @@
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type {
   EpisodeRecord,
   FallbackAuditRecord,
@@ -114,7 +115,7 @@ function statusTone(status: string): string {
 }
 
 function sourceModeLabel(mode: VideoStorySourceMode): string {
-  return mode === 'textplay-enriched-story' ? 'TextPlay Enriched Story' : 'Canonical Story';
+  return mode === 'textplay-enriched-story' ? 'enriched' : 'canonical';
 }
 
 function workbenchStageLabel(stage: VideoPlayWorkbenchStage): string {
@@ -168,6 +169,7 @@ function isPipelineStep(step: string): step is VideoPlayPipelineStep {
 }
 
 export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
+  const { t } = useModTranslation('videoplay');
   const canPublish = Boolean(
     props.selectedReleaseCandidate
     && (props.selectedReleaseCandidate.qcStatus === 'APPROVED' || props.selectedReleaseCandidate.qcStatus === 'ADJUSTED'),
@@ -207,7 +209,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
             disabled={!canRun}
             className="ui-sync-btn ui-sync-btn-primary rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Run Pipeline
+            {t('action.runPipeline')}
           </button>
           <button
             type="button"
@@ -215,7 +217,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
             disabled={!canRerun}
             className="ui-sync-btn ui-sync-btn-secondary rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Rerun Step
+            {t('action.rerunStep')}
           </button>
           <button
             type="button"
@@ -223,23 +225,23 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
             disabled={!canAdvance}
             className="ui-sync-btn ui-sync-btn-secondary rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Advance Stage
+            {t('action.advanceStage')}
           </button>
           <button
             type="button"
             onClick={props.onCancelRun}
             className="ui-sync-btn rounded-md border border-rose-300 bg-white px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50"
           >
-            Cancel Run
+            {t('action.cancelRun')}
           </button>
         </div>
       </header>
       <div className="ui-sync-shell-main flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 xl:grid xl:grid-cols-[minmax(280px,320px)_minmax(0,1fr)_minmax(300px,360px)] xl:grid-rows-[minmax(0,1fr)] xl:overflow-hidden">
         <aside className="ui-sync-pane ui-sync-pane-side min-h-[220px] overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 xl:min-h-0">
           <section className="space-y-2 rounded-lg border border-gray-200 p-3">
-            <h3 className="text-sm font-semibold text-gray-900">Story Source</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{t('label.storySource')}</h3>
             <label className="block text-xs text-gray-600">
-              World ID
+              {t('label.worldId')}
               <input
                 value={props.worldId}
                 onChange={(event) => props.onWorldIdChange(event.target.value)}
@@ -247,7 +249,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
               />
             </label>
             <label className="block text-xs text-gray-600">
-              Project ID
+              {t('label.projectId')}
               <input
                 value={props.projectId}
                 onChange={(event) => props.onProjectIdChange(event.target.value)}
@@ -255,7 +257,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
               />
             </label>
             <label className="block text-xs text-gray-600">
-              Story
+              {t('label.story')}
               <select
                 value={props.selectedStoryId}
                 onChange={(event) => props.onSelectStory(event.target.value)}
@@ -266,22 +268,22 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
                     {story.title} ({story.storyId})
                   </option>
                 ))}
-                {props.stories.length === 0 ? <option value="">No playable PRIMARY stories</option> : null}
+                {props.stories.length === 0 ? <option value="">{t('empty.noPlayableStories')}</option> : null}
               </select>
             </label>
             <label className="block text-xs text-gray-600">
-              Source Mode
+              {t('label.sourceMode')}
               <select
                 value={props.sourceMode}
                 onChange={(event) => props.onSourceModeChange(event.target.value as VideoStorySourceMode)}
                 className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-xs"
               >
-                <option value="canonical-story">Canonical Story</option>
-                <option value="textplay-enriched-story">TextPlay Enriched Story</option>
+                <option value="canonical-story">{t('sourceMode.canonical')}</option>
+                <option value="textplay-enriched-story">{t('sourceMode.enriched')}</option>
               </select>
             </label>
             <label className="block text-xs text-gray-600">
-              Ingest Cursor Start (Debug)
+              {t('label.ingestCursorStart')}
               <input
                 value={props.ingestCursorStart}
                 onChange={(event) => props.onIngestCursorStartChange(event.target.value)}
@@ -289,7 +291,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
               />
             </label>
             <p className="text-[11px] text-gray-500">
-              Story ID: <span className="font-medium text-gray-700">{props.selectedStory?.storyId || '-'}</span>
+              {t('label.storyId')}: <span className="font-medium text-gray-700">{props.selectedStory?.storyId || '-'}</span>
             </p>
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -297,33 +299,33 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
                 onClick={props.onReloadStoryPackage}
                 className="rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
               >
-                Reload Package
+                {t('action.reloadPackage')}
               </button>
               <button
                 type="button"
                 onClick={props.onRefresh}
                 className="rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
               >
-                Refresh
+                {t('action.refresh')}
               </button>
             </div>
           </section>
 
           <section className="mt-3 space-y-2 rounded-lg border border-gray-200 p-3">
-            <h3 className="text-sm font-semibold text-gray-900">Story Package</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{t('label.storyPackage')}</h3>
             <p className={`text-xs font-medium ${props.storyPackageLoading ? 'text-amber-600' : 'text-slate-600'}`}>
-              {props.storyPackageLoading ? 'loading' : props.storyPackage ? 'ready' : 'not-ready'}
+              {props.storyPackageLoading ? t('state.loading') : props.storyPackage ? t('state.ready') : t('state.notReady')}
             </p>
             {props.storyPackage ? (
               <>
-                <p className="text-xs text-gray-600">sourceMode: {sourceModeLabel(props.storyPackage.sourceMode)}</p>
-                <p className="text-xs text-gray-600">version: {props.storyPackage.snapshot.version}</p>
-                <p className="text-xs text-gray-600">coverage: {packageCoverageText(props.storyPackage)}</p>
+                <p className="text-xs text-gray-600">{t('label.sourceModeValue')}: {t(`sourceMode.${sourceModeLabel(props.storyPackage.sourceMode)}`)}</p>
+                <p className="text-xs text-gray-600">{t('label.version')}: {props.storyPackage.snapshot.version}</p>
+                <p className="text-xs text-gray-600">{t('label.contextCoverage')}: {packageCoverageText(props.storyPackage)}</p>
                 <p className="text-xs text-gray-600">
-                  gapWarnings: {props.storyPackage.snapshot.gapWarnings.length > 0 ? props.storyPackage.snapshot.gapWarnings.join(', ') : 'none'}
+                  {t('label.gapWarnings')}: {props.storyPackage.snapshot.gapWarnings.length > 0 ? props.storyPackage.snapshot.gapWarnings.join(', ') : t('state.none')}
                 </p>
                 <p className="text-xs text-gray-600">
-                  turns: {props.storyPackage.turnWindow.turns.length} (max={props.storyPackage.windowPolicy.maxTurns})
+                  {t('label.turns')}: {props.storyPackage.turnWindow.turns.length} (max={props.storyPackage.windowPolicy.maxTurns})
                 </p>
               </>
             ) : null}
@@ -337,7 +339,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
           </section>
 
           <section className="mt-3 space-y-2 rounded-lg border border-gray-200 p-3">
-            <h3 className="text-sm font-semibold text-gray-900">Episodes</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{t('label.episodes')}</h3>
             <div className="max-h-52 space-y-1 overflow-y-auto">
               {props.episodes.map((episode) => (
                 <button
@@ -350,12 +352,12 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
                   <p className={`text-[11px] ${statusTone(episode.quality.status)}`}>{episode.quality.status}</p>
                 </button>
               ))}
-              {props.episodes.length === 0 ? <p className="text-xs text-gray-500">No episodes yet.</p> : null}
+              {props.episodes.length === 0 ? <p className="text-xs text-gray-500">{t('empty.noEpisodes')}</p> : null}
             </div>
           </section>
 
           <section className="mt-3 space-y-2 rounded-lg border border-gray-200 p-3">
-            <h3 className="text-sm font-semibold text-gray-900">Runs</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{t('label.runs')}</h3>
             <div className="max-h-40 space-y-1 overflow-y-auto">
               {props.runs.map((run) => (
                 <div key={run.runId} className="rounded-md border border-gray-200 px-2 py-1 text-xs">
@@ -364,7 +366,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
                   <p className="text-[11px] text-gray-500">episodes={run.episodeCount} release={run.releaseCandidateCount}</p>
                 </div>
               ))}
-              {props.runs.length === 0 ? <p className="text-xs text-gray-500">No runs yet.</p> : null}
+              {props.runs.length === 0 ? <p className="text-xs text-gray-500">{t('empty.noRuns')}</p> : null}
             </div>
           </section>
         </aside>
@@ -372,7 +374,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
         <main className="ui-sync-pane ui-sync-pane-main min-h-[320px] overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 xl:min-h-0">
           <section className="rounded-lg border border-gray-200 bg-white p-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-900">Pipeline Flow</h3>
+              <h3 className="text-sm font-semibold text-gray-900">{t('label.pipelineFlow')}</h3>
               <p className={`text-xs font-medium ${statusTone(props.runStatus)}`}>{props.runStatus}</p>
             </div>
             <p className="mt-1 text-xs text-gray-500">
@@ -424,15 +426,15 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
                   {stage.actionHint ? <p className="text-gray-500">{stage.actionHint}</p> : null}
                 </div>
               ))}
-              {props.stageProgress.length === 0 ? <p className="text-xs text-gray-500">No stage progress yet.</p> : null}
+              {props.stageProgress.length === 0 ? <p className="text-xs text-gray-500">{t('empty.noStageProgress')}</p> : null}
             </div>
           </section>
 
           <section className="mt-3 rounded-lg border border-gray-200 bg-white p-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-900">Stage Workbench</h3>
+              <h3 className="text-sm font-semibold text-gray-900">{t('label.shotWorkbench')}</h3>
               <p className="text-xs text-gray-500">
-                Active branch: <span className="font-medium text-gray-700">{props.activeBranchName}</span>
+                {t('label.activeBranch')}: <span className="font-medium text-gray-700">{props.activeBranchName}</span>
               </p>
             </div>
             <p className="mt-1 text-xs text-gray-500">
@@ -473,7 +475,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
                 </select>
               </label>
               <label className="text-xs text-gray-600">
-                Operation
+                {t('label.operation')}
                 <select
                   value={props.operationType}
                   onChange={(event) => props.onOperationTypeChange(event.target.value as VideoPlayOperationType)}
@@ -491,12 +493,12 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
                   disabled={!props.selectedEpisode}
                   className="w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Apply Operation
+                  {t('action.applyOperation')}
                 </button>
               </div>
             </div>
             <label className="mt-2 block text-xs text-gray-600">
-              Operation Payload (JSON)
+              {t('label.operationPayload')}
               <textarea
                 value={props.operationPayload}
                 onChange={(event) => props.onOperationPayloadChange(event.target.value)}
@@ -507,37 +509,37 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
           </section>
 
           <section className="mt-3 rounded-lg border border-gray-200 bg-white p-3">
-            <h3 className="text-sm font-semibold text-gray-900">Shots</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{t('label.shots')}</h3>
             <div className="mt-2 max-h-[360px] space-y-1 overflow-y-auto">
               {props.selectedEpisode?.storyboard.shotPlans.map((shot) => (
                 <div key={shot.shotId} className="rounded-md border border-gray-200 px-2 py-1 text-xs">
                   <p className="font-medium text-gray-900">{shot.shotId}</p>
                   <p className="text-gray-600">clip={shot.clipId} beat={shot.beatId} duration={shot.durationMs}ms</p>
-                  <p className="text-gray-500">sourceEventIds: {shot.sourceEventIds.join(', ')}</p>
+                  <p className="text-gray-500">{t('label.sourceEventIds')}: {shot.sourceEventIds.join(', ')}</p>
                 </div>
               ))}
-              {!props.selectedEpisode ? <p className="text-xs text-gray-500">Select an episode to inspect shots.</p> : null}
+              {!props.selectedEpisode ? <p className="text-xs text-gray-500">{t('empty.noEpisodeSelected')}</p> : null}
             </div>
           </section>
         </main>
 
         <aside className="ui-sync-pane ui-sync-pane-right min-h-[220px] overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 xl:min-h-0">
           <section className="space-y-2 rounded-lg border border-gray-200 p-3">
-            <h3 className="text-sm font-semibold text-gray-900">Route Status</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{t('label.routeStatus')}</h3>
             <p className={`text-xs font-medium ${props.routeReady ? 'text-emerald-600' : 'text-rose-600'}`}>
-              {props.routeReady ? 'all-ready' : 'missing-route'}
+              {props.routeReady ? t('state.allReady') : t('state.missingRoute')}
             </p>
             {props.routeStatuses.map((route) => (
               <div key={route.capability} className="rounded-md border border-gray-200 px-2 py-1 text-xs">
                 <p className="font-medium text-gray-900">{route.capability}</p>
-                <p className={route.ready ? 'text-emerald-600' : 'text-rose-600'}>{route.ready ? 'ready' : 'unavailable'}</p>
+                <p className={route.ready ? 'text-emerald-600' : 'text-rose-600'}>{route.ready ? t('state.ready') : t('state.unavailable')}</p>
                 <p className="text-gray-500">{route.source} / {route.connectorId || '-'} / {route.model || '-'}</p>
               </div>
             ))}
           </section>
 
           <section className="mt-3 space-y-2 rounded-lg border border-gray-200 p-3">
-            <h3 className="text-sm font-semibold text-gray-900">Story Package Diagnostics</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{t('label.storyPackageDiagnostics')}</h3>
             {props.storyPackage ? (
               <>
                 <p className="text-xs text-gray-600">story: {props.storyPackage.storyId}</p>
@@ -552,7 +554,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
                 ) : null}
               </>
             ) : (
-              <p className="text-xs text-gray-500">Story package unavailable.</p>
+              <p className="text-xs text-gray-500">{t('empty.noStoryPackage')}</p>
             )}
           </section>
 
@@ -566,18 +568,18 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
                 <p className="text-gray-500">{gate.reasonCode}</p>
               </div>
             ))}
-            {!props.selectedEpisode ? <p className="text-xs text-gray-500">No quality report selected.</p> : null}
+            {!props.selectedEpisode ? <p className="text-xs text-gray-500">{t('empty.noQualityReport')}</p> : null}
           </section>
 
           <section className="mt-3 space-y-2 rounded-lg border border-gray-200 p-3">
-            <h3 className="text-sm font-semibold text-gray-900">Asset Analysis / Queue</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{t('label.assetAnalysisQueue')}</h3>
             {renderCoverageEvent ? (
               <p className="text-xs text-gray-600">
                 coverage={Number(renderCoverageEvent.details?.coverage ?? 0).toFixed(3)}
                 {' '}voiceCoverage={Number(renderCoverageEvent.details?.voiceCoverage ?? 0).toFixed(3)}
               </p>
             ) : (
-              <p className="text-xs text-gray-500">No render coverage record yet.</p>
+              <p className="text-xs text-gray-500">{t('empty.noRenderCoverage')}</p>
             )}
             <div className="max-h-32 space-y-1 overflow-y-auto">
               {renderQueueEvents.map((event) => (
@@ -595,20 +597,20 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
                   </p>
                 </div>
               ))}
-              {renderQueueEvents.length === 0 ? <p className="text-xs text-gray-500">No batch queue records.</p> : null}
+              {renderQueueEvents.length === 0 ? <p className="text-xs text-gray-500">{t('empty.noBatchRecords')}</p> : null}
             </div>
           </section>
 
           <section className="mt-3 space-y-2 rounded-lg border border-gray-200 p-3">
-            <h3 className="text-sm font-semibold text-gray-900">Publish Panel</h3>
-            <p className="text-xs text-gray-600">Candidate QC status: {props.selectedReleaseCandidate?.qcStatus || '-'}</p>
+            <h3 className="text-sm font-semibold text-gray-900">{t('label.publishPanel')}</h3>
+            <p className="text-xs text-gray-600">{t('label.candidateQcStatus')}: {props.selectedReleaseCandidate?.qcStatus || '-'}</p>
             <button
               type="button"
               onClick={props.onPublish}
               disabled={!canPublish}
               className="w-full rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Publish
+              {t('action.publish')}
             </button>
             <div className="max-h-24 space-y-1 overflow-y-auto">
               {props.releases.map((release) => (
@@ -621,7 +623,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
           </section>
 
           <section className="mt-3 space-y-2 rounded-lg border border-gray-200 p-3">
-            <h3 className="text-sm font-semibold text-gray-900">Fallback Audit</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{t('label.fallbackAudit')}</h3>
             <div className="max-h-24 space-y-1 overflow-y-auto">
               {props.fallbackAudits.map((audit, index) => (
                 <div key={`${audit.stage}:${index}`} className="rounded-md border border-gray-200 px-2 py-1 text-xs">
@@ -630,12 +632,12 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
                   <p className="text-gray-500">{audit.reason}</p>
                 </div>
               ))}
-              {props.fallbackAudits.length === 0 ? <p className="text-xs text-gray-500">No fallback used.</p> : null}
+              {props.fallbackAudits.length === 0 ? <p className="text-xs text-gray-500">{t('empty.noFallback')}</p> : null}
             </div>
           </section>
 
           <section className="mt-3 space-y-2 rounded-lg border border-gray-200 p-3">
-            <h3 className="text-sm font-semibold text-gray-900">Run Events</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{t('label.runEvents')}</h3>
             <div className="max-h-40 space-y-1 overflow-y-auto">
               {props.runEvents.map((event) => (
                 <div key={`${event.runId}:${event.seq}`} className="rounded-md border border-gray-200 px-2 py-1 text-xs">
@@ -644,7 +646,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
                   {event.actionHint ? <p className="text-gray-500">{event.actionHint}</p> : null}
                 </div>
               ))}
-              {props.runEvents.length === 0 ? <p className="text-xs text-gray-500">No events yet.</p> : null}
+              {props.runEvents.length === 0 ? <p className="text-xs text-gray-500">{t('empty.noEvents')}</p> : null}
             </div>
           </section>
 

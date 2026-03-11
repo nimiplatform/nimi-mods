@@ -1,4 +1,5 @@
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 
 interface VoiceButtonProps {
   isRecording: boolean;
@@ -7,6 +8,7 @@ interface VoiceButtonProps {
 }
 
 export function VoiceButton({ isRecording, onStart, onStop }: VoiceButtonProps) {
+  const { t } = useModTranslation('buddy');
   return (
     <button
       type="button"
@@ -34,7 +36,7 @@ export function VoiceButton({ isRecording, onStart, onStop }: VoiceButtonProps) 
         <line x1="12" y1="19" x2="12" y2="23" />
         <line x1="8" y1="23" x2="16" y2="23" />
       </svg>
-      {isRecording ? '松开发送' : '按住说话'}
+      {isRecording ? t('BuddyPage.voiceRelease') : t('BuddyPage.voiceHold')}
     </button>
   );
 }

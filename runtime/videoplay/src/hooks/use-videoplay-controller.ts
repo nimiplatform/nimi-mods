@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
 import { createModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import { useAppStore } from '@nimiplatform/sdk/mod/ui';
@@ -154,6 +155,7 @@ function stageFromNextStep(step: VideoPlayPipelineStep | null): VideoPlayWorkben
 }
 
 export function useVideoPlayController(): VideoPlayWorkbenchProps {
+  const { t } = useModTranslation('videoplay');
   const hookClient = useMemo(() => createHookClient(VIDEOPLAY_MOD_ID), []);
   const runtimeClient = useMemo(() => createModRuntimeClient(VIDEOPLAY_MOD_ID), []);
   const aiClient = useMemo(() => createVideoPlayRuntimeAiClient(runtimeClient), [runtimeClient]);
@@ -328,7 +330,7 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
         setStoryPackageError({
           reasonCode: VIDEOPLAY_REASON.STORY_SOURCE_UNAVAILABLE,
           actionHint: 'Create PRIMARY world event projection first.',
-          message: 'No playable PRIMARY stories found.',
+          message: t('empty.noPlayableStories'),
         });
       } else {
         setStoryPackageError(null);
@@ -995,8 +997,8 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
   );
 
   return {
-    title: 'VideoPlay Workbench',
-    subtitle: 'Canonical narrative -> episode production package',
+    title: t('page.title'),
+    subtitle: t('page.subtitle'),
     worldId,
     projectId,
     ingestCursorStart,

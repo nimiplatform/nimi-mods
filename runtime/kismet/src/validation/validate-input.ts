@@ -2,6 +2,7 @@ import { CITY_CATALOG } from '../data/city-catalog.js';
 import { KismetBirthInputSchema } from '../schemas.js';
 import type { KismetBirthInputV2, KismetError } from '../types.js';
 import { KISMET_REASON } from '../contracts.js';
+import { kismetMessage } from '../i18n/messages.js';
 import { normalizeDateValue, normalizeTimeValue } from '../utils/normalize-birth-fields.js';
 
 type ValidateInputResult =
@@ -50,8 +51,11 @@ export function validateKismetBirthInput(raw: unknown): ValidateInputResult {
     ok: false,
     error: {
       reasonCode: KISMET_REASON.INPUT_INVALID,
-      message: `输入校验失败: ${issues}`,
-      actionHint: '请检查出生日期、时间、出生地和授权开关是否完整。',
+      message: kismetMessage('Messages.inputInvalid', 'Input validation failed: {{issues}}', { issues }),
+      actionHint: kismetMessage(
+        'Messages.inputInvalidHint',
+        'Check birth date, time, birth city, and consent switches.',
+      ),
     },
   };
 }

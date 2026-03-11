@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { ChatMessage } from '../services/dialogue-engine.js';
 
 interface ChatOverlayProps {
@@ -18,21 +19,21 @@ interface ChatOverlayProps {
   inputActions: React.ReactNode;
 }
 
-function presentAudioError(raw: string): string {
+function presentAudioError(raw: string, t: (key: string) => string): string {
   const text = String(raw || '').trim();
-  if (!text) return '语音生成失败';
+  if (!text) return t('Errors.audioGeneric');
   if (text.includes('AI_MEDIA_OPTION_UNSUPPORTED') || text.includes('adjust_tts_voice_or_audio_options')) {
-    return '当前 TTS voice 不支持这个模型，请在右侧控制台切换 TTS Voice。';
+    return t('Errors.audioUnsupported');
   }
   if (text.includes('AI_PROVIDER_INTERNAL')) {
-    return 'TTS provider 内部错误，先换一个 voice 或稍后再试。';
+    return t('Errors.audioProvider');
   }
   return text;
 }
 
 function isGenerationFailureMessage(text: string): boolean {
   const value = String(text || '').trim();
-  return value.includes('生成失败') || value.includes('请重试');
+  return value.includes('生成失败') || value.includes('请重试') || value.includes('failed') || value.includes('retry');
 }
 
 export function ChatOverlay({
@@ -51,6 +52,7 @@ export function ChatOverlay({
   onPlayAssistantMessageAudio,
   inputActions,
 }: ChatOverlayProps) {
+  const { t } = useModTranslation('buddy');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom on new messages
@@ -66,13 +68,13 @@ export function ChatOverlay({
     <div className="flex min-h-0 max-h-[23rem] flex-col overflow-hidden rounded-[30px] border border-white/18 bg-white/8 shadow-[0_20px_50px_rgba(148,163,184,0.05)]">
       <div className="flex items-center justify-between border-b border-white/18 bg-white/6 px-4 py-3">
         <div>
-          <div className="text-sm font-semibold text-slate-900">对话记录</div>
+          <div className="text-sm font-semibold text-slate-900">{t('ChatOverlay.title')}</div>
           <div className="text-xs text-slate-500">
-            {voiceModeEnabled ? '自动播报已开启' : '可手动点助手消息播放'}
+            {voiceModeEnabled ? t('ChatOverlay.autoVoiceEnabled') : t('ChatOverlay.manualPlay')}
           </div>
         </div>
         <div className="rounded-full border border-white/16 bg-white/10 px-3 py-1 text-[11px] font-medium tracking-[0.14em] text-slate-500">
-          最近 {visibleMessages.length} 条
+          {t('ChatOverlay.recentCount', { count: visibleMessages.length })}
         </div>
       </div>
 
@@ -82,7 +84,7 @@ export function ChatOverlay({
       >
         {visibleMessages.length === 0 && !streamingText && (
           <div className="flex h-full min-h-28 items-center justify-center rounded-[22px] border border-dashed border-white/18 bg-white/6 px-6 text-center text-sm text-slate-500">
-            先打个招呼，或者按住下方按钮直接说话。
+            {t('ChatOverlay.emptyState')}
           </div>
         )}
 
@@ -113,14 +115,14 @@ export function ChatOverlay({
                     }`}
                   >
                     {activeAudioMessageId === msg.id
-                      ? '角色播报中...'
+                      ? t('ChatOverlay.playingAudio')
                       : audioStatusByMessageId[msg.id] === 'loading'
-                        ? '生成语音中...'
-                        : '播放语音'}
+                        ? t('ChatOverlay.generatingAudio')
+                        : t('ChatOverlay.playAudio')}
                   </button>
                   {audioStatusByMessageId[msg.id] === 'loading' && (
                     <span className="text-[11px] text-slate-500">
-                      文本已生成，语音仍在准备中
+                      {t('ChatOverlay.audioPreparing')}
                     </span>
                   )}
                   {msg.emotion && (
@@ -130,7 +132,7 @@ export function ChatOverlay({
                   )}
                   {audioStatusByMessageId[msg.id] === 'error' && (
                     <span className="max-w-full break-all text-[11px] text-rose-500">
-                      {presentAudioError(audioErrorByMessageId[msg.id] || '')}
+                      {presentAudioError(audioErrorByMessageId[msg.id] || '', t)}
                     </span>
                   )}
                 </div>
@@ -160,7 +162,7 @@ export function ChatOverlay({
           value={input}
           onChange={(event) => onInputChange(event.target.value)}
           onKeyDown={onInputKeyDown}
-          placeholder={isRecording ? '录音中，松开后会自动转写并发送…' : '说点什么吧…'}
+          placeholder={isRecording ? t('BuddyPage.recordingPlaceholder') : t('BuddyPage.placeholder')}
           disabled={isGenerating}
           className="min-w-0 flex-1 bg-transparent px-2 text-sm text-slate-800 outline-none placeholder:text-slate-400 disabled:opacity-50"
         />
@@ -169,7 +171,7 @@ export function ChatOverlay({
           disabled={!input.trim() || isGenerating}
           className="rounded-full bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 px-6 py-3 text-sm font-medium text-white shadow-[0_12px_24px_rgba(16,185,129,0.22)] transition-opacity disabled:opacity-40"
         >
-          {isGenerating ? '回应中' : '发送'}
+          {isGenerating ? t('BuddyPage.responding') : t('BuddyPage.send')}
         </button>
       </form>
     </div>

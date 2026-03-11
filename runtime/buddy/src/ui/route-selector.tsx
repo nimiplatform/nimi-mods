@@ -1,4 +1,5 @@
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type {
   RuntimeRouteBinding,
   RuntimeRouteOptionsSnapshot,
@@ -34,6 +35,7 @@ export function RouteSelector({
   onChangeConnector,
   onChangeModel,
 }: RouteSelectorProps) {
+  const { t } = useModTranslation('buddy');
   const source = value.binding?.source || 'local';
   const connectorId = value.binding?.connectorId || '';
   const model = value.binding?.model || '';
@@ -46,7 +48,7 @@ export function RouteSelector({
           {value.label}
         </div>
         <div className="text-[11px] text-slate-400">
-          {value.loading ? 'loading' : source}
+          {value.loading ? t('RouteSelector.loading') : t(`RouteSelector.${source}`)}
         </div>
       </div>
 
@@ -56,8 +58,8 @@ export function RouteSelector({
           onChange={(event) => onChangeSource(event.target.value === 'cloud' ? 'cloud' : 'local')}
           className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-700 outline-none"
         >
-          <option value="local">local</option>
-          <option value="cloud">cloud</option>
+          <option value="local">{t('RouteSelector.local')}</option>
+          <option value="cloud">{t('RouteSelector.cloud')}</option>
         </select>
 
         {source === 'cloud' ? (
@@ -74,7 +76,7 @@ export function RouteSelector({
           </select>
         ) : (
           <div className="rounded-2xl border border-dashed border-slate-200 px-3 py-2.5 text-xs text-slate-400">
-            runtime local
+            {t('RouteSelector.runtimeLocal')}
           </div>
         )}
       </div>

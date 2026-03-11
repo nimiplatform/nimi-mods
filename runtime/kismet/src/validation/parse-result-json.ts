@@ -1,4 +1,5 @@
 import { KISMET_REASON } from '../contracts.js';
+import { kismetMessage } from '../i18n/messages.js';
 import type { KismetError } from '../types.js';
 
 type ParseJsonResult =
@@ -134,7 +135,11 @@ function buildParseError(message: string, actionHint: string, rawText: string): 
 export function parseResultFromText(text: string): ParseJsonResult {
   const trimmed = String(text || '').replace(/^\uFEFF/, '').trim();
   if (!trimmed) {
-    return buildParseError('输入文本为空', '请粘贴 AI 生成的 JSON 结果。', trimmed);
+    return buildParseError(
+      kismetMessage('Messages.parseEmpty', 'Input text is empty.'),
+      kismetMessage('Messages.parseEmptyHint', 'Paste the AI-generated JSON result.'),
+      trimmed,
+    );
   }
 
   const codeBlockMatch = trimmed.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/i);
@@ -162,23 +167,35 @@ export function parseResultFromText(text: string): ParseJsonResult {
   const braceBalance = countBraceBalance(trimmed);
   if (trimmed.includes('{') && braceBalance > 0) {
     return buildParseError(
-      '检测到 JSON 起始符但未闭合，对象可能已被截断',
-      '请确认已复制 AI 返回的完整内容，并要求模型只返回完整 JSON 结果对象。',
+      kismetMessage(
+        'Messages.parseTruncated',
+        'Detected an opening JSON brace without a closing pair. The object may be truncated.',
+      ),
+      kismetMessage(
+        'Messages.parseTruncatedHint',
+        'Copy the full AI response and ask the model to return only one complete JSON object.',
+      ),
       trimmed,
     );
   }
 
   if (!extractBalancedJsonObject(trimmed) && !extractBalancedJsonObject(codeBlockText)) {
     return buildParseError(
-      '未找到可解析的 JSON 对象',
-      '请确保返回内容以 JSON 对象为主体，不要夹杂额外说明文字。',
+      kismetMessage('Messages.parseNoObject', 'No parseable JSON object was found.'),
+      kismetMessage(
+        'Messages.parseNoObjectHint',
+        'Make sure the response is primarily a JSON object without extra explanation.',
+      ),
       trimmed,
     );
   }
 
   return buildParseError(
-    'JSON 解析失败',
-    '请检查返回内容是否包含缺失括号、尾逗号或非 JSON 前后缀。',
+    kismetMessage('Messages.parseFailed', 'JSON parsing failed.'),
+    kismetMessage(
+      'Messages.parseFailedHint',
+      'Check for missing braces, trailing commas, or non-JSON prefixes/suffixes.',
+    ),
     trimmed,
   );
 }

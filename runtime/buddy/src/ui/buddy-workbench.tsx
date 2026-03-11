@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { BuddyControllerState, BuddyControllerActions } from '../hooks/use-buddy-controller.js';
 import { Live2DCanvas } from './live2d-canvas.js';
 import { ChatOverlay } from './chat-overlay.js';
@@ -12,6 +13,7 @@ type Props = BuddyControllerState & BuddyControllerActions;
 const DEFAULT_MODEL_PATH = 'haru/haru.model3.json';
 
 export function BuddyWorkbench(props: Props) {
+  const { t } = useModTranslation('buddy');
   const {
     modelState,
     modelError,
@@ -61,7 +63,7 @@ export function BuddyWorkbench(props: Props) {
   const latestAssistantMessage = [...messages].reverse().find((message) => message.role === 'assistant') || null;
   const stageHint = streamingText
     ? streamingText.replace(/\[emotion:\w+\]/, '').trim()
-    : latestAssistantMessage?.content || '点一下角色触发动作，或者从下方输入区开始聊天。';
+    : latestAssistantMessage?.content || t('BuddyPage.stageHintFallback');
 
   const onCanvasReady = (canvas: HTMLCanvasElement) => {
     if (initialized.current) return;
@@ -100,13 +102,17 @@ export function BuddyWorkbench(props: Props) {
       <div className="relative z-20 flex items-center justify-between gap-4 border-b border-white/60 bg-white/72 px-6 py-4 backdrop-blur">
         <div className="flex items-center gap-4">
           <div>
-            <div className="text-lg font-semibold text-slate-900">Buddy</div>
+            <div className="text-lg font-semibold text-slate-900">{t('BuddyPage.title')}</div>
             <div className="text-xs text-slate-500">
-              {modelState === 'ready' ? '角色在线，可点击角色触发动作或语音播报' : modelState === 'loading' ? '角色加载中' : '选择模型开始互动'}
+              {modelState === 'ready'
+                ? t('BuddyPage.subtitleReady')
+                : modelState === 'loading'
+                  ? t('BuddyPage.subtitleLoading')
+                  : t('BuddyPage.subtitleIdle')}
             </div>
           </div>
           <div className="hidden rounded-full border border-white/80 bg-white/70 px-3 py-1 text-[11px] font-medium tracking-[0.18em] text-slate-500 md:block">
-            LIVE COMPANION
+            {t('BuddyPage.liveBadge')}
           </div>
         </div>
 
@@ -116,9 +122,9 @@ export function BuddyWorkbench(props: Props) {
             onClick={() => setShowRoutePanel((value) => !value)}
             className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700"
           >
-            {showRoutePanel ? '收起控制台' : '打开控制台'}
+            {showRoutePanel ? t('BuddyPage.closeConsole') : t('BuddyPage.openConsole')}
           </button>
-          <span className="hidden sm:inline">模型</span>
+          <span className="hidden sm:inline">{t('BuddyPage.modelLabel')}</span>
           <select
             value={selectedModelId}
             onChange={(event) => selectModel(event.target.value)}
@@ -143,20 +149,20 @@ export function BuddyWorkbench(props: Props) {
 
           <div className="pointer-events-none absolute left-6 top-6 z-10 max-w-sm rounded-[24px] border border-white/80 bg-white/80 px-4 py-3 shadow-sm backdrop-blur">
             <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-600">
-              {streamingText || activeAudioMessageId ? '舞台播报' : '舞台状态'}
+              {streamingText || activeAudioMessageId ? t('BuddyPage.stageBroadcast') : t('BuddyPage.stageStatus')}
             </div>
             <div className="text-sm leading-6 text-slate-700">{stageHint}</div>
           </div>
 
           <div className="pointer-events-none absolute bottom-[17rem] left-6 z-10 flex max-w-[24rem] flex-wrap items-center gap-2">
             <span className="rounded-full border border-white/80 bg-white/72 px-3 py-1.5 text-xs text-slate-600 backdrop-blur">
-              模型：{selectedModel.label}
+              {t('BuddyPage.modelChip', { model: selectedModel.label })}
             </span>
             <span className="rounded-full border border-white/80 bg-white/72 px-3 py-1.5 text-xs text-slate-600 backdrop-blur">
-              {voiceModeEnabled ? '语音自动播报开启' : '手动播报模式'}
+              {voiceModeEnabled ? t('BuddyPage.voiceAutoChip') : t('BuddyPage.voiceManualChip')}
             </span>
             <span className="rounded-full border border-white/80 bg-white/72 px-3 py-1.5 text-xs text-slate-600 backdrop-blur">
-              {activeAudioMessageId ? '角色说话中' : '待机中'}
+              {activeAudioMessageId ? t('BuddyPage.speakingChip') : t('BuddyPage.idleChip')}
             </span>
           </div>
 
@@ -166,26 +172,26 @@ export function BuddyWorkbench(props: Props) {
               onClick={() => setShowRoutePanel((value) => !value)}
               className="pointer-events-auto rounded-full border border-white/75 bg-white/78 px-4 py-2 text-sm text-slate-700 shadow-sm backdrop-blur transition hover:border-emerald-300 hover:text-emerald-700"
             >
-              {showRoutePanel ? '收起控制台' : '打开控制台'}
+              {showRoutePanel ? t('BuddyPage.closeConsole') : t('BuddyPage.openConsole')}
             </button>
           </div>
 
           {showRoutePanel && (
             <div className="absolute inset-y-4 right-4 z-30 flex w-[21rem] flex-col gap-4 rounded-[30px] border border-white/70 bg-white/84 p-4 shadow-[0_24px_60px_rgba(148,163,184,0.16)] backdrop-blur">
               <div className="flex items-start justify-between gap-3">
-                <div className="text-base font-semibold text-slate-900">控制台</div>
+                <div className="text-base font-semibold text-slate-900">{t('BuddyPage.consoleTitle')}</div>
                 <button
                   type="button"
                   onClick={() => setShowRoutePanel(false)}
                   className="rounded-full border border-slate-200 px-3 py-1.5 text-xs text-slate-500"
                 >
-                  收起
+                  {t('BuddyPage.collapse')}
                 </button>
               </div>
 
               <div className="rounded-[24px] border border-emerald-100 bg-[linear-gradient(135deg,_rgba(236,253,245,0.9)_0%,_rgba(240,249,255,0.95)_100%)] p-4">
                 <div className="flex items-start justify-between gap-4">
-                  <div className="text-sm font-semibold text-slate-900">语音模式</div>
+                  <div className="text-sm font-semibold text-slate-900">{t('BuddyPage.voiceMode')}</div>
                   <button
                     type="button"
                     onClick={() => setVoiceModeEnabled(!voiceModeEnabled)}
@@ -195,16 +201,16 @@ export function BuddyWorkbench(props: Props) {
                         : 'bg-white text-slate-500'
                     }`}
                   >
-                    {voiceModeEnabled ? '已开启' : '已关闭'}
+                    {voiceModeEnabled ? t('BuddyPage.enabled') : t('BuddyPage.disabled')}
                   </button>
                 </div>
               </div>
 
               <div className="rounded-[24px] border border-slate-100 bg-slate-50/80 p-4">
-                <div className="mb-3 text-sm font-semibold text-slate-900">模型资料</div>
+                <div className="mb-3 text-sm font-semibold text-slate-900">{t('BuddyPage.modelProfile')}</div>
                 <div className="grid gap-3 text-xs text-slate-500">
                   <label className="grid gap-1">
-                    <span>当前模型</span>
+                    <span>{t('BuddyPage.currentModel')}</span>
                     <select
                       value={selectedModelId}
                       onChange={(event) => selectModel(event.target.value)}
@@ -223,7 +229,7 @@ export function BuddyWorkbench(props: Props) {
               <div className="grid gap-3 overflow-y-auto pr-1">
                 <RouteSelector
                   value={{
-                    label: 'Chat Route',
+                    label: t('RouteSelector.chatRoute'),
                     binding: textRouteBinding,
                     options: textRouteOptions,
                     loading: routeOptionsLoading,
@@ -234,7 +240,7 @@ export function BuddyWorkbench(props: Props) {
                 />
                 <RouteSelector
                   value={{
-                    label: 'TTS Route',
+                    label: t('RouteSelector.ttsRoute'),
                     binding: ttsRouteBinding,
                     options: ttsRouteOptions,
                     loading: routeOptionsLoading,
@@ -244,7 +250,7 @@ export function BuddyWorkbench(props: Props) {
                   onChangeModel={(model) => setRouteModel('tts', model)}
                 />
                 <div className="rounded-[24px] border border-slate-100 bg-slate-50/80 p-4">
-                  <div className="mb-3 text-sm font-semibold text-slate-900">TTS Voice</div>
+                  <div className="mb-3 text-sm font-semibold text-slate-900">{t('BuddyPage.ttsVoice')}</div>
                   <div className="grid gap-2">
                     <select
                       value={selectedTtsVoiceId}
@@ -254,7 +260,7 @@ export function BuddyWorkbench(props: Props) {
                     >
                       {ttsVoiceOptions.length === 0 ? (
                         <option value="">
-                          {ttsVoicesLoading ? '加载 voice 列表中...' : '当前路由没有可用 voice'}
+                          {ttsVoicesLoading ? t('BuddyPage.voiceLoading') : t('BuddyPage.voiceUnavailable')}
                         </option>
                       ) : (
                         ttsVoiceOptions.map((voice) => (
@@ -268,7 +274,7 @@ export function BuddyWorkbench(props: Props) {
                 </div>
                 <RouteSelector
                   value={{
-                    label: 'STT Route',
+                    label: t('RouteSelector.sttRoute'),
                     binding: sttRouteBinding,
                     options: sttRouteOptions,
                     loading: routeOptionsLoading,
@@ -283,22 +289,22 @@ export function BuddyWorkbench(props: Props) {
 
             {modelState === 'loading' && (
               <div className="absolute inset-0 z-10 flex items-center justify-center">
-                <div className="rounded-xl bg-white/85 px-6 py-3 text-sm text-slate-500 shadow-sm backdrop-blur">
-                  角色加载中...
-                </div>
+                  <div className="rounded-xl bg-white/85 px-6 py-3 text-sm text-slate-500 shadow-sm backdrop-blur">
+                  {t('BuddyPage.modelLoading')}
+                  </div>
               </div>
             )}
 
             {modelState === 'error' && (
               <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3">
                 <div className="rounded-xl bg-red-50 px-6 py-3 text-sm text-red-600">
-                  角色加载失败{modelError ? `：${modelError}` : ''}
+                  {t('BuddyPage.modelError')}{modelError ? `: ${modelError}` : ''}
                 </div>
                 <button
                   className="rounded-lg bg-blue-500 px-4 py-2 text-sm text-white hover:bg-blue-600"
                   onClick={retry}
                 >
-                  重试
+                  {t('BuddyPage.retry')}
                 </button>
               </div>
             )}
@@ -333,8 +339,8 @@ export function BuddyWorkbench(props: Props) {
           </div>
 
           <div className="pointer-events-none absolute bottom-1 left-6 right-6 z-10 flex items-center justify-between px-1 text-xs text-slate-500">
-            <div>{isRecording ? '录音中，松开后会自动转写并发送。' : '右下角输入区已和对话记录整合。'}</div>
-            <div>{voiceModeEnabled ? '角色回复后会自动播报' : '可在消息中手动点击播放语音'}</div>
+            <div>{isRecording ? t('BuddyPage.recordingHint') : t('BuddyPage.chatHint')}</div>
+            <div>{voiceModeEnabled ? t('BuddyPage.autoPlaybackHint') : t('BuddyPage.manualPlaybackHint')}</div>
           </div>
         </div>
       </div>
@@ -343,12 +349,12 @@ export function BuddyWorkbench(props: Props) {
         <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/20 backdrop-blur-sm">
           <div className="mx-4 max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl">
             <div className="mb-3 text-4xl">😊</div>
-            <p className="mb-4 text-gray-700">我们休息一下眼睛吧！</p>
+            <p className="mb-4 text-gray-700">{t('BuddyPage.restReminder')}</p>
             <button
               className="rounded-lg bg-blue-500 px-6 py-2 text-sm text-white hover:bg-blue-600"
               onClick={dismissRestReminder}
             >
-              好的，继续
+              {t('BuddyPage.continueAction')}
             </button>
           </div>
         </div>

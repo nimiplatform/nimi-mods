@@ -27,6 +27,7 @@ import {
   validateNatalAiOutput,
 } from '../validation/validate-result.js';
 import { KISMET_REASON } from '../contracts.js';
+import { kismetMessage } from '../i18n/messages.js';
 
 function asRecord(input: unknown): Record<string, unknown> {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -41,24 +42,42 @@ function detectPromptPayload(kind: KismetPromptKind, raw: unknown): KismetError 
   if (kind === 'natal-profile' && record.pillars && record.dayMaster && record.birthCity) {
     return {
       reasonCode: KISMET_REASON.IMPORT_PARSE_FAILED,
-      message: '当前粘贴内容是命盘分析的 User Prompt，不是 AI 输出结果。',
-      actionHint: '请把上方 Prompt 发给 AI，并将 AI 最终返回的 JSON 结果粘贴到这里，不要直接粘贴 User Prompt。',
+      message: kismetMessage(
+        'Messages.promptImportNatalUserPrompt',
+        'The pasted content is the natal-analysis user prompt, not the AI result.',
+      ),
+      actionHint: kismetMessage(
+        'Messages.promptImportNatalUserPromptHint',
+        'Send the prompt above to AI, then paste only the final JSON response here.',
+      ),
     };
   }
 
   if (kind === 'daily-fortune' && record.canonicalProfile && record.dailyDefaults && record.instructions) {
     return {
       reasonCode: KISMET_REASON.IMPORT_PARSE_FAILED,
-      message: '当前粘贴内容是今日运势的 User Prompt，不是 AI 输出结果。',
-      actionHint: '请把上方 Prompt 发给 AI，并将 AI 最终返回的 JSON 结果粘贴到这里，不要直接粘贴 User Prompt。',
+      message: kismetMessage(
+        'Messages.promptImportDailyUserPrompt',
+        'The pasted content is the daily-fortune user prompt, not the AI result.',
+      ),
+      actionHint: kismetMessage(
+        'Messages.promptImportDailyUserPromptHint',
+        'Send the prompt above to AI, then paste only the final JSON response here.',
+      ),
     };
   }
 
   if (kind === 'compatibility' && record.selfProfile && record.targetProfile && record.deterministicCompatibilityScore !== undefined) {
     return {
       reasonCode: KISMET_REASON.IMPORT_PARSE_FAILED,
-      message: '当前粘贴内容是命理匹配的 User Prompt，不是 AI 输出结果。',
-      actionHint: '请把上方 Prompt 发给 AI，并将 AI 最终返回的 JSON 结果粘贴到这里，不要直接粘贴 User Prompt。',
+      message: kismetMessage(
+        'Messages.promptImportCompatibilityUserPrompt',
+        'The pasted content is the compatibility user prompt, not the AI result.',
+      ),
+      actionHint: kismetMessage(
+        'Messages.promptImportCompatibilityUserPromptHint',
+        'Send the prompt above to AI, then paste only the final JSON response here.',
+      ),
     };
   }
 
@@ -71,7 +90,7 @@ export function buildNatalPromptPackage(input: {
 }): GeneratedPromptPackage {
   return {
     kind: 'natal-profile',
-    title: '命盘分析 Prompt',
+    title: kismetMessage('Messages.natalPromptTitle', 'Natal Analysis Prompt'),
     systemPrompt: buildNatalSystemPrompt(),
     userPrompt: buildNatalUserPrompt(input),
   };
@@ -87,7 +106,7 @@ export function buildDailyPromptPackage(input: {
 }): GeneratedPromptPackage {
   return {
     kind: 'daily-fortune',
-    title: '今日运势 Prompt',
+    title: kismetMessage('Messages.dailyPromptTitle', 'Daily Fortune Prompt'),
     systemPrompt: buildDailySystemPrompt(),
     userPrompt: buildDailyUserPrompt(input),
   };
@@ -99,7 +118,7 @@ export function buildFortuneStickPromptPackage(input: {
 }): GeneratedPromptPackage {
   return {
     kind: 'fortune-stick',
-    title: '求签 Prompt',
+    title: kismetMessage('Messages.fortuneStickPromptTitle', 'Fortune Stick Prompt'),
     systemPrompt: buildFortuneStickSystemPrompt(),
     userPrompt: buildFortuneStickUserPrompt(input),
   };
@@ -108,7 +127,7 @@ export function buildFortuneStickPromptPackage(input: {
 export function buildCompatibilityPromptPackage(input: KismetCompatibilityInput): GeneratedPromptPackage {
   return {
     kind: 'compatibility',
-    title: '命理匹配 Prompt',
+    title: kismetMessage('Messages.compatibilityPromptTitle', 'Compatibility Prompt'),
     systemPrompt: buildCompatibilitySystemPrompt(),
     userPrompt: buildCompatibilityUserPrompt(input),
   };

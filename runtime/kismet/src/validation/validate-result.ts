@@ -14,6 +14,7 @@ import type {
   KismetNatalAiOutput,
   KismetNatalAnalysisResult,
 } from '../types.js';
+import { kismetMessage } from '../i18n/messages.js';
 
 type ValidationFailure = { ok: false; error: KismetError };
 
@@ -34,7 +35,11 @@ export function validateNatalAiOutput(raw: unknown):
   const result = KismetNatalAiOutputSchema.safeParse(raw);
   if (!result.success) {
     const issues = result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ');
-    return buildSchemaError('AI 输出 schema 校验失败', '请确保输出仅包含 analysis 与 keyNodes。', issues);
+    return buildSchemaError(
+      kismetMessage('Messages.natalAiSchemaInvalid', 'AI output schema validation failed: {{issues}}', { issues }),
+      kismetMessage('Messages.natalAiSchemaInvalidHint', 'Ensure the output only contains `analysis` and `keyNodes`.'),
+      issues,
+    );
   }
   return { ok: true, data: result.data };
 }
@@ -45,7 +50,11 @@ export function validateNatalResult(raw: unknown):
   const result = KismetNatalAnalysisResultSchema.safeParse(raw);
   if (!result.success) {
     const issues = result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ');
-    return buildSchemaError('命盘结果 schema 校验失败', '请确认导入内容是完整的命盘 JSON。', issues);
+    return buildSchemaError(
+      kismetMessage('Messages.natalResultSchemaInvalid', 'Natal result schema validation failed: {{issues}}', { issues }),
+      kismetMessage('Messages.natalResultSchemaInvalidHint', 'Make sure the imported content is a complete natal JSON payload.'),
+      issues,
+    );
   }
   return { ok: true, data: result.data };
 }
@@ -56,7 +65,11 @@ export function validateDailyResult(raw: unknown):
   const result = KismetDailyFortuneResultSchema.safeParse(raw);
   if (!result.success) {
     const issues = result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ');
-    return buildSchemaError('今日运势结果 schema 校验失败', '请确认导入内容是完整的今日运势 JSON。', issues);
+    return buildSchemaError(
+      kismetMessage('Messages.dailyResultSchemaInvalid', 'Daily fortune schema validation failed: {{issues}}', { issues }),
+      kismetMessage('Messages.dailyResultSchemaInvalidHint', 'Make sure the imported content is a complete daily fortune JSON payload.'),
+      issues,
+    );
   }
   return { ok: true, data: result.data };
 }
@@ -67,7 +80,11 @@ export function validateFortuneStickResult(raw: unknown):
   const result = KismetFortuneStickResultSchema.safeParse(raw);
   if (!result.success) {
     const issues = result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ');
-    return buildSchemaError('求签结果 schema 校验失败', '请确认输出内容是完整的求签 JSON。', issues);
+    return buildSchemaError(
+      kismetMessage('Messages.fortuneStickSchemaInvalid', 'Fortune stick schema validation failed: {{issues}}', { issues }),
+      kismetMessage('Messages.fortuneStickSchemaInvalidHint', 'Make sure the imported content is a complete fortune stick JSON payload.'),
+      issues,
+    );
   }
   return { ok: true, data: result.data };
 }
@@ -78,7 +95,11 @@ export function validateCompatibilityResult(raw: unknown):
   const result = KismetCompatibilityResultSchema.safeParse(raw);
   if (!result.success) {
     const issues = result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ');
-    return buildSchemaError('命理匹配结果 schema 校验失败', '请确认导入内容是完整的匹配 JSON。', issues);
+    return buildSchemaError(
+      kismetMessage('Messages.compatibilitySchemaInvalid', 'Compatibility schema validation failed: {{issues}}', { issues }),
+      kismetMessage('Messages.compatibilitySchemaInvalidHint', 'Make sure the imported content is a complete compatibility JSON payload.'),
+      issues,
+    );
   }
   return { ok: true, data: result.data };
 }

@@ -175,6 +175,7 @@ function DraftProfileCard(props: {
   onGenerate: () => void;
   loading: boolean;
 }) {
+  const { t } = useTranslation('kismet');
   const [editing, setEditing] = useState(false);
   const [activating, setActivating] = useState(false);
 
@@ -201,7 +202,7 @@ function DraftProfileCard(props: {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ width: 28, height: 1, background: 'linear-gradient(to right, transparent, #8A7254)' }} />
-          <span className="ks-serif" style={{ fontSize: '0.75rem', color: '#8C857B', letterSpacing: 4 }}>命 主</span>
+          <span className="ks-serif" style={{ fontSize: '0.75rem', color: '#8C857B', letterSpacing: 4 }}>{t('Shell.subject')}</span>
           <div style={{ width: 28, height: 1, background: 'linear-gradient(to left, transparent, #8A7254)' }} />
         </div>
         <div
@@ -310,7 +311,7 @@ function DraftProfileCard(props: {
           className="ks-serif"
           style={{ background: 'none', border: 'none', color: '#8C857B', cursor: 'pointer', fontSize: '0.9rem', letterSpacing: 2 }}
         >
-          {editing ? '完成' : '修改'}
+          {editing ? t('Shell.done') : t('Shell.edit')}
         </button>
       </div>
 
@@ -335,7 +336,7 @@ function DraftProfileCard(props: {
             borderRadius: 2, transition: 'all 0.3s',
           }}
         >
-          {activating ? '天 机 衍 算 中 …' : props.loading ? '推 演 中 …' : '确 认 生 成'}
+          {activating ? t('Shell.activating') : props.loading ? t('Shell.generating') : t('Shell.confirmGenerate')}
         </button>
       </div>
 
@@ -404,7 +405,7 @@ export function KismetShell() {
                 textShadow: '0 0 10px rgba(138,114,84,0.2)',
               }}
             >
-              天机·司命
+              {t('Shell.brand')}
             </div>
           </div>
 
@@ -445,7 +446,7 @@ export function KismetShell() {
 
           {store.primaryProfile && (
             <div style={{ padding: '10px 14px', background: 'rgba(138,114,84,0.08)', border: '1px solid rgba(138,114,84,0.15)' }}>
-              <div className="ks-serif text-xs" style={{ color: '#8A7254' }}>当前命主</div>
+              <div className="ks-serif text-xs" style={{ color: '#8A7254' }}>{t('Shell.currentProfile')}</div>
               <div className="ks-serif mt-1" style={{ fontSize: '0.9rem', color: '#E8E3D7' }}>
                 {store.primaryProfile.birthInput.name || store.primaryProfile.canonicalProfile.dayMaster.label} · {store.primaryProfile.canonicalProfile.zodiac}
               </div>
@@ -463,7 +464,7 @@ export function KismetShell() {
                   className="ks-serif"
                   style={{ marginTop: 10, width: '100%', padding: '8px 0', background: 'transparent', border: '1px solid rgba(138,114,84,0.3)', color: '#8A7254', fontSize: '0.8rem', cursor: 'pointer', letterSpacing: 2, transition: 'all 0.3s' }}
                 >
-                  加载上次命盘
+                  {t('Shell.loadLastProfile')}
                 </button>
               )}
             </div>
@@ -539,7 +540,7 @@ export function KismetShell() {
                 letterSpacing: 2,
               }}
             >
-              {t('Compatibility.title')} / Matchmaking
+              {t('Compatibility.title')} / {t('Shell.compatibilitySuffix')}
             </div>
 
             {/* Ritual container */}
@@ -675,7 +676,7 @@ export function KismetShell() {
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, marginBottom: 20 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <div style={{ width: 28, height: 1, background: 'linear-gradient(to right, transparent, #8A7254)' }} />
-                      <span className="ks-serif" style={{ fontSize: '0.75rem', color: '#8C857B', letterSpacing: 4 }}>命 主</span>
+                      <span className="ks-serif" style={{ fontSize: '0.75rem', color: '#8C857B', letterSpacing: 4 }}>{t('Shell.subject')}</span>
                       <div style={{ width: 28, height: 1, background: 'linear-gradient(to left, transparent, #8A7254)' }} />
                     </div>
                     <div

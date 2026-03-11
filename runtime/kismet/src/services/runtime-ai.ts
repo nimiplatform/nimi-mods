@@ -2,6 +2,7 @@ import type { ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
 import type { KismetAiRawResponse, KismetError, RouteSourceDisplay } from '../types.js';
 import { KISMET_REASON } from '../contracts.js';
+import { kismetMessage } from '../i18n/messages.js';
 import { parseResultFromText } from '../validation/parse-result-json.js';
 import { emitKismetLog } from '../logging.js';
 
@@ -79,14 +80,17 @@ function normalizeAiFailure(error: unknown): NormalizedAiFailure {
   return {
     reasonCode: routeUnavailable ? KISMET_REASON.ROUTE_UNAVAILABLE : KISMET_REASON.AI_GENERATE_FAILED,
     message: rawMessage
-      ? `AI 生成失败: ${rawMessage}`
+      ? kismetMessage('Messages.aiGenerateFailedWithDetail', 'AI generation failed: {{detail}}', { detail: rawMessage })
       : routeUnavailable
-        ? 'AI 生成失败: Runtime 路由不可用'
-        : 'AI 生成失败',
+        ? kismetMessage('Messages.aiGenerateFailedRouteUnavailable', 'AI generation failed: Runtime route unavailable')
+        : kismetMessage('Messages.aiGenerateFailedSimple', 'AI generation failed'),
     actionHint: rawActionHint || (
       routeUnavailable
-        ? '请切换到 Prompt-Import 模式，或检查 Runtime 路由配置后重试。'
-        : '请重试或切换到 Prompt-Import 模式。'
+        ? kismetMessage(
+          'Messages.aiGenerateRouteHint',
+          'Switch to Prompt Import mode, or check Runtime route config and retry.',
+        )
+        : kismetMessage('Messages.aiGenerateGeneralHint', 'Retry, or switch to Prompt Import mode.')
     ),
     ...(traceId ? { traceId } : {}),
     ...(rawReasonCode && rawReasonCode !== (routeUnavailable ? KISMET_REASON.ROUTE_UNAVAILABLE : KISMET_REASON.AI_GENERATE_FAILED)

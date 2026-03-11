@@ -14,6 +14,7 @@ import { generateJsonViaAi } from '../services/runtime-ai.js';
 import { getKismetAiClient } from '../runtime-mod.js';
 import { emitKismetLog } from '../logging.js';
 import { KISMET_AUDIT, KISMET_REASON } from '../contracts.js';
+import { kismetMessage } from '../i18n/messages.js';
 import { deriveCanonicalProfile } from '../services/bazi/derive-profile.js';
 import { buildLocationContext } from '../services/city-affinity.js';
 import { interpolateKeyNodes } from '../services/interpolation.js';
@@ -45,8 +46,13 @@ import type {
 function buildCanonicalProfileError(issues: string[]) {
   return {
     reasonCode: KISMET_REASON.CANONICAL_PROFILE_INVALID,
-    message: `命盘推导失败: ${issues.join('; ')}`,
-    actionHint: '请检查出生日期、时间与出生地后重试。',
+    message: kismetMessage('Messages.canonicalProfileInvalid', 'Canonical profile derivation failed: {{issues}}', {
+      issues: issues.join('; '),
+    }),
+    actionHint: kismetMessage(
+      'Messages.canonicalProfileInvalidHint',
+      'Check birth date, time, and birth city, then try again.',
+    ),
   };
 }
 
@@ -57,8 +63,14 @@ function buildRouteUnavailableError(): {
 } {
   return {
     reasonCode: KISMET_REASON.ROUTE_UNAVAILABLE,
-    message: '当前 AI 路由无有效 connector/model 绑定，已阻止本次请求。',
-    actionHint: '请确认 cloud 已选择有效连接器和模型，或改用 Prompt Import。',
+    message: kismetMessage(
+      'Messages.routeUnavailable',
+      'Current AI route has no valid connector/model binding. Request blocked.',
+    ),
+    actionHint: kismetMessage(
+      'Messages.routeUnavailableHint',
+      'Pick a valid cloud connector and model, or switch to Prompt Import.',
+    ),
   };
 }
 
@@ -280,7 +292,10 @@ export function useKismetController() {
       targetShareProfile = createLocalShareProfile(validation.data.name || validation.data.birthPlaceLabel, targetCanonical);
     }
 
-    const selfShareProfile = createLocalShareProfile(store.birthInput.name || store.birthInput.birthPlaceLabel || 'Self', selfProfile);
+    const selfShareProfile = createLocalShareProfile(
+      store.birthInput.name || store.birthInput.birthPlaceLabel || kismetMessage('Messages.selfProfileFallback', 'Self'),
+      selfProfile,
+    );
     const compatibilityInput = scoreCompatibility(selfShareProfile, targetShareProfile);
     const promptPackage = buildCompatibilityPromptPackage(compatibilityInput);
     store.setGeneratedPrompt(promptPackage);
@@ -416,8 +431,14 @@ export function useKismetController() {
       if (!validation.ok || !confirmedProfile) {
         store.setError(validation.ok ? {
           reasonCode: KISMET_REASON.CANONICAL_PROFILE_INVALID,
-          message: '缺少已确认命盘，无法导入命盘分析结果。',
-          actionHint: '请先重新推导并确认命盘。',
+          message: kismetMessage(
+            'Messages.importMissingProfile',
+            'No confirmed natal profile is available, so the natal result cannot be imported.',
+          ),
+          actionHint: kismetMessage(
+            'Messages.importMissingProfileHint',
+            'Re-derive and confirm the natal profile first.',
+          ),
         } : validation.error);
         return;
       }
@@ -479,7 +500,7 @@ export function useKismetController() {
     // Also save to compatibility profiles list
     if (store.birthInput.consent?.allowLocalProfileMatchUse) {
       const profile = createLocalShareProfile(
-        store.birthInput.name || store.birthInput.birthPlaceLabel || 'Kismet Profile',
+        store.birthInput.name || store.birthInput.birthPlaceLabel || kismetMessage('Messages.savedProfileFallback', 'Kismet Profile'),
         profileToSave,
       );
       const nextProfiles = [profile, ...store.savedProfiles.filter((item) => item.displayName !== profile.displayName)];

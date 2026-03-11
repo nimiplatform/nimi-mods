@@ -1,9 +1,12 @@
 import React, { Suspense } from 'react';
+import { getPromptLocale } from '@nimiplatform/sdk/mod/i18n';
 import type { HookClient } from '@nimiplatform/sdk/mod/types';
 import {
   KISMET_NAV_SLOT,
   KISMET_ROUTE_SLOT,
 } from '../contracts.js';
+import enLocale from '../locales/en.js';
+import zhLocale from '../locales/zh.js';
 
 const LazyKismetPage = React.lazy(async () => {
   const module = await import('../kismet-page.js');
@@ -16,6 +19,7 @@ export async function registerKismetUiExtensions(input: {
   hookClient: HookClient;
 }): Promise<void> {
   const { hookClient } = input;
+  const locale = getPromptLocale() === 'zh' ? zhLocale : enLocale;
 
   await hookClient.ui.register({
     slot: KISMET_NAV_SLOT,
@@ -23,7 +27,7 @@ export async function registerKismetUiExtensions(input: {
     extension: {
       type: 'nav-item',
       tabId: 'mod:kismet',
-      label: 'Kismet',
+      label: locale.nav.label,
       badge: 'MOD',
       icon: 'kismet',
       strategy: 'append',
@@ -46,7 +50,7 @@ export async function registerKismetUiExtensions(input: {
             {
               className: 'm-4 rounded-xl border border-gray-200 bg-white p-3 text-xs text-gray-600',
             },
-            'Kismet loading...',
+            locale.nav.loading,
           ),
         },
         React.createElement(LazyKismetPage),
