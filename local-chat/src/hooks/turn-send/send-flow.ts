@@ -18,6 +18,7 @@ import { createPersistableVoicePlaybackCacheMeta } from '../../services/voice/pl
 import { deriveInteractionProfile } from './interaction-profile.js';
 import { resolveTurnMode } from './turn-mode-resolver.js';
 import { resolveFastTurnPerception } from './fast-turn-perception.js';
+import { getPromptLocale } from '@nimiplatform/sdk/mod/i18n';
 import { perceiveTurn } from './turn-perception.js';
 import { composeInteractionTurnPlan } from './turn-composer.js';
 import { runFirstBeatReactor } from './first-beat-reactor.js';
@@ -404,11 +405,13 @@ export async function runLocalChatTurnSend(input: {
     });
     ensureNotAborted(input.abortSignal);
 
+    const promptLocale = getPromptLocale();
     const fastPerception = resolveFastTurnPerception({
       userText: text,
       interactionProfile: firstBeatPrepared.contextPacket.target.interactionProfile,
       snapshot: firstBeatPrepared.contextPacket.interactionSnapshot || null,
       recentTurns: firstBeatPrepared.contextPacket.recentTurns,
+      promptLocale,
     });
     const resolvedExperiencePolicy = compileResolvedExperiencePolicy({
       interactionProfile: firstBeatPrepared.contextPacket.target.interactionProfile,
@@ -469,6 +472,7 @@ export async function runLocalChatTurnSend(input: {
           memorySlots: prepared.contextPacket.relationMemorySlots || [],
           recentTurns: recentTurnsForPerception,
           regexFallbackTurnMode: regexTurnMode,
+          promptLocale,
         });
         return { ok: true as const, perception, prepared };
       } catch (error) {

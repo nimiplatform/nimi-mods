@@ -1,4 +1,5 @@
 import type { LocalChatTarget } from '../../data/types.js';
+import { pt, type PromptLocale } from '../../prompt/prompt-locale.js';
 
 export type AgentVoiceStylePrompt = {
   language?: string;
@@ -66,6 +67,7 @@ function inferLanguage(target: LocalChatTarget | null, message: string): string 
 export function buildAgentVoiceStylePrompt(input: {
   target: LocalChatTarget | null;
   messageText: string;
+  promptLocale?: PromptLocale;
 }): AgentVoiceStylePrompt {
   const target = input.target;
   const displayName = compactText(target?.displayName || target?.handle || 'the agent', 80);
@@ -88,15 +90,16 @@ export function buildAgentVoiceStylePrompt(input: {
   const worldName = readRecordString(world, 'name') || readRecordString(world, 'title');
 
   // Build instructions — focus on voice characteristics, no repeated text content
+  const locale = input.promptLocale || 'en';
   const styleBlocks = [
-    `角色：${displayName}。`,
-    coreIdentity ? `身份：${coreIdentity}。` : '',
-    persona ? `人设：${persona}。` : '',
-    bio ? `背景线索：${bio}。` : '',
-    tone ? `语气：${tone}。` : '语气：自然，与角色情感一致。',
-    worldName ? `世界观：${worldName}。` : '',
-    '以第一人称角色身份自然演绎，不要以旁白或评论口吻朗读。',
-    '保持简洁、有表现力、与角色人设一致的演绎。',
+    pt(locale, 'voice.role', { name: displayName }),
+    coreIdentity ? pt(locale, 'voice.identity', { value: coreIdentity }) : '',
+    persona ? pt(locale, 'voice.persona', { value: persona }) : '',
+    bio ? pt(locale, 'voice.bio', { value: bio }) : '',
+    tone ? pt(locale, 'voice.tone', { value: tone }) : pt(locale, 'voice.toneDefault'),
+    worldName ? pt(locale, 'voice.world', { value: worldName }) : '',
+    pt(locale, 'voice.inCharacter'),
+    pt(locale, 'voice.keepConcise'),
   ].filter(Boolean);
 
   return {

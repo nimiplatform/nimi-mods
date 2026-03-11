@@ -10,6 +10,7 @@ import { createUlid } from '../../utils/ulid.js';
 import type { LocalChatTurnAiClient } from './types.js';
 import type { TurnInvokeInput } from './request-builder.js';
 import { stripTrailingEndMarkerFragment } from './stream-end-marker.js';
+import { pt, type PromptLocale } from '../../prompt/prompt-locale.js';
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -221,43 +222,44 @@ export async function composeInteractionTurnPlan(input: {
   if (input.intimacyCeiling) {
     perceptionLines.push(`intimacyCeiling=${input.intimacyCeiling}`);
   }
+  const locale: PromptLocale = input.contextPacket.promptLocale || 'en';
   if (input.recentBeatTexts && input.recentBeatTexts.length > 0) {
     perceptionLines.push('');
-    perceptionLines.push('以下是最近的回复，新 beat 不要重复类似的内容或句式：');
+    perceptionLines.push(pt(locale, 'composer.recentNoDup'));
     perceptionLines.push(input.recentBeatTexts.join(' | '));
   }
 
   const prompt = [
     input.invokeInput.prompt,
     '',
-    '请规划这轮对话在首拍之后的 tail beat 计划，仅返回一个 JSON 对象，不要有任何其它文字。',
+    pt(locale, 'composer.planInstruction'),
     '',
-    '严格按照以下 JSON 格式：',
+    pt(locale, 'composer.jsonFormat'),
     '```json',
-    '{"beats":[{"text":"一句完整的话","intent":"answer","relationMove":"friendly","sceneMove":"日常","pauseMs":650}]}',
+    '{"beats":[{"text":"...","intent":"answer","relationMove":"friendly","sceneMove":"daily","pauseMs":650}]}',
     '```',
     '',
-    '字段说明：',
-    '- text: 必须是完整的句子，不能断在半截，不能是空字符串',
-    '- intent: 只能是 answer/clarify/checkin/comfort/tease/invite/media 之一',
-    '- relationMove: 描述这句话对关系的推进（如 friendly/warm/comfort/tease/closer）',
-    '- sceneMove: 描述场景变化（如 日常/深入/安慰/调侃）',
-    '- pauseMs: 这条 tail beat 相对上一拍的停顿毫秒数（建议 300-2000）',
-    '- assetRequest: 可选，但只允许 explicit-media 模式输出 {"kind":"image|video","prompt":"描述"}',
+    pt(locale, 'composer.fieldExplain'),
+    pt(locale, 'composer.fieldText'),
+    pt(locale, 'composer.fieldIntent'),
+    pt(locale, 'composer.fieldRelation'),
+    pt(locale, 'composer.fieldScene'),
+    pt(locale, 'composer.fieldPause'),
+    pt(locale, 'composer.fieldAsset'),
     '',
-    '规则：',
-    '- beats 数量 0-4 条，不要超过 4 条',
-    '- information 模式可以直接返回空 beats',
-    '- 这些都是首拍之后的补充 beat，不要重写、重复、解释或微调首拍',
-    '- 后续 beat 必须带来新信息、新情绪动作或新关系推进，不能只是换个说法重复首拍或上一条',
-    '- 非 explicit-media 模式不要输出 assetRequest，也不要暗示系统会自动发图/发视频',
-    '- 不要使用 markdown 格式、不要代码块、不要解释',
-    '- 整个输出只能是一个 JSON 对象，以 { 开头，以 } 结尾',
+    pt(locale, 'composer.rulesHeader'),
+    pt(locale, 'composer.ruleCount'),
+    pt(locale, 'composer.ruleInfoEmpty'),
+    pt(locale, 'composer.ruleTailOnly'),
+    pt(locale, 'composer.ruleNewInfo'),
+    pt(locale, 'composer.ruleNoMedia'),
+    pt(locale, 'composer.ruleNoMarkdown'),
+    pt(locale, 'composer.ruleJsonOnly'),
     '',
-    `已经封口的首拍：${input.sealedFirstBeatText}`,
+    pt(locale, 'composer.sealedFirstBeat', { text: input.sealedFirstBeatText }),
     '',
-    '示例（emotional 模式，用户说"好累"）：',
-    '{"beats":[{"text":"先别一个人硬撑，把最压你的那件事丢给我。","intent":"invite","relationMove":"warm","sceneMove":"深入","pauseMs":750}]}',
+    pt(locale, 'composer.exampleHeader'),
+    '{"beats":[{"text":"先别一个人硬撑，把最压你的那件事丢给我。","intent":"invite","relationMove":"warm","sceneMove":"deeper","pauseMs":750}]}',
     '',
     `turnMode=${input.turnMode}`,
     `deliveryStyle=${input.deliveryStyle || 'natural'}`,
@@ -274,7 +276,7 @@ export async function composeInteractionTurnPlan(input: {
         ...input.invokeInput,
         prompt: attempt === 1
           ? prompt
-          : prompt + '\n\n重要提醒：上一次你的输出不是合法 JSON，导致解析失败。这一次请严格只输出一个 JSON 对象，不要有任何其它文字、不要 markdown 代码块包裹、不要解释。以 { 开头，以 } 结尾。',
+          : prompt + '\n\n' + pt(locale, 'composer.retryReminder'),
         maxTokens: 1200,
         temperature: attempt === 1 ? 0.5 : 0.3,
       });

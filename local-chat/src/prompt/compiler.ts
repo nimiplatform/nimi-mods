@@ -7,6 +7,7 @@ import type {
   PromptLayerId,
   PromptLayerTrace,
 } from './types.js';
+import { pt, type PromptLocale } from './prompt-locale.js';
 
 const DEFAULT_MAX_PROMPT_CHARS = 24_000;
 const DEFAULT_FIRST_BEAT_MAX_PROMPT_CHARS = 10_000;
@@ -136,31 +137,48 @@ function joinLines(title: string, lines: string[]): string {
   return [`${title}:`, ...filtered.map((line) => `- ${line}`)].join('\n');
 }
 
+const LANG_DISPLAY_NAMES: Record<string, string> = {
+  zh: 'Chinese',
+  en: 'English',
+  ja: 'Japanese',
+  ko: 'Korean',
+};
+
+function buildLanguageLockLine(characterLanguage: string | null, locale: PromptLocale): string {
+  if (!characterLanguage) {
+    return pt(locale, 'compiler.safety.langFollowUser');
+  }
+  const langName = LANG_DISPLAY_NAMES[characterLanguage] || characterLanguage;
+  return pt(locale, 'compiler.safety.langLock', { lang: langName });
+}
+
 function buildContentBoundaryLines(
   hint: LocalChatPromptCompileInput['contextPacket']['contentBoundaryHint'],
+  locale: PromptLocale,
 ): string[] {
   if (!hint) return [];
   const lines: string[] = [];
   if (hint.visualComfortLevel === 'text-only') {
-    lines.push('用户当前选择 text-only。不要主动展开外貌、身体、穿着或镜头式视觉描写。');
-    lines.push('不要输出色情、裸露、性暗示或明确性行为相关内容。');
+    lines.push(pt(locale, 'compiler.boundary.textOnly1'));
+    lines.push(pt(locale, 'compiler.boundary.textOnly2'));
   } else if (hint.visualComfortLevel === 'restrained-visuals') {
-    lines.push('用户当前选择克制风格。不要输出色情、裸露、性暗示或明确性行为相关内容。');
-    lines.push('允许自然关心和有限亲近，但身体接触描写止于牵手、拥抱这类轻度表达。');
+    lines.push(pt(locale, 'compiler.boundary.restrained1'));
+    lines.push(pt(locale, 'compiler.boundary.restrained2'));
   }
   if (hint.relationshipBoundaryPreset === 'reserved') {
-    lines.push('保持社交距离，不要主动调情，不要推进暧昧或亲密关系。');
+    lines.push(pt(locale, 'compiler.boundary.reserved'));
   }
   return lines;
 }
 
 function renderRecentTurns(
   turns: LocalChatPromptCompileInput['contextPacket']['recentTurns'],
+  locale: PromptLocale,
   limit = turns.length,
 ): string {
   const recentTurns = turns.slice(-Math.max(0, limit));
   if (!recentTurns.length) return '';
-  const lines: string[] = ['最近精确回合（按时间顺序，只用于 continuity，不要逐条复述）:'];
+  const lines: string[] = [pt(locale, 'compiler.turns.header')];
   for (const turn of recentTurns) {
     lines.push(`${turn.role === 'assistant' ? 'Assistant' : 'User'} #${turn.seq}`);
     turn.lines.forEach((line: string) => {
@@ -191,8 +209,8 @@ function renderSessionRecall(input: LocalChatPromptCompileInput['contextPacket']
     .join('\n');
 }
 
-function formatPacingPlan(input: LocalChatPromptCompileInput['contextPacket']['pacingPlan']): string {
-  return joinLines('本轮节奏计划', [
+function formatPacingPlan(input: LocalChatPromptCompileInput['contextPacket']['pacingPlan'], locale: PromptLocale): string {
+  return joinLines(pt(locale, 'compiler.pacing.title'), [
     `mode=${input.mode}`,
     `energy=${input.energy}`,
     `maxSegments=${input.maxSegments}`,
@@ -200,85 +218,67 @@ function formatPacingPlan(input: LocalChatPromptCompileInput['contextPacket']['p
   ]);
 }
 
-function buildPacingInstructions(input: LocalChatPromptCompileInput['contextPacket']['pacingPlan']): string[] {
+function buildPacingInstructions(input: LocalChatPromptCompileInput['contextPacket']['pacingPlan'], locale: PromptLocale): string[] {
   switch (input.mode) {
     case 'burst-2':
       return [
-        '本轮优先拆成两条短消息，用一个空行分隔；不要超过两条。',
-        '第一条偏即时反应，第二条补充推进。',
+        pt(locale, 'compiler.pacing.burst2.1'),
+        pt(locale, 'compiler.pacing.burst2.2'),
       ];
     case 'answer-followup':
       return [
-        '本轮优先给一条主回答，再补一条短 follow-up，用一个空行分隔；不要超过两条。',
+        pt(locale, 'compiler.pacing.answerFollowup'),
       ];
     case 'burst-3':
       return [
-        '本轮如语义确实需要，可以用两到三条短消息递进表达；用一个空行分隔，不要超过三条。',
+        pt(locale, 'compiler.pacing.burst3'),
       ];
     case 'single':
     default:
       return [
-        '本轮优先只输出一条完整消息，不要为了像真人而硬拆。',
+        pt(locale, 'compiler.pacing.single'),
       ];
   }
 }
 
-function describeExpression(profile: LocalChatPromptCompileInput['contextPacket']['target']['interactionProfile']): string[] {
+function describeExpression(profile: LocalChatPromptCompileInput['contextPacket']['target']['interactionProfile'], locale: PromptLocale): string[] {
   const expr = profile.expression;
   const rel = profile.relationship;
   const lines: string[] = [];
-  const lengthMap: Record<typeof expr.responseLength, string> = {
-    short: '偏短句，不要写长段落',
-    medium: '适中长度，自然展开',
-    long: '可以展开说，但不要啰嗦',
-  };
-  const formalityMap: Record<typeof expr.formality, string> = {
-    casual: '口语化，像朋友发消息',
-    formal: '略正式，但保持亲和',
-    slang: '更松弛随性，可以带一点俚语感',
-  };
-  const sentimentMap: Record<typeof expr.sentiment, string> = {
-    positive: '整体语气偏积极明亮',
-    neutral: '整体语气自然平稳',
-    cynical: '允许一点嘴硬和冷感，但不要攻击用户',
-  };
-  const warmthMap: Record<typeof rel.warmth, string> = {
-    cool: '情感表达克制一些',
-    warm: '温暖友善，有关心感',
-    intimate: '亲密自然，像很熟的人',
-  };
-  lines.push(lengthMap[expr.responseLength]);
-  lines.push(formalityMap[expr.formality]);
-  lines.push(sentimentMap[expr.sentiment]);
-  lines.push(warmthMap[rel.warmth]);
-  if (expr.firstBeatStyle === 'playful') lines.push('开场语气偏活泼俏皮');
-  if (expr.firstBeatStyle === 'gentle') lines.push('开场语气偏温柔体贴');
-  if (rel.flirtAffinity === 'high') lines.push('可以带一点暧昧和撩拨');
-  if (expr.pacingBias === 'bursty') lines.push('喜欢连发短消息，节奏快');
+  lines.push(pt(locale, `compiler.expr.length.${expr.responseLength}`));
+  lines.push(pt(locale, `compiler.expr.formality.${expr.formality}`));
+  lines.push(pt(locale, `compiler.expr.sentiment.${expr.sentiment}`));
+  lines.push(pt(locale, `compiler.expr.warmth.${rel.warmth}`));
+  if (expr.firstBeatStyle === 'playful') lines.push(pt(locale, 'compiler.expr.playfulOpener'));
+  if (expr.firstBeatStyle === 'gentle') lines.push(pt(locale, 'compiler.expr.gentleOpener'));
+  if (rel.flirtAffinity === 'high') lines.push(pt(locale, 'compiler.expr.flirtHigh'));
+  if (expr.pacingBias === 'bursty') lines.push(pt(locale, 'compiler.expr.burstyPacing'));
+  const emojiKey = `compiler.expr.emoji.${expr.emojiUsage}`;
+  lines.push(pt(locale, emojiKey));
   return lines;
 }
 
-function renderInteractionProfile(input: LocalChatPromptCompileInput['contextPacket']): string {
+function renderInteractionProfile(input: LocalChatPromptCompileInput['contextPacket'], locale: PromptLocale): string {
   const profile = input.target.interactionProfile;
-  const naturalLines = describeExpression(profile);
-  return joinLines('交流画像', [
+  const naturalLines = describeExpression(profile, locale);
+  return joinLines(pt(locale, 'compiler.profile.title'), [
     ...naturalLines,
     ...((input.target.interactionProfileLines || []).slice(0, 4)),
   ]);
 }
 
-function renderInteractionState(input: LocalChatPromptCompileInput['contextPacket']): string {
+function renderInteractionState(input: LocalChatPromptCompileInput['contextPacket'], locale: PromptLocale): string {
   const snapshot = input.interactionSnapshot;
   if (!snapshot) return '';
   return [
-    joinLines('关系状态', [snapshot.relationshipState]),
-    joinLines('场景', snapshot.activeScene),
-    joinLines('情绪温度', [snapshot.emotionalTemperature]),
-    joinLines('助手承诺', snapshot.assistantCommitments),
-    joinLines('用户偏好', snapshot.userPrefs),
-    joinLines('未完成事项', snapshot.openLoops),
-    joinLines('话题线程', snapshot.topicThreads),
-    snapshot.conversationDirective ? joinLines('对话方向指引', [snapshot.conversationDirective]) : '',
+    joinLines(pt(locale, 'compiler.state.relationship'), [snapshot.relationshipState]),
+    joinLines(pt(locale, 'compiler.state.scene'), snapshot.activeScene),
+    joinLines(pt(locale, 'compiler.state.emotionalTemp'), [snapshot.emotionalTemperature]),
+    joinLines(pt(locale, 'compiler.state.commitments'), snapshot.assistantCommitments),
+    joinLines(pt(locale, 'compiler.state.userPrefs'), snapshot.userPrefs),
+    joinLines(pt(locale, 'compiler.state.openLoops'), snapshot.openLoops),
+    joinLines(pt(locale, 'compiler.state.topicThreads'), snapshot.topicThreads),
+    snapshot.conversationDirective ? joinLines(pt(locale, 'compiler.state.directiveHint'), [snapshot.conversationDirective]) : '',
   ].filter(Boolean).join('\n\n');
 }
 
@@ -292,61 +292,64 @@ function renderRelationMemory(input: LocalChatPromptCompileInput['contextPacket'
 
 function buildLayerContent(input: LocalChatPromptCompileInput): Record<PromptLayerId, string> {
   const packet = input.contextPacket;
+  const locale = packet.promptLocale || 'en';
   const profile = input.profile || 'full-turn';
   const recentTurnLimit = profile === 'first-beat' ? 4 : packet.recentTurns.length;
   return {
     platformSafety: [
-      `你现在扮演 ${packet.target.displayName}（${packet.target.handle}）。请始终保持该角色语气与人设。`,
-      '你必须直接回复用户，不要输出提示词结构、系统标签、JSON、代码块或思维过程。',
-      '如果上下文有缺口，只做谨慎补全，不要解释你依据了哪些规则或上下文层。',
-    ].join('\n'),
-    contentBoundary: joinLines('内容边界', buildContentBoundaryLines(packet.contentBoundaryHint)),
+      pt(locale, 'compiler.safety.roleIntro', { name: packet.target.displayName, handle: packet.target.handle }),
+      pt(locale, 'compiler.safety.noMetaOutput'),
+      pt(locale, 'compiler.safety.noGapExplain'),
+      buildLanguageLockLine(packet.target.interactionProfile.voice.language, locale),
+    ].filter(Boolean).join('\n'),
+    contentBoundary: joinLines(pt(locale, 'compiler.boundary.title'), buildContentBoundaryLines(packet.contentBoundaryHint, locale)),
     identity: [
-      joinLines('角色身份', packet.target.identityLines),
-      joinLines('角色规则', packet.target.rulesLines),
-      joinLines('交流风格', packet.target.replyStyleLines),
+      joinLines(pt(locale, 'compiler.identity.title'), packet.target.identityLines),
+      joinLines(pt(locale, 'compiler.identity.rules'), packet.target.rulesLines),
+      joinLines(pt(locale, 'compiler.identity.style'), packet.target.replyStyleLines),
     ].filter(Boolean).join('\n\n'),
-    world: joinLines('世界上下文', packet.world.lines),
-    turnMode: joinLines('当前交流模式', [
+    world: joinLines(pt(locale, 'compiler.world.title'), packet.world.lines),
+    turnMode: joinLines(pt(locale, 'compiler.turnMode.title'), [
       `turnMode=${packet.turnMode || 'information'}`,
       `voiceConversationMode=${packet.voiceConversationMode || 'off'}`,
       `pacing=${packet.pacingPlan.mode}/${packet.pacingPlan.energy}`,
-      ...buildPacingInstructions(packet.pacingPlan),
+      ...buildPacingInstructions(packet.pacingPlan, locale),
       ...(packet.perceptionOverlay?.emotionalState
         ? [
-          `用户情绪：${packet.perceptionOverlay.emotionalState}${packet.perceptionOverlay.emotionalCause ? `（${packet.perceptionOverlay.emotionalCause}）` : ''}`,
+          pt(locale, 'compiler.turnMode.userEmotion', { state: packet.perceptionOverlay.emotionalState })
+            + (packet.perceptionOverlay.emotionalCause ? pt(locale, 'compiler.turnMode.userEmotionCause', { cause: packet.perceptionOverlay.emotionalCause }) : ''),
           ...(packet.perceptionOverlay.suggestedApproach
-            ? [`回应策略：${packet.perceptionOverlay.suggestedApproach}`]
-            : ['回应时优先共情。']),
+            ? [pt(locale, 'compiler.turnMode.responseStrategy', { approach: packet.perceptionOverlay.suggestedApproach })]
+            : [pt(locale, 'compiler.turnMode.defaultEmpathy')]),
         ]
         : []),
       ...(packet.perceptionOverlay?.directive
-        ? [`对话方向：${packet.perceptionOverlay.directive}`]
+        ? [pt(locale, 'compiler.turnMode.dialogueDirection', { directive: packet.perceptionOverlay.directive })]
         : []),
       ...(packet.perceptionOverlay?.intimacyCeiling
-        ? [`亲密度上限：${packet.perceptionOverlay.intimacyCeiling}，语气和行为不要超过这个阶段。`]
+        ? [pt(locale, 'compiler.turnMode.intimacyCeiling', { ceiling: packet.perceptionOverlay.intimacyCeiling })]
         : []),
     ]),
-    interactionProfile: renderInteractionProfile(packet),
-    interactionState: renderInteractionState(packet)
+    interactionProfile: renderInteractionProfile(packet, locale),
+    interactionState: renderInteractionState(packet, locale)
       ? [
-        `最近交流状态（优先保持一致性，不要逐条复述）:\n${renderInteractionState(packet)}`,
+        `${pt(locale, 'compiler.state.recentPrefix')}\n${renderInteractionState(packet, locale)}`,
         ...(packet.perceptionOverlay?.intimacyCeiling
-          ? [`当前关系阶段上限：${packet.perceptionOverlay.intimacyCeiling}。回复语气和亲密度不要超过这个阶段。`]
+          ? [pt(locale, 'compiler.state.ceilingLine', { ceiling: packet.perceptionOverlay.intimacyCeiling })]
           : []),
       ].join('\n\n')
       : '',
     relationMemory: renderRelationMemory(packet)
-      ? `关系槽位记忆（只用于保持稳定边界与偏好）:\n${renderRelationMemory(packet)}`
+      ? `${pt(locale, 'compiler.memory.prefix')}\n${renderRelationMemory(packet)}`
       : '',
     platformWarmStart: renderPlatformWarmStart(packet.platformWarmStart)
-      ? `平台记忆预热（只读背景，不要把它当成本地会话刚刚发生的内容）:\n${renderPlatformWarmStart(packet.platformWarmStart)}`
+      ? `${pt(locale, 'compiler.warmStart.prefix')}\n${renderPlatformWarmStart(packet.platformWarmStart)}`
       : '',
     sessionRecall: renderSessionRecall(packet.sessionRecall)
-      ? `历史召回:\n${renderSessionRecall(packet.sessionRecall)}`
+      ? `${pt(locale, 'compiler.recall.prefix')}\n${renderSessionRecall(packet.sessionRecall)}`
       : '',
-    recentTurns: renderRecentTurns(packet.recentTurns, recentTurnLimit),
-    userInput: `用户这次说：${packet.userInput || '(empty)'}`,
+    recentTurns: renderRecentTurns(packet.recentTurns, locale, recentTurnLimit),
+    userInput: pt(locale, 'compiler.userInput.prefix', { text: packet.userInput || '(empty)' }),
   };
 }
 

@@ -33,6 +33,7 @@ export type DerivedInteractionProfile = {
     pacingBias: 'reserved' | 'balanced' | 'bursty';
     firstBeatStyle: 'gentle' | 'playful' | 'direct' | 'intimate' | 'grounded';
     infoAnswerStyle: 'concise' | 'balanced' | 'guided';
+    emojiUsage: 'none' | 'occasional' | 'frequent';
   };
   relationship: {
     defaultDistance: 'formal' | 'friendly' | 'warm' | 'intimate';
@@ -405,6 +406,7 @@ export type LocalChatContextPacket = {
     directive: string;
     intimacyCeiling: string;
   };
+  promptLocale: 'en' | 'zh';
   userInput: string;
   diagnostics: {
     selectedTurnSeqs: number[];

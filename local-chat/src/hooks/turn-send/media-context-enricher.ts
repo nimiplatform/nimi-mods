@@ -9,6 +9,7 @@ import {
   buildCharacterVisualAnchor,
   type CharacterVisualAnchor,
 } from './character-visual-anchor.js';
+import { pt, type PromptLocale } from '../../prompt/prompt-locale.js';
 
 export type MediaContextSnapshot = {
   visualAnchor: CharacterVisualAnchor;
@@ -124,13 +125,15 @@ function buildRecentTurnSummary(input: {
   messages: ChatMessage[];
   userText: string;
   assistantText: string;
+  promptLocale?: PromptLocale;
 }): string {
+  const locale = input.promptLocale || 'en';
   const lines: string[] = [];
   if (input.userText) {
-    lines.push(`用户刚提到: ${compactText(input.userText, 88)}`);
+    lines.push(pt(locale, 'enricher.userMention', { text: compactText(input.userText, 88) }));
   }
   if (input.assistantText) {
-    lines.push(`助手刚说: ${compactText(input.assistantText, 96)}`);
+    lines.push(pt(locale, 'enricher.assistantSaid', { text: compactText(input.assistantText, 96) }));
   }
   for (let index = input.messages.length - 1; index >= 0 && lines.length < 5; index -= 1) {
     const message = input.messages[index];
@@ -138,13 +141,14 @@ function buildRecentTurnSummary(input: {
     if (message.kind === 'image' || message.kind === 'video') {
       const shadow = message.meta?.mediaShadow;
       if (shadow) {
-        lines.push(`最近媒体: ${summarizeShadow(shadow)}`);
+        lines.push(pt(locale, 'enricher.recentMedia', { text: summarizeShadow(shadow) }));
       }
       continue;
     }
     const content = compactText(message.content, 84);
     if (!content) continue;
-    lines.push(`${message.role === 'user' ? '更早用户' : '更早助手'}: ${content}`);
+    const roleLabel = message.role === 'user' ? pt(locale, 'enricher.earlierUser') : pt(locale, 'enricher.earlierAssistant');
+    lines.push(`${roleLabel}: ${content}`);
   }
   return joinUnique(lines, ' | ', 420) || '-';
 }
@@ -152,20 +156,22 @@ function buildRecentTurnSummary(input: {
 function buildContinuitySummary(input: {
   visualAnchor: CharacterVisualAnchor;
   recentMediaShadows: LocalChatMediaArtifactShadow[];
+  promptLocale?: PromptLocale;
 }): string {
+  const locale = input.promptLocale || 'en';
   const refs = [
     ...input.visualAnchor.continuityRefs,
-    ...input.recentMediaShadows.map((shadow) => `最近${shadow.kind}: ${summarizeShadow(shadow)}`),
+    ...input.recentMediaShadows.map((shadow) => pt(locale, 'enricher.recentMediaContinuity', { kind: shadow.kind, summary: summarizeShadow(shadow) })),
   ];
   return joinUnique(refs, ' | ', 360) || '-';
 }
 
-function buildWorldHint(target: LocalChatTarget): string {
+function buildWorldHint(target: LocalChatTarget, locale: PromptLocale): string {
   const worldName = asString((target.world as Record<string, unknown> | null)?.name);
   const worldviewName = asString((target.worldview as Record<string, unknown> | null)?.name);
   return joinUnique([
-    worldName ? `世界: ${worldName}` : '',
-    worldviewName ? `世界观: ${worldviewName}` : '',
+    worldName ? pt(locale, 'enricher.worldLabel', { name: worldName }) : '',
+    worldviewName ? pt(locale, 'enricher.worldviewLabel', { name: worldviewName }) : '',
   ], '，', 80);
 }
 
@@ -178,35 +184,39 @@ function collectRuleHints(rules: SignalRule[], source: string): string[] {
 function inferMood(input: {
   semanticIntent: MediaIntent;
   cueSource: string;
+  promptLocale?: PromptLocale;
 }): string {
+  const locale = input.promptLocale || 'en';
   const semanticMood = asString(input.semanticIntent.mood);
   const moods: string[] = [];
   if (isMeaningfulDescriptor(semanticMood)) {
     moods.push(semanticMood);
   }
   if (input.semanticIntent.nsfwIntent === 'suggested' || INTIMATE_RE.test(input.cueSource)) {
-    moods.push('亲近、私密、像只发给用户的一条私聊内容');
+    moods.push(pt(locale, 'enricher.intimateMood'));
   } else if (EMOTIONAL_RE.test(input.cueSource)) {
-    moods.push('温柔、安抚、带陪伴感');
+    moods.push(pt(locale, 'enricher.emotionalMood'));
   } else if (EXCITED_RE.test(input.cueSource)) {
-    moods.push('轻快、俏皮、带一点互动感');
+    moods.push(pt(locale, 'enricher.excitedMood'));
   } else if (NIGHT_RE.test(input.cueSource)) {
-    moods.push('安静、松弛、带夜聊氛围');
+    moods.push(pt(locale, 'enricher.nightMood'));
   } else {
-    moods.push('自然、放松、像聊天里顺手发来的内容');
+    moods.push(pt(locale, 'enricher.defaultMood'));
   }
-  return joinUnique(moods, '，', 140) || '自然、放松、像聊天里顺手发来的内容';
+  return joinUnique(moods, '，', 140) || pt(locale, 'enricher.defaultMood');
 }
 
 function buildSubject(input: {
   kind: MediaIntent['kind'];
   semanticIntent: MediaIntent;
   contextSnapshot: MediaContextSnapshot;
+  promptLocale?: PromptLocale;
 }): string {
+  const locale = input.promptLocale || 'en';
   const semanticSubject = asString(input.semanticIntent.subject);
   const fallbackPose = input.kind === 'image'
-    ? '当前状态像正在回用户消息时顺手拍下来的她'
-    : '当前状态像正在对着镜头自然回应用户的一小段画面';
+    ? pt(locale, 'enricher.imageFallbackPose')
+    : pt(locale, 'enricher.videoFallbackPose');
   return joinUnique([
     input.contextSnapshot.visualAnchor.subject,
     isMeaningfulDescriptor(semanticSubject) ? `当前状态: ${semanticSubject}` : fallbackPose,
@@ -220,7 +230,9 @@ function buildScene(input: {
   userText: string;
   assistantText: string;
   contextSnapshot: MediaContextSnapshot;
+  promptLocale?: PromptLocale;
 }): string {
+  const locale = input.promptLocale || 'en';
   const sceneParts: string[] = [];
   const semanticScene = asString(input.semanticIntent.scene);
   const requestDetail = stripRequestBoilerplate(input.userText);
@@ -228,19 +240,19 @@ function buildScene(input: {
     sceneParts.push(semanticScene);
   }
   if (requestDetail) {
-    sceneParts.push(`围绕“${compactText(requestDetail, 84)}”展开`);
+    sceneParts.push(pt(locale, 'enricher.expandAround', { detail: compactText(requestDetail, 84) }));
   }
   if (input.contextSnapshot.recentTurnSummary !== '-') {
-    sceneParts.push(`延续最近聊天: ${input.contextSnapshot.recentTurnSummary}`);
+    sceneParts.push(pt(locale, 'enricher.continuityLine', { summary: input.contextSnapshot.recentTurnSummary }));
   }
-  const worldHint = buildWorldHint(input.target);
+  const worldHint = buildWorldHint(input.target, locale);
   if (worldHint) {
     sceneParts.push(worldHint);
   }
   sceneParts.push(
     input.kind === 'image'
-      ? '像她顺手发来的一张自然照片'
-      : '像她顺手录来的一小段自然短视频',
+      ? pt(locale, 'enricher.imageSceneFallback')
+      : pt(locale, 'enricher.videoSceneFallback'),
   );
   return joinUnique(sceneParts, '；', 320);
 }
@@ -250,7 +262,9 @@ function buildStyleIntent(input: {
   semanticIntent: MediaIntent;
   cueSource: string;
   contextSnapshot: MediaContextSnapshot;
+  promptLocale?: PromptLocale;
 }): string {
+  const locale = input.promptLocale || 'en';
   const styleParts: string[] = [];
   const semanticStyle = asString(input.semanticIntent.styleIntent);
   if (isMeaningfulDescriptor(semanticStyle)) {
@@ -260,8 +274,8 @@ function buildStyleIntent(input: {
   styleParts.push(...collectRuleHints(STYLE_RULES, input.cueSource));
   styleParts.push(
     input.kind === 'image'
-      ? '自然写实、生活流、高质量私聊照片质感'
-      : '自然写实、生活流、短视频质感，动作和表情要连贯',
+      ? pt(locale, 'enricher.imageStyleFallback')
+      : pt(locale, 'enricher.videoStyleFallback'),
   );
   return joinUnique(styleParts, '，', 260);
 }
@@ -270,12 +284,14 @@ function buildComposition(input: {
   kind: MediaIntent['kind'];
   cueSource: string;
   currentComposition?: string;
+  promptLocale?: PromptLocale;
 }): string {
+  const locale = input.promptLocale || 'en';
   const rules = input.kind === 'image' ? IMAGE_COMPOSITION_RULES : VIDEO_COMPOSITION_RULES;
   const ruleHints = collectRuleHints(rules, input.cueSource);
   const fallback = input.kind === 'image'
-    ? '主体清楚，镜头自然，像高质量但不摆拍的聊天照片'
-    : '人物为主，动作自然，镜头稳定，像聊天里顺手录的一小段';
+    ? pt(locale, 'enricher.imageCompositionFallback')
+    : pt(locale, 'enricher.videoCompositionFallback');
   return joinUnique([
     input.currentComposition,
     ...ruleHints,
@@ -286,10 +302,13 @@ function buildComposition(input: {
 function buildNegativeCues(input: {
   kind: MediaIntent['kind'];
   hints?: LocalChatMediaHints;
+  promptLocale?: PromptLocale;
 }): string[] {
-  const defaults = input.kind === 'image'
-    ? ['多余人物', '手部崩坏', '过度磨皮', '服装漂移', '脸部失真']
-    : ['多余人物', '动作突变', '镜头乱晃', '人物漂移', '表情抽动'];
+  const locale = input.promptLocale || 'en';
+  const rawDefaults = input.kind === 'image'
+    ? pt(locale, 'enricher.imageNegCues')
+    : pt(locale, 'enricher.videoNegCues');
+  const defaults = rawDefaults.split('|');
   return normalizeStringList([
     ...(input.hints?.negativeCues || []),
     ...defaults,
@@ -299,11 +318,13 @@ function buildNegativeCues(input: {
 function buildContinuityRefs(input: {
   hints?: LocalChatMediaHints;
   contextSnapshot: MediaContextSnapshot;
+  promptLocale?: PromptLocale;
 }): string[] {
+  const locale = input.promptLocale || 'en';
   return normalizeStringList([
     ...(input.hints?.continuityRefs || []),
     ...input.contextSnapshot.visualAnchor.continuityRefs,
-    ...input.contextSnapshot.recentMediaShadows.map((shadow) => `延续最近媒体: ${summarizeShadow(shadow)}`),
+    ...input.contextSnapshot.recentMediaShadows.map((shadow) => pt(locale, 'enricher.continuityMediaPrefix', { summary: summarizeShadow(shadow) })),
   ], 6);
 }
 
@@ -312,16 +333,18 @@ export function collectMediaContextSnapshot(input: {
   messages: ChatMessage[];
   userText: string;
   assistantText: string;
+  promptLocale?: PromptLocale;
 }): MediaContextSnapshot {
   const visualAnchor = buildCharacterVisualAnchor(input.target);
   const recentMediaShadows = collectRecentMediaShadows(input.messages);
   return {
     visualAnchor,
     visualAnchorSummary: visualAnchor.plannerSummary,
-    recentTurnSummary: buildRecentTurnSummary(input),
+    recentTurnSummary: buildRecentTurnSummary({ ...input, promptLocale: input.promptLocale }),
     continuitySummary: buildContinuitySummary({
       visualAnchor,
       recentMediaShadows,
+      promptLocale: input.promptLocale,
     }),
     recentMediaShadows,
   };
@@ -333,7 +356,9 @@ export function enrichMediaIntent(input: {
   userText: string;
   assistantText: string;
   contextSnapshot: MediaContextSnapshot;
+  promptLocale?: PromptLocale;
 }): MediaIntent {
+  const locale = input.promptLocale || 'en';
   const cueSource = [
     input.userText,
     input.assistantText,
@@ -351,6 +376,7 @@ export function enrichMediaIntent(input: {
       kind: input.semanticIntent.kind,
       semanticIntent: input.semanticIntent,
       contextSnapshot: input.contextSnapshot,
+      promptLocale: locale,
     }),
     scene: buildScene({
       kind: input.semanticIntent.kind,
@@ -359,30 +385,36 @@ export function enrichMediaIntent(input: {
       userText: input.userText,
       assistantText: input.assistantText,
       contextSnapshot: input.contextSnapshot,
+      promptLocale: locale,
     }),
     styleIntent: buildStyleIntent({
       kind: input.semanticIntent.kind,
       semanticIntent: input.semanticIntent,
       cueSource,
       contextSnapshot: input.contextSnapshot,
+      promptLocale: locale,
     }),
     mood: inferMood({
       semanticIntent: input.semanticIntent,
       cueSource,
+      promptLocale: locale,
     }),
     hints: {
       composition: buildComposition({
         kind: input.semanticIntent.kind,
         cueSource,
         currentComposition: input.semanticIntent.hints?.composition,
+        promptLocale: locale,
       }),
       negativeCues: buildNegativeCues({
         kind: input.semanticIntent.kind,
         hints: input.semanticIntent.hints,
+        promptLocale: locale,
       }),
       continuityRefs: buildContinuityRefs({
         hints: input.semanticIntent.hints,
         contextSnapshot: input.contextSnapshot,
+        promptLocale: locale,
       }),
     },
   };

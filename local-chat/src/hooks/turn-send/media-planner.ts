@@ -4,6 +4,7 @@ import type { LocalChatTarget } from '../../data/index.js';
 import type { LocalChatPromptTrace } from '../../state/index.js';
 import type { NsfwMediaPolicy } from '../../services/policy/nsfw-media-policy.js';
 import type { LocalChatTurnAiClient } from './types.js';
+import { pt, type PromptLocale } from '../../prompt/prompt-locale.js';
 
 export type MediaPlannerTrigger =
   | 'user-explicit'
@@ -147,44 +148,46 @@ function buildMediaPlannerPrompt(input: {
   visualAnchorSummary: string;
   recentTurnSummary: string;
   continuitySummary: string;
+  promptLocale?: PromptLocale;
 }): string {
+  const locale = input.promptLocale || 'en';
   return [
-    '你是 local-chat 的媒体触发 planner。',
-    '任务：判断这一轮聊天是否应该额外发送一个媒体内容来增强陪伴感。',
-    '要求：如果没有非常明确的价值，就返回 none。',
-    '规则：',
-    '- 只能返回一个动作：none / image / video。',
-    '- image 比较常规；video 必须更谨慎，只在画面感、镜头感或动态效果明显更合适时选择。',
-    '- 只有在动作变化、镜头推进、表情变化或连续动态本身很重要时，才允许选择 video。',
-    '- 只有在文本已经自然成立的前提下，媒体才是补充；不要为了炫技而发媒体。',
-    '- 如果对应能力未就绪，不要选择该媒体类型。',
-    '- 如果语境可能偏 NSFW，只有在策略允许时才可建议；不确定时宁可返回 none。',
-    '- 严格输出 JSON，不要输出解释。',
+    pt(locale, 'planner.role'),
+    pt(locale, 'planner.task'),
+    pt(locale, 'planner.require'),
+    pt(locale, 'planner.rulesHeader'),
+    pt(locale, 'planner.rule1'),
+    pt(locale, 'planner.rule2'),
+    pt(locale, 'planner.rule3'),
+    pt(locale, 'planner.rule4'),
+    pt(locale, 'planner.rule5'),
+    pt(locale, 'planner.rule6'),
+    pt(locale, 'planner.rule7'),
     '',
-    '输出 JSON 格式：',
-    '{"kind":"none|image|video","trigger":"assistant-offer|scene-enhancement|none","confidence":0.0,"subject":"string","scene":"string","styleIntent":"string","mood":"string","hints":{"composition":"string?","negativeCues":["string"],"continuityRefs":["string"]},"reason":"string","nsfwIntent":"none|suggested"}',
+    pt(locale, 'planner.outputFormat'),
+    '{“kind”:”none|image|video”,”trigger”:”assistant-offer|scene-enhancement|none”,”confidence”:0.0,”subject”:”string”,”scene”:”string”,”styleIntent”:”string”,”mood”:”string”,”hints”:{“composition”:”string?”,”negativeCues”:[“string”],”continuityRefs”:[“string”]},”reason”:”string”,”nsfwIntent”:”none|suggested”}',
     '',
-    `角色摘要: ${summarizeTarget(input.target)}`,
-    `世界摘要: ${summarizeWorld(input.target)}`,
-    `角色视觉锚点: ${input.visualAnchorSummary || '-'}`,
-    `用户本轮输入: ${input.userText || '-'}`,
-    `助手本轮正文: ${input.assistantText || '-'}`,
-    `最近对话摘要: ${input.recentTurnSummary || '-'}`,
-    `连续性参考: ${input.continuitySummary || '-'}`,
-    `对话诊断提示: ${formatPromptTraceHints(input.promptTrace)}`,
-    `NSFW 策略: ${input.nsfwPolicy}`,
-    `图片可用: ${input.imageReady ? 'yes' : 'no'} (dependency=${input.imageDependencyStatus})`,
-    `视频可用: ${input.videoReady ? 'yes' : 'no'} (dependency=${input.videoDependencyStatus})`,
-    `最近媒体历史: ${input.recentMediaSummary}`,
+    pt(locale, 'planner.targetSummary', { value: summarizeTarget(input.target) }),
+    pt(locale, 'planner.worldSummary', { value: summarizeWorld(input.target) }),
+    pt(locale, 'planner.visualAnchor', { value: input.visualAnchorSummary || '-' }),
+    pt(locale, 'planner.userInput', { value: input.userText || '-' }),
+    pt(locale, 'planner.assistantText', { value: input.assistantText || '-' }),
+    pt(locale, 'planner.recentTurns', { value: input.recentTurnSummary || '-' }),
+    pt(locale, 'planner.continuity', { value: input.continuitySummary || '-' }),
+    pt(locale, 'planner.diagnostics', { value: formatPromptTraceHints(input.promptTrace) }),
+    pt(locale, 'planner.nsfwPolicy', { value: input.nsfwPolicy }),
+    pt(locale, 'planner.imageReady', { ready: input.imageReady ? 'yes' : 'no', status: input.imageDependencyStatus }),
+    pt(locale, 'planner.videoReady', { ready: input.videoReady ? 'yes' : 'no', status: input.videoDependencyStatus }),
+    pt(locale, 'planner.recentMedia', { value: input.recentMediaSummary }),
     '',
-    '决策准则：',
-    '- assistant-offer: 助手正文已经明显在“提出/承诺/准备给用户看某个画面或视频”，例如“我给你发一张”“我拍给你看”。',
-    '- scene-enhancement: 当前话题本身具有很强画面感，补一个媒体会明显更贴切。',
-    '- kind=none 时 trigger 必须是 none，subject/scene/styleIntent/mood 置空。',
-    '- subject 只写媒体主体，不要写长句。',
-    '- scene 写具体画面或镜头情境。',
-    '- styleIntent 写视觉风格倾向。',
-    '- mood 写情绪基调。',
+    pt(locale, 'planner.decisionHeader'),
+    pt(locale, 'planner.decisionOffer'),
+    pt(locale, 'planner.decisionScene'),
+    pt(locale, 'planner.decisionNone'),
+    pt(locale, 'planner.decisionSubject'),
+    pt(locale, 'planner.decisionSceneDesc'),
+    pt(locale, 'planner.decisionStyle'),
+    pt(locale, 'planner.decisionMood'),
   ].join('\n');
 }
 
@@ -218,6 +221,7 @@ export async function planMediaTurn(input: {
   visualAnchorSummary: string;
   recentTurnSummary: string;
   continuitySummary: string;
+  promptLocale?: PromptLocale;
 }): Promise<MediaPlannerResult> {
   const controller = new AbortController();
   const timeout = setTimeout(() => {
@@ -244,6 +248,7 @@ export async function planMediaTurn(input: {
         visualAnchorSummary: input.visualAnchorSummary,
         recentTurnSummary: input.recentTurnSummary,
         continuitySummary: input.continuitySummary,
+        promptLocale: input.promptLocale,
       }),
       maxTokens: MEDIA_PLANNER_MAX_TOKENS,
       temperature: MEDIA_PLANNER_TEMPERATURE,

@@ -117,6 +117,9 @@ export function deriveInteractionProfile(target: LocalChatTarget): DerivedIntera
         : reservedSignal
           ? 'guided'
           : 'balanced',
+      emojiUsage: playfulSignal || intimateRelationship ? 'frequent'
+        : reservedSignal ? 'none'
+        : 'occasional',
     },
     relationship: {
       defaultDistance: intimateRelationship

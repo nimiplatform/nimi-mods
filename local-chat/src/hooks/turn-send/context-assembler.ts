@@ -1,6 +1,8 @@
 import type { LocalChatMemoryRecallResult, LocalChatTarget } from '../../data/index.js';
 import { recallLocalChatMemoryForPrompt } from '../../data/index.js';
 import type { LocalChatPromptProfile } from '../../prompt/index.js';
+import { getPromptLocale } from '@nimiplatform/sdk/mod/i18n';
+import { pt, type PromptLocale } from '../../prompt/prompt-locale.js';
 import {
   getLocalChatInteractionSnapshot,
   listLocalChatExactHistoryTurns,
@@ -261,7 +263,7 @@ function summarizeWorld(target: LocalChatTarget): string[] {
   ].filter(Boolean);
 }
 
-function summarizeIdentity(target: LocalChatTarget, interactionProfile: DerivedInteractionProfile): {
+function summarizeIdentity(target: LocalChatTarget, interactionProfile: DerivedInteractionProfile, locale: PromptLocale): {
   identityLines: string[];
   rulesLines: string[];
   replyStyleLines: string[];
@@ -285,9 +287,9 @@ function summarizeIdentity(target: LocalChatTarget, interactionProfile: DerivedI
     ].filter(Boolean),
     rulesLines: rules,
     replyStyleLines: [
-      `默认距离：${interactionProfile.relationship.defaultDistance}；温度：${interactionProfile.relationship.warmth}。`,
-      `首拍风格：${interactionProfile.expression.firstBeatStyle}；信息回复：${interactionProfile.expression.infoAnswerStyle}。`,
-      '保持像真人聊天一样的停顿、短句和递进，不要一次说尽。',
+      pt(locale, 'assembler.style.distance', { distance: interactionProfile.relationship.defaultDistance, warmth: interactionProfile.relationship.warmth }),
+      pt(locale, 'assembler.style.firstBeat', { firstBeatStyle: interactionProfile.expression.firstBeatStyle, infoAnswerStyle: interactionProfile.expression.infoAnswerStyle }),
+      pt(locale, 'assembler.style.naturalChat'),
     ],
     interactionProfileLines: [
       `expression=${interactionProfile.expression.responseLength}/${interactionProfile.expression.formality}/${interactionProfile.expression.sentiment}/${interactionProfile.expression.pacingBias}`,
@@ -573,7 +575,8 @@ export async function assembleLocalChatContextPacket(input: AssembleLocalChatCon
       topK: 6,
     }).catch(() => null)
     : null;
-  const identity = summarizeIdentity(input.selectedTarget, interactionProfile);
+  const promptLocale = getPromptLocale();
+  const identity = summarizeIdentity(input.selectedTarget, interactionProfile, promptLocale);
   const pacingPlan = derivePacingPlan({
     text: input.text,
     interactionProfile,
@@ -621,6 +624,7 @@ export async function assembleLocalChatContextPacket(input: AssembleLocalChatCon
     turnMode: input.turnMode,
     voiceConversationMode: input.voiceConversationMode,
     pacingPlan,
+    promptLocale,
     userInput: input.text,
     diagnostics: {
       selectedTurnSeqs: selectedRecentTurns.map((turn) => turn.seq),

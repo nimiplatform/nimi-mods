@@ -2,6 +2,7 @@ import type { LocalChatTurnMode } from '../../types.js';
 import type { InteractionSnapshot, RelationMemorySlot } from '../../state/index.js';
 import type { LocalChatTurnAiClient } from './types.js';
 import type { TurnInvokeInput } from './request-builder.js';
+import { pt, type PromptLocale } from '../../prompt/prompt-locale.js';
 
 export type TurnPerceptionResult = {
   turnMode: LocalChatTurnMode;
@@ -15,82 +16,41 @@ export type TurnPerceptionResult = {
   intimacyCeiling: 'friendly' | 'warm' | 'intimate';
 };
 
-const PERCEPTION_PROMPT_TEMPLATE = `你是一个对话感知模块。分析以下用户消息和对话上下文，返回 JSON。
+function getPerceptionPromptTemplate(locale: PromptLocale): string {
+  return pt(locale, 'perception.template');
+}
 
-用户消息：
-{userText}
-
-{recentTurnsContext}
-
-{snapshotContext}
-
-{memoryContext}
-
-请返回以下 JSON，不要有任何其它文本：
-{"turnMode":"information|emotional|playful|intimate|checkin|explicit-media|explicit-voice","emotionalState":null 或 {"detected":"情绪名","cause":"原因","suggestedApproach":"建议回应方式"},"relevantMemoryIds":["相关记忆ID列表"],"conversationDirective":"给下一轮AI的1-2句方向指引，如果不需要则为null","intimacyCeiling":"friendly|warm|intimate"}
-
-turnMode 判定规则：
-- information：用户在提问或寻求信息
-- emotional：用户在表达情绪（难过、焦虑、疲惫、孤独等），需要共情
-- playful：用户在开玩笑、撒娇、逗趣
-- intimate：用户在推进亲密关系（表白、暧昧、亲密互动）
-- checkin：简单问候、打招呼、早安晚安
-- explicit-media：用户明确要求发图片或视频
-- explicit-voice：用户明确要求语音回复
-- 注意区分"我想抱歉"（emotional）和"我想抱你"（intimate）
-- 注意"怎么回事啊哈哈"优先是 playful 而非 information
-
-emotionalState 判定规则：
-- 仅当用户明显带有情绪时填写，日常对话返回 null
-- cause 要基于上下文推断真正原因，不只看表面词汇
-- suggestedApproach 指导后续 AI 如何回应（如 "empathize-first", "lighten-mood", "be-supportive"）
-
-relevantMemoryIds：
-- 从提供的记忆列表中选出与当前对话相关的 ID
-- 只选真正相关的，不要全选
-
-conversationDirective：
-- 基于当前对话走向，给出 1-2 句简短指引
-- 例如："用户刚分享了工作烦恼，继续深入关心，不要急着转话题"
-- 如果是简单问候或信息查询，返回 null
-
-intimacyCeiling 判定规则：
-- 基于当前 relationshipState 和对话上下文，判断本轮回复的亲密度上限
-- 最多比当前 relationshipState 升一级：new→friendly, friendly→warm, warm→intimate
-- 不要跳级：如 friendly 状态下不能直接到 intimate
-- 用户单方面推进亲密不等于关系已经到那个阶段`;
-
-function buildSnapshotContext(snapshot: InteractionSnapshot | null): string {
-  if (!snapshot) return '当前对话状态：新对话，没有历史上下文。';
+function buildSnapshotContext(snapshot: InteractionSnapshot | null, locale: PromptLocale): string {
+  if (!snapshot) return pt(locale, 'perception.snapshotNew');
   const parts = [
-    `关系状态：${snapshot.relationshipState}`,
-    `情绪温度：${snapshot.emotionalTemperature}`,
+    pt(locale, 'perception.relationship', { value: snapshot.relationshipState }),
+    pt(locale, 'perception.emotionalTemp', { value: snapshot.emotionalTemperature }),
   ];
   if (snapshot.topicThreads.length > 0) {
-    parts.push(`近期话题：${snapshot.topicThreads.slice(0, 4).join('；')}`);
+    parts.push(pt(locale, 'perception.recentTopics', { value: snapshot.topicThreads.slice(0, 4).join('；') }));
   }
   if (snapshot.openLoops.length > 0) {
-    parts.push(`未完成事项：${snapshot.openLoops.slice(0, 3).join('；')}`);
+    parts.push(pt(locale, 'perception.openLoops', { value: snapshot.openLoops.slice(0, 3).join('；') }));
   }
   if (snapshot.userPrefs.length > 0) {
-    parts.push(`用户偏好：${snapshot.userPrefs.slice(0, 3).join('；')}`);
+    parts.push(pt(locale, 'perception.userPrefs', { value: snapshot.userPrefs.slice(0, 3).join('；') }));
   }
   if (snapshot.assistantCommitments.length > 0) {
-    parts.push(`助手承诺：${snapshot.assistantCommitments.slice(0, 3).join('；')}`);
+    parts.push(pt(locale, 'perception.commitments', { value: snapshot.assistantCommitments.slice(0, 3).join('；') }));
   }
-  return `当前对话状态：\n${parts.join('\n')}`;
+  return `${pt(locale, 'perception.snapshotPrefix')}\n${parts.join('\n')}`;
 }
 
-function buildMemoryContext(slots: RelationMemorySlot[]): string {
-  if (slots.length === 0) return '可用记忆：无';
+function buildMemoryContext(slots: RelationMemorySlot[], locale: PromptLocale): string {
+  if (slots.length === 0) return pt(locale, 'perception.memoryNone');
   const lines = slots.map((slot) => `- [${slot.id}] (${slot.slotType}) ${slot.key}: ${slot.value}`);
-  return `可用记忆（从中选出相关的 ID）：\n${lines.join('\n')}`;
+  return `${pt(locale, 'perception.memoryHeader')}\n${lines.join('\n')}`;
 }
 
-function buildRecentTurnsContext(recentTurns: Array<{ role: string; text: string }>): string {
-  if (recentTurns.length === 0) return '最近对话：无';
+function buildRecentTurnsContext(recentTurns: Array<{ role: string; text: string }>, locale: PromptLocale): string {
+  if (recentTurns.length === 0) return pt(locale, 'perception.turnsNone');
   const lines = recentTurns.map((turn) => `- ${turn.role}: ${turn.text}`);
-  return `最近对话（用于判断关系边界和对话走向）：\n${lines.join('\n')}`;
+  return `${pt(locale, 'perception.turnsHeader')}\n${lines.join('\n')}`;
 }
 
 function buildPerceptionPrompt(input: {
@@ -98,12 +58,13 @@ function buildPerceptionPrompt(input: {
   snapshot: InteractionSnapshot | null;
   memorySlots: RelationMemorySlot[];
   recentTurns: Array<{ role: string; text: string }>;
+  promptLocale: PromptLocale;
 }): string {
-  return PERCEPTION_PROMPT_TEMPLATE
+  return getPerceptionPromptTemplate(input.promptLocale)
     .replace('{userText}', input.userText)
-    .replace('{recentTurnsContext}', buildRecentTurnsContext(input.recentTurns))
-    .replace('{snapshotContext}', buildSnapshotContext(input.snapshot))
-    .replace('{memoryContext}', buildMemoryContext(input.memorySlots));
+    .replace('{recentTurnsContext}', buildRecentTurnsContext(input.recentTurns, input.promptLocale))
+    .replace('{snapshotContext}', buildSnapshotContext(input.snapshot, input.promptLocale))
+    .replace('{memoryContext}', buildMemoryContext(input.memorySlots, input.promptLocale));
 }
 
 function parseIntimacyCeiling(value: unknown, fallback: 'friendly' | 'warm' | 'intimate'): TurnPerceptionResult['intimacyCeiling'] {
@@ -180,6 +141,7 @@ export async function perceiveTurn(input: {
   recentTurns?: Array<{ role: string; text: string }>;
   proactive?: boolean;
   regexFallbackTurnMode?: LocalChatTurnMode;
+  promptLocale?: PromptLocale;
 }): Promise<TurnPerceptionResult> {
   const currentRelationship = input.snapshot?.relationshipState || 'new';
   const defaultCeiling: TurnPerceptionResult['intimacyCeiling'] =
@@ -207,6 +169,7 @@ export async function perceiveTurn(input: {
     snapshot: input.snapshot,
     memorySlots: input.memorySlots,
     recentTurns: (input.recentTurns || []).slice(-5),
+    promptLocale: input.promptLocale || 'en',
   });
 
   try {
