@@ -1,0 +1,214 @@
+version: 1
+entities:
+  - name: GarmentItem
+    description: 衣橱中的单件衣物，由用户拍照上传后 AI 自动分类生成
+    source_rule: DO-DOM-001
+    fields:
+      - name: id
+        type: ULID
+        required: true
+        description: 唯一标识
+      - name: photoUrls
+        type: string[]
+        required: true
+        description: 用户上传的原始照片 URL 数组
+      - name: thumbnailUrl
+        type: string
+        required: false
+        description: AI 去背景后的缩略图 URL，用于拼图预览
+      - name: category
+        type: enum
+        required: true
+        values: [top, bottom, shoes, outerwear, accessory]
+        description: 一级分类
+      - name: subcategory
+        type: string
+        required: false
+        description: 二级分类（T恤、衬衫、牛仔裤等），AI 自动填充
+      - name: colors
+        type: string[]
+        required: true
+        description: 颜色标签数组，支持多色
+      - name: material
+        type: string
+        required: false
+        description: 材质标签（棉、涤纶、羊毛、皮革、丝绸等）
+      - name: styleTags
+        type: string[]
+        required: true
+        description: 风格标签数组（商务、极简、街头等），AI 识别 + 用户可修正
+      - name: seasons
+        type: enum[]
+        required: true
+        values: [spring, summer, autumn, winter]
+        description: 适用季节
+      - name: formalityLevel
+        type: integer
+        required: true
+        range: [1, 5]
+        description: 正式程度（1=极休闲, 5=极正式）
+      - name: status
+        type: enum
+        required: true
+        values: [active, retired]
+        description: 衣物状态
+      - name: wearCount
+        type: integer
+        required: true
+        default: 0
+        description: 累计穿着次数，仅通过穿搭日志确认递增
+      - name: lastWornAt
+        type: date
+        required: false
+        description: 最后一次穿着日期
+      - name: createdAt
+        type: datetime
+        required: true
+        description: 录入时间
+
+  - name: UserProfile
+    description: 用户穿搭偏好画像，Onboarding 建立 + 日常演化
+    source_rule: DO-DOM-004
+    fields:
+      - name: id
+        type: ULID
+        required: true
+        description: 唯一标识
+      - name: gender
+        type: enum
+        required: true
+        values: [male, female, non-binary]
+        description: 性别
+      - name: ageGroup
+        type: enum
+        required: true
+        values: ['18-24', '25-30', '31-40', '41-50', '50+']
+        description: 年龄段
+      - name: selfieUrl
+        type: string
+        required: false
+        description: 用户自拍照片 URL，用于虚拟试穿
+      - name: styleWeights
+        type: Record<string, float>
+        required: true
+        default: '{}'
+        description: 风格偏好权重映射，值域 -1.0 ~ 1.0
+      - name: sceneFrequencies
+        type: Record<string, float>
+        required: true
+        default: '{}'
+        description: 场景频率权重映射，值域 0.0 ~ 1.0
+      - name: createdAt
+        type: datetime
+        required: true
+        description: 创建时间
+      - name: updatedAt
+        type: datetime
+        required: true
+        description: 最后更新时间
+
+  - name: StyleSample
+    description: Onboarding 风格测试用的预置穿搭样本图
+    source_rule: DO-DOM-005
+    fields:
+      - name: id
+        type: string
+        required: true
+        description: 唯一标识
+      - name: imageUrl
+        type: string
+        required: true
+        description: 预置穿搭图片 URL
+      - name: styleTags
+        type: string[]
+        required: true
+        description: 风格标签数组
+      - name: gender
+        type: enum
+        required: true
+        values: [male, female, non-binary]
+        description: 适用性别
+      - name: ageGroup
+        type: enum
+        required: false
+        values: ['18-24', '25-30', '31-40', '41-50', '50+']
+        description: 适用年龄段，空表示通用
+
+  - name: OutfitCombo
+    description: 一次穿搭推荐生成的完整搭配方案
+    source_rule: DO-DOM-006
+    fields:
+      - name: id
+        type: ULID
+        required: true
+        description: 唯一标识
+      - name: itemIds
+        type: ULID[]
+        required: true
+        description: 引用的 GarmentItem ID 数组
+      - name: occasion
+        type: string
+        required: true
+        description: 场景描述原文
+      - name: occasionTags
+        type: string[]
+        required: true
+        description: AI 提取的结构化场景标签
+      - name: collageImageUrl
+        type: string
+        required: false
+        description: 拼图式预览图 URL
+      - name: tryOnImageUrl
+        type: string
+        required: false
+        description: AI 虚拟试穿图 URL（用户请求时生成）
+      - name: aiReasoning
+        type: string
+        required: true
+        description: AI 推荐理由
+      - name: isFavorite
+        type: boolean
+        required: true
+        default: false
+        description: 是否已收藏
+      - name: lockedItemIds
+        type: ULID[]
+        required: false
+        description: 迭代调整中锁定不替换的单品 ID
+      - name: createdAt
+        type: datetime
+        required: true
+        description: 创建时间
+
+  - name: WearLog
+    description: 用户确认实际穿着的搭配记录
+    source_rule: DO-DOM-007
+    fields:
+      - name: id
+        type: ULID
+        required: true
+        description: 唯一标识
+      - name: outfitComboId
+        type: ULID
+        required: false
+        description: 关联的 OutfitCombo ID（可为空）
+      - name: itemIds
+        type: ULID[]
+        required: true
+        description: 实际穿着的衣物 ID 列表
+      - name: date
+        type: date
+        required: true
+        description: 穿着日期
+      - name: occasion
+        type: string
+        required: false
+        description: 场景描述
+      - name: notes
+        type: string
+        required: false
+        description: 用户备注
+      - name: createdAt
+        type: datetime
+        required: true
+        description: 创建时间
