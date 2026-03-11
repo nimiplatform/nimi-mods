@@ -135,7 +135,10 @@ export async function runCreatePhase1(
       });
       input.taskController.failTask(resumeTask.id, resumeError);
       input.setError(resumeError);
-      input.setNotice('Resume state missing. Please rerun extraction.');
+      input.setNotice(worldStudioMessage(
+        'notice.resumeStateMissing',
+        'Resume state missing. Please rerun extraction.',
+      ));
       return;
     }
     // Resume requires accumulated state and always reuses the full chunk list.
@@ -169,8 +172,14 @@ export async function runCreatePhase1(
       mode: effectiveMode,
     });
     if (isResumeRun && resumeTask) {
-      input.taskController.completeTask(resumeTask.id, 'No remaining chunks to resume.');
-      input.setNotice('No remaining chunks to run.');
+      input.taskController.completeTask(resumeTask.id, worldStudioMessage(
+        'task.noRemainingChunksToResume',
+        'No remaining chunks to resume.',
+      ));
+      input.setNotice(worldStudioMessage(
+        'notice.noRemainingChunksToRun',
+        'No remaining chunks to run.',
+      ));
     }
     return;
   }
@@ -178,7 +187,10 @@ export async function runCreatePhase1(
   let taskId = '';
   let abortSignal: AbortSignal | undefined;
   if (isResumeRun && resumeTask) {
-    const resumed = input.taskController.resumeTask(resumeTask.id, 'Resuming extraction');
+    const resumed = input.taskController.resumeTask(resumeTask.id, worldStudioMessage(
+      'task.resumingExtraction',
+      'Resuming extraction',
+    ));
     if (!resumed) {
       input.setError('WORLD_STUDIO_TASK_RESUME_FAILED: task is not resumable.');
       return;
@@ -189,13 +201,13 @@ export async function runCreatePhase1(
   } else {
     const started = input.taskController.startTask({
       kind: 'CREATE_PHASE1',
-      label: 'Extract world events',
+      label: worldStudioMessage('task.extractionLabel', 'Extract world events'),
       atomic: false,
       resumable: true,
       canPause: true,
       canCancel: true,
       step: 'INGEST',
-      message: 'Extraction started',
+      message: worldStudioMessage('task.extractionStarted', 'Extraction started'),
     });
     if (!started) {
       input.setError('WORLD_STUDIO_TASK_CONFLICT: another task is running.');
@@ -230,7 +242,9 @@ export async function runCreatePhase1(
   input.setCreateStep('INGEST');
   input.taskController.updateTask(taskId, {
     progress: 0,
-    message: isResumeRun ? 'Resuming extraction' : 'Extraction started',
+    message: isResumeRun
+      ? worldStudioMessage('task.resumingExtraction', 'Resuming extraction')
+      : worldStudioMessage('task.extractionStarted', 'Extraction started'),
     canPause: true,
     canCancel: true,
   });

@@ -10,6 +10,7 @@ import {
   toFailedChunkIndices,
   toTerminalChunkTaskMap,
 } from '../../../services/event-graph-map.js';
+import { worldStudioMessage } from '../../../i18n/messages.js';
 import type {
   DistillRouteBindingMap,
   FinalDraftAccumulator,
@@ -69,9 +70,20 @@ export function resolveRetryChunks(
   );
   if (failedChunkIndices.length === 0) {
     if (activeRetryErrorCode) {
-      input.setNotice(`No failed chunks matched code=${activeRetryErrorCode} under scope=${input.retryScope}.`);
+      input.setNotice(worldStudioMessage(
+        'notice.noFailedChunksMatchedCode',
+        'No failed chunks matched code={{code}} under scope={{scope}}.',
+        {
+          code: activeRetryErrorCode,
+          scope: input.retryScope,
+        },
+      ));
     } else {
-      input.setNotice(`No failed chunks matched retry scope: ${input.retryScope}.`);
+      input.setNotice(worldStudioMessage(
+        'notice.noFailedChunksMatchedScope',
+        'No failed chunks matched retry scope: {{scope}}.',
+        { scope: input.retryScope },
+      ));
     }
     return { chunksToRun: [] };
   }
@@ -79,7 +91,10 @@ export function resolveRetryChunks(
     .map((index) => allChunks[index])
     .filter((chunk): chunk is string => typeof chunk === 'string' && chunk.trim().length > 0);
   if (chunksToRun.length === 0) {
-    input.setNotice('No failed chunks to retry.');
+    input.setNotice(worldStudioMessage(
+      'notice.noFailedChunksToRetry',
+      'No failed chunks to retry.',
+    ));
     return { chunksToRun: [] };
   }
   return {

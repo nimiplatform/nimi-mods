@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { WorldStudioTaskCheckpoint, WorldStudioTaskRecord } from '../../../contracts.js';
+import { worldStudioMessage } from '../../../i18n/messages.js';
 import { ensureTaskStatusTransition, isTaskTerminalStatus } from './state-machine.js';
 import type {
   WorldStudioTaskController,
@@ -33,7 +34,7 @@ function toErrorParts(error: unknown): { message: string; code: string | null } 
   ).trim();
   const codeMatch = message.match(/[A-Z][A-Z0-9_]{2,}/);
   return {
-    message: message || 'Task failed',
+    message: message || worldStudioMessage('task.taskFailed', 'Task failed'),
     code: codeMatch ? codeMatch[0] : null,
   };
 }
@@ -246,7 +247,7 @@ export function useWorldStudioTaskController(
   const completeTask = useCallback((taskId: string, message?: string | null) => {
     finalizeTask(taskId, {
       status: 'COMPLETED',
-      message: message || 'Task completed',
+      message: message || worldStudioMessage('task.taskCompleted', 'Task completed'),
     });
   }, [finalizeTask]);
 
@@ -263,9 +264,9 @@ export function useWorldStudioTaskController(
   const cancelTask = useCallback((taskId: string, message?: string | null) => {
     finalizeTask(taskId, {
       status: 'CANCELED',
-      message: message || 'Task canceled',
+      message: message || worldStudioMessage('task.taskCanceled', 'Task canceled'),
       errorCode: 'WORLD_STUDIO_TASK_CANCELED',
-      errorMessage: message || 'Task canceled',
+      errorMessage: message || worldStudioMessage('task.taskCanceled', 'Task canceled'),
     });
   }, [finalizeTask]);
 
@@ -277,7 +278,7 @@ export function useWorldStudioTaskController(
       canPause: false,
       canResume: true,
       canCancel: true,
-      message: message || 'Task paused',
+      message: message || worldStudioMessage('task.taskPaused', 'Task paused'),
     });
     emitTaskEvent({
       name: 'pause',
@@ -298,7 +299,7 @@ export function useWorldStudioTaskController(
       canPause: true,
       canResume: false,
       canCancel: true,
-      message: message || 'Task resumed',
+      message: message || worldStudioMessage('task.taskResumed', 'Task resumed'),
     });
     runtime.waiters.forEach((resolver) => resolver('resume'));
     runtime.waiters.clear();
@@ -323,7 +324,7 @@ export function useWorldStudioTaskController(
       canPause: false,
       canResume: false,
       canCancel: true,
-      message: 'Pause requested',
+      message: worldStudioMessage('task.pauseRequested', 'Pause requested'),
     });
     return true;
   }, [ensureRuntimeRecord, updateTask]);
@@ -340,7 +341,7 @@ export function useWorldStudioTaskController(
       canPause: false,
       canResume: false,
       canCancel: false,
-      message: 'Cancel requested',
+      message: worldStudioMessage('task.cancelRequested', 'Cancel requested'),
     });
     runtime.waiters.forEach((resolver) => resolver('cancel'));
     runtime.waiters.clear();
@@ -360,7 +361,7 @@ export function useWorldStudioTaskController(
   const waitWhilePaused = useCallback(async (taskId: string): Promise<'resume' | 'cancel'> => {
     const runtime = ensureRuntimeRecord(taskId);
     if (!runtime.pauseRequested) return 'resume';
-    pauseTask(taskId, 'Task paused. Resume to continue.');
+    pauseTask(taskId, worldStudioMessage('task.taskPausedResume', 'Task paused. Resume to continue.'));
     return await new Promise<'resume' | 'cancel'>((resolve) => {
       runtime.waiters.add(resolve);
     });

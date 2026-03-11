@@ -1,4 +1,5 @@
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { WorldStudioAgentDraft, WorldStudioAssetDraft } from '../../contracts.js';
 import type { Phase2Result } from '../../generation/pipeline.js';
 
@@ -33,36 +34,45 @@ function StatusTag(props: { status: 'idle' | 'queued' | 'running' | 'succeeded' 
 }
 
 export function Phase2Panel(props: Phase2PanelProps) {
+  const { t } = useModTranslation('world-studio');
   return (
     <section className="ui-sync-card ui-sync-card-inset p-4">
-      <h3 className="text-sm font-semibold text-gray-900">Synthesis Result</h3>
+      <h3 className="text-sm font-semibold text-gray-900">{t('phase2Panel.title')}</h3>
       {!props.phase2 ? (
-        <p className="mt-2 text-xs text-gray-500">No synthesis output yet.</p>
+        <p className="mt-2 text-xs text-gray-500">{t('phase2Panel.empty')}</p>
       ) : (
         <div className="mt-3 space-y-3">
           <div className="grid gap-2 lg:grid-cols-4">
             <div className="ui-sync-metric-card p-2">
-              <div className="font-medium text-gray-800">World</div>
-              <div className="text-xs text-gray-500">name: {String(props.phase2.world?.name || 'Untitled')}</div>
+              <div className="font-medium text-gray-800">{t('phase2Panel.world')}</div>
+              <div className="text-xs text-gray-500">{t('phase2Panel.worldName', {
+                name: String(props.phase2.world?.name || t('phase2Panel.untitled')),
+              })}</div>
             </div>
             <div className="ui-sync-metric-card p-2">
-              <div className="font-medium text-gray-800">Worldview</div>
-              <div className="text-xs text-gray-500">modules: {Object.keys(props.phase2.worldview || {}).length}</div>
+              <div className="font-medium text-gray-800">{t('phase2Panel.worldview')}</div>
+              <div className="text-xs text-gray-500">{t('phase2Panel.worldviewModules', {
+                count: Object.keys(props.phase2.worldview || {}).length,
+              })}</div>
             </div>
             <div className="ui-sync-metric-card p-2">
-              <div className="font-medium text-gray-800">Lorebooks</div>
-              <div className="text-xs text-gray-500">count: {Array.isArray(props.phase2.worldLorebooks) ? props.phase2.worldLorebooks.length : 0}</div>
+              <div className="font-medium text-gray-800">{t('phase2Panel.lorebooks')}</div>
+              <div className="text-xs text-gray-500">{t('phase2Panel.lorebooksCount', {
+                count: Array.isArray(props.phase2.worldLorebooks) ? props.phase2.worldLorebooks.length : 0,
+              })}</div>
             </div>
             <div className="ui-sync-metric-card p-2">
-              <div className="font-medium text-gray-800">Events</div>
-              <div className="text-xs text-gray-500">count: {Array.isArray(props.phase2.worldEvents) ? props.phase2.worldEvents.length : 0}</div>
+              <div className="font-medium text-gray-800">{t('phase2Panel.events')}</div>
+              <div className="text-xs text-gray-500">{t('phase2Panel.eventsCount', {
+                count: Array.isArray(props.phase2.worldEvents) ? props.phase2.worldEvents.length : 0,
+              })}</div>
             </div>
           </div>
 
           <div className="ui-sync-toolbar p-3">
             <div className="grid gap-3 lg:grid-cols-2">
               <label className="text-xs text-gray-700">
-                OASIS Time Flow Ratio
+                {t('phase2Panel.timeFlowRatio')}
                 <input
                   className="mt-1 h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-xs"
                   value={props.timeFlowRatio}
@@ -71,7 +81,7 @@ export function Phase2Panel(props: Phase2PanelProps) {
                 />
               </label>
               <label className="text-xs text-gray-700">
-                Current Time Node
+                {t('phase2Panel.currentTimeNode')}
                 <input
                   className="mt-1 h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-xs"
                   value={props.currentTimeNode}
@@ -83,7 +93,7 @@ export function Phase2Panel(props: Phase2PanelProps) {
           </div>
 
           <div className="ui-sync-code-panel p-3">
-            <div className="mb-1 text-xs font-semibold text-gray-800">Future Historical Events</div>
+            <div className="mb-1 text-xs font-semibold text-gray-800">{t('phase2Panel.futureHistoricalEvents')}</div>
             <textarea
               className="h-28 w-full rounded-md border border-gray-300 p-2 font-mono text-xs"
               value={props.futureEventsText}
@@ -92,8 +102,8 @@ export function Phase2Panel(props: Phase2PanelProps) {
           </div>
 
           <div className="ui-sync-soft-card p-3">
-            <div className="flex items-center justify-between">
-              <div className="text-xs font-semibold text-gray-800">World Cover</div>
+              <div className="flex items-center justify-between">
+              <div className="text-xs font-semibold text-gray-800">{t('phase2Panel.worldCover')}</div>
               <StatusTag status={props.assets.worldCover.status} />
             </div>
             <button
@@ -102,7 +112,7 @@ export function Phase2Panel(props: Phase2PanelProps) {
               onClick={props.onGenerateWorldCover}
               disabled={props.working}
             >
-              Generate Image
+              {t('phase2Panel.generateImage')}
             </button>
             {props.assets.worldCover.imageUrl ? (
               <p className="mt-1 truncate text-[11px] text-gray-500">{props.assets.worldCover.imageUrl}</p>
@@ -110,10 +120,10 @@ export function Phase2Panel(props: Phase2PanelProps) {
           </div>
 
           <div className="ui-sync-card p-3">
-            <div className="text-xs font-semibold text-gray-800">Character Portrait + Agent Sync</div>
+            <div className="text-xs font-semibold text-gray-800">{t('phase2Panel.characterPortraitAgentSync')}</div>
             <div className="mt-2 max-h-44 space-y-2 overflow-auto">
               {props.selectedCharacters.length === 0 ? (
-                <p className="text-xs text-gray-500">No character selected.</p>
+                <p className="text-xs text-gray-500">{t('phase2Panel.noCharacterSelected')}</p>
               ) : props.selectedCharacters.map((name) => {
                 const portrait = props.assets.characterPortraits[name]
                   || ({ status: 'idle', imageUrl: null } as const);
@@ -140,7 +150,7 @@ export function Phase2Panel(props: Phase2PanelProps) {
                         onClick={() => props.onGenerateCharacterPortrait(name)}
                         disabled={props.working}
                       >
-                        Generate Portrait
+                        {t('phase2Panel.generatePortrait')}
                       </button>
                       <label className="flex items-center gap-1 text-[11px] text-gray-700">
                         <input
@@ -148,12 +158,12 @@ export function Phase2Panel(props: Phase2PanelProps) {
                           checked={syncChecked}
                           onChange={(event) => props.onToggleAgentSyncCharacter(name, event.target.checked)}
                         />
-                        Sync as world-specific Agent
+                        {t('phase2Panel.syncAsAgent')}
                       </label>
                     </div>
                     <div className="mt-2 grid gap-2 md:grid-cols-2">
                       <label className="text-[11px] text-gray-700">
-                        handle
+                        {t('phase2Panel.handle')}
                         <input
                           className="mt-1 h-8 w-full rounded-md border border-gray-300 px-2 text-[11px]"
                           value={draft.handle}
@@ -162,22 +172,22 @@ export function Phase2Panel(props: Phase2PanelProps) {
                         />
                       </label>
                       <label className="text-[11px] text-gray-700">
-                        DNA Primary Trait (optional)
+                        {t('phase2Panel.dnaPrimaryTrait')}
                         <input
                           className="mt-1 h-8 w-full rounded-md border border-gray-300 px-2 text-[11px]"
                           value={draft.dnaPrimary || ''}
                           onChange={(event) => props.onAgentDraftChange(name, { dnaPrimary: event.target.value })}
-                          placeholder="Calm, decisive, rational..."
+                          placeholder={t('phase2Panel.dnaPrimaryPlaceholder')}
                         />
                       </label>
                     </div>
                     <label className="mt-2 block text-[11px] text-gray-700">
-                      Agent Concept
+                      {t('phase2Panel.agentConcept')}
                       <textarea
                         className="mt-1 h-16 w-full rounded-md border border-gray-300 p-2 text-[11px]"
                         value={draft.concept}
                         onChange={(event) => props.onAgentDraftChange(name, { concept: event.target.value })}
-                        placeholder="Role positioning, language style, behavior principles"
+                        placeholder={t('phase2Panel.agentConceptPlaceholder')}
                       />
                     </label>
                     {portrait.imageUrl ? (

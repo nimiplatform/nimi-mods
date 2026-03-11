@@ -1,4 +1,5 @@
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { EventNodeDraft } from '../../../contracts.js';
 import { EventDetailDrawer } from '../event-detail-drawer.js';
 
@@ -21,13 +22,14 @@ type EventGraphEditorCanvasProps = {
 };
 
 export function EventGraphEditorCanvas(props: EventGraphEditorCanvasProps) {
+  const { t } = useModTranslation('world-studio');
   return (
     <div className="mt-3 grid gap-3 xl:grid-cols-[280px_280px_1fr]">
       <div className="ui-sync-soft-card p-2.5">
-        <p className="text-xs font-semibold text-gray-700">Primary Events</p>
+        <p className="text-xs font-semibold text-gray-700">{t('eventGraphEditor.primaryEvents')}</p>
         <div className="mt-2 max-h-[420px] space-y-2 overflow-auto">
           {props.graphPrimary.length === 0 ? (
-            <p className="text-[11px] text-gray-500">No primary events yet.</p>
+            <p className="text-[11px] text-gray-500">{t('eventGraphEditor.noPrimaryEvents')}</p>
           ) : props.graphPrimary.map((event) => (
             <div
               key={`primary-${event.id}`}
@@ -42,7 +44,9 @@ export function EventGraphEditorCanvas(props: EventGraphEditorCanvasProps) {
                   type="button"
                   className="ui-sync-btn ui-sync-btn-secondary rounded border border-gray-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-gray-600"
                   onClick={() => props.onToggleExpanded(event.id)}
-                  title={props.expandedPrimaryIds.includes(event.id) ? 'Collapse' : 'Expand'}
+                  title={props.expandedPrimaryIds.includes(event.id)
+                    ? t('eventGraphEditor.collapse')
+                    : t('eventGraphEditor.expand')}
                 >
                   {props.expandedPrimaryIds.includes(event.id) ? '-' : '+'}
                 </button>
@@ -53,7 +57,7 @@ export function EventGraphEditorCanvas(props: EventGraphEditorCanvasProps) {
                       className="ui-sync-btn ui-sync-btn-secondary rounded border border-gray-300 bg-white px-1 py-0.5 text-[10px] font-semibold text-gray-600 disabled:opacity-40"
                       onClick={() => props.onMovePrimary(event.id, 'up')}
                       disabled={props.graphPrimary.findIndex((item) => item.id === event.id) === 0}
-                      title="Move Up"
+                      title={t('eventGraphEditor.moveUp')}
                     >
                       ↑
                     </button>
@@ -62,7 +66,7 @@ export function EventGraphEditorCanvas(props: EventGraphEditorCanvasProps) {
                       className="ui-sync-btn ui-sync-btn-secondary rounded border border-gray-300 bg-white px-1 py-0.5 text-[10px] font-semibold text-gray-600 disabled:opacity-40"
                       onClick={() => props.onMovePrimary(event.id, 'down')}
                       disabled={props.graphPrimary.findIndex((item) => item.id === event.id) === props.graphPrimary.length - 1}
-                      title="Move Down"
+                      title={t('eventGraphEditor.moveDown')}
                     >
                       ↓
                     </button>
@@ -75,7 +79,9 @@ export function EventGraphEditorCanvas(props: EventGraphEditorCanvasProps) {
                 >
                   <p className="truncate text-xs font-semibold text-gray-900">{event.title || event.id}</p>
                   <p className="mt-0.5 text-[11px] text-gray-500">
-                    Secondary {props.graphSecondary.filter((item) => item.parentEventId === event.id).length} · Evidence {event.evidenceRefs.length}
+                    {t('eventGraphEditor.secondaryCount', {
+                      count: props.graphSecondary.filter((item) => item.parentEventId === event.id).length,
+                    })} · {t('eventGraphEditor.evidenceCount', { count: event.evidenceRefs.length })}
                   </p>
                 </button>
               </div>
@@ -85,11 +91,11 @@ export function EventGraphEditorCanvas(props: EventGraphEditorCanvasProps) {
       </div>
 
       <div className="ui-sync-soft-card p-2.5">
-        <p className="text-xs font-semibold text-gray-700">Secondary Events</p>
-        <p className="mt-0.5 text-[11px] text-gray-500">Parent Event: {props.activePrimaryId || '-'}</p>
+        <p className="text-xs font-semibold text-gray-700">{t('eventGraphEditor.secondaryEvents')}</p>
+        <p className="mt-0.5 text-[11px] text-gray-500">{t('eventGraphEditor.parentEvent', { value: props.activePrimaryId || '-' })}</p>
         <div className="mt-2 max-h-[420px] space-y-2 overflow-auto">
           {props.secondaryForPrimary.length === 0 ? (
-            <p className="text-[11px] text-gray-500">No secondary events under the selected parent.</p>
+            <p className="text-[11px] text-gray-500">{t('eventGraphEditor.noSecondaryEventsForParent')}</p>
           ) : props.secondaryForPrimary.map((event) => (
             <div
               key={`secondary-${event.id}`}
@@ -107,7 +113,7 @@ export function EventGraphEditorCanvas(props: EventGraphEditorCanvasProps) {
                       className="ui-sync-btn ui-sync-btn-secondary rounded border border-gray-300 bg-white px-1 py-0.5 text-[10px] font-semibold text-gray-600 disabled:opacity-40"
                       onClick={() => props.onMoveSecondary(event.id, props.activePrimaryId, 'up')}
                       disabled={props.secondaryForPrimary.findIndex((item) => item.id === event.id) === 0}
-                      title="Move Up"
+                      title={t('eventGraphEditor.moveUp')}
                     >
                       ↑
                     </button>
@@ -116,7 +122,7 @@ export function EventGraphEditorCanvas(props: EventGraphEditorCanvasProps) {
                       className="ui-sync-btn ui-sync-btn-secondary rounded border border-gray-300 bg-white px-1 py-0.5 text-[10px] font-semibold text-gray-600 disabled:opacity-40"
                       onClick={() => props.onMoveSecondary(event.id, props.activePrimaryId, 'down')}
                       disabled={props.secondaryForPrimary.findIndex((item) => item.id === event.id) === props.secondaryForPrimary.length - 1}
-                      title="Move Down"
+                      title={t('eventGraphEditor.moveDown')}
                     >
                       ↓
                     </button>
@@ -128,7 +134,7 @@ export function EventGraphEditorCanvas(props: EventGraphEditorCanvasProps) {
                   onClick={() => props.onSelect(event.id)}
                 >
                   <p className="truncate text-xs font-semibold text-gray-900">{event.title || event.id}</p>
-                  <p className="mt-0.5 text-[11px] text-gray-500">Evidence {event.evidenceRefs.length}</p>
+                  <p className="mt-0.5 text-[11px] text-gray-500">{t('eventGraphEditor.evidenceCount', { count: event.evidenceRefs.length })}</p>
                 </button>
               </div>
             </div>
@@ -145,7 +151,7 @@ export function EventGraphEditorCanvas(props: EventGraphEditorCanvasProps) {
         />
       ) : (
         <div className="ui-sync-empty-card p-4 text-xs text-gray-500">
-          Select an event to edit details.
+          {t('eventGraphEditor.selectEventToEdit')}
         </div>
       )}
     </div>

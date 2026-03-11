@@ -1,4 +1,5 @@
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { EventNodeDraft } from '../../contracts.js';
 import { countPrimaryEventsMissingEvidence } from '../../services/event-horizon.js';
 import { EventGraphEditor } from '../create/event-graph-editor.js';
@@ -23,6 +24,7 @@ type EventGraphMaintenanceProps = {
 };
 
 export function EventGraphMaintenance(props: EventGraphMaintenanceProps) {
+  const { t } = useModTranslation('world-studio');
   const totalEvents = props.events.primary.length + props.events.secondary.length;
   const missingPrimaryEvidence = countPrimaryEventsMissingEvidence(props.events.primary);
   const primaryIds = new Set(props.events.primary.map((item) => String(item.id || '').trim()).filter(Boolean));
@@ -34,7 +36,7 @@ export function EventGraphMaintenance(props: EventGraphMaintenanceProps) {
   return (
     <div className="space-y-3">
       <EventGraphEditor
-        title="Events (Primary / Secondary)"
+        title={t('eventGraphMaintenance.title')}
         events={props.events}
         onChange={props.onEventsChange}
         layout={props.layout}
@@ -43,13 +45,20 @@ export function EventGraphMaintenance(props: EventGraphMaintenanceProps) {
 
       <section className="ui-sync-card ui-sync-card-inset p-4">
         <div className="ui-sync-toolbar mb-3 px-3 py-2 text-xs text-gray-700">
-          <p>Snapshot: {props.editorSnapshotVersion || '-'}</p>
-          <p>Events: total {totalEvents} · primary {props.events.primary.length} · secondary {props.events.secondary.length}</p>
-          <p>Primary missing evidence: {missingPrimaryEvidence} · orphan secondary: {orphanSecondary}</p>
+          <p>{t('eventGraphMaintenance.snapshot', { value: props.editorSnapshotVersion || '-' })}</p>
+          <p>{t('eventGraphMaintenance.eventSummary', {
+            total: totalEvents,
+            primary: props.events.primary.length,
+            secondary: props.events.secondary.length,
+          })}</p>
+          <p>{t('eventGraphMaintenance.evidenceSummary', {
+            missing: missingPrimaryEvidence,
+            orphan: orphanSecondary,
+          })}</p>
         </div>
         <div className="grid gap-3 md:grid-cols-[220px_1fr]">
           <label className="text-xs text-gray-700">
-            <span className="mb-1 block font-medium">Bulk Sync Mode</span>
+            <span className="mb-1 block font-medium">{t('eventGraphMaintenance.bulkSyncMode')}</span>
             <select
               className="h-9 w-full rounded-md border border-gray-300 px-2 text-xs"
               value={props.syncMode}
@@ -57,12 +66,12 @@ export function EventGraphMaintenance(props: EventGraphMaintenanceProps) {
                 event.target.value === 'replace' ? 'replace' : 'merge',
               )}
             >
-              <option value="merge">merge (incremental update)</option>
-              <option value="replace">replace (active graph rewrite)</option>
+              <option value="merge">{t('eventGraphMaintenance.mergeLabel')}</option>
+              <option value="replace">{t('eventGraphMaintenance.replaceLabel')}</option>
             </select>
           </label>
           <div className="ui-sync-soft-card px-3 py-2 text-xs text-gray-600">
-            `replace` archives existing active events first, then writes the current graph as a new active set; `merge` only does incremental upsert.
+            {t('eventGraphMaintenance.modeHint')}
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
@@ -72,7 +81,7 @@ export function EventGraphMaintenance(props: EventGraphMaintenanceProps) {
             onClick={props.onSyncEvents}
             disabled={props.working}
           >
-            Sync Events ({props.syncMode})
+            {t('eventGraphMaintenance.syncEvents', { mode: props.syncMode })}
           </button>
           <button
             type="button"
@@ -80,7 +89,7 @@ export function EventGraphMaintenance(props: EventGraphMaintenanceProps) {
             onClick={props.onDeleteFirstEvent}
             disabled={props.working}
           >
-            Delete First Event
+            {t('eventGraphMaintenance.deleteFirstEvent')}
           </button>
         </div>
       </section>

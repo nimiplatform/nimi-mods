@@ -38,7 +38,7 @@ export function RouteCapabilityControls(props: RouteCapabilityControlsProps) {
     ready: true,
     reasonCode: ReasonCode.WORLD_STUDIO_ROUTE_READY,
     actionHint: 'none',
-    message: 'Route is ready.',
+    message: t('routeCapabilityControls.routeReady'),
   };
   const [modelQuery, setModelQuery] = useState(props.binding?.model || '');
   const filteredModelOptions = useMemo(
@@ -60,8 +60,8 @@ export function RouteCapabilityControls(props: RouteCapabilityControlsProps) {
           onChange={(event) => props.onRouteSourceChange(props.profile, normalizeRuntimeRouteSource(event.target.value))}
           className="h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-900"
         >
-          <option value="local">Local</option>
-          <option value="cloud">Cloud</option>
+          <option value="local">{t('routeCapabilityControls.sourceLocal')}</option>
+          <option value="cloud">{t('routeCapabilityControls.sourceCloud')}</option>
         </select>
       </div>
       <div>

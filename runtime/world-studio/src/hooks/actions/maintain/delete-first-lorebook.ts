@@ -1,5 +1,6 @@
 import { asRecord } from '@nimiplatform/sdk/mod/utils';
 import type { WorldLorebookDraftRow } from '../../../contracts.js';
+import { worldStudioMessage } from '../../../i18n/messages.js';
 import type { WorldStudioMaintainActionContext } from './types.js';
 
 export async function deleteFirstLorebook(context: WorldStudioMaintainActionContext) {
@@ -10,7 +11,7 @@ export async function deleteFirstLorebook(context: WorldStudioMaintainActionCont
     const lorebooks = context.snapshot.lorebooksDraft;
     const firstLorebookId = String(lorebooks[0]?.id || '').trim();
     if (!firstLorebookId) {
-      throw new Error('No lorebook id found in first lorebook item.');
+      throw new Error(worldStudioMessage('error.noLorebookIdFound', 'No lorebook id found in first lorebook item.'));
     }
     const payload = asRecord(await context.mutations.deleteLorebookMutation.mutateAsync({
       worldId: context.selectedWorldId,
@@ -26,7 +27,12 @@ export async function deleteFirstLorebook(context: WorldStudioMaintainActionCont
         lorebooks: false,
       },
     });
-    context.setStatusBanner({ kind: 'info', message: `Lorebook ${firstLorebookId} deleted` });
+    context.setStatusBanner({
+      kind: 'info',
+      message: worldStudioMessage('banner.lorebookDeleted', 'Lorebook {{lorebookId}} deleted', {
+        lorebookId: firstLorebookId,
+      }),
+    });
     await context.queries.mutationsQuery.refetch();
   } catch (deleteError) {
     context.setError(deleteError instanceof Error ? deleteError.message : String(deleteError));

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { WorldStudioKnowledgeGraphDraft } from '../../../contracts.js';
 
 function PreviewList(props: {
@@ -29,31 +30,32 @@ function PreviewList(props: {
 }
 
 export function Phase1PreviewGrid(props: { graph: WorldStudioKnowledgeGraphDraft }) {
+  const { t } = useModTranslation('world-studio');
   const primaryEvents = props.graph.events.primary || [];
   const secondaryEvents = props.graph.events.secondary || [];
 
   return (
     <div className="mt-3 grid gap-3 xl:grid-cols-2">
       <PreviewList
-        title="Event Graph (Primary -> Secondary)"
+        title={t('phase1.previewEventGraph')}
         items={primaryEvents}
-        emptyText="Primary events have not been extracted yet."
+        emptyText={t('phase1.previewPrimaryEventsEmpty')}
         renderItem={(item, index) => {
-          const eventId = String(item.id || `Primary Event ${index + 1}`);
+          const eventId = String(item.id || t('phase1.previewPrimaryEventFallback', { index: index + 1 }));
           const children = secondaryEvents.filter((child) => String(child.parentEventId || '') === eventId);
           const evidenceCount = Array.isArray(item.evidenceRefs) ? item.evidenceRefs.length : 0;
           return (
             <>
-              <p className="text-xs font-medium text-gray-900">{String(item.title || `Primary Event ${index + 1}`)}</p>
+              <p className="text-xs font-medium text-gray-900">{String(item.title || t('phase1.previewPrimaryEventFallback', { index: index + 1 }))}</p>
               <p className="mt-0.5 text-[11px] text-gray-600">{String(item.summary || item.cause || '')}</p>
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
                   evidenceCount > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
                 }`}>
-                  Evidence {evidenceCount}
+                  {t('phase1.previewEvidenceCount', { count: evidenceCount })}
                 </span>
                 <span className="ui-sync-pill rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-700">
-                  Secondary {children.length}
+                  {t('eventGraphEditor.secondaryCount', { count: children.length })}
                 </span>
               </div>
             </>
@@ -61,47 +63,47 @@ export function Phase1PreviewGrid(props: { graph: WorldStudioKnowledgeGraphDraft
         }}
       />
       <PreviewList
-        title="Primary Events"
+        title={t('phase1.previewPrimaryEvents')}
         items={primaryEvents}
-        emptyText="Primary events have not been extracted yet."
+        emptyText={t('phase1.previewPrimaryEventsEmpty')}
         renderItem={(item, index) => (
           <>
-            <p className="text-xs font-medium text-gray-900">{String(item.title || `Primary Event ${index + 1}`)}</p>
+            <p className="text-xs font-medium text-gray-900">{String(item.title || t('phase1.previewPrimaryEventFallback', { index: index + 1 }))}</p>
             <p className="mt-0.5 text-[11px] text-gray-600">{String(item.summary || item.cause || '')}</p>
-            <p className="mt-0.5 text-[11px] text-gray-500">Evidence: {Array.isArray(item.evidenceRefs) ? item.evidenceRefs.length : 0}</p>
+            <p className="mt-0.5 text-[11px] text-gray-500">{t('phase1.previewEvidenceCount', { count: Array.isArray(item.evidenceRefs) ? item.evidenceRefs.length : 0 })}</p>
           </>
         )}
       />
       <PreviewList
-        title="Secondary Events"
+        title={t('phase1.previewSecondaryEvents')}
         items={secondaryEvents}
-        emptyText="Secondary events have not been extracted yet."
+        emptyText={t('phase1.previewSecondaryEventsEmpty')}
         renderItem={(item, index) => (
           <>
-            <p className="text-xs font-medium text-gray-900">{String(item.title || `Secondary Event ${index + 1}`)}</p>
+            <p className="text-xs font-medium text-gray-900">{String(item.title || t('phase1.previewSecondaryEventFallback', { index: index + 1 }))}</p>
             <p className="mt-0.5 text-[11px] text-gray-600">{String(item.summary || item.cause || '')}</p>
-            <p className="mt-0.5 text-[11px] text-gray-500">Parent Event: {String(item.parentEventId || '-')}</p>
+            <p className="mt-0.5 text-[11px] text-gray-500">{t('phase1.previewParentEvent', { value: String(item.parentEventId || '-') })}</p>
           </>
         )}
       />
       <PreviewList
-        title="Timeline"
+        title={t('phase1.previewTimeline')}
         items={props.graph.timeline}
-        emptyText="Timeline nodes have not been extracted yet."
+        emptyText={t('phase1.previewTimelineEmpty')}
         renderItem={(item, index) => (
           <>
-            <p className="text-xs font-medium text-gray-900">{String(item.label || item.time || `Timeline ${index + 1}`)}</p>
+            <p className="text-xs font-medium text-gray-900">{String(item.label || item.time || t('phase1.previewTimelineFallback', { index: index + 1 }))}</p>
             <p className="mt-0.5 text-[11px] text-gray-600">{String(item.description || '')}</p>
           </>
         )}
       />
       <PreviewList
-        title="Characters"
+        title={t('phase1.previewCharacters')}
         items={props.graph.characters}
-        emptyText="Characters have not been extracted yet."
+        emptyText={t('phase1.previewCharactersEmpty')}
         renderItem={(item, index) => (
           <>
-            <p className="text-xs font-medium text-gray-900">{String(item.name || `Character ${index + 1}`)}</p>
+            <p className="text-xs font-medium text-gray-900">{String(item.name || t('phase1.previewCharacterFallback', { index: index + 1 }))}</p>
             <p className="mt-0.5 text-[11px] text-gray-600">{String(item.summary || '')}</p>
           </>
         )}

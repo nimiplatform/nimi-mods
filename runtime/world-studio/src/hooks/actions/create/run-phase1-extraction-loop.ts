@@ -4,6 +4,7 @@ import { resolveContextTokenBudget } from '../../../engine/accumulated-context.j
 import { isContextOverflowText } from '../../../engine/errors.js';
 import type { AccumulatedState, FinalDraftAccumulator } from '../../../engine/types.js';
 import { runPhase1ExtractionFromChunks } from '../../../generation/pipeline.js';
+import { worldStudioMessage } from '../../../i18n/messages.js';
 import { emitWorldStudioLog } from '../../../logging.js';
 import { toFailedChunkIndices } from '../../../services/event-graph-map.js';
 import { formatRouteBindingSummary } from '../../../services/mutation-payload.js';
@@ -237,12 +238,18 @@ export async function executePhase1ExtractionLoop(
         chunkPolicy: activeChunkPolicy,
         finalDraftAccumulator: pausedResult.finalDraftAccumulator,
       });
-      input.taskController.pauseTask(taskId, 'Extraction paused. Resume to continue.');
+      input.taskController.pauseTask(taskId, worldStudioMessage(
+        'task.extractionPaused',
+        'Extraction paused. Resume to continue.',
+      ));
       input.taskController.updateTask(taskId, {
         progress: Math.max(0.1, Math.min(0.95, pausedResult.qualityGate.metrics.chunkSuccessRatio)),
       });
-      input.setNotice('Extraction paused. Resume task to continue.');
-      input.setStatusBanner({ kind: 'info', message: 'Extraction paused' });
+      input.setNotice(worldStudioMessage('notice.extractionPaused', 'Extraction paused. Resume task to continue.'));
+      input.setStatusBanner({
+        kind: 'info',
+        message: worldStudioMessage('banner.extractionPaused', 'Extraction paused'),
+      });
       diagLog('Phase1 paused', {
         taskId,
         remainingChunkIndices,
@@ -259,9 +266,12 @@ export async function executePhase1ExtractionLoop(
           chunkPolicy: activeChunkPolicy,
         },
       });
-      input.taskController.cancelTask(taskId, 'Extraction canceled');
-      input.setNotice('Extraction canceled.');
-      input.setStatusBanner({ kind: 'warn', message: 'Extraction canceled' });
+      input.taskController.cancelTask(taskId, worldStudioMessage('task.extractionCanceled', 'Extraction canceled'));
+      input.setNotice(worldStudioMessage('notice.extractionCanceled', 'Extraction canceled.'));
+      input.setStatusBanner({
+        kind: 'warn',
+        message: worldStudioMessage('banner.extractionCanceled', 'Extraction canceled'),
+      });
       diagLog('Phase1 canceled', { taskId });
       return;
     }
@@ -353,9 +363,12 @@ export async function executePhase1ExtractionLoop(
 
     if (effectiveResult.qualityGate.status === 'PASS') {
       input.setNotice(effectiveMode === 'failed'
-        ? 'Failed chunks re-extracted. Confirm checkpoints.'
-        : 'Extraction completed. Confirm checkpoints.');
-      input.setStatusBanner({ kind: 'success', message: 'Extraction completed' });
+        ? worldStudioMessage('notice.extractionRetryCompletedConfirm', 'Failed chunks re-extracted. Confirm checkpoints.')
+        : worldStudioMessage('notice.extractionCompletedConfirm', 'Extraction completed. Confirm checkpoints.'));
+      input.setStatusBanner({
+        kind: 'success',
+        message: worldStudioMessage('banner.extractionCompleted', 'Extraction completed'),
+      });
       emitWorldStudioLog({
         level: 'info',
         message: 'world-studio:event-gate:pass',
@@ -365,9 +378,18 @@ export async function executePhase1ExtractionLoop(
       });
     } else if (effectiveResult.qualityGate.status === 'WARN') {
       input.setNotice(effectiveMode === 'failed'
-        ? 'Failed chunks re-extracted with warnings. Confirm checkpoints before synthesize.'
-        : 'Extraction completed with warnings. Confirm checkpoints before synthesize.');
-      input.setStatusBanner({ kind: 'warn', message: 'Extraction completed with warnings' });
+        ? worldStudioMessage(
+          'notice.extractionRetryCompletedWarnConfirm',
+          'Failed chunks re-extracted with warnings. Confirm checkpoints before synthesize.',
+        )
+        : worldStudioMessage(
+          'notice.extractionCompletedWarnConfirm',
+          'Extraction completed with warnings. Confirm checkpoints before synthesize.',
+        ));
+      input.setStatusBanner({
+        kind: 'warn',
+        message: worldStudioMessage('banner.extractionCompletedWithWarnings', 'Extraction completed with warnings'),
+      });
       emitWorldStudioLog({
         level: 'warn',
         message: 'world-studio:event-gate:warn',
@@ -380,10 +402,19 @@ export async function executePhase1ExtractionLoop(
       });
     } else {
       input.setNotice(effectiveMode === 'failed'
-        ? 'Retry completed, but quality gate is still blocked. Try switching Fine model and rerun failed chunks again.'
-        : 'Extraction completed, but quality gate blocked synthesize. Try switching Fine model and rerun extract.');
+        ? worldStudioMessage(
+          'notice.extractionRetryBlocked',
+          'Retry completed, but quality gate is still blocked. Try switching Fine model and rerun failed chunks again.',
+        )
+        : worldStudioMessage(
+          'notice.extractionBlocked',
+          'Extraction completed, but quality gate blocked synthesize. Try switching Fine model and rerun extract.',
+        ));
       input.setError(`WORLD_STUDIO_PHASE1_QUALITY_GATE_BLOCKED: ${effectiveResult.qualityGate.reasons.join(' | ')}`);
-      input.setStatusBanner({ kind: 'warn', message: 'Extraction finished with quality gate block' });
+      input.setStatusBanner({
+        kind: 'warn',
+        message: worldStudioMessage('banner.extractionQualityGateBlocked', 'Extraction finished with quality gate block'),
+      });
       emitWorldStudioLog({
         level: 'warn',
         message: 'world-studio:event-gate:blocked',
@@ -396,7 +427,7 @@ export async function executePhase1ExtractionLoop(
       });
     }
 
-    input.taskController.completeTask(taskId, 'Extraction completed');
+    input.taskController.completeTask(taskId, worldStudioMessage('task.extractionCompleted', 'Extraction completed'));
     diagLog('Phase1 COMPLETE', {
       taskId,
       mode: effectiveMode,
@@ -435,9 +466,12 @@ export async function executePhase1ExtractionLoop(
           chunkPolicy: activeChunkPolicy,
         },
       });
-      input.taskController.cancelTask(taskId, 'Extraction canceled');
-      input.setNotice('Extraction canceled.');
-      input.setStatusBanner({ kind: 'warn', message: 'Extraction canceled' });
+      input.taskController.cancelTask(taskId, worldStudioMessage('task.extractionCanceled', 'Extraction canceled'));
+      input.setNotice(worldStudioMessage('notice.extractionCanceled', 'Extraction canceled.'));
+      input.setStatusBanner({
+        kind: 'warn',
+        message: worldStudioMessage('banner.extractionCanceled', 'Extraction canceled'),
+      });
       diagLog('Phase1 canceled during catch', {
         taskId,
         error: error instanceof Error ? error.message : String(error),
@@ -539,17 +573,35 @@ export async function executePhase1ExtractionLoop(
           createStep: 'CHECKPOINTS',
         });
         if (effectiveRetriedResult.qualityGate.status === 'PASS') {
-          input.setNotice('Extraction completed after adaptive chunk shrink. Confirm checkpoints.');
-          input.setStatusBanner({ kind: 'success', message: 'Extraction completed' });
+          input.setNotice(worldStudioMessage(
+            'notice.extractionAdaptiveShrinkCompleted',
+            'Extraction completed after adaptive chunk shrink. Confirm checkpoints.',
+          ));
+          input.setStatusBanner({
+            kind: 'success',
+            message: worldStudioMessage('banner.extractionCompleted', 'Extraction completed'),
+          });
         } else if (effectiveRetriedResult.qualityGate.status === 'WARN') {
-          input.setNotice('Extraction completed after adaptive chunk shrink with warnings. Confirm checkpoints.');
-          input.setStatusBanner({ kind: 'warn', message: 'Extraction completed with warnings' });
+          input.setNotice(worldStudioMessage(
+            'notice.extractionAdaptiveShrinkWarn',
+            'Extraction completed after adaptive chunk shrink with warnings. Confirm checkpoints.',
+          ));
+          input.setStatusBanner({
+            kind: 'warn',
+            message: worldStudioMessage('banner.extractionCompletedWithWarnings', 'Extraction completed with warnings'),
+          });
         } else {
-          input.setNotice('Extraction retried with smaller chunks, but quality gate is still blocked.');
+          input.setNotice(worldStudioMessage(
+            'notice.extractionAdaptiveShrinkBlocked',
+            'Extraction retried with smaller chunks, but quality gate is still blocked.',
+          ));
           input.setError(`WORLD_STUDIO_PHASE1_QUALITY_GATE_BLOCKED: ${effectiveRetriedResult.qualityGate.reasons.join(' | ')}`);
-          input.setStatusBanner({ kind: 'warn', message: 'Extraction finished with quality gate block' });
+          input.setStatusBanner({
+            kind: 'warn',
+            message: worldStudioMessage('banner.extractionQualityGateBlocked', 'Extraction finished with quality gate block'),
+          });
         }
-        input.taskController.completeTask(taskId, 'Extraction completed');
+        input.taskController.completeTask(taskId, worldStudioMessage('task.extractionCompleted', 'Extraction completed'));
         diagLog('Phase1 COMPLETE (catch retry path)', {
           taskId,
           mode: effectiveMode,

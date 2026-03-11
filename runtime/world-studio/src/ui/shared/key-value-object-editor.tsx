@@ -1,4 +1,5 @@
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 
 type KeyValueObjectEditorProps = {
   label: string;
@@ -47,6 +48,7 @@ function toObject(rows: ObjectRow[]): Record<string, unknown> {
 }
 
 export function KeyValueObjectEditor(props: KeyValueObjectEditorProps) {
+  const { t } = useModTranslation('world-studio');
   const rows = normalizeRows(props.value || {});
   const spacing = props.compact ? 'space-y-1.5' : 'space-y-2';
 
@@ -64,12 +66,12 @@ export function KeyValueObjectEditor(props: KeyValueObjectEditorProps) {
             });
           }}
         >
-          Add Field
+          {t('shared.addField')}
         </button>
       </div>
       <div className={spacing}>
         {rows.length === 0 ? (
-          <p className="text-[11px] text-gray-500">No fields yet.</p>
+          <p className="text-[11px] text-gray-500">{t('shared.noFieldsYet')}</p>
         ) : rows.map((row, index) => (
           <div key={`${row.key}-${index}`} className="grid grid-cols-[1fr_2fr_auto] gap-2">
             <input
@@ -80,7 +82,7 @@ export function KeyValueObjectEditor(props: KeyValueObjectEditorProps) {
                 nextRows[index] = { ...row, key: event.target.value };
                 props.onChange(toObject(nextRows));
               }}
-              placeholder="Key"
+              placeholder={t('shared.keyPlaceholder')}
             />
             <input
               className="h-8 rounded border border-gray-300 px-2 text-xs"
@@ -90,7 +92,7 @@ export function KeyValueObjectEditor(props: KeyValueObjectEditorProps) {
                 nextRows[index] = { ...row, value: event.target.value };
                 props.onChange(toObject(nextRows));
               }}
-              placeholder="Value"
+              placeholder={t('shared.valuePlaceholder')}
             />
             <button
               type="button"
@@ -100,7 +102,7 @@ export function KeyValueObjectEditor(props: KeyValueObjectEditorProps) {
                 props.onChange(toObject(nextRows));
               }}
             >
-              Del
+              {t('shared.deleteShort')}
             </button>
           </div>
         ))}

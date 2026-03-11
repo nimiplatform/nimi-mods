@@ -1,4 +1,5 @@
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { EventNodeDraft, WorldLorebookDraftRow } from '../../contracts.js';
 import { WorldBasePanel } from '../maintain/world-base-panel.js';
 import { WorldviewPanel } from '../maintain/worldview-panel.js';
@@ -26,12 +27,13 @@ type DraftEditorPanelProps = {
 };
 
 export function DraftEditorPanel(props: DraftEditorPanelProps) {
+  const { t } = useModTranslation('world-studio');
   return (
     <div className="space-y-4">
       <section className="ui-sync-card ui-sync-card-inset p-4">
-        <h3 className="text-sm font-semibold text-gray-900">Draft Editor</h3>
+        <h3 className="text-sm font-semibold text-gray-900">{t('draftEditor.title')}</h3>
         <p className="mt-1 text-xs text-gray-500">
-          Structured editing path. Raw JSON is only shown in debug folds.
+          {t('draftEditor.description')}
         </p>
       </section>
 
@@ -46,7 +48,7 @@ export function DraftEditorPanel(props: DraftEditorPanelProps) {
       />
 
       <EventGraphEditor
-        title="Event Graph"
+        title={t('draftEditor.eventGraph')}
         events={props.events}
         sourceContextText={props.sourceText}
         onChange={props.onEventsChange}

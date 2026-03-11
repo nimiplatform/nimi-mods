@@ -1,4 +1,5 @@
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { WorldStudioCreateStep, WorldStudioParseJobState } from '../../contracts.js';
 
 type PublishPanelProps = {
@@ -35,29 +36,35 @@ function parseDone(parseJob: WorldStudioParseJobState): boolean {
 }
 
 export function PublishPanel(props: PublishPanelProps) {
+  const { t } = useModTranslation('world-studio');
   const embedded = Boolean(props.embedded);
   const showTitle = props.showTitle !== false;
   return (
     <section className={embedded ? '' : 'ui-sync-card ui-sync-card-inset m-3 p-3'}>
-      {showTitle ? <h3 className="text-sm font-semibold text-gray-900">Create Actions</h3> : null}
-      <p className={`${showTitle ? 'mt-1 ' : ''}text-xs text-gray-500`}>Current Step: {props.step}</p>
+      {showTitle ? <h3 className="text-sm font-semibold text-gray-900">{t('publishPanel.title')}</h3> : null}
+      <p className={`${showTitle ? 'mt-1 ' : ''}text-xs text-gray-500`}>{t('publishPanel.currentStep', { step: props.step })}</p>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <StepBadge label="EXTRACT" done={props.hasPhase1 && parseDone(props.parseJob)} />
-        <StepBadge label="SYNTHESIZE" done={props.hasPhase2} />
-        <StepBadge label="DRAFT" done={Boolean(props.draftId)} />
-        <StepBadge label="PUBLISH" done={false} />
+        <StepBadge label={t('publishPanel.extract')} done={props.hasPhase1 && parseDone(props.parseJob)} />
+        <StepBadge label={t('publishPanel.synthesize')} done={props.hasPhase2} />
+        <StepBadge label={t('publishPanel.draft')} done={Boolean(props.draftId)} />
+        <StepBadge label={t('publishPanel.publish')} done={false} />
       </div>
 
       <div className="ui-sync-toolbar mt-3 p-2">
         <p className="text-[11px] text-gray-600">
-          Parse: {props.parseJob.phase} · {props.parseJob.chunkCompleted}/{props.parseJob.chunkTotal} chunks · failed {props.parseJob.chunkFailed}
+          {t('publishPanel.parseSummary', {
+            phase: props.parseJob.phase,
+            completed: props.parseJob.chunkCompleted,
+            total: props.parseJob.chunkTotal,
+            failed: props.parseJob.chunkFailed,
+          })}
         </p>
         <p className="mt-1 text-[11px] text-gray-600">
-          Agent Sync Selected: {props.selectedAgentSyncCount}
+          {t('publishPanel.agentSyncSelected', { count: props.selectedAgentSyncCount })}
         </p>
         <p className="mt-1 text-[11px] text-gray-600">
-          World Cover: {props.worldCoverStatus}
+          {t('publishPanel.worldCover', { status: props.worldCoverStatus })}
         </p>
       </div>
 
@@ -68,7 +75,7 @@ export function PublishPanel(props: PublishPanelProps) {
           onClick={props.onSaveDraft}
           disabled={props.working || !props.hasPhase2}
         >
-          {props.draftId ? 'Update Draft' : 'Create Draft'}
+          {props.draftId ? t('publishPanel.updateDraft') : t('publishPanel.createDraft')}
         </button>
         <button
           type="button"
@@ -76,10 +83,10 @@ export function PublishPanel(props: PublishPanelProps) {
           onClick={props.onPublishDraft}
           disabled={props.working || !props.draftId}
         >
-          Publish Draft
+          {t('publishPanel.publishDraft')}
         </button>
       </div>
-      {props.draftId ? <p className="mt-2 text-xs text-gray-500">draftId: {props.draftId}</p> : null}
+      {props.draftId ? <p className="mt-2 text-xs text-gray-500">{t('publishPanel.draftId', { draftId: props.draftId })}</p> : null}
     </section>
   );
 }

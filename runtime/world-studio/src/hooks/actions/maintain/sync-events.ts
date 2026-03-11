@@ -1,5 +1,6 @@
 import { asRecord } from '@nimiplatform/sdk/mod/utils';
 import { emitWorldStudioLog } from '../../../logging.js';
+import { worldStudioMessage } from '../../../i18n/messages.js';
 import type { EventNodeDraft } from '../../../contracts.js';
 import { toWorldEventUpsertPayloadList } from '../../../services/world-event-upsert-payload.js';
 import type { WorldStudioMaintainActionContext, WorldStudioMaintainActionPayload } from './types.js';
@@ -12,13 +13,13 @@ export async function syncEvents(
 
   const started = context.taskController.startTask({
     kind: 'MAINTAIN_SYNC_EVENTS',
-    label: 'Sync events',
+    label: worldStudioMessage('task.syncEventsLabel', 'Sync events'),
     atomic: false,
     resumable: false,
     canPause: false,
     canCancel: true,
     step: 'MAINTAIN',
-    message: 'Syncing events',
+    message: worldStudioMessage('task.syncingEvents', 'Syncing events'),
   });
   if (!started) {
     context.setError('WORLD_STUDIO_TASK_CONFLICT: another task is running.');
@@ -37,13 +38,13 @@ export async function syncEvents(
 
   try {
     if (context.taskController.shouldCancel(started.taskId)) {
-      context.taskController.cancelTask(started.taskId, 'Event sync canceled');
-      context.setNotice('Event sync canceled.');
+      context.taskController.cancelTask(started.taskId, worldStudioMessage('task.eventSyncCanceled', 'Event sync canceled'));
+      context.setNotice(worldStudioMessage('notice.eventSyncCanceled', 'Event sync canceled.'));
       return;
     }
     context.taskController.updateTask(started.taskId, {
       canCancel: false,
-      message: 'Submitting event sync',
+      message: worldStudioMessage('task.submittingEventSync', 'Submitting event sync'),
       progress: 0.2,
     });
 
@@ -86,8 +87,11 @@ export async function syncEvents(
         events: false,
       },
     });
-    context.setStatusBanner({ kind: 'success', message: 'Events synchronized' });
-    context.taskController.completeTask(started.taskId, 'Events synchronized');
+    context.setStatusBanner({
+      kind: 'success',
+      message: worldStudioMessage('banner.eventsSynchronized', 'Events synchronized'),
+    });
+    context.taskController.completeTask(started.taskId, worldStudioMessage('task.eventsSynchronized', 'Events synchronized'));
     await Promise.all([
       context.queries.eventsQuery.refetch(),
       context.queries.mutationsQuery.refetch(),

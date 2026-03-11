@@ -7,6 +7,7 @@ import { projectEventsForSelectedStartTime } from '../../services/start-time-pro
 import { buildPhase1ArtifactFromResult } from '../../services/phase1-artifact.js';
 import type { WorldStudioSnapshotPatch, WorldStudioWorkspaceSnapshot } from '../../contracts.js';
 import type { Phase1Result, Phase2Result } from '../../generation/pipeline.js';
+import { worldStudioMessage } from '../../i18n/messages.js';
 import { emitWorldStudioLog } from '../../logging.js';
 
 type UseWorldStudioWorkspaceControllerActionsInput = {
@@ -79,7 +80,10 @@ export function useWorldStudioWorkspaceControllerActions(
     if (!projection.applied) {
       const reasonCode = projection.reasonCode || 'WORLD_STUDIO_START_TIME_PROJECTION_FAILED';
       input.setError(`WORLD_STUDIO_START_TIME_PROJECTION_FAILED: ${reasonCode}`);
-      input.setNotice('Quality gate refresh aborted: start-time projection failed.');
+      input.setNotice(worldStudioMessage(
+        'notice.qualityGateRefreshProjectionFailed',
+        'Quality gate refresh aborted: start-time projection failed.',
+      ));
       return;
     }
     const projectedKnowledgeGraph = {
@@ -149,7 +153,11 @@ export function useWorldStudioWorkspaceControllerActions(
       },
     });
     input.setError(null);
-    input.setNotice(`Quality gate refreshed: ${qualityGate.status}.`);
+    input.setNotice(worldStudioMessage(
+      'notice.qualityGateRefreshed',
+      'Quality gate refreshed: {{status}}.',
+      { status: qualityGate.status },
+    ));
   }, [input]);
 
   const onTimeFlowRatioChange = useCallback((value: string) => {
@@ -256,7 +264,10 @@ export function useWorldStudioWorkspaceControllerActions(
       editorSnapshotVersion: input.remoteMaintenanceSnapshotVersion,
     });
     input.setError(null);
-    input.setNotice('Adopted remote snapshot version. Retry save/sync when ready.');
+    input.setNotice(worldStudioMessage(
+      'notice.adoptedRemoteSnapshot',
+      'Adopted remote snapshot version. Retry save/sync when ready.',
+    ));
   }, [input]);
 
   return {

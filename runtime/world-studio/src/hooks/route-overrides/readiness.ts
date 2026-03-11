@@ -2,6 +2,7 @@ import type { RuntimeRouteBinding, RuntimeRouteOptionsSnapshot } from '@nimiplat
 import type { DistillRouteBindingMap } from '../../generation/pipeline.js';
 import type { WorldStudioWorkspaceSnapshot } from '../../contracts.js';
 import { ReasonCode } from '@nimiplatform/sdk/types';
+import { worldStudioMessage } from '../../i18n/messages.js';
 
 function hasText(value: unknown): boolean {
   return String(value || '').trim().length > 0;
@@ -30,7 +31,7 @@ export function evaluateRouteBindingReadiness(
       ready: false,
       reasonCode: ReasonCode.WORLD_STUDIO_ROUTE_BINDING_MISSING,
       actionHint: 'select-model',
-      message: 'Route binding is missing.',
+      message: worldStudioMessage('notice.routeBindingMissing', 'Route binding is missing.'),
     };
   }
 
@@ -40,7 +41,7 @@ export function evaluateRouteBindingReadiness(
         ready: false,
         reasonCode: ReasonCode.WORLD_STUDIO_LOCAL_MODEL_MISSING,
         actionHint: 'install-local-model',
-        message: 'No local runtime model selected.',
+        message: worldStudioMessage('notice.localModelMissing', 'No local runtime model selected.'),
       };
     }
     const localModels = routeOptions?.local?.models || [];
@@ -50,7 +51,7 @@ export function evaluateRouteBindingReadiness(
         ready: false,
         reasonCode: ReasonCode.WORLD_STUDIO_LOCAL_MODEL_UNAVAILABLE,
         actionHint: 'install-local-model',
-        message: 'Selected local model is unavailable.',
+        message: worldStudioMessage('notice.localModelUnavailable', 'Selected local model is unavailable.'),
       };
     }
     if (String(matchedModel.status || '').trim() === 'unhealthy') {
@@ -58,14 +59,14 @@ export function evaluateRouteBindingReadiness(
         ready: false,
         reasonCode: ReasonCode.WORLD_STUDIO_LOCAL_MODEL_UNHEALTHY,
         actionHint: 'install-local-model',
-        message: 'Selected local model is unhealthy.',
+        message: worldStudioMessage('notice.localModelUnhealthy', 'Selected local model is unhealthy.'),
       };
     }
     return {
       ready: true,
       reasonCode: ReasonCode.WORLD_STUDIO_ROUTE_READY,
       actionHint: 'none',
-      message: 'Local route is ready.',
+      message: worldStudioMessage('notice.localRouteReady', 'Local route is ready.'),
     };
   }
 
@@ -74,7 +75,7 @@ export function evaluateRouteBindingReadiness(
       ready: false,
       reasonCode: ReasonCode.WORLD_STUDIO_TOKEN_ROUTE_INCOMPLETE,
       actionHint: 'select-connector',
-      message: 'Cloud route requires connector and model.',
+      message: worldStudioMessage('notice.cloudRouteIncomplete', 'Cloud route requires connector and model.'),
     };
   }
   if (!routeOptions) {
@@ -82,7 +83,7 @@ export function evaluateRouteBindingReadiness(
       ready: true,
       reasonCode: ReasonCode.WORLD_STUDIO_ROUTE_READY,
       actionHint: 'none',
-      message: 'Cloud route is ready.',
+      message: worldStudioMessage('notice.cloudRouteReady', 'Cloud route is ready.'),
     };
   }
 
@@ -92,7 +93,7 @@ export function evaluateRouteBindingReadiness(
       ready: false,
       reasonCode: ReasonCode.WORLD_STUDIO_CONNECTOR_MISSING,
       actionHint: 'select-connector',
-      message: 'Selected Cloud connector is missing.',
+      message: worldStudioMessage('notice.cloudConnectorMissing', 'Selected Cloud connector is missing.'),
     };
   }
   if (connector.models.length === 0 || connector.models.includes(binding.model)) {
@@ -100,14 +101,14 @@ export function evaluateRouteBindingReadiness(
       ready: true,
       reasonCode: ReasonCode.WORLD_STUDIO_ROUTE_READY,
       actionHint: 'none',
-      message: 'Cloud route is ready.',
+      message: worldStudioMessage('notice.cloudRouteReady', 'Cloud route is ready.'),
     };
   }
   return {
     ready: false,
     reasonCode: ReasonCode.WORLD_STUDIO_TOKEN_MODEL_UNAVAILABLE,
     actionHint: 'select-model',
-    message: 'Selected Cloud model is unavailable on connector.',
+    message: worldStudioMessage('notice.cloudModelUnavailable', 'Selected Cloud model is unavailable on connector.'),
   };
 }
 
@@ -139,7 +140,7 @@ export function evaluateEmbeddingReadiness(input: {
       healthy: true,
       reasonCode: ReasonCode.WORLD_STUDIO_EMBEDDING_NOT_REQUIRED,
       actionHint: 'none',
-      message: 'No lorebooks available for embedding index.',
+      message: worldStudioMessage('notice.embeddingNotRequired', 'No lorebooks available for embedding index.'),
     };
   }
 
@@ -163,7 +164,7 @@ export function evaluateEmbeddingReadiness(input: {
       healthy: true,
       reasonCode: ReasonCode.WORLD_STUDIO_EMBEDDING_BUILDING,
       actionHint: 'none',
-      message: 'Embedding index is building.',
+      message: worldStudioMessage('notice.embeddingBuilding', 'Embedding index is building.'),
     };
   }
   if (embeddingIndex.status === 'ready' && entryCount > 0) {
@@ -171,7 +172,7 @@ export function evaluateEmbeddingReadiness(input: {
       healthy: true,
       reasonCode: ReasonCode.WORLD_STUDIO_EMBEDDING_READY,
       actionHint: 'none',
-      message: 'Embedding index is ready.',
+      message: worldStudioMessage('notice.embeddingReady', 'Embedding index is ready.'),
     };
   }
   if (embeddingIndex.status === 'failed') {
@@ -179,13 +180,13 @@ export function evaluateEmbeddingReadiness(input: {
       healthy: false,
       reasonCode: ReasonCode.WORLD_STUDIO_EMBEDDING_BUILD_FAILED,
       actionHint: 'retry',
-      message: embeddingIndex.errorMessage || 'Embedding index build failed.',
+      message: embeddingIndex.errorMessage || worldStudioMessage('notice.embeddingFailed', 'Embedding index build failed.'),
     };
   }
   return {
     healthy: false,
     reasonCode: ReasonCode.WORLD_STUDIO_EMBEDDING_NOT_BUILT,
     actionHint: 'retry',
-    message: 'Embedding index is not built yet.',
+    message: worldStudioMessage('notice.embeddingNotBuilt', 'Embedding index is not built yet.'),
   };
 }

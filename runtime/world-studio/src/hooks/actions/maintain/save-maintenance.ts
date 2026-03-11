@@ -1,5 +1,6 @@
 import { asRecord } from '@nimiplatform/sdk/mod/utils';
 import { emitWorldStudioLog } from '../../../logging.js';
+import { worldStudioMessage } from '../../../i18n/messages.js';
 import { validateWorldviewPatchInput } from '../../../services/snapshot-normalize.js';
 import type { WorldStudioMaintainActionContext, WorldStudioMaintainActionPayload } from './types.js';
 
@@ -11,13 +12,13 @@ export async function saveMaintenance(
 
   const started = context.taskController.startTask({
     kind: 'MAINTAIN_SAVE',
-    label: 'Save maintenance',
+    label: worldStudioMessage('task.saveMaintenanceLabel', 'Save maintenance'),
     atomic: true,
     resumable: false,
     canPause: false,
     canCancel: false,
     step: 'MAINTAIN',
-    message: 'Saving maintenance changes',
+    message: worldStudioMessage('task.savingMaintenanceChanges', 'Saving maintenance changes'),
   });
   if (!started) {
     context.setError('WORLD_STUDIO_TASK_CONFLICT: another task is running.');
@@ -53,9 +54,12 @@ export async function saveMaintenance(
         worldview: false,
       },
     });
-    context.setNotice('Maintenance update applied.');
-    context.setStatusBanner({ kind: 'success', message: 'Maintenance saved' });
-    context.taskController.completeTask(started.taskId, 'Maintenance saved');
+    context.setNotice(worldStudioMessage('notice.maintenanceApplied', 'Maintenance update applied.'));
+    context.setStatusBanner({
+      kind: 'success',
+      message: worldStudioMessage('banner.maintenanceSaved', 'Maintenance saved'),
+    });
+    context.taskController.completeTask(started.taskId, worldStudioMessage('task.maintenanceSaved', 'Maintenance saved'));
     emitWorldStudioLog({
       level: 'info',
       message: 'world-studio:ui:maintenance-saved',

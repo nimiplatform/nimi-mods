@@ -1,5 +1,6 @@
 import { asRecord } from '@nimiplatform/sdk/mod/utils';
 import type { EventNodeDraft } from '../../../contracts.js';
+import { worldStudioMessage } from '../../../i18n/messages.js';
 import type { WorldStudioMaintainActionContext } from './types.js';
 
 export async function deleteFirstEvent(context: WorldStudioMaintainActionContext) {
@@ -10,7 +11,7 @@ export async function deleteFirstEvent(context: WorldStudioMaintainActionContext
     const events = context.eventsGraph;
     const firstEventId = String(events.primary[0]?.id || events.secondary[0]?.id || '').trim();
     if (!firstEventId) {
-      throw new Error('No event id found in events payload.');
+      throw new Error(worldStudioMessage('error.noEventIdFound', 'No event id found in events payload.'));
     }
     const data = asRecord(await context.mutations.deleteEventMutation.mutateAsync({
       worldId: context.selectedWorldId,
@@ -37,7 +38,10 @@ export async function deleteFirstEvent(context: WorldStudioMaintainActionContext
         events: false,
       },
     });
-    context.setStatusBanner({ kind: 'info', message: `Event ${firstEventId} deleted` });
+    context.setStatusBanner({
+      kind: 'info',
+      message: worldStudioMessage('banner.eventDeleted', 'Event {{eventId}} deleted', { eventId: firstEventId }),
+    });
     await context.queries.mutationsQuery.refetch();
   } catch (deleteError) {
     context.setError(deleteError instanceof Error ? deleteError.message : String(deleteError));

@@ -5,6 +5,7 @@ import {
   summarizePrimaryEvidenceCoverage,
 } from '../../../engine/primary-evidence.js';
 import { deriveCharacterCandidates, deriveStartTimeOptions } from '../../../generation/phase1/derived-options.js';
+import { worldStudioMessage } from '../../../i18n/messages.js';
 import { emitWorldStudioLog } from '../../../logging.js';
 import { runPhase2DraftGeneration } from '../../../generation/pipeline.js';
 import { buildWorldStudioEmbeddingIndex } from '../../../services/embedding-index.js';
@@ -93,13 +94,15 @@ export async function runRebuildEmbeddingIndex(input: WorldStudioCreateActionsIn
   if (result.ok) {
     input.setStatusBanner({
       kind: 'success',
-      message: `Embedding index rebuilt: ${result.entryCount} entries`,
+      message: worldStudioMessage('banner.embeddingRebuilt', 'Embedding index rebuilt: {{entryCount}} entries', {
+        entryCount: result.entryCount,
+      }),
     });
     return;
   }
   input.setStatusBanner({
     kind: 'warn',
-    message: result.embeddingIndex.errorMessage || 'Embedding index rebuild failed',
+    message: result.embeddingIndex.errorMessage || worldStudioMessage('notice.embeddingFailed', 'Embedding index build failed.'),
   });
 }
 
@@ -283,7 +286,10 @@ export async function runCreatePhase2(
   let taskId = '';
   let abortSignal: AbortSignal | undefined;
   if (resumeTask) {
-    const resumed = input.taskController.resumeTask(resumeTask.id, 'Resuming synthesize task');
+    const resumed = input.taskController.resumeTask(
+      resumeTask.id,
+      worldStudioMessage('task.resumingSynthesize', 'Resuming synthesize task'),
+    );
     if (!resumed) {
       input.setError('WORLD_STUDIO_TASK_RESUME_FAILED: synthesize task cannot resume.');
       return;
@@ -294,13 +300,13 @@ export async function runCreatePhase2(
   } else {
     const started = input.taskController.startTask({
       kind: 'CREATE_PHASE2',
-      label: 'Synthesize world draft',
+      label: worldStudioMessage('task.synthesizeDraftLabel', 'Synthesize world draft'),
       atomic: false,
       resumable: false,
       canPause: false,
       canCancel: true,
       step: 'SYNTHESIZE',
-      message: 'Synthesize started',
+      message: worldStudioMessage('task.synthesizeStarted', 'Synthesize started'),
     });
     if (!started) {
       input.setError('WORLD_STUDIO_TASK_CONFLICT: another task is running.');
@@ -325,7 +331,7 @@ export async function runCreatePhase2(
   input.setCreateStep('SYNTHESIZE');
   input.taskController.updateTask(taskId, {
     progress: Math.max(0.9, input.snapshot.parseJob.progress),
-    message: 'Generating publish-ready draft',
+    message: worldStudioMessage('task.generatingPublishReadyDraft', 'Generating publish-ready draft'),
   });
   input.taskController.setCheckpoint(taskId, {
     step: 'SYNTHESIZE',
@@ -506,13 +512,23 @@ export async function runCreatePhase2(
         : 0,
     });
     if (missingDnaCharacters.length > 0) {
-      input.setNotice(`Synthesize completed, but missing DNA for: ${missingDnaCharacters.join(', ')}`);
-      input.setStatusBanner({ kind: 'warn', message: 'Synthesize completed with DNA gaps' });
+      input.setNotice(worldStudioMessage(
+        'notice.synthesizeCompletedMissingDna',
+        'Synthesize completed, but missing DNA for: {{characters}}',
+        { characters: missingDnaCharacters.join(', ') },
+      ));
+      input.setStatusBanner({
+        kind: 'warn',
+        message: worldStudioMessage('banner.synthesizeCompletedWithDnaGaps', 'Synthesize completed with DNA gaps'),
+      });
     } else {
-      input.setNotice('Synthesize completed. Draft editor is ready.');
-      input.setStatusBanner({ kind: 'success', message: 'Synthesize completed' });
+      input.setNotice(worldStudioMessage('notice.synthesizeCompletedReady', 'Synthesize completed. Draft editor is ready.'));
+      input.setStatusBanner({
+        kind: 'success',
+        message: worldStudioMessage('banner.synthesizeCompleted', 'Synthesize completed'),
+      });
     }
-    input.taskController.completeTask(taskId, 'Synthesize completed');
+    input.taskController.completeTask(taskId, worldStudioMessage('task.synthesizeCompleted', 'Synthesize completed'));
     diagLog('Phase2 COMPLETE', { taskId });
 
     void rebuildEmbeddingIndex(input, Array.isArray(result.worldLorebooks)
@@ -520,7 +536,11 @@ export async function runCreatePhase2(
       : undefined)
       .then((embeddingResult) => {
         if (!embeddingResult.ok) {
-          input.setNotice(`Embedding index needs attention: ${embeddingResult.embeddingIndex.errorMessage || 'build failed'}`);
+          input.setNotice(worldStudioMessage(
+            'notice.embeddingNeedsAttention',
+            'Embedding index needs attention: {{detail}}',
+            { detail: embeddingResult.embeddingIndex.errorMessage || 'build failed' },
+          ));
         }
       })
       .catch((error) => {
@@ -540,9 +560,12 @@ export async function runCreatePhase2(
           updatedAt: new Date().toISOString(),
         },
       });
-      input.taskController.cancelTask(taskId, 'Synthesize canceled');
-      input.setNotice('Synthesize canceled.');
-      input.setStatusBanner({ kind: 'warn', message: 'Synthesize canceled' });
+      input.taskController.cancelTask(taskId, worldStudioMessage('task.synthesizeCanceled', 'Synthesize canceled'));
+      input.setNotice(worldStudioMessage('notice.synthesizeCanceled', 'Synthesize canceled.'));
+      input.setStatusBanner({
+        kind: 'warn',
+        message: worldStudioMessage('banner.synthesizeCanceled', 'Synthesize canceled'),
+      });
       diagLog('Phase2 canceled', {
         taskId,
         reason: runError instanceof Error ? runError.message : String(runError || ''),

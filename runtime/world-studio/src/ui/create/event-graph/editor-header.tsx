@@ -1,4 +1,5 @@
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 
 type MissingDependencySample = {
   eventId: string;
@@ -26,6 +27,7 @@ type EventGraphEditorHeaderProps = {
 };
 
 export function EventGraphEditorHeader(props: EventGraphEditorHeaderProps) {
+  const { t } = useModTranslation('world-studio');
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -37,7 +39,7 @@ export function EventGraphEditorHeader(props: EventGraphEditorHeaderProps) {
               className="ui-sync-btn ui-sync-btn-secondary rounded border border-gray-300 bg-white px-2 py-1 text-xs font-semibold text-gray-700"
               onClick={props.onAddPrimary}
             >
-              Add Primary Event
+              {t('eventGraphEditor.addPrimaryEvent')}
             </button>
             <button
               type="button"
@@ -45,34 +47,34 @@ export function EventGraphEditorHeader(props: EventGraphEditorHeaderProps) {
               disabled={!props.canAddSecondary}
               onClick={props.onAddSecondary}
             >
-              Add Secondary Event
+              {t('eventGraphEditor.addSecondaryEvent')}
             </button>
           </div>
         ) : null}
       </div>
       <div className="mt-2 grid gap-2 sm:grid-cols-4">
         <div className="ui-sync-metric-card px-2.5 py-2">
-          <p className="text-[11px] uppercase tracking-wide text-gray-500">PRIMARY</p>
+          <p className="text-[11px] uppercase tracking-wide text-gray-500">{t('eventGraphEditor.primary')}</p>
           <p className="mt-1 text-sm font-semibold text-gray-900">{props.primaryCount}</p>
         </div>
         <div className="ui-sync-metric-card px-2.5 py-2">
-          <p className="text-[11px] uppercase tracking-wide text-gray-500">SECONDARY</p>
+          <p className="text-[11px] uppercase tracking-wide text-gray-500">{t('eventGraphEditor.secondary')}</p>
           <p className="mt-1 text-sm font-semibold text-gray-900">{props.secondaryCount}</p>
         </div>
         <div className="ui-sync-metric-card px-2.5 py-2">
-          <p className="text-[11px] uppercase tracking-wide text-gray-500">PRIMARY MISSING EVIDENCE</p>
+          <p className="text-[11px] uppercase tracking-wide text-gray-500">{t('eventGraphEditor.primaryMissingEvidence')}</p>
           <p className={`mt-1 text-sm font-semibold ${props.missingEvidencePrimaryCount > 0 ? 'text-red-700' : 'text-emerald-700'}`}>
             {props.missingEvidencePrimaryCount}
           </p>
         </div>
         <div className="ui-sync-metric-card px-2.5 py-2">
-          <p className="text-[11px] uppercase tracking-wide text-gray-500">SELECTED</p>
+          <p className="text-[11px] uppercase tracking-wide text-gray-500">{t('eventGraphEditor.selected')}</p>
           <p className="mt-1 truncate text-sm font-semibold text-gray-900">{props.selectedTitle || '-'}</p>
         </div>
       </div>
       {!props.readonly ? (
         <div className="ui-sync-toolbar mt-3 p-2.5">
-          <p className="text-xs font-semibold text-gray-700">Batch Repair</p>
+          <p className="text-xs font-semibold text-gray-700">{t('eventGraphEditor.batchRepair')}</p>
           <div className="mt-2 flex flex-wrap gap-2">
             <button
               type="button"
@@ -80,7 +82,7 @@ export function EventGraphEditorHeader(props: EventGraphEditorHeaderProps) {
               onClick={props.onApplyEvidenceTemplate}
               disabled={props.missingEvidencePrimaryCount === 0}
             >
-              Fill Missing Primary Evidence
+              {t('eventGraphEditor.fillMissingEvidence')}
             </button>
             <button
               type="button"
@@ -88,7 +90,7 @@ export function EventGraphEditorHeader(props: EventGraphEditorHeaderProps) {
               onClick={props.onRepairSecondaryParents}
               disabled={!props.canRepairSecondaryParents}
             >
-              Repair Secondary Parent Links
+              {t('eventGraphEditor.repairSecondaryParents')}
             </button>
             <button
               type="button"
@@ -96,7 +98,7 @@ export function EventGraphEditorHeader(props: EventGraphEditorHeaderProps) {
               onClick={props.onPruneInvalidDependencies}
               disabled={!props.canPruneInvalidDependencies}
             >
-              Prune Invalid Items + Break Cycles
+              {t('eventGraphEditor.pruneInvalidDependencies')}
             </button>
           </div>
         </div>
@@ -113,7 +115,7 @@ export function EventGraphEditorHeader(props: EventGraphEditorHeaderProps) {
             props.diagnosticsHasIssues ? 'text-amber-700' : 'text-emerald-700'
           }`}
         >
-          Event Graph Diagnostics {props.diagnosticsHasIssues ? '· Action Required' : '· Healthy'}
+          {t('eventGraphEditor.diagnostics')} {props.diagnosticsHasIssues ? `· ${t('eventGraphEditor.actionRequired')}` : `· ${t('eventGraphEditor.healthy')}`}
         </p>
         {props.diagnosticsHasIssues ? (
           <div className="mt-1 space-y-1">
@@ -124,15 +126,16 @@ export function EventGraphEditorHeader(props: EventGraphEditorHeaderProps) {
             ))}
             {props.missingDependencySample ? (
               <p className="text-[11px] text-amber-700">
-                Missing Dependency Sample: {props.missingDependencySample.eventId}
-                {' -> '}
-                {props.missingDependencySample.dependencyId}
+                {t('eventGraphEditor.missingDependencySample', {
+                  eventId: props.missingDependencySample.eventId,
+                  dependencyId: props.missingDependencySample.dependencyId,
+                })}
               </p>
             ) : null}
           </div>
         ) : (
           <p className="mt-1 text-[11px] text-emerald-700">
-            Dependency graph, parent links, and primary evidence are all valid.
+            {t('eventGraphEditor.healthyHint')}
           </p>
         )}
       </div>

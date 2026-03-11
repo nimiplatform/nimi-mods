@@ -1,4 +1,5 @@
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { EvidenceRefDraft } from '../../contracts.js';
 
 type EvidenceEditorProps = {
@@ -28,28 +29,29 @@ function extractContextPreview(contextText: string, start: number, end: number):
 }
 
 export function EvidenceEditor(props: EvidenceEditorProps) {
+  const { t } = useModTranslation('world-studio');
   const missingRequired = Boolean(props.required) && props.value.length === 0;
 
   return (
     <div className="ui-sync-soft-card p-2.5">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-semibold text-gray-800">
-          Evidence Refs
+          {t('evidenceEditor.title')}
         </p>
         <button
           type="button"
           className="ui-sync-btn ui-sync-btn-secondary rounded border border-gray-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-gray-700"
           onClick={() => props.onChange([...props.value, createEmptyEvidence()])}
         >
-          Add Evidence
+          {t('evidenceEditor.addEvidence')}
         </button>
       </div>
       {missingRequired ? (
-        <p className="ui-sync-alert ui-sync-alert-danger mt-1 px-2 py-1 text-[11px] text-red-700">Primary event requires at least 1 evidence ref.</p>
+        <p className="ui-sync-alert ui-sync-alert-danger mt-1 px-2 py-1 text-[11px] text-red-700">{t('evidenceEditor.requiredHint')}</p>
       ) : null}
       <div className="mt-2 space-y-2">
         {props.value.length === 0 ? (
-          <p className="text-[11px] text-gray-500">No evidence refs yet.</p>
+          <p className="text-[11px] text-gray-500">{t('evidenceEditor.empty')}</p>
         ) : props.value.map((item, index) => (
           <div key={`evidence-${index}`} className="ui-sync-card p-2">
             {props.contextText ? (
@@ -73,14 +75,14 @@ export function EvidenceEditor(props: EvidenceEditorProps) {
                       props.onChange(next);
                     }}
                   >
-                    Locate Excerpt
+                    {t('evidenceEditor.locateExcerpt')}
                   </button>
                   <p className="text-[10px] text-gray-600">
                     {item.excerpt.trim()
                       ? (props.contextText.indexOf(item.excerpt.trim()) >= 0
-                        ? `found @ ${props.contextText.indexOf(item.excerpt.trim())}`
-                        : 'not found in current source')
-                      : 'excerpt is empty'}
+                        ? t('evidenceEditor.excerptFoundAt', { index: props.contextText.indexOf(item.excerpt.trim()) })
+                        : t('evidenceEditor.excerptNotFound'))
+                      : t('evidenceEditor.excerptEmpty')}
                   </p>
                 </div>
                 {Number.isFinite(item.offsetStart)
@@ -96,7 +98,7 @@ export function EvidenceEditor(props: EvidenceEditorProps) {
             ) : null}
             <div className="grid gap-2 lg:grid-cols-2">
               <label className="text-[11px] text-gray-700">
-                <span className="mb-0.5 block">segmentId</span>
+                <span className="mb-0.5 block">{t('evidenceEditor.segmentId')}</span>
                 <input
                   className="h-8 w-full rounded border border-gray-300 px-2 text-[11px]"
                   value={item.segmentId}
@@ -108,7 +110,7 @@ export function EvidenceEditor(props: EvidenceEditorProps) {
                 />
               </label>
               <label className="text-[11px] text-gray-700">
-                <span className="mb-0.5 block">sourceType</span>
+                <span className="mb-0.5 block">{t('evidenceEditor.sourceType')}</span>
                 <select
                   className="h-8 w-full rounded border border-gray-300 px-2 text-[11px]"
                   value={item.sourceType}
@@ -128,7 +130,7 @@ export function EvidenceEditor(props: EvidenceEditorProps) {
               </label>
             </div>
             <label className="mt-2 block text-[11px] text-gray-700">
-              <span className="mb-0.5 block">excerpt</span>
+              <span className="mb-0.5 block">{t('evidenceEditor.excerpt')}</span>
               <textarea
                 className="h-16 w-full rounded border border-gray-300 p-1.5 text-[11px]"
                 value={item.excerpt}
@@ -141,7 +143,7 @@ export function EvidenceEditor(props: EvidenceEditorProps) {
             </label>
             <div className="mt-2 grid gap-2 lg:grid-cols-3">
               <label className="text-[11px] text-gray-700">
-                <span className="mb-0.5 block">offsetStart</span>
+                <span className="mb-0.5 block">{t('evidenceEditor.offsetStart')}</span>
                 <input
                   type="number"
                   className="h-8 w-full rounded border border-gray-300 px-2 text-[11px]"
@@ -157,7 +159,7 @@ export function EvidenceEditor(props: EvidenceEditorProps) {
                 />
               </label>
               <label className="text-[11px] text-gray-700">
-                <span className="mb-0.5 block">offsetEnd</span>
+                <span className="mb-0.5 block">{t('evidenceEditor.offsetEnd')}</span>
                 <input
                   type="number"
                   className="h-8 w-full rounded border border-gray-300 px-2 text-[11px]"
@@ -173,7 +175,7 @@ export function EvidenceEditor(props: EvidenceEditorProps) {
                 />
               </label>
               <label className="text-[11px] text-gray-700">
-                <span className="mb-0.5 block">confidence</span>
+                <span className="mb-0.5 block">{t('evidenceEditor.confidence')}</span>
                 <input
                   type="number"
                   min={0}
@@ -201,7 +203,7 @@ export function EvidenceEditor(props: EvidenceEditorProps) {
                 props.onChange(next);
               }}
             >
-              Delete
+              {t('evidenceEditor.delete')}
             </button>
           </div>
         ))}

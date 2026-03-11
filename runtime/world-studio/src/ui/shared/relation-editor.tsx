@@ -1,4 +1,5 @@
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 
 type RelationEditorProps = {
   label: string;
@@ -12,6 +13,7 @@ function normalizeList(value: string[]): string[] {
 }
 
 export function RelationEditor(props: RelationEditorProps) {
+  const { t } = useModTranslation('world-studio');
   const text = props.value.join(', ');
   return (
     <label className="block text-xs text-gray-700">
@@ -19,7 +21,7 @@ export function RelationEditor(props: RelationEditorProps) {
       <input
         className="h-9 w-full rounded-md border border-gray-300 px-2 text-xs text-gray-900"
         value={text}
-        placeholder={props.placeholder || 'Comma separated'}
+        placeholder={props.placeholder || t('shared.commaSeparated')}
         onChange={(event) => {
           const next = normalizeList(event.target.value.split(','));
           props.onChange(next);

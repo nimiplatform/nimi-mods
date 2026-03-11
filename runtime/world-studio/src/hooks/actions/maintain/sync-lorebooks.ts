@@ -1,4 +1,5 @@
 import { asRecord } from '@nimiplatform/sdk/mod/utils';
+import { worldStudioMessage } from '../../../i18n/messages.js';
 import { validateLorebooksInput } from '../../../services/snapshot-normalize.js';
 import type { WorldStudioMaintainActionContext, WorldStudioMaintainActionPayload } from './types.js';
 
@@ -10,13 +11,13 @@ export async function syncLorebooks(
 
   const started = context.taskController.startTask({
     kind: 'MAINTAIN_SYNC_LOREBOOKS',
-    label: 'Sync lorebooks',
+    label: worldStudioMessage('task.syncLorebooksLabel', 'Sync lorebooks'),
     atomic: false,
     resumable: false,
     canPause: false,
     canCancel: true,
     step: 'MAINTAIN',
-    message: 'Syncing lorebooks',
+    message: worldStudioMessage('task.syncingLorebooks', 'Syncing lorebooks'),
   });
   if (!started) {
     context.setError('WORLD_STUDIO_TASK_CONFLICT: another task is running.');
@@ -33,13 +34,13 @@ export async function syncLorebooks(
       return;
     }
     if (context.taskController.shouldCancel(started.taskId)) {
-      context.taskController.cancelTask(started.taskId, 'Lorebooks sync canceled');
-      context.setNotice('Lorebooks sync canceled.');
+      context.taskController.cancelTask(started.taskId, worldStudioMessage('task.lorebooksSyncCanceled', 'Lorebooks sync canceled'));
+      context.setNotice(worldStudioMessage('notice.lorebooksSyncCanceled', 'Lorebooks sync canceled.'));
       return;
     }
     context.taskController.updateTask(started.taskId, {
       canCancel: false,
-      message: 'Submitting lorebooks sync',
+      message: worldStudioMessage('task.submittingLorebooksSync', 'Submitting lorebooks sync'),
       progress: 0.2,
     });
     await context.mutations.syncLorebooksMutation.mutateAsync({
@@ -55,8 +56,14 @@ export async function syncLorebooks(
         lorebooks: false,
       },
     });
-    context.setStatusBanner({ kind: 'success', message: 'Lorebooks synchronized' });
-    context.taskController.completeTask(started.taskId, 'Lorebooks synchronized');
+    context.setStatusBanner({
+      kind: 'success',
+      message: worldStudioMessage('banner.lorebooksSynchronized', 'Lorebooks synchronized'),
+    });
+    context.taskController.completeTask(
+      started.taskId,
+      worldStudioMessage('task.lorebooksSynchronized', 'Lorebooks synchronized'),
+    );
     await Promise.all([
       context.queries.lorebooksQuery.refetch(),
       context.queries.mutationsQuery.refetch(),

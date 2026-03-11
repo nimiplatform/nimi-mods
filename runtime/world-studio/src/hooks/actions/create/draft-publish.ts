@@ -9,6 +9,7 @@ import {
   normalizeDnaSecondaryTraits,
 } from '../../../services/agent-dna-traits.js';
 import { emitWorldStudioLog } from '../../../logging.js';
+import { worldStudioMessage } from '../../../i18n/messages.js';
 import type { WorldStudioCreateActionsInput } from './types.js';
 
 type DraftTaskOptions = {
@@ -85,13 +86,13 @@ export async function saveWorldDraft(
 ): Promise<void> {
   const started = input.taskController.startTask({
     kind: 'CREATE_SAVE_DRAFT',
-    label: 'Save draft',
+    label: worldStudioMessage('task.saveDraftLabel', 'Save draft'),
     atomic: true,
     resumable: false,
     canPause: false,
     canCancel: false,
     step: 'DRAFT',
-    message: 'Saving draft',
+    message: worldStudioMessage('task.savingDraft', 'Saving draft'),
   });
   if (!started) {
     input.setError('WORLD_STUDIO_TASK_CONFLICT: another task is running.');
@@ -181,9 +182,15 @@ export async function saveWorldDraft(
       },
     });
     input.setCreateStep('PUBLISH');
-    input.setNotice(`Draft ${draftId} saved.`);
-    input.setStatusBanner({ kind: 'success', message: `Draft ${draftId} saved` });
-    input.taskController.completeTask(started.taskId, `Draft ${draftId} saved`);
+    input.setNotice(worldStudioMessage('notice.draftSaved', 'Draft {{draftId}} saved.', { draftId }));
+    input.setStatusBanner({
+      kind: 'success',
+      message: worldStudioMessage('banner.draftSaved', 'Draft {{draftId}} saved', { draftId }),
+    });
+    input.taskController.completeTask(
+      started.taskId,
+      worldStudioMessage('task.draftSaved', 'Draft {{draftId}} saved', { draftId }),
+    );
     emitWorldStudioLog({
       level: 'info',
       message: 'world-studio:ui:draft-autosave',
@@ -207,18 +214,18 @@ export async function publishWorldDraft(
 ): Promise<void> {
   if (!input.selectedDraftId) {
     diagLog('publishWorldDraft ABORTED: no selectedDraftId');
-    input.setError('Please save draft before publishing.');
+    input.setError(worldStudioMessage('notice.publishSaveDraftFirst', 'Please save draft before publishing.'));
     return;
   }
   const started = input.taskController.startTask({
     kind: 'CREATE_PUBLISH_DRAFT',
-    label: 'Publish world draft',
+    label: worldStudioMessage('task.publishWorldDraftLabel', 'Publish world draft'),
     atomic: true,
     resumable: false,
     canPause: false,
     canCancel: false,
     step: 'PUBLISH',
-    message: 'Publishing world draft',
+    message: worldStudioMessage('task.publishingWorldDraft', 'Publishing world draft'),
   });
   if (!started) {
     diagLog('publishWorldDraft ABORTED: task conflict');
@@ -491,7 +498,18 @@ export async function publishWorldDraft(
 
       const createdCount = Array.isArray(syncResult.created) ? syncResult.created.length : 0;
       const failedCount = Array.isArray(syncResult.failed) ? syncResult.failed.length : 0;
-      syncNotice = ` Agent sync: ${createdCount}/${items.length} created${failedCount > 0 ? `, ${failedCount} failed` : ''}.`;
+      const failedSuffix = failedCount > 0
+        ? worldStudioMessage('notice.agentSyncFailedSuffix', ', {{failedCount}} failed', { failedCount })
+        : '';
+      syncNotice = worldStudioMessage(
+        'notice.agentSyncSummary',
+        ' Agent sync: {{createdCount}}/{{totalCount}} created{{failedSuffix}}.',
+        {
+          createdCount,
+          totalCount: items.length,
+          failedSuffix,
+        },
+      );
     } else {
       diagLog('agent sync SKIPPED: syncCharacters is empty');
     }
@@ -578,9 +596,19 @@ export async function publishWorldDraft(
     });
     input.setLanding({ target: 'MAINTAIN', worldId, reason: null });
     input.patchPanel({ selectedWorldId: worldId });
-    input.setNotice(`Draft published to world ${worldId}.${syncNotice}`);
-    input.setStatusBanner({ kind: 'success', message: `World published: ${worldId}` });
-    input.taskController.completeTask(started.taskId, `World published: ${worldId}`);
+    input.setNotice(worldStudioMessage(
+      'notice.draftPublishedToWorld',
+      'Draft published to world {{worldId}}.{{syncNotice}}',
+      { worldId, syncNotice },
+    ));
+    input.setStatusBanner({
+      kind: 'success',
+      message: worldStudioMessage('banner.worldPublished', 'World published: {{worldId}}', { worldId }),
+    });
+    input.taskController.completeTask(
+      started.taskId,
+      worldStudioMessage('task.worldPublished', 'World published: {{worldId}}', { worldId }),
+    );
 
     diagLog('publishWorldDraft COMPLETE', { worldId, syncNotice });
 
@@ -621,7 +649,11 @@ export async function publishWorldDraft(
     ].filter(Boolean).join(' | ');
     input.setError(`${structuredError}: ${errorMessage}`);
     if (isBackend500) {
-      input.setNotice(`Publish request reached backend but failed (HTTP 500). Draft ${input.selectedDraftId} is still saved.`);
+      input.setNotice(worldStudioMessage(
+        'notice.publishBackendFailedDraftSaved',
+        'Publish request reached backend but failed (HTTP 500). Draft {{draftId}} is still saved.',
+        { draftId: input.selectedDraftId || '' },
+      ));
     }
   }
 }

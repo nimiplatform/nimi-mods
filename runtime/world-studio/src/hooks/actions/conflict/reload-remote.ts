@@ -1,5 +1,6 @@
 import { asRecord } from '@nimiplatform/sdk/mod/utils';
 import { formatConflictReloadSummary } from '../../../ui/status-summary.js';
+import { worldStudioMessage } from '../../../i18n/messages.js';
 import type {
   EventNodeDraft,
   WorldLorebookDraftRow,
@@ -22,7 +23,7 @@ export type WorldStudioConflictActionContext = {
 export async function reloadRemoteForConflict(context: WorldStudioConflictActionContext) {
   if (!context.selectedWorldId) {
     context.setConflictReloadSummary(null);
-    context.setNotice('Remote maintenance snapshot is unavailable.');
+    context.setNotice(worldStudioMessage('notice.remoteSnapshotUnavailable', 'Remote maintenance snapshot is unavailable.'));
     return;
   }
 
@@ -40,7 +41,7 @@ export async function reloadRemoteForConflict(context: WorldStudioConflictAction
   const world = asRecord(maintenancePayload.world);
   if (Object.keys(world).length === 0) {
     context.setConflictReloadSummary(null);
-    context.setNotice('Remote maintenance snapshot is unavailable.');
+    context.setNotice(worldStudioMessage('notice.remoteSnapshotUnavailable', 'Remote maintenance snapshot is unavailable.'));
     return;
   }
   const worldview = asRecord(maintenancePayload.worldview);
@@ -99,7 +100,10 @@ export async function reloadRemoteForConflict(context: WorldStudioConflictAction
   });
   context.setConflictReloadSummary(summary);
   context.setNotice(
-    `Reloaded remote maintenance snapshot and replaced local unsaved changes. `
-    + `${summary}.`,
+    worldStudioMessage(
+      'notice.reloadRemoteReplaced',
+      'Reloaded remote maintenance snapshot and replaced local unsaved changes. {{summary}}.',
+      { summary },
+    ),
   );
 }

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { EventNodeDraft } from '../../contracts.js';
 import {
   deriveNeedsEvidence,
@@ -15,6 +16,7 @@ type EventDetailDrawerProps = {
 };
 
 export function EventDetailDrawer(props: EventDetailDrawerProps) {
+  const { t } = useModTranslation('world-studio');
   const missingEvidence = isEvidenceRequiredForEvent(props.event) && props.event.evidenceRefs.length === 0;
   const autoEvidenceExcerpt = [
     props.event.summary,
@@ -57,19 +59,19 @@ export function EventDetailDrawer(props: EventDetailDrawerProps) {
     <aside className="ui-sync-card ui-sync-card-inset p-3">
       <div className="flex items-center justify-between gap-2">
         <h4 className="text-sm font-semibold text-gray-900">
-          Event Details
+          {t('eventDetail.title')}
         </h4>
         <button
           type="button"
           className="ui-sync-btn rounded border border-red-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-red-700"
           onClick={props.onDelete}
         >
-          Delete
+          {t('eventDetail.delete')}
         </button>
       </div>
       <div className="mt-2 grid gap-2 lg:grid-cols-3">
         <label className="text-xs text-gray-700">
-          <span className="mb-1 block font-medium">Level</span>
+          <span className="mb-1 block font-medium">{t('eventDetail.level')}</span>
           <select
             className="h-9 w-full rounded-md border border-gray-300 px-2 text-xs"
             value={props.event.level}
@@ -87,7 +89,7 @@ export function EventDetailDrawer(props: EventDetailDrawerProps) {
           </select>
         </label>
         <label className="text-xs text-gray-700">
-          <span className="mb-1 block font-medium">Horizon</span>
+          <span className="mb-1 block font-medium">{t('eventDetail.horizon')}</span>
           <select
             className="h-9 w-full rounded-md border border-gray-300 px-2 text-xs"
             value={props.event.eventHorizon}
@@ -113,7 +115,7 @@ export function EventDetailDrawer(props: EventDetailDrawerProps) {
           </select>
         </label>
         <label className="text-xs text-gray-700">
-          <span className="mb-1 block font-medium">Time Ref</span>
+          <span className="mb-1 block font-medium">{t('eventDetail.timeRef')}</span>
           <input
             className="h-9 w-full rounded-md border border-gray-300 px-2 text-xs"
             value={props.event.timeRef}
@@ -121,12 +123,12 @@ export function EventDetailDrawer(props: EventDetailDrawerProps) {
               ...props.event,
               timeRef: event.target.value,
             })}
-            placeholder="e.g. 2008-01 / era:crisis"
+            placeholder={t('eventDetail.timeRefPlaceholder')}
           />
         </label>
       </div>
       <label className="mt-2 block text-xs text-gray-700">
-        <span className="mb-1 block font-medium">Title</span>
+        <span className="mb-1 block font-medium">{t('eventDetail.titleField')}</span>
         <input
           className="h-9 w-full rounded-md border border-gray-300 px-2 text-xs"
           value={props.event.title}
@@ -137,7 +139,7 @@ export function EventDetailDrawer(props: EventDetailDrawerProps) {
         />
       </label>
       <label className="mt-2 block text-xs text-gray-700">
-        <span className="mb-1 block font-medium">Summary</span>
+        <span className="mb-1 block font-medium">{t('eventDetail.summary')}</span>
         <textarea
           className="h-16 w-full rounded-md border border-gray-300 p-2 text-xs"
           value={props.event.summary}
@@ -149,7 +151,7 @@ export function EventDetailDrawer(props: EventDetailDrawerProps) {
       </label>
       <div className="mt-2 grid gap-2">
         <label className="text-xs text-gray-700">
-          <span className="mb-1 block font-medium">Cause</span>
+          <span className="mb-1 block font-medium">{t('eventDetail.cause')}</span>
           <textarea
             className="h-14 w-full rounded-md border border-gray-300 p-2 text-xs"
             value={props.event.cause}
@@ -161,7 +163,7 @@ export function EventDetailDrawer(props: EventDetailDrawerProps) {
           />
         </label>
         <label className="text-xs text-gray-700">
-          <span className="mb-1 block font-medium">Process</span>
+          <span className="mb-1 block font-medium">{t('eventDetail.process')}</span>
           <textarea
             className="h-14 w-full rounded-md border border-gray-300 p-2 text-xs"
             value={props.event.process}
@@ -173,7 +175,7 @@ export function EventDetailDrawer(props: EventDetailDrawerProps) {
           />
         </label>
         <label className="text-xs text-gray-700">
-          <span className="mb-1 block font-medium">Result</span>
+          <span className="mb-1 block font-medium">{t('eventDetail.result')}</span>
           <textarea
             className="h-14 w-full rounded-md border border-gray-300 p-2 text-xs"
             value={props.event.result}
@@ -188,22 +190,22 @@ export function EventDetailDrawer(props: EventDetailDrawerProps) {
 
       <div className="mt-2 grid gap-2">
         <RelationEditor
-          label="Characters"
+          label={t('eventDetail.characters')}
           value={props.event.characterRefs}
           onChange={(next) => props.onChange({ ...props.event, characterRefs: next })}
-          placeholder="Ye Wenjie, Wang Miao"
+          placeholder={t('eventDetail.charactersPlaceholder')}
         />
         <RelationEditor
-          label="Locations"
+          label={t('eventDetail.locations')}
           value={props.event.locationRefs}
           onChange={(next) => props.onChange({ ...props.event, locationRefs: next })}
-          placeholder="Red Coast Base"
+          placeholder={t('eventDetail.locationsPlaceholder')}
         />
         <RelationEditor
-          label="Dependency Event IDs"
+          label={t('eventDetail.dependencyEventIds')}
           value={props.event.dependsOnEventIds}
           onChange={(next) => props.onChange({ ...props.event, dependsOnEventIds: next })}
-          placeholder="event-id-1, event-id-2"
+          placeholder={t('eventDetail.dependencyEventIdsPlaceholder')}
         />
       </div>
 
@@ -215,10 +217,10 @@ export function EventDetailDrawer(props: EventDetailDrawerProps) {
             disabled={!autoEvidenceExcerpt}
             onClick={appendAutoEvidence}
           >
-            Add Evidence from Event Text
+            {t('eventDetail.addEvidenceFromText')}
           </button>
           <p className="text-[11px] text-gray-500">
-            Quickly inject summary/cause/process/result as evidence.
+            {t('eventDetail.addEvidenceHint')}
           </p>
         </div>
         <EvidenceEditor
@@ -237,7 +239,7 @@ export function EventDetailDrawer(props: EventDetailDrawerProps) {
       </div>
       {missingEvidence ? (
         <p className="ui-sync-alert ui-sync-alert-danger mt-2 px-2 py-1 text-[11px] text-red-700">
-          PRIMARY events with `PAST` or `ONGOING` horizon require evidence refs.
+          {t('eventDetail.missingEvidence')}
         </p>
       ) : null}
     </aside>

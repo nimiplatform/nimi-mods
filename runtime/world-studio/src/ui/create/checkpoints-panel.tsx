@@ -1,4 +1,5 @@
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { Phase1Result } from '../../generation/pipeline.js';
 import type { EventNodeDraft } from '../../contracts.js';
 import { countPrimaryEventsMissingEvidence } from '../../services/event-horizon.js';
@@ -27,11 +28,12 @@ type CheckpointsPanelProps = {
 };
 
 export function CheckpointsPanel(props: CheckpointsPanelProps) {
+  const { t } = useModTranslation('world-studio');
   if (!props.phase1) {
     return (
       <section className="ui-sync-card ui-sync-card-inset p-4">
-        <h3 className="text-sm font-semibold text-gray-900">Checkpoints</h3>
-        <p className="mt-2 text-xs text-gray-500">Run Phase 1 first to unlock checkpoint selection.</p>
+        <h3 className="text-sm font-semibold text-gray-900">{t('checkpoints.title')}</h3>
+        <p className="mt-2 text-xs text-gray-500">{t('checkpoints.empty')}</p>
       </section>
     );
   }
@@ -47,18 +49,18 @@ export function CheckpointsPanel(props: CheckpointsPanelProps) {
     <div className="space-y-4">
       <section className="ui-sync-card ui-sync-card-inset p-4">
         <div className="flex items-start justify-between gap-3">
-          <h3 className="text-sm font-semibold text-gray-900">Checkpoints</h3>
+          <h3 className="text-sm font-semibold text-gray-900">{t('checkpoints.title')}</h3>
           <button
             type="button"
             className="ui-sync-btn ui-sync-btn-secondary rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 disabled:opacity-60"
             onClick={props.onRefreshQualityGate}
             disabled={props.working}
           >
-            Refresh Quality Gate
+            {t('checkpoints.refreshQualityGate')}
           </button>
         </div>
         <div className="mt-3">
-          <label className="text-xs font-medium text-gray-700">Checkpoint 1: Start Time</label>
+          <label className="text-xs font-medium text-gray-700">{t('checkpoints.startTime')}</label>
           <select
             className="mt-1 h-9 w-full rounded-md border border-gray-300 px-2 text-xs"
             value={props.selectedStartTimeId}
@@ -73,7 +75,7 @@ export function CheckpointsPanel(props: CheckpointsPanelProps) {
         </div>
 
         <div className="mt-3">
-          <label className="text-xs font-medium text-gray-700">Checkpoint 2: Character Selection</label>
+          <label className="text-xs font-medium text-gray-700">{t('checkpoints.characterSelection')}</label>
           <div className="ui-sync-soft-card mt-1 max-h-56 overflow-auto p-2">
             {props.phase1.characterCandidates.map((item) => {
               const checked = props.selectedCharacters.includes(item.name);
@@ -93,7 +95,7 @@ export function CheckpointsPanel(props: CheckpointsPanelProps) {
       </section>
 
       <EventGraphEditor
-        title="Checkpoint 3: Event Graph Editor"
+        title={t('checkpoints.eventGraphEditor')}
         events={props.events}
         sourceContextText={props.sourceText}
         onChange={props.onEventsChange}
@@ -104,9 +106,9 @@ export function CheckpointsPanel(props: CheckpointsPanelProps) {
       <section className="ui-sync-card ui-sync-card-inset p-4">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">Run Synthesis</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{t('checkpoints.runSynthesis')}</h3>
             <p className="mt-1 text-xs text-gray-600">
-              Requires a start time, selected characters, and complete non-future primary evidence.
+              {t('checkpoints.runSynthesisHint')}
             </p>
           </div>
           <button
@@ -115,17 +117,17 @@ export function CheckpointsPanel(props: CheckpointsPanelProps) {
             onClick={props.onRunPhase2}
             disabled={!canRunSynthesize}
           >
-            Run Synthesis
+            {t('checkpoints.runSynthesis')}
           </button>
         </div>
         {primaryMissingEvidence > 0 ? (
           <p className="ui-sync-alert ui-sync-alert-danger mt-2 px-2 py-1 text-xs text-red-700">
-            {primaryMissingEvidence} primary events are still missing evidence refs.
+            {t('checkpoints.primaryMissingEvidence', { count: primaryMissingEvidence })}
           </p>
         ) : null}
         {props.events.primary.length === 0 ? (
           <p className="ui-sync-alert ui-sync-alert-danger mt-2 px-2 py-1 text-xs text-red-700">
-            WORLD_STUDIO_EVENT_GRAPH_INVALID: at least one primary event is required.
+            {t('checkpoints.primaryRequired')}
           </p>
         ) : null}
       </section>

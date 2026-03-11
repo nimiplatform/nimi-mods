@@ -1,4 +1,5 @@
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import { KeyValueObjectEditor } from '../shared/key-value-object-editor.js';
 
 type WorldBasePanelProps = {
@@ -16,16 +17,17 @@ function updateWorld(
 }
 
 export function WorldBasePanel(props: WorldBasePanelProps) {
+  const { t } = useModTranslation('world-studio');
   const world = props.worldPatch || {};
   const worldPatchText = JSON.stringify(world, null, 2);
   return (
     <section className="ui-sync-card ui-sync-card-inset p-4">
-      <h3 className="text-sm font-semibold text-gray-900">World Base</h3>
-      <p className="mt-1 text-xs text-gray-500">Structured editor for core world settings.</p>
+      <h3 className="text-sm font-semibold text-gray-900">{t('worldBase.title')}</h3>
+      <p className="mt-1 text-xs text-gray-500">{t('worldBase.description')}</p>
 
       <div className="mt-3 grid gap-3 md:grid-cols-2">
         <label className="text-xs text-gray-700">
-          <span className="mb-1 block font-medium">Name</span>
+          <span className="mb-1 block font-medium">{t('worldBase.name')}</span>
           <input
             className="h-9 w-full rounded-md border border-gray-300 px-2 text-xs"
             value={String(world.name || '')}
@@ -35,7 +37,7 @@ export function WorldBasePanel(props: WorldBasePanelProps) {
           />
         </label>
         <label className="text-xs text-gray-700">
-          <span className="mb-1 block font-medium">Time Flow Ratio</span>
+          <span className="mb-1 block font-medium">{t('worldBase.timeFlowRatio')}</span>
           <input
             type="number"
             step="0.1"
@@ -49,7 +51,7 @@ export function WorldBasePanel(props: WorldBasePanelProps) {
       </div>
 
       <label className="mt-3 block text-xs text-gray-700">
-        <span className="mb-1 block font-medium">Description</span>
+        <span className="mb-1 block font-medium">{t('worldBase.descriptionField')}</span>
         <textarea
           className="h-20 w-full rounded-md border border-gray-300 p-2 text-xs"
           value={String(world.description || '')}
@@ -61,7 +63,7 @@ export function WorldBasePanel(props: WorldBasePanelProps) {
 
       <div className="ui-sync-soft-card mt-3 p-2.5">
         <KeyValueObjectEditor
-          label="rules"
+          label={t('worldBase.rules')}
           value={world.rules && typeof world.rules === 'object' && !Array.isArray(world.rules)
             ? (world.rules as Record<string, unknown>)
             : {}}
@@ -72,7 +74,7 @@ export function WorldBasePanel(props: WorldBasePanelProps) {
       </div>
 
       <details className="ui-sync-code-panel mt-3 p-2">
-        <summary className="cursor-pointer text-xs font-semibold text-gray-700">Raw JSON (Debug)</summary>
+        <summary className="cursor-pointer text-xs font-semibold text-gray-700">{t('shared.rawJsonDebug')}</summary>
         <textarea
           className="mt-2 h-52 w-full rounded-md border border-gray-300 bg-gray-100 p-2 font-mono text-xs text-gray-600"
           value={worldPatchText}

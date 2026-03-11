@@ -1,4 +1,5 @@
 import type { WorldStudioCreateActionsInput } from './types.js';
+import { worldStudioMessage } from '../../../i18n/messages.js';
 
 type AssetTaskOptions = {
   taskId?: string;
@@ -37,13 +38,13 @@ export async function generateWorldCoverAsset(
 ): Promise<void> {
   const started = input.taskController.startTask({
     kind: 'CREATE_WORLD_COVER',
-    label: 'Generate world cover',
+    label: worldStudioMessage('task.generateWorldCoverLabel', 'Generate world cover'),
     atomic: false,
     resumable: false,
     canPause: false,
     canCancel: true,
     step: 'DRAFT',
-    message: 'Generating world cover',
+    message: worldStudioMessage('task.generatingWorldCover', 'Generating world cover'),
   });
   if (!started) {
     input.setError('WORLD_STUDIO_TASK_CONFLICT: another task is running.');
@@ -77,8 +78,11 @@ export async function generateWorldCoverAsset(
         worldCover: { status: 'succeeded', imageUrl: resolveGeneratedImageUrl(response.artifacts) },
       },
     });
-    input.setStatusBanner({ kind: 'success', message: 'World cover generated' });
-    input.taskController.completeTask(started.taskId, 'World cover generated');
+    input.setStatusBanner({
+      kind: 'success',
+      message: worldStudioMessage('banner.worldCoverGenerated', 'World cover generated'),
+    });
+    input.taskController.completeTask(started.taskId, worldStudioMessage('task.worldCoverGenerated', 'World cover generated'));
   } catch (imageError) {
     if (started.abortSignal.aborted || input.taskController.shouldCancel(started.taskId)) {
       input.patchSnapshot({
@@ -86,8 +90,11 @@ export async function generateWorldCoverAsset(
           worldCover: { status: 'failed', imageUrl: null },
         },
       });
-      input.taskController.cancelTask(started.taskId, 'World cover generation canceled');
-      input.setNotice('World cover generation canceled.');
+      input.taskController.cancelTask(
+        started.taskId,
+        worldStudioMessage('task.worldCoverGenerationCanceled', 'World cover generation canceled'),
+      );
+      input.setNotice(worldStudioMessage('notice.worldCoverGenerationCanceled', 'World cover generation canceled.'));
       return;
     }
     input.patchSnapshot({
@@ -107,13 +114,13 @@ export async function generateCharacterPortraitAsset(
 ): Promise<void> {
   const started = input.taskController.startTask({
     kind: 'CREATE_CHARACTER_PORTRAIT',
-    label: `Generate portrait: ${name}`,
+    label: worldStudioMessage('task.generatePortraitLabel', 'Generate portrait: {{name}}', { name }),
     atomic: false,
     resumable: false,
     canPause: false,
     canCancel: true,
     step: 'DRAFT',
-    message: `Generating portrait for ${name}`,
+    message: worldStudioMessage('task.generatingPortrait', 'Generating portrait for {{name}}', { name }),
   });
   if (!started) {
     input.setError('WORLD_STUDIO_TASK_CONFLICT: another task is running.');
@@ -153,8 +160,14 @@ export async function generateCharacterPortraitAsset(
         characterPortraits: succeededPortraits,
       },
     });
-    input.setStatusBanner({ kind: 'success', message: `Portrait generated: ${name}` });
-    input.taskController.completeTask(started.taskId, `Portrait generated: ${name}`);
+    input.setStatusBanner({
+      kind: 'success',
+      message: worldStudioMessage('banner.portraitGenerated', 'Portrait generated: {{name}}', { name }),
+    });
+    input.taskController.completeTask(
+      started.taskId,
+      worldStudioMessage('task.portraitGenerated', 'Portrait generated: {{name}}', { name }),
+    );
   } catch (imageError) {
     const failedPortraits = {
       ...input.snapshot.assets.characterPortraits,
@@ -166,8 +179,11 @@ export async function generateCharacterPortraitAsset(
       },
     });
     if (started.abortSignal.aborted || input.taskController.shouldCancel(started.taskId)) {
-      input.taskController.cancelTask(started.taskId, `Portrait generation canceled: ${name}`);
-      input.setNotice(`Portrait generation canceled: ${name}`);
+      input.taskController.cancelTask(
+        started.taskId,
+        worldStudioMessage('task.portraitGenerationCanceled', 'Portrait generation canceled: {{name}}', { name }),
+      );
+      input.setNotice(worldStudioMessage('notice.portraitGenerationCanceled', 'Portrait generation canceled: {{name}}', { name }));
       return;
     }
     input.taskController.failTask(started.taskId, imageError);
@@ -182,13 +198,21 @@ export async function generateLocationImageAsset(
 ): Promise<void> {
   const started = input.taskController.startTask({
     kind: 'CREATE_WORLD_COVER',
-    label: `Generate location image: ${locationName}`,
+    label: worldStudioMessage(
+      'task.generateLocationImageLabel',
+      'Generate location image: {{locationName}}',
+      { locationName },
+    ),
     atomic: false,
     resumable: false,
     canPause: false,
     canCancel: true,
     step: 'DRAFT',
-    message: `Generating location image for ${locationName}`,
+    message: worldStudioMessage(
+      'task.generatingLocationImage',
+      'Generating location image for {{locationName}}',
+      { locationName },
+    ),
   });
   if (!started) {
     input.setError('WORLD_STUDIO_TASK_CONFLICT: another task is running.');
@@ -229,8 +253,20 @@ export async function generateLocationImageAsset(
       [locationName]: { status: 'succeeded' as const, imageUrl: resolveGeneratedImageUrl(response.artifacts) },
     };
     input.patchSnapshot({ assets: { locationImages: succeededLocationImages } });
-    input.setStatusBanner({ kind: 'success', message: `Location image generated: ${locationName}` });
-    input.taskController.completeTask(started.taskId, `Location image generated: ${locationName}`);
+    input.setStatusBanner({
+      kind: 'success',
+      message: worldStudioMessage(
+        'banner.locationImageGenerated',
+        'Location image generated: {{locationName}}',
+        { locationName },
+      ),
+    });
+    input.taskController.completeTask(
+      started.taskId,
+      worldStudioMessage('task.locationImageGenerated', 'Location image generated: {{locationName}}', {
+        locationName,
+      }),
+    );
   } catch (imageError) {
     const failedLocationImages = {
       ...input.snapshot.assets.locationImages,
@@ -238,8 +274,19 @@ export async function generateLocationImageAsset(
     };
     input.patchSnapshot({ assets: { locationImages: failedLocationImages } });
     if (started.abortSignal.aborted || input.taskController.shouldCancel(started.taskId)) {
-      input.taskController.cancelTask(started.taskId, `Location image generation canceled: ${locationName}`);
-      input.setNotice(`Location image generation canceled: ${locationName}`);
+      input.taskController.cancelTask(
+        started.taskId,
+        worldStudioMessage(
+          'task.locationImageGenerationCanceled',
+          'Location image generation canceled: {{locationName}}',
+          { locationName },
+        ),
+      );
+      input.setNotice(worldStudioMessage(
+        'notice.locationImageGenerationCanceled',
+        'Location image generation canceled: {{locationName}}',
+        { locationName },
+      ));
       return;
     }
     input.taskController.failTask(started.taskId, imageError);

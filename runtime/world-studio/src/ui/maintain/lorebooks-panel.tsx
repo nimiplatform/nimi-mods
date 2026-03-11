@@ -1,4 +1,5 @@
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { WorldLorebookDraftRow } from '../../contracts.js';
 import { KeyValueObjectEditor } from '../shared/key-value-object-editor.js';
 
@@ -12,6 +13,7 @@ type LorebooksPanelProps = {
 };
 
 export function LorebooksPanel(props: LorebooksPanelProps) {
+  const { t } = useModTranslation('world-studio');
   const rows = props.lorebooksDraft || [];
   const invalidRows = rows.filter((row) => String(row.key || '').trim().length === 0);
 
@@ -22,8 +24,8 @@ export function LorebooksPanel(props: LorebooksPanelProps) {
     <section className="ui-sync-card ui-sync-card-inset p-4">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-gray-900">Lorebooks / Knowledge Base</h3>
-          <p className="mt-1 text-xs text-gray-500">Structured lorebook rows. Raw JSON is for debugging only.</p>
+          <h3 className="text-sm font-semibold text-gray-900">{t('lorebooks.title')}</h3>
+          <p className="mt-1 text-xs text-gray-500">{t('lorebooks.description')}</p>
         </div>
         <button
           type="button"
@@ -44,23 +46,23 @@ export function LorebooksPanel(props: LorebooksPanelProps) {
             }]);
           }}
         >
-          Add Lorebook
+          {t('lorebooks.addLorebook')}
         </button>
       </div>
 
       <div className="mt-3 space-y-3">
         {invalidRows.length > 0 ? (
           <div className="ui-sync-alert ui-sync-alert-warning px-2.5 py-2 text-xs text-amber-800">
-            {invalidRows.length} lorebooks are missing `key`. Fix them before sync.
+            {t('lorebooks.invalidRows', { count: invalidRows.length })}
           </div>
         ) : null}
         {rows.length === 0 ? (
-          <p className="text-xs text-gray-500">No lorebooks yet.</p>
+          <p className="text-xs text-gray-500">{t('lorebooks.empty')}</p>
         ) : rows.map((row, index) => (
           <div key={`lorebook-row-${row.id || index}`} className="ui-sync-soft-card p-2.5">
             <div className="grid gap-2 md:grid-cols-2">
               <label className="text-xs text-gray-700">
-                <span className="mb-1 block font-medium">key</span>
+                <span className="mb-1 block font-medium">{t('lorebooks.key')}</span>
                 <input
                   className="h-9 w-full rounded-md border border-gray-300 px-2 text-xs"
                   value={row.key}
@@ -72,10 +74,10 @@ export function LorebooksPanel(props: LorebooksPanelProps) {
                 />
               </label>
               <label className="text-xs text-gray-700">
-                <span className="mb-1 block font-medium">name</span>
+                <span className="mb-1 block font-medium">{t('lorebooks.name')}</span>
                 <input
                   className="h-9 w-full rounded-md border border-gray-300 px-2 text-xs"
-                  placeholder="Short title"
+                  placeholder={t('lorebooks.namePlaceholder')}
                   value={row.name || ''}
                   onChange={(event) => {
                     const next = [...rows];
@@ -86,10 +88,10 @@ export function LorebooksPanel(props: LorebooksPanelProps) {
               </label>
             </div>
             <label className="mt-2 block text-xs text-gray-700">
-              <span className="mb-1 block font-medium">content</span>
+              <span className="mb-1 block font-medium">{t('lorebooks.content')}</span>
               <textarea
                 className="h-20 w-full rounded-md border border-gray-300 px-2 py-1 text-xs"
-                placeholder="LLM-readable full paragraph"
+                placeholder={t('lorebooks.contentPlaceholder')}
                 value={row.content || ''}
                 onChange={(event) => {
                   const next = [...rows];
@@ -100,10 +102,10 @@ export function LorebooksPanel(props: LorebooksPanelProps) {
             </label>
             <div className="mt-2 grid gap-2 md:grid-cols-2">
               <label className="text-xs text-gray-700">
-                <span className="mb-1 block font-medium">keywords</span>
+                <span className="mb-1 block font-medium">{t('lorebooks.keywords')}</span>
                 <input
                   className="h-9 w-full rounded-md border border-gray-300 px-2 text-xs"
-                  placeholder="Comma-separated keywords"
+                  placeholder={t('lorebooks.keywordsPlaceholder')}
                   value={(row.keywords || []).join(', ')}
                   onChange={(event) => {
                     const next = [...rows];
@@ -119,7 +121,7 @@ export function LorebooksPanel(props: LorebooksPanelProps) {
                 />
               </label>
               <label className="text-xs text-gray-700">
-                <span className="mb-1 block font-medium">validFrom</span>
+                <span className="mb-1 block font-medium">{t('lorebooks.validFrom')}</span>
                 <input
                   className="h-9 w-full rounded-md border border-gray-300 px-2 text-xs"
                   value={row.validFrom || ''}
@@ -133,7 +135,7 @@ export function LorebooksPanel(props: LorebooksPanelProps) {
             </div>
             <div className="mt-2 grid gap-2 md:grid-cols-3">
               <label className="text-xs text-gray-700">
-                <span className="mb-1 block font-medium">priority</span>
+                <span className="mb-1 block font-medium">{t('lorebooks.priority')}</span>
                 <input
                   type="number"
                   className="h-9 w-full rounded-md border border-gray-300 px-2 text-xs"
@@ -155,7 +157,7 @@ export function LorebooksPanel(props: LorebooksPanelProps) {
                     updateRows(next);
                   }}
                 />
-                <span className="font-medium">constant</span>
+                <span className="font-medium">{t('lorebooks.constant')}</span>
               </label>
               <label className="flex items-center gap-2 text-xs text-gray-700">
                 <input
@@ -167,12 +169,12 @@ export function LorebooksPanel(props: LorebooksPanelProps) {
                     updateRows(next);
                   }}
                 />
-                <span className="font-medium">enabled</span>
+                <span className="font-medium">{t('lorebooks.enabled')}</span>
               </label>
             </div>
             <div className="ui-sync-card mt-2 p-2">
               <KeyValueObjectEditor
-                label="value"
+                label={t('lorebooks.value')}
                 value={row.value || {}}
                 compact
                 onChange={(nextValue) => {
@@ -184,7 +186,7 @@ export function LorebooksPanel(props: LorebooksPanelProps) {
             </div>
             <div className="ui-sync-card mt-2 p-2">
               <KeyValueObjectEditor
-                label="provenance"
+                label={t('lorebooks.provenance')}
                 value={row.provenance || {}}
                 compact
                 onChange={(nextValue) => {
@@ -201,7 +203,7 @@ export function LorebooksPanel(props: LorebooksPanelProps) {
                 updateRows(rows.filter((_, rowIndex) => rowIndex !== index));
               }}
             >
-              Delete Lorebook
+              {t('lorebooks.deleteLorebook')}
             </button>
           </div>
         ))}
@@ -215,7 +217,7 @@ export function LorebooksPanel(props: LorebooksPanelProps) {
             onClick={props.onSyncLorebooks}
             disabled={props.working || invalidRows.length > 0}
           >
-            Bulk Update Lorebooks
+            {t('lorebooks.bulkUpdate')}
           </button>
           <button
             type="button"
@@ -223,13 +225,13 @@ export function LorebooksPanel(props: LorebooksPanelProps) {
             onClick={props.onDeleteFirstLorebook}
             disabled={props.working}
           >
-            Delete First Lorebook
+            {t('lorebooks.deleteFirst')}
           </button>
         </div>
       ) : null}
 
       <details className="ui-sync-code-panel mt-3 p-2">
-        <summary className="cursor-pointer text-xs font-semibold text-gray-700">Raw JSON (Debug)</summary>
+        <summary className="cursor-pointer text-xs font-semibold text-gray-700">{t('shared.rawJsonDebug')}</summary>
         <textarea
           className="mt-2 h-44 w-full rounded-md border border-gray-300 bg-gray-100 p-2 font-mono text-xs text-gray-600"
           value={lorebooksText}
