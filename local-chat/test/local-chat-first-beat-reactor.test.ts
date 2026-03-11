@@ -244,6 +244,50 @@ test('first-beat reactor accepts an unmarked complete fallback sentence from gen
   assert.equal(result.traceId, 'trace-unmarked-fallback');
 });
 
+test('first-beat reactor strips trailing partial end markers from unmarked fallback text', async () => {
+  let generateCalls = 0;
+  const result = await runFirstBeatReactor({
+    aiClient: {
+      ...createAiClientFromChunks([
+        '你先等我想想',
+      ], 'trace-partial-marker', 'length'),
+      generateText: async () => {
+        generateCalls += 1;
+        return {
+          text: '我当然认得你。|EN',
+          traceId: 'trace-partial-marker-fallback',
+          promptTraceId: 'trace-partial-marker-fallback',
+          route: {
+            capability: 'text.generate',
+            source: 'local',
+            provider: 'local',
+            model: 'model-a',
+            connectorId: '',
+            endpoint: '',
+            localOpenAiEndpoint: '',
+            localProviderEndpoint: '',
+            localModelId: '',
+            adapter: 'test',
+          },
+        };
+      },
+    } as unknown as LocalChatTurnAiClient,
+    invokeInput: {
+      capability: 'text.generate',
+      prompt: 'raw prompt',
+      mode: 'STORY',
+      agentId: 'agent-1',
+    },
+    contextPacket: createContextPacket(),
+    userText: '你到底认不认得我',
+    transientMessageId: 'transient-partial-marker',
+  });
+
+  assert.equal(generateCalls, 1);
+  assert.equal(result.text, '我当然认得你。');
+  assert.equal(result.traceId, 'trace-partial-marker-fallback');
+});
+
 test('first-beat reactor accepts a complete first sentence even when the provider reports finishReason=length', async () => {
   let fallbackCalls = 0;
   const result = await runFirstBeatReactor({

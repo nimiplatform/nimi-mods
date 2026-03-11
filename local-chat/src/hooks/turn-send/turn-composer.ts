@@ -9,6 +9,7 @@ import { describeLocalChatGenerateObjectFailure } from '../../runtime-ai-client.
 import { createUlid } from '../../utils/ulid.js';
 import type { LocalChatTurnAiClient } from './types.js';
 import type { TurnInvokeInput } from './request-builder.js';
+import { stripTrailingEndMarkerFragment } from './stream-end-marker.js';
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -18,6 +19,10 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function asString(value: unknown): string {
   return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function asBeatText(value: unknown): string {
+  return stripTrailingEndMarkerFragment(asString(value));
 }
 
 function normalizeBeatIntent(value: unknown): InteractionBeat['intent'] {
@@ -115,7 +120,7 @@ function parsePlanObject(input: {
     .slice(0, clampBeatCount(input.turnMode))
     .forEach((item, index, list) => {
       const record = asRecord(item);
-      const text = asString(record.text || record.content);
+      const text = asBeatText(record.text || record.content);
       if (!text) {
         return;
       }
@@ -123,7 +128,7 @@ function parsePlanObject(input: {
         return;
       }
       const kind = asString(asRecord(record.assetRequest).kind);
-      const prompt = asString(asRecord(record.assetRequest).prompt);
+      const prompt = asBeatText(asRecord(record.assetRequest).prompt);
       const rawRelationMove = asString(record.relationMove || record.relation_move || input.turnMode);
       const allowAssetRequest = input.turnMode === 'explicit-media';
       beats.push({
@@ -261,45 +266,56 @@ export async function composeInteractionTurnPlan(input: {
     ...perceptionLines,
   ].join('\n');
 
-  try {
-    console.log('[turn-composer] generateObject: calling...', { turnMode: input.turnMode });
-    const result = await input.aiClient.generateObject({
-      ...input.invokeInput,
-      prompt,
-      maxTokens: 1200,
-      temperature: 0.5,
-    });
-    const rawBeats = (result.object as Record<string, unknown>)?.beats;
-    console.log('[turn-composer] generateObject: success', {
-      beatCount: Array.isArray(rawBeats) ? rawBeats.length : 'non-array',
-      turnMode: input.turnMode,
-      rawText: result.text?.slice(0, 200),
-    });
-    const plan = parsePlanObject({
-      object: result.object,
-      turnId: input.turnId,
-      turnMode: input.turnMode,
-      intimacyCeiling: input.intimacyCeiling,
-      recentBeatTexts: input.recentBeatTexts,
-      sealedFirstBeatText: input.sealedFirstBeatText,
-    });
-    if (plan.beats.length > 0) {
-      console.log('[turn-composer] plan accepted:', plan.beats.length, 'beats');
-      return plan;
+  const TURN_COMPOSER_MAX_ATTEMPTS = 2;
+  for (let attempt = 1; attempt <= TURN_COMPOSER_MAX_ATTEMPTS; attempt++) {
+    try {
+      console.log('[turn-composer] generateObject: calling...', { turnMode: input.turnMode, attempt });
+      const result = await input.aiClient.generateObject({
+        ...input.invokeInput,
+        prompt: attempt === 1
+          ? prompt
+          : prompt + '\n\n重要提醒：上一次你的输出不是合法 JSON，导致解析失败。这一次请严格只输出一个 JSON 对象，不要有任何其它文字、不要 markdown 代码块包裹、不要解释。以 { 开头，以 } 结尾。',
+        maxTokens: 1200,
+        temperature: attempt === 1 ? 0.5 : 0.3,
+      });
+      const rawBeats = (result.object as Record<string, unknown>)?.beats;
+      console.log('[turn-composer] generateObject: success', {
+        beatCount: Array.isArray(rawBeats) ? rawBeats.length : 'non-array',
+        turnMode: input.turnMode,
+        rawText: result.text?.slice(0, 200),
+        attempt,
+      });
+      const plan = parsePlanObject({
+        object: result.object,
+        turnId: input.turnId,
+        turnMode: input.turnMode,
+        intimacyCeiling: input.intimacyCeiling,
+        recentBeatTexts: input.recentBeatTexts,
+        sealedFirstBeatText: input.sealedFirstBeatText,
+      });
+      if (plan.beats.length > 0) {
+        console.log('[turn-composer] plan accepted:', plan.beats.length, 'beats', { attempt });
+        return plan;
+      }
+      console.warn('[turn-composer] generateObject: parsed but 0 valid tail beats', { turnMode: input.turnMode, attempt });
+      break; // Parsed OK but no valid beats — retrying won't help
+    } catch (err) {
+      const failure = describeLocalChatGenerateObjectFailure(err);
+      console.error('[turn-composer] generateObject: FAILED', {
+        error: err instanceof Error ? err.message : String(err),
+        failureStage: failure.failureStage,
+        reasonCode: failure.reasonCode,
+        traceId: failure.traceId,
+        rawTextPreview: failure.rawTextPreview,
+        rawTextChars: failure.rawTextChars,
+        errorName: failure.errorName,
+        turnMode: input.turnMode,
+        attempt,
+      });
+      if (attempt >= TURN_COMPOSER_MAX_ATTEMPTS) break;
+      // Retry on parse failure only — call failures are likely transient network issues
+      if (failure.failureStage !== 'parse') break;
     }
-    console.warn('[turn-composer] generateObject: parsed but 0 valid tail beats', { turnMode: input.turnMode });
-  } catch (err) {
-    const failure = describeLocalChatGenerateObjectFailure(err);
-    console.error('[turn-composer] generateObject: FAILED', {
-      error: err instanceof Error ? err.message : String(err),
-      failureStage: failure.failureStage,
-      reasonCode: failure.reasonCode,
-      traceId: failure.traceId,
-      rawTextPreview: failure.rawTextPreview,
-      rawTextChars: failure.rawTextChars,
-      errorName: failure.errorName,
-      turnMode: input.turnMode,
-    });
   }
   return {
     planId: `plan_${createUlid()}`,

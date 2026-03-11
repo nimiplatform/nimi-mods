@@ -14,9 +14,10 @@ import { compileInteractionState } from './interaction-state-compiler.js';
 import { compilePortableMemorySlots } from './portable-memory-compiler.js';
 import { extractRelationMemoryCandidates } from './relation-memory-extractor.js';
 import type { LocalChatTurnAiClient } from './types.js';
+import { stripTrailingEndMarkerFragment } from './stream-end-marker.js';
 
 function normalizeBeatText(content: string): string {
-  return content.replace(/\s+/g, ' ').trim();
+  return stripTrailingEndMarkerFragment(content.replace(/\s+/g, ' ').trim());
 }
 
 function candidateToRelationMemorySlot(input: {

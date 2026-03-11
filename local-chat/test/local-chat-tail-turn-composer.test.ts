@@ -162,3 +162,61 @@ test('tail turn composer logs structured failure stage for generateObject errors
     console.error = originalConsoleError;
   }
 });
+
+test('tail turn composer strips trailing partial end markers from planned beat text', async () => {
+  const plan = await composeInteractionTurnPlan({
+    aiClient: {
+      generateObject: async () => ({
+        object: {
+          beats: [
+            {
+              text: '你这是故意考我呢。|END',
+              intent: 'tease',
+              relationMove: 'warm',
+              sceneMove: '调侃',
+              pauseMs: 500,
+            },
+            {
+              text: '我当然还记得你。|EN',
+              intent: 'answer',
+              relationMove: 'warm',
+              sceneMove: '日常',
+              pauseMs: 700,
+            },
+          ],
+        },
+        text: '',
+        traceId: 'trace-tail-partial-marker',
+        promptTraceId: 'trace-tail-partial-marker',
+        route: {
+          source: 'local',
+          model: 'model-a',
+          provider: 'local',
+          connectorId: '',
+          endpoint: '',
+          localOpenAiEndpoint: '',
+          localProviderEndpoint: '',
+          localModelId: '',
+          adapter: 'test',
+          capability: 'text.generate',
+        },
+      }),
+    } as unknown as LocalChatTurnAiClient,
+    invokeInput: {
+      capability: 'text.generate',
+      prompt: 'raw prompt',
+      mode: 'STORY',
+      agentId: 'agent-1',
+    },
+    contextPacket: createContextPacket(),
+    userText: '你知道我是谁吗',
+    turnId: 'turn-partial-marker',
+    turnMode: 'emotional',
+    deliveryStyle: 'natural',
+    sealedFirstBeatText: '我当然知道是你。',
+  });
+
+  assert.equal(plan.beats.length, 2);
+  assert.equal(plan.beats[0]?.text, '你这是故意考我呢。');
+  assert.equal(plan.beats[1]?.text, '我当然还记得你。');
+});

@@ -44,6 +44,7 @@ import {
   buildLocalChatTurnContextKey,
   buildLocalChatTurnContextSnapshot,
 } from './context-key.js';
+import { stripTrailingEndMarkerFragment } from './stream-end-marker.js';
 
 type OrchestratedBeat = ReturnType<typeof orchestrateBeatModalities>[number];
 type ConcreteMediaDecision = Exclude<MediaExecutionDecision, { kind: 'none' }>;
@@ -91,7 +92,7 @@ function createCancelledAudit(input: {
 }
 
 function normalizeBeatText(content: string): string {
-  return String(content || '').replace(/\s+/g, ' ').trim();
+  return stripTrailingEndMarkerFragment(String(content || '').replace(/\s+/g, ' ').trim());
 }
 
 function toMarkerOverrideIntent(input: {
@@ -493,6 +494,13 @@ export async function runLocalChatTurnSend(input: {
       userText: text,
       transientMessageId: firstBeatMessageId,
       abortSignal: input.abortSignal,
+      debugContext: {
+        entry: 'send-flow',
+        flowId,
+        turnTxnId,
+        targetId: selectedTarget.id,
+        sessionId,
+      },
       onPreview: (preview) => {
         input.setSendPhase('streaming-first-beat');
         upsertTransientFirstBeatMessage({

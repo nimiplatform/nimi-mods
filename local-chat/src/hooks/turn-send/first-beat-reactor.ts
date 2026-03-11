@@ -1,12 +1,73 @@
 import type { FirstBeatResult, LocalChatContextPacket } from '../../state/index.js';
+import { emitLocalChatLog } from '../../logging.js';
 import type { LocalChatTurnAiClient } from './types.js';
 import type { TurnInvokeInput } from './request-builder.js';
+import {
+  DEFAULT_STREAM_END_MARKER,
+  findTrailingEndMarkerFragmentLength,
+  stripTrailingEndMarkerFragment,
+} from './stream-end-marker.js';
 
-export const FIRST_BEAT_END_MARKER = '|END|';
-const FIRST_BEAT_MAX_TOKENS = 384;
-const FIRST_BEAT_REPAIR_MAX_TOKENS = 512;
-const FIRST_BEAT_FALLBACK_MAX_TOKENS = 512;
+export const FIRST_BEAT_END_MARKER = DEFAULT_STREAM_END_MARKER;
+const FIRST_BEAT_MAX_TOKENS = 1024;
+const FIRST_BEAT_REPAIR_MAX_TOKENS = 1024;
+const FIRST_BEAT_FALLBACK_MAX_TOKENS = 1024;
 const FIRST_BEAT_UNAVAILABLE_ERROR = 'LOCAL_CHAT_FIRST_BEAT_UNAVAILABLE';
+const FIRST_BEAT_DEBUG_RECORD_LIMIT = 200;
+
+type FirstBeatDebugContext = {
+  flowId?: string;
+  turnTxnId?: string;
+  targetId?: string;
+  sessionId?: string;
+  entry?: 'send-flow' | 'proactive';
+};
+
+function persistFirstBeatDebugRecord(record: Record<string, unknown>): void {
+  try {
+    const runtimeWindow = window as typeof window & {
+      __LOCAL_CHAT_FIRST_BEAT_DEBUG__?: Array<Record<string, unknown>>;
+      __LOCAL_CHAT_FIRST_BEAT_DEBUG_LATEST__?: Record<string, unknown>;
+    };
+    const existing = Array.isArray(runtimeWindow.__LOCAL_CHAT_FIRST_BEAT_DEBUG__)
+      ? [...runtimeWindow.__LOCAL_CHAT_FIRST_BEAT_DEBUG__]
+      : [];
+    existing.push(record);
+    if (existing.length > FIRST_BEAT_DEBUG_RECORD_LIMIT) {
+      existing.splice(0, existing.length - FIRST_BEAT_DEBUG_RECORD_LIMIT);
+    }
+    runtimeWindow.__LOCAL_CHAT_FIRST_BEAT_DEBUG__ = existing;
+    runtimeWindow.__LOCAL_CHAT_FIRST_BEAT_DEBUG_LATEST__ = record;
+  } catch {
+    // ignore debug persistence failures
+  }
+}
+
+function emitFirstBeatDebugLog(input: {
+  event: string;
+  context?: FirstBeatDebugContext;
+  details?: Record<string, unknown>;
+}): void {
+  const record = {
+    ts: new Date().toISOString(),
+    event: input.event,
+    ...(input.context || {}),
+    ...(input.details || {}),
+  };
+  persistFirstBeatDebugRecord(record);
+  emitLocalChatLog({
+    level: 'debug',
+    message: `local-chat:first-beat:${input.event}`,
+    flowId: input.context?.flowId,
+    source: 'runFirstBeatReactor',
+    details: record,
+  });
+  try {
+    console.info(`[local-chat:first-beat] ${input.event}`, record);
+  } catch {
+    // ignore console failures
+  }
+}
 
 function normalizeWhitespace(value: string): string {
   return String(value || '')
@@ -38,13 +99,8 @@ function extractMarkedFirstBeat(value: string): string {
 }
 
 function longestTrailingMarkerPrefix(value: string): number {
-  const raw = String(value || '');
-  for (let size = FIRST_BEAT_END_MARKER.length - 1; size >= 2; size -= 1) {
-    if (raw.endsWith(FIRST_BEAT_END_MARKER.slice(0, size))) {
-      return size;
-    }
-  }
-  return 0;
+  const size = findTrailingEndMarkerFragmentLength(value, FIRST_BEAT_END_MARKER);
+  return size >= FIRST_BEAT_END_MARKER.length ? 0 : size;
 }
 
 function extractStablePreview(value: string): string {
@@ -60,7 +116,7 @@ function extractStablePreview(value: string): string {
 }
 
 function extractUnmarkedCompleteFirstBeat(value: string): string {
-  const normalized = normalizePreview(value);
+  const normalized = normalizePreview(stripTrailingEndMarkerFragment(value, FIRST_BEAT_END_MARKER));
   if (!normalized) return '';
   if (/[，,、：:；;（(]$/u.test(normalized)) return '';
   if (/(?:\.\.\.|…)$/.test(normalized)) return '';
@@ -159,6 +215,7 @@ export async function runFirstBeatReactor(input: {
   transientMessageId: string;
   abortSignal?: AbortSignal;
   onPreview?: (preview: string) => void;
+  debugContext?: FirstBeatDebugContext;
 }): Promise<FirstBeatResult> {
   const startedAt = performance.now();
   const prompt = buildFirstBeatPrompt({
@@ -172,6 +229,27 @@ export async function runFirstBeatReactor(input: {
   let finishReason: string | null = null;
   let streamDeltaCount = 0;
   let streamFailed = false;
+  const routeBinding = input.invokeInput.routeBinding;
+
+  emitFirstBeatDebugLog({
+    event: 'start',
+    context: input.debugContext,
+    details: {
+      transientMessageId: input.transientMessageId,
+      userText: input.userText,
+      promptChars: prompt.length,
+      prompt,
+      routeSource: routeBinding?.source || null,
+      routeModel: routeBinding?.model || null,
+      targetFirstBeatStyle: input.contextPacket.target.interactionProfile.expression.firstBeatStyle,
+      turnMode: input.contextPacket.turnMode || null,
+      voiceConversationMode: input.contextPacket.voiceConversationMode || null,
+      temperature: 0.82,
+      maxTokens: FIRST_BEAT_MAX_TOKENS,
+      endMarker: FIRST_BEAT_END_MARKER,
+      visualComfortLevel: input.contextPacket.contentBoundaryHint?.visualComfortLevel || null,
+    },
+  });
 
   try {
     for await (const event of input.aiClient.streamText({
@@ -184,13 +262,54 @@ export async function runFirstBeatReactor(input: {
       if (event.type === 'text_delta') {
         buffer += event.textDelta;
         streamDeltaCount += 1;
+        const prefixSize = longestTrailingMarkerPrefix(buffer);
         const nextPreview = extractStablePreview(buffer);
+        const sealedCandidate = extractMarkedFirstBeat(buffer);
+        emitFirstBeatDebugLog({
+          event: 'stream-delta',
+          context: input.debugContext,
+          details: {
+            transientMessageId: input.transientMessageId,
+            deltaIndex: streamDeltaCount,
+            textDelta: event.textDelta,
+            buffer,
+            bufferChars: buffer.length,
+            previewCandidate: nextPreview || null,
+            previewChanged: Boolean(nextPreview && nextPreview !== preview),
+            sealedCandidate: sealedCandidate || null,
+            markerSeen: buffer.includes(FIRST_BEAT_END_MARKER),
+            trailingMarkerPrefixSize: prefixSize,
+          },
+        });
         if (nextPreview && nextPreview !== preview) {
           preview = nextPreview;
+          emitFirstBeatDebugLog({
+            event: 'preview-update',
+            context: input.debugContext,
+            details: {
+              transientMessageId: input.transientMessageId,
+              deltaIndex: streamDeltaCount,
+              preview,
+              buffer,
+            },
+          });
           input.onPreview?.(nextPreview);
         }
-        const sealed = extractMarkedFirstBeat(buffer);
+        const sealed = sealedCandidate;
         if (sealed) {
+          emitFirstBeatDebugLog({
+            event: 'stream-sealed',
+            context: input.debugContext,
+            details: {
+              transientMessageId: input.transientMessageId,
+              text: sealed,
+              buffer,
+              streamDeltaCount,
+              traceId,
+              finishReason,
+              latencyMs: Math.round(performance.now() - startedAt),
+            },
+          });
           return {
             text: sealed,
             transientMessageId: input.transientMessageId,
@@ -205,6 +324,19 @@ export async function runFirstBeatReactor(input: {
       if (event.type === 'done') {
         traceId = String(event.traceId || '').trim() || null;
         finishReason = String(event.finishReason || '').trim() || null;
+        emitFirstBeatDebugLog({
+          event: 'stream-done',
+          context: input.debugContext,
+          details: {
+            transientMessageId: input.transientMessageId,
+            traceId,
+            finishReason,
+            streamDeltaCount,
+            buffer,
+            partialText: normalizePreview(buffer),
+            sealedCandidate: extractMarkedFirstBeat(buffer) || null,
+          },
+        });
       }
     }
   } catch (error) {
@@ -212,11 +344,48 @@ export async function runFirstBeatReactor(input: {
       throw error;
     }
     streamFailed = true;
+    emitFirstBeatDebugLog({
+      event: 'stream-error',
+      context: input.debugContext,
+      details: {
+        transientMessageId: input.transientMessageId,
+        error: error instanceof Error ? error.message : String(error || ''),
+        streamDeltaCount,
+        buffer,
+        partialText: normalizePreview(buffer),
+      },
+    });
   }
 
   const partialText = normalizePreview(buffer);
   const finalText = extractMarkedFirstBeat(buffer);
+  emitFirstBeatDebugLog({
+    event: 'post-stream-eval',
+    context: input.debugContext,
+    details: {
+      transientMessageId: input.transientMessageId,
+      streamFailed,
+      traceId,
+      finishReason,
+      streamDeltaCount,
+      buffer,
+      partialText,
+      finalText: finalText || null,
+    },
+  });
   if (!streamFailed && finishReason !== null && finalText) {
+    emitFirstBeatDebugLog({
+      event: 'return-stream-final',
+      context: input.debugContext,
+      details: {
+        transientMessageId: input.transientMessageId,
+        text: finalText,
+        traceId,
+        finishReason,
+        streamDeltaCount,
+        latencyMs: Math.round(performance.now() - startedAt),
+      },
+    });
     return {
       text: finalText,
       transientMessageId: input.transientMessageId,
@@ -228,6 +397,23 @@ export async function runFirstBeatReactor(input: {
   }
 
   try {
+    emitFirstBeatDebugLog({
+      event: 'repair-start',
+      context: input.debugContext,
+      details: {
+        transientMessageId: input.transientMessageId,
+        partialText,
+        partialChars: partialText.length,
+        prompt: buildFirstBeatRepairPrompt({
+          prompt: input.invokeInput.prompt,
+          contextPacket: input.contextPacket,
+          userText: input.userText,
+          partialText,
+        }),
+        maxTokens: FIRST_BEAT_REPAIR_MAX_TOKENS,
+        temperature: 0.55,
+      },
+    });
     const repaired = await input.aiClient.generateText({
       ...input.invokeInput,
       prompt: buildFirstBeatRepairPrompt({
@@ -241,7 +427,28 @@ export async function runFirstBeatReactor(input: {
     });
     const repairedText = extractMarkedFirstBeat(String(repaired.text || ''))
       || extractUnmarkedCompleteFirstBeat(String(repaired.text || ''));
+    emitFirstBeatDebugLog({
+      event: 'repair-result',
+      context: input.debugContext,
+      details: {
+        transientMessageId: input.transientMessageId,
+        rawText: String(repaired.text || ''),
+        extractedText: repairedText || null,
+        traceId: String(repaired.traceId || '').trim() || null,
+      },
+    });
     if (repairedText) {
+      emitFirstBeatDebugLog({
+        event: 'return-repair',
+        context: input.debugContext,
+        details: {
+          transientMessageId: input.transientMessageId,
+          text: repairedText,
+          traceId: String(repaired.traceId || '').trim() || traceId,
+          streamDeltaCount,
+          latencyMs: Math.round(performance.now() - startedAt),
+        },
+      });
       return {
         text: repairedText,
         transientMessageId: input.transientMessageId,
@@ -255,9 +462,31 @@ export async function runFirstBeatReactor(input: {
     if (input.abortSignal?.aborted) {
       throw error;
     }
+    emitFirstBeatDebugLog({
+      event: 'repair-error',
+      context: input.debugContext,
+      details: {
+        transientMessageId: input.transientMessageId,
+        error: error instanceof Error ? error.message : String(error || ''),
+      },
+    });
   }
 
   try {
+    emitFirstBeatDebugLog({
+      event: 'fallback-start',
+      context: input.debugContext,
+      details: {
+        transientMessageId: input.transientMessageId,
+        prompt: buildFirstBeatFallbackPrompt({
+          prompt: input.invokeInput.prompt,
+          contextPacket: input.contextPacket,
+          userText: input.userText,
+        }),
+        maxTokens: FIRST_BEAT_FALLBACK_MAX_TOKENS,
+        temperature: 0.45,
+      },
+    });
     const regenerated = await input.aiClient.generateText({
       ...input.invokeInput,
       prompt: buildFirstBeatFallbackPrompt({
@@ -270,7 +499,28 @@ export async function runFirstBeatReactor(input: {
     });
     const regeneratedText = extractMarkedFirstBeat(String(regenerated.text || ''))
       || extractUnmarkedCompleteFirstBeat(String(regenerated.text || ''));
+    emitFirstBeatDebugLog({
+      event: 'fallback-result',
+      context: input.debugContext,
+      details: {
+        transientMessageId: input.transientMessageId,
+        rawText: String(regenerated.text || ''),
+        extractedText: regeneratedText || null,
+        traceId: String(regenerated.traceId || '').trim() || null,
+      },
+    });
     if (regeneratedText) {
+      emitFirstBeatDebugLog({
+        event: 'return-fallback',
+        context: input.debugContext,
+        details: {
+          transientMessageId: input.transientMessageId,
+          text: regeneratedText,
+          traceId: String(regenerated.traceId || '').trim() || traceId,
+          streamDeltaCount,
+          latencyMs: Math.round(performance.now() - startedAt),
+        },
+      });
       return {
         text: regeneratedText,
         transientMessageId: input.transientMessageId,
@@ -284,7 +534,27 @@ export async function runFirstBeatReactor(input: {
     if (input.abortSignal?.aborted) {
       throw error;
     }
+    emitFirstBeatDebugLog({
+      event: 'fallback-error',
+      context: input.debugContext,
+      details: {
+        transientMessageId: input.transientMessageId,
+        error: error instanceof Error ? error.message : String(error || ''),
+      },
+    });
   }
 
+  emitFirstBeatDebugLog({
+    event: 'unavailable',
+    context: input.debugContext,
+    details: {
+      transientMessageId: input.transientMessageId,
+      streamDeltaCount,
+      traceId,
+      finishReason,
+      partialText,
+      buffer,
+    },
+  });
   throw new Error(FIRST_BEAT_UNAVAILABLE_ERROR);
 }

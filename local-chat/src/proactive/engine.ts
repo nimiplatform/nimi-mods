@@ -44,6 +44,7 @@ import {
 } from '../hooks/turn-send/session-persist.js';
 import type { ChatMessage, LocalChatBeatModality } from '../types.js';
 import type { MediaExecutionDecision } from '../hooks/turn-send/media-decision-types.js';
+import { stripTrailingEndMarkerFragment } from '../hooks/turn-send/stream-end-marker.js';
 
 type OrchestratedBeat = ReturnType<typeof orchestrateBeatModalities>[number];
 type ConcreteMediaDecision = Exclude<MediaExecutionDecision, { kind: 'none' }>;
@@ -76,7 +77,7 @@ function parseLastUserIdleMs(input: {
 }
 
 function normalizeBeatText(content: string): string {
-  return String(content || '').replace(/\s+/g, ' ').trim();
+  return stripTrailingEndMarkerFragment(String(content || '').replace(/\s+/g, ' ').trim());
 }
 
 function toMarkerOverrideIntent(input: {
@@ -283,6 +284,12 @@ export async function runLocalChatProactiveHeartbeatCycle(
         contextPacket: prepared.contextPacket,
         userText: proactiveDirective,
         transientMessageId: firstBeatId,
+        debugContext: {
+          entry: 'proactive',
+          turnTxnId: turnId,
+          targetId: target.id,
+          sessionId: session.id,
+        },
       });
       const firstBeatText = normalizeBeatText(firstBeatResult.text);
       if (!firstBeatText) {
