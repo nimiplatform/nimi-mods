@@ -13,9 +13,8 @@ import { DailyFortuneView } from './daily-fortune-view.js';
 import { FortuneStickView } from './fortune-stick-view.js';
 
 const KISMET_STYLES = `
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;600;900&family=Noto+Sans+SC:wght@300;400;500&display=swap');
-.ks-serif { font-family: 'Noto Serif SC', serif; }
-.ks-sans { font-family: 'Noto Sans SC', sans-serif; }
+.ks-serif { font-family: var(--font-serif); }
+.ks-sans { font-family: var(--font-display); }
 .gu-card {
   position: relative;
   background: #181615;
@@ -33,19 +32,22 @@ const KISMET_STYLES = `
 .gu-tag::before { content: '\\3010'; color: #8A7254; opacity: 0.6; }
 .gu-tag::after { content: '\\3011'; color: #8A7254; opacity: 0.6; }
 .kismet-root {
+  --ks-font-ui: var(--font-ui);
+  --ks-font-display: var(--font-display);
+  --ks-font-serif: var(--font-serif);
   background-color: #100f0d;
   background-image:
     radial-gradient(circle at 50% 0%, #201D1A 0%, transparent 70%),
     url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%25" height="100%25" filter="url(%23n)" opacity="0.03"/></svg>');
   color: #E8E3D7;
-  font-family: 'Noto Sans SC', sans-serif;
+  font-family: var(--ks-font-ui);
 }
 .kismet-root ::-webkit-scrollbar { width: 6px; }
 .kismet-root ::-webkit-scrollbar-track { background: transparent; }
 .kismet-root ::-webkit-scrollbar-thumb { background: rgba(138, 114, 84, 0.3); border-radius: 10px; }
 .kismet-root ::-webkit-scrollbar-thumb:hover { background: #8A7254; }
 .kismet-root input, .kismet-root select, .kismet-root textarea {
-  font-family: 'Noto Serif SC', serif;
+  font-family: var(--ks-font-serif);
 }
 .ks-input {
   width: 100%; background: transparent; border: none;
@@ -60,7 +62,7 @@ const KISMET_STYLES = `
   border: 1px solid #A6382E; color: #A6382E;
   font-size: 1rem; font-weight: 600; letter-spacing: 6px;
   cursor: pointer; transition: all 0.4s;
-  font-family: 'Noto Serif SC', serif;
+  font-family: var(--ks-font-serif);
 }
 .ks-btn-seal:hover { background: #A6382E; color: #E8E3D7; box-shadow: 0 0 15px rgba(166,56,46,0.3); }
 .ks-btn-seal:disabled { opacity: 0.5; pointer-events: none; }
@@ -374,7 +376,7 @@ export function KismetShell() {
             background: 'rgba(138,114,84,0.95)',
             color: '#E8E3D7',
             fontSize: '0.85rem',
-            fontFamily: "'Noto Serif SC', serif",
+            fontFamily: 'var(--font-serif)',
             letterSpacing: 2,
             boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
             animation: 'ks-toast-in 0.3s ease',

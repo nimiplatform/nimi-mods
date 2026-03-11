@@ -36,6 +36,7 @@ export async function registerKismetUiExtensions(input: {
     extension: {
       type: 'tab-page',
       tabId: 'mod:kismet',
+      shellMode: 'immersive',
       strategy: 'append',
       component: () => React.createElement(
         Suspense,

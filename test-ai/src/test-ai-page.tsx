@@ -4018,7 +4018,7 @@ export function TestAiPage() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-row overflow-hidden bg-gray-50 text-sm text-gray-900">
+    <div data-nimi-mod-root="test-ai" className="flex h-full min-h-0 flex-row overflow-hidden bg-gray-50 text-sm text-gray-900">
       <CapabilitySidebar
         active={activeCapability}
         states={states}

@@ -55,16 +55,23 @@ function buildShareCardDocument(input: ShareCardInput): string {
     return `<div class="${cls}"><span>${esc(col.chars[0] || '')}</span><span>${esc(col.chars[1] || '')}</span></div>`;
   }).join('\n                    ');
 
+  const serifFontStack = `"Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", Georgia, serif`;
+  const uiFontStack = `"Inter", "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei UI", "Segoe UI", system-ui, sans-serif`;
+
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;900&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --ks-share-font-serif: ${serifFontStack};
+            --ks-share-font-ui: ${uiFontStack};
+        }
+
         body {
             background-color: #1a1a1a;
             display: flex; justify-content: center; align-items: center;
-            min-height: 100vh; margin: 0; font-family: 'Noto Serif SC', serif;
+            min-height: 100vh; margin: 0; font-family: var(--ks-share-font-serif);
         }
 
         .bookmark-card {
@@ -118,7 +125,7 @@ function buildShareCardDocument(input: ShareCardInput): string {
             width: 70px; height: 70px;
             display: grid; grid-template-columns: 1fr 1fr;
             font-size: 1.6rem; font-weight: 900;
-            font-family: '隶书', '楷体', serif;
+            font-family: var(--ks-share-font-serif);
             text-align: center; align-items: center;
             line-height: 1;
             filter: url(#stone-carving);
@@ -127,7 +134,7 @@ function buildShareCardDocument(input: ShareCardInput): string {
         .gold-seal-block span { transform: scaleY(1.1); }
 
         .seal-text-en {
-            color: #dcb347; font-size: 0.75rem; font-family: sans-serif; line-height: 1.2; text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            color: #dcb347; font-size: 0.75rem; font-family: var(--ks-share-font-ui); line-height: 1.2; text-shadow: 0 2px 4px rgba(0,0,0,0.8);
         }
 
         .bazi-section { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
@@ -198,7 +205,7 @@ function buildShareCardDocument(input: ShareCardInput): string {
                     <div class="qr-mock"></div>
                     <div class="qr-text">
                         <span style="color: #dcb347; font-size: 0.8rem; letter-spacing: 2px;">扫码测算天机</span>
-                        <span style="font-size: 0.6rem; color: #736b60; font-family: sans-serif;">KISMET V2</span>
+                        <span style="font-size: 0.6rem; color: #736b60; font-family: var(--ks-share-font-ui);">KISMET V2</span>
                     </div>
                 </div>
             </div>

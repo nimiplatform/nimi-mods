@@ -18,7 +18,7 @@ export function AudioBookPage() {
   // No active project -> show project list
   if (!store.activeProjectId) {
     return (
-      <div className="flex h-full min-h-0 flex-col bg-gray-50">
+      <div data-nimi-mod-root="audio-book" className="flex h-full min-h-0 flex-col bg-gray-50">
         <header className="flex shrink-0 items-center border-b border-gray-200 bg-white px-4 py-2">
           <span className="text-sm font-semibold text-gray-900">Audio Book</span>
         </header>
@@ -43,35 +43,37 @@ export function AudioBookPage() {
 
   // Active project -> step-based workflow
   return (
-    <TooltipProvider>
-      <AudioBookShell
-        header={
-          <ProjectHeader
-            projectName={store.project?.name ?? ''}
-            onBack={() => store.closeProject()}
-            steps={navigation.steps}
-            currentStep={navigation.currentStep}
-            currentIndex={navigation.currentIndex}
-            canEnterStep={navigation.canEnterStep}
-            onStepClick={navigation.goToStep}
-          />
-        }
-        content={<StepContent controller={controller} />}
-        footer={
-          <StepFooter
-            canRetreat={navigation.canRetreat}
-            canAdvance={navigation.canAdvance}
-            onPrev={navigation.goPrev}
-            onNext={navigation.goNext}
-            prevStep={prevStep}
-            nextStep={nextStep}
-          />
-        }
-        error={ui.error}
-        onDismissError={ui.clearError}
-        confirmDialog={ui.confirmDialog}
-        onDismissConfirm={() => ui.setConfirmDialog(null)}
-      />
-    </TooltipProvider>
+    <div data-nimi-mod-root="audio-book" className="h-full min-h-0">
+      <TooltipProvider>
+        <AudioBookShell
+          header={
+            <ProjectHeader
+              projectName={store.project?.name ?? ''}
+              onBack={() => store.closeProject()}
+              steps={navigation.steps}
+              currentStep={navigation.currentStep}
+              currentIndex={navigation.currentIndex}
+              canEnterStep={navigation.canEnterStep}
+              onStepClick={navigation.goToStep}
+            />
+          }
+          content={<StepContent controller={controller} />}
+          footer={
+            <StepFooter
+              canRetreat={navigation.canRetreat}
+              canAdvance={navigation.canAdvance}
+              onPrev={navigation.goPrev}
+              onNext={navigation.goNext}
+              prevStep={prevStep}
+              nextStep={nextStep}
+            />
+          }
+          error={ui.error}
+          onDismissError={ui.clearError}
+          confirmDialog={ui.confirmDialog}
+          onDismissConfirm={() => ui.setConfirmDialog(null)}
+        />
+      </TooltipProvider>
+    </div>
   );
 }

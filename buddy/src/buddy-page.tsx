@@ -5,5 +5,9 @@ import { getSdkRuntimeContext } from './sdk-context.js';
 
 export function BuddyPage() {
   const controller = useBuddyController(getSdkRuntimeContext());
-  return <BuddyWorkbench {...controller} />;
+  return (
+    <div data-nimi-mod-root="buddy" className="h-full min-h-0">
+      <BuddyWorkbench {...controller} />
+    </div>
+  );
 }

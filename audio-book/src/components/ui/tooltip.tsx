@@ -27,6 +27,7 @@ export function Tooltip({ content, children, side = 'top' }: TooltipProps) {
       </TooltipPrimitive.Trigger>
       <TooltipPrimitive.Portal>
         <TooltipPrimitive.Content
+          data-nimi-mod-portal="audio-book"
           side={side}
           sideOffset={4}
           className="z-50 rounded-md bg-gray-900 px-2.5 py-1.5 text-xs text-white shadow-md"

@@ -4,5 +4,9 @@ import { VideoPlayWorkbench } from './ui/video-play-workbench.js';
 
 export function VideoPlayPage() {
   const props = useVideoPlayController();
-  return <VideoPlayWorkbench {...props} />;
+  return (
+    <div data-nimi-mod-root="videoplay" className="h-full min-h-0">
+      <VideoPlayWorkbench {...props} />
+    </div>
+  );
 }

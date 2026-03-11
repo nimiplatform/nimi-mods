@@ -4,5 +4,9 @@ import { useLocalChatPageController } from './hooks/use-local-chat-page-controll
 
 export function LocalChatPage() {
   const props = useLocalChatPageController();
-  return <LocalChatShell {...props} />;
+  return (
+    <div data-nimi-mod-root="local-chat" className="h-full min-h-0">
+      <LocalChatShell {...props} />
+    </div>
+  );
 }

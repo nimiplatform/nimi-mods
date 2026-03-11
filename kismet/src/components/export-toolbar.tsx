@@ -20,7 +20,7 @@ export function ExportToolbar({ canExport, onExportJson, onExportPdf, onExportHt
     fontSize: '0.8rem',
     cursor: 'pointer',
     transition: 'all 0.3s',
-    fontFamily: "'Noto Serif SC', serif",
+    fontFamily: 'var(--font-serif)',
   };
 
   return (

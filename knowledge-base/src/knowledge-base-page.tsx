@@ -17,7 +17,7 @@ export function KnowledgeBasePage() {
 
   if (!store.initialized) {
     return (
-      <div className="flex h-full items-center justify-center bg-gray-50">
+      <div data-nimi-mod-root="knowledge-base" className="flex h-full items-center justify-center bg-gray-50">
         <div className="flex items-center gap-2">
           <span className="inline-block h-3 w-3 animate-spin rounded-full border border-indigo-400 border-t-transparent" />
           <p className="text-xs text-gray-400">Loading Knowledge Base...</p>
@@ -81,13 +81,15 @@ export function KnowledgeBasePage() {
   }
 
   return (
-    <KBShell
-      header={header}
-      content={content}
-      error={ui.error}
-      onDismissError={ui.clearError}
-      confirmDialog={ui.confirmDialog}
-      onDismissConfirm={() => ui.setConfirmDialog(null)}
-    />
+    <div data-nimi-mod-root="knowledge-base" className="h-full min-h-0">
+      <KBShell
+        header={header}
+        content={content}
+        error={ui.error}
+        onDismissError={ui.clearError}
+        confirmDialog={ui.confirmDialog}
+        onDismissConfirm={() => ui.setConfirmDialog(null)}
+      />
+    </div>
   );
 }

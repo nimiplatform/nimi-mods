@@ -19,7 +19,7 @@ export function KlineChart({ data }: KlineChartProps) {
       layout: {
         background: { color: '#181615' },
         textColor: '#8C857B',
-        fontFamily: "'Noto Serif SC', serif",
+        fontFamily: 'var(--font-serif)',
         fontSize: 11,
       },
       grid: {
@@ -83,7 +83,7 @@ export function KlineChart({ data }: KlineChartProps) {
 
       tooltipRef.current.style.display = 'block';
       tooltipRef.current.innerHTML = `
-        <div style="font-family:'Noto Serif SC',serif;font-size:12px;line-height:1.6;">
+        <div style="font-family:var(--font-serif);font-size:12px;line-height:1.6;">
           <div style="font-weight:600;color:#8A7254;">${point.age}岁 · ${point.year}年</div>
           <div style="color:#8C857B;">${point.ganZhi} · ${point.daYun}</div>
           <div style="color:#8C857B;">O:${point.open} C:${point.close} H:${point.high} L:${point.low}</div>

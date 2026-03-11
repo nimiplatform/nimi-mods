@@ -72,7 +72,7 @@ function FiveElementRose({ ratio }: { ratio: FiveElementDistribution }) {
             fill="#E8E3D7"
             fontSize={12}
             fontWeight={600}
-            fontFamily="'Noto Serif SC', serif"
+            fontFamily="var(--font-serif)"
           >
             {s.label}
           </text>

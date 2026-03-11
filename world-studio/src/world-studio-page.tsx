@@ -9,5 +9,9 @@ import { useWorldStudioPageContent } from './controllers/world-studio-page-contr
 // top failure:
 // Reloaded remote maintenance snapshot and replaced local unsaved changes.
 export function WorldStudioPage() {
-  return useWorldStudioPageContent();
+  return (
+    <div data-nimi-mod-root="world-studio" className="h-full min-h-0">
+      {useWorldStudioPageContent()}
+    </div>
+  );
 }

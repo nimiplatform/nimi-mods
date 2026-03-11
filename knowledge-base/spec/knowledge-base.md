@@ -4,7 +4,7 @@
 
 ## Positioning
 
-Knowledge Base 是 Nimi Desktop 的私有本地知识库助手模块，提供文档摄入、语义检索、多轮 RAG 问答全链路。所有数据仅存储在浏览器 IndexedDB 中，不离开设备。
+Knowledge Base 是运行于 Nimi Desktop zero-bundle mod host 的私有本地知识库 runtime mod，提供文档摄入、语义检索、多轮 RAG 问答全链路。所有数据仅存储在浏览器 IndexedDB 中，不离开设备。
 
 ## Module Map
 

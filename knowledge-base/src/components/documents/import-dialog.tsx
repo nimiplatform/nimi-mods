@@ -89,8 +89,8 @@ export function ImportDialog(props: ImportDialogProps) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/30" />
-        <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-gray-200 bg-white shadow-xl">
+        <DialogPrimitive.Overlay data-nimi-mod-portal="knowledge-base" className="fixed inset-0 z-40 bg-black/30" />
+        <DialogPrimitive.Content data-nimi-mod-portal="knowledge-base" className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl border border-gray-200 bg-white shadow-xl">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
             <DialogPrimitive.Title className="text-sm font-semibold text-gray-900">

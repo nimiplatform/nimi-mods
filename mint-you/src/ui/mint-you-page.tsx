@@ -14,7 +14,7 @@ export function MintYouPage() {
   }, [sessionId, initSession]);
 
   return (
-    <div className="h-full bg-gray-50">
+    <div data-nimi-mod-root="mint-you" className="h-full bg-gray-50">
       <MintYouShell />
     </div>
   );
