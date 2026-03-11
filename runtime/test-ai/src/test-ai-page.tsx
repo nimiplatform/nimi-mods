@@ -1,4 +1,5 @@
 ﻿import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import {
   buildLocalImageWorkflowExtensions,
 } from '@nimiplatform/sdk/mod/runtime';
@@ -18,6 +19,8 @@ import type {
   RuntimeRouteOptionsSnapshot,
   RuntimeRouteSource,
 } from '@nimiplatform/sdk/mod/runtime-route';
+import enLocale from './locales/en.js';
+import zhLocale from './locales/zh.js';
 import { getTestAiRuntimeClient } from './runtime-mod.js';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -35,22 +38,20 @@ type CapabilityId =
 
 type CapabilityMeta = {
   id: CapabilityId;
-  label: string;
-  description: string;
   hasRoute: boolean;
   routeCapability?: RuntimeCanonicalCapability;
 };
 
 const CAPABILITIES: CapabilityMeta[] = [
-  { id: 'text.generate',    label: 'Text Generate',    description: 'Text generation (chat)',                hasRoute: true, routeCapability: 'text.generate' },
-  { id: 'text.embed',       label: 'Text Embed',       description: 'Text embedding (vector)',               hasRoute: true, routeCapability: 'text.embed' },
-  { id: 'image.generate',   label: 'Image Generate',   description: 'Image generation (wait for completion)', hasRoute: true, routeCapability: 'image.generate' },
-  { id: 'image.create-job', label: 'Image Create Job', description: 'Submit image job and monitor progress', hasRoute: true, routeCapability: 'image.generate' },
-  { id: 'video.generate',   label: 'Video Generate',   description: 'Video generation',                     hasRoute: true, routeCapability: 'video.generate' },
-  { id: 'audio.synthesize', label: 'Audio Synthesize', description: 'Text-to-speech synthesis',             hasRoute: true, routeCapability: 'audio.synthesize' },
-  { id: 'audio.transcribe', label: 'Audio Transcribe', description: 'Speech-to-text transcription',         hasRoute: true, routeCapability: 'audio.transcribe' },
-  { id: 'voice.clone',      label: 'Voice Clone',      description: 'Voice asset cloning',                  hasRoute: false },
-  { id: 'voice.design',     label: 'Voice Design',     description: 'Voice asset design',                   hasRoute: false },
+  { id: 'text.generate', hasRoute: true, routeCapability: 'text.generate' },
+  { id: 'text.embed', hasRoute: true, routeCapability: 'text.embed' },
+  { id: 'image.generate', hasRoute: true, routeCapability: 'image.generate' },
+  { id: 'image.create-job', hasRoute: true, routeCapability: 'image.generate' },
+  { id: 'video.generate', hasRoute: true, routeCapability: 'video.generate' },
+  { id: 'audio.synthesize', hasRoute: true, routeCapability: 'audio.synthesize' },
+  { id: 'audio.transcribe', hasRoute: true, routeCapability: 'audio.transcribe' },
+  { id: 'voice.clone', hasRoute: false },
+  { id: 'voice.design', hasRoute: false },
 ];
 
 type VoiceOption = {
@@ -161,19 +162,18 @@ type ImageWorkflowCompanionTier = 'core' | 'extended';
 type ImageWorkflowPresetSelection = {
   key: ImageWorkflowPresetSelectionKey;
   slot: typeof COMMON_IMAGE_WORKFLOW_SLOTS[number];
-  label: string;
   kind: ModRuntimeLocalArtifactKind;
   tier: ImageWorkflowCompanionTier;
 };
 
 const IMAGE_WORKFLOW_PRESET_SELECTIONS: ImageWorkflowPresetSelection[] = [
-  { key: 'vaeModel', slot: 'vae_path', label: 'VAE model', kind: 'vae', tier: 'core' },
-  { key: 'llmModel', slot: 'llm_path', label: 'LLM model', kind: 'llm', tier: 'core' },
-  { key: 'clipLModel', slot: 'clip_l_path', label: 'CLIP-L model', kind: 'clip', tier: 'extended' },
-  { key: 'clipGModel', slot: 'clip_g_path', label: 'CLIP-G model', kind: 'clip', tier: 'extended' },
-  { key: 'controlnetModel', slot: 'controlnet_path', label: 'ControlNet model', kind: 'controlnet', tier: 'extended' },
-  { key: 'loraModel', slot: 'lora_path', label: 'LoRA model', kind: 'lora', tier: 'extended' },
-  { key: 'auxiliaryModel', slot: 'aux_path', label: 'Auxiliary model', kind: 'auxiliary', tier: 'extended' },
+  { key: 'vaeModel', slot: 'vae_path', kind: 'vae', tier: 'core' },
+  { key: 'llmModel', slot: 'llm_path', kind: 'llm', tier: 'core' },
+  { key: 'clipLModel', slot: 'clip_l_path', kind: 'clip', tier: 'extended' },
+  { key: 'clipGModel', slot: 'clip_g_path', kind: 'clip', tier: 'extended' },
+  { key: 'controlnetModel', slot: 'controlnet_path', kind: 'controlnet', tier: 'extended' },
+  { key: 'loraModel', slot: 'lora_path', kind: 'lora', tier: 'extended' },
+  { key: 'auxiliaryModel', slot: 'aux_path', kind: 'auxiliary', tier: 'extended' },
 ];
 
 type CompanionArtifactSelectionsInput = Record<ImageWorkflowPresetSelectionKey, string> & {
@@ -182,6 +182,8 @@ type CompanionArtifactSelectionsInput = Record<ImageWorkflowPresetSelectionKey, 
 
 export const LOCALAI_IMAGE_COMPONENTS_REQUIRED_ERROR =
   'LocalAI image workflow requires explicit companion artifacts. Select one or more layered companion presets, or add workflow components first. If you are not sure what to pick, install or verify the companion artifacts in desktop first.';
+
+type TestAiLocale = typeof enLocale | typeof zhLocale;
 
 function routeCapabilityFor(capabilityId: CapabilityId): RuntimeCanonicalCapability | null {
   const capability = CAPABILITIES.find((item) => item.id === capabilityId)?.routeCapability || null;
@@ -198,10 +200,13 @@ function linkedRouteCapabilityIds(capabilityId: CapabilityId): CapabilityId[] {
     .map((item) => item.id);
 }
 
-function createInitialImageWorkflowDraftState(): ImageWorkflowDraftState {
+function createInitialImageWorkflowDraftState(
+  prompt: string = zhLocale.image.defaultPrompt,
+  negativePrompt: string = zhLocale.image.defaultNegativePrompt,
+): ImageWorkflowDraftState {
   return {
-    prompt: '一只穿宇航服的橘猫，电影感，细节丰富',
-    negativePrompt: 'low quality, blurry',
+    prompt,
+    negativePrompt,
     size: '1024x1024',
     n: '1',
     seed: '',
@@ -222,6 +227,43 @@ function createInitialImageWorkflowDraftState(): ImageWorkflowDraftState {
     auxiliaryModel: '',
     componentDrafts: [],
   };
+}
+
+function useTestAiLocale(): TestAiLocale {
+  const { i18n } = useModTranslation('test-ai');
+  const language = `${i18n.resolvedLanguage || i18n.language || 'en'}`.toLowerCase();
+  return language.startsWith('zh') ? zhLocale : enLocale;
+}
+
+function capabilityCopy(locale: TestAiLocale, capabilityId: CapabilityId) {
+  return locale.sidebar.capabilities[capabilityId];
+}
+
+function presetLabel(locale: TestAiLocale, key: ImageWorkflowPresetSelectionKey): string {
+  return locale.image.presetLabels[key];
+}
+
+function localizeKnownMessage(message: string, locale: TestAiLocale): string {
+  switch (message) {
+    case LOCALAI_IMAGE_COMPONENTS_REQUIRED_ERROR:
+      return locale.image.companionRequired;
+    case 'Raw profile_overrides JSON must be an object.':
+      return locale.image.rawProfileMustBeObject;
+    case 'Invalid profile_overrides JSON.':
+      return locale.image.invalidProfileJson;
+    default:
+      return message;
+  }
+}
+
+function localizedJobStatus(value: unknown, locale: TestAiLocale): string {
+  const statusKey = scenarioJobStatusLabel(value) as keyof typeof locale.jobs.statuses;
+  return locale.jobs.statuses[statusKey] || locale.jobs.statuses.unknown;
+}
+
+function localizedJobEvent(value: unknown, locale: TestAiLocale): string {
+  const eventKey = scenarioJobEventLabel(value) as keyof typeof locale.jobs.events;
+  return locale.jobs.events[eventKey] || locale.jobs.events.event;
 }
 
 // ── Utility ──────────────────────────────────────────────────────────────────
@@ -899,6 +941,7 @@ type RouteBindingEditorProps = {
 };
 
 function RouteBindingEditor(props: RouteBindingEditorProps) {
+  const locale = useTestAiLocale();
   const {
     effectiveBinding,
     activeSource,
@@ -926,7 +969,7 @@ function RouteBindingEditor(props: RouteBindingEditorProps) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-3">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-semibold text-gray-700">Route Binding</span>
+        <span className="text-xs font-semibold text-gray-700">{locale.route.title}</span>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -934,14 +977,14 @@ function RouteBindingEditor(props: RouteBindingEditorProps) {
             disabled={props.loading}
             onClick={props.onReload}
           >
-            {props.loading ? 'Refreshing...' : 'Refresh'}
+            {props.loading ? locale.common.refreshing : locale.common.refresh}
           </button>
           <button
             type="button"
             className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs"
             onClick={() => props.onBindingChange(null)}
           >
-            Use default
+            {locale.common.useDefault}
           </button>
         </div>
       </div>
@@ -950,7 +993,7 @@ function RouteBindingEditor(props: RouteBindingEditorProps) {
       ) : null}
       <div className="grid grid-cols-3 gap-2">
         <label className="flex flex-col gap-1 text-xs">
-          <span className="text-gray-500">Source</span>
+          <span className="text-gray-500">{locale.route.source}</span>
           <select
             className="rounded-md border border-gray-300 bg-white px-2 py-1"
             value={activeSource}
@@ -959,12 +1002,12 @@ function RouteBindingEditor(props: RouteBindingEditorProps) {
             }}
             disabled={!props.snapshot}
           >
-            <option value="local">local</option>
-            <option value="cloud">cloud</option>
+            <option value="local">{locale.common.local}</option>
+            <option value="cloud">{locale.common.cloud}</option>
           </select>
         </label>
         <label className="flex flex-col gap-1 text-xs">
-          <span className="text-gray-500">Connector</span>
+          <span className="text-gray-500">{locale.route.connector}</span>
           <select
             className="rounded-md border border-gray-300 bg-white px-2 py-1"
             value={activeSource === 'cloud' ? activeConnectorId : ''}
@@ -973,7 +1016,7 @@ function RouteBindingEditor(props: RouteBindingEditorProps) {
             }}
             disabled={!props.snapshot || activeSource !== 'cloud'}
           >
-            <option value="">--</option>
+            <option value="">{locale.common.none}</option>
             {tokenConnectors.map((connector) => (
               <option key={connector.id} value={connector.id}>
                 {connector.label || connector.id}
@@ -982,7 +1025,7 @@ function RouteBindingEditor(props: RouteBindingEditorProps) {
           </select>
         </label>
         <label className="flex flex-col gap-1 text-xs">
-          <span className="text-gray-500">Model</span>
+          <span className="text-gray-500">{locale.route.model}</span>
           <select
             className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
             value={activeModelInOptions ? activeModel : ''}
@@ -994,8 +1037,8 @@ function RouteBindingEditor(props: RouteBindingEditorProps) {
           >
             <option value="">
               {modelOptions.length === 0
-                ? (activeSource === 'cloud' ? 'Connector catalog missing models' : 'No local models')
-                : 'Select model'}
+                ? (activeSource === 'cloud' ? locale.route.connectorCatalogMissingModels : locale.route.noLocalModels)
+                : locale.route.selectModel}
             </option>
             {modelOptions.map((model) => (
               <option key={model} value={model}>{model}</option>
@@ -1005,26 +1048,26 @@ function RouteBindingEditor(props: RouteBindingEditorProps) {
       </div>
       {cloudCatalogMissing ? (
         <div className="mt-2 rounded-md bg-amber-50 p-2 text-xs text-amber-700">
-          Connector catalog data is missing models for this capability. Refresh the connector or use a manual override.
+          {locale.route.connectorCatalogMissingHelp}
         </div>
       ) : null}
       <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
         <span>
           {activeSource === 'cloud'
-            ? `provider: ${activeConnector?.provider || effectiveBinding?.provider || 'unknown'}`
-            : 'local runtime model catalog'}
+            ? `${locale.common.provider.toLowerCase()}: ${activeConnector?.provider || effectiveBinding?.provider || locale.common.unknown}`
+            : locale.route.localCatalogSummary}
         </span>
         <button
           type="button"
           className="text-blue-600 hover:underline"
           onClick={() => setShowManualModelOverride((prev) => !prev)}
         >
-          {showManualModelOverride ? 'Hide manual override' : 'Manual override'}
+          {showManualModelOverride ? locale.route.hideManualOverride : locale.route.manualOverride}
         </button>
       </div>
       {showManualModelOverride ? (
         <label className="mt-2 flex flex-col gap-1 text-xs">
-          <span className="text-gray-500">Manual model override</span>
+          <span className="text-gray-500">{locale.route.manualModelOverride}</span>
           <input
             className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
             value={modelDraft}
@@ -1035,18 +1078,18 @@ function RouteBindingEditor(props: RouteBindingEditorProps) {
               props.onBindingChange(bindingForModel(props.snapshot, nextValue, effectiveBinding));
             }}
             disabled={!props.snapshot}
-            placeholder="model id"
+            placeholder={locale.route.modelIdPlaceholder}
           />
         </label>
       ) : null}
       <div className="mt-1.5 text-xs text-gray-500">
         {effectiveBinding
           ? `${effectiveBinding.source} · ${effectiveBinding.provider || '—'} · ${effectiveBinding.connectorId || '—'} · ${effectiveBinding.model || '—'}`
-          : 'runtime default'}
+          : locale.route.runtimeDefault}
       </div>
       {effectiveBinding?.source === 'local' ? (
         <div className="mt-1 text-xs text-gray-500">
-          {`adapter=${effectiveBinding.adapter || '—'} · go-runtime=${effectiveBinding.goRuntimeStatus || 'unknown'} · localModelId=${effectiveBinding.localModelId || '—'}`}
+          {`adapter=${effectiveBinding.adapter || '—'} · go-runtime=${effectiveBinding.goRuntimeStatus || locale.common.unknown} · localModelId=${effectiveBinding.localModelId || '—'}`}
         </div>
       ) : null}
     </div>
@@ -1079,6 +1122,7 @@ type DiagnosticsPanelProps = {
 };
 
 function DiagnosticsPanel(props: DiagnosticsPanelProps) {
+  const locale = useTestAiLocale();
   const { diagnostics } = props;
   if (!diagnostics.requestParams && !diagnostics.resolvedRoute && !diagnostics.responseMetadata) {
     return null;
@@ -1092,7 +1136,7 @@ function DiagnosticsPanel(props: DiagnosticsPanelProps) {
       {/* Request Params */}
       {params ? (
         <div className="rounded-xl border border-gray-200 bg-white p-3">
-          <div className="mb-1.5 font-semibold text-gray-600">Request Params</div>
+          <div className="mb-1.5 font-semibold text-gray-600">{locale.diagnostics.requestParams}</div>
           {Object.entries(params).map(([k, v]) => {
             if (v === undefined || v === null || v === '') return null;
             const displayValue = typeof v === 'object' ? toPrettyJson(v) : String(v);
@@ -1112,7 +1156,7 @@ function DiagnosticsPanel(props: DiagnosticsPanelProps) {
       {/* Route Preview */}
       {route ? (
         <div className="rounded-xl border border-gray-200 bg-white p-3">
-          <div className="mb-1.5 font-semibold text-gray-600">Route Preview</div>
+          <div className="mb-1.5 font-semibold text-gray-600">{locale.diagnostics.routePreview}</div>
           <KVRow label="source" value={route.source} mono highlight="blue" />
           <KVRow label="provider" value={route.provider} mono />
           <KVRow label="modelSelector" value={route.model} mono />
@@ -1131,7 +1175,7 @@ function DiagnosticsPanel(props: DiagnosticsPanelProps) {
       {/* Response Metadata */}
       {meta ? (
         <div className="rounded-xl border border-gray-200 bg-white p-3">
-          <div className="mb-1.5 font-semibold text-gray-600">Response Metadata</div>
+          <div className="mb-1.5 font-semibold text-gray-600">{locale.diagnostics.responseMetadata}</div>
           {meta.elapsed !== undefined ? (
             <KVRow label="elapsed" value={`${meta.elapsed} ms`} highlight="blue" />
           ) : null}
@@ -1179,14 +1223,16 @@ type SidebarProps = {
 };
 
 function CapabilitySidebar(props: SidebarProps) {
+  const locale = useTestAiLocale();
   return (
     <nav className="flex w-44 shrink-0 flex-col gap-1 overflow-y-auto border-r border-gray-200 bg-white p-2">
       <div className="mb-1 px-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
-        AI Capabilities
+        {locale.sidebar.title}
       </div>
       {CAPABILITIES.map((cap) => {
         const state = props.states[cap.id];
         const isActive = props.active === cap.id;
+        const capCopy = capabilityCopy(locale, cap.id);
         let statusIcon = '○';
         let statusColor = 'text-gray-400';
         if (state.result === 'passed') { statusIcon = '✓'; statusColor = 'text-green-500'; }
@@ -1205,8 +1251,8 @@ function CapabilitySidebar(props: SidebarProps) {
           >
             <span className={`shrink-0 text-sm font-mono ${statusColor}`}>{statusIcon}</span>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-xs font-medium">{cap.label}</div>
-              <div className="truncate text-xs text-gray-400">{cap.description}</div>
+              <div className="truncate text-xs font-medium">{capCopy.label}</div>
+              <div className="truncate text-xs text-gray-400">{capCopy.description}</div>
             </div>
           </button>
         );
@@ -1218,6 +1264,7 @@ function CapabilitySidebar(props: SidebarProps) {
 // ── Shared UI atoms ───────────────────────────────────────────────────────────
 
 function RunButton(props: { busy: boolean; busyLabel?: string; label: string; onClick: () => void }) {
+  const locale = useTestAiLocale();
   return (
     <button
       type="button"
@@ -1232,7 +1279,7 @@ function RunButton(props: { busy: boolean; busyLabel?: string; label: string; on
             <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white/90 [animation-delay:-0.1s]" />
             <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-white/90" />
           </span>
-          <span>{(asString(props.busyLabel) || 'Running...').replace(/\.{3}$/, '')}</span>
+          <span>{(asString(props.busyLabel) || locale.common.running).replace(/\.{3}$/, '')}</span>
         </>
       ) : props.label}
     </button>
@@ -1252,6 +1299,7 @@ function InfoBox(props: { message: string }) {
 }
 
 function RawJsonSection(props: { content: string }) {
+  const locale = useTestAiLocale();
   const [copied, setCopied] = React.useState(false);
   const handleCopy = React.useCallback(() => {
     void navigator.clipboard.writeText(props.content).then(() => {
@@ -1265,7 +1313,7 @@ function RawJsonSection(props: { content: string }) {
       onClick={handleCopy}
       className="rounded border border-gray-300 bg-white px-3 py-1 text-xs text-gray-500 hover:bg-gray-100 active:bg-gray-200"
     >
-      {copied ? '✓ Copied' : 'Copy Raw JSON'}
+      {copied ? `✓ ${locale.common.copied}` : locale.common.copyRawJson}
     </button>
   );
 }
@@ -1291,6 +1339,7 @@ function RouteSelect(props: {
   disabled?: boolean;
   onChange: (value: string) => void;
 }) {
+  const locale = useTestAiLocale();
   const { value, options, disabled = false, onChange } = props;
   const [open, setOpen] = React.useState(false);
   const rootRef = React.useRef<HTMLDivElement | null>(null);
@@ -1315,7 +1364,7 @@ function RouteSelect(props: {
         onClick={() => setOpen((prev) => !prev)}
         className="flex w-full items-center justify-between rounded-[18px] border border-gray-200 bg-white px-4 py-3 text-left text-gray-900 transition hover:border-gray-300 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
       >
-        <span className="truncate">{selected?.label || 'Select'}</span>
+        <span className="truncate">{selected?.label || locale.route.selectModel}</span>
         <svg
           className={`ml-3 h-4 w-4 shrink-0 text-gray-700 transition ${open ? 'rotate-180' : ''}`}
           viewBox="0 0 24 24"
@@ -1361,8 +1410,9 @@ function RouteSelect(props: {
 }
 
 function TextGeneratePanel(props: TextGeneratePanelProps) {
+  const locale = useTestAiLocale();
   const { state, runtimeClient, onStateChange, onRouteReload } = props;
-  const [prompt, setPrompt] = React.useState('你好，请用两句话介绍你自己。');
+  const [prompt, setPrompt] = React.useState<string>(locale.textGenerate.defaultPrompt);
   const [system, setSystem] = React.useState('');
   const [temperature, setTemperature] = React.useState('1');
   const [maxTokens, setMaxTokens] = React.useState('');
@@ -1392,13 +1442,13 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
     : 1;
   const quickTokenOptions = ['Auto', '1024', '2048', '4096'] as const;
   const modelMenuOptions = modelOptions.length > 0 ? modelOptions : (activeModel ? [activeModel] : []);
-  const modelDisplayName = activeModel || effectiveBinding?.model || effectiveBinding?.modelId || 'Select model';
+  const modelDisplayName = activeModel || effectiveBinding?.model || effectiveBinding?.modelId || locale.route.selectModel;
   const sourceOptions: RouteSelectOption[] = [
-    { value: 'local', label: 'local' },
-    { value: 'cloud', label: 'cloud' },
+    { value: 'local', label: locale.common.local },
+    { value: 'cloud', label: locale.common.cloud },
   ];
   const connectorOptions: RouteSelectOption[] = [
-    { value: '', label: '--' },
+    { value: '', label: locale.common.none },
     ...tokenConnectors.map((connector) => ({
       value: connector.id,
       label: connector.label || connector.id,
@@ -1407,11 +1457,11 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
   const modelSelectOptions: RouteSelectOption[] = modelOptions.length === 0
     ? [{
         value: '',
-        label: activeSource === 'cloud' ? 'Connector catalog missing models' : 'No local models',
+        label: activeSource === 'cloud' ? locale.route.connectorCatalogMissingModels : locale.route.noLocalModels,
         disabled: true,
       }]
     : [
-        { value: '', label: 'Select model' },
+        { value: '', label: locale.route.selectModel },
         ...modelOptions.map((model) => ({ value: model, label: model })),
       ];
 
@@ -1454,12 +1504,12 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
 
   const handleRun = React.useCallback(async () => {
     if (!asString(prompt)) {
-      onStateChange((prev) => ({ ...prev, error: 'Prompt is empty.' }));
+      onStateChange((prev) => ({ ...prev, error: locale.textGenerate.promptEmpty }));
       return;
     }
     setShowAdvanced(false);
     setShowModelMenu(false);
-    onStateChange((prev) => ({ ...prev, busy: true, busyLabel: 'Preparing route...', error: '', diagnostics: makeEmptyDiagnostics() }));
+    onStateChange((prev) => ({ ...prev, busy: true, busyLabel: locale.textGenerate.preparingRoute, error: '', diagnostics: makeEmptyDiagnostics() }));
     const t0 = Date.now();
     const binding = resolveEffectiveBinding(state.snapshot, state.binding) || undefined;
     const tempNum = temperature ? Number(temperature) : undefined;
@@ -1477,7 +1527,7 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
       onStateChange((prev) => ({
         ...prev,
         busy: true,
-        busyLabel: resolved?.source === 'local' ? 'Warming local model...' : 'Running...',
+        busyLabel: resolved?.source === 'local' ? locale.textGenerate.warmingLocalModel : locale.common.running,
       }));
       const result = await runtimeClient.ai.text.generate({
         input: prompt,
@@ -1493,7 +1543,7 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
         busy: false,
         busyLabel: '',
         result: 'passed',
-        output: asString(result.text) || '(empty output)',
+        output: asString(result.text) || locale.textGenerate.emptyOutput,
         rawResponse: toPrettyJson({ request: requestParams, resolved, response: result }),
         diagnostics: {
           requestParams,
@@ -1511,7 +1561,7 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
       }));
     } catch (error) {
       const elapsed = Date.now() - t0;
-      const message = error instanceof Error ? error.message : String(error || 'Text generate failed.');
+      const message = error instanceof Error ? error.message : String(error || locale.textGenerate.generateFailed);
       onStateChange((prev) => ({
         ...prev,
         busy: false,
@@ -1522,7 +1572,7 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
         diagnostics: { requestParams, resolvedRoute: resolved ?? null, responseMetadata: { elapsed } },
       }));
     }
-  }, [prompt, system, temperature, maxTokens, state.snapshot, state.binding, runtimeClient, onStateChange]);
+  }, [locale, prompt, system, temperature, maxTokens, state.snapshot, state.binding, runtimeClient, onStateChange]);
 
   const selectModel = React.useCallback((model: string) => {
     if (!asString(model)) return;
@@ -1559,7 +1609,7 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
   const titleHero = (
     <div className="mb-5 flex flex-col items-center text-center">
       <h1 className="text-[58px] font-black uppercase tracking-[0.08em] text-[#0f172a] sm:text-[72px]">
-        Test AI
+        {locale.textGenerate.heroTitle}
       </h1>
     </div>
   );
@@ -1571,7 +1621,7 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
                 className="min-h-[56px] w-full resize-none overflow-y-auto border-0 bg-transparent pr-2 text-[16px] leading-7 text-gray-900 outline-none placeholder:text-gray-400"
                 value={prompt}
                 onChange={(event) => setPrompt(event.target.value)}
-                placeholder="Ask away. Long-form writing, summaries, and structured answers all work well here."
+                placeholder={locale.textGenerate.placeholder}
               />
 
               <div className="absolute bottom-4 left-4 flex items-center gap-2">
@@ -1583,7 +1633,7 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
                       setShowModelMenu(false);
                     }}
                     className="flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition hover:border-gray-300 hover:text-gray-800"
-                    title="Advanced settings"
+                    title={locale.textGenerate.advancedSettings}
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M12 3v4" />
@@ -1600,19 +1650,19 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
 
                   {showAdvanced ? (
                     <div className="absolute bottom-14 left-0 z-20 w-[360px] rounded-[26px] border border-gray-200 bg-white p-4 shadow-[0_22px_55px_rgba(15,23,42,0.16)]">
-                      <div className="mb-4 text-sm font-semibold text-gray-900">Advanced Parameters</div>
+                      <div className="mb-4 text-sm font-semibold text-gray-900">{locale.textGenerate.advancedParameters}</div>
                       <div className="space-y-4">
                         <label className="block">
-                          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">System Prompt</div>
+                          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">{locale.textGenerate.systemPrompt}</div>
                           <textarea
                             className="h-24 w-full resize-none rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 text-sm leading-6 text-gray-800 outline-none focus:border-[#4ECCA3] focus:bg-white"
                             value={system}
                             onChange={(event) => setSystem(event.target.value)}
-                            placeholder="Optional system instructions..."
+                            placeholder={locale.textGenerate.systemPromptPlaceholder}
                           />
                         </label>
                         <div>
-                          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">Temperature</div>
+                          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">{locale.textGenerate.temperature}</div>
                           <input
                             type="range"
                             min="0"
@@ -1623,13 +1673,13 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
                             className="h-2 w-full cursor-pointer appearance-none rounded-full bg-gray-200 accent-[#4ECCA3]"
                           />
                           <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
-                            <span>Precise</span>
+                            <span>{locale.textGenerate.precise}</span>
                             <span>{temperatureValue.toFixed(1)}</span>
-                            <span>Creative</span>
+                            <span>{locale.textGenerate.creative}</span>
                           </div>
                         </div>
                         <div>
-                          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">Max Tokens</div>
+                          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">{locale.textGenerate.maxTokens}</div>
                           <div className="flex flex-wrap gap-2">
                             {quickTokenOptions.map((option) => {
                               const active = option === 'Auto' ? !asString(maxTokens) : maxTokens === option;
@@ -1672,7 +1722,7 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
 
                   {showModelMenu ? (
                     <div className="absolute bottom-14 right-0 z-20 w-[320px] rounded-[26px] border border-gray-200 bg-white p-2 shadow-[0_22px_55px_rgba(15,23,42,0.16)]">
-                      <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">Models</div>
+                      <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">{locale.textGenerate.models}</div>
                       <div className="max-h-80 overflow-y-auto py-1">
                         {modelMenuOptions.length > 0 ? modelMenuOptions.map((model) => {
                           const active = model === activeModel;
@@ -1689,7 +1739,7 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
                           );
                         }) : (
                           <div className="px-3 py-3 text-sm text-gray-400">
-                            {cloudCatalogMissing ? 'Connector catalog is missing model data.' : 'No model options available yet.'}
+                            {cloudCatalogMissing ? locale.textGenerate.connectorModelDataMissing : locale.textGenerate.noModelData}
                           </div>
                         )}
                       </div>
@@ -1703,7 +1753,7 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
                         }}
                         className="flex w-full items-center rounded-2xl px-3 py-2.5 text-left text-sm text-gray-700 transition hover:bg-gray-50"
                       >
-                        Manual Override / Custom Route
+                        {locale.route.dialogTitle}
                       </button>
                     </div>
                   ) : null}
@@ -1714,7 +1764,7 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
                   disabled={state.busy || !asString(prompt)}
                   onClick={() => { void handleRun(); }}
                   className="flex h-11 w-11 items-center justify-center rounded-full bg-[#111827] text-white transition hover:bg-[#1f2937] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
-                  title="Send"
+                  title={locale.textGenerate.send}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M12 19V5" />
@@ -1779,7 +1829,7 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
                   onClick={() => setShowConversation((prev) => !prev)}
                   className="inline-flex items-center gap-2 rounded-full border border-[#4ECCA3]/20 bg-[#4ECCA3]/10 px-4 py-2 text-sm text-[#2E8D73] transition hover:bg-[#4ECCA3]/14"
                 >
-                  <span>{showConversation ? 'Hide conversation' : 'Show conversation'}</span>
+                  <span>{showConversation ? locale.common.hideConversation : locale.common.showConversation}</span>
                   <svg
                     className={`h-4 w-4 transition-transform ${showConversation ? 'rotate-180' : ''}`}
                     viewBox="0 0 24 24"
@@ -1800,9 +1850,9 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
                 </div>
                 <div className="rounded-[30px] border border-gray-200 bg-white px-6 py-5 shadow-[0_20px_45px_rgba(15,23,42,0.06)]">
                   <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
-                    <span>Assistant</span>
+                    <span>{locale.common.assistant}</span>
                     {state.result === 'passed' ? (
-                      <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] tracking-normal text-green-700">Ready</span>
+                      <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] tracking-normal text-green-700">{locale.common.ready}</span>
                     ) : null}
                   </div>
                   <div className="whitespace-pre-wrap text-[15px] leading-8 text-gray-800">{asString(state.output)}</div>
@@ -1818,7 +1868,7 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
                     <span className="h-2 w-2 animate-bounce rounded-full bg-emerald-400 [animation-delay:-0.1s]" />
                     <span className="h-2 w-2 animate-bounce rounded-full bg-emerald-400" />
                   </span>
-                  <span>{(state.busyLabel || 'Running...').replace(/\.{3}$/, '')}</span>
+                  <span>{(state.busyLabel || locale.common.running).replace(/\.{3}$/, '')}</span>
                 </div>
               </div>
             ) : null}
@@ -1834,9 +1884,9 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
               {composer}
             </div>
 
-            {state.busy && state.busyLabel === 'Warming local model...' ? (
+            {state.busy && state.busyLabel === locale.textGenerate.warmingLocalModel ? (
               <div className="mt-4">
-                <InfoBox message="Local runtime is prewarming the selected model before sending your prompt." />
+                <InfoBox message={locale.textGenerate.prewarmingNotice} />
               </div>
             ) : null}
 
@@ -1857,7 +1907,7 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
                     >
                       <path d="m9 6 6 6-6 6" />
                     </svg>
-                    <span>Developer details</span>
+                    <span>{locale.common.developerDetails}</span>
                   </button>
                   {showDeveloperDetails ? (
                     <div className="border-t border-gray-200 p-4">
@@ -1879,9 +1929,9 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
           <div className="w-full max-w-2xl rounded-[30px] bg-white p-6 shadow-[0_30px_80px_rgba(15,23,42,0.2)]">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
-                <div className="text-lg font-semibold text-gray-950">Manual Override / Custom Route</div>
+                <div className="text-lg font-semibold text-gray-950">{locale.route.dialogTitle}</div>
                 <div className="mt-1 text-sm text-gray-500">
-                  Use advanced routing controls when you need to pin source, connector, or a custom model.
+                  {locale.route.dialogDescription}
                 </div>
               </div>
               <button
@@ -1904,7 +1954,7 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
 
             <div className="grid gap-4 md:grid-cols-3">
               <label className="flex flex-col gap-2 text-sm">
-                <span className="text-gray-500">Source</span>
+                <span className="text-gray-500">{locale.route.source}</span>
                 <RouteSelect
                   value={activeSource}
                   options={sourceOptions}
@@ -1913,7 +1963,7 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
                 />
               </label>
               <label className="flex flex-col gap-2 text-sm">
-                <span className="text-gray-500">Connector</span>
+                <span className="text-gray-500">{locale.route.connector}</span>
                 <RouteSelect
                   value={activeSource === 'cloud' ? activeConnectorId : ''}
                   options={connectorOptions}
@@ -1922,7 +1972,7 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
                 />
               </label>
               <label className="flex flex-col gap-2 text-sm">
-                <span className="text-gray-500">Model</span>
+                <span className="text-gray-500">{locale.route.model}</span>
                 <RouteSelect
                   value={activeModelInOptions ? activeModel : ''}
                   options={modelSelectOptions}
@@ -1934,18 +1984,18 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
 
             <div className="mt-4 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-600">
               {activeSource === 'cloud'
-                ? `Provider: ${activeConnector?.label || activeConnector?.id || 'unknown'}`
-                : 'Using local runtime model catalog'}
+                ? `${locale.common.provider}: ${activeConnector?.label || activeConnector?.id || locale.common.unknown}`
+                : locale.route.usingLocalCatalog}
             </div>
 
             <label className="mt-4 flex flex-col gap-2 text-sm">
-              <span className="text-gray-500">Manual model override</span>
+              <span className="text-gray-500">{locale.route.manualModelOverride}</span>
               <input
                 className="rounded-2xl border border-gray-200 bg-white px-3 py-3 outline-none focus:border-[#4ECCA3]"
                 value={manualModelDraft}
                 onChange={(event) => setManualModelDraft(event.target.value)}
                 onBlur={() => applyManualModel(manualModelDraft)}
-                placeholder="model id"
+                placeholder={locale.route.modelIdPlaceholder}
               />
             </label>
 
@@ -1956,7 +2006,7 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
                 disabled={state.routeLoading}
                 className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 transition hover:border-gray-300 hover:bg-gray-50 disabled:opacity-50"
               >
-                {state.routeLoading ? 'Refreshing...' : 'Refresh'}
+                {state.routeLoading ? locale.common.refreshing : locale.common.refresh}
               </button>
               <div className="flex items-center gap-2">
                 <button
@@ -1964,7 +2014,7 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
                   onClick={() => onStateChange((prev) => ({ ...prev, binding: null }))}
                   className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 transition hover:border-gray-300 hover:bg-gray-50"
                 >
-                  Use default
+                  {locale.common.useDefault}
                 </button>
                 <button
                   type="button"
@@ -1974,7 +2024,7 @@ function TextGeneratePanel(props: TextGeneratePanelProps) {
                   }}
                   className="rounded-full bg-[#111827] px-4 py-2 text-sm text-white transition hover:bg-[#1f2937]"
                 >
-                  Done
+                  {locale.common.done}
                 </button>
               </div>
             </div>
@@ -1995,8 +2045,9 @@ type TextEmbedPanelProps = {
 };
 
 function TextEmbedPanel(props: TextEmbedPanelProps) {
+  const locale = useTestAiLocale();
   const { state, runtimeClient, onStateChange, onRouteReload } = props;
-  const [text, setText] = React.useState('Hello, world.');
+  const [text, setText] = React.useState<string>(locale.textEmbed.defaultText);
   const [showModelMenu, setShowModelMenu] = React.useState(false);
   const [showRouteDialog, setShowRouteDialog] = React.useState(false);
   const [manualModelDraft, setManualModelDraft] = React.useState('');
@@ -2016,16 +2067,16 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
   const tokenConnectors = state.snapshot?.connectors || [];
   const activeConnector = tokenConnectors.find((item) => item.id === activeConnectorId) || null;
   const modelMenuOptions = modelOptions.length > 0 ? modelOptions : (activeModel ? [activeModel] : []);
-  const modelDisplayName = activeModel || effectiveBinding?.model || effectiveBinding?.modelId || 'Select model';
+  const modelDisplayName = activeModel || effectiveBinding?.model || effectiveBinding?.modelId || locale.route.selectModel;
   const textLength = text.length;
   const lineCount = Math.max(1, text.split(/\r?\n/g).length);
   const estimatedTokens = Math.max(1, Math.ceil(asString(text).length / 4));
   const sourceSelectOptions: RouteSelectOption[] = [
-    { value: 'local', label: 'local' },
-    { value: 'cloud', label: 'cloud' },
+    { value: 'local', label: locale.common.local },
+    { value: 'cloud', label: locale.common.cloud },
   ];
   const connectorSelectOptions: RouteSelectOption[] = [
-    { value: '', label: '--', disabled: true },
+    { value: '', label: locale.common.none, disabled: true },
     ...tokenConnectors.map((connector) => ({
       value: connector.id,
       label: connector.label || connector.id,
@@ -2035,8 +2086,8 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
     {
       value: '',
       label: modelOptions.length === 0
-        ? (activeSource === 'cloud' ? 'Connector catalog missing models' : 'No local models')
-        : 'Select model',
+        ? (activeSource === 'cloud' ? locale.route.connectorCatalogMissingModels : locale.route.noLocalModels)
+        : locale.route.selectModel,
       disabled: true,
     },
     ...modelOptions.map((model) => ({ value: model, label: model })),
@@ -2093,13 +2144,13 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
 
   const handleRun = React.useCallback(async () => {
     if (!asString(text)) {
-      onStateChange((prev) => ({ ...prev, error: 'Input text is empty.' }));
+      onStateChange((prev) => ({ ...prev, error: locale.textEmbed.inputEmpty }));
       return;
     }
     onStateChange((prev) => ({
       ...prev,
       busy: true,
-      busyLabel: 'Preparing route...',
+      busyLabel: locale.textEmbed.preparingRoute,
       error: '',
       diagnostics: makeEmptyDiagnostics(),
     }));
@@ -2112,7 +2163,7 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
       onStateChange((prev) => ({
         ...prev,
         busy: true,
-        busyLabel: resolved?.source === 'local' ? 'Warming local embedding model...' : 'Generating embedding...',
+        busyLabel: resolved?.source === 'local' ? locale.textEmbed.warmingLocalModel : locale.textEmbed.generating,
       }));
       const result = await runtimeClient.ai.embedding.generate({ input: text, binding });
       const elapsed = Date.now() - t0;
@@ -2147,7 +2198,7 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
       }));
     } catch (error) {
       const elapsed = Date.now() - t0;
-      const message = error instanceof Error ? error.message : String(error || 'Text embed failed.');
+      const message = error instanceof Error ? error.message : String(error || locale.textEmbed.failed);
       onStateChange((prev) => ({
         ...prev,
         busy: false,
@@ -2158,7 +2209,7 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
         diagnostics: { requestParams, resolvedRoute: resolved ?? null, responseMetadata: { elapsed } },
       }));
     }
-  }, [text, state.snapshot, state.binding, runtimeClient, onStateChange]);
+  }, [locale, text, state.snapshot, state.binding, runtimeClient, onStateChange]);
 
   const embedOutput = state.output as {
     dimensions?: number;
@@ -2186,16 +2237,16 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
               <div className="border-b border-gray-100 bg-[#fbfcfd] px-5 py-5">
                 <div className="mb-5 flex items-start justify-between gap-4">
                   <div>
-                    <div className="text-lg font-semibold text-gray-950">Advanced Routing Configuration</div>
+                    <div className="text-lg font-semibold text-gray-950">{locale.textEmbed.title}</div>
                     <div className="mt-1 text-sm text-gray-500">
-                      Pin source, connector, or model when you need to inspect a specific embedding path.
+                      {locale.textEmbed.description}
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setShowRouteDialog(false)}
                     className="rounded-full border border-gray-200 p-2 text-gray-500 transition hover:border-gray-300 hover:text-gray-700"
-                    title="Collapse"
+                    title={locale.common.collapse}
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="m18 15-6-6-6 6" />
@@ -2211,7 +2262,7 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
 
                 <div className="grid gap-4 md:grid-cols-3">
                   <label className="flex flex-col gap-2 text-sm">
-                    <span className="text-gray-500">Source</span>
+                    <span className="text-gray-500">{locale.route.source}</span>
                     <RouteSelect
                       value={activeSource}
                       options={sourceSelectOptions}
@@ -2220,7 +2271,7 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
                     />
                   </label>
                   <label className="flex flex-col gap-2 text-sm">
-                    <span className="text-gray-500">Connector</span>
+                    <span className="text-gray-500">{locale.route.connector}</span>
                     <RouteSelect
                       value={activeSource === 'cloud' ? activeConnectorId : ''}
                       options={connectorSelectOptions}
@@ -2229,7 +2280,7 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
                     />
                   </label>
                   <label className="flex flex-col gap-2 text-sm">
-                    <span className="text-gray-500">Model Override</span>
+                    <span className="text-gray-500">{locale.route.modelOverride}</span>
                     <RouteSelect
                       value={activeModelInOptions ? activeModel : ''}
                       options={modelSelectOptions}
@@ -2244,18 +2295,18 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
 
                 <div className="mt-4 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-600">
                   {activeSource === 'cloud'
-                    ? `Provider: ${activeConnector?.label || activeConnector?.id || 'unknown'}`
-                    : 'Using local runtime model catalog'}
+                    ? `${locale.common.provider}: ${activeConnector?.label || activeConnector?.id || locale.common.unknown}`
+                    : locale.route.usingLocalCatalog}
                 </div>
 
                 <label className="mt-4 flex flex-col gap-2 text-sm">
-                  <span className="text-gray-500">Manual model id</span>
+                  <span className="text-gray-500">{locale.route.manualModelId}</span>
                   <input
                     className="rounded-2xl border border-gray-200 bg-white px-3 py-3 outline-none focus:border-emerald-400"
                     value={manualModelDraft}
                     onChange={(event) => setManualModelDraft(event.target.value)}
                     onBlur={() => applyManualModel(manualModelDraft)}
-                    placeholder="model id"
+                    placeholder={locale.route.modelIdPlaceholder}
                   />
                 </label>
 
@@ -2265,15 +2316,15 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
                     onClick={() => onStateChange((prev) => ({ ...prev, binding: null }))}
                     className="rounded-full border border-gray-200 px-4 py-2 text-sm text-gray-600 transition hover:border-gray-300 hover:text-gray-900"
                   >
-                    Use default route
+                    {locale.route.useDefaultRoute}
                   </button>
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
-                      onClick={onRouteReload}
-                      className="rounded-full border border-gray-200 px-4 py-2 text-sm text-gray-600 transition hover:border-gray-300 hover:text-gray-900"
-                    >
-                      {state.routeLoading ? 'Refreshing...' : 'Refresh route'}
+                    onClick={onRouteReload}
+                    className="rounded-full border border-gray-200 px-4 py-2 text-sm text-gray-600 transition hover:border-gray-300 hover:text-gray-900"
+                  >
+                      {state.routeLoading ? locale.common.refreshing : locale.route.refreshRoute}
                     </button>
                     <button
                       type="button"
@@ -2283,7 +2334,7 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
                       }}
                       className="rounded-full bg-[#111827] px-4 py-2 text-sm text-white transition hover:bg-[#1f2937]"
                     >
-                      Save configuration
+                      {locale.common.saveConfiguration}
                     </button>
                   </div>
                 </div>
@@ -2295,7 +2346,7 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
               className="min-h-[220px] flex-1 resize-none border-0 bg-transparent px-5 py-5 text-[17px] leading-8 text-gray-900 outline-none placeholder:text-gray-400"
               value={text}
               onChange={(event) => setText(event.target.value)}
-              placeholder="Enter text to embed..."
+              placeholder={locale.textEmbed.inputPlaceholder}
             />
 
             <div className="border-t border-gray-100 bg-[#fbfcfd] px-4 py-3">
@@ -2315,7 +2366,7 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
                   {showModelMenu ? (
                     <div className="absolute bottom-[calc(100%+10px)] left-0 z-30 w-72 rounded-[24px] border border-gray-200 bg-white p-2 shadow-[0_20px_50px_rgba(15,23,42,0.16)]">
                       <div className="mb-1 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">
-                        Route Model
+                        {locale.route.routeModel}
                       </div>
                       {modelMenuOptions.map((model) => (
                         <button
@@ -2329,7 +2380,7 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
                         >
                           <span className="truncate font-mono text-[12px]">{model}</span>
                           {activeModel === model ? (
-                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Active</span>
+                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">{locale.common.ready}</span>
                           ) : null}
                         </button>
                       ))}
@@ -2342,7 +2393,7 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
                         }}
                         className="flex w-full items-center rounded-2xl px-3 py-2.5 text-left text-sm text-gray-700 transition hover:bg-gray-50"
                       >
-                        Manual Override / Custom Route
+                        {locale.route.dialogTitle}
                       </button>
                     </div>
                   ) : null}
@@ -2353,7 +2404,7 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
                   disabled={state.busy || !asString(text)}
                   onClick={() => { void handleRun(); }}
                   className="flex h-11 w-11 items-center justify-center rounded-full bg-[#111827] text-white transition hover:bg-[#1f2937] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
-                  title="Run Text Embed"
+                  title={locale.textEmbed.run}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M5 12h14" />
@@ -2364,25 +2415,25 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
 
               <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
                 <span className="rounded-full bg-gray-100 px-2.5 py-1 font-medium">
-                  Source: <span className="font-mono text-gray-700">{activeSource}</span>
+                  {locale.textEmbed.source}: <span className="font-mono text-gray-700">{activeSource}</span>
                 </span>
                 <span className="rounded-full bg-gray-100 px-2.5 py-1 font-medium">
-                  Chars: <span className="font-mono text-gray-700">{textLength}</span>
+                  {locale.textEmbed.chars}: <span className="font-mono text-gray-700">{textLength}</span>
                 </span>
                 <span className="rounded-full bg-gray-100 px-2.5 py-1 font-medium">
-                  Lines: <span className="font-mono text-gray-700">{lineCount}</span>
+                  {locale.textEmbed.lines}: <span className="font-mono text-gray-700">{lineCount}</span>
                 </span>
                 <span className="rounded-full bg-gray-100 px-2.5 py-1 font-medium">
-                  Est. tokens: <span className="font-mono text-gray-700">~{estimatedTokens}</span>
+                  {locale.textEmbed.estimatedTokens}: <span className="font-mono text-gray-700">~{estimatedTokens}</span>
                 </span>
                 {activeSource === 'cloud' && activeConnectorId ? (
                   <span className="rounded-full bg-gray-100 px-2.5 py-1 font-medium">
-                    Connector: <span className="font-mono text-gray-700">{activeConnector?.label || activeConnectorId}</span>
+                    {locale.textEmbed.connector}: <span className="font-mono text-gray-700">{activeConnector?.label || activeConnectorId}</span>
                   </span>
                 ) : null}
                 {responseMeta?.modelResolved ? (
                   <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700">
-                    Resolved: <span className="font-mono">{responseMeta.modelResolved}</span>
+                    {locale.textEmbed.resolved}: <span className="font-mono">{responseMeta.modelResolved}</span>
                   </span>
                 ) : null}
               </div>
@@ -2392,20 +2443,20 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
           <div className="flex min-h-[440px] flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-[linear-gradient(180deg,_rgba(248,250,252,0.96)_0%,_rgba(241,245,249,0.96)_100%)] shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
             <div className="flex items-center justify-between border-b border-slate-200 bg-white/70 px-4 py-3">
               <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Vector Output</div>
-                <div className="mt-1 text-xs text-slate-500">Structured numeric response for the first vector.</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">{locale.textEmbed.vectorOutput}</div>
+                <div className="mt-1 text-xs text-slate-500">{locale.textEmbed.vectorOutputDescription}</div>
               </div>
               {embedOutput ? (
                 <div className="flex items-center gap-2">
                   <div className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">
-                    Dim {embedOutput.dimensions ?? 0}
+                    {locale.textEmbed.shortDimensions} {embedOutput.dimensions ?? 0}
                   </div>
                   <button
                     type="button"
                     onClick={handleCopyVector}
                     className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
                   >
-                    {copiedVector ? 'Copied' : 'Copy'}
+                    {copiedVector ? locale.common.copied : locale.common.copy}
                   </button>
                 </div>
               ) : null}
@@ -2413,26 +2464,26 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
 
             <div className="grid gap-3 border-b border-slate-200 px-4 py-3 sm:grid-cols-3">
               <div className="rounded-2xl bg-white/75 px-3 py-3">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Vectors</div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">{locale.textEmbed.vectors}</div>
                 <div className="mt-1 font-mono text-sm text-slate-800">{embedOutput?.vectors ?? 0}</div>
               </div>
               <div className="rounded-2xl bg-white/75 px-3 py-3">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Dimensions</div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">{locale.textEmbed.dimensions}</div>
                 <div className="mt-1 font-mono text-sm text-slate-800">{embedOutput?.dimensions ?? '—'}</div>
               </div>
               <div className="rounded-2xl bg-white/75 px-3 py-3">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Elapsed</div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">{locale.textEmbed.elapsed}</div>
                 <div className="mt-1 font-mono text-sm text-slate-800">{responseMeta?.elapsed !== undefined ? `${responseMeta.elapsed} ms` : '—'}</div>
               </div>
             </div>
 
             <div className="grid gap-3 border-b border-slate-200 px-4 py-3 sm:grid-cols-2">
               <div className="rounded-2xl bg-white/75 px-3 py-3">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Resolved Model</div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">{locale.textEmbed.resolvedModel}</div>
                 <div className="mt-1 truncate font-mono text-sm text-slate-800">{responseMeta?.modelResolved || modelDisplayName}</div>
               </div>
               <div className="rounded-2xl bg-white/75 px-3 py-3">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">Trace Id</div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">{locale.textEmbed.traceId}</div>
                 <div className="mt-1 truncate font-mono text-sm text-slate-800">{responseMeta?.traceId || '—'}</div>
               </div>
             </div>
@@ -2454,7 +2505,7 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
                       <path d="m15.6 8.4 2.8-2.8" />
                     </svg>
                   </div>
-                  <div className="text-sm">{state.busyLabel || 'Embedding text...'}</div>
+                  <div className="text-sm">{state.busyLabel || locale.textEmbed.embedding}</div>
                 </div>
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-slate-400">
@@ -2465,7 +2516,7 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
                       <path d="M4 17h10" />
                     </svg>
                   </div>
-                  <div className="text-sm italic">Output will appear here...</div>
+                  <div className="text-sm italic">{locale.common.outputPending}</div>
                 </div>
               )}
             </div>
@@ -2473,7 +2524,7 @@ function TextEmbedPanel(props: TextEmbedPanelProps) {
       </div>
 
       {state.error ? <ErrorBox message={state.error} /> : null}
-      {embedOutput?.preview ? <InfoBox message={`Preview: ${embedOutput.preview}`} /> : null}
+      {embedOutput?.preview ? <InfoBox message={`${locale.common.previewPrefix} ${embedOutput.preview}`} /> : null}
       <DiagnosticsPanel diagnostics={state.diagnostics} />
       {state.rawResponse ? <RawJsonSection content={state.rawResponse} /> : null}
     </div>
@@ -2494,6 +2545,7 @@ type ImageGeneratePanelProps = {
 };
 
 function ImageGeneratePanel(props: ImageGeneratePanelProps) {
+  const locale = useTestAiLocale();
   const {
     mode,
     state,
@@ -2553,7 +2605,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
       if (cancelled) return;
       setArtifacts([]);
       setArtifactLoading(false);
-      setArtifactError(error instanceof Error ? error.message : String(error || 'Failed to load local artifacts.'));
+      setArtifactError(error instanceof Error ? error.message : String(error || locale.image.localArtifactsMissing));
     });
     return () => {
       cancelled = true;
@@ -2636,7 +2688,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
 
   const buildRequestContext = React.useCallback(() => {
     if (!asString(draft.prompt)) {
-      return { error: 'Prompt is empty.' };
+      return { error: locale.image.promptEmpty };
     }
     const profileOverridesResult = buildImageWorkflowProfileOverrides({
       step: draft.step,
@@ -2647,7 +2699,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
       rawJsonText: draft.rawProfileOverridesText,
     });
     if (profileOverridesResult.error) {
-      return { error: profileOverridesResult.error };
+      return { error: localizeKnownMessage(profileOverridesResult.error, locale) };
     }
     const binding = effectiveBinding || undefined;
     const nNum = Math.max(1, Number(draft.n) || 1);
@@ -2665,7 +2717,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
         profileOverrides: profileOverridesResult.overrides,
       });
       if (localWorkflow.error) {
-        return { error: localWorkflow.error };
+        return { error: localizeKnownMessage(localWorkflow.error, locale) };
       }
       extensions = localWorkflow.extensions;
     }
@@ -2684,7 +2736,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
         binding,
       }),
     };
-  }, [draft, effectiveBinding, isLocalAIImageWorkflow]);
+  }, [draft, effectiveBinding, isLocalAIImageWorkflow, locale]);
 
   const finalizeAsyncImageJob = React.useCallback(async (input: {
     jobId: string;
@@ -2782,7 +2834,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
     onStateChange((prev) => ({
       ...prev,
       busy: true,
-      busyLabel: 'Watching image job...',
+      busyLabel: locale.image.watchingJob,
       error: '',
       output: [],
       diagnostics: {
@@ -2840,7 +2892,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
       job: currentJob,
       elapsed: Date.now() - startedAt,
     });
-  }, [finalizeAsyncImageJob, onStateChange, runtimeClient.media.jobs]);
+  }, [finalizeAsyncImageJob, locale, onStateChange, runtimeClient.media.jobs]);
 
   const handleRun = React.useCallback(async () => {
     const requestContext = buildRequestContext();
@@ -2849,7 +2901,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
       return;
     }
     if (!requestContext.requestParams) {
-      onStateChange((prev) => ({ ...prev, error: 'Image request is empty.' }));
+      onStateChange((prev) => ({ ...prev, error: locale.image.imageRequestEmpty }));
       return;
     }
     onStateChange((prev) => ({ ...prev, busy: true, error: '', diagnostics: makeEmptyDiagnostics() }));
@@ -2903,7 +2955,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
       }));
     } catch (error) {
       const elapsed = Date.now() - t0;
-      const message = error instanceof Error ? error.message : String(error || (mode === 'job' ? 'Image job submit failed.' : 'Image generate failed.'));
+      const message = error instanceof Error ? error.message : String(error || (mode === 'job' ? locale.image.submitFailed : locale.image.generateFailed));
       onStateChange((prev) => ({
         ...prev,
         busy: false,
@@ -2916,6 +2968,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
     }
   }, [
     buildRequestContext,
+    locale,
     mode,
     runtimeClient,
     onStateChange,
@@ -2925,7 +2978,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
   const handleWatchExistingJob = React.useCallback(async () => {
     const targetJobId = asString(watchJobId);
     if (!targetJobId) {
-      onStateChange((prev) => ({ ...prev, error: 'Job ID is empty.' }));
+      onStateChange((prev) => ({ ...prev, error: locale.image.jobIdEmpty }));
       return;
     }
     try {
@@ -2940,15 +2993,15 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
         busy: false,
         busyLabel: '',
         result: 'failed',
-        error: error instanceof Error ? error.message : String(error || 'Failed to watch job.'),
+        error: error instanceof Error ? error.message : String(error || locale.image.watchFailed),
       }));
     }
-  }, [onStateChange, watchAsyncImageJob, watchJobId]);
+  }, [locale, onStateChange, watchAsyncImageJob, watchJobId]);
 
   const handleCancelJob = React.useCallback(async () => {
     const targetJobId = asString(watchJobId);
     if (!targetJobId) {
-      onStateChange((prev) => ({ ...prev, error: 'Job ID is empty.' }));
+      onStateChange((prev) => ({ ...prev, error: locale.image.jobIdEmpty }));
       return;
     }
     try {
@@ -2968,10 +3021,10 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
     } catch (error) {
       onStateChange((prev) => ({
         ...prev,
-        error: error instanceof Error ? error.message : String(error || 'Failed to cancel job.'),
+        error: error instanceof Error ? error.message : String(error || locale.image.cancelFailed),
       }));
     }
-  }, [onStateChange, runtimeClient.media.jobs, watchJobId]);
+  }, [locale, onStateChange, runtimeClient.media.jobs, watchJobId]);
 
   const imageUris = (state.output as string[] | null) || [];
   const companionPresetArtifacts = React.useMemo(() => (
@@ -3010,17 +3063,17 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
         className="h-20 w-full resize-y rounded-lg border border-gray-300 bg-white p-2 font-mono text-xs"
         value={draft.prompt}
         onChange={(event) => updateDraft({ prompt: event.target.value })}
-        placeholder="Prompt"
+        placeholder={locale.image.promptPlaceholder}
       />
       <textarea
         className="h-14 w-full resize-y rounded-lg border border-gray-300 bg-white p-2 font-mono text-xs"
         value={draft.negativePrompt}
         onChange={(event) => updateDraft({ negativePrompt: event.target.value })}
-        placeholder="Negative prompt (optional)"
+        placeholder={locale.image.negativePromptPlaceholder}
       />
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-1 text-xs">
-          <span className="text-gray-500">Size</span>
+          <span className="text-gray-500">{locale.image.size}</span>
           <input
             className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
             value={draft.size}
@@ -3033,7 +3086,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
           </datalist>
         </label>
         <label className="flex flex-col gap-1 text-xs">
-          <span className="text-gray-500">Count (n)</span>
+          <span className="text-gray-500">{locale.image.count}</span>
           <input
             type="number" min="1" max="4"
             className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
@@ -3045,14 +3098,14 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
       {isLocalAIImageWorkflow ? (
         <div className="rounded-xl border border-gray-200 bg-white p-3">
           <div className="mb-2">
-            <div className="text-xs font-semibold text-gray-700">Companion models</div>
+            <div className="text-xs font-semibold text-gray-700">{locale.image.companionModels}</div>
             <div className="text-[11px] text-gray-500">
-              Test-AI exposes the full LocalAI companion surface in layers. Start with the core presets, then add extended companions when your model family needs them.
+              {locale.image.companionDescription}
             </div>
           </div>
           {artifactLoading ? (
             <div className="rounded-md bg-blue-50 p-2 text-[11px] text-blue-700">
-              Loading installed local artifacts...
+              {locale.image.loadingArtifacts}
             </div>
           ) : null}
           {artifactError ? (
@@ -3060,22 +3113,22 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
           ) : null}
           <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
             <div className="mb-2">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-600">Layer 1: Core companions</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-600">{locale.image.coreCompanions}</div>
               <div className="text-[11px] text-gray-500">
-                Common LocalAI image workflows often start here.
+                {locale.image.coreCompanionsDescription}
               </div>
             </div>
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
               {coreCompanionPresets.map((preset) => (
                 <label key={preset.key} className="flex flex-col gap-1 text-xs">
-                  <span className="text-gray-500">{preset.label}</span>
+                  <span className="text-gray-500">{presetLabel(locale, preset.key)}</span>
                   <select
                     className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
                     value={draft[preset.key]}
                     onChange={(event) => updateDraft({ [preset.key]: event.target.value } as Partial<ImageWorkflowDraftState>)}
                     disabled={artifactLoading || companionPresetArtifacts[preset.key].length === 0}
                   >
-                    <option value="">-- optional --</option>
+                    <option value="">{locale.image.layerOptional}</option>
                     {companionPresetArtifacts[preset.key].map((artifact) => (
                       <option key={artifact.localArtifactId} value={artifact.localArtifactId}>
                         {artifactDisplayLabel(artifact)}
@@ -3088,22 +3141,22 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
           </div>
           <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
             <div className="mb-2">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-600">Layer 2: Extended companions</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-600">{locale.image.extendedCompanions}</div>
               <div className="text-[11px] text-gray-500">
-                Use these when the selected LocalAI image workflow depends on CLIP, ControlNet, LoRA, or auxiliary assets.
+                {locale.image.extendedCompanionsDescription}
               </div>
             </div>
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
               {extendedCompanionPresets.map((preset) => (
                 <label key={preset.key} className="flex flex-col gap-1 text-xs">
-                  <span className="text-gray-500">{preset.label}</span>
+                  <span className="text-gray-500">{presetLabel(locale, preset.key)}</span>
                   <select
                     className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
                     value={draft[preset.key]}
                     onChange={(event) => updateDraft({ [preset.key]: event.target.value } as Partial<ImageWorkflowDraftState>)}
                     disabled={artifactLoading || companionPresetArtifacts[preset.key].length === 0}
                   >
-                    <option value="">-- optional --</option>
+                    <option value="">{locale.image.layerOptional}</option>
                     {companionPresetArtifacts[preset.key].map((artifact) => (
                       <option key={artifact.localArtifactId} value={artifact.localArtifactId}>
                         {artifactDisplayLabel(artifact)}
@@ -3116,16 +3169,16 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
           </div>
           {!artifactLoading && !artifactError && !hasKnownCompanionArtifacts ? (
             <div className="mt-2 rounded-md bg-amber-50 p-2 text-[11px] text-amber-700">
-              No known LocalAI companion artifacts are installed for this runtime yet. Import VAE, LLM, CLIP, ControlNet, LoRA, or auxiliary assets in desktop model center first.
+              {locale.image.localArtifactsMissing}
             </div>
           ) : null}
         </div>
       ) : null}
       <details className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs">
-        <summary className="cursor-pointer font-semibold text-gray-600">Advanced options</summary>
+        <summary className="cursor-pointer font-semibold text-gray-600">{locale.image.advancedOptions}</summary>
         <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
           <label className="flex max-w-xs flex-col gap-1 text-xs">
-            <span className="text-gray-500">Response format</span>
+            <span className="text-gray-500">{locale.image.responseFormat}</span>
             <select
               className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
               value={draft.responseFormatMode}
@@ -3136,23 +3189,23 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
               <option value="url">url</option>
             </select>
             <span className="text-[11px] text-gray-400">
-              Auto leaves the response format unset so the runtime/provider can pick the native path.
+              {locale.image.responseFormatHint}
             </span>
           </label>
           <label className="flex max-w-xs flex-col gap-1 text-xs">
-            <span className="text-gray-500">Seed</span>
+            <span className="text-gray-500">{locale.image.seed}</span>
             <input
               className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
               value={draft.seed}
               onChange={(event) => updateDraft({ seed: event.target.value })}
-              placeholder="optional"
+              placeholder={locale.image.layerOptional}
             />
             <span className="text-[11px] text-gray-400">
-              Seed stays on the standard image request. Workflow profile overrides stay in the LocalAI extension payload.
+              {locale.image.seedHint}
             </span>
           </label>
           <label className="flex max-w-xs flex-col gap-1 text-xs">
-            <span className="text-gray-500">Timeout (ms)</span>
+            <span className="text-gray-500">{locale.image.timeout}</span>
             <input
               className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
               value={draft.timeoutMs}
@@ -3160,7 +3213,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
               placeholder="600000"
             />
             <span className="text-[11px] text-gray-400">
-              Default is 10 minutes. For heavier local jobs, increase it manually or switch to `Image Create Job`.
+              {locale.image.timeoutHint}
             </span>
           </label>
         </div>
@@ -3168,9 +3221,9 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
           <div className="mt-3 rounded-lg border border-gray-200 bg-white p-3">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <div className="font-semibold text-gray-700">Local workflow</div>
+                <div className="font-semibold text-gray-700">{locale.image.localWorkflow}</div>
                 <div className="text-[11px] text-gray-500">
-                  Layer 3 is the fully open test surface. Use it for non-standard slot names or to exercise workflow shapes beyond the preset companion layers above.
+                  {locale.image.localWorkflowDescription}
                 </div>
               </div>
               <button
@@ -3178,7 +3231,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
                 className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs"
                 onClick={handleAddComponent}
               >
-                Add component
+                {locale.common.addComponent}
               </button>
             </div>
             <datalist id="test-ai-image-workflow-slots">
@@ -3188,7 +3241,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
             </datalist>
             {artifactLoading ? (
               <div className="mt-2 rounded-md bg-blue-50 p-2 text-[11px] text-blue-700">
-                Loading installed local artifacts...
+                {locale.image.loadingArtifacts}
               </div>
             ) : null}
             {artifactError ? (
@@ -3196,13 +3249,13 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
             ) : null}
             {!artifactLoading && !artifactError && artifacts.length === 0 ? (
               <div className="mt-2 rounded-md bg-amber-50 p-2 text-[11px] text-amber-700">
-                No companion artifacts are installed for the selected local runtime yet. Download/import VAE or LLM assets in desktop first, then select them here.
+                {locale.image.noInstalledArtifacts}
               </div>
             ) : null}
             <div className="mt-3 flex flex-col gap-2">
               {draft.componentDrafts.length === 0 ? (
                 <div className="rounded-md bg-gray-50 p-2 text-[11px] text-gray-500">
-                  No extra workflow components configured.
+                  {locale.image.noExtraComponents}
                 </div>
               ) : null}
               {draft.componentDrafts.map((component) => {
@@ -3217,7 +3270,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
                 return (
                   <div key={component.id} className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
                     <label className="flex flex-col gap-1 text-xs">
-                      <span className="text-gray-500">Slot</span>
+                      <span className="text-gray-500">{locale.image.slot}</span>
                       <input
                         className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
                         value={component.slot}
@@ -3227,14 +3280,14 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
                       />
                     </label>
                     <label className="flex flex-col gap-1 text-xs">
-                      <span className="text-gray-500">Artifact</span>
+                      <span className="text-gray-500">{locale.image.artifact}</span>
                       <select
                         className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
                         value={component.localArtifactId}
                         onChange={(event) => handleComponentChange(component.id, 'localArtifactId', event.target.value)}
                         disabled={artifactLoading || artifactChoices.length === 0}
                       >
-                        <option value="">-- optional --</option>
+                        <option value="">{locale.image.layerOptional}</option>
                         {artifactChoices.map((artifact) => (
                           <option key={artifact.localArtifactId} value={artifact.localArtifactId}>
                             {artifactDisplayLabel(artifact)}
@@ -3248,7 +3301,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
                         className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs"
                         onClick={() => handleRemoveComponent(component.id)}
                       >
-                        Remove
+                        {locale.common.remove}
                       </button>
                     </div>
                   </div>
@@ -3257,7 +3310,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
             </div>
             <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
               <label className="flex flex-col gap-1 text-xs">
-                <span className="text-gray-500">Steps</span>
+                <span className="text-gray-500">{locale.image.steps}</span>
                 <input
                   className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
                   value={draft.step}
@@ -3266,16 +3319,16 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
                 />
               </label>
               <label className="flex flex-col gap-1 text-xs">
-                <span className="text-gray-500">CFG scale</span>
+                <span className="text-gray-500">{locale.image.cfgScale}</span>
                 <input
                   className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
                   value={draft.cfgScale}
                   onChange={(event) => updateDraft({ cfgScale: event.target.value })}
-                  placeholder="optional"
+                  placeholder={locale.image.layerOptional}
                 />
               </label>
               <label className="flex flex-col gap-1 text-xs">
-                <span className="text-gray-500">Sampler</span>
+                <span className="text-gray-500">{locale.image.sampler}</span>
                 <input
                   className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
                   value={draft.sampler}
@@ -3284,17 +3337,17 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
                 />
               </label>
               <label className="flex flex-col gap-1 text-xs">
-                <span className="text-gray-500">Scheduler</span>
+                <span className="text-gray-500">{locale.image.scheduler}</span>
                 <input
                   className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
                   value={draft.scheduler}
                   onChange={(event) => updateDraft({ scheduler: event.target.value })}
-                  placeholder="optional"
+                  placeholder={locale.image.layerOptional}
                 />
               </label>
             </div>
             <label className="mt-3 flex flex-col gap-1 text-xs">
-              <span className="text-gray-500">Options (one per line)</span>
+              <span className="text-gray-500">{locale.image.optionsPerLine}</span>
               <textarea
                 className="h-20 resize-y rounded-md border border-gray-300 bg-white p-2 font-mono text-xs"
                 value={draft.optionsText}
@@ -3303,7 +3356,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
               />
             </label>
             <label className="mt-3 flex flex-col gap-1 text-xs">
-              <span className="text-gray-500">Raw profile_overrides JSON</span>
+              <span className="text-gray-500">{locale.image.rawProfileOverrides}</span>
               <textarea
                 className="h-24 resize-y rounded-md border border-gray-300 bg-white p-2 font-mono text-xs"
                 value={draft.rawProfileOverridesText}
@@ -3311,25 +3364,25 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
                 placeholder={'{"clip_skip": 2}'}
               />
               <span className="text-[11px] text-gray-400">
-                Runtime rejects path overrides like `*_path` and `parameters.model`; choose those via the component rows above instead.
+                {locale.image.rawProfileOverridesHint}
               </span>
             </label>
           </div>
         ) : (
           <div className="mt-3 rounded-md bg-blue-50 p-2 text-[11px] text-blue-700">
-            Local workflow controls apply only when the route source is `local`. When using `cloud`, the request only sends the standard image fields.
+            {locale.image.localOnlyHint}
           </div>
         )}
       </details>
       {mode === 'job' ? (
         <div className="flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-3">
-          <div className="text-xs font-semibold text-gray-700">Async image job</div>
+          <div className="text-xs font-semibold text-gray-700">{locale.image.asyncJob}</div>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto]">
             <input
               className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
               value={watchJobId}
               onChange={(event) => setWatchJobId(event.target.value)}
-              placeholder="job id"
+              placeholder={locale.image.jobIdPlaceholder}
             />
             <button
               type="button"
@@ -3337,7 +3390,7 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
               disabled={state.busy}
               onClick={() => { void handleWatchExistingJob(); }}
             >
-              Watch Job
+              {locale.common.watchJob}
             </button>
             <button
               type="button"
@@ -3345,19 +3398,19 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
               disabled={!asString(watchJobId)}
               onClick={() => { void handleCancelJob(); }}
             >
-              Cancel Job
+              {locale.common.cancelJob}
             </button>
           </div>
-          <RunButton busy={state.busy} busyLabel={state.busyLabel} label="Submit Image Job" onClick={() => { void handleRun(); }} />
+          <RunButton busy={state.busy} busyLabel={state.busyLabel} label={locale.image.submitJob} onClick={() => { void handleRun(); }} />
           {jobTimeline.length > 0 ? (
             <div className="rounded-md bg-gray-50 p-2 text-xs">
-              <div className="mb-1 font-semibold text-gray-600">Job timeline</div>
+              <div className="mb-1 font-semibold text-gray-600">{locale.image.jobTimeline}</div>
               <div className="flex flex-col gap-1">
                 {jobTimeline.map((event, index) => (
                   <div key={`${String(event.sequence || index)}`} className="grid grid-cols-[80px_1fr] gap-x-2">
                     <span className="font-mono text-gray-400">{String(event.sequence || index + 1)}</span>
                     <span className="text-gray-700">
-                      {String(event.label || 'event')} · {String(event.status || 'unknown')}
+                      {localizedJobEvent(event.label, locale)} · {localizedJobStatus(event.status, locale)}
                       {event.reasonDetail ? ` · ${String(event.reasonDetail)}` : ''}
                     </span>
                   </div>
@@ -3367,13 +3420,13 @@ function ImageGeneratePanel(props: ImageGeneratePanelProps) {
           ) : null}
         </div>
       ) : (
-        <RunButton busy={state.busy} busyLabel={state.busyLabel} label="Run Image Generate" onClick={() => { void handleRun(); }} />
+        <RunButton busy={state.busy} busyLabel={state.busyLabel} label={locale.image.runGenerate} onClick={() => { void handleRun(); }} />
       )}
       {state.error ? <ErrorBox message={state.error} /> : null}
       {imageUris.length > 0 ? (
         <div className="grid grid-cols-2 gap-2">
           {imageUris.map((uri) => (
-            <img key={uri} alt="Generated" src={uri} className="rounded-lg border border-gray-200" />
+            <img key={uri} alt={locale.image.generatedAlt} src={uri} className="rounded-lg border border-gray-200" />
           ))}
         </div>
       ) : null}
@@ -3395,20 +3448,21 @@ type VideoGeneratePanelProps = {
 };
 
 function VideoGeneratePanel(props: VideoGeneratePanelProps) {
+  const locale = useTestAiLocale();
   const { state, runtimeClient, onStateChange, onRouteReload } = props;
   const [mode, setMode] = React.useState<VideoMode>('t2v');
-  const [prompt, setPrompt] = React.useState('A cat in an astronaut suit floating in space, cinematic');
+  const [prompt, setPrompt] = React.useState<string>(locale.video.defaultPrompt);
   const [refImageUri, setRefImageUri] = React.useState('');
 
   const isI2v = mode !== 't2v';
 
   const handleRun = React.useCallback(async () => {
     if (!asString(prompt)) {
-      onStateChange((prev) => ({ ...prev, error: 'Prompt is empty.' }));
+      onStateChange((prev) => ({ ...prev, error: locale.video.promptEmpty }));
       return;
     }
     if (isI2v && !asString(refImageUri)) {
-      onStateChange((prev) => ({ ...prev, error: 'Reference image URL required for i2v mode.' }));
+      onStateChange((prev) => ({ ...prev, error: locale.video.referenceRequired }));
       return;
     }
     onStateChange((prev) => ({ ...prev, busy: true, error: '', diagnostics: makeEmptyDiagnostics() }));
@@ -3453,7 +3507,7 @@ function VideoGeneratePanel(props: VideoGeneratePanelProps) {
       }));
     } catch (error) {
       const elapsed = Date.now() - t0;
-      const message = error instanceof Error ? error.message : String(error || 'Video generate failed.');
+      const message = error instanceof Error ? error.message : String(error || locale.video.failed);
       onStateChange((prev) => ({
         ...prev,
         busy: false,
@@ -3463,7 +3517,7 @@ function VideoGeneratePanel(props: VideoGeneratePanelProps) {
         diagnostics: { requestParams, resolvedRoute: resolved ?? null, responseMetadata: { elapsed } },
       }));
     }
-  }, [mode, prompt, refImageUri, isI2v, state.snapshot, state.binding, runtimeClient, onStateChange]);
+  }, [isI2v, locale, mode, prompt, refImageUri, state.snapshot, state.binding, runtimeClient, onStateChange]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -3477,32 +3531,32 @@ function VideoGeneratePanel(props: VideoGeneratePanelProps) {
         onBindingChange={(binding) => onStateChange((prev) => ({ ...prev, binding }))}
       />
       <label className="flex flex-col gap-1 text-xs">
-        <span className="text-gray-500">Mode</span>
+        <span className="text-gray-500">{locale.video.mode}</span>
         <select
           className="rounded-md border border-gray-300 bg-white px-2 py-1"
           value={mode}
           onChange={(event) => setMode(event.target.value as VideoMode)}
         >
-          <option value="t2v">Text-to-Video (t2v)</option>
-          <option value="i2v-first-frame">Image-to-Video first frame (i2v-first-frame)</option>
-          <option value="i2v-reference">Image-to-Video reference (i2v-reference)</option>
+          <option value="t2v">{locale.video.t2v}</option>
+          <option value="i2v-first-frame">{locale.video.i2vFirstFrame}</option>
+          <option value="i2v-reference">{locale.video.i2vReference}</option>
         </select>
       </label>
       <textarea
         className="h-20 w-full resize-y rounded-lg border border-gray-300 bg-white p-2 font-mono text-xs"
         value={prompt}
         onChange={(event) => setPrompt(event.target.value)}
-        placeholder="Prompt"
+        placeholder={locale.video.promptPlaceholder}
       />
       {isI2v ? (
         <input
           className="w-full rounded-lg border border-gray-300 bg-white p-2 font-mono text-xs"
           value={refImageUri}
           onChange={(event) => setRefImageUri(event.target.value)}
-          placeholder="Reference image URL"
+          placeholder={locale.video.referenceImagePlaceholder}
         />
       ) : null}
-      <RunButton busy={state.busy} label="Run Video Generate" onClick={() => { void handleRun(); }} />
+      <RunButton busy={state.busy} label={locale.video.run} onClick={() => { void handleRun(); }} />
       {state.error ? <ErrorBox message={state.error} /> : null}
       <DiagnosticsPanel diagnostics={state.diagnostics} />
       {state.rawResponse ? <RawJsonSection content={state.rawResponse} /> : null}
@@ -3520,8 +3574,9 @@ type AudioSynthesizePanelProps = {
 };
 
 function AudioSynthesizePanel(props: AudioSynthesizePanelProps) {
+  const locale = useTestAiLocale();
   const { state, runtimeClient, onStateChange, onRouteReload } = props;
-  const [text, setText] = React.useState('这是一个 TTS 链路测试。');
+  const [text, setText] = React.useState<string>(locale.audioSynthesize.defaultText);
   const [voices, setVoices] = React.useState<VoiceOption[]>([]);
   const [selectedVoiceId, setSelectedVoiceId] = React.useState('');
   const [manualVoiceId, setManualVoiceId] = React.useState('');
@@ -3551,12 +3606,12 @@ function AudioSynthesizePanel(props: AudioSynthesizePanelProps) {
 
   const handleRun = React.useCallback(async () => {
     if (!asString(text)) {
-      onStateChange((prev) => ({ ...prev, error: 'Input text is empty.' }));
+      onStateChange((prev) => ({ ...prev, error: locale.audioSynthesize.inputEmpty }));
       return;
     }
     const voice = asString(manualVoiceId) || asString(selectedVoiceId);
     if (!voice) {
-      onStateChange((prev) => ({ ...prev, error: 'No voice selected.' }));
+      onStateChange((prev) => ({ ...prev, error: locale.audioSynthesize.noVoiceSelected }));
       return;
     }
     onStateChange((prev) => ({ ...prev, busy: true, error: '', diagnostics: makeEmptyDiagnostics() }));
@@ -3591,7 +3646,7 @@ function AudioSynthesizePanel(props: AudioSynthesizePanelProps) {
       }));
     } catch (error) {
       const elapsed = Date.now() - t0;
-      const message = error instanceof Error ? error.message : String(error || 'TTS synthesize failed.');
+      const message = error instanceof Error ? error.message : String(error || locale.audioSynthesize.failed);
       onStateChange((prev) => ({
         ...prev,
         busy: false,
@@ -3601,7 +3656,7 @@ function AudioSynthesizePanel(props: AudioSynthesizePanelProps) {
         diagnostics: { requestParams, resolvedRoute: resolved ?? null, responseMetadata: { elapsed } },
       }));
     }
-  }, [text, manualVoiceId, selectedVoiceId, audioFormat, state.snapshot, state.binding, runtimeClient, onStateChange]);
+  }, [audioFormat, locale, manualVoiceId, onStateChange, runtimeClient, selectedVoiceId, state.binding, state.snapshot, text]);
 
   const audioOutput = state.output as { audioUri?: string; mimeType?: string; durationMs?: number } | null;
 
@@ -3620,17 +3675,17 @@ function AudioSynthesizePanel(props: AudioSynthesizePanelProps) {
         className="h-20 w-full resize-y rounded-lg border border-gray-300 bg-white p-2 font-mono text-xs"
         value={text}
         onChange={(event) => setText(event.target.value)}
-        placeholder="Text to synthesize"
+        placeholder={locale.audioSynthesize.textPlaceholder}
       />
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-1 text-xs">
-          <span className="text-gray-500">Preset Voice</span>
+          <span className="text-gray-500">{locale.audioSynthesize.presetVoice}</span>
           <select
             className="rounded-md border border-gray-300 bg-white px-2 py-1"
             value={selectedVoiceId}
             onChange={(event) => setSelectedVoiceId(event.target.value)}
           >
-            <option value="">--</option>
+            <option value="">{locale.common.none}</option>
             {voices.map((voice) => (
               <option key={voice.voiceId} value={voice.voiceId}>
                 {voice.name} [{voice.lang}]
@@ -3639,7 +3694,7 @@ function AudioSynthesizePanel(props: AudioSynthesizePanelProps) {
           </select>
         </label>
         <label className="flex flex-col gap-1 text-xs">
-          <span className="text-gray-500">Audio Format</span>
+          <span className="text-gray-500">{locale.audioSynthesize.audioFormat}</span>
           <select
             className="rounded-md border border-gray-300 bg-white px-2 py-1"
             value={audioFormat}
@@ -3653,21 +3708,21 @@ function AudioSynthesizePanel(props: AudioSynthesizePanelProps) {
         </label>
       </div>
       <label className="flex flex-col gap-1 text-xs">
-        <span className="text-gray-500">Manual Voice Override</span>
+        <span className="text-gray-500">{locale.audioSynthesize.manualVoiceOverride}</span>
         <input
           className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
           value={manualVoiceId}
           onChange={(event) => setManualVoiceId(event.target.value)}
-          placeholder="voice id (overrides preset)"
+          placeholder={locale.audioSynthesize.manualVoicePlaceholder}
         />
       </label>
-      <RunButton busy={state.busy} label="Run Audio Synthesize" onClick={() => { void handleRun(); }} />
+      <RunButton busy={state.busy} label={locale.audioSynthesize.run} onClick={() => { void handleRun(); }} />
       {state.error ? <ErrorBox message={state.error} /> : null}
       {audioOutput?.audioUri ? (
         <div>
           <audio controls className="w-full" src={audioOutput.audioUri} />
           <div className="mt-1 text-xs text-gray-500">
-            {audioOutput.mimeType || 'audio'} · {audioOutput.durationMs ? `${audioOutput.durationMs}ms` : 'duration unknown'}
+            {audioOutput.mimeType || locale.common.audio} · {audioOutput.durationMs ? `${audioOutput.durationMs}ms` : locale.common.durationUnknown}
           </div>
         </div>
       ) : null}
@@ -3687,6 +3742,7 @@ type AudioTranscribePanelProps = {
 };
 
 function AudioTranscribePanel(props: AudioTranscribePanelProps) {
+  const locale = useTestAiLocale();
   const { state, runtimeClient, onStateChange, onRouteReload } = props;
   const [audioUri, setAudioUri] = React.useState('');
   const [language, setLanguage] = React.useState('');
@@ -3694,7 +3750,7 @@ function AudioTranscribePanel(props: AudioTranscribePanelProps) {
 
   const handleRun = React.useCallback(async () => {
     if (!asString(audioUri)) {
-      onStateChange((prev) => ({ ...prev, error: 'Audio URL is empty.' }));
+      onStateChange((prev) => ({ ...prev, error: locale.audioTranscribe.audioUrlEmpty }));
       return;
     }
     onStateChange((prev) => ({ ...prev, busy: true, error: '', diagnostics: makeEmptyDiagnostics() }));
@@ -3721,7 +3777,7 @@ function AudioTranscribePanel(props: AudioTranscribePanelProps) {
         ...prev,
         busy: false,
         result: 'passed',
-        output: result.text || '(no transcription)',
+        output: result.text || locale.audioTranscribe.noTranscription,
         rawResponse: toPrettyJson({ request: requestParams, resolved, response: result }),
         diagnostics: {
           requestParams,
@@ -3736,7 +3792,7 @@ function AudioTranscribePanel(props: AudioTranscribePanelProps) {
       }));
     } catch (error) {
       const elapsed = Date.now() - t0;
-      const message = error instanceof Error ? error.message : String(error || 'STT transcribe failed.');
+      const message = error instanceof Error ? error.message : String(error || locale.audioTranscribe.failed);
       onStateChange((prev) => ({
         ...prev,
         busy: false,
@@ -3746,7 +3802,7 @@ function AudioTranscribePanel(props: AudioTranscribePanelProps) {
         diagnostics: { requestParams, resolvedRoute: resolved ?? null, responseMetadata: { elapsed } },
       }));
     }
-  }, [audioUri, language, mimeType, state.snapshot, state.binding, runtimeClient, onStateChange]);
+  }, [audioUri, language, locale, mimeType, onStateChange, runtimeClient, state.binding, state.snapshot]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -3763,29 +3819,29 @@ function AudioTranscribePanel(props: AudioTranscribePanelProps) {
         className="w-full rounded-lg border border-gray-300 bg-white p-2 font-mono text-xs"
         value={audioUri}
         onChange={(event) => setAudioUri(event.target.value)}
-        placeholder="Audio URL (https://... or data:...)"
+        placeholder={locale.audioTranscribe.audioUrlPlaceholder}
       />
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-1 text-xs">
-          <span className="text-gray-500">Language (optional)</span>
+          <span className="text-gray-500">{locale.audioTranscribe.language}</span>
           <input
             className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
             value={language}
             onChange={(event) => setLanguage(event.target.value)}
-            placeholder="zh / en / ja …"
+            placeholder={locale.audioTranscribe.languagePlaceholder}
           />
         </label>
         <label className="flex flex-col gap-1 text-xs">
-          <span className="text-gray-500">MIME Type (optional)</span>
+          <span className="text-gray-500">{locale.audioTranscribe.mimeType}</span>
           <input
             className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs"
             value={mimeType}
             onChange={(event) => setMimeType(event.target.value)}
-            placeholder="audio/mp3 …"
+            placeholder={locale.audioTranscribe.mimeTypePlaceholder}
           />
         </label>
       </div>
-      <RunButton busy={state.busy} label="Run Audio Transcribe" onClick={() => { void handleRun(); }} />
+      <RunButton busy={state.busy} label={locale.audioTranscribe.run} onClick={() => { void handleRun(); }} />
       {state.error ? <ErrorBox message={state.error} /> : null}
       {state.output ? (
         <pre className="max-h-48 overflow-auto rounded-md bg-gray-50 p-2 text-xs">{asString(state.output)}</pre>
@@ -3804,6 +3860,7 @@ type VoiceClonePanelProps = {
 };
 
 function VoiceClonePanel(props: VoiceClonePanelProps) {
+  const locale = useTestAiLocale();
   const { state, onStateChange } = props;
   const [refAudioUri, setRefAudioUri] = React.useState('');
   const [targetModel, setTargetModel] = React.useState('');
@@ -3813,30 +3870,30 @@ function VoiceClonePanel(props: VoiceClonePanelProps) {
     onStateChange((prev) => ({
       ...prev,
       result: 'failed',
-      error: 'voice.clone is not yet available in the current SDK surface.',
-      rawResponse: toPrettyJson({ error: 'SDK method not available', capability: 'runtime.media.voice.clone', requestParams }),
+      error: locale.voiceClone.error,
+      rawResponse: toPrettyJson({ error: locale.voiceClone.sdkMethodUnavailable, capability: 'runtime.media.voice.clone', requestParams }),
       diagnostics: { requestParams, resolvedRoute: null, responseMetadata: null },
     }));
-  }, [refAudioUri, targetModel, onStateChange]);
+  }, [locale, onStateChange, refAudioUri, targetModel]);
 
   return (
     <div className="flex flex-col gap-3">
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
-        voice.clone SDK surface is not yet implemented. This panel captures the expected input shape for future integration.
+        {locale.voiceClone.banner}
       </div>
       <input
         className="w-full rounded-lg border border-gray-300 bg-white p-2 font-mono text-xs"
         value={refAudioUri}
         onChange={(event) => setRefAudioUri(event.target.value)}
-        placeholder="Reference audio URL"
+        placeholder={locale.voiceClone.refAudioPlaceholder}
       />
       <input
         className="w-full rounded-lg border border-gray-300 bg-white p-2 font-mono text-xs"
         value={targetModel}
         onChange={(event) => setTargetModel(event.target.value)}
-        placeholder="Target model (optional)"
+        placeholder={locale.voiceClone.targetModelPlaceholder}
       />
-      <RunButton busy={state.busy} label="Run Voice Clone" onClick={() => { void handleRun(); }} />
+      <RunButton busy={state.busy} label={locale.voiceClone.run} onClick={() => { void handleRun(); }} />
       {state.error ? <ErrorBox message={state.error} /> : null}
       {state.rawResponse ? <RawJsonSection content={state.rawResponse} /> : null}
     </div>
@@ -3851,6 +3908,7 @@ type VoiceDesignPanelProps = {
 };
 
 function VoiceDesignPanel(props: VoiceDesignPanelProps) {
+  const locale = useTestAiLocale();
   const { state, onStateChange } = props;
   const [instruction, setInstruction] = React.useState('');
 
@@ -3859,24 +3917,24 @@ function VoiceDesignPanel(props: VoiceDesignPanelProps) {
     onStateChange((prev) => ({
       ...prev,
       result: 'failed',
-      error: 'voice.design is not yet available in the current SDK surface.',
-      rawResponse: toPrettyJson({ error: 'SDK method not available', capability: 'runtime.media.voice.design', requestParams }),
+      error: locale.voiceDesign.error,
+      rawResponse: toPrettyJson({ error: locale.voiceDesign.sdkMethodUnavailable, capability: 'runtime.media.voice.design', requestParams }),
       diagnostics: { requestParams, resolvedRoute: null, responseMetadata: null },
     }));
-  }, [instruction, onStateChange]);
+  }, [instruction, locale, onStateChange]);
 
   return (
     <div className="flex flex-col gap-3">
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
-        voice.design SDK surface is not yet implemented. This panel captures the expected input shape for future integration.
+        {locale.voiceDesign.banner}
       </div>
       <textarea
         className="h-20 w-full resize-y rounded-lg border border-gray-300 bg-white p-2 font-mono text-xs"
         value={instruction}
         onChange={(event) => setInstruction(event.target.value)}
-        placeholder="Voice design instruction (e.g. 'A calm, deep male voice with a slight British accent')"
+        placeholder={locale.voiceDesign.instructionPlaceholder}
       />
-      <RunButton busy={state.busy} label="Run Voice Design" onClick={() => { void handleRun(); }} />
+      <RunButton busy={state.busy} label={locale.voiceDesign.run} onClick={() => { void handleRun(); }} />
       {state.error ? <ErrorBox message={state.error} /> : null}
       {state.rawResponse ? <RawJsonSection content={state.rawResponse} /> : null}
     </div>
@@ -3886,10 +3944,13 @@ function VoiceDesignPanel(props: VoiceDesignPanelProps) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export function TestAiPage() {
+  const locale = useTestAiLocale();
   const runtimeClient = React.useMemo(() => getTestAiRuntimeClient(), []);
   const [activeCapability, setActiveCapability] = React.useState<CapabilityId>('text.generate');
   const [states, setStates] = React.useState<CapabilityStates>(makeInitialCapabilityStates);
-  const [imageDraft, setImageDraft] = React.useState<ImageWorkflowDraftState>(createInitialImageWorkflowDraftState);
+  const [imageDraft, setImageDraft] = React.useState<ImageWorkflowDraftState>(() => (
+    createInitialImageWorkflowDraftState(locale.image.defaultPrompt, locale.image.defaultNegativePrompt)
+  ));
 
   const updateCapabilityState = React.useCallback(
     (capabilityId: CapabilityId, updater: (prev: CapabilityState) => CapabilityState) => {
@@ -3926,6 +3987,7 @@ export function TestAiPage() {
 
   const activeState = states[activeCapability];
   const activeMeta = CAPABILITIES.find((c) => c.id === activeCapability)!;
+  const activeCopy = capabilityCopy(locale, activeMeta.id);
 
   function renderPanel() {
     switch (activeCapability) {
@@ -4026,7 +4088,7 @@ export function TestAiPage() {
       />
       <div className="flex min-w-0 flex-1 flex-col overflow-y-auto p-4">
         <div className="mb-3 px-1">
-          <h2 className="text-sm font-semibold text-gray-900">{activeMeta.label}</h2>
+          <h2 className="text-sm font-semibold text-gray-900">{activeCopy.label}</h2>
         </div>
         {renderPanel()}
       </div>

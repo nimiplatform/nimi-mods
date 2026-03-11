@@ -1,10 +1,13 @@
 import React, { Suspense } from 'react';
+import { getPromptLocale } from '@nimiplatform/sdk/mod/i18n';
 import type { HookClient } from '@nimiplatform/sdk/mod/types';
 import {
   TEST_AI_NAV_SLOT,
   TEST_AI_ROUTE_SLOT,
   TEST_AI_TAB_ID,
 } from '../contracts.js';
+import enLocale from '../locales/en.js';
+import zhLocale from '../locales/zh.js';
 
 const LazyTestAiPage = React.lazy(async () => {
   const module = await import('../test-ai-page.js');
@@ -15,6 +18,7 @@ export async function registerTestAiUiExtensions(input: {
   hookClient: HookClient;
 }): Promise<void> {
   const { hookClient } = input;
+  const locale = getPromptLocale() === 'zh' ? zhLocale : enLocale;
 
   await hookClient.ui.register({
     slot: TEST_AI_NAV_SLOT,
@@ -22,7 +26,7 @@ export async function registerTestAiUiExtensions(input: {
     extension: {
       type: 'nav-item',
       tabId: TEST_AI_TAB_ID,
-      label: 'Test AI',
+      label: locale.nav.label,
       badge: 'TEST',
       icon: 'local-chat',
       strategy: 'append',
@@ -42,7 +46,7 @@ export async function registerTestAiUiExtensions(input: {
           fallback: React.createElement(
             'div',
             { className: 'm-4 rounded-xl border border-gray-200 bg-white p-3 text-xs text-gray-600' },
-            'Test AI loading...',
+            locale.nav.loading,
           ),
         },
         React.createElement(LazyTestAiPage),

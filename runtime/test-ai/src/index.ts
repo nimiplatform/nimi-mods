@@ -1,3 +1,10 @@
+import { registerModTranslations } from '@nimiplatform/sdk/mod/i18n';
+import enLocale from './locales/en.js';
+import zhLocale from './locales/zh.js';
+
+registerModTranslations('test-ai', 'en', enLocale as Record<string, unknown>);
+registerModTranslations('test-ai', 'zh', zhLocale as Record<string, unknown>);
+
 import {
   TEST_AI_CAPABILITIES,
   TEST_AI_MOD_ID,
