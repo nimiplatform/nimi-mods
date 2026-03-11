@@ -4,10 +4,12 @@ version: 1.0.0
 kind: capability-mod
 icon: local-chat
 entry: ./dist/mods/local-chat/index.js
+styles:
+  - ./dist/mods/local-chat/index.css
 description: >
   Adds hook-based local chat execution with chat-routing and read-only
-  agent friend target loading for desktop local chat.
-  This mod is optional and does not change desktop core cloud routing.
+  agent friend target loading for runtime local chat.
+  This mod is optional and does not change host cloud routing defaults.
 capabilities:
   - runtime.ai.text.generate
   - runtime.ai.text.stream

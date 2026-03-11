@@ -74,5 +74,6 @@ export function createAudioBookRuntimeMod(): RuntimeModRegistration {
         costMs: Number((performance.now() - startedAt).toFixed(2)),
       });
     },
+    teardown: async () => {},
   };
 }

@@ -2,8 +2,8 @@ import type { RuntimeModRegistration } from '@nimiplatform/sdk/mod/types';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
 import { MOD_CAPABILITIES, MOD_ID } from './contracts.js';
 import { registerBuddyUiExtensions } from './registrars/ui.js';
-import { setSdkRuntimeContext } from './sdk-context.js';
-import { ensureCubismCore } from './cubism-core-loader.js';
+import { clearSdkRuntimeContext, setSdkRuntimeContext } from './sdk-context.js';
+import { ensureCubismCore, resetCubismCoreLoader } from './cubism-core-loader.js';
 
 export function createBuddyRuntimeMod(): RuntimeModRegistration {
   return {
@@ -21,6 +21,10 @@ export function createBuddyRuntimeMod(): RuntimeModRegistration {
 
       const hookClient = createHookClient(MOD_ID, sdkRuntimeContext);
       await registerBuddyUiExtensions({ hookClient });
+    },
+    teardown: async () => {
+      clearSdkRuntimeContext();
+      resetCubismCoreLoader();
     },
   };
 }

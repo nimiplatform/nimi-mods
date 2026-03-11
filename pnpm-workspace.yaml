@@ -1,4 +1,5 @@
 packages:
+  - 'buddy'
   - 'kismet'
   - 'local-chat'
   - 'mint-you'

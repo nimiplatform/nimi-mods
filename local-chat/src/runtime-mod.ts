@@ -9,6 +9,7 @@ import {
 import { registerLocalChatDataCapabilities, createLocalChatReadContextResolver } from './registrars/data.js';
 import { registerLocalChatUiExtensions } from './registrars/ui.js';
 import { startLocalChatProactiveHeartbeat } from './heartbeat.js';
+import { stopLocalChatProactiveHeartbeat } from './heartbeat.js';
 import { createLocalChatAiClient } from './runtime-ai-client.js';
 
 type FetchImpl = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -62,6 +63,9 @@ export function createLocalChatRuntimeMod(): RuntimeModRegistration {
         source: 'createLocalChatRuntimeMod.setup',
         costMs: Number((performance.now() - startedAt).toFixed(2)),
       });
+    },
+    teardown: async () => {
+      stopLocalChatProactiveHeartbeat();
     },
   };
 }

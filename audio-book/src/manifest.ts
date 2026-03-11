@@ -13,6 +13,7 @@ export const AUDIO_BOOK_MANIFEST = {
   author: { name: 'Nimi', url: 'https://nimi.xyz' },
   license: 'MIT',
   entry: './dist/mods/audio-book/index.js',
+  styles: ['./dist/mods/audio-book/index.css'],
   hash: 'default-audio-book',
   nimi: {
     minVersion: '1.0.0',

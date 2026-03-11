@@ -28,6 +28,9 @@ export function createTestAiRuntimeMod(): RuntimeModRegistration {
       _runtimeClient = runtimeClient;
       await registerTestAiUiExtensions({ hookClient });
     },
+    teardown: async () => {
+      _runtimeClient = null;
+    },
   };
 }
 

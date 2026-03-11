@@ -48,6 +48,7 @@ type ManifestValidationResult = {
 function validateLocalManifestShape(manifest: {
   id?: unknown;
   entry?: unknown;
+  styles?: unknown;
   capabilities?: unknown;
 }): ManifestValidationResult {
   const issues: string[] = [];
@@ -56,6 +57,9 @@ function validateLocalManifestShape(manifest: {
   }
   if (typeof manifest.entry !== 'string' || !manifest.entry.trim()) {
     issues.push('entry-required');
+  }
+  if (!Array.isArray(manifest.styles) || manifest.styles.length === 0) {
+    issues.push('styles-required');
   }
   if (!Array.isArray(manifest.capabilities)) {
     issues.push('capabilities-array-required');

@@ -4,8 +4,10 @@
 
 ## Context
 
-`nimi-mods/` stores first-party runtime mods loaded by `@nimiplatform/desktop`.
-Current built-in examples: `local-chat`, `kismet`, `re-life`, `world-studio`.
+`nimi-mods/` is an optional external workspace for example mods, test inputs, and reusable authoring fixtures.
+`@nimiplatform/desktop` is a zero-bundle host and does not ship `nimi-mods` contents as built-in product mods.
+
+Desktop loads mods from installed/runtime source directories. During local authoring, the primary Desktop-side flow is App UI only: `Settings > Mod Developer` to add or manage a dev source directory.
 
 Mods run in desktop-governed hook runtime and must not call runtime SDK directly.
 
@@ -110,22 +112,26 @@ Do not use legacy `hook.eventBus` / `hook.dataApi` / `hook.uiExtension` naming.
 
 ## Build and Dev Commands
 
-Use `nimi-mods` scripts as source of truth:
+Author workflows belong to `@nimiplatform/dev-tools` via the `nimi-mod` CLI. Prefer each mod's package-local scripts:
+
+```bash
+pnpm run dev
+pnpm run build
+pnpm run doctor
+pnpm run pack
+```
+
+Workspace-level verification still lives at the `nimi-mods` root:
 
 ```bash
 pnpm run check
 pnpm run check:spec
-pnpm run build -- --mod local-chat
-pnpm run watch:local-chat
 pnpm run verify
 ```
 
-Desktop integration in local dev is env-driven:
+Desktop-side local development is not env-driven as a primary workflow. Add a dev source directory in `Settings > Mod Developer`, then point it at the mod workspace or a dedicated runtime mods folder.
 
-```bash
-export NIMI_MODS_ROOT=/ABS/PATH/TO/nimi-mods
-export NIMI_RUNTIME_MODS_DIR="$NIMI_MODS_ROOT"
-```
+Environment-variable overrides are CI / internal compatibility only. They are not the supported third-party author path and must not be reintroduced as the primary Desktop integration model.
 
 ## Quality Rules
 

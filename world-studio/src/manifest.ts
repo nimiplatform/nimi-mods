@@ -13,6 +13,7 @@ export const WORLD_STUDIO_MANIFEST = {
   author: { name: 'Nimi', url: 'https://nimi.xyz' },
   license: 'MIT',
   entry: './dist/mods/world-studio/index.js',
+  styles: ['./dist/mods/world-studio/index.css'],
   hash: 'default-world-studio',
   nimi: {
     minVersion: '1.0.0',

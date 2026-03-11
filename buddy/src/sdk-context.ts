@@ -12,3 +12,7 @@ export function setSdkRuntimeContext(ctx: unknown) {
 export function getSdkRuntimeContext(): unknown {
   return _sdkRuntimeContext;
 }
+
+export function clearSdkRuntimeContext() {
+  _sdkRuntimeContext = null;
+}

@@ -4,6 +4,8 @@ version: 1.0.0
 kind: capability-mod
 icon: buddy
 entry: ./dist/mods/buddy/index.js
+styles:
+  - ./dist/mods/buddy/index.css
 description: >
   Live2D 儿童互动陪伴 mod。渲染卡通角色，通过文字和语音与用户互动，
   角色具备眨眼、眼球微动、呼吸、口型同步和情绪表情等动画能力。

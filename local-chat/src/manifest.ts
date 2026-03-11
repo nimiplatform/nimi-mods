@@ -15,9 +15,9 @@ import {
 /**
  * local-chat mod manifest.
  *
- * This is a default bundled external mod that exposes local LLM provider execution
- * as a first-party capability of Nimi Desktop. It demonstrates how
- * a mod declares capabilities, turn-hooks, and inter-mod channels.
+ * This runtime mod exposes local LLM provider execution through the current
+ * zero-bundle host contract. It demonstrates how a mod declares capabilities,
+ * turn-hooks, and inter-mod channels without relying on desktop-private code.
  */
 export const LOCAL_CHAT_MANIFEST = {
   id: LOCAL_CHAT_MOD_ID,
@@ -28,6 +28,7 @@ export const LOCAL_CHAT_MANIFEST = {
   author: { name: 'Nimi', url: 'https://nimi.xyz' },
   license: 'MIT',
   entry: './dist/mods/local-chat/index.js',
+  styles: ['./dist/mods/local-chat/index.css'],
   hash: 'default-local-chat',
   nimi: {
     minVersion: '1.0.0',

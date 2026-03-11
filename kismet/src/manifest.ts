@@ -14,6 +14,7 @@ export const KISMET_MANIFEST = {
   author: { name: 'Nimi', url: 'https://nimi.xyz' },
   license: 'MIT',
   entry: './dist/mods/kismet/index.js',
+  styles: ['./dist/mods/kismet/index.css'],
   hash: 'default-kismet',
   nimi: {
     minVersion: '1.0.0',

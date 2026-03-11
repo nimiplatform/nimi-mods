@@ -17,6 +17,7 @@ export const MINTYOU_MANIFEST = {
   author: { name: 'Nimi', url: 'https://nimi.xyz' },
   license: 'MIT',
   entry: './dist/mods/mint-you/index.js',
+  styles: ['./dist/mods/mint-you/index.css'],
   hash: 'default-mint-you',
   nimi: {
     minVersion: '1.0.0',

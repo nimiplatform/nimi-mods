@@ -13,6 +13,7 @@ export const KB_MANIFEST = {
   author: { name: 'Nimi', url: 'https://nimi.xyz' },
   license: 'MIT',
   entry: './dist/mods/knowledge-base/index.js',
+  styles: ['./dist/mods/knowledge-base/index.css'],
   hash: 'default-knowledge-base',
   nimi: {
     minVersion: '1.0.0',

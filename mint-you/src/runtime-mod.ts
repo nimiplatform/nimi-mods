@@ -57,6 +57,10 @@ export function createMintYouRuntimeMod(): RuntimeModRegistration {
         costMs: Number((performance.now() - startedAt).toFixed(2)),
       });
     },
+    teardown: async () => {
+      _runtimeClient = null;
+      _hookClient = null;
+    },
   };
 }
 

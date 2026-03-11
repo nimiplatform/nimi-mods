@@ -6,6 +6,10 @@ export function initializeWorldStudioRuntimeClient(runtimeClient: ModRuntimeClie
   _runtimeClient = runtimeClient;
 }
 
+export function resetWorldStudioRuntimeClient(): void {
+  _runtimeClient = null;
+}
+
 export function getWorldStudioRuntimeClient(): ModRuntimeClient {
   if (!_runtimeClient) {
     throw new Error('WORLD_STUDIO_RUNTIME_CLIENT_NOT_INITIALIZED');

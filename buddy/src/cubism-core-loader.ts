@@ -1,6 +1,13 @@
 declare const __NIMI_MOD_DIR__: string;
 
+declare global {
+  interface Window {
+    Live2DCubismCore?: unknown;
+  }
+}
+
 let loadPromise: Promise<void> | null = null;
+const SCRIPT_MARKER = 'data-nimi-buddy-cubism-core';
 
 /**
  * Ensure the Live2D Cubism 4 Core runtime (`window.Live2DCubismCore`) is loaded.
@@ -34,6 +41,7 @@ function buildLocalCoreUrl(): string {
 function tryLoadScript(src: string): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const script = document.createElement('script');
+    script.setAttribute(SCRIPT_MARKER, '1');
     script.src = src;
     script.onload = () => resolve();
     script.onerror = () =>
@@ -49,4 +57,13 @@ function tryLoadScript(src: string): Promise<void> {
       );
     document.head.appendChild(script);
   });
+}
+
+export function resetCubismCoreLoader(): void {
+  loadPromise = null;
+  const script = document.querySelector(`script[${SCRIPT_MARKER}]`);
+  script?.parentElement?.removeChild(script);
+  if (window.Live2DCubismCore) {
+    delete window.Live2DCubismCore;
+  }
 }

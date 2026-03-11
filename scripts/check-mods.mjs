@@ -68,6 +68,50 @@ function parsePackageJson(modDir) {
   return parsed;
 }
 
+function parseTsconfig(modDir) {
+  const tsconfigPath = path.join(modDir, 'tsconfig.json');
+  if (!existsSync(tsconfigPath)) {
+    return null;
+  }
+  return JSON.parse(readFileSync(tsconfigPath, 'utf8'));
+}
+
+function hasUiCapabilities(manifest) {
+  const capabilities = Array.isArray(manifest?.capabilities) ? manifest.capabilities : [];
+  return capabilities.some((capability) => String(capability || '').startsWith('ui.register.'));
+}
+
+function validateRuntimeModPackage(modName, modDir, packageJson, errors) {
+  const scripts = packageJson?.scripts || {};
+  for (const scriptName of ['build', 'dev', 'doctor', 'pack']) {
+    if (typeof scripts[scriptName] !== 'string' || !scripts[scriptName].trim()) {
+      errors.push(`runtime mod package.json must define scripts.${scriptName}`);
+    }
+  }
+
+  const allDeps = {
+    ...(packageJson?.dependencies || {}),
+    ...(packageJson?.devDependencies || {}),
+  };
+
+  if (!allDeps.react) {
+    errors.push('runtime mod package.json must declare react dependency');
+  }
+  if (!allDeps['@nimiplatform/sdk']) {
+    errors.push('runtime mod package.json must declare @nimiplatform/sdk dependency');
+  }
+  if (!allDeps['@nimiplatform/dev-tools']) {
+    errors.push('runtime mod package.json must declare @nimiplatform/dev-tools dependency');
+  }
+
+  const tsconfig = parseTsconfig(modDir);
+  const sdkPaths = tsconfig?.compilerOptions?.paths?.['@nimiplatform/sdk'];
+  const sdkWildcardPaths = tsconfig?.compilerOptions?.paths?.['@nimiplatform/sdk/*'];
+  if (sdkPaths || sdkWildcardPaths) {
+    errors.push('tsconfig.json must not define @nimiplatform/sdk path aliases');
+  }
+}
+
 function validateMod(modName) {
   const modDir = path.join(modsRoot, modName);
   const errors = [];
@@ -110,6 +154,29 @@ function validateMod(modName) {
     const manifestId = String(manifest.id || '').trim();
     if (!manifestId) {
       errors.push('manifest.id is required');
+    }
+
+    validateRuntimeModPackage(modName, modDir, packageJson, errors);
+
+    if (hasUiCapabilities(manifest)) {
+      const stylePaths = Array.isArray(manifest.styles)
+        ? manifest.styles.map((item) => String(item || '').trim()).filter(Boolean)
+        : [];
+      if (stylePaths.length === 0) {
+        errors.push('UI runtime mod manifest must declare styles[]');
+      }
+      for (const stylePath of stylePaths) {
+        const expectedStylePath = `./dist/mods/${modName}/index.css`;
+        if (stylePath !== expectedStylePath) {
+          errors.push(`manifest.styles[] must be ["${expectedStylePath}"] (received "${stylePath}")`);
+        }
+        if (requireDist) {
+          const absoluteStylePath = path.join(modDir, stylePath.slice(2));
+          if (!existsSync(absoluteStylePath)) {
+            errors.push(`missing dist style file: ${stylePath}`);
+          }
+        }
+      }
     }
 
     if (requireDist) {

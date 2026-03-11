@@ -4,8 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node ../scripts/build-mod.mjs --mod textplay",
-    "watch": "node ../scripts/build-mod.mjs --mod textplay --watch",
+    "build": "nimi-mod build",
+    "dev": "nimi-mod dev",
+    "doctor": "nimi-mod doctor",
+    "pack": "nimi-mod pack",
+    "watch": "nimi-mod dev",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
     "test": "npx tsx --test test/*.mjs",
     "test:smoke": "npx tsx --tsconfig scripts/tsconfig.smoke.json scripts/smoke-start-click.mjs && npx tsx --tsconfig scripts/tsconfig.smoke.json scripts/smoke-start-replay-conflict.mjs",
@@ -15,7 +18,15 @@
     "verify": "pnpm run verify:spec && pnpm run verify:code",
     "clean": "rm -rf dist"
   },
+  "dependencies": {
+    "@nimiplatform/sdk": "file:../../sdk",
+    "react": "19.2.3"
+  },
   "devDependencies": {
-    "tsx": "^4.21.0"
+    "@nimiplatform/dev-tools": "file:../../dev-tools",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.14",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }

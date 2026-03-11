@@ -21,6 +21,7 @@ export const VIDEOPLAY_MANIFEST = {
   author: { name: 'Nimi', url: 'https://nimi.xyz' },
   license: 'MIT',
   entry: './dist/mods/videoplay/index.js',
+  styles: ['./dist/mods/videoplay/index.css'],
   hash: 'default-videoplay',
   nimi: {
     minVersion: '1.0.0',
