@@ -1,5 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {
+  CONTINUITY_REFERENCE_RE,
+  RECENT_CONVERSATION_SUMMARY_RE,
+  RECENT_MEDIA_RE,
+  VISUAL_ANCHOR_RE,
+} from './helpers/prompt-matchers.mjs';
 import { DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS } from '../src/state/index.ts';
 import { decideMediaExecution } from '../src/hooks/turn-send/media-decision-policy.ts';
 
@@ -375,8 +381,8 @@ test('media decision policy enriches explicit image request with visual anchor a
   const compiledPrompt = result.prepared.compiled.compiledPromptText;
   assert.match(compiledPrompt, /Policy Bot/u);
   assert.match(compiledPrompt, /黑色.*长发|浅灰色眼睛|宽松家居衬衫/u);
-  assert.match(compiledPrompt, /连续性参考/u);
-  assert.match(compiledPrompt, /最近媒体|固定外观|穿搭延续/u);
+  assert.match(compiledPrompt, CONTINUITY_REFERENCE_RE);
+  assert.match(compiledPrompt, RECENT_MEDIA_RE);
 });
 
 test('media decision policy passes visual anchor and recent turn context into planner prompt', async () => {
@@ -439,7 +445,7 @@ test('media decision policy passes visual anchor and recent turn context into pl
   });
 
   assert.equal(result.kind, 'none');
-  assert.match(capturedPrompt, /角色视觉锚点:/u);
-  assert.match(capturedPrompt, /最近对话摘要:/u);
-  assert.match(capturedPrompt, /连续性参考:/u);
+  assert.match(capturedPrompt, VISUAL_ANCHOR_RE);
+  assert.match(capturedPrompt, RECENT_CONVERSATION_SUMMARY_RE);
+  assert.match(capturedPrompt, CONTINUITY_REFERENCE_RE);
 });

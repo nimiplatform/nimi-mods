@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import {
+  buildUserSaidRe,
+  INTERACTION_PROFILE_RE,
+  RELATION_MEMORY_RE,
+  RESTRAINED_STYLE_RE,
+  RESERVED_BOUNDARY_RE,
+} from './helpers/prompt-matchers.mjs';
 import type { LocalChatTarget } from '../src/data/types.ts';
 import { buildLocalChatCompiledPrompt } from '../src/data/index.ts';
 import { assembleLocalChatContextPacket } from '../src/hooks/turn-send/context-assembler.ts';
@@ -167,8 +174,8 @@ test('context assembler derives interaction profile, pacing plan, and prompt lan
   assert.ok(compiled.layerOrder.includes('interactionProfile'));
   assert.ok(compiled.layerOrder.includes('interactionState'));
   assert.ok(compiled.layerOrder.includes('relationMemory'));
-  assert.match(compiled.prompt, /交流画像/u);
-  assert.match(compiled.prompt, /关系槽位记忆/u);
+  assert.match(compiled.prompt, INTERACTION_PROFILE_RE);
+  assert.match(compiled.prompt, RELATION_MEMORY_RE);
   assert.match(compiled.prompt, /用户期待和助手一起看烟花/u);
 });
 
@@ -332,8 +339,8 @@ test('compiled prompt renders restrained content boundary when hint is present',
   });
 
   assert.equal(compiled.layerOrder.includes('contentBoundary'), true);
-  assert.match(compiled.prompt, /用户当前选择克制风格/u);
-  assert.match(compiled.prompt, /不要主动调情/u);
+  assert.match(compiled.prompt, RESTRAINED_STYLE_RE);
+  assert.match(compiled.prompt, RESERVED_BOUNDARY_RE);
 });
 
 test('context assembler prioritizes unresolved continuity and trims session recall to top-k', async () => {
@@ -463,7 +470,7 @@ test('context assembler omits the just-persisted user turn from recent turns so 
   });
 
   assert.equal(packet.recentTurns.length, 0);
-  assert.match(compiled.prompt, /用户这次说：今晚也想和你慢慢聊。/u);
+  assert.match(compiled.prompt, buildUserSaidRe('今晚也想和你慢慢聊。'));
   assert.doesNotMatch(compiled.prompt, /Assistant #/u);
   assert.doesNotMatch(compiled.prompt, /User #1[\s\S]*今晚也想和你慢慢聊。/u);
 });

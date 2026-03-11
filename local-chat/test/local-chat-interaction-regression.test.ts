@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import {
+  FAST_DIRECTIVE_BOUNDARY_RE,
+  FAST_DIRECTIVE_MEDIA_FOLLOWUP_RE,
+} from './helpers/prompt-matchers.mjs';
 import { DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS } from '../src/default-settings-store.ts';
 import { resolveFastTurnPerception } from '../src/hooks/turn-send/fast-turn-perception.ts';
 import { orchestrateBeatModalities } from '../src/hooks/turn-send/modality-orchestrator.ts';
@@ -184,7 +188,7 @@ test('fast-turn-perception provides a conservative emotional first-beat hint', (
   assert.equal(result.emotionalState?.detected, '委屈');
   assert.equal(result.emotionalState?.suggestedApproach, 'empathize-first');
   assert.equal(result.intimacyCeiling, 'friendly');
-  assert.match(result.conversationDirective || '', /不要越过当前边界/u);
+  assert.match(result.conversationDirective || '', FAST_DIRECTIVE_BOUNDARY_RE);
 });
 
 test('fast-turn-perception keeps explicit media requests as setup-first followups', () => {
@@ -197,7 +201,7 @@ test('fast-turn-perception keeps explicit media requests as setup-first followup
 
   assert.equal(result.turnMode, 'explicit-media');
   assert.equal(result.intimacyCeiling, 'warm');
-  assert.match(result.conversationDirective || '', /媒体相关内容留到后续补充/u);
+  assert.match(result.conversationDirective || '', FAST_DIRECTIVE_MEDIA_FOLLOWUP_RE);
 });
 
 test('turn-mode regression: explicit intimate cue still resolves to intimate after guard tightening', () => {

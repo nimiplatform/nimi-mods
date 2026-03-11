@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { buildSealedFirstBeatRe, TAIL_ONLY_RULE_RE } from './helpers/prompt-matchers.mjs';
 import type { LocalChatContextPacket } from '../src/state/index.ts';
 import type { LocalChatTurnAiClient } from '../src/hooks/turn-send/types.ts';
 import { composeInteractionTurnPlan } from '../src/hooks/turn-send/turn-composer.ts';
@@ -103,8 +104,8 @@ test('tail turn composer passes sealed first beat into planner and prunes duplic
     sealedFirstBeatText: '真的辛苦你了，先让我接住你。',
   });
 
-  assert.match(capturedPrompt, /已经封口的首拍：真的辛苦你了，先让我接住你。/u);
-  assert.match(capturedPrompt, /不要重写、重复、解释或微调首拍/u);
+  assert.match(capturedPrompt, buildSealedFirstBeatRe('真的辛苦你了，先让我接住你。'));
+  assert.match(capturedPrompt, TAIL_ONLY_RULE_RE);
   assert.match(capturedPrompt, /deliveryStyle=compact/u);
   assert.equal(plan.beats.length, 1);
   assert.equal(plan.beats[0]?.text, '先别一个人扛着，把最压你的那件事慢慢告诉我。');

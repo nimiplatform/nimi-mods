@@ -1,10 +1,14 @@
-import { Runtime } from '@nimiplatform/sdk';
+import { Runtime, ExecutionMode, ScenarioType } from '@nimiplatform/sdk/runtime';
 import { createModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import type { ModRuntimeHost } from '@nimiplatform/sdk/mod/types';
-import { ExecutionMode, ScenarioType } from '../../../../sdk/src/runtime/generated/runtime/v1/ai.js';
-import { VoiceReferenceKind } from '../../../../sdk/src/runtime/generated/runtime/v1/voice.js';
 import { loadGoldFixture, loadGoldFixtureAudioInput } from '../../../../scripts/ai-gold-path/fixtures.mjs';
 import { createLocalChatAiClient } from '../../src/runtime-ai-client.js';
+
+const VoiceReferenceKind = {
+  PRESET: 1,
+  VOICE_ASSET: 2,
+  PROVIDER_VOICE_REF: 3,
+} as const;
 
 function toTokenApiModelID(modelId: string): string {
   const normalized = String(modelId || '').trim();

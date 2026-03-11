@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import {
+  isPerceptionPrompt,
+} from './helpers/prompt-matchers.mjs';
 import { assembleLocalChatContextPacket } from '../src/hooks/turn-send/context-assembler.ts';
 import {
   getLocalChatInteractionSnapshot,
@@ -152,7 +155,7 @@ test('flagship scenario: first beat becomes visible before perception finishes',
     > = {
       ...scripted.client,
       async generateObject(payload) {
-        if (String(payload.prompt || '').includes('你是一个对话感知模块。')) {
+        if (isPerceptionPrompt(payload)) {
           await perceptionGate;
         }
         return scripted.client.generateObject(payload);
@@ -224,7 +227,7 @@ test('flagship scenario: local route starts first beat before deep perception', 
         yield* scripted.client.streamText(payload);
       },
       async generateObject(payload) {
-        if (String(payload.prompt || '').includes('你是一个对话感知模块。')) {
+        if (isPerceptionPrompt(payload)) {
           order.push('perception');
         }
         return scripted.client.generateObject(payload);

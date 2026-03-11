@@ -3,6 +3,11 @@ import type { ModRuntimeDependencySnapshot } from '@nimiplatform/sdk/mod/runtime
 import type { LocalChatAiClient } from '../../src/runtime-ai-client.ts';
 import { FIRST_BEAT_END_MARKER } from '../../src/hooks/turn-send/first-beat-reactor.ts';
 import {
+  isMediaPlannerPromptText,
+  isPerceptionPromptText,
+  isTailPlanPromptText,
+} from './prompt-matchers.mjs';
+import {
   configureLocalChatCoreQueryBridge,
   CORE_DATA_API_AGENT_MEMORY_CORE_LIST,
   CORE_DATA_API_AGENT_MEMORY_E2E_LIST,
@@ -245,7 +250,7 @@ export function createScriptedAiClient(input: {
       },
       async generateObject(payload: Record<string, unknown>) {
         const prompt = String(payload.prompt || '');
-        if (prompt.includes('你是一个对话感知模块。')) {
+        if (isPerceptionPromptText(prompt)) {
           counters.perception += 1;
           const object = input.perceptionResult || {
             turnMode: 'information',
@@ -262,7 +267,7 @@ export function createScriptedAiClient(input: {
             route: localRoute('chat-model'),
           };
         }
-        if (prompt.includes('请规划这轮对话在首拍之后的 tail beat 计划')) {
+        if (isTailPlanPromptText(prompt)) {
           counters.plan += 1;
           const object = {
             beats: input.planBeats || [
@@ -309,7 +314,7 @@ export function createScriptedAiClient(input: {
             route: localRoute('chat-model'),
           };
         }
-        if (prompt.includes('你是 local-chat 的媒体触发 planner。')) {
+        if (isMediaPlannerPromptText(prompt)) {
           counters.planner += 1;
           if (!input.mediaPlannerDecision) {
             throw new Error('LOCAL_CHAT_TEST_UNEXPECTED_MEDIA_PLANNER');

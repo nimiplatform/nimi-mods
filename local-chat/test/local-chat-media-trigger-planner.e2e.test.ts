@@ -3,6 +3,13 @@ import assert from 'node:assert/strict';
 import { clearModSdkHost, setModSdkHost } from '@nimiplatform/sdk/mod/host';
 import type { ModRuntimeDependencySnapshot } from '@nimiplatform/sdk/mod/runtime';
 import {
+  isMediaPlannerPromptText,
+  isPerceptionPromptText,
+  isTailPlanPromptText,
+  RESTRAINED_STYLE_RE,
+  SEXUAL_CONTENT_BOUNDARY_RE,
+} from './helpers/prompt-matchers.mjs';
+import {
   configureLocalChatCoreQueryBridge,
   CORE_DATA_API_AGENT_MEMORY_RECALL_FOR_ENTITY,
   type LocalChatTarget,
@@ -404,11 +411,11 @@ function createHarness() {
         ...input.defaultSettings,
       };
       const isMediaPlannerPrompt = (payload: Record<string, unknown>) =>
-        String(payload.prompt || '').includes('媒体触发 planner');
+        isMediaPlannerPromptText(String(payload.prompt || ''));
       const isPerceptionPrompt = (payload: Record<string, unknown>) =>
-        String(payload.prompt || '').includes('你是一个对话感知模块');
+        isPerceptionPromptText(String(payload.prompt || ''));
       const isTailPlanPrompt = (payload: Record<string, unknown>) =>
-        String(payload.prompt || '').includes('请规划这轮对话在首拍之后的 tail beat 计划');
+        isTailPlanPromptText(String(payload.prompt || ''));
       const context = {
         aiClient: {
           streamText: input.aiClientOverrides?.streamText
@@ -618,7 +625,7 @@ test('send-flow ignores composer media marker on plain greeting turns', async ()
         streamText: createTextStream('你好，今天过得怎么样？'),
         generateObject: async (payload: Record<string, unknown>) => {
           const prompt = String(payload.prompt || '');
-          if (prompt.includes('请规划这轮对话在首拍之后的 tail beat 计划')) {
+          if (isTailPlanPromptText(prompt)) {
             const object = {
               beats: [{
                 text: '你好，今天过得怎么样？',
@@ -680,7 +687,7 @@ test('send-flow delivers all planned text beats while session id bootstraps from
         streamText: createTextStream('真的辛苦你了，先让我接住你。'),
         generateObject: async (payload: Record<string, unknown>) => {
           const prompt = String(payload.prompt || '');
-          if (prompt.includes('请规划这轮对话在首拍之后的 tail beat 计划')) {
+          if (isTailPlanPromptText(prompt)) {
             const object = {
               beats: [
                 {
@@ -747,7 +754,7 @@ test('send-flow planner auto path generates image when gate passes', async () =>
       aiClientOverrides: {
         generateObject: async (payload: Record<string, unknown>) => {
           const prompt = String(payload.prompt || '');
-          if (prompt.includes('你是一个对话感知模块')) {
+          if (isPerceptionPromptText(prompt)) {
             const object = defaultPerceptionObject(prompt);
             return {
               object,
@@ -761,7 +768,7 @@ test('send-flow planner auto path generates image when gate passes', async () =>
               },
             };
           }
-          if (prompt.includes('请规划这轮对话在首拍之后的 tail beat 计划')) {
+          if (isTailPlanPromptText(prompt)) {
             const object = defaultTailPlanObject(prompt);
             return {
               object,
@@ -846,7 +853,7 @@ test('send-flow injects restrained content boundary into first-beat and tail pro
         },
         generateObject: async (payload: Record<string, unknown>) => {
           const prompt = String(payload.prompt || '');
-          if (prompt.includes('你是一个对话感知模块')) {
+          if (isPerceptionPromptText(prompt)) {
             const object = defaultPerceptionObject(prompt);
             return {
               object,
@@ -860,7 +867,7 @@ test('send-flow injects restrained content boundary into first-beat and tail pro
               },
             };
           }
-          if (prompt.includes('请规划这轮对话在首拍之后的 tail beat 计划')) {
+          if (isTailPlanPromptText(prompt)) {
             tailPrompt = prompt;
             const object = defaultTailPlanObject(prompt);
             return {
@@ -882,10 +889,10 @@ test('send-flow injects restrained content boundary into first-beat and tail pro
 
     const assistantMessages = result.state.messages.filter((message) => message.role === 'assistant');
     assert.equal(assistantMessages.some((message) => message.kind === 'text'), true);
-    assert.match(firstBeatPrompt, /用户当前选择克制风格/u);
-    assert.match(firstBeatPrompt, /不要输出色情、裸露、性暗示/u);
+    assert.match(firstBeatPrompt, RESTRAINED_STYLE_RE);
+    assert.match(firstBeatPrompt, SEXUAL_CONTENT_BOUNDARY_RE);
     assert.match(tailPrompt, /## Content Boundary/u);
-    assert.match(tailPrompt, /用户当前选择克制风格/u);
+    assert.match(tailPrompt, RESTRAINED_STYLE_RE);
   });
 });
 
@@ -898,7 +905,7 @@ test('send-flow planner auto path generates video with reference image content w
       aiClientOverrides: {
         generateObject: async (payload: Record<string, unknown>) => {
           const prompt = String(payload.prompt || '');
-          if (prompt.includes('你是一个对话感知模块')) {
+          if (isPerceptionPromptText(prompt)) {
             const object = defaultPerceptionObject(prompt);
             return {
               object,
@@ -912,7 +919,7 @@ test('send-flow planner auto path generates video with reference image content w
               },
             };
           }
-          if (prompt.includes('请规划这轮对话在首拍之后的 tail beat 计划')) {
+          if (isTailPlanPromptText(prompt)) {
             const object = defaultTailPlanObject(prompt);
             return {
               object,
@@ -997,7 +1004,7 @@ test('send-flow planner does not hijack explicit voice delivery into image', asy
       aiClientOverrides: {
         generateObject: async (payload: Record<string, unknown>) => {
           const prompt = String(payload.prompt || '');
-          if (prompt.includes('媒体触发 planner')) {
+          if (isMediaPlannerPromptText(prompt)) {
             const raw = JSON.stringify({
               version: 'v1',
               kind: 'image',
@@ -1019,7 +1026,7 @@ test('send-flow planner does not hijack explicit voice delivery into image', asy
               },
             };
           }
-          if (prompt.includes('你是一个对话感知模块')) {
+          if (isPerceptionPromptText(prompt)) {
             const object = defaultPerceptionObject(prompt);
             return {
               object,
@@ -1033,7 +1040,7 @@ test('send-flow planner does not hijack explicit voice delivery into image', asy
               },
             };
           }
-          if (prompt.includes('请规划这轮对话在首拍之后的 tail beat 计划')) {
+          if (isTailPlanPromptText(prompt)) {
             const object = defaultTailPlanObject(prompt);
             return {
               object,
@@ -1083,7 +1090,7 @@ test('send-flow explicit media request still delivers image when turn composer f
       aiClientOverrides: {
         generateObject: async (payload: Record<string, unknown>) => {
           const prompt = String(payload.prompt || '');
-          if (prompt.includes('你是一个对话感知模块')) {
+          if (isPerceptionPromptText(prompt)) {
             const object = defaultPerceptionObject(prompt);
             return {
               object,
@@ -1097,7 +1104,7 @@ test('send-flow explicit media request still delivers image when turn composer f
               },
             };
           }
-          if (prompt.includes('请规划这轮对话在首拍之后的 tail beat 计划')) {
+          if (isTailPlanPromptText(prompt)) {
             const error = new Error('LOCAL_CHAT_AI_GENERATE_OBJECT_PARSE_FAILED') as Error & Record<string, unknown>;
             error.failureStage = 'parse';
             error.reasonCode = 'LOCAL_CHAT_AI_GENERATE_OBJECT_INVALID_JSON_OBJECT';
@@ -1166,10 +1173,10 @@ test('send-flow cooldown gate skips planner invocation', async () => {
       aiClientOverrides: {
         generateObject: async (payload: Record<string, unknown>) => {
           const prompt = String(payload.prompt || '');
-          if (prompt.includes('媒体触发 planner')) {
+          if (isMediaPlannerPromptText(prompt)) {
             throw new Error('planner should have been gated');
           }
-          if (prompt.includes('你是一个对话感知模块')) {
+          if (isPerceptionPromptText(prompt)) {
             const object = defaultPerceptionObject(prompt);
             return {
               object,
@@ -1219,10 +1226,10 @@ test('send-flow explicit request still calls runtime media image generate when d
       aiClientOverrides: {
         generateObject: async (payload: Record<string, unknown>) => {
           const prompt = String(payload.prompt || '');
-          if (prompt.includes('媒体触发 planner')) {
+          if (isMediaPlannerPromptText(prompt)) {
             throw new Error('planner should not run for explicit request');
           }
-          if (prompt.includes('你是一个对话感知模块')) {
+          if (isPerceptionPromptText(prompt)) {
             const object = defaultPerceptionObject(prompt);
             return {
               object,
@@ -1269,10 +1276,10 @@ test('send-flow planner failure silently degrades to text-only', async () => {
       aiClientOverrides: {
         generateObject: async (payload: Record<string, unknown>) => {
           const prompt = String(payload.prompt || '');
-          if (prompt.includes('媒体触发 planner')) {
+          if (isMediaPlannerPromptText(prompt)) {
             throw new Error('planner exploded');
           }
-          if (prompt.includes('你是一个对话感知模块')) {
+          if (isPerceptionPromptText(prompt)) {
             const object = defaultPerceptionObject(prompt);
             return {
               object,
