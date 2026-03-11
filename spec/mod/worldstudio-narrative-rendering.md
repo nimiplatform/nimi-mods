@@ -193,16 +193,16 @@ NarrativeContext 正式 scope 字段：
 
 ## 8. 引用关系
 
-1. world-studio：`nimi-mods/world-studio/spec/world-studio.md`
-2. narrative-engine：`nimi-mods/narrative-engine/spec/narrative-engine.md`
-3. textplay：`nimi-mods/textplay/spec/textplay.md`
-4. videoplay：`nimi-mods/videoplay/spec/videoplay.md`
+1. world-studio：`nimi-mods/runtime/world-studio/spec/world-studio.md`
+2. narrative-engine：`nimi-mods/modules/narrative-engine/spec/narrative-engine.md`
+3. textplay：`nimi-mods/runtime/textplay/spec/textplay.md`
+4. videoplay：`nimi-mods/runtime/videoplay/spec/videoplay.md`
 5. 链路运行协议：`spec/mod/kernel/chain-run-contract.md`
 6. 链路守卫治理：`spec/mod/kernel/chain-guard-contract.md`
-7. videoplay spec index：`nimi-mods/videoplay/spec/INDEX.md`
-8. videoplay 分集切分契约：`nimi-mods/videoplay/spec/kernel/tables/segmentation-policy.yaml`
-9. videoplay 剪辑合成契约：`nimi-mods/videoplay/spec/kernel/tables/edit-compose-policy.yaml`
-10. videoplay 创作操作契约：`nimi-mods/videoplay/spec/kernel/creator-workflow-contract.md`
+7. videoplay spec index：`nimi-mods/runtime/videoplay/spec/INDEX.md`
+8. videoplay 分集切分契约：`nimi-mods/runtime/videoplay/spec/kernel/tables/segmentation-policy.yaml`
+9. videoplay 剪辑合成契约：`nimi-mods/runtime/videoplay/spec/kernel/tables/edit-compose-policy.yaml`
+10. videoplay 创作操作契约：`nimi-mods/runtime/videoplay/spec/kernel/creator-workflow-contract.md`
 11. mod 通用治理：`spec/desktop/kernel/mod-governance-contract.md`
 12. world 边界桩：`spec/realm/world.md`
 13. agent 边界桩：`spec/realm/agent.md`

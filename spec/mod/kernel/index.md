@@ -6,9 +6,10 @@
 ## Rule ID Format
 
 - Format: `MC-<DOMAIN>-NNN`
-- Domain enum: `RUN`, `GUARD`
+- Domain enum: `RUN`, `GUARD`, `WS`
 
 ## Ownership
 
 - `chain-run-contract.md` -> `MC-RUN-*`
 - `chain-guard-contract.md` -> `MC-GUARD-*`
+- `workspace-structure-contract.md` -> `MC-WS-*`

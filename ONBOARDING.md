@@ -19,7 +19,7 @@ It is not bundled into Desktop. Desktop is only the host.
 
 Within this workspace there are three buckets:
 
-- runtime mods in `pnpm-workspace.yaml`
+- runtime mods in `runtime/*` and `pnpm-workspace.yaml`
 - capability modules that participate in verification but are not loadable runtime mods
 - audit-only directories outside the workspace contract
 
@@ -27,6 +27,7 @@ Current runtime mods:
 
 - `audio-book`
 - `buddy`
+- `daily-outfit`
 - `kismet`
 - `knowledge-base`
 - `local-chat`
@@ -69,7 +70,7 @@ Non-negotiable boundaries:
 Runtime mods are expected to have:
 
 ```text
-<mod>/
+nimi-mods/runtime/<mod>/
 ├── index.ts
 ├── mod.manifest.yaml
 ├── package.json
@@ -140,7 +141,7 @@ Supported path:
 
 1. build or watch the mod from this workspace
 2. use `Settings > Mod Developer` in Desktop
-3. add a dev source
+3. add `nimi-mods/runtime` or one specific `nimi-mods/runtime/<mod>` directory as a dev source
 4. reload the source after changes
 
 Environment-variable paths are compatibility-only and should not be documented as the primary third-party path.
@@ -194,7 +195,7 @@ Recent examples:
 
 Checklist:
 
-1. Create the package directory with the required file layout.
+1. Create the package directory under `runtime/<mod>` with the required file layout.
 2. Add it to `pnpm-workspace.yaml`.
 3. Add root script coverage in `package.json`:
    - `generate:spec:<mod>-kernel-docs`
@@ -221,7 +222,7 @@ If you are migrating an older mod, the usual work is:
 
 ## 11. Spec workflow
 
-Each mod owns its own spec under `<mod>/spec/**`.
+Each mod owns its own spec under `runtime/<mod>/spec/**` or `modules/<pkg>/spec/**`.
 
 Generated kernel docs must stay in sync.
 

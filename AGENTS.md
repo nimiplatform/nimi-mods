@@ -11,10 +11,21 @@ Desktop loads mods from installed/runtime source directories. During local autho
 
 Mods run in desktop-governed hook runtime and must not call runtime SDK directly.
 
+## Workspace Layout
+
+`nimi-mods/` root is reserved for workspace infrastructure only:
+
+- `runtime/*` for runtime-loadable mods
+- `modules/*` for capability modules
+- `audit/*` for audit-only packages outside the workspace contract
+- `scripts/`, `shared/`, `spec/`, and `dev/` for shared infrastructure
+
+Do not add new mod/package directories directly under the `nimi-mods/` root.
+
 ## Required File Shape
 
 ```
-nimi-mods/<mod-name>/
+nimi-mods/runtime/<mod-name>/
 ├── index.ts
 ├── spec/
 │   ├── AGENTS.md
@@ -34,7 +45,7 @@ nimi-mods/<mod-name>/
 └── tsconfig.build.json
 ```
 
-Each mod owns its own business spec in `nimi-mods/<mod-name>/spec/**`.
+Each runtime mod owns its own business spec in `nimi-mods/runtime/<mod-name>/spec/**`.
 Cross-mod contracts live in `nimi-mods/spec/mod/**`.
 
 ## Registration Contract
@@ -129,7 +140,7 @@ pnpm run check:spec
 pnpm run verify
 ```
 
-Desktop-side local development is not env-driven as a primary workflow. Add a dev source directory in `Settings > Mod Developer`, then point it at the mod workspace or a dedicated runtime mods folder.
+Desktop-side local development is not env-driven as a primary workflow. Add a dev source directory in `Settings > Mod Developer`, then point it at `nimi-mods/runtime` or a specific runtime mod directory.
 
 Environment-variable overrides are CI / internal compatibility only. They are not the supported third-party author path and must not be reintroduced as the primary Desktop integration model.
 

@@ -5,11 +5,12 @@
 
 ## Scope
 
-Cross-mod contracts for `world-studio -> narrative-engine -> textplay|videoplay` chain.
+Cross-mod contracts for shared mod workspace layout and the `world-studio -> narrative-engine -> textplay|videoplay` chain.
 
 ## Structure
 
 - Kernel:
+  - `kernel/workspace-structure-contract.md`
   - `kernel/chain-run-contract.md`
   - `kernel/chain-guard-contract.md`
 - Domain:
@@ -17,6 +18,7 @@ Cross-mod contracts for `world-studio -> narrative-engine -> textplay|videoplay`
 
 ## Reading Order
 
-1. `kernel/chain-run-contract.md`
-2. `kernel/chain-guard-contract.md`
-3. `worldstudio-narrative-rendering.md`
+1. `kernel/workspace-structure-contract.md`
+2. `kernel/chain-run-contract.md`
+3. `kernel/chain-guard-contract.md`
+4. `worldstudio-narrative-rendering.md`

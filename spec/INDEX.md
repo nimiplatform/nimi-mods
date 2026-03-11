@@ -7,15 +7,15 @@
 
 - Cross-mod contracts: `spec/mod/**`
 - Per-mod specs:
-  - `kismet/spec/**`
-  - `local-chat/spec/**`
-  - `re-life/spec/**`
-  - `mint-you/spec/**`
-  - `test-ai/spec/**`
-  - `narrative-engine/spec/**`
-  - `textplay/spec/**`
-  - `videoplay/spec/**`
-  - `world-studio/spec/**`
+  - `runtime/kismet/spec/**`
+  - `runtime/local-chat/spec/**`
+  - `audit/re-life/spec/**`
+  - `runtime/mint-you/spec/**`
+  - `runtime/test-ai/spec/**`
+  - `modules/narrative-engine/spec/**`
+  - `runtime/textplay/spec/**`
+  - `runtime/videoplay/spec/**`
+  - `runtime/world-studio/spec/**`
 
 ## Global Rules
 
@@ -23,6 +23,7 @@
 2. Domain docs only define domain increments and rule references.
 3. Generated docs are derived artifacts and must not be edited manually.
 4. Shared world-studio -> narrative-engine -> renderer chain contracts are defined once in `spec/mod/**`.
+5. Workspace layout and package bucket rules are defined once in `spec/mod/kernel/workspace-structure-contract.md`.
 
 ## Task-Oriented Read Path
 
@@ -34,9 +35,9 @@
 
 ### Change a single mod business contract
 
-1. `<mod>/spec/INDEX.md`
-2. `<mod>/spec/kernel/*.md`
-3. `<mod>/spec/<mod>.md`
+1. `<bucket>/<mod>/spec/INDEX.md`
+2. `<bucket>/<mod>/spec/kernel/*.md`
+3. `<bucket>/<mod>/spec/<mod>.md`
 
 ## Verification
 

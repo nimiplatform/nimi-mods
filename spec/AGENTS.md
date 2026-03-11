@@ -1,13 +1,13 @@
 # Mods Spec AGENTS.md
 
-> Conventions for AI agents working under `nimi-mods/spec/**` and `nimi-mods/*/spec/**`.
+> Conventions for AI agents working under `nimi-mods/spec/**`, `nimi-mods/runtime/*/spec/**`, `nimi-mods/modules/*/spec/**`, and `nimi-mods/audit/*/spec/**`.
 
 ## Scope
 
 Applies to:
 
 - `spec/mod/**` (cross-mod contracts)
-- `*/spec/**` (single-mod specs)
+- `runtime/*/spec/**`, `modules/*/spec/**`, `audit/*/spec/**` (single-package specs)
 
 ## Authoritative Structure
 
@@ -27,7 +27,7 @@ Applies to:
 
 Run commands based on changed scope.
 
-If `<mod>/spec/kernel/tables/*.yaml` changed:
+If `runtime/<mod>/spec/kernel/tables/*.yaml`, `modules/<pkg>/spec/kernel/tables/*.yaml`, or `audit/<pkg>/spec/kernel/tables/*.yaml` changed:
 
 1. `pnpm -C nimi-mods run generate:spec:<mod>-kernel-docs`
 2. `pnpm -C nimi-mods run check:spec:<mod>-kernel-docs-drift`

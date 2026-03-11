@@ -106,9 +106,9 @@
 
 ## 7. 与模块合同关系
 
-1. narrative-engine 运行细节：`nimi-mods/narrative-engine/spec/kernel/run-orchestration-contract.md`
-2. textplay 运行细节：`nimi-mods/textplay/spec/kernel/run-orchestration-contract.md`
-3. videoplay 创作与重跑影响：`nimi-mods/videoplay/spec/kernel/creator-workflow-contract.md`
+1. narrative-engine 运行细节：`nimi-mods/modules/narrative-engine/spec/kernel/run-orchestration-contract.md`
+2. textplay 运行细节：`nimi-mods/runtime/textplay/spec/kernel/run-orchestration-contract.md`
+3. videoplay 创作与重跑影响：`nimi-mods/runtime/videoplay/spec/kernel/creator-workflow-contract.md`
 4. 跨阶段守卫治理：`spec/mod/kernel/chain-guard-contract.md`
 
 ## 8. Bridge Determinism（MUST）

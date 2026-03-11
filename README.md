@@ -6,6 +6,8 @@ If you are a third-party developer and want to build your first mod, start here.
 
 If you are working inside the Nimi monorepo and need the deeper maintenance rules, read `ONBOARDING.md` after this file.
 
+If you are releasing an official Nimi-maintained mod from this workspace, read [`RELEASE.md`](./RELEASE.md).
+
 ## What is a Nimi mod?
 
 A Nimi mod is a small package that Desktop can load at runtime.
@@ -43,10 +45,10 @@ pnpm install
 
 These directories are already working examples:
 
-- `test-ai`: small diagnostic UI mod, easiest starting point for a page-style mod
-- `local-chat`: large production-style runtime mod
-- `kismet`: immersive full-screen mod page
-- `buddy`: animated character mod with more complex runtime cleanup
+- `runtime/test-ai`: small diagnostic UI mod, easiest starting point for a page-style mod
+- `runtime/local-chat`: large production-style runtime mod
+- `runtime/kismet`: immersive full-screen mod page
+- `runtime/buddy`: animated character mod with more complex runtime cleanup
 
 ## Runtime mods in this workspace
 
@@ -54,6 +56,7 @@ Loadable runtime mods:
 
 - `audio-book`
 - `buddy`
+- `daily-outfit`
 - `kismet`
 - `knowledge-base`
 - `local-chat`
@@ -85,7 +88,7 @@ The simplest path is:
 Build:
 
 ```bash
-cd nimi-mods/test-ai
+cd nimi-mods/runtime/test-ai
 pnpm run build
 ```
 
@@ -100,8 +103,8 @@ Load in Desktop:
 1. Open Desktop
 2. Go to `Settings > Mod Developer`
 3. Add either:
-   - the whole `nimi-mods/` directory, or
-   - one specific mod directory such as `nimi-mods/test-ai`
+   - `nimi-mods/runtime`, or
+   - one specific mod directory such as `nimi-mods/runtime/test-ai`
 4. Reload the source after every rebuild
 
 ## The minimum file layout
@@ -329,5 +332,6 @@ If this is your first mod:
 ## Where to go next
 
 - For internal workspace and maintenance rules: `ONBOARDING.md`
+- For official first-party mod publishing: `RELEASE.md`
 - For strict workspace conventions: `AGENTS.md`
-- For a specific mod contract: `<mod>/spec/AGENTS.md`
+- For a specific mod contract: `runtime/<mod>/spec/AGENTS.md`
