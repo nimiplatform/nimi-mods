@@ -1,6 +1,6 @@
 # Cashbook Spec AGENTS
 
-> Conventions for AI agents working under `nimi-mods/cashbook/spec/`.
+> Conventions for AI agents working under `nimi-mods/audit/cashbook/spec/`.
 
 ## Authoritative Structure
 

@@ -11,7 +11,7 @@
  * Run:
  *   NIMI_SDK_LIVE=1 \
  *   NIMI_LIVE_GEMINI_API_KEY=<key> \
- *   npx tsx --test nimi-mods/meeting-scribe/test/smoke/stt-transcribe.test.ts
+ *   npx tsx --test nimi-mods/audit/meeting-scribe/test/smoke/stt-transcribe.test.ts
  */
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';

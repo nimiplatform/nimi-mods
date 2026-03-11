@@ -46,13 +46,13 @@ test script (TypeScript, node:test)
 # 使用内置 fixture
 NIMI_SDK_LIVE=1 \
 NIMI_LIVE_GEMINI_API_KEY=<your-key> \
-npx tsx --test nimi-mods/meeting-scribe/test/smoke/stt-transcribe.test.ts
+npx tsx --test nimi-mods/audit/meeting-scribe/test/smoke/stt-transcribe.test.ts
 
 # 使用自定义音频文件
 MS_TEST_AUDIO_FILE=/path/to/meeting.wav \
 NIMI_SDK_LIVE=1 \
 NIMI_LIVE_GEMINI_API_KEY=<your-key> \
-npx tsx --test nimi-mods/meeting-scribe/test/smoke/stt-transcribe.test.ts
+npx tsx --test nimi-mods/audit/meeting-scribe/test/smoke/stt-transcribe.test.ts
 ```
 
 **验证项**:
@@ -83,13 +83,13 @@ runtime.media.stt.transcribe({
 # 使用内置样本转录
 NIMI_SDK_LIVE=1 \
 NIMI_LIVE_GEMINI_API_KEY=<your-key> \
-npx tsx --test nimi-mods/meeting-scribe/test/smoke/analysis-generate.test.ts
+npx tsx --test nimi-mods/audit/meeting-scribe/test/smoke/analysis-generate.test.ts
 
 # 使用自定义转录文件
 MS_TEST_TRANSCRIPT_FILE=/path/to/transcript.txt \
 NIMI_SDK_LIVE=1 \
 NIMI_LIVE_GEMINI_API_KEY=<your-key> \
-npx tsx --test nimi-mods/meeting-scribe/test/smoke/analysis-generate.test.ts
+npx tsx --test nimi-mods/audit/meeting-scribe/test/smoke/analysis-generate.test.ts
 ```
 
 **验证项**:
