@@ -1,3 +1,10 @@
+import { registerModTranslations } from '@nimiplatform/sdk/mod/i18n';
+import enLocale from './locales/en.js';
+import zhLocale from './locales/zh.js';
+
+registerModTranslations('daily-outfit', 'en', enLocale as Record<string, unknown>);
+registerModTranslations('daily-outfit', 'zh', zhLocale as Record<string, unknown>);
+
 import { DAILY_OUTFIT_MANIFEST } from './manifest.js';
 import {
   DAILY_OUTFIT_CAPABILITIES,

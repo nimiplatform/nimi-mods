@@ -1,4 +1,5 @@
 import React, { Suspense } from 'react';
+import { getPromptLocale } from '@nimiplatform/sdk/mod/i18n';
 import { type RuntimeModRegistration } from '@nimiplatform/sdk/mod/types';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
 import {
@@ -9,6 +10,8 @@ import {
   AUDIO_BOOK_TAB_ID,
 } from './contracts.js';
 import { createAudioBookFlowId, emitAudioBookLog } from './logging.js';
+import enLocale from './locales/en.js';
+import zhLocale from './locales/zh.js';
 
 const LazyAudioBookPage = React.lazy(async () => {
   const module = await import('./audio-book-page.js');
@@ -22,6 +25,7 @@ export function createAudioBookRuntimeMod(): RuntimeModRegistration {
     isDefaultPrivateExecution: false,
     setup: async ({ sdkRuntimeContext }) => {
       const hookClient = createHookClient(AUDIO_BOOK_MOD_ID, sdkRuntimeContext);
+      const locale = getPromptLocale() === 'zh' ? zhLocale : enLocale;
       const flowId = createAudioBookFlowId('audio-book-setup');
       const startedAt = performance.now();
 
@@ -38,7 +42,7 @@ export function createAudioBookRuntimeMod(): RuntimeModRegistration {
         extension: {
           type: 'nav-item',
           tabId: AUDIO_BOOK_TAB_ID,
-          label: 'Audio Book',
+          label: locale.nav.label,
           badge: 'MOD',
           icon: 'microphone',
           strategy: 'append',
@@ -58,7 +62,7 @@ export function createAudioBookRuntimeMod(): RuntimeModRegistration {
               fallback: React.createElement(
                 'div',
                 { className: 'm-4 rounded-xl border border-gray-200 bg-white p-3 text-xs text-gray-600' },
-                'Audio Book is loading...',
+                locale.nav.loading,
               ),
             },
             React.createElement(LazyAudioBookPage),

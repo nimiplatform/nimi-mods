@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { KBDocument } from '../../types.js';
 
 type ScopeSelectorProps = {
@@ -12,6 +13,7 @@ type ScopeSelectorProps = {
 };
 
 export function ScopeSelector(props: ScopeSelectorProps) {
+  const { t } = useModTranslation('knowledge-base');
   const { documents, selectedDocIds, onChange } = props;
   const readyDocs = documents.filter((d) => d.status === 'ready');
 
@@ -27,7 +29,7 @@ export function ScopeSelector(props: ScopeSelectorProps) {
 
   return (
     <div className="flex items-center gap-2 border-b border-gray-100 bg-white px-5 py-2.5">
-      <span className="text-[11px] font-medium text-gray-500">Scope:</span>
+      <span className="text-[11px] font-medium text-gray-500">{t('chat.scope')}</span>
       <div className="flex flex-wrap gap-1.5">
         <button
           type="button"
@@ -38,7 +40,7 @@ export function ScopeSelector(props: ScopeSelectorProps) {
               : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
           }`}
         >
-          All documents
+          {t('chat.allDocuments')}
         </button>
         {readyDocs.map((doc) => (
           <button

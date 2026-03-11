@@ -1,4 +1,5 @@
 import React, { Suspense } from 'react';
+import { getPromptLocale } from '@nimiplatform/sdk/mod/i18n';
 import type { HookClient } from '@nimiplatform/sdk/mod/types';
 import {
   TEXTPLAY_MOD_ID,
@@ -6,6 +7,8 @@ import {
   TEXTPLAY_ROUTE_SLOT,
   TEXTPLAY_TAB_ID,
 } from '../contracts.js';
+import enLocale from '../locales/en.js';
+import zhLocale from '../locales/zh.js';
 
 const LazyTextplayPage = React.lazy(async () => {
   const module = await import('../textplay-page.js');
@@ -18,6 +21,7 @@ export async function registerTextplayUiExtensions(input: {
   hookClient: HookClient;
 }): Promise<void> {
   const { hookClient } = input;
+  const locale = getPromptLocale() === 'zh' ? zhLocale : enLocale;
 
   await hookClient.ui.register({
     slot: TEXTPLAY_NAV_SLOT,
@@ -25,7 +29,7 @@ export async function registerTextplayUiExtensions(input: {
     extension: {
       type: 'nav-item',
       tabId: TEXTPLAY_TAB_ID,
-      label: 'TextPlay',
+      label: locale.nav.label,
       badge: 'MOD',
       icon: 'textplay',
       strategy: 'append',
@@ -49,7 +53,7 @@ export async function registerTextplayUiExtensions(input: {
             {
               className: 'm-4 rounded-xl border border-gray-200 bg-white p-3 text-xs text-gray-600',
             },
-            'TextPlay is loading...',
+            locale.nav.loading,
           ),
         },
         React.createElement(LazyTextplayPage),

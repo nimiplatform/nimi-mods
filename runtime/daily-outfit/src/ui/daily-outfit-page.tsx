@@ -1,4 +1,5 @@
 import React, { startTransition, useState, useSyncExternalStore } from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import {
   createGarment,
   createWearLog,
@@ -76,6 +77,7 @@ function readFileAsDataUrl(file: File): Promise<string> {
 }
 
 export function DailyOutfitPage() {
+  const { t } = useModTranslation('daily-outfit');
   const snapshot = useSyncExternalStore(subscribeDailyOutfitStore, getDailyOutfitSnapshot, getDailyOutfitSnapshot);
   const [gender, setGender] = useState<(typeof DAILY_OUTFIT_GENDERS)[number]>(snapshot.profile?.gender || 'female');
   const [ageGroup, setAgeGroup] = useState<(typeof DAILY_OUTFIT_AGE_GROUPS)[number]>(snapshot.profile?.ageGroup || '25-30');
@@ -175,7 +177,7 @@ export function DailyOutfitPage() {
       setSelfieUrl(dataUrl);
       setSelfieFileName(file.name);
     } catch (error) {
-      setUploadError(error instanceof Error ? error.message : String(error || 'Upload failed'));
+      setUploadError(error instanceof Error ? error.message : String(error || t('common.uploadFailed')));
     } finally {
       event.target.value = '';
     }
@@ -198,7 +200,7 @@ export function DailyOutfitPage() {
         }
       }
     } catch (error) {
-      setUploadError(error instanceof Error ? error.message : String(error || 'Upload failed'));
+      setUploadError(error instanceof Error ? error.message : String(error || t('common.uploadFailed')));
     } finally {
       event.target.value = '';
     }
@@ -215,113 +217,112 @@ export function DailyOutfitPage() {
         <section className="rounded-[28px] border border-orange-200/70 bg-white/90 p-6 shadow-[0_24px_80px_-40px_rgba(120,53,15,0.45)]">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div className="max-w-3xl">
-              <div className="text-xs uppercase tracking-[0.28em] text-orange-600">Daily Outfit</div>
-              <h1 className="mt-3 text-4xl font-semibold tracking-tight text-neutral-950">Operate the wardrobe, not just view it</h1>
+              <div className="text-xs uppercase tracking-[0.28em] text-orange-600">{t('hero.eyebrow')}</div>
+              <h1 className="mt-3 text-4xl font-semibold tracking-tight text-neutral-950">{t('hero.title')}</h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-600">
-                This slice now supports onboarding seed, garment intake, outfit suggestion generation, favorites,
-                wear logging, and live insight updates on one workspace.
+                {t('hero.description')}
               </p>
             </div>
             <div className="rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3 text-sm text-orange-900">
-              {snapshot.profile ? 'Profile seeded' : 'Onboarding profile missing'}
+              {snapshot.profile ? t('hero.profileSeeded') : t('hero.profileMissing')}
             </div>
           </div>
         </section>
 
         <section className="grid gap-4 md:grid-cols-4">
-          <MetricCard label="Active garments" value={snapshot.insights.activeGarmentCount} hint="Closet pieces currently eligible for recommendations." />
-          <MetricCard label="Retired garments" value={snapshot.insights.retiredGarmentCount} hint="Archived pieces retained for history only." />
-          <MetricCard label="Wear logs" value={snapshot.insights.wearLogCount} hint="Confirmed outfit history entries." />
-          <MetricCard label="Favorites" value={snapshot.insights.favoriteOutfitCount} hint="Saved outfit combinations." />
+          <MetricCard label={t('metrics.activeGarments')} value={snapshot.insights.activeGarmentCount} hint={t('metrics.activeGarmentsHint')} />
+          <MetricCard label={t('metrics.retiredGarments')} value={snapshot.insights.retiredGarmentCount} hint={t('metrics.retiredGarmentsHint')} />
+          <MetricCard label={t('metrics.wearLogs')} value={snapshot.insights.wearLogCount} hint={t('metrics.wearLogsHint')} />
+          <MetricCard label={t('metrics.favorites')} value={snapshot.insights.favoriteOutfitCount} hint={t('metrics.favoritesHint')} />
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-          <SectionCard title="Onboarding and profile" eyebrow="Profile seed">
+          <SectionCard title={t('sections.profileTitle')} eyebrow={t('sections.profileEyebrow')}>
             <div className="grid gap-4 md:grid-cols-2">
-              <FieldLabel label="Gender">
+              <FieldLabel label={t('fields.gender')}>
                 <select className="rounded-2xl border border-neutral-200 px-4 py-3" value={gender} onChange={(event) => setGender(event.target.value as (typeof DAILY_OUTFIT_GENDERS)[number])}>
                   {DAILY_OUTFIT_GENDERS.map((option) => (
-                    <option key={option} value={option}>{option}</option>
+                    <option key={option} value={option}>{t(`options.genders.${option}`)}</option>
                   ))}
                 </select>
               </FieldLabel>
-              <FieldLabel label="Age group">
+              <FieldLabel label={t('fields.ageGroup')}>
                 <select className="rounded-2xl border border-neutral-200 px-4 py-3" value={ageGroup} onChange={(event) => setAgeGroup(event.target.value as (typeof DAILY_OUTFIT_AGE_GROUPS)[number])}>
                   {DAILY_OUTFIT_AGE_GROUPS.map((option) => (
                     <option key={option} value={option}>{option}</option>
                   ))}
                 </select>
               </FieldLabel>
-              <FieldLabel label="Selfie URL" hint="Optional for now; try-on orchestration can use it later.">
-                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={selfieUrl} onChange={(event) => setSelfieUrl(event.target.value)} placeholder="local://daily-outfit/selfie" />
+              <FieldLabel label={t('fields.selfieUrl')} hint={t('hints.selfieUrl')}>
+                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={selfieUrl} onChange={(event) => setSelfieUrl(event.target.value)} placeholder={t('placeholders.selfieUrl')} />
               </FieldLabel>
-              <FieldLabel label="Preferred styles" hint="Comma-separated tags, e.g. minimal, business, street.">
+              <FieldLabel label={t('fields.preferredStyles')} hint={t('hints.preferredStyles')}>
                 <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={stylesText} onChange={(event) => setStylesText(event.target.value)} />
               </FieldLabel>
-              <FieldLabel label="Frequent scenes" hint="Comma-separated scenes, e.g. office, weekend, dinner.">
+              <FieldLabel label={t('fields.frequentScenes')} hint={t('hints.frequentScenes')}>
                 <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={scenesText} onChange={(event) => setScenesText(event.target.value)} />
               </FieldLabel>
             </div>
             <div className="mt-4 grid gap-4 md:grid-cols-[220px_1fr]">
               <div className="overflow-hidden rounded-3xl border border-neutral-200 bg-neutral-50">
                 {selfieUrl ? (
-                  <img src={selfieUrl} alt="Selfie preview" className="h-56 w-full object-cover" />
+                  <img src={selfieUrl} alt={t('fields.uploadSelfie')} className="h-56 w-full object-cover" />
                 ) : (
-                  <div className="flex h-56 items-center justify-center text-sm text-neutral-500">No selfie uploaded</div>
+                  <div className="flex h-56 items-center justify-center text-sm text-neutral-500">{t('common.noSelfie')}</div>
                 )}
               </div>
               <div className="flex flex-col gap-3">
-                <FieldLabel label="Upload selfie" hint="Uses browser File API for local preview right now.">
+                <FieldLabel label={t('fields.uploadSelfie')} hint={t('hints.uploadSelfie')}>
                   <input className="rounded-2xl border border-neutral-200 px-4 py-3" type="file" accept="image/*" onChange={handleSelfieUpload} />
                 </FieldLabel>
-                {selfieFileName ? <div className="text-sm text-neutral-600">Selected: {selfieFileName}</div> : null}
+                {selfieFileName ? <div className="text-sm text-neutral-600">{t('common.selected')} {selfieFileName}</div> : null}
               </div>
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <button className="rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-medium text-white" onClick={handleSaveProfile}>
-                Save onboarding profile
+                {t('actions.saveProfile')}
               </button>
               {snapshot.profile ? (
                 <div className="text-sm text-neutral-600">
-                  Current styles: {Object.keys(snapshot.profile.styleWeights).join(', ') || 'none'}
+                  {t('state.currentStyles')} {Object.keys(snapshot.profile.styleWeights).join(', ') || t('common.none')}
                 </div>
               ) : null}
               {uploadError ? <div className="text-sm text-red-600">{uploadError}</div> : null}
             </div>
           </SectionCard>
 
-          <SectionCard title="Garment intake" eyebrow="Wardrobe">
+          <SectionCard title={t('sections.wardrobeTitle')} eyebrow={t('sections.wardrobeEyebrow')}>
             <div className="grid gap-4 md:grid-cols-2">
-              <FieldLabel label="Category">
+              <FieldLabel label={t('fields.category')}>
                 <select className="rounded-2xl border border-neutral-200 px-4 py-3" value={category} onChange={(event) => setCategory(event.target.value as (typeof DAILY_OUTFIT_CATEGORIES)[number])}>
                   {DAILY_OUTFIT_CATEGORIES.map((option) => (
-                    <option key={option} value={option}>{option}</option>
+                    <option key={option} value={option}>{t(`options.categories.${option}`)}</option>
                   ))}
                 </select>
               </FieldLabel>
-              <FieldLabel label="Subcategory">
-                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={subcategory} onChange={(event) => setSubcategory(event.target.value)} placeholder="shirt, denim, sneaker" />
+              <FieldLabel label={t('fields.subcategory')}>
+                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={subcategory} onChange={(event) => setSubcategory(event.target.value)} placeholder={t('placeholders.subcategory')} />
               </FieldLabel>
-              <FieldLabel label="Colors">
-                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={colorsText} onChange={(event) => setColorsText(event.target.value)} placeholder="white, navy" />
+              <FieldLabel label={t('fields.colors')}>
+                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={colorsText} onChange={(event) => setColorsText(event.target.value)} placeholder={t('placeholders.colors')} />
               </FieldLabel>
-              <FieldLabel label="Style tags">
-                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={styleTagsText} onChange={(event) => setStyleTagsText(event.target.value)} placeholder="minimal, business" />
+              <FieldLabel label={t('fields.styleTags')}>
+                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={styleTagsText} onChange={(event) => setStyleTagsText(event.target.value)} placeholder={t('placeholders.styleTags')} />
               </FieldLabel>
-              <FieldLabel label="Material">
-                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={material} onChange={(event) => setMaterial(event.target.value)} placeholder="cotton" />
+              <FieldLabel label={t('fields.material')}>
+                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={material} onChange={(event) => setMaterial(event.target.value)} placeholder={t('placeholders.material')} />
               </FieldLabel>
-              <FieldLabel label="Photo URL">
+              <FieldLabel label={t('fields.photoUrl')}>
                 <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={photoUrl} onChange={(event) => setPhotoUrl(event.target.value)} />
               </FieldLabel>
-              <FieldLabel label="Formality level">
+              <FieldLabel label={t('fields.formalityLevel')}>
                 <select className="rounded-2xl border border-neutral-200 px-4 py-3" value={formalityLevel} onChange={(event) => setFormalityLevel(event.target.value)}>
                   {['1', '2', '3', '4', '5'].map((option) => (
                     <option key={option} value={option}>{option}</option>
                   ))}
                 </select>
               </FieldLabel>
-              <FieldLabel label="Seasons">
+              <FieldLabel label={t('fields.seasons')}>
                 <div className="flex flex-wrap gap-2">
                   {DAILY_OUTFIT_SEASONS.map((season) => (
                     <button
@@ -334,7 +335,7 @@ export function DailyOutfitPage() {
                       }`}
                       onClick={() => handleToggleSeason(season)}
                     >
-                      {season}
+                      {t(`options.seasons.${season}`)}
                     </button>
                   ))}
                 </div>
@@ -343,32 +344,32 @@ export function DailyOutfitPage() {
             <div className="mt-4 grid gap-4 md:grid-cols-[220px_1fr]">
               <div className="overflow-hidden rounded-3xl border border-neutral-200 bg-neutral-50">
                 {photoUrl ? (
-                  <img src={photoUrl} alt="Garment preview" className="h-56 w-full object-cover" />
+                  <img src={photoUrl} alt={t('fields.uploadGarment')} className="h-56 w-full object-cover" />
                 ) : (
-                  <div className="flex h-56 items-center justify-center text-sm text-neutral-500">No garment photo uploaded</div>
+                  <div className="flex h-56 items-center justify-center text-sm text-neutral-500">{t('common.noGarmentPhoto')}</div>
                 )}
               </div>
               <div className="flex flex-col gap-3">
-                <FieldLabel label="Upload garment image" hint="PNG/JPG/WebP all work here; stored as a local data URL for now.">
+                <FieldLabel label={t('fields.uploadGarment')} hint={t('hints.uploadGarment')}>
                   <input className="rounded-2xl border border-neutral-200 px-4 py-3" type="file" accept="image/*" onChange={handleGarmentUpload} />
                 </FieldLabel>
-                {photoFileName ? <div className="text-sm text-neutral-600">Selected: {photoFileName}</div> : null}
+                {photoFileName ? <div className="text-sm text-neutral-600">{t('common.selected')} {photoFileName}</div> : null}
               </div>
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <button className="rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-medium text-white" onClick={handleCreateGarment}>
-                Add garment
+                {t('actions.addGarment')}
               </button>
-              <div className="text-sm text-neutral-600">{activeGarments.length} active garments ready for outfit generation</div>
+              <div className="text-sm text-neutral-600">{t('state.activeGarmentsReady', { count: activeGarments.length })}</div>
               {uploadError ? <div className="text-sm text-red-600">{uploadError}</div> : null}
             </div>
           </SectionCard>
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-          <SectionCard title="Recommendation lab" eyebrow="Generate">
+          <SectionCard title={t('sections.generateTitle')} eyebrow={t('sections.generateEyebrow')}>
             <div className="flex flex-col gap-4">
-              <FieldLabel label="Occasion prompt" hint="Examples: office coffee catch-up, rainy client meeting, weekend hike.">
+              <FieldLabel label={t('fields.occasionPrompt')} hint={t('hints.occasionPrompt')}>
                 <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={occasionInput} onChange={(event) => setOccasionInput(event.target.value)} />
               </FieldLabel>
               <div className="flex flex-wrap gap-3">
@@ -377,22 +378,22 @@ export function DailyOutfitPage() {
                   onClick={handleGenerateOutfits}
                   disabled={activeGarments.length === 0}
                 >
-                  Generate outfit suggestions
+                  {t('actions.generateOutfits')}
                 </button>
                 <div className="text-sm text-neutral-600">
-                  Suggestion engine currently uses local heuristics from scene keywords, style weights, season, and formality.
+                  {t('state.suggestionHint')}
                 </div>
               </div>
               <div className="grid gap-4">
                 {snapshot.outfits.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-600">
-                    No outfits yet. Seed profile + garments first, then generate suggestions.
+                    {t('state.noOutfits')}
                   </div>
                 ) : snapshot.outfits.slice(0, 6).map((outfit) => (
                   <div key={outfit.id} className="rounded-2xl border border-neutral-200 p-4">
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div>
-                        <div className="text-sm uppercase tracking-[0.2em] text-neutral-500">{outfit.occasionTags.join(', ') || 'general'}</div>
+                        <div className="text-sm uppercase tracking-[0.2em] text-neutral-500">{outfit.occasionTags.join(', ') || t('state.general')}</div>
                         <div className="mt-1 text-lg font-semibold text-neutral-950">{outfit.occasion}</div>
                         <div className="mt-2 text-sm leading-6 text-neutral-600">{outfit.aiReasoning}</div>
                         <div className="mt-3 flex flex-wrap gap-2">
@@ -408,10 +409,10 @@ export function DailyOutfitPage() {
                       </div>
                       <div className="flex min-w-[220px] flex-col gap-2">
                         <button className="rounded-2xl border border-neutral-200 px-4 py-3 text-sm font-medium text-neutral-900" onClick={() => handleFavorite(outfit.id)}>
-                          {outfit.isFavorite ? 'Unfavorite outfit' : 'Favorite outfit'}
+                          {outfit.isFavorite ? t('actions.unfavorite') : t('actions.favorite')}
                         </button>
                         <button className="rounded-2xl bg-orange-500 px-4 py-3 text-sm font-medium text-white" onClick={() => handleLogWear(outfit.id, outfit.occasion)}>
-                          Log wear today
+                          {t('actions.logWear')}
                         </button>
                       </div>
                     </div>
@@ -422,11 +423,11 @@ export function DailyOutfitPage() {
           </SectionCard>
 
           <div className="space-y-6">
-            <SectionCard title="Wardrobe snapshot" eyebrow="Live state">
+            <SectionCard title={t('sections.liveStateTitle')} eyebrow={t('sections.liveStateEyebrow')}>
               <div className="space-y-3">
                 {snapshot.garments.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-600">
-                    No garments yet. Use the intake form to start your closet.
+                    {t('state.noGarments')}
                   </div>
                 ) : snapshot.garments.map((garment) => (
                   <div key={garment.id} className="flex items-start justify-between rounded-2xl border border-neutral-200 px-4 py-3">
@@ -437,16 +438,16 @@ export function DailyOutfitPage() {
                       <div>
                         <div className="font-medium text-neutral-950">{garment.subcategory || garment.category}</div>
                         <div className="mt-1 text-sm text-neutral-600">
-                          {garment.colors.join(', ')} · {garment.styleTags.join(', ') || 'No style tags'}
+                          {garment.colors.join(', ')} · {garment.styleTags.join(', ') || t('common.noStyleTags')}
                         </div>
                         <div className="mt-1 text-xs uppercase tracking-[0.16em] text-neutral-500">
-                          {garment.seasons.join(', ')} · formality {garment.formalityLevel}
+                          {garment.seasons.map((season) => t(`options.seasons.${season}`)).join(', ')} · {t('state.formality')} {garment.formalityLevel}
                         </div>
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-2">
                       <div className="text-xs uppercase tracking-[0.16em] text-neutral-500">
-                        {garment.status} · worn {garment.wearCount}x
+                        {(garment.status === 'active' ? t('state.statusActive') : t('state.statusRetired'))} · {t('common.worn')} {garment.wearCount}x
                       </div>
                       {garment.status === 'active' ? (
                         <button
@@ -457,7 +458,7 @@ export function DailyOutfitPage() {
                             });
                           }}
                         >
-                          Retire
+                          {t('common.retire')}
                         </button>
                       ) : null}
                     </div>
@@ -466,28 +467,28 @@ export function DailyOutfitPage() {
               </div>
             </SectionCard>
 
-            <SectionCard title="Recent wear logs" eyebrow="History">
+            <SectionCard title={t('sections.historyTitle')} eyebrow={t('sections.historyEyebrow')}>
               <div className="space-y-3">
                 {snapshot.wearLogs.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-600">
-                    No wear logs yet. Logging an outfit will update wear counts and scene frequencies.
+                    {t('state.noWearLogs')}
                   </div>
                 ) : snapshot.wearLogs.slice(0, 6).map((wearLog) => (
                   <div key={wearLog.id} className="rounded-2xl border border-neutral-200 px-4 py-3">
-                    <div className="font-medium text-neutral-950">{wearLog.occasion || 'No occasion'}</div>
+                    <div className="font-medium text-neutral-950">{wearLog.occasion || t('common.noOccasion')}</div>
                     <div className="mt-1 text-sm text-neutral-600">
-                      {wearLog.date} · {wearLog.itemIds.length} items
+                      {wearLog.date} · {wearLog.itemIds.length} {t('common.items')}
                     </div>
                   </div>
                 ))}
               </div>
             </SectionCard>
 
-            <SectionCard title="Insight gaps" eyebrow="Closet signals">
+            <SectionCard title={t('sections.insightsTitle')} eyebrow={t('sections.insightsEyebrow')}>
               <div className="space-y-3 text-sm text-neutral-700">
                 {snapshot.insights.gapSuggestions.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-4 text-neutral-600">
-                    No immediate gaps detected from the current local state.
+                    {t('state.noInsights')}
                   </div>
                 ) : snapshot.insights.gapSuggestions.map((suggestion) => (
                   <div key={suggestion} className="rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-orange-900">

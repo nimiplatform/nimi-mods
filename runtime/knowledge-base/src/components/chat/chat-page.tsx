@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import React, { useCallback, useMemo, useState } from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { KBPageController } from '../../controllers/use-kb-page-controller.js';
 import { ConversationSidebar } from './conversation-sidebar.js';
 import { MessageList } from './message-list.js';
@@ -67,9 +68,10 @@ function ChevronDownIcon({ className }: { className?: string }) {
 }
 
 function RouteChip({ label, value }: { label: string; value: RouteDisplay }) {
-  const sourceLabel = value.source === 'auto' ? 'Auto'
-    : value.source === 'cloud' ? 'Cloud'
-    : 'Local';
+  const { t } = useModTranslation('knowledge-base');
+  const sourceLabel = value.source === 'auto' ? t('common.autoRoute')
+    : value.source === 'cloud' ? t('common.cloud')
+    : t('common.local');
   const modelLabel = value.model || '(auto)';
 
   return (
@@ -101,6 +103,7 @@ function QuickQuestion({ text, onClick }: { text: string; onClick: () => void })
 }
 
 export function ChatPage(props: ChatPageProps) {
+  const { t } = useModTranslation('knowledge-base');
   const { controller } = props;
   const { store, ui, chatActions } = controller;
   const [scopeDocIds, setScopeDocIds] = useState<string[]>([]);
@@ -116,13 +119,13 @@ export function ChatPage(props: ChatPageProps) {
 
   const handleDeleteConversation = useCallback((id: string) => {
     ui.setConfirmDialog({
-      message: 'Delete this conversation and all its messages?',
+      message: t('chat.confirmDeleteMessage'),
       onConfirm: () => {
         void chatActions.deleteConversation(id);
         ui.setConfirmDialog(null);
       },
     });
-  }, [chatActions, ui]);
+  }, [chatActions, t, ui]);
 
   const handleRenameConversation = useCallback((id: string, title: string) => {
     const conv = store.conversations.find((c) => c.id === id);
@@ -196,9 +199,9 @@ export function ChatPage(props: ChatPageProps) {
             className="flex w-full items-center justify-between px-5 py-2 text-[11px] text-gray-500 hover:bg-gray-50"
           >
             <div className="flex items-center gap-2">
-              <span className="font-medium text-gray-600">Runtime Route</span>
-              <RouteChip label="Chat" value={chatRouteDisplay} />
-              <RouteChip label="Embed" value={embeddingRouteDisplay} />
+              <span className="font-medium text-gray-600">{t('chat.runtimeRoute')}</span>
+              <RouteChip label={t('chat.routeChat')} value={chatRouteDisplay} />
+              <RouteChip label={t('chat.routeEmbed')} value={embeddingRouteDisplay} />
             </div>
             <ChevronDownIcon className={`h-3.5 w-3.5 text-gray-400 transition-transform ${routeBannerOpen ? 'rotate-180' : ''}`} />
           </button>
@@ -206,16 +209,16 @@ export function ChatPage(props: ChatPageProps) {
             <div className="border-t border-gray-100 bg-gray-50 px-5 py-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-lg border border-gray-200 bg-white p-3">
-                  <p className="text-[11px] font-medium text-gray-700">Chat Route</p>
-                  <p className="mt-1 text-[11px] text-gray-500">Source: {chatRouteDisplay.source}</p>
-                  {chatRouteDisplay.connectorId && <p className="text-[11px] text-gray-500">Connector: {chatRouteDisplay.connectorId}</p>}
-                  <p className="text-[11px] text-gray-500">Model: {chatRouteDisplay.model || '(auto)'}</p>
+                  <p className="text-[11px] font-medium text-gray-700">{t('chat.routeChatTitle')}</p>
+                  <p className="mt-1 text-[11px] text-gray-500">{t('chat.source')}: {chatRouteDisplay.source}</p>
+                  {chatRouteDisplay.connectorId && <p className="text-[11px] text-gray-500">{t('chat.connector')}: {chatRouteDisplay.connectorId}</p>}
+                  <p className="text-[11px] text-gray-500">{t('chat.model')}: {chatRouteDisplay.model || t('common.auto')}</p>
                 </div>
                 <div className="rounded-lg border border-gray-200 bg-white p-3">
-                  <p className="text-[11px] font-medium text-gray-700">Embedding Route</p>
-                  <p className="mt-1 text-[11px] text-gray-500">Source: {embeddingRouteDisplay.source}</p>
-                  {embeddingRouteDisplay.connectorId && <p className="text-[11px] text-gray-500">Connector: {embeddingRouteDisplay.connectorId}</p>}
-                  <p className="text-[11px] text-gray-500">Model: {embeddingRouteDisplay.model || '(auto)'}</p>
+                  <p className="text-[11px] font-medium text-gray-700">{t('chat.routeEmbeddingTitle')}</p>
+                  <p className="mt-1 text-[11px] text-gray-500">{t('chat.source')}: {embeddingRouteDisplay.source}</p>
+                  {embeddingRouteDisplay.connectorId && <p className="text-[11px] text-gray-500">{t('chat.connector')}: {embeddingRouteDisplay.connectorId}</p>}
+                  <p className="text-[11px] text-gray-500">{t('chat.model')}: {embeddingRouteDisplay.model || t('common.auto')}</p>
                 </div>
               </div>
               <button
@@ -223,7 +226,7 @@ export function ChatPage(props: ChatPageProps) {
                 onClick={() => { void controller.refreshRouteOptions(); }}
                 className="mt-2 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-50"
               >
-                Refresh
+                {t('common.refresh')}
               </button>
             </div>
           )}
@@ -235,20 +238,20 @@ export function ChatPage(props: ChatPageProps) {
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
             </svg>
-            <p className="mt-3 text-sm font-medium text-gray-500">No documents ready</p>
-            <p className="mt-1 text-xs text-gray-400">Import and process documents first to start chatting</p>
+            <p className="mt-3 text-sm font-medium text-gray-500">{t('chat.noDocumentsReady')}</p>
+            <p className="mt-1 text-xs text-gray-400">{t('chat.noDocumentsHint')}</p>
           </div>
         ) : !store.activeConversation ? (
           <div className="flex h-full flex-col">
             <div className="flex flex-1 flex-col items-center justify-center gap-4">
               <MessageSquareIcon />
               <div className="text-center">
-                <p className="text-sm font-medium text-gray-600">Start a conversation</p>
-                <p className="mt-1 text-xs text-gray-400">Ask questions about your imported documents</p>
+                <p className="text-sm font-medium text-gray-600">{t('chat.startConversation')}</p>
+                <p className="mt-1 text-xs text-gray-400">{t('chat.startConversationHint')}</p>
               </div>
               <div className="mt-2 flex flex-col gap-2">
-                <QuickQuestion text="Summarize the main topics across all documents" onClick={() => handleSend('Summarize the main topics across all documents')} />
-                <QuickQuestion text="What are the key concepts mentioned?" onClick={() => handleSend('What are the key concepts mentioned?')} />
+                <QuickQuestion text={t('chat.quickQuestionSummary')} onClick={() => handleSend(t('chat.quickQuestionSummary'))} />
+                <QuickQuestion text={t('chat.quickQuestionConcepts')} onClick={() => handleSend(t('chat.quickQuestionConcepts'))} />
               </div>
             </div>
             <ChatInput onSend={handleSend} disabled={false} />

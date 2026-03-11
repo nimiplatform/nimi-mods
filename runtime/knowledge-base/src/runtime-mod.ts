@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import React, { Suspense } from 'react';
+import { getPromptLocale } from '@nimiplatform/sdk/mod/i18n';
 import { type RuntimeModRegistration } from '@nimiplatform/sdk/mod/types';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
 import {
@@ -14,6 +15,8 @@ import {
 } from './contracts.js';
 import { createKBFlowId, emitKBLog } from './logging.js';
 import { registerKBDataCapabilities } from './registrars/data.js';
+import enLocale from './locales/en.js';
+import zhLocale from './locales/zh.js';
 
 const LazyKnowledgeBasePage = React.lazy(async () => {
   const module = await import('./knowledge-base-page.js');
@@ -27,6 +30,7 @@ export function createKnowledgeBaseRuntimeMod(): RuntimeModRegistration {
     isDefaultPrivateExecution: false,
     setup: async ({ sdkRuntimeContext }) => {
       const hookClient = createHookClient(KB_MOD_ID, sdkRuntimeContext);
+      const locale = getPromptLocale() === 'zh' ? zhLocale : enLocale;
       const flowId = createKBFlowId('setup');
       const startedAt = performance.now();
 
@@ -44,7 +48,7 @@ export function createKnowledgeBaseRuntimeMod(): RuntimeModRegistration {
         extension: {
           type: 'nav-item',
           tabId: KB_TAB_ID,
-          label: 'Knowledge Base',
+          label: locale.nav.label,
           badge: 'MOD',
           icon: 'knowledge-base',
           strategy: 'append',
@@ -65,7 +69,7 @@ export function createKnowledgeBaseRuntimeMod(): RuntimeModRegistration {
               fallback: React.createElement(
                 'div',
                 { className: 'm-4 rounded-xl border border-gray-200 bg-white p-3 text-xs text-gray-600' },
-                'Knowledge Base is loading...',
+                locale.nav.loading,
               ),
             },
             React.createElement(LazyKnowledgeBasePage),

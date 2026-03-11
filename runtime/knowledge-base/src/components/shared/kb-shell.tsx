@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import React, { useEffect, useState } from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import { ConfirmDialog } from '../ui/dialog.js';
 
 type KBShellProps = {
@@ -34,6 +35,7 @@ function CloseIcon() {
 }
 
 export function KBShell(props: KBShellProps) {
+  const { t } = useModTranslation('knowledge-base');
   const [toastVisible, setToastVisible] = useState(false);
 
   useEffect(() => {
@@ -82,7 +84,7 @@ export function KBShell(props: KBShellProps) {
           onConfirm={props.confirmDialog.onConfirm}
           onCancel={() => props.onDismissConfirm?.()}
           variant="destructive"
-          confirmLabel="Delete"
+          confirmLabel={t('shell.confirmDelete')}
         />
       )}
     </div>

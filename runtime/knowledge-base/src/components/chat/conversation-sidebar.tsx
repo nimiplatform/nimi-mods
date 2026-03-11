@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { KBConversation } from '../../types.js';
 import { Button } from '../ui/button.js';
 
@@ -64,6 +65,7 @@ function ConversationItem(props: {
   onDelete: () => void;
   onRename?: (title: string) => void;
 }) {
+  const { t } = useModTranslation('knowledge-base');
   const { conv, isActive, onSelect, onDelete, onRename } = props;
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(conv.title);
@@ -124,7 +126,7 @@ function ConversationItem(props: {
             isActive ? 'text-gray-900' : 'text-gray-700'
           }`}
           onDoubleClick={handleStartRename}
-          title="Double-click to rename"
+          title={t('chat.doubleClickRename')}
         >
           {conv.title}
         </p>
@@ -144,7 +146,7 @@ function ConversationItem(props: {
               type="button"
               onClick={handleStartRename}
               className="rounded p-0.5 text-gray-300 opacity-0 hover:bg-gray-100 hover:text-gray-600 group-hover:opacity-100"
-              title="Rename"
+              title={t('common.rename')}
             >
               <PencilIcon />
             </button>
@@ -153,7 +155,7 @@ function ConversationItem(props: {
             type="button"
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
             className="rounded p-0.5 text-gray-300 opacity-0 hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
-            title="Delete"
+            title={t('common.delete')}
           >
             <TrashIcon />
           </button>
@@ -164,6 +166,7 @@ function ConversationItem(props: {
 }
 
 export function ConversationSidebar(props: ConversationSidebarProps) {
+  const { t } = useModTranslation('knowledge-base');
   const { conversations, activeId, onSelect, onCreate, onDelete, onRename } = props;
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -178,7 +181,7 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
       <div className="flex flex-col gap-2 p-4">
         <Button size="sm" className="w-full" onClick={onCreate}>
           <PlusIcon />
-          New Chat
+          {t('chat.newChat')}
         </Button>
         {conversations.length > 0 && (
           <div className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5">
@@ -187,7 +190,7 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search conversations..."
+              placeholder={t('chat.searchPlaceholder')}
               className="w-full bg-transparent text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none"
             />
           </div>
@@ -200,11 +203,11 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
             <svg className="h-10 w-10 text-gray-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
-            <p className="mt-2 text-xs text-gray-400">No conversations yet</p>
+            <p className="mt-2 text-xs text-gray-400">{t('chat.noConversations')}</p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex items-center justify-center py-8">
-            <p className="text-xs text-gray-400">No matches for &ldquo;{searchQuery}&rdquo;</p>
+            <p className="text-xs text-gray-400">{t('chat.noMatches', { query: searchQuery })}</p>
           </div>
         ) : (
           <div className="flex flex-col gap-1">

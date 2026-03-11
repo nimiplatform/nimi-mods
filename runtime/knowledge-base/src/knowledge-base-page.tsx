@@ -4,6 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import { useKBPageController } from './controllers/use-kb-page-controller.js';
 import { KBShell } from './components/shared/kb-shell.js';
 import { KBNavTabs } from './components/shared/kb-nav-tabs.js';
@@ -12,6 +13,7 @@ import { ChatPage } from './components/chat/chat-page.js';
 import { SettingsPage } from './components/settings/settings-page.js';
 
 export function KnowledgeBasePage() {
+  const { t } = useModTranslation('knowledge-base');
   const controller = useKBPageController();
   const { store, ui } = controller;
 
@@ -20,7 +22,7 @@ export function KnowledgeBasePage() {
       <div data-nimi-mod-root="knowledge-base" className="flex h-full items-center justify-center bg-gray-50">
         <div className="flex items-center gap-2">
           <span className="inline-block h-3 w-3 animate-spin rounded-full border border-indigo-400 border-t-transparent" />
-          <p className="text-xs text-gray-400">Loading Knowledge Base...</p>
+          <p className="text-xs text-gray-400">{t('nav.pageLoading')}</p>
         </div>
       </div>
     );
@@ -53,7 +55,7 @@ export function KnowledgeBasePage() {
           onImportUrl={controller.documentActions.importUrl}
           onDelete={(docId) => {
             ui.setConfirmDialog({
-              message: 'Delete this document and all associated data?',
+              message: t('documents.confirmDeleteMessage'),
               onConfirm: () => {
                 controller.documentActions.deleteDocument(docId);
                 ui.setConfirmDialog(null);

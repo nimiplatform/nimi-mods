@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import { useAudioBookPageController } from './controllers/audio-book-page-controller.js';
 import { AudioBookShell } from './components/shell/audio-book-shell.js';
 import { StepFooter } from './components/shell/step-footer.js';
@@ -12,6 +13,7 @@ import { StepContent } from './components/step-content.js';
 import { TooltipProvider } from './components/ui/tooltip.js';
 
 export function AudioBookPage() {
+  const { t } = useModTranslation('audio-book');
   const controller = useAudioBookPageController();
   const { store, ui, navigation } = controller;
 
@@ -20,7 +22,7 @@ export function AudioBookPage() {
     return (
       <div data-nimi-mod-root="audio-book" className="flex h-full min-h-0 flex-col bg-gray-50">
         <header className="flex shrink-0 items-center border-b border-gray-200 bg-white px-4 py-2">
-          <span className="text-sm font-semibold text-gray-900">Audio Book</span>
+          <span className="text-sm font-semibold text-gray-900">{t('page.title')}</span>
         </header>
         <main className="min-h-0 flex-1 overflow-y-auto">
           <ProjectListView

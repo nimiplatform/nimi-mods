@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { KBViewTab } from '../../types.js';
 
 type KBNavTabsProps = {
@@ -48,6 +49,7 @@ const TABS: Array<{ id: KBViewTab; label: string; Icon: React.FC }> = [
 ];
 
 export function KBNavTabs(props: KBNavTabsProps) {
+  const { t } = useModTranslation('knowledge-base');
   const { activeTab, onTabChange, documentCount, conversationCount } = props;
 
   return (
@@ -70,7 +72,7 @@ export function KBNavTabs(props: KBNavTabsProps) {
             }`}
           >
             <tab.Icon />
-            {tab.label}
+            {t(`tabs.${tab.id}`)}
             {count !== undefined && count > 0 && (
               <span className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${
                 isActive ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'

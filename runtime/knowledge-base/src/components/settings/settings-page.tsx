@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import React, { useCallback, useMemo } from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
 import type { KBSettings } from '../../types.js';
 import { Button } from '../ui/button.js';
@@ -147,6 +148,7 @@ function RoutePanel(props: {
   onModelChange: (value: string) => void;
   modelListId: string;
 }) {
+  const { t } = useModTranslation('knowledge-base');
   const selectedConnector = useMemo(() => {
     const id = asString(props.connectorId);
     if (!id) return props.routeOptions?.connectors[0] || null;
@@ -180,12 +182,12 @@ function RoutePanel(props: {
       <h4 className="mb-3 text-xs font-semibold text-gray-700">{props.title}</h4>
       <div className="flex flex-col gap-3">
         <SelectField
-          label="Source"
+          label={t('settings.source')}
           value={props.source}
           options={[
-            { value: 'auto', label: 'Auto (cloud-first)' },
-            { value: 'cloud', label: 'Cloud' },
-            { value: 'local', label: 'Local' },
+            { value: 'auto', label: t('settings.sourceAutoCloudFirst') },
+            { value: 'cloud', label: t('settings.sourceCloud') },
+            { value: 'local', label: t('settings.sourceLocal') },
           ]}
           onChange={(v) => props.onSourceChange(v as KBSettings['chatRouteSource'])}
         />
@@ -193,10 +195,10 @@ function RoutePanel(props: {
         {props.source === 'cloud' && (
           <>
             <SelectField
-              label="Connector"
+              label={t('settings.connector')}
               value={effectiveConnectorId}
               options={[
-                { value: '', label: '(auto)' },
+                { value: '', label: t('common.auto') },
                 ...(props.routeOptions?.connectors || []).map((c) => ({
                   value: c.id,
                   label: c.label || c.id,
@@ -205,9 +207,9 @@ function RoutePanel(props: {
               onChange={props.onConnectorChange}
             />
             <InputField
-              label="Model"
+              label={t('settings.model')}
               value={props.model}
-              placeholder="Model id (auto if empty)"
+              placeholder={t('settings.modelPlaceholder')}
               listId={props.modelListId}
               onChange={props.onModelChange}
             >
@@ -222,10 +224,10 @@ function RoutePanel(props: {
 
         {props.source === 'local' && (
           <SelectField
-            label="Model"
+            label={t('settings.model')}
             value={props.model}
             options={[
-              { value: '', label: '(auto)' },
+              { value: '', label: t('common.auto') },
               ...localModels.map((item) => ({
                 value: item.model,
                 label: item.label,
@@ -244,6 +246,7 @@ function RoutePanel(props: {
 // ---------------------------------------------------------------------------
 
 export function SettingsPage(props: SettingsPageProps) {
+  const { t } = useModTranslation('knowledge-base');
   const { settings, onUpdate } = props;
 
   const handleChatRouteSourceChange = useCallback((value: KBSettings['chatRouteSource']) => {
@@ -257,25 +260,25 @@ export function SettingsPage(props: SettingsPageProps) {
   return (
     <div className="flex h-full flex-col overflow-y-auto">
       <div className="px-6 py-4">
-        <h2 className="text-lg font-bold text-gray-900">Settings</h2>
+        <h2 className="text-lg font-bold text-gray-900">{t('settings.title')}</h2>
       </div>
 
       <div className="flex flex-col gap-4 px-6 pb-6">
         {/* Card 1: Chunking */}
         <SettingsCard
-          title="Chunking"
-          description="Configure how documents are split into chunks for embedding"
+          title={t('settings.chunkingTitle')}
+          description={t('settings.chunkingDescription')}
         >
           <div className="grid grid-cols-2 gap-4">
             <NumberField
-              label="Chunk Size (tokens)"
+              label={t('settings.chunkSize')}
               value={settings.chunkSize}
               min={128}
               max={2048}
               onChange={(v) => onUpdate({ chunkSize: v })}
             />
             <NumberField
-              label="Overlap (tokens)"
+              label={t('settings.overlap')}
               value={settings.chunkOverlap}
               min={0}
               max={256}
@@ -283,25 +286,25 @@ export function SettingsPage(props: SettingsPageProps) {
             />
           </div>
           <p className="mt-3 text-[10px] text-gray-400">
-            Changes do not affect already-processed documents. Re-import to apply new settings.
+            {t('settings.chunkingReimportHint')}
           </p>
         </SettingsCard>
 
         {/* Card 2: Retrieval */}
         <SettingsCard
-          title="Retrieval"
-          description="Control how documents are retrieved and ranked for queries"
+          title={t('settings.retrievalTitle')}
+          description={t('settings.retrievalDescription')}
         >
           <div className="grid grid-cols-3 gap-4">
             <NumberField
-              label="Top K Results"
+              label={t('settings.topKResults')}
               value={settings.topK}
               min={1}
               max={20}
               onChange={(v) => onUpdate({ topK: v })}
             />
             <NumberField
-              label="Similarity Threshold"
+              label={t('settings.similarityThreshold')}
               value={settings.similarityThreshold}
               min={0}
               max={1}
@@ -309,7 +312,7 @@ export function SettingsPage(props: SettingsPageProps) {
               onChange={(v) => onUpdate({ similarityThreshold: v })}
             />
             <NumberField
-              label="Max Context Chunks"
+              label={t('settings.maxContextChunks')}
               value={settings.maxContextChunks}
               min={1}
               max={20}
@@ -319,12 +322,12 @@ export function SettingsPage(props: SettingsPageProps) {
         </SettingsCard>
 
         {/* Card 3: Query Rewriting */}
-        <SettingsCard title="Query Rewriting" description="Expand multi-turn queries with context for better retrieval">
+        <SettingsCard title={t('settings.rewritingTitle')} description={t('settings.rewritingDescription')}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-gray-700">Enable multi-turn query rewriting</p>
+              <p className="text-xs text-gray-700">{t('settings.rewritingEnabled')}</p>
               <p className="mt-0.5 text-[10px] text-gray-400">
-                Follow-up questions are rewritten to include conversation context for better search results.
+                {t('settings.rewritingHint')}
               </p>
             </div>
             <ToggleSwitch
@@ -335,17 +338,17 @@ export function SettingsPage(props: SettingsPageProps) {
         </SettingsCard>
 
         {/* Card 4: Runtime Route */}
-        <SettingsCard title="Runtime Route" description="Configure LLM and embedding model routing">
+        <SettingsCard title={t('settings.routeTitle')} description={t('settings.routeDescription')}>
           <div className="mb-3 flex justify-end">
             {props.onRefreshRouteOptions && (
               <Button variant="secondary" size="sm" onClick={props.onRefreshRouteOptions}>
-                Refresh
+                {t('common.refresh')}
               </Button>
             )}
           </div>
           <div className="flex gap-4">
             <RoutePanel
-              title="Chat Route"
+              title={t('settings.chatRoute')}
               source={settings.chatRouteSource}
               connectorId={settings.chatConnectorId}
               model={settings.chatModel}
@@ -356,7 +359,7 @@ export function SettingsPage(props: SettingsPageProps) {
               modelListId="kb-chat-model-list"
             />
             <RoutePanel
-              title="Embedding Route"
+              title={t('settings.embeddingRoute')}
               source={settings.embeddingRouteSource}
               connectorId={settings.embeddingConnectorId}
               model={settings.embeddingModel}
@@ -368,7 +371,7 @@ export function SettingsPage(props: SettingsPageProps) {
             />
           </div>
           <p className="mt-3 text-[10px] text-gray-400">
-            Changing the embedding route or embedding model does not re-embed existing documents. Re-import documents after an embedding route change.
+            {t('settings.routeHint')}
           </p>
         </SettingsCard>
       </div>

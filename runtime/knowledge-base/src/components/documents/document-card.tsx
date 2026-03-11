@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import React, { useState } from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { KBDocument } from '../../types.js';
 import { DocumentStatusBadge } from './document-status-badge.js';
 import { Progress } from '../ui/progress.js';
@@ -93,6 +94,7 @@ function RetryIcon() {
 }
 
 export function DocumentCard(props: DocumentCardProps) {
+  const { t } = useModTranslation('knowledge-base');
   const { document: doc, onDelete, onRetry } = props;
   const [menuOpen, setMenuOpen] = useState(false);
   const isProcessing = ['parsing', 'chunking', 'embedding'].includes(doc.status);
@@ -111,18 +113,18 @@ export function DocumentCard(props: DocumentCardProps) {
         </div>
 
         <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400">
-          <span>{formatFileSize(doc.fileSize)}</span>
-          <span>&middot;</span>
-          {doc.chunkCount > 0 && (
-            <>
-              <span>{doc.chunkCount} chunks</span>
+              <span>{formatFileSize(doc.fileSize)}</span>
               <span>&middot;</span>
-            </>
-          )}
-          <span>{formatDate(doc.updatedAt)}</span>
-          <span>&middot;</span>
-          <span className="capitalize">{doc.sourceKind === 'paste' ? 'Text paste' : doc.sourceKind === 'url' ? 'URL import' : 'File upload'}</span>
-        </div>
+              {doc.chunkCount > 0 && (
+                <>
+                  <span>{t('documents.chunks', { count: doc.chunkCount })}</span>
+                  <span>&middot;</span>
+                </>
+              )}
+              <span>{formatDate(doc.updatedAt)}</span>
+              <span>&middot;</span>
+              <span className="capitalize">{doc.sourceKind === 'paste' ? t('documents.sourcePaste') : doc.sourceKind === 'url' ? t('documents.sourceUrl') : t('documents.sourceFile')}</span>
+            </div>
 
         {isProcessing && (
           <div className="mt-2">
@@ -152,7 +154,7 @@ export function DocumentCard(props: DocumentCardProps) {
             type="button"
             onClick={() => onRetry(doc.id)}
             className="rounded-md p-1.5 text-indigo-600 hover:bg-indigo-50"
-            title="Retry"
+            title={t('documents.retry')}
           >
             <RetryIcon />
           </button>
@@ -176,7 +178,7 @@ export function DocumentCard(props: DocumentCardProps) {
                   className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
                 >
                   <RetryIcon />
-                  Retry
+                  {t('documents.retry')}
                 </button>
               )}
               <button
@@ -188,7 +190,7 @@ export function DocumentCard(props: DocumentCardProps) {
                   <polyline points="3 6 5 6 21 6" />
                   <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                 </svg>
-                Delete
+                {t('documents.delete')}
               </button>
             </div>
           </>

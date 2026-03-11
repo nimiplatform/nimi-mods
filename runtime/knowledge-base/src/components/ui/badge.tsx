@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { KBDocumentStatus } from '../../types.js';
 
 type BadgeProps = {
@@ -18,13 +19,13 @@ export function Badge({ children, className }: BadgeProps) {
   );
 }
 
-const STATUS_CONFIG: Record<KBDocumentStatus, { bg: string; text: string; label: string; icon: string }> = {
-  pending: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Pending', icon: '' },
-  parsing: { bg: 'bg-blue-50', text: 'text-blue-600', label: 'Parsing', icon: '' },
-  chunking: { bg: 'bg-blue-50', text: 'text-blue-600', label: 'Chunking', icon: '' },
-  embedding: { bg: 'bg-purple-50', text: 'text-purple-600', label: 'Embedding', icon: '' },
-  ready: { bg: 'bg-green-50', text: 'text-green-700', label: 'Ready', icon: '' },
-  error: { bg: 'bg-red-50', text: 'text-red-600', label: 'Error', icon: '' },
+const STATUS_CONFIG: Record<KBDocumentStatus, { bg: string; text: string }> = {
+  pending: { bg: 'bg-gray-100', text: 'text-gray-600' },
+  parsing: { bg: 'bg-blue-50', text: 'text-blue-600' },
+  chunking: { bg: 'bg-blue-50', text: 'text-blue-600' },
+  embedding: { bg: 'bg-purple-50', text: 'text-purple-600' },
+  ready: { bg: 'bg-green-50', text: 'text-green-700' },
+  error: { bg: 'bg-red-50', text: 'text-red-600' },
 };
 
 // SVG icons for status badges
@@ -48,6 +49,7 @@ function AlertCircleIcon() {
 }
 
 export function StatusBadge({ status }: { status: KBDocumentStatus }) {
+  const { t } = useModTranslation('knowledge-base');
   const config = STATUS_CONFIG[status];
   const isProcessing = ['parsing', 'chunking', 'embedding'].includes(status);
 
@@ -58,7 +60,7 @@ export function StatusBadge({ status }: { status: KBDocumentStatus }) {
       {isProcessing && (
         <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
       )}
-      {config.label}
+      {t(`documents.status.${status}`)}
     </Badge>
   );
 }

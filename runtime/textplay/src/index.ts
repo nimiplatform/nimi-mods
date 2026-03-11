@@ -1,3 +1,10 @@
+import { registerModTranslations } from '@nimiplatform/sdk/mod/i18n';
+import enLocale from './locales/en.js';
+import zhLocale from './locales/zh.js';
+
+registerModTranslations('textplay', 'en', enLocale as Record<string, unknown>);
+registerModTranslations('textplay', 'zh', zhLocale as Record<string, unknown>);
+
 import { TEXTPLAY_MANIFEST } from './manifest.js';
 import {
   TEXTPLAY_CAPABILITIES,

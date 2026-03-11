@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import React, { useEffect, useRef } from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { KBTurn } from '../../types.js';
 import { MessageBubble } from './message-bubble.js';
 
@@ -14,6 +15,7 @@ type MessageListProps = {
 };
 
 export function MessageList(props: MessageListProps) {
+  const { t } = useModTranslation('knowledge-base');
   const { turns, onCitationClick, isSending, streamingText } = props;
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -28,7 +30,7 @@ export function MessageList(props: MessageListProps) {
   if (turns.length === 0) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-xs text-gray-400">Ask a question about your documents</p>
+        <p className="text-xs text-gray-400">{t('chat.askEmpty')}</p>
       </div>
     );
   }

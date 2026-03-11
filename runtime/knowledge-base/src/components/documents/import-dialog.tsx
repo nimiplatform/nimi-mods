@@ -4,6 +4,7 @@
 
 import React, { useCallback, useRef, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import { Button } from '../ui/button.js';
 
 type ImportDialogProps = {
@@ -36,13 +37,14 @@ function CloseIcon() {
   );
 }
 
-const MODE_TABS: Array<{ id: ImportMode; label: string; icon: string }> = [
-  { id: 'file', label: 'File', icon: '📄' },
-  { id: 'paste', label: 'Text', icon: '📝' },
-  { id: 'url', label: 'URL', icon: '🔗' },
+const MODE_TABS: Array<{ id: ImportMode; labelKey: string; icon: string }> = [
+  { id: 'file', labelKey: 'documents.modeFile', icon: '📄' },
+  { id: 'paste', labelKey: 'documents.modePaste', icon: '📝' },
+  { id: 'url', labelKey: 'documents.modeUrl', icon: '🔗' },
 ];
 
 export function ImportDialog(props: ImportDialogProps) {
+  const { t } = useModTranslation('knowledge-base');
   const { open, onClose, onImportFile, onImportText, onImportUrl, isImporting } = props;
   const [mode, setMode] = useState<ImportMode>('file');
   const [pasteText, setPasteText] = useState('');
@@ -94,7 +96,7 @@ export function ImportDialog(props: ImportDialogProps) {
           {/* Header */}
           <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
             <DialogPrimitive.Title className="text-sm font-semibold text-gray-900">
-              Import Document
+              {t('documents.importDialogTitle')}
             </DialogPrimitive.Title>
             <DialogPrimitive.Close asChild>
               <button
@@ -119,7 +121,7 @@ export function ImportDialog(props: ImportDialogProps) {
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                {tab.label}
+                {t(tab.labelKey)}
               </button>
             ))}
           </div>
@@ -138,17 +140,18 @@ export function ImportDialog(props: ImportDialogProps) {
                 <UploadIcon />
                 <div className="text-center">
                   <p className="text-sm font-medium text-gray-700">
-                    Drop file here or{' '}
+                    {t('documents.dropHerePrefix')}{' '}
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       className="text-indigo-600 hover:text-indigo-700"
                     >
-                      browse
+                      {t('common.browse')}
                     </button>
+                    {t('documents.dropHereSuffix')}
                   </p>
                   <p className="mt-1 text-[11px] text-gray-400">
-                    Supports .txt, .md, .csv, .json, .html
+                    {t('documents.supports')}
                   </p>
                 </div>
                 <input
@@ -164,21 +167,21 @@ export function ImportDialog(props: ImportDialogProps) {
             {mode === 'paste' && (
               <div className="flex flex-col gap-3">
                 <div>
-                  <label className="text-xs font-medium text-gray-700">Title (optional)</label>
+                  <label className="text-xs font-medium text-gray-700">{t('documents.titleOptional')}</label>
                   <input
                     type="text"
                     value={pasteTitle}
                     onChange={(e) => setPasteTitle(e.target.value)}
-                    placeholder="Document title"
+                    placeholder={t('documents.titlePlaceholder')}
                     className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-900 placeholder:text-gray-400 focus:border-indigo-300 focus:outline-none focus:ring-1 focus:ring-indigo-300"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-gray-700">Content</label>
+                  <label className="text-xs font-medium text-gray-700">{t('documents.content')}</label>
                   <textarea
                     value={pasteText}
                     onChange={(e) => setPasteText(e.target.value)}
-                    placeholder="Paste your text here..."
+                    placeholder={t('documents.contentPlaceholder')}
                     rows={6}
                     className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-900 placeholder:text-gray-400 focus:border-indigo-300 focus:outline-none focus:ring-1 focus:ring-indigo-300"
                   />
@@ -189,7 +192,7 @@ export function ImportDialog(props: ImportDialogProps) {
                   disabled={isImporting || !pasteText.trim()}
                   className="self-end"
                 >
-                  {isImporting ? 'Importing...' : 'Import Text'}
+                  {isImporting ? t('common.importing') : t('documents.importText')}
                 </Button>
               </div>
             )}
@@ -197,22 +200,22 @@ export function ImportDialog(props: ImportDialogProps) {
             {mode === 'url' && (
               <div className="flex flex-col gap-3">
                 <div>
-                  <label className="text-xs font-medium text-gray-700">Title (optional)</label>
+                  <label className="text-xs font-medium text-gray-700">{t('documents.titleOptional')}</label>
                   <input
                     type="text"
                     value={urlTitle}
                     onChange={(e) => setUrlTitle(e.target.value)}
-                    placeholder="Document title"
+                    placeholder={t('documents.titlePlaceholder')}
                     className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-900 placeholder:text-gray-400 focus:border-indigo-300 focus:outline-none focus:ring-1 focus:ring-indigo-300"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-gray-700">URL</label>
+                  <label className="text-xs font-medium text-gray-700">{t('documents.url')}</label>
                   <input
                     type="url"
                     value={urlInput}
                     onChange={(e) => setUrlInput(e.target.value)}
-                    placeholder="https://example.com/article"
+                    placeholder={t('documents.urlPlaceholder')}
                     className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-900 placeholder:text-gray-400 focus:border-indigo-300 focus:outline-none focus:ring-1 focus:ring-indigo-300"
                   />
                 </div>
@@ -222,7 +225,7 @@ export function ImportDialog(props: ImportDialogProps) {
                   disabled={isImporting || !urlInput.trim()}
                   className="self-end"
                 >
-                  {isImporting ? 'Fetching...' : 'Import URL'}
+                  {isImporting ? t('common.fetching') : t('documents.importUrl')}
                 </Button>
               </div>
             )}

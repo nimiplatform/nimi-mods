@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import React, { useMemo, useState } from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { KBDocument } from '../../types.js';
 import { DocumentCard } from './document-card.js';
 import { ImportDialog } from './import-dialog.js';
@@ -51,6 +52,7 @@ function EmptyStateIcon() {
 }
 
 export function DocumentListPage(props: DocumentListPageProps) {
+  const { t } = useModTranslation('knowledge-base');
   const {
     documents,
     importDialogOpen,
@@ -80,9 +82,13 @@ export function DocumentListPage(props: DocumentListPageProps) {
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">Documents</h2>
+          <h2 className="text-lg font-bold text-gray-900">{t('documents.title')}</h2>
           <p className="text-xs text-gray-500">
-            {documents.length === 0 ? 'No documents yet' : `${documents.length} document${documents.length > 1 ? 's' : ''} imported`}
+            {documents.length === 0
+              ? t('documents.empty')
+              : documents.length === 1
+                ? t('documents.countOne')
+                : t('documents.countOther', { count: documents.length })}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -93,14 +99,14 @@ export function DocumentListPage(props: DocumentListPageProps) {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search documents..."
+              placeholder={t('documents.searchPlaceholder')}
               className="w-48 bg-transparent text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none"
             />
           </div>
           {/* Import button */}
           <Button size="sm" onClick={onOpenImportDialog}>
             <PlusIcon />
-            Import
+            {t('common.import')}
           </Button>
         </div>
       </div>
@@ -110,18 +116,18 @@ export function DocumentListPage(props: DocumentListPageProps) {
         {filteredDocs.length === 0 && documents.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center">
             <EmptyStateIcon />
-            <h3 className="mt-4 text-sm font-semibold text-gray-700">Import your first document</h3>
+            <h3 className="mt-4 text-sm font-semibold text-gray-700">{t('documents.firstTitle')}</h3>
             <p className="mt-1 text-xs text-gray-400">
-              Supports .txt, .md, .csv, .json, .html files
+              {t('documents.firstHint')}
             </p>
             <Button size="sm" className="mt-4" onClick={onOpenImportDialog}>
               <PlusIcon />
-              Import Document
+              {t('common.importDocument')}
             </Button>
           </div>
         ) : filteredDocs.length === 0 ? (
           <div className="flex h-32 items-center justify-center">
-            <p className="text-xs text-gray-400">No documents match &ldquo;{searchQuery}&rdquo;</p>
+            <p className="text-xs text-gray-400">{t('documents.noMatches', { query: searchQuery })}</p>
           </div>
         ) : (
           <div className="flex flex-col gap-2">

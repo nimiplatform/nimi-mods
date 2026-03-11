@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import React, { useCallback, useState } from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 
 type ChatInputProps = {
   onSend: (query: string) => void;
@@ -20,6 +21,7 @@ function SendIcon() {
 }
 
 export function ChatInput(props: ChatInputProps) {
+  const { t } = useModTranslation('knowledge-base');
   const { onSend, disabled, placeholder } = props;
   const [value, setValue] = useState('');
 
@@ -47,7 +49,7 @@ export function ChatInput(props: ChatInputProps) {
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={placeholder ?? 'Ask a question about your documents...'}
+            placeholder={placeholder ?? t('chat.askPlaceholder')}
             disabled={disabled}
             rows={1}
             className="min-h-[24px] flex-1 resize-none bg-transparent text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none disabled:opacity-50"
