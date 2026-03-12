@@ -156,7 +156,7 @@ const zhLocale = {
   },
   image: {
     defaultPrompt: '一只穿宇航服的橘猫，电影感，细节丰富',
-    defaultNegativePrompt: 'low quality, blurry',
+    defaultNegativePrompt: '低质量, 模糊',
     promptPlaceholder: '提示词',
     negativePromptPlaceholder: '负面提示词（可选）',
     size: '尺寸',

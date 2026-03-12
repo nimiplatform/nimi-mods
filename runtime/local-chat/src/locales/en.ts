@@ -114,7 +114,7 @@ const enLocale = {
     title: 'Voice Model Config',
     enabledNote:
       'Voice is available under the current trigger or voice-session settings. This config applies to voice segments.',
-    disabledNote: 'Voice is unavailable under the current trigger and session settings.',
+    disabledNote: 'Voice is unavailable under the current trigger and session settings. TTS, STT, and voice catalog queries will not be executed.',
     ttsRouteSource: 'TTS Route Source',
     sttRouteSource: 'STT Route Source',
     routeAuto: 'Auto',
