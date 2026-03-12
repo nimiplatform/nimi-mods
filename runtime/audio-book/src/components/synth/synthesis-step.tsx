@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { SynthProgress } from '../../controllers/use-audio-book-ui-state.js';
 import type { ScriptSegment, SynthesisJob } from '../../types.js';
 import { Button } from '../ui/button.js';
@@ -38,6 +39,7 @@ export function SynthesisStep(props: SynthesisStepProps) {
     testMode, testSegmentIds,
     onStart, onStartTest, onPause, onResume, onCancel, onPlaySegment, onGoToPlayer,
   } = props;
+  const { t } = useModTranslation('audio-book');
   const isPaused = synthesisJob?.status === 'paused';
   const isDone = synthesisJob?.status === 'done' || synthesisJob?.status === 'done_with_errors';
 
@@ -55,11 +57,11 @@ export function SynthesisStep(props: SynthesisStepProps) {
     <div className="flex h-full flex-col items-center overflow-y-auto px-6 py-10">
       {/* Title section */}
       <div className="mb-8 text-center">
-        <h2 className="text-2xl font-semibold text-gray-900">Audio Synthesis</h2>
+        <h2 className="text-2xl font-semibold text-gray-900">{t('synthesis.title')}</h2>
         <p className="mt-2 text-sm text-gray-500">
           {testMode
-            ? 'Test synthesis with a few segments before full synthesis'
-            : 'Convert your script segments into audio'}
+            ? t('synthesis.subtitleTest')
+            : t('synthesis.subtitleFull')}
         </p>
       </div>
 
@@ -75,7 +77,7 @@ export function SynthesisStep(props: SynthesisStepProps) {
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="5 3 19 12 5 21 5 3" />
               </svg>
-              {synthesisJob ? 'Resume Synthesis' : 'Start Synthesis'}
+              {synthesisJob ? t('synthesis.resumeSynthesis') : t('synthesis.startSynthesis')}
             </button>
             <button
               type="button"
@@ -85,7 +87,7 @@ export function SynthesisStep(props: SynthesisStepProps) {
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 3h6l3 7-6 11-6-11z" />
               </svg>
-              Test Synthesis
+              {t('synthesis.testSynthesis')}
             </button>
           </div>
         )}
@@ -95,16 +97,16 @@ export function SynthesisStep(props: SynthesisStepProps) {
           <div className="mb-6 rounded-lg border border-gray-200 bg-white p-5">
             <div className="mb-3 flex items-center justify-between">
               <span className="text-sm font-medium text-gray-700">
-                {progress.completed} / {progress.total} segments
+                {t('synthesis.segmentsProgress', { completed: progress.completed, total: progress.total })}
               </span>
               <span className="text-xs text-gray-400">
-                ~{formatTime(progress.estimatedRemainingMs)} remaining
+                {t('synthesis.remaining', { time: formatTime(progress.estimatedRemainingMs) })}
               </span>
             </div>
             <Progress value={progress.completed} max={progress.total} />
             {progress.failed > 0 && (
               <p className="mt-2 text-xs text-red-500">
-                {progress.failed} segment{progress.failed !== 1 ? 's' : ''} failed
+                {t('synthesis.failedSegments', { count: progress.failed })}
               </p>
             )}
 
@@ -112,15 +114,15 @@ export function SynthesisStep(props: SynthesisStepProps) {
             <div className="mt-4 flex gap-2">
               {isPaused ? (
                 <Button variant="secondary" size="sm" onClick={onResume}>
-                  Resume
+                  {t('synthesis.resume')}
                 </Button>
               ) : (
                 <Button variant="secondary" size="sm" onClick={onPause}>
-                  Pause
+                  {t('synthesis.pause')}
                 </Button>
               )}
               <Button variant="destructive" size="sm" onClick={onCancel}>
-                Cancel
+                {t('synthesis.cancel')}
               </Button>
             </div>
           </div>
@@ -129,7 +131,7 @@ export function SynthesisStep(props: SynthesisStepProps) {
         {synthRunning && !progress && (
           <div className="mb-6 flex items-center justify-center gap-2 py-8">
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
-            <span className="text-sm text-gray-500">Starting synthesis...</span>
+            <span className="text-sm text-gray-500">{t('synthesis.startingSynthesis')}</span>
           </div>
         )}
 
@@ -140,10 +142,10 @@ export function SynthesisStep(props: SynthesisStepProps) {
               <svg className="h-5 w-5 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 3h6l3 7-6 11-6-11z" />
               </svg>
-              <h3 className="text-sm font-semibold text-amber-900">Test Synthesis Complete</h3>
+              <h3 className="text-sm font-semibold text-amber-900">{t('synthesis.testComplete')}</h3>
             </div>
             <p className="mb-4 text-xs text-amber-700">
-              {testDoneSegments.length} of {testSegmentIds.length} test segments synthesized successfully.
+              {t('synthesis.testResult', { done: testDoneSegments.length, total: testSegmentIds.length })}
             </p>
 
             {/* Test segment playback */}
@@ -158,14 +160,14 @@ export function SynthesisStep(props: SynthesisStepProps) {
                   <div key={segId} className="flex items-center gap-3 rounded-md border border-amber-100 bg-white px-3 py-2.5">
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-medium text-gray-700">
-                        {seg?.speaker ?? 'Unknown'}
+                        {seg?.speaker ?? t('synthesis.unknownSpeaker')}
                       </p>
                       <p className="truncate text-[11px] text-gray-500">
                         {seg?.text ?? segId}
                       </p>
                       {hasFailed && (
                         <p className="mt-0.5 text-[10px] text-red-600">
-                          {job?.error ?? 'Synthesis failed'}
+                          {job?.error ?? t('synthesis.synthesisFailed')}
                         </p>
                       )}
                     </div>
@@ -178,11 +180,11 @@ export function SynthesisStep(props: SynthesisStepProps) {
                         <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
                           <polygon points="5 3 19 12 5 21 5 3" />
                         </svg>
-                        Play
+                        {t('synthesis.play')}
                       </button>
                     )}
                     {hasFailed && (
-                      <span className="text-[10px] font-medium text-red-500">Failed</span>
+                      <span className="text-[10px] font-medium text-red-500">{t('synthesis.failed')}</span>
                     )}
                   </div>
                 );
@@ -196,7 +198,7 @@ export function SynthesisStep(props: SynthesisStepProps) {
                 onClick={onStart}
                 className="flex w-full items-center justify-center gap-2 rounded-md bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
               >
-                Start Full Synthesis
+                {t('synthesis.startFullSynthesis')}
               </button>
               <div className="flex gap-2">
                 {testDoneSegments.length > 0 && onGoToPlayer && (
@@ -205,7 +207,7 @@ export function SynthesisStep(props: SynthesisStepProps) {
                     onClick={onGoToPlayer}
                     className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-gray-200 px-4 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50"
                   >
-                    Preview in Player
+                    {t('synthesis.previewInPlayer')}
                     <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
                     </svg>
@@ -216,7 +218,7 @@ export function SynthesisStep(props: SynthesisStepProps) {
                   onClick={onStartTest}
                   className="rounded-md border border-amber-200 px-4 py-2 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-50"
                 >
-                  Re-test
+                  {t('synthesis.retest')}
                 </button>
               </div>
             </div>
@@ -245,13 +247,13 @@ export function SynthesisStep(props: SynthesisStepProps) {
                 )}
                 <div>
                   <p className="text-sm font-semibold text-gray-900">
-                    Synthesis {synthesisJob.status === 'done' ? 'Complete' : 'Complete (with errors)'}
+                    {synthesisJob.status === 'done' ? t('synthesis.synthComplete') : t('synthesis.synthCompleteErrors')}
                   </p>
                   <p className="text-xs text-gray-500">
-                    {doneCount} done
-                    {failedCount > 0 && ` / ${failedCount} failed`}
-                    {' / '}
-                    {synthesisJob.segmentJobs.length} total
+                    {t('synthesis.doneCount', { done: doneCount })}
+                    {failedCount > 0 && ` ${t('synthesis.failedCount', { failed: failedCount })}`}
+                    {' '}
+                    {t('synthesis.totalCount', { total: synthesisJob.segmentJobs.length })}
                   </p>
                 </div>
               </div>

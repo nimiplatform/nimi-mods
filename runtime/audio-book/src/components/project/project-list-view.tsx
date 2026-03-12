@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import React, { useCallback, useState } from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { ProjectState } from '../../types.js';
 
 type ProjectMeta = { id: string; name: string; state: ProjectState; updatedAt: string };
@@ -14,18 +15,18 @@ type ProjectListViewProps = {
   onDelete: (id: string) => void;
 };
 
-const STATE_LABELS: Record<ProjectState, string> = {
-  draft: 'Draft',
-  imported: 'Imported',
-  analyzing: 'Analyzing...',
-  analyzed: 'Analyzed',
-  casting: 'Casting...',
-  cast_complete: 'Cast Complete',
-  synthesizing: 'Synthesizing...',
-  done: 'Done',
-  done_with_errors: 'Done (errors)',
-  cancelled: 'Cancelled',
-  paused: 'Paused',
+const STATE_LABEL_KEYS: Record<ProjectState, string> = {
+  draft: 'projectList.stateDraft',
+  imported: 'projectList.stateImported',
+  analyzing: 'projectList.stateAnalyzing',
+  analyzed: 'projectList.stateAnalyzed',
+  casting: 'projectList.stateCasting',
+  cast_complete: 'projectList.stateCastComplete',
+  synthesizing: 'projectList.stateSynthesizing',
+  done: 'projectList.stateDone',
+  done_with_errors: 'projectList.stateDoneWithErrors',
+  cancelled: 'projectList.stateCancelled',
+  paused: 'projectList.statePaused',
 };
 
 const STATE_COLORS: Record<ProjectState, string> = {
@@ -44,6 +45,7 @@ const STATE_COLORS: Record<ProjectState, string> = {
 
 export function ProjectListView(props: ProjectListViewProps) {
   const { projects, onOpen, onCreate, onDelete } = props;
+  const { t } = useModTranslation('audio-book');
   const [newName, setNewName] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
 
@@ -60,7 +62,7 @@ export function ProjectListView(props: ProjectListViewProps) {
   }, [deleteConfirm, onDelete]);
 
   const handleCreate = () => {
-    const name = newName.trim() || 'Untitled';
+    const name = newName.trim() || t('projectList.defaultName');
     onCreate(name);
     setNewName('');
   };
@@ -75,8 +77,8 @@ export function ProjectListView(props: ProjectListViewProps) {
             <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
           </svg>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">AudioBook Studio</h1>
-            <p className="text-xs text-gray-500">Your audiobook projects</p>
+            <h1 className="text-xl font-semibold text-gray-900">{t('projectList.studioTitle')}</h1>
+            <p className="text-xs text-gray-500">{t('projectList.subtitle')}</p>
           </div>
         </div>
       </div>
@@ -92,7 +94,7 @@ export function ProjectListView(props: ProjectListViewProps) {
             </svg>
             <input
               type="text"
-              placeholder="New project name..."
+              placeholder={t('projectList.newProjectPlaceholder')}
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
@@ -104,7 +106,7 @@ export function ProjectListView(props: ProjectListViewProps) {
             onClick={handleCreate}
             className="shrink-0 rounded-md bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
           >
-            Create
+            {t('projectList.createButton')}
           </button>
         </div>
 
@@ -115,8 +117,8 @@ export function ProjectListView(props: ProjectListViewProps) {
               <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
               <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
             </svg>
-            <p className="text-sm font-medium text-gray-400">No projects yet</p>
-            <p className="mt-1 text-xs text-gray-400">Create one to get started</p>
+            <p className="text-sm font-medium text-gray-400">{t('projectList.noProjectsTitle')}</p>
+            <p className="mt-1 text-xs text-gray-400">{t('projectList.noProjectsHint')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -135,7 +137,7 @@ export function ProjectListView(props: ProjectListViewProps) {
                   </h3>
                   <div className="mt-2.5 flex items-center gap-2">
                     <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${STATE_COLORS[p.state]}`}>
-                      {STATE_LABELS[p.state]}
+                      {t(STATE_LABEL_KEYS[p.state])}
                     </span>
                     <span className="text-[11px] text-gray-400">
                       {new Date(p.updatedAt).toLocaleDateString()}
@@ -148,7 +150,7 @@ export function ProjectListView(props: ProjectListViewProps) {
                   type="button"
                   onClick={(e) => handleDeleteClick(e, p)}
                   className="absolute right-2.5 top-2.5 rounded-md p-1.5 text-gray-300 opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
-                  title="Delete project"
+                  title={t('projectList.deleteProject')}
                 >
                   <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 6h18" />
@@ -174,10 +176,10 @@ export function ProjectListView(props: ProjectListViewProps) {
                   <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
                 </svg>
               </div>
-              <h3 className="text-sm font-semibold text-gray-900">Delete Project</h3>
+              <h3 className="text-sm font-semibold text-gray-900">{t('projectList.deleteTitle')}</h3>
             </div>
             <p className="mb-5 ml-10 text-xs text-gray-500">
-              Are you sure you want to delete <span className="font-medium text-gray-700">{deleteConfirm.name}</span>? This action cannot be undone.
+              {t('projectList.deleteConfirm')} <span className="font-medium text-gray-700">{deleteConfirm.name}</span>{t('projectList.deleteWarning')}
             </p>
             <div className="flex justify-end gap-2">
               <button
@@ -185,14 +187,14 @@ export function ProjectListView(props: ProjectListViewProps) {
                 onClick={() => setDeleteConfirm(null)}
                 className="rounded-md border border-gray-200 px-4 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50"
               >
-                Cancel
+                {t('projectList.cancelButton')}
               </button>
               <button
                 type="button"
                 onClick={handleDeleteConfirm}
                 className="rounded-md bg-red-600 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-red-700"
               >
-                Delete
+                {t('projectList.deleteButton')}
               </button>
             </div>
           </div>

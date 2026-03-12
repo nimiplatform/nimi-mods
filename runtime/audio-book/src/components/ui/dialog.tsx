@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { Button } from './button.js';
 
@@ -21,10 +22,12 @@ export function ConfirmDialog({
   message,
   onConfirm,
   onCancel,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   variant = 'default',
 }: ConfirmDialogProps) {
+  const { t } = useModTranslation('audio-book');
+
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(v) => { if (!v) onCancel(); }}>
       <DialogPrimitive.Portal>
@@ -35,14 +38,14 @@ export function ConfirmDialog({
           </DialogPrimitive.Description>
           <div className="mt-4 flex justify-end gap-2">
             <Button variant="ghost" size="sm" onClick={onCancel}>
-              {cancelLabel}
+              {cancelLabel ?? t('dialog.cancel')}
             </Button>
             <Button
               variant={variant === 'destructive' ? 'destructive' : 'primary'}
               size="sm"
               onClick={onConfirm}
             >
-              {confirmLabel}
+              {confirmLabel ?? t('dialog.confirm')}
             </Button>
           </div>
         </DialogPrimitive.Content>

@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { PlaybackState } from '../../controllers/use-audio-book-ui-state.js';
 import type { ScriptSegment, SourceChapter, SynthesisJob } from '../../types.js';
 import { Button } from '../ui/button.js';
@@ -38,6 +39,7 @@ export function PlaybackStep(props: PlaybackStepProps) {
     onPlaySegment, onStopPlayback, onRetryFailed,
     onSetSpeed, onSetChapter,
   } = props;
+  const { t } = useModTranslation('audio-book');
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const activeSegmentRef = useRef<HTMLDivElement>(null);
@@ -144,7 +146,7 @@ export function PlaybackStep(props: PlaybackStepProps) {
                   : 'text-gray-400 hover:text-gray-600'
               }`}
             >
-              {ch.title || `Chapter ${i + 1}`}
+              {ch.title || t('playback.chapterFallback', { index: i + 1 })}
             </button>
           ))}
         </div>
@@ -154,10 +156,10 @@ export function PlaybackStep(props: PlaybackStepProps) {
       {failedJobs.length > 0 && (
         <div className="flex items-center justify-between bg-red-50 px-6 py-2">
           <p className="text-xs text-red-600">
-            {failedJobs.length} segment{failedJobs.length !== 1 ? 's' : ''} failed
+            {t('playback.failedSegments', { count: failedJobs.length })}
           </p>
           <Button variant="secondary" size="sm" onClick={onRetryFailed} disabled={synthRunning}>
-            {synthRunning ? 'Retrying...' : 'Retry'}
+            {synthRunning ? t('playback.retrying') : t('playback.retry')}
           </Button>
         </div>
       )}
@@ -192,8 +194,8 @@ export function PlaybackStep(props: PlaybackStepProps) {
                     isCurrentSeg ? 'text-indigo-600' : 'text-gray-400'
                   }`}>
                     {seg.speaker}
-                    {seg.type === 'dialogue' && ' (Dialogue)'}
-                    {seg.type === 'inner_thought' && ' (Thought)'}
+                    {seg.type === 'dialogue' && ` ${t('playback.dialogue')}`}
+                    {seg.type === 'inner_thought' && ` ${t('playback.thought')}`}
                   </p>
                   <p className={`mt-0.5 text-[13px] leading-relaxed ${
                     isCurrentSeg ? 'text-gray-900' : 'text-gray-500'
@@ -202,7 +204,7 @@ export function PlaybackStep(props: PlaybackStepProps) {
                   </p>
                   {hasFailed && (
                     <p className="mt-1 text-[10px] text-red-600">
-                      Failed: {failedBySegmentId.get(seg.id)?.error || 'unknown error'}
+                      {t('playback.failedPrefix', { error: failedBySegmentId.get(seg.id)?.error || t('playback.unknownError') })}
                     </p>
                   )}
                 </div>
@@ -212,7 +214,7 @@ export function PlaybackStep(props: PlaybackStepProps) {
         </div>
         {chapterSegments.length === 0 && (
           <p className="py-12 text-center text-sm text-gray-400">
-            No segments in this chapter.
+            {t('playback.noSegments')}
           </p>
         )}
       </div>

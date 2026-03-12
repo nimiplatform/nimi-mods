@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { AnalysisProgress } from '../../controllers/use-audio-book-ui-state.js';
 import type { TtsRouteState } from '../../controllers/use-tts-route.js';
 import type { CharacterProfile, SourceChapter, ScriptSegment } from '../../types.js';
@@ -24,6 +25,7 @@ type AnalyzeStepProps = {
 
 export function AnalyzeStep(props: AnalyzeStepProps) {
   const { chapters, analysisRunning, progress, characters, segments, ttsRoute, onStart, onCancel } = props;
+  const { t } = useModTranslation('audio-book');
   const hasResults = characters.length > 0;
   const selectedChatConnector = ttsRoute.chatConnectors.find((connector) => connector.id === ttsRoute.chatSelection.connectorId) || null;
   const availableChatModels = selectedChatConnector
@@ -42,20 +44,20 @@ export function AnalyzeStep(props: AnalyzeStepProps) {
       <div className="flex min-h-0 flex-1 gap-0">
         {/* Left panel — analysis controls & progress */}
         <div className="flex w-80 shrink-0 flex-col border-r border-gray-100 px-6 py-6">
-          <h3 className="mb-1 text-lg font-semibold text-gray-900">Script Analysis</h3>
+          <h3 className="mb-1 text-lg font-semibold text-gray-900">{t('analyze.title')}</h3>
           <p className="mb-5 text-xs text-gray-500">
-            Analyze your text to detect characters and segment the script.
+            {t('analyze.subtitle')}
           </p>
 
           {/* Chat LLM connector selector */}
           <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
-            <label className="mb-1.5 block text-xs font-medium text-gray-600">LLM Provider</label>
+            <label className="mb-1.5 block text-xs font-medium text-gray-600">{t('analyze.llmProviderLabel')}</label>
             {ttsRoute.loading ? (
-              <p className="text-xs text-gray-400">Loading providers...</p>
+              <p className="text-xs text-gray-400">{t('analyze.loadingProviders')}</p>
             ) : ttsRoute.error ? (
               <p className="text-xs text-red-500">{ttsRoute.error}</p>
             ) : ttsRoute.chatConnectors.length === 0 ? (
-              <p className="text-xs text-gray-500">No LLM connectors available. Configure one in Settings.</p>
+              <p className="text-xs text-gray-500">{t('analyze.noLlmConnectors')}</p>
             ) : (
               <Select
                 value={ttsRoute.chatSelection.connectorId}
@@ -65,21 +67,21 @@ export function AnalyzeStep(props: AnalyzeStepProps) {
                   label: c.label || c.id,
                   description: c.vendor ? `(${c.vendor})` : undefined,
                 }))}
-                placeholder="Select provider..."
+                placeholder={t('analyze.selectProvider')}
               />
             )}
           </div>
 
           <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
-            <label className="mb-1.5 block text-xs font-medium text-gray-600">LLM Model</label>
+            <label className="mb-1.5 block text-xs font-medium text-gray-600">{t('analyze.llmModelLabel')}</label>
             {ttsRoute.loading ? (
-              <p className="text-xs text-gray-400">Loading models...</p>
+              <p className="text-xs text-gray-400">{t('analyze.loadingModels')}</p>
             ) : ttsRoute.error ? (
               <p className="text-xs text-red-500">{ttsRoute.error}</p>
             ) : !selectedChatConnector ? (
-              <p className="text-xs text-gray-500">Select a provider first.</p>
+              <p className="text-xs text-gray-500">{t('analyze.selectProviderFirst')}</p>
             ) : availableChatModels.length === 0 ? (
-              <p className="text-xs text-gray-500">This provider does not expose selectable chat models. Runtime default will be used.</p>
+              <p className="text-xs text-gray-500">{t('analyze.noSelectableModels')}</p>
             ) : (
               <Select
                 value={ttsRoute.chatSelection.model || availableChatModels[0] || ''}
@@ -88,7 +90,7 @@ export function AnalyzeStep(props: AnalyzeStepProps) {
                   value: model,
                   label: model,
                 }))}
-                placeholder="Select model..."
+                placeholder={t('analyze.selectModel')}
               />
             )}
           </div>
@@ -96,7 +98,7 @@ export function AnalyzeStep(props: AnalyzeStepProps) {
           {/* Chapter summary */}
           <div className="mb-4 rounded-lg border border-gray-200 bg-white px-3 py-2.5">
             <p className="text-xs text-gray-600">
-              {chapters.length} chapter{chapters.length !== 1 ? 's' : ''} loaded
+              {t('analyze.chaptersLoaded', { count: chapters.length })}
             </p>
           </div>
 
@@ -110,7 +112,7 @@ export function AnalyzeStep(props: AnalyzeStepProps) {
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
               </svg>
-              Start Analysis
+              {t('analyze.startAnalysis')}
             </button>
           )}
 
@@ -118,10 +120,10 @@ export function AnalyzeStep(props: AnalyzeStepProps) {
             <div className="mb-4">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-xs font-medium text-gray-600">
-                  Chapter {progress.currentChapterIndex + 1} / {progress.totalChapters}
+                  {t('analyze.chapterProgress', { current: progress.currentChapterIndex + 1, total: progress.totalChapters })}
                 </span>
                 <Button variant="destructive" size="sm" onClick={onCancel}>
-                  Cancel
+                  {t('analyze.cancel')}
                 </Button>
               </div>
               <Progress
@@ -129,7 +131,7 @@ export function AnalyzeStep(props: AnalyzeStepProps) {
                 max={progress.totalChapters}
               />
               <p className="mt-2 text-[11px] text-gray-500">
-                {progress.segmentsSoFar} segments &middot; {progress.charactersSoFar} characters detected
+                {t('analyze.segmentsDetected', { segments: progress.segmentsSoFar, characters: progress.charactersSoFar })}
               </p>
             </div>
           )}
@@ -137,14 +139,14 @@ export function AnalyzeStep(props: AnalyzeStepProps) {
           {analysisRunning && !progress && (
             <div className="mb-4 flex items-center justify-center gap-2 py-6">
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
-              <span className="text-sm text-gray-500">Starting analysis...</span>
+              <span className="text-sm text-gray-500">{t('analyze.startingAnalysis')}</span>
             </div>
           )}
 
           {/* Character chips */}
           {hasResults && (
             <div className="mb-4">
-              <h4 className="mb-2 text-xs font-semibold text-gray-700">Characters ({characters.length})</h4>
+              <h4 className="mb-2 text-xs font-semibold text-gray-700">{t('analyze.charactersHeader', { count: characters.length })}</h4>
               <div className="flex flex-wrap gap-1.5">
                 {characters.map((ch) => (
                   <span
@@ -173,7 +175,7 @@ export function AnalyzeStep(props: AnalyzeStepProps) {
               onClick={onStart}
               className="mt-auto flex w-full items-center justify-center gap-1.5 rounded-md border border-gray-200 px-4 py-2 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-50"
             >
-              Re-analyze
+              {t('analyze.reAnalyze')}
             </button>
           )}
         </div>
@@ -184,7 +186,7 @@ export function AnalyzeStep(props: AnalyzeStepProps) {
             <>
               <div className="border-b border-gray-100 px-6 py-3">
                 <h4 className="text-xs font-semibold text-gray-700">
-                  Segments Preview ({segments.length} total)
+                  {t('analyze.segmentsPreview', { count: segments.length })}
                 </h4>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto px-6 py-2">
@@ -202,7 +204,7 @@ export function AnalyzeStep(props: AnalyzeStepProps) {
                 ))}
                 {segments.length > 50 && (
                   <p className="py-3 text-center text-xs text-gray-400">
-                    ...and {segments.length - 50} more segments
+                    {t('analyze.moreSegments', { count: segments.length - 50 })}
                   </p>
                 )}
               </div>
@@ -210,7 +212,7 @@ export function AnalyzeStep(props: AnalyzeStepProps) {
           ) : (
             <div className="flex flex-1 items-center justify-center">
               <p className="text-sm text-gray-400">
-                {analysisRunning ? 'Analyzing...' : 'Run analysis to see segments here.'}
+                {analysisRunning ? t('analyze.analyzing') : t('analyze.emptySegments')}
               </p>
             </div>
           )}

@@ -3,14 +3,15 @@
 // ---------------------------------------------------------------------------
 
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { AudioBookStep } from '../../controllers/use-audio-book-ui-state.js';
 
-const STEP_LABELS: Record<AudioBookStep, string> = {
-  import: 'Import',
-  analyze: 'Analyze',
-  cast: 'Cast',
-  synth: 'Synth',
-  play: 'Play',
+const STEP_LABEL_KEYS: Record<AudioBookStep, string> = {
+  import: 'stepLabels.import',
+  analyze: 'stepLabels.analyze',
+  cast: 'stepLabels.cast',
+  synth: 'stepLabels.synth',
+  play: 'stepLabels.play',
 };
 
 type StepIndicatorProps = {
@@ -23,13 +24,14 @@ type StepIndicatorProps = {
 
 export function StepIndicator(props: StepIndicatorProps) {
   const { steps, currentStep, canEnterStep, onStepClick, currentIndex } = props;
+  const { t } = useModTranslation('audio-book');
 
   return (
     <nav className="flex items-center gap-1">
       {steps.map((step, i) => {
         const isCurrent = step === currentStep;
         const isClickable = canEnterStep(step);
-        const label = STEP_LABELS[step];
+        const label = t(STEP_LABEL_KEYS[step]);
 
         let pillClass = 'text-gray-400';
         if (isCurrent) pillClass = 'bg-indigo-50 text-indigo-600 font-semibold';

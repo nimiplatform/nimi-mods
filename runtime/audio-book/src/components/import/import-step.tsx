@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import React, { useCallback, useRef, useState } from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { TextStats } from '../../types.js';
 import { splitTextIntoChapters, computeTextStats } from '../../services/chapter-splitter.js';
 
@@ -16,6 +17,7 @@ type ImportStepProps = {
 
 export function ImportStep(props: ImportStepProps) {
   const { importText, importLoading, onImport, onNameChange } = props;
+  const { t } = useModTranslation('audio-book');
   const [text, setText] = useState(importText);
   const [name, setName] = useState(props.projectName);
   const [stats, setStats] = useState<TextStats | null>(null);
@@ -66,20 +68,20 @@ export function ImportStep(props: ImportStepProps) {
     <div className="flex h-full flex-col items-center overflow-y-auto px-6 py-10">
       {/* Title section */}
       <div className="mb-8 text-center">
-        <h2 className="text-2xl font-semibold text-gray-900">Import Your Text</h2>
-        <p className="mt-2 text-sm text-gray-500">Upload or paste your novel text to get started</p>
+        <h2 className="text-2xl font-semibold text-gray-900">{t('import.title')}</h2>
+        <p className="mt-2 text-sm text-gray-500">{t('import.subtitle')}</p>
       </div>
 
       <div className="w-full max-w-lg">
         {/* Project name */}
         <div className="mb-6">
-          <label className="mb-1.5 block text-[13px] font-medium text-gray-900">Project Name</label>
+          <label className="mb-1.5 block text-[13px] font-medium text-gray-900">{t('import.projectNameLabel')}</label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onBlur={() => onNameChange?.(name)}
-            placeholder="My Audiobook Project"
+            placeholder={t('import.projectNamePlaceholder')}
             className="w-full rounded-md border border-gray-200 px-3 py-2.5 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
           />
         </div>
@@ -101,16 +103,16 @@ export function ImportStep(props: ImportStepProps) {
             <line x1="12" y1="3" x2="12" y2="15" />
           </svg>
           <p className="text-sm text-gray-500">
-            Drag &amp; drop your .txt file here, or{' '}
+            {t('import.dropzoneText')}{' '}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               className="font-medium text-indigo-600 hover:underline"
             >
-              browse
+              {t('import.dropzoneBrowse')}
             </button>
           </p>
-          <p className="mt-1.5 text-xs text-gray-400">or paste text directly below</p>
+          <p className="mt-1.5 text-xs text-gray-400">{t('import.dropzoneHint')}</p>
           <input
             ref={fileInputRef}
             type="file"
@@ -130,7 +132,7 @@ export function ImportStep(props: ImportStepProps) {
             onChange={(e) => handleTextChange(e.target.value)}
             onPaste={handlePaste}
             rows={6}
-            placeholder="Paste your novel text here..."
+            placeholder={t('import.textareaPlaceholder')}
             className="w-full rounded-md border border-gray-200 px-3 py-3 text-[13px] leading-relaxed text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
           />
         </div>
@@ -144,7 +146,7 @@ export function ImportStep(props: ImportStepProps) {
               className="flex w-full items-center justify-between px-4 py-2.5 text-left"
             >
               <p className="text-xs font-medium text-gray-700">
-                {stats.totalChars.toLocaleString()} chars &middot; {stats.totalChapters} chapter{stats.totalChapters !== 1 ? 's' : ''}
+                {t('import.statsChars', { count: stats.totalChars.toLocaleString() })} &middot; {t('import.statsChapters', { count: stats.totalChapters })}
               </p>
               <svg
                 className={`h-4 w-4 text-gray-400 transition-transform ${statsExpanded ? 'rotate-180' : ''}`}
@@ -162,7 +164,7 @@ export function ImportStep(props: ImportStepProps) {
                       key={ch.index}
                       className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[10px] text-gray-600"
                     >
-                      Ch{ch.index + 1}: {ch.title} ({ch.charCount.toLocaleString()})
+                      {t('import.chapterLabel', { index: ch.index + 1, title: ch.title, count: ch.charCount.toLocaleString() })}
                     </span>
                   ))}
                 </div>
@@ -178,7 +180,7 @@ export function ImportStep(props: ImportStepProps) {
           onClick={() => onImport(text, name)}
           className="flex w-full items-center justify-center gap-2 rounded-md bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
         >
-          {importLoading ? 'Importing...' : 'Import & Continue'}
+          {importLoading ? t('import.importingButton') : t('import.importButton')}
           {!importLoading && (
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />

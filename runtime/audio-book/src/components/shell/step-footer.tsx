@@ -3,14 +3,15 @@
 // ---------------------------------------------------------------------------
 
 import React from 'react';
+import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type { AudioBookStep } from '../../controllers/use-audio-book-ui-state.js';
 
-const STEP_LABELS: Record<AudioBookStep, string> = {
-  import: 'Import',
-  analyze: 'Analyze',
-  cast: 'Cast',
-  synth: 'Synthesize',
-  play: 'Play',
+const STEP_LABEL_KEYS: Record<AudioBookStep, string> = {
+  import: 'stepLabels.import',
+  analyze: 'stepLabels.analyze',
+  cast: 'stepLabels.cast',
+  synth: 'stepLabels.synthFull',
+  play: 'stepLabels.play',
 };
 
 type StepFooterProps = {
@@ -24,9 +25,10 @@ type StepFooterProps = {
 
 export function StepFooter(props: StepFooterProps) {
   const { canRetreat, canAdvance, onPrev, onNext, prevStep, nextStep } = props;
+  const { t } = useModTranslation('audio-book');
 
-  const prevLabel = prevStep ? STEP_LABELS[prevStep] : 'Previous';
-  const nextLabel = nextStep ? STEP_LABELS[nextStep] : 'Next';
+  const prevLabel = prevStep ? t(STEP_LABEL_KEYS[prevStep]) : t('stepLabels.previous');
+  const nextLabel = nextStep ? t(STEP_LABEL_KEYS[nextStep]) : t('stepLabels.next');
 
   return (
     <footer className="flex items-center justify-between border-t border-gray-200 bg-white px-6 py-3">
