@@ -10,6 +10,7 @@ export const WORLD_STUDIO_MANIFEST = {
   name: 'World Studio',
   version: '1.0.0',
   description: 'World creation and maintenance studio built on unified world APIs',
+  iconAsset: './assets/icon.svg',
   author: { name: 'Nimi', url: 'https://nimi.xyz' },
   license: 'MIT',
   entry: './dist/mods/world-studio/index.js',

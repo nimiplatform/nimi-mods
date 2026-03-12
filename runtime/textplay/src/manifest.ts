@@ -23,6 +23,7 @@ export const TEXTPLAY_MANIFEST = {
   version: '1.0.0',
   description: 'Narrative text renderer for interactive story play',
   icon: 'textplay',
+  iconAsset: './assets/icon.svg',
   author: { name: 'Nimi', url: 'https://nimi.xyz' },
   license: 'MIT',
   entry: './dist/mods/textplay/index.js',

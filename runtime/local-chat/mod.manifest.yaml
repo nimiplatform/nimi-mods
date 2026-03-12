@@ -3,6 +3,7 @@ name: Local Chat
 version: 1.0.0
 kind: capability-mod
 icon: local-chat
+iconAsset: ./assets/icon.svg
 entry: ./dist/mods/local-chat/index.js
 styles:
   - ./dist/mods/local-chat/index.css

@@ -2,6 +2,7 @@ id: world.nimi.world-studio
 name: 世界工坊
 version: 1.0.0
 kind: capability-mod
+iconAsset: ./assets/icon.svg
 entry: ./dist/mods/world-studio/index.js
 styles:
   - ./dist/mods/world-studio/index.css

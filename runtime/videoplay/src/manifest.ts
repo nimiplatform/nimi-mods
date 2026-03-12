@@ -18,6 +18,7 @@ export const VIDEOPLAY_MANIFEST = {
   name: 'VideoPlay',
   version: '1.1.0',
   description: 'Episode-scale narrative video production workbench',
+  iconAsset: './assets/icon.svg',
   author: { name: 'Nimi', url: 'https://nimi.xyz' },
   license: 'MIT',
   entry: './dist/mods/videoplay/index.js',

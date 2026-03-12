@@ -3,6 +3,7 @@ name: Kismet
 version: 1.0.0
 kind: capability-mod
 icon: kismet
+iconAsset: ./assets/icon.svg
 entry: ./dist/mods/kismet/index.js
 styles:
   - ./dist/mods/kismet/index.css

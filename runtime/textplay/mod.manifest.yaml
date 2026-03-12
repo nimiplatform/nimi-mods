@@ -3,6 +3,7 @@ name: TextPlay
 version: 1.0.0
 kind: capability-mod
 icon: textplay
+iconAsset: ./assets/icon.svg
 entry: ./dist/mods/textplay/index.js
 styles:
   - ./dist/mods/textplay/index.css

@@ -3,6 +3,7 @@ name: VideoPlay
 version: 1.1.0
 kind: capability-mod
 icon: videoplay
+iconAsset: ./assets/icon.svg
 entry: ./dist/mods/videoplay/index.js
 styles:
   - ./dist/mods/videoplay/index.css

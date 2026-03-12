@@ -2,6 +2,7 @@ id: world.nimi.audio-book
 name: Audio Book
 version: 0.1.0
 kind: capability-mod
+iconAsset: ./assets/icon.svg
 entry: ./dist/mods/audio-book/index.js
 styles:
   - ./dist/mods/audio-book/index.css

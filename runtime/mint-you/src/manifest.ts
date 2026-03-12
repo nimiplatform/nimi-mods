@@ -14,6 +14,7 @@ export const MINTYOU_MANIFEST = {
   version: '1.0.0',
   description: 'Conversational social persona agent creator for OASIS-bound master-owned agents',
   icon: 'mint-you',
+  iconAsset: './assets/icon.svg',
   author: { name: 'Nimi', url: 'https://nimi.xyz' },
   license: 'MIT',
   entry: './dist/mods/mint-you/index.js',

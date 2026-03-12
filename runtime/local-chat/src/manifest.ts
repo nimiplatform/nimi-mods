@@ -25,6 +25,7 @@ export const LOCAL_CHAT_MANIFEST = {
   version: '1.0.0',
   description: 'Third-party style local LLM execution mod for private chats',
   icon: 'local-chat',
+  iconAsset: './assets/icon.svg',
   author: { name: 'Nimi', url: 'https://nimi.xyz' },
   license: 'MIT',
   entry: './dist/mods/local-chat/index.js',

@@ -12,6 +12,7 @@ export const KB_MANIFEST = {
   description: 'Private local knowledge base with document import, semantic search, and RAG-powered Q&A',
   author: { name: 'Nimi', url: 'https://nimi.xyz' },
   license: 'MIT',
+  iconAsset: './assets/icon.svg',
   entry: './dist/mods/knowledge-base/index.js',
   styles: ['./dist/mods/knowledge-base/index.css'],
   hash: 'default-knowledge-base',

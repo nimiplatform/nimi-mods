@@ -24,6 +24,7 @@ export const DAILY_OUTFIT_MANIFEST = {
   version: '1.0.0',
   description: 'Local-first wardrobe planning and outfit history workspace.',
   icon: 'daily-outfit',
+  iconAsset: './assets/icon.svg',
   author: { name: 'Nimi', url: 'https://nimi.xyz' },
   license: 'MIT',
   entry: './dist/mods/daily-outfit/index.js',
