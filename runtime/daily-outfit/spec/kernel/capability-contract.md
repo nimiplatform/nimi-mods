@@ -8,20 +8,15 @@
 
 ## DO-CAP-002 允许的 SDK 接口
 
-Daily Outfit 业务路径只允许使用稳定的 `@nimiplatform/sdk/mod/*` 导出。
+Daily Outfit 业务路径只允许使用稳定的 mod SDK surface。
 
-允许的子路径:
-- `@nimiplatform/sdk/mod/hook` — 事件、数据、UI、turn hook
-- `@nimiplatform/sdk/mod/runtime` — AI text/image 生成、媒体处理
-- `@nimiplatform/sdk/mod/types` — 类型定义
+允许的入口:
+- `@nimiplatform/sdk/mod` — hook/runtime/types/logging/i18n/settings 等业务 API
 - `@nimiplatform/sdk/mod/shell` — shell facade
 - `@nimiplatform/sdk/mod/lifecycle` — route lifecycle facade
-- `@nimiplatform/sdk/mod/logging` — 结构化日志
-- `@nimiplatform/sdk/mod/i18n` — 国际化
-- `@nimiplatform/sdk/mod/settings` — 设置/偏好
 
 禁止的模式:
-- `@nimiplatform/sdk/mod/host` — 绕过稳定 mod SDK 边界
+- host wiring import 或任何 SDK internal source path — 绕过稳定 mod SDK 边界
 - `@nimiplatform/sdk` 或 `@nimiplatform/sdk/runtime` — 仅限桌面层
 - `@tauri-apps/*` — 仅限桌面层
 - `node:*` 内置模块 — mod 运行时不可用

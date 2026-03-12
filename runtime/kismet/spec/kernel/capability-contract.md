@@ -9,7 +9,10 @@ No SDK, desktop, runtime, or realm changes are permitted in scope.
 
 ## KIS-CAP-002 Hook Boundary
 
-Kismet MUST consume AI and route options only through mod hook capabilities and `@nimiplatform/sdk/mod/*` subpath imports.
+Kismet MUST consume AI and route options only through mod hook capabilities and the stable mod SDK surface:
+- `@nimiplatform/sdk/mod`
+- `@nimiplatform/sdk/mod/shell`
+- `@nimiplatform/sdk/mod/lifecycle`
 
 ## KIS-CAP-003 Local-Only Matching
 

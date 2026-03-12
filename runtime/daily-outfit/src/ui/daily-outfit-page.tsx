@@ -1,218 +1,180 @@
 import React, { startTransition, useState, useSyncExternalStore } from 'react';
-import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
-import {
-  createGarment,
-  createWearLog,
-  generateOutfitSuggestions,
-  getDailyOutfitSnapshot,
-  retireGarment,
-  seedProfileFromPreferences,
-  subscribeDailyOutfitStore,
-  toggleFavoriteOutfit,
-} from '../state/store.js';
+import { createGarment, createWearLog, generateOutfitSuggestions, getDailyOutfitSnapshot, retireGarment, seedProfileFromPreferences, subscribeDailyOutfitStore, toggleFavoriteOutfit, } from '../state/store.js';
 import { DAILY_OUTFIT_AGE_GROUPS, DAILY_OUTFIT_CATEGORIES, DAILY_OUTFIT_GENDERS, DAILY_OUTFIT_SEASONS } from '../types.js';
-
+import { useModTranslation } from "@nimiplatform/sdk/mod";
 function MetricCard(input: {
-  label: string;
-  value: string | number;
-  hint: string;
+    label: string;
+    value: string | number;
+    hint: string;
 }) {
-  return (
-    <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
+    return (<div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
       <div className="text-xs uppercase tracking-[0.2em] text-neutral-500">{input.label}</div>
       <div className="mt-2 text-3xl font-semibold text-neutral-950">{input.value}</div>
       <div className="mt-2 text-sm text-neutral-600">{input.hint}</div>
-    </div>
-  );
+    </div>);
 }
-
 function SectionCard(input: {
-  title: string;
-  eyebrow?: string;
-  children: React.ReactNode;
+    title: string;
+    eyebrow?: string;
+    children: React.ReactNode;
 }) {
-  return (
-    <section className="rounded-[28px] border border-neutral-200 bg-white p-6 shadow-sm">
-      {input.eyebrow ? (
-        <div className="text-xs uppercase tracking-[0.22em] text-orange-600">{input.eyebrow}</div>
-      ) : null}
+    return (<section className="rounded-[28px] border border-neutral-200 bg-white p-6 shadow-sm">
+      {input.eyebrow ? (<div className="text-xs uppercase tracking-[0.22em] text-orange-600">{input.eyebrow}</div>) : null}
       <h2 className="mt-1 text-xl font-semibold text-neutral-950">{input.title}</h2>
       <div className="mt-5">{input.children}</div>
-    </section>
-  );
+    </section>);
 }
-
 function FieldLabel(input: {
-  label: string;
-  hint?: string;
-  children: React.ReactNode;
+    label: string;
+    hint?: string;
+    children: React.ReactNode;
 }) {
-  return (
-    <label className="flex flex-col gap-2 text-sm text-neutral-700">
+    return (<label className="flex flex-col gap-2 text-sm text-neutral-700">
       <span className="font-medium text-neutral-900">{input.label}</span>
       {input.children}
       {input.hint ? <span className="text-xs text-neutral-500">{input.hint}</span> : null}
-    </label>
-  );
+    </label>);
 }
-
 function textList(value: string): string[] {
-  return value
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter(Boolean);
+    return value
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean);
 }
-
 function seasonSelected(current: string[], season: string): boolean {
-  return current.includes(season);
+    return current.includes(season);
 }
-
 function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(reader.error || new Error('DAILY_OUTFIT_FILE_READ_FAILED'));
-    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
-    reader.readAsDataURL(file);
-  });
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(reader.error || new Error('DAILY_OUTFIT_FILE_READ_FAILED'));
+        reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+        reader.readAsDataURL(file);
+    });
 }
-
 export function DailyOutfitPage() {
-  const { t } = useModTranslation('daily-outfit');
-  const snapshot = useSyncExternalStore(subscribeDailyOutfitStore, getDailyOutfitSnapshot, getDailyOutfitSnapshot);
-  const [gender, setGender] = useState<(typeof DAILY_OUTFIT_GENDERS)[number]>(snapshot.profile?.gender || 'female');
-  const [ageGroup, setAgeGroup] = useState<(typeof DAILY_OUTFIT_AGE_GROUPS)[number]>(snapshot.profile?.ageGroup || '25-30');
-  const [selfieUrl, setSelfieUrl] = useState(snapshot.profile?.selfieUrl || '');
-  const [selfieFileName, setSelfieFileName] = useState('');
-  const [stylesText, setStylesText] = useState(Object.keys(snapshot.profile?.styleWeights || {}).join(', '));
-  const [scenesText, setScenesText] = useState(Object.keys(snapshot.profile?.sceneFrequencies || {}).join(', '));
-
-  const [category, setCategory] = useState<(typeof DAILY_OUTFIT_CATEGORIES)[number]>('top');
-  const [subcategory, setSubcategory] = useState('');
-  const [colorsText, setColorsText] = useState('white');
-  const [styleTagsText, setStyleTagsText] = useState('minimal');
-  const [material, setMaterial] = useState('cotton');
-  const [seasons, setSeasons] = useState<string[]>(['spring', 'summer']);
-  const [formalityLevel, setFormalityLevel] = useState('3');
-  const [photoUrl, setPhotoUrl] = useState('');
-  const [photoFileName, setPhotoFileName] = useState('');
-
-  const [occasionInput, setOccasionInput] = useState(() => t('placeholders.occasionInput'));
-  const [uploadError, setUploadError] = useState('');
-
-  const handleSaveProfile = () => {
-    startTransition(() => {
-      seedProfileFromPreferences({
-        gender,
-        ageGroup,
-        selfieUrl: selfieUrl.trim() || undefined,
-        stylesText,
-        scenesText,
-      });
-    });
-  };
-
-  const handleCreateGarment = () => {
-    startTransition(() => {
-      createGarment({
-        photoUrls: [photoUrl.trim() || `local://daily-outfit/${category}`],
-        thumbnailUrl: photoUrl.trim() || undefined,
-        category,
-        subcategory: subcategory.trim() || undefined,
-        colors: textList(colorsText),
-        material: material.trim() || undefined,
-        styleTags: textList(styleTagsText),
-        seasons: seasons as (typeof DAILY_OUTFIT_SEASONS)[number][],
-        formalityLevel: Number(formalityLevel),
-      });
-    });
-    setSubcategory('');
-    setColorsText('white');
-    setStyleTagsText('minimal');
-    setPhotoFileName('');
-  };
-
-  const handleToggleSeason = (season: string) => {
-    setSeasons((current) => (
-      current.includes(season)
-        ? current.filter((entry) => entry !== season)
-        : [...current, season]
-    ));
-  };
-
-  const handleGenerateOutfits = () => {
-    startTransition(() => {
-      generateOutfitSuggestions({
-        occasion: occasionInput,
-        count: 3,
-      });
-    });
-  };
-
-  const handleFavorite = (outfitId: string) => {
-    startTransition(() => {
-      toggleFavoriteOutfit(outfitId);
-    });
-  };
-
-  const handleLogWear = (outfitId: string, occasion: string) => {
-    startTransition(() => {
-      createWearLog({
-        outfitComboId: outfitId,
-        itemIds: [],
-        date: new Date().toISOString().slice(0, 10),
-        occasion,
-        notes: t('state.wearLogNote'),
-      });
-    });
-  };
-
-  const handleSelfieUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
-    try {
-      setUploadError('');
-      const dataUrl = await readFileAsDataUrl(file);
-      setSelfieUrl(dataUrl);
-      setSelfieFileName(file.name);
-    } catch (error) {
-      setUploadError(error instanceof Error ? error.message : String(error || t('common.uploadFailed')));
-    } finally {
-      event.target.value = '';
-    }
-  };
-
-  const handleGarmentUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
-    try {
-      setUploadError('');
-      const dataUrl = await readFileAsDataUrl(file);
-      setPhotoUrl(dataUrl);
-      setPhotoFileName(file.name);
-      if (!subcategory.trim()) {
-        const inferredName = file.name.replace(/\.[^.]+$/u, '').replace(/[-_]+/gu, ' ').trim();
-        if (inferredName) {
-          setSubcategory(inferredName);
+    const { t } = useModTranslation('daily-outfit');
+    const snapshot = useSyncExternalStore(subscribeDailyOutfitStore, getDailyOutfitSnapshot, getDailyOutfitSnapshot);
+    const [gender, setGender] = useState<(typeof DAILY_OUTFIT_GENDERS)[number]>(snapshot.profile?.gender || 'female');
+    const [ageGroup, setAgeGroup] = useState<(typeof DAILY_OUTFIT_AGE_GROUPS)[number]>(snapshot.profile?.ageGroup || '25-30');
+    const [selfieUrl, setSelfieUrl] = useState(snapshot.profile?.selfieUrl || '');
+    const [selfieFileName, setSelfieFileName] = useState('');
+    const [stylesText, setStylesText] = useState(Object.keys(snapshot.profile?.styleWeights || {}).join(', '));
+    const [scenesText, setScenesText] = useState(Object.keys(snapshot.profile?.sceneFrequencies || {}).join(', '));
+    const [category, setCategory] = useState<(typeof DAILY_OUTFIT_CATEGORIES)[number]>('top');
+    const [subcategory, setSubcategory] = useState('');
+    const [colorsText, setColorsText] = useState('white');
+    const [styleTagsText, setStyleTagsText] = useState('minimal');
+    const [material, setMaterial] = useState('cotton');
+    const [seasons, setSeasons] = useState<string[]>(['spring', 'summer']);
+    const [formalityLevel, setFormalityLevel] = useState('3');
+    const [photoUrl, setPhotoUrl] = useState('');
+    const [photoFileName, setPhotoFileName] = useState('');
+    const [occasionInput, setOccasionInput] = useState(() => t('placeholders.occasionInput'));
+    const [uploadError, setUploadError] = useState('');
+    const handleSaveProfile = () => {
+        startTransition(() => {
+            seedProfileFromPreferences({
+                gender,
+                ageGroup,
+                selfieUrl: selfieUrl.trim() || undefined,
+                stylesText,
+                scenesText,
+            });
+        });
+    };
+    const handleCreateGarment = () => {
+        startTransition(() => {
+            createGarment({
+                photoUrls: [photoUrl.trim() || `local://daily-outfit/${category}`],
+                thumbnailUrl: photoUrl.trim() || undefined,
+                category,
+                subcategory: subcategory.trim() || undefined,
+                colors: textList(colorsText),
+                material: material.trim() || undefined,
+                styleTags: textList(styleTagsText),
+                seasons: seasons as (typeof DAILY_OUTFIT_SEASONS)[number][],
+                formalityLevel: Number(formalityLevel),
+            });
+        });
+        setSubcategory('');
+        setColorsText('white');
+        setStyleTagsText('minimal');
+        setPhotoFileName('');
+    };
+    const handleToggleSeason = (season: string) => {
+        setSeasons((current) => (current.includes(season)
+            ? current.filter((entry) => entry !== season)
+            : [...current, season]));
+    };
+    const handleGenerateOutfits = () => {
+        startTransition(() => {
+            generateOutfitSuggestions({
+                occasion: occasionInput,
+                count: 3,
+            });
+        });
+    };
+    const handleFavorite = (outfitId: string) => {
+        startTransition(() => {
+            toggleFavoriteOutfit(outfitId);
+        });
+    };
+    const handleLogWear = (outfitId: string, occasion: string) => {
+        startTransition(() => {
+            createWearLog({
+                outfitComboId: outfitId,
+                itemIds: [],
+                date: new Date().toISOString().slice(0, 10),
+                occasion,
+                notes: t('state.wearLogNote'),
+            });
+        });
+    };
+    const handleSelfieUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) {
+            return;
         }
-      }
-    } catch (error) {
-      setUploadError(error instanceof Error ? error.message : String(error || t('common.uploadFailed')));
-    } finally {
-      event.target.value = '';
-    }
-  };
-
-  const activeGarments = snapshot.garments.filter((garment) => garment.status === 'active');
-
-  return (
-    <div
-      data-nimi-mod-root="daily-outfit"
-      className="min-h-full bg-[radial-gradient(circle_at_top_left,#fed7aa_0%,transparent_32%),linear-gradient(180deg,#fff7ed_0%,#fafaf9_42%,#ffffff_100%)] px-6 py-8 text-neutral-950"
-    >
+        try {
+            setUploadError('');
+            const dataUrl = await readFileAsDataUrl(file);
+            setSelfieUrl(dataUrl);
+            setSelfieFileName(file.name);
+        }
+        catch (error) {
+            setUploadError(error instanceof Error ? error.message : String(error || t('common.uploadFailed')));
+        }
+        finally {
+            event.target.value = '';
+        }
+    };
+    const handleGarmentUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) {
+            return;
+        }
+        try {
+            setUploadError('');
+            const dataUrl = await readFileAsDataUrl(file);
+            setPhotoUrl(dataUrl);
+            setPhotoFileName(file.name);
+            if (!subcategory.trim()) {
+                const inferredName = file.name.replace(/\.[^.]+$/u, '').replace(/[-_]+/gu, ' ').trim();
+                if (inferredName) {
+                    setSubcategory(inferredName);
+                }
+            }
+        }
+        catch (error) {
+            setUploadError(error instanceof Error ? error.message : String(error || t('common.uploadFailed')));
+        }
+        finally {
+            event.target.value = '';
+        }
+    };
+    const activeGarments = snapshot.garments.filter((garment) => garment.status === 'active');
+    return (<div data-nimi-mod-root="daily-outfit" className="min-h-full bg-[radial-gradient(circle_at_top_left,#fed7aa_0%,transparent_32%),linear-gradient(180deg,#fff7ed_0%,#fafaf9_42%,#ffffff_100%)] px-6 py-8 text-neutral-950">
       <div className="mx-auto flex max-w-7xl flex-col gap-8">
         <section className="rounded-[28px] border border-orange-200/70 bg-white/90 p-6 shadow-[0_24px_80px_-40px_rgba(120,53,15,0.45)]">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -230,10 +192,10 @@ export function DailyOutfitPage() {
         </section>
 
         <section className="grid gap-4 md:grid-cols-4">
-          <MetricCard label={t('metrics.activeGarments')} value={snapshot.insights.activeGarmentCount} hint={t('metrics.activeGarmentsHint')} />
-          <MetricCard label={t('metrics.retiredGarments')} value={snapshot.insights.retiredGarmentCount} hint={t('metrics.retiredGarmentsHint')} />
-          <MetricCard label={t('metrics.wearLogs')} value={snapshot.insights.wearLogCount} hint={t('metrics.wearLogsHint')} />
-          <MetricCard label={t('metrics.favorites')} value={snapshot.insights.favoriteOutfitCount} hint={t('metrics.favoritesHint')} />
+          <MetricCard label={t('metrics.activeGarments')} value={snapshot.insights.activeGarmentCount} hint={t('metrics.activeGarmentsHint')}/>
+          <MetricCard label={t('metrics.retiredGarments')} value={snapshot.insights.retiredGarmentCount} hint={t('metrics.retiredGarmentsHint')}/>
+          <MetricCard label={t('metrics.wearLogs')} value={snapshot.insights.wearLogCount} hint={t('metrics.wearLogsHint')}/>
+          <MetricCard label={t('metrics.favorites')} value={snapshot.insights.favoriteOutfitCount} hint={t('metrics.favoritesHint')}/>
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
@@ -241,39 +203,31 @@ export function DailyOutfitPage() {
             <div className="grid gap-4 md:grid-cols-2">
               <FieldLabel label={t('fields.gender')}>
                 <select className="rounded-2xl border border-neutral-200 px-4 py-3" value={gender} onChange={(event) => setGender(event.target.value as (typeof DAILY_OUTFIT_GENDERS)[number])}>
-                  {DAILY_OUTFIT_GENDERS.map((option) => (
-                    <option key={option} value={option}>{t(`options.genders.${option}`)}</option>
-                  ))}
+                  {DAILY_OUTFIT_GENDERS.map((option) => (<option key={option} value={option}>{t(`options.genders.${option}`)}</option>))}
                 </select>
               </FieldLabel>
               <FieldLabel label={t('fields.ageGroup')}>
                 <select className="rounded-2xl border border-neutral-200 px-4 py-3" value={ageGroup} onChange={(event) => setAgeGroup(event.target.value as (typeof DAILY_OUTFIT_AGE_GROUPS)[number])}>
-                  {DAILY_OUTFIT_AGE_GROUPS.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
+                  {DAILY_OUTFIT_AGE_GROUPS.map((option) => (<option key={option} value={option}>{option}</option>))}
                 </select>
               </FieldLabel>
               <FieldLabel label={t('fields.selfieUrl')} hint={t('hints.selfieUrl')}>
-                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={selfieUrl} onChange={(event) => setSelfieUrl(event.target.value)} placeholder={t('placeholders.selfieUrl')} />
+                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={selfieUrl} onChange={(event) => setSelfieUrl(event.target.value)} placeholder={t('placeholders.selfieUrl')}/>
               </FieldLabel>
               <FieldLabel label={t('fields.preferredStyles')} hint={t('hints.preferredStyles')}>
-                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={stylesText} onChange={(event) => setStylesText(event.target.value)} />
+                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={stylesText} onChange={(event) => setStylesText(event.target.value)}/>
               </FieldLabel>
               <FieldLabel label={t('fields.frequentScenes')} hint={t('hints.frequentScenes')}>
-                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={scenesText} onChange={(event) => setScenesText(event.target.value)} />
+                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={scenesText} onChange={(event) => setScenesText(event.target.value)}/>
               </FieldLabel>
             </div>
             <div className="mt-4 grid gap-4 md:grid-cols-[220px_1fr]">
               <div className="overflow-hidden rounded-3xl border border-neutral-200 bg-neutral-50">
-                {selfieUrl ? (
-                  <img src={selfieUrl} alt={t('fields.uploadSelfie')} className="h-56 w-full object-cover" />
-                ) : (
-                  <div className="flex h-56 items-center justify-center text-sm text-neutral-500">{t('common.noSelfie')}</div>
-                )}
+                {selfieUrl ? (<img src={selfieUrl} alt={t('fields.uploadSelfie')} className="h-56 w-full object-cover"/>) : (<div className="flex h-56 items-center justify-center text-sm text-neutral-500">{t('common.noSelfie')}</div>)}
               </div>
               <div className="flex flex-col gap-3">
                 <FieldLabel label={t('fields.uploadSelfie')} hint={t('hints.uploadSelfie')}>
-                  <input className="rounded-2xl border border-neutral-200 px-4 py-3" type="file" accept="image/*" onChange={handleSelfieUpload} />
+                  <input className="rounded-2xl border border-neutral-200 px-4 py-3" type="file" accept="image/*" onChange={handleSelfieUpload}/>
                 </FieldLabel>
                 {selfieFileName ? <div className="text-sm text-neutral-600">{t('common.selected')} {selfieFileName}</div> : null}
               </div>
@@ -282,11 +236,9 @@ export function DailyOutfitPage() {
               <button className="rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-medium text-white" onClick={handleSaveProfile}>
                 {t('actions.saveProfile')}
               </button>
-              {snapshot.profile ? (
-                <div className="text-sm text-neutral-600">
+              {snapshot.profile ? (<div className="text-sm text-neutral-600">
                   {t('state.currentStyles')} {Object.keys(snapshot.profile.styleWeights).join(', ') || t('common.none')}
-                </div>
-              ) : null}
+                </div>) : null}
               {uploadError ? <div className="text-sm text-red-600">{uploadError}</div> : null}
             </div>
           </SectionCard>
@@ -295,63 +247,46 @@ export function DailyOutfitPage() {
             <div className="grid gap-4 md:grid-cols-2">
               <FieldLabel label={t('fields.category')}>
                 <select className="rounded-2xl border border-neutral-200 px-4 py-3" value={category} onChange={(event) => setCategory(event.target.value as (typeof DAILY_OUTFIT_CATEGORIES)[number])}>
-                  {DAILY_OUTFIT_CATEGORIES.map((option) => (
-                    <option key={option} value={option}>{t(`options.categories.${option}`)}</option>
-                  ))}
+                  {DAILY_OUTFIT_CATEGORIES.map((option) => (<option key={option} value={option}>{t(`options.categories.${option}`)}</option>))}
                 </select>
               </FieldLabel>
               <FieldLabel label={t('fields.subcategory')}>
-                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={subcategory} onChange={(event) => setSubcategory(event.target.value)} placeholder={t('placeholders.subcategory')} />
+                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={subcategory} onChange={(event) => setSubcategory(event.target.value)} placeholder={t('placeholders.subcategory')}/>
               </FieldLabel>
               <FieldLabel label={t('fields.colors')}>
-                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={colorsText} onChange={(event) => setColorsText(event.target.value)} placeholder={t('placeholders.colors')} />
+                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={colorsText} onChange={(event) => setColorsText(event.target.value)} placeholder={t('placeholders.colors')}/>
               </FieldLabel>
               <FieldLabel label={t('fields.styleTags')}>
-                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={styleTagsText} onChange={(event) => setStyleTagsText(event.target.value)} placeholder={t('placeholders.styleTags')} />
+                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={styleTagsText} onChange={(event) => setStyleTagsText(event.target.value)} placeholder={t('placeholders.styleTags')}/>
               </FieldLabel>
               <FieldLabel label={t('fields.material')}>
-                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={material} onChange={(event) => setMaterial(event.target.value)} placeholder={t('placeholders.material')} />
+                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={material} onChange={(event) => setMaterial(event.target.value)} placeholder={t('placeholders.material')}/>
               </FieldLabel>
               <FieldLabel label={t('fields.photoUrl')}>
-                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={photoUrl} onChange={(event) => setPhotoUrl(event.target.value)} />
+                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={photoUrl} onChange={(event) => setPhotoUrl(event.target.value)}/>
               </FieldLabel>
               <FieldLabel label={t('fields.formalityLevel')}>
                 <select className="rounded-2xl border border-neutral-200 px-4 py-3" value={formalityLevel} onChange={(event) => setFormalityLevel(event.target.value)}>
-                  {['1', '2', '3', '4', '5'].map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
+                  {['1', '2', '3', '4', '5'].map((option) => (<option key={option} value={option}>{option}</option>))}
                 </select>
               </FieldLabel>
               <FieldLabel label={t('fields.seasons')}>
                 <div className="flex flex-wrap gap-2">
-                  {DAILY_OUTFIT_SEASONS.map((season) => (
-                    <button
-                      key={season}
-                      type="button"
-                      className={`rounded-full border px-3 py-2 text-xs uppercase tracking-[0.18em] ${
-                        seasonSelected(seasons, season)
-                          ? 'border-orange-300 bg-orange-50 text-orange-900'
-                          : 'border-neutral-200 bg-white text-neutral-600'
-                      }`}
-                      onClick={() => handleToggleSeason(season)}
-                    >
+                  {DAILY_OUTFIT_SEASONS.map((season) => (<button key={season} type="button" className={`rounded-full border px-3 py-2 text-xs uppercase tracking-[0.18em] ${seasonSelected(seasons, season)
+                ? 'border-orange-300 bg-orange-50 text-orange-900'
+                : 'border-neutral-200 bg-white text-neutral-600'}`} onClick={() => handleToggleSeason(season)}>
                       {t(`options.seasons.${season}`)}
-                    </button>
-                  ))}
+                    </button>))}
                 </div>
               </FieldLabel>
             </div>
             <div className="mt-4 grid gap-4 md:grid-cols-[220px_1fr]">
               <div className="overflow-hidden rounded-3xl border border-neutral-200 bg-neutral-50">
-                {photoUrl ? (
-                  <img src={photoUrl} alt={t('fields.uploadGarment')} className="h-56 w-full object-cover" />
-                ) : (
-                  <div className="flex h-56 items-center justify-center text-sm text-neutral-500">{t('common.noGarmentPhoto')}</div>
-                )}
+                {photoUrl ? (<img src={photoUrl} alt={t('fields.uploadGarment')} className="h-56 w-full object-cover"/>) : (<div className="flex h-56 items-center justify-center text-sm text-neutral-500">{t('common.noGarmentPhoto')}</div>)}
               </div>
               <div className="flex flex-col gap-3">
                 <FieldLabel label={t('fields.uploadGarment')} hint={t('hints.uploadGarment')}>
-                  <input className="rounded-2xl border border-neutral-200 px-4 py-3" type="file" accept="image/*" onChange={handleGarmentUpload} />
+                  <input className="rounded-2xl border border-neutral-200 px-4 py-3" type="file" accept="image/*" onChange={handleGarmentUpload}/>
                 </FieldLabel>
                 {photoFileName ? <div className="text-sm text-neutral-600">{t('common.selected')} {photoFileName}</div> : null}
               </div>
@@ -370,14 +305,10 @@ export function DailyOutfitPage() {
           <SectionCard title={t('sections.generateTitle')} eyebrow={t('sections.generateEyebrow')}>
             <div className="flex flex-col gap-4">
               <FieldLabel label={t('fields.occasionPrompt')} hint={t('hints.occasionPrompt')}>
-                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={occasionInput} onChange={(event) => setOccasionInput(event.target.value)} />
+                <input className="rounded-2xl border border-neutral-200 px-4 py-3" value={occasionInput} onChange={(event) => setOccasionInput(event.target.value)}/>
               </FieldLabel>
               <div className="flex flex-wrap gap-3">
-                <button
-                  className="rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
-                  onClick={handleGenerateOutfits}
-                  disabled={activeGarments.length === 0}
-                >
+                <button className="rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-neutral-300" onClick={handleGenerateOutfits} disabled={activeGarments.length === 0}>
                   {t('actions.generateOutfits')}
                 </button>
                 <div className="text-sm text-neutral-600">
@@ -385,12 +316,9 @@ export function DailyOutfitPage() {
                 </div>
               </div>
               <div className="grid gap-4">
-                {snapshot.outfits.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-600">
+                {snapshot.outfits.length === 0 ? (<div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-600">
                     {t('state.noOutfits')}
-                  </div>
-                ) : snapshot.outfits.slice(0, 6).map((outfit) => (
-                  <div key={outfit.id} className="rounded-2xl border border-neutral-200 p-4">
+                  </div>) : snapshot.outfits.slice(0, 6).map((outfit) => (<div key={outfit.id} className="rounded-2xl border border-neutral-200 p-4">
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div>
                         <div className="text-sm uppercase tracking-[0.2em] text-neutral-500">{outfit.occasionTags.join(', ') || t('state.general')}</div>
@@ -398,13 +326,11 @@ export function DailyOutfitPage() {
                         <div className="mt-2 text-sm leading-6 text-neutral-600">{outfit.aiReasoning}</div>
                         <div className="mt-3 flex flex-wrap gap-2">
                           {outfit.itemIds.map((itemId) => {
-                            const garment = snapshot.garments.find((entry) => entry.id === itemId);
-                            return (
-                              <span key={itemId} className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-700">
+                const garment = snapshot.garments.find((entry) => entry.id === itemId);
+                return (<span key={itemId} className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-700">
                                 {garment?.subcategory || garment?.category || itemId}
-                              </span>
-                            );
-                          })}
+                              </span>);
+            })}
                         </div>
                       </div>
                       <div className="flex min-w-[220px] flex-col gap-2">
@@ -416,8 +342,7 @@ export function DailyOutfitPage() {
                         </button>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  </div>))}
               </div>
             </div>
           </SectionCard>
@@ -425,16 +350,11 @@ export function DailyOutfitPage() {
           <div className="space-y-6">
             <SectionCard title={t('sections.liveStateTitle')} eyebrow={t('sections.liveStateEyebrow')}>
               <div className="space-y-3">
-                {snapshot.garments.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-600">
+                {snapshot.garments.length === 0 ? (<div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-600">
                     {t('state.noGarments')}
-                  </div>
-                ) : snapshot.garments.map((garment) => (
-                  <div key={garment.id} className="flex items-start justify-between rounded-2xl border border-neutral-200 px-4 py-3">
+                  </div>) : snapshot.garments.map((garment) => (<div key={garment.id} className="flex items-start justify-between rounded-2xl border border-neutral-200 px-4 py-3">
                     <div className="flex items-start gap-3">
-                      {garment.thumbnailUrl ? (
-                        <img src={garment.thumbnailUrl} alt={garment.subcategory || garment.category} className="h-16 w-16 rounded-2xl object-cover" />
-                      ) : null}
+                      {garment.thumbnailUrl ? (<img src={garment.thumbnailUrl} alt={garment.subcategory || garment.category} className="h-16 w-16 rounded-2xl object-cover"/>) : null}
                       <div>
                         <div className="font-medium text-neutral-950">{garment.subcategory || garment.category}</div>
                         <div className="mt-1 text-sm text-neutral-600">
@@ -449,57 +369,42 @@ export function DailyOutfitPage() {
                       <div className="text-xs uppercase tracking-[0.16em] text-neutral-500">
                         {(garment.status === 'active' ? t('state.statusActive') : t('state.statusRetired'))} · {t('common.worn')} {garment.wearCount}x
                       </div>
-                      {garment.status === 'active' ? (
-                        <button
-                          className="rounded-full border border-neutral-200 px-3 py-2 text-xs text-neutral-700"
-                          onClick={() => {
-                            startTransition(() => {
-                              retireGarment(garment.id);
-                            });
-                          }}
-                        >
+                      {garment.status === 'active' ? (<button className="rounded-full border border-neutral-200 px-3 py-2 text-xs text-neutral-700" onClick={() => {
+                    startTransition(() => {
+                        retireGarment(garment.id);
+                    });
+                }}>
                           {t('common.retire')}
-                        </button>
-                      ) : null}
+                        </button>) : null}
                     </div>
-                  </div>
-                ))}
+                  </div>))}
               </div>
             </SectionCard>
 
             <SectionCard title={t('sections.historyTitle')} eyebrow={t('sections.historyEyebrow')}>
               <div className="space-y-3">
-                {snapshot.wearLogs.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-600">
+                {snapshot.wearLogs.length === 0 ? (<div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-600">
                     {t('state.noWearLogs')}
-                  </div>
-                ) : snapshot.wearLogs.slice(0, 6).map((wearLog) => (
-                  <div key={wearLog.id} className="rounded-2xl border border-neutral-200 px-4 py-3">
+                  </div>) : snapshot.wearLogs.slice(0, 6).map((wearLog) => (<div key={wearLog.id} className="rounded-2xl border border-neutral-200 px-4 py-3">
                     <div className="font-medium text-neutral-950">{wearLog.occasion || t('common.noOccasion')}</div>
                     <div className="mt-1 text-sm text-neutral-600">
                       {wearLog.date} · {wearLog.itemIds.length} {t('common.items')}
                     </div>
-                  </div>
-                ))}
+                  </div>))}
               </div>
             </SectionCard>
 
             <SectionCard title={t('sections.insightsTitle')} eyebrow={t('sections.insightsEyebrow')}>
               <div className="space-y-3 text-sm text-neutral-700">
-                {snapshot.insights.gapSuggestions.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-4 text-neutral-600">
+                {snapshot.insights.gapSuggestions.length === 0 ? (<div className="rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 p-4 text-neutral-600">
                     {t('state.noInsights')}
-                  </div>
-                ) : snapshot.insights.gapSuggestions.map((suggestion) => (
-                  <div key={suggestion} className="rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-orange-900">
+                  </div>) : snapshot.insights.gapSuggestions.map((suggestion) => (<div key={suggestion} className="rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-orange-900">
                     {suggestion}
-                  </div>
-                ))}
+                  </div>))}
               </div>
             </SectionCard>
           </div>
         </section>
       </div>
-    </div>
-  );
+    </div>);
 }

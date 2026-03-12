@@ -42,7 +42,7 @@ required_capabilities:
     purpose: 主内容区域（Live2D Canvas + 对话 UI）
     source_rule: BD-CAP-001
 allowed_sdk_surfaces:
-  - package: '@nimiplatform/sdk/mod/runtime'
+  - package: '@nimiplatform/sdk/mod'
     apis:
       - ai.text.generate
       - ai.text.stream
@@ -54,7 +54,7 @@ allowed_sdk_surfaces:
       - route.resolve
       - route.checkHealth
     source_rule: BD-CAP-002
-  - package: '@nimiplatform/sdk/mod/hook'
+  - package: '@nimiplatform/sdk/mod'
     source_rule: BD-CAP-002
 forbidden_patterns:
   - pattern: sdk-mod-host-direct-import

@@ -40,8 +40,8 @@
 ## VS-CAP-006 — Allowed SDK Surface And Forbidden Patterns
 
 - Allowed SDK packages:
-  - `@nimiplatform/sdk/mod/runtime`
-  - `@nimiplatform/sdk/mod/hook`
+  - `@nimiplatform/sdk/mod`
+  - `@nimiplatform/sdk/mod/lifecycle`
 - Forbidden patterns:
   - direct provider HTTP calls for TTS or voice discovery
   - legacy route-hint / route-override fields

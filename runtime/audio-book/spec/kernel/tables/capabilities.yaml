@@ -33,11 +33,11 @@ required_capabilities:
     purpose: Subscribe to synthesis progress updates
     source_rule: VS-CAP-005
 allowed_sdk_surfaces:
-  - package: '@nimiplatform/sdk/mod/runtime'
+  - package: '@nimiplatform/sdk/mod'
     apis:
       - createModRuntimeClient
     source_rule: VS-CAP-006
-  - package: '@nimiplatform/sdk/mod/hook'
+  - package: '@nimiplatform/sdk/mod'
     source_rule: VS-CAP-006
 forbidden_patterns:
   - pattern: legacy-route-hint

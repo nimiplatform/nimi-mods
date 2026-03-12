@@ -8,10 +8,10 @@
 
 ## BD-CAP-002 允许的 SDK 表面
 
-Buddy 业务路径只允许使用稳定的 `@nimiplatform/sdk/mod/*` 导出。
+Buddy 业务路径只允许使用稳定的 mod SDK surface：`@nimiplatform/sdk/mod`，以及在确有需要时使用 `@nimiplatform/sdk/mod/shell` / `@nimiplatform/sdk/mod/lifecycle`。
 
 禁止：
-1. 直接导入 `@nimiplatform/sdk/mod/host`
+1. 直接使用 host wiring 或 SDK internal source path
 2. 直接调用浏览器 fetch 访问外部 AI/TTS 端点
 3. 导入 Tauri 原生 API
 
