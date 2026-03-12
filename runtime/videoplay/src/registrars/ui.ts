@@ -40,7 +40,9 @@ export async function registerVideoPlayUiExtensions(input: {
     extension: {
       type: 'tab-page',
       tabId: VIDEOPLAY_TAB_ID,
+      shellMode: 'immersive',
       strategy: 'append',
+      modId: VIDEOPLAY_MOD_ID,
       component: () => React.createElement(
         Suspense,
         {
@@ -56,7 +58,4 @@ export async function registerVideoPlayUiExtensions(input: {
       ),
     },
   });
-
-  // Ensure registrations are scoped to this mod for host inspection tooling.
-  void VIDEOPLAY_MOD_ID;
 }

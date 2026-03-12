@@ -6,7 +6,10 @@ import { VideoPlayWorkbench } from './ui/video-play-workbench.js';
 export function VideoPlayPage() {
   const props = useVideoPlayController();
   return (
-    <div data-nimi-mod-root="videoplay" className="h-full min-h-0">
+    <div
+      data-nimi-mod-root="videoplay"
+      className="flex h-full min-h-0 min-w-0 flex-1 overflow-hidden"
+    >
       <VideoPlayVisualStyles />
       <VideoPlayWorkbench {...props} />
     </div>

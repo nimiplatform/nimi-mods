@@ -196,7 +196,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
     .find((event) => event.step === 'asset-render' && typeof event.details?.coverage === 'number');
 
   return (
-    <div className="ui-sync-root flex h-full min-h-0 flex-col overflow-hidden">
+    <div className="ui-sync-root flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <header className="ui-sync-shell-header flex shrink-0 flex-col gap-3 border-b border-gray-200 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="ui-sync-shell-title text-xl font-semibold text-gray-900">{props.title}</h2>
@@ -236,8 +236,8 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
           </button>
         </div>
       </header>
-      <div className="ui-sync-shell-main flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 xl:grid xl:grid-cols-[minmax(280px,320px)_minmax(0,1fr)_minmax(300px,360px)] xl:grid-rows-[minmax(0,1fr)] xl:overflow-hidden">
-        <aside className="ui-sync-pane ui-sync-pane-side min-h-[220px] overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 xl:min-h-0">
+      <div className="ui-sync-shell-main videoplay-shell-main flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-3 lg:grid lg:grid-cols-[minmax(240px,280px)_minmax(0,1fr)_minmax(260px,320px)] lg:grid-rows-[minmax(0,1fr)] lg:overflow-hidden xl:grid-cols-[minmax(280px,320px)_minmax(0,1fr)_minmax(300px,360px)]">
+        <aside className="ui-sync-pane ui-sync-pane-side videoplay-shell-side min-h-[220px] overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 lg:min-h-0">
           <section className="space-y-2 rounded-lg border border-gray-200 p-3">
             <h3 className="text-sm font-semibold text-gray-900">{t('label.storySource')}</h3>
             <label className="block text-xs text-gray-600">
@@ -371,7 +371,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
           </section>
         </aside>
 
-        <main className="ui-sync-pane ui-sync-pane-main min-h-[320px] overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 xl:min-h-0">
+        <main className="ui-sync-pane ui-sync-pane-main videoplay-shell-center min-h-[320px] min-w-0 overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 lg:min-h-0">
           <section className="rounded-lg border border-gray-200 bg-white p-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-gray-900">{t('label.pipelineFlow')}</h3>
@@ -523,7 +523,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
           </section>
         </main>
 
-        <aside className="ui-sync-pane ui-sync-pane-right min-h-[220px] overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 xl:min-h-0">
+        <aside className="ui-sync-pane ui-sync-pane-right videoplay-shell-right min-h-[220px] overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 lg:min-h-0">
           <section className="space-y-2 rounded-lg border border-gray-200 p-3">
             <h3 className="text-sm font-semibold text-gray-900">{t('label.routeStatus')}</h3>
             <p className={`text-xs font-medium ${props.routeReady ? 'text-emerald-600' : 'text-rose-600'}`}>
