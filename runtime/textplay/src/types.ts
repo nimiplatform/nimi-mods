@@ -364,14 +364,3 @@ export type TextplayStoryBrief = {
   text: string;
   generatedAt: string;
 };
-
-export type TextplayHistorySession = {
-  runId: string;
-  storyId: string;
-  worldId: string;
-  agentId: string;
-  storyTitle: string;
-  updatedAt: string;
-  triggerSource: TextplayTriggerSource;
-  preview: string;
-};

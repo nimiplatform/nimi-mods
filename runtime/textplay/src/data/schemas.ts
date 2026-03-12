@@ -429,31 +429,6 @@ const PersistRecordInputSchema = z.strictObject({
   presenceReports: z.array(PersistPresenceReportSchema),
 });
 
-export const TextplayHistorySessionMineQuerySchema = z.strictObject({
-  userId: z.string().min(1),
-  worldId: z.string().min(1).optional(),
-  limit: z.number().int().min(1).max(200).optional(),
-  cursor: z.string().min(1).optional(),
-  refresh: z.boolean().optional(),
-});
-
-const TextplayHistorySessionMineRowSchema = z.strictObject({
-  runId: z.string().min(1),
-  storyId: z.string().min(1),
-  worldId: z.string().min(1),
-  agentId: z.string().min(1),
-  storyTitle: z.string().min(1),
-  updatedAt: z.string().min(1),
-  triggerSource: NarrativeTriggerSourceSchema,
-  preview: z.string().min(1),
-});
-
-export const TextplayHistorySessionMineResponseSchema = z.strictObject({
-  items: z.array(TextplayHistorySessionMineRowSchema).default([]),
-  nextCursor: z.union([z.string().min(1), z.null()]).optional().transform((value) => value ?? null),
-  total: z.number().int().min(0).optional(),
-}).passthrough();
-
 export const TextplayPersistQuerySchema = z.discriminatedUnion('op', [
   z.strictObject({
     op: z.literal('upsert'),
@@ -543,7 +518,5 @@ export type TextplayWorldSceneListResponse = z.infer<typeof TextplayWorldSceneLi
 export type TextplayWorldNarrativeContextRow = z.infer<typeof TextplayWorldNarrativeContextRowSchema>;
 export type TextplayWorldNarrativeContextListResponse = z.infer<typeof TextplayWorldNarrativeContextListResponseSchema>;
 export type TextplayMemoryRecallResponse = z.infer<typeof TextplayMemoryRecallResponseSchema>;
-export type TextplayHistorySessionMineQuery = z.infer<typeof TextplayHistorySessionMineQuerySchema>;
-export type TextplayHistorySessionMineResponse = z.infer<typeof TextplayHistorySessionMineResponseSchema>;
 export type TextplayPersistQuery = z.infer<typeof TextplayPersistQuerySchema>;
 export type TextplayRenderRequest = z.infer<typeof TextplayRenderRequestSchema>;
