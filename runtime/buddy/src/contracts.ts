@@ -44,10 +44,21 @@ export type BuddyModelId = typeof BUDDY_MODELS[number]['id'];
 export const DEFAULT_BUDDY_MODEL_ID: BuddyModelId = 'haru';
 
 /** 情绪标签正则 */
-export const EMOTION_TAG_REGEX = /\[emotion:(happy|sad|surprised|thinking|excited|sleepy)\]/;
+export const EMOTION_TAG_REGEX = /\[emotion:(happy|sad|surprised|thinking|excited|sleepy|calm|shy|confused|playful|caring)\]/;
 
 /** 支持的情绪类型 */
-export type EmotionType = 'happy' | 'sad' | 'surprised' | 'thinking' | 'excited' | 'sleepy';
+export type EmotionType =
+  | 'happy'
+  | 'sad'
+  | 'surprised'
+  | 'thinking'
+  | 'excited'
+  | 'sleepy'
+  | 'calm'
+  | 'shy'
+  | 'confused'
+  | 'playful'
+  | 'caring';
 
 /** 默认情绪（儿童陪伴场景应默认积极） */
 export const DEFAULT_EMOTION: EmotionType = 'happy';

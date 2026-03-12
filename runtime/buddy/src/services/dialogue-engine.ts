@@ -28,8 +28,15 @@ const DEFAULT_SYSTEM_PROMPT = buildBuddySystemPrompt(getBuddyPromptProfile(DEFAU
 export function extractEmotion(text: string): DialogueResult {
   const match = text.match(EMOTION_TAG_REGEX);
   const emotion = (match?.[1] as EmotionType) ?? DEFAULT_EMOTION;
-  const cleanText = text.replace(EMOTION_TAG_REGEX, '').trim();
+  const cleanText = stripEmotionTags(text);
   return { text: cleanText, emotion };
+}
+
+export function stripEmotionTags(text: string): string {
+  return String(text || '')
+    .replace(/\[(?:emotion:)?(happy|sad|surprised|thinking|excited|sleepy|calm|shy|confused|playful|caring)\]/gi, '')
+    .replace(EMOTION_TAG_REGEX, '')
+    .trim();
 }
 
 function createMessageId(): string {

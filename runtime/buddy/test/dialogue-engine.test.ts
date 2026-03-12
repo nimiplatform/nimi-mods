@@ -37,6 +37,31 @@ describe('extractEmotion (BD-PIPE-004)', () => {
     assert.equal(result.emotion, 'sleepy');
   });
 
+  it('extracts calm emotion tag', () => {
+    const result = extractEmotion('[emotion:calm]没关系，我们慢慢说。');
+    assert.equal(result.emotion, 'calm');
+  });
+
+  it('extracts shy emotion tag', () => {
+    const result = extractEmotion('[emotion:shy]这样说会不会有点害羞呀...');
+    assert.equal(result.emotion, 'shy');
+  });
+
+  it('extracts confused emotion tag', () => {
+    const result = extractEmotion('[emotion:confused]咦，这个地方我有点没听懂。');
+    assert.equal(result.emotion, 'confused');
+  });
+
+  it('extracts playful emotion tag', () => {
+    const result = extractEmotion('[emotion:playful]那我可要和你开个小玩笑啦。');
+    assert.equal(result.emotion, 'playful');
+  });
+
+  it('extracts caring emotion tag', () => {
+    const result = extractEmotion('[emotion:caring]你先别急，我在这儿陪着你。');
+    assert.equal(result.emotion, 'caring');
+  });
+
   it('defaults to happy when no tag (BD-PIPE-004 rule 3)', () => {
     const result = extractEmotion('没有标签的回复');
     assert.equal(result.emotion, 'happy');
@@ -105,6 +130,8 @@ describe('compileMessages (BD-PIPE-001)', () => {
     assert.ok(result[0]?.content.includes('日和（Hiyori）'));
     assert.ok(result[0]?.content.includes('[emotion:excited]'));
     assert.ok(result[0]?.content.includes('元气系 Live2D 陪伴角色'));
+    assert.ok(result[0]?.content.includes('如果用户问你叫什么'));
+    assert.ok(result[0]?.content.includes('你就是“日和（Hiyori）”'));
   });
 });
 

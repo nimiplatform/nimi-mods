@@ -70,6 +70,14 @@ const en = {
     audioGeneric: 'Voice generation failed',
     audioUnsupported: 'The current TTS voice does not support this model. Switch the TTS voice in the console.',
     audioProvider: 'TTS provider internal error. Try another voice or retry later.',
+    micUnsupported: 'This runtime does not support microphone capture.',
+    micPermissionDenied: 'Microphone permission was denied. Allow Nimi to use the microphone in system settings and try again.',
+    micDeviceMissing: 'No microphone input device was found. Check your input device settings.',
+    micUnavailable: 'Microphone is unavailable. Check system or browser permissions and try again.',
+    micStartFailed: 'Failed to start microphone capture. Please try again later.',
+    recordingEmpty: 'No valid voice was captured. Hold a little longer and try again.',
+    transcriptionEmpty: 'I could not catch that clearly. Try saying it again.',
+    transcriptionFailed: 'Voice transcription failed. Please try again later.',
   },
 };
 

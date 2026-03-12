@@ -70,6 +70,14 @@ const zh = {
     audioGeneric: '语音生成失败',
     audioUnsupported: '当前 TTS voice 不支持这个模型，请在右侧控制台切换 TTS Voice。',
     audioProvider: 'TTS provider 内部错误，先换一个 voice 或稍后再试。',
+    micUnsupported: '当前运行环境不支持麦克风录音。',
+    micPermissionDenied: '麦克风权限被拒绝，请到系统设置里允许 Nimi 使用麦克风后重试。',
+    micDeviceMissing: '没有找到可用的麦克风设备，请检查输入设备。',
+    micUnavailable: '麦克风不可用，请检查系统或浏览器权限后再试。',
+    micStartFailed: '麦克风启动失败，请稍后再试。',
+    recordingEmpty: '没有录到有效声音，按住久一点再试一次。',
+    transcriptionEmpty: '没有听清楚你刚才说的话，再说一次试试。',
+    transcriptionFailed: '语音转写失败，请稍后再试。',
   },
 };
 

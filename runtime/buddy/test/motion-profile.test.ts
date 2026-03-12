@@ -15,6 +15,7 @@ describe('getBuddyMotionProfile', () => {
     assert.deepEqual(profile.idle, ['']);
     assert.deepEqual(profile.tap, ['']);
     assert.deepEqual(profile.emotion.happy, ['']);
+    assert.deepEqual(profile.emotion.playful, ['']);
   });
 
   it('uses hiyori motion groups when hiyori is selected', () => {
@@ -22,5 +23,6 @@ describe('getBuddyMotionProfile', () => {
     assert.ok(profile.idle.includes('Idle'));
     assert.ok(profile.tap.includes('Tap@Body'));
     assert.ok(profile.emotion.surprised.includes('FlickUp'));
+    assert.ok(profile.emotion.caring.includes('FlickUp'));
   });
 });
