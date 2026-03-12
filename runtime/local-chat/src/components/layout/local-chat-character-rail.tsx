@@ -89,8 +89,8 @@ export const LocalChatCharacterRail = React.memo(function LocalChatCharacterRail
         <div className="absolute bottom-16 right-[-56px] h-56 w-56 rounded-full bg-sky-100/70 blur-3xl" />
       </div>
 
-      <div className="relative z-10 flex h-full min-h-0 flex-col px-5 py-5">
-        <div className="shrink-0">
+      <div className="relative z-10 flex h-full min-h-0 flex-col">
+        <div className="shrink-0 border-b border-white/70 px-6 py-3">
           <button
             type="button"
             onClick={onBackToTargets}
@@ -102,7 +102,7 @@ export const LocalChatCharacterRail = React.memo(function LocalChatCharacterRail
           </button>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col pt-4">
+        <div className="flex min-h-0 flex-1 flex-col px-5 pb-5 pt-4">
           <div className="flex min-h-0 flex-1 items-center justify-center pb-8">
             <button
               type="button"

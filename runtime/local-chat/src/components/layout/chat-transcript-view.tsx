@@ -25,6 +25,7 @@ type ChatTranscriptViewProps = {
   hasConversationHistory: boolean;
   onSeedFirstTurnComposer: () => void;
   onTranscriptNearBottomChange: (value: boolean) => void;
+  widthClassName?: string;
 };
 
 function formatDateLabel(date: Date, t: (key: string, values?: Record<string, unknown>) => string): string {
@@ -189,6 +190,7 @@ export const ChatTranscriptView = React.memo(function ChatTranscriptView({
   hasConversationHistory,
   onSeedFirstTurnComposer,
   onTranscriptNearBottomChange,
+  widthClassName = LOCAL_CHAT_CONVERSATION_WIDTH_CLASS,
 }: ChatTranscriptViewProps) {
   const { t } = useModTranslation('local-chat');
   const scrollRootRef = React.useRef<HTMLDivElement | null>(null);
@@ -225,7 +227,7 @@ export const ChatTranscriptView = React.memo(function ChatTranscriptView({
       }}
     >
       {showLoadingState ? (
-        <div className={`mx-auto flex h-full ${LOCAL_CHAT_CONVERSATION_WIDTH_CLASS} items-center justify-center`}>
+        <div className={`mx-auto flex h-full ${widthClassName} items-center justify-center`}>
           <div className="w-full rounded-[30px] border border-white/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(237,247,247,0.86))] px-6 py-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
             <div className="lc-skeleton-pill h-4 w-28" />
             <div className="mt-4 lc-skeleton-card h-24 w-full" />
@@ -233,7 +235,7 @@ export const ChatTranscriptView = React.memo(function ChatTranscriptView({
           </div>
         </div>
       ) : (
-        <div className={`mx-auto ${LOCAL_CHAT_CONVERSATION_WIDTH_CLASS} space-y-5`}>
+        <div className={`mx-auto ${widthClassName} space-y-5`}>
           {welcomeTarget ? (
             <section className="lc-card rounded-[30px] border border-white/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(239,247,247,0.88))] px-6 py-7 text-center shadow-[0_20px_52px_rgba(15,23,42,0.08)]">
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-mint-700/70">

@@ -127,7 +127,7 @@ export const LocalChatConversationPane = React.memo(function LocalChatConversati
               <button
                 type="button"
                 onClick={onOpenHistory}
-                className="lc-btn lc-btn-secondary h-9 w-9 rounded-full text-slate-700"
+                className="lc-btn lc-btn-secondary h-10 w-10 rounded-full text-slate-700"
                 aria-label={t('Header.openHistory')}
                 title={t('Header.openHistory')}
               >
@@ -137,7 +137,7 @@ export const LocalChatConversationPane = React.memo(function LocalChatConversati
               <button
                 type="button"
                 onClick={onReturnToStage}
-                className="lc-btn lc-btn-secondary h-9 w-9 rounded-full text-slate-700"
+                className="lc-btn lc-btn-secondary h-10 w-10 rounded-full text-slate-700"
                 aria-label={t('Header.returnToStage')}
                 title={t('Header.returnToStage')}
               >
@@ -148,7 +148,7 @@ export const LocalChatConversationPane = React.memo(function LocalChatConversati
             <button
               type="button"
               onClick={onOpenSettings}
-              className="lc-btn lc-btn-secondary h-9 w-9 rounded-full text-slate-700"
+              className="lc-btn lc-btn-secondary h-10 w-10 rounded-full text-slate-700"
               aria-label={t('Header.openSettings')}
               title={t('Header.openSettings')}
             >
@@ -218,6 +218,7 @@ export const LocalChatConversationPane = React.memo(function LocalChatConversati
               hasConversationHistory={hasConversationHistory}
               onSeedFirstTurnComposer={onSeedFirstTurnComposer}
               onTranscriptNearBottomChange={onTranscriptNearBottomChange}
+              widthClassName={LOCAL_CHAT_STAGE_SURFACE_WIDTH_CLASS}
             />
 
             <ConversationComposer
@@ -236,6 +237,7 @@ export const LocalChatConversationPane = React.memo(function LocalChatConversati
               onSend={onSend}
               canSend={canSend}
               runtimeReady={runtimeReady}
+              widthClassName={LOCAL_CHAT_STAGE_SURFACE_WIDTH_CLASS}
             />
           </>
         )}
