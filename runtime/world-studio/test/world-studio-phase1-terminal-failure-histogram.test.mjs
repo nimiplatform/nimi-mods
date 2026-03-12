@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { setModSdkHost, clearModSdkHost } from '@nimiplatform/sdk/mod/host';
+import { setModSdkHost, clearModSdkHost } from '../../../shared/testing/mod-sdk-host.js';
 import { cloneDefaultSnapshot } from '../src/state/workspace/defaults.ts';
 import { runCreatePhase1 } from '../src/hooks/actions/create/run-phase1.ts';
 import { createMockTaskController } from './helpers/world-studio-task-controller-mock.mjs';
