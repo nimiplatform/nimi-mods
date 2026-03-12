@@ -10,7 +10,7 @@ import { listMyWorlds } from '../data/world-catalog.js';
 import { runTextplayRender } from '../pipeline/run-textplay-render.js';
 import { createTextplayPresenceMachine } from '../presence/state-machine.js';
 import type { TextplayShellProps } from '../components/textplay-shell.js';
-import { TextplayWorldNarrativeContextListResponseSchema, type NarrativeTurnWindowResponse, type TextplayWorldNarrativeContextRow, } from '../data/schemas.js';
+import { TextplayWorldNarrativeContextListResponseSchema, type NarrativeTurnWindowResponse, } from '../data/schemas.js';
 import type { TextplayHistorySession, TextplayPersistRecord, TextplayPresenceReport, TextplayStoryBrief, TextplayStoryDetail, TextplayStorySummary, TextplayWorldSummary, TextplayRunEvent, TextplayRunSnapshot, TextplayRenderSuccess, TextplayWarning, } from '../types.js';
 import { createUlid } from '../utils/ulid.js';
 import { createTextplayFlowId, emitTextplayLog } from '../logging.js';
@@ -20,6 +20,37 @@ import { createFallbackPersistRecord, hasPersistenceWarning, } from './session-o
 import { createTextplayRuntimeAiClient } from '../runtime-ai-client.js';
 import { loadTextplayRouteBinding, persistTextplayRouteBinding, } from '../route-override-store.js';
 import { createHookClient, createModRuntimeClient, type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot, type RuntimeRouteSource } from "@nimiplatform/sdk/mod";
+import {
+    asRecord,
+    isEntityId,
+    parsePersistRecord,
+    parsePersistRecordList,
+    parseRunEvents,
+    parseRunSnapshot,
+    toPlayerProfileScope,
+    toTrimmedString,
+    uniqueStrings,
+} from './textplay-parsers.js';
+import {
+    collectWorldAgentCandidatesByStory,
+    deriveRouteBindingByConnector,
+    deriveRouteBindingByModel,
+    deriveRouteBindingBySource,
+    deriveStoryPlaceholder,
+    formatRouteLabel,
+    isRouteBindingUsable,
+    mergeAgentCandidateIds,
+    mergeRunEvents,
+    pickAgentFallbackCandidates,
+    pickWorldSummaryById,
+    resolveEffectiveRouteBinding,
+    sortHistorySessions,
+    toHistorySession,
+    toRouteBindingRecord,
+    upsertHistorySessionByStory,
+    upsertPersistRecord,
+    WORLD_AGENT_CANDIDATE_KEY,
+} from './textplay-helpers.js';
 type PlayerProfileDraft = {
     playerName: string;
     playerIdentity: string;
@@ -27,485 +58,6 @@ type PlayerProfileDraft = {
 const GLOBAL_PLAYER_PROFILE_SCOPE = '__global__';
 const SEND_RUNTIME_ERROR_REASON = 'TEXTPLAY_RENDER_RUNTIME_ERROR';
 const MAX_AGENT_FALLBACK_CANDIDATES = 2;
-function asRecord(value: unknown): Record<string, unknown> | null {
-    if (!value || typeof value !== 'object') {
-        return null;
-    }
-    return value as Record<string, unknown>;
-}
-function toTrimmedString(value: unknown): string {
-    return typeof value === 'string' ? value.trim() : '';
-}
-const ENTITY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{1,}$/;
-function isEntityId(value: string): boolean {
-    return ENTITY_ID_PATTERN.test(value);
-}
-function uniqueStrings(values: string[]): string[] {
-    return [...new Set(values.map((item) => item.trim()).filter(Boolean))];
-}
-function parseWorldIdFromStoryId(storyId: string): string {
-    const parts = storyId.split('.');
-    if (parts.length >= 3 && parts[0] === 'story') {
-        return parts[1] || '';
-    }
-    return '';
-}
-function toPlayerProfileScope(worldId: string): string {
-    const normalized = worldId.trim();
-    return normalized || GLOBAL_PLAYER_PROFILE_SCOPE;
-}
-function parseRunEvent(value: unknown): TextplayRunEvent | null {
-    const record = asRecord(value);
-    if (!record) {
-        return null;
-    }
-    const traceId = toTrimmedString(record.traceId);
-    const runId = toTrimmedString(record.runId);
-    const stage = toTrimmedString(record.stage);
-    const step = toTrimmedString(record.step);
-    const eventType = toTrimmedString(record.eventType);
-    const seq = Number(record.seq);
-    const attempt = Number(record.attempt);
-    const timestamp = toTrimmedString(record.timestamp);
-    if (!traceId || !runId || !stage || !step || !eventType || !Number.isFinite(seq) || !Number.isFinite(attempt) || !timestamp) {
-        return null;
-    }
-    return {
-        traceId,
-        runId,
-        parentRunId: typeof record.parentRunId === 'string' ? record.parentRunId : null,
-        taskId: typeof record.taskId === 'string' ? record.taskId : undefined,
-        stage: 'textplay',
-        step,
-        eventType: eventType as TextplayRunEvent['eventType'],
-        seq: Math.floor(seq),
-        attempt: Math.floor(attempt),
-        timestamp,
-        reasonCode: typeof record.reasonCode === 'string' ? record.reasonCode : undefined,
-        actionHint: typeof record.actionHint === 'string' ? record.actionHint : undefined,
-        retryClass: record.retryClass === 'retryable' || record.retryClass === 'non-retryable'
-            ? record.retryClass
-            : undefined,
-        idempotencyKey: typeof record.idempotencyKey === 'string' ? record.idempotencyKey : undefined,
-        checkpointToken: typeof record.checkpointToken === 'string' ? record.checkpointToken : undefined,
-        stepInputHash: typeof record.stepInputHash === 'string' ? record.stepInputHash : undefined,
-        lastCompletedUnit: typeof record.lastCompletedUnit === 'string' ? record.lastCompletedUnit : undefined,
-    };
-}
-function parseRunEvents(value: unknown): TextplayRunEvent[] {
-    if (!Array.isArray(value)) {
-        return [];
-    }
-    return value
-        .map(parseRunEvent)
-        .filter((item): item is TextplayRunEvent => item !== null)
-        .sort((left, right) => left.seq - right.seq);
-}
-function parseWarning(value: unknown): TextplayWarning | null {
-    const record = asRecord(value);
-    if (!record) {
-        return null;
-    }
-    const code = toTrimmedString(record.code);
-    const stage = toTrimmedString(record.stage);
-    const actionHint = toTrimmedString(record.actionHint);
-    const message = toTrimmedString(record.message);
-    const at = toTrimmedString(record.at);
-    if (!code || !stage || !actionHint || !message || !at) {
-        return null;
-    }
-    return {
-        code,
-        stage,
-        actionHint,
-        message,
-        at,
-    };
-}
-function parseWarnings(value: unknown): TextplayWarning[] {
-    if (!Array.isArray(value)) {
-        return [];
-    }
-    return value
-        .map(parseWarning)
-        .filter((item): item is TextplayWarning => item !== null);
-}
-function parsePresenceReport(value: unknown): TextplayPresenceReport | null {
-    const record = asRecord(value);
-    if (!record) {
-        return null;
-    }
-    const id = toTrimmedString(record.id);
-    const at = toTrimmedString(record.at);
-    const fromState = toTrimmedString(record.fromState);
-    const toState = toTrimmedString(record.toState);
-    const event = toTrimmedString(record.event);
-    if (!id || !at || !fromState || !toState || !event) {
-        return null;
-    }
-    return {
-        id,
-        at,
-        fromState: fromState as TextplayPresenceReport['fromState'],
-        toState: toState as TextplayPresenceReport['toState'],
-        event,
-    };
-}
-function parsePresenceReports(value: unknown): TextplayPresenceReport[] {
-    if (!Array.isArray(value)) {
-        return [];
-    }
-    return value
-        .map(parsePresenceReport)
-        .filter((item): item is TextplayPresenceReport => item !== null);
-}
-function parseRunSnapshot(value: unknown): TextplayRunSnapshot | null {
-    const record = asRecord(value);
-    if (!record) {
-        return null;
-    }
-    const status = toTrimmedString(record.status);
-    const lastSeq = Number(record.lastSeq);
-    const lastCompletedStep = toTrimmedString(record.lastCompletedStep);
-    const checkpointToken = toTrimmedString(record.checkpointToken);
-    const stepInputHash = toTrimmedString(record.stepInputHash);
-    const lastCompletedUnit = toTrimmedString(record.lastCompletedUnit);
-    const gapRefillApplied = Boolean(record.gapRefillApplied);
-    if (!status || !Number.isFinite(lastSeq) || !lastCompletedStep || !checkpointToken || !stepInputHash || !lastCompletedUnit) {
-        return null;
-    }
-    return {
-        status: status as TextplayRunSnapshot['status'],
-        lastSeq: Math.floor(lastSeq),
-        lastCompletedStep,
-        checkpointToken,
-        stepInputHash,
-        lastCompletedUnit,
-        gapRefillApplied,
-        terminalEventType: typeof record.terminalEventType === 'string'
-            ? (record.terminalEventType as TextplayRunSnapshot['terminalEventType'])
-            : undefined,
-    };
-}
-function parsePersistRecord(value: unknown): TextplayPersistRecord | null {
-    const record = asRecord(value);
-    if (!record) {
-        return null;
-    }
-    const storyId = toTrimmedString(record.storyId);
-    const worldId = toTrimmedString(record.worldId) || parseWorldIdFromStoryId(storyId);
-    const agentId = toTrimmedString(record.agentId);
-    const turnId = toTrimmedString(record.turnId);
-    const runId = toTrimmedString(record.runId);
-    const traceId = toTrimmedString(record.traceId);
-    const playerId = toTrimmedString(record.playerId);
-    const openingPayload = asRecord(asRecord(record.systemPayload)?.opening);
-    const playerIdentity = firstNonEmptyText([
-        record.playerIdentity,
-        openingPayload?.playerIdentity,
-        openingPayload?.playerRole,
-    ]);
-    if (!storyId || !turnId || !runId || !traceId || !playerId) {
-        return null;
-    }
-    const runSnapshot = parseRunSnapshot(record.runSnapshot);
-    if (!runSnapshot) {
-        return null;
-    }
-    return {
-        id: toTrimmedString(record.id) || createUlid(),
-        storyId,
-        worldId,
-        agentId,
-        turnId,
-        runId,
-        traceId,
-        triggerSource: (toTrimmedString(record.triggerSource) || 'UserTurn') as TextplayPersistRecord['triggerSource'],
-        playerId,
-        playerIdentity: playerIdentity || undefined,
-        userMessage: typeof record.userMessage === 'string' ? record.userMessage : '',
-        systemPayload: record.systemPayload && typeof record.systemPayload === 'object'
-            ? (record.systemPayload as Record<string, unknown>)
-            : null,
-        text: typeof record.text === 'string' ? record.text : '',
-        meta: record.meta && typeof record.meta === 'object'
-            ? record.meta as TextplayPersistRecord['meta']
-            : {
-                storyId,
-                turnId,
-                runId,
-                traceId,
-                promptTraceId: '',
-                route: {
-                    source: '',
-                    connectorId: '',
-                    model: '',
-                    provider: '',
-                    endpoint: '',
-                },
-                sourceEventIds: [],
-                warnings: [],
-                presenceReports: [],
-                runSnapshot,
-            },
-        runEvents: parseRunEvents(record.runEvents),
-        runSnapshot,
-        warnings: parseWarnings(record.warnings),
-        presenceReports: parsePresenceReports(record.presenceReports),
-        createdAt: toTrimmedString(record.createdAt) || new Date().toISOString(),
-        updatedAt: toTrimmedString(record.updatedAt) || new Date().toISOString(),
-    };
-}
-function parsePersistRecordList(value: unknown): TextplayPersistRecord[] {
-    const envelope = asRecord(value);
-    if (!envelope) {
-        return [];
-    }
-    const recordsRaw = Array.isArray(envelope.records) ? envelope.records : [];
-    return recordsRaw
-        .map(parsePersistRecord)
-        .filter((item): item is TextplayPersistRecord => item !== null)
-        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-}
-function mergeRunEvents(existing: TextplayRunEvent[], incoming: TextplayRunEvent[]): TextplayRunEvent[] {
-    if (incoming.length === 0) {
-        return existing;
-    }
-    const merged = new Map<number, TextplayRunEvent>();
-    for (const event of existing) {
-        merged.set(event.seq, event);
-    }
-    for (const event of incoming) {
-        merged.set(event.seq, event);
-    }
-    return [...merged.values()].sort((left, right) => left.seq - right.seq);
-}
-function upsertPersistRecord(records: TextplayPersistRecord[], next: TextplayPersistRecord): TextplayPersistRecord[] {
-    const index = records.findIndex((item) => item.runId === next.runId);
-    if (index === -1) {
-        return [next, ...records].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-    }
-    const copied = [...records];
-    copied[index] = next;
-    return copied.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-}
-function abbreviateText(value: string, maxLength = 72): string {
-    const normalized = value.replace(/\s+/g, ' ').trim();
-    if (!normalized) {
-        return '';
-    }
-    if (normalized.length <= maxLength) {
-        return normalized;
-    }
-    return `${normalized.slice(0, maxLength)}...`;
-}
-function buildHistoryPreview(record: TextplayPersistRecord): string {
-    const renderText = abbreviateText(String(record.text || ''));
-    if (renderText) {
-        return renderText;
-    }
-    const userMessage = abbreviateText(String(record.userMessage || ''));
-    if (userMessage) {
-        return userMessage;
-    }
-    return '(no preview)';
-}
-function toHistorySession(input: {
-    record: TextplayPersistRecord;
-    storyTitle: string;
-}): TextplayHistorySession {
-    return {
-        runId: input.record.runId,
-        storyId: input.record.storyId,
-        worldId: input.record.worldId || parseWorldIdFromStoryId(input.record.storyId),
-        agentId: input.record.agentId,
-        storyTitle: input.storyTitle.trim() || input.record.storyId,
-        updatedAt: input.record.updatedAt,
-        triggerSource: input.record.triggerSource,
-        preview: buildHistoryPreview(input.record),
-    };
-}
-function sortHistorySessions(sessions: TextplayHistorySession[]): TextplayHistorySession[] {
-    return [...sessions].sort((left, right) => (right.updatedAt.localeCompare(left.updatedAt)
-        || left.storyId.localeCompare(right.storyId)
-        || left.runId.localeCompare(right.runId)));
-}
-function upsertHistorySessionByStory(sessions: TextplayHistorySession[], next: TextplayHistorySession): TextplayHistorySession[] {
-    const index = sessions.findIndex((item) => item.storyId === next.storyId);
-    if (index === -1) {
-        return sortHistorySessions([...sessions, next]);
-    }
-    const previous = sessions[index];
-    if (!previous) {
-        return sortHistorySessions([...sessions, next]);
-    }
-    if (previous.updatedAt.localeCompare(next.updatedAt) >= 0) {
-        return sessions;
-    }
-    const copied = [...sessions];
-    copied[index] = next;
-    return sortHistorySessions(copied);
-}
-const WORLD_AGENT_CANDIDATE_KEY = '__world__';
-function withAgentCandidate(index: Record<string, string[]>, key: string, candidate: unknown): void {
-    const normalizedKey = key.trim();
-    const normalized = toTrimmedString(candidate);
-    if (!normalizedKey || !isEntityId(normalized)) {
-        return;
-    }
-    const existing = index[normalizedKey] || [];
-    if (!existing.includes(normalized)) {
-        index[normalizedKey] = [...existing, normalized];
-    }
-}
-function collectWorldAgentCandidatesByStory(rows: TextplayWorldNarrativeContextRow[]): Record<string, string[]> {
-    const out: Record<string, string[]> = {};
-    for (const row of rows) {
-        const storyId = toTrimmedString(row.storyId);
-        const storyKey = storyId || WORLD_AGENT_CANDIDATE_KEY;
-        const subjectType = toTrimmedString(row.subjectType).toUpperCase();
-        const targetType = toTrimmedString(row.targetSubjectType).toUpperCase();
-        if (subjectType === 'AGENT') {
-            withAgentCandidate(out, storyKey, row.subjectId);
-        }
-        if (targetType === 'AGENT') {
-            withAgentCandidate(out, storyKey, row.targetSubjectId);
-        }
-        if (storyId) {
-            if (subjectType === 'AGENT') {
-                withAgentCandidate(out, WORLD_AGENT_CANDIDATE_KEY, row.subjectId);
-            }
-            if (targetType === 'AGENT') {
-                withAgentCandidate(out, WORLD_AGENT_CANDIDATE_KEY, row.targetSubjectId);
-            }
-        }
-    }
-    return out;
-}
-function mergeAgentCandidateIds(values: string[]): string[] {
-    return uniqueStrings(values).filter((candidate) => isEntityId(candidate));
-}
-function pickAgentFallbackCandidates(input: {
-    preferredAgentId?: string;
-    candidateAgentIds?: string[];
-    max?: number;
-}): string[] {
-    const max = Number.isFinite(input.max) ? Math.max(1, Math.floor(Number(input.max))) : MAX_AGENT_FALLBACK_CANDIDATES;
-    const merged = mergeAgentCandidateIds([
-        String(input.preferredAgentId || ''),
-        ...(Array.isArray(input.candidateAgentIds) ? input.candidateAgentIds : []),
-    ]);
-    return merged.slice(0, max);
-}
-function deriveStoryPlaceholder(input: {
-    story: TextplayStoryDetail | null;
-    startupReady: boolean;
-    started: boolean;
-    paused: boolean;
-}): string {
-    if (!input.story) {
-        return 'Select a world and story first...';
-    }
-    if (!input.started) {
-        return 'Fill Player Name, then click Start to load background and opening narration...';
-    }
-    if (input.paused) {
-        return 'Session paused. Click Resume in Current Session before sending.';
-    }
-    if (!input.startupReady) {
-        return 'Startup package is loading...';
-    }
-    return `在《${input.story.title}》中输入下一步行动...`;
-}
-function formatRouteLabel(binding: RuntimeRouteBinding | null): string {
-    if (!binding || !binding.model.trim()) {
-        return 'unresolved';
-    }
-    return `${binding.source}/${binding.connectorId || 'default'}:${binding.model}`;
-}
-function toRouteBindingRecord(binding: RuntimeRouteBinding | null): Record<string, unknown> | undefined {
-    if (!binding) {
-        return undefined;
-    }
-    const model = binding.model.trim();
-    if (!model) {
-        return undefined;
-    }
-    return {
-        source: binding.source,
-        connectorId: binding.connectorId,
-        model,
-        ...(binding.localModelId ? { localModelId: binding.localModelId } : {}),
-        ...(binding.engine ? { engine: binding.engine } : {}),
-    };
-}
-function pickWorldSummaryById(worlds: TextplayWorldSummary[], worldId: string): TextplayWorldSummary | null {
-    const normalizedWorldId = worldId.trim();
-    if (!normalizedWorldId) {
-        return null;
-    }
-    return worlds.find((world) => world.id === normalizedWorldId) || null;
-}
-function deriveRouteBindingBySource(input: {
-    source: RuntimeRouteSource;
-    previous: RuntimeRouteBinding | null;
-    options: RuntimeRouteOptionsSnapshot | null;
-}): RuntimeRouteBinding {
-    const previous = input.previous || input.options?.selected || null;
-    if (input.source === 'local') {
-        const firstLocal = input.options?.local?.models[0] || null;
-        return {
-            source: 'local',
-            connectorId: '',
-            model: firstLocal?.model || previous?.model || '',
-            localModelId: firstLocal?.localModelId || previous?.localModelId,
-            engine: firstLocal?.engine || previous?.engine,
-        };
-    }
-    const firstConnector = input.options?.connectors[0] || null;
-    const firstModel = firstConnector?.models[0] || '';
-    return {
-        source: 'cloud',
-        connectorId: firstConnector?.id || previous?.connectorId || '',
-        model: firstModel || previous?.model || '',
-    };
-}
-function deriveRouteBindingByConnector(input: {
-    connectorId: string;
-    previous: RuntimeRouteBinding | null;
-    options: RuntimeRouteOptionsSnapshot | null;
-}): RuntimeRouteBinding {
-    const connector = input.options?.connectors.find((item) => item.id === input.connectorId) || null;
-    const previous = input.previous || input.options?.selected || null;
-    return {
-        source: 'cloud',
-        connectorId: input.connectorId,
-        model: connector?.models[0] || previous?.model || '',
-    };
-}
-function deriveRouteBindingByModel(input: {
-    model: string;
-    previous: RuntimeRouteBinding | null;
-    options: RuntimeRouteOptionsSnapshot | null;
-}): RuntimeRouteBinding {
-    const previous = input.previous || input.options?.selected || null;
-    return {
-        source: previous?.source || 'local',
-        connectorId: previous?.connectorId || '',
-        model: input.model.trim(),
-        ...(previous?.localModelId ? { localModelId: previous.localModelId } : {}),
-        ...(previous?.engine ? { engine: previous.engine } : {}),
-    };
-}
-function firstNonEmptyText(values: unknown[]): string {
-    for (const value of values) {
-        const text = toTrimmedString(value);
-        if (text) {
-            return text;
-        }
-    }
-    return '';
-}
 export function useTextplayController(): TextplayShellProps {
     const { runtimeFields, setRuntimeField } = useShellRuntimeFields();
     const { showStatusBanner: setStatusBanner } = useShellStatusBanner();
@@ -608,7 +160,10 @@ export function useTextplayController(): TextplayShellProps {
     const playerProfileScope = toPlayerProfileScope(worldId);
     const previousPlayerProfileScopeRef = useRef(playerProfileScope);
     const agentId = agentIdRuntime || selectedStory?.primaryAgentId || '';
-    const effectiveRouteBinding = binding || chatRouteOptions?.selected || null;
+    const effectiveRouteBinding = resolveEffectiveRouteBinding({
+        binding,
+        selected: chatRouteOptions?.selected || null,
+    });
     const routeSource = effectiveRouteBinding?.source || 'local';
     const routeConnectorId = effectiveRouteBinding?.connectorId || '';
     const routeModel = effectiveRouteBinding?.model || '';
@@ -616,6 +171,18 @@ export function useTextplayController(): TextplayShellProps {
     const routeModelOptions = routeSource === 'cloud'
         ? (routeConnectors.find((item) => item.id === routeConnectorId)?.models || [])
         : (chatRouteOptions?.local?.models || []).map((item) => item.model);
+    const ensureExplicitRouteBindingUsable = useCallback((actionLabel: string) => {
+        if (!binding || isRouteBindingUsable(binding)) {
+            return true;
+        }
+        if (typeof setStatusBanner === 'function') {
+            setStatusBanner({
+                kind: 'warning',
+                message: `${actionLabel} requires a complete route binding. Pick a valid source, connector, and model first.`,
+            });
+        }
+        return false;
+    }, [binding, setStatusBanner]);
     const syncPresenceView = useCallback(() => {
         setPresenceState(presenceMachine.getState());
         setPresenceReports(presenceMachine.getAllReports().slice(-20));
@@ -1599,6 +1166,9 @@ export function useTextplayController(): TextplayShellProps {
             if (isRunning) {
                 return;
             }
+            if (!ensureExplicitRouteBindingUsable('TextPlay send')) {
+                return;
+            }
             if (sessionPaused) {
                 if (typeof setStatusBanner === 'function') {
                     setStatusBanner({
@@ -1883,6 +1453,7 @@ export function useTextplayController(): TextplayShellProps {
         agentIdRuntime,
         aiClient,
         applyRenderSuccessSurface,
+        ensureExplicitRouteBindingUsable,
         ensureStartupPackage,
         hookClient,
         inputText,
@@ -1935,6 +1506,9 @@ export function useTextplayController(): TextplayShellProps {
     const triggerInitiativeRender = useCallback((inactiveMs: number) => {
         void (async () => {
             if (isRunning) {
+                return;
+            }
+            if (!ensureExplicitRouteBindingUsable('TextPlay initiative')) {
                 return;
             }
             const activeStory = selectedStory;
@@ -2134,6 +1708,7 @@ export function useTextplayController(): TextplayShellProps {
         agentIdRuntime,
         aiClient,
         applyRenderSuccessSurface,
+        ensureExplicitRouteBindingUsable,
         hookClient,
         isRunning,
         narrativeEngine,
@@ -2153,6 +1728,9 @@ export function useTextplayController(): TextplayShellProps {
     const onStartStory = useCallback(() => {
         void (async () => {
             if (isRunning) {
+                return;
+            }
+            if (!ensureExplicitRouteBindingUsable('TextPlay story start')) {
                 return;
             }
             const activeStory = selectedStory;
@@ -2549,6 +2127,7 @@ export function useTextplayController(): TextplayShellProps {
         aiClient,
         applyRecordSurface,
         applyRenderSuccessSurface,
+        ensureExplicitRouteBindingUsable,
         ensureStartupPackage,
         hookClient,
         isRunning,
@@ -2950,7 +2529,7 @@ export function useTextplayController(): TextplayShellProps {
         });
     }, [presenceMachine]);
     const storyStarted = records.length > 0;
-    const hasRouteConfig = routeLabel !== 'unavailable' && routeModel.trim().length > 0;
+    const hasRouteConfig = routeLabel !== 'unavailable' && isRouteBindingUsable(effectiveRouteBinding);
     const hasStoryRuntimeBinding = storyId.trim().length > 0
         && playerId.trim().length > 0
         && worldId.trim().length > 0;
