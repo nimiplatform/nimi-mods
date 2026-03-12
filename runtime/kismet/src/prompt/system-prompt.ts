@@ -42,6 +42,10 @@ export function buildNatalSystemPrompt(): string {
     'citySummary: 一句话总结宜居方向与环境（≤20字），如"宜居北方水旺之地，近水近土"。',
     '此字段是顶层字段，与 analysis、keyNodes、recommendedCities 同级。',
     '',
+    '输出 JSON 结构示例：',
+    '{"analysis":{"summary":"","personality":"","industry":"","fengShui":"","wealth":"","marriage":"","health":"","family":"","crypto":"","partnerAffinitySummary":"","cryptoYear":"","cryptoStyle":"","scores":{"summary":0,"personality":0,"industry":0,"fengShui":0,"wealth":0,"marriage":0,"health":0,"family":0,"crypto":0},"tags":{"summary":[""],"personality":[""],"industry":[""],"fengShui":[""],"wealth":[""],"marriage":[""],"health":[""],"family":[""],"crypto":[""]},"zodiacYearFortune":{"year":"","zodiac":"","wealth":"","relationship":"","career":""}},"keyNodes":[{"age":1,"daYun":"","score":0,"open":0,"close":0,"high":0,"low":0,"tag":""}],"recommendedCities":[{"name":"","score":0,"description":""}],"citySummary":""}',
+    '必须保留 analysis.scores、analysis.tags、analysis.zodiacYearFortune 这三个嵌套对象。',
+    '',
     '禁止输出 markdown、解释文字或额外字段。',
   ].join('\n');
 }

@@ -203,7 +203,7 @@ const zhLocale = {
     inputInvalid: '输入校验失败：{{issues}}',
     inputInvalidHint: '请检查出生日期、时间、出生地和授权开关是否完整。',
     natalAiSchemaInvalid: 'AI 输出 schema 校验失败：{{issues}}',
-    natalAiSchemaInvalidHint: '请确保输出仅包含 analysis 与 keyNodes。',
+    natalAiSchemaInvalidHint: '请确保输出包含完整的 analysis、keyNodes，以及有效的城市推荐字段。',
     natalResultSchemaInvalid: '命盘结果 schema 校验失败：{{issues}}',
     natalResultSchemaInvalidHint: '请确认导入内容是完整的命盘 JSON。',
     dailyResultSchemaInvalid: '今日运势结果 schema 校验失败：{{issues}}',

@@ -63,7 +63,8 @@ test('parseImportedResult rejects natal user prompt payload', () => {
   }));
   assert.equal(result.ok, false);
   if (!result.ok) {
-    assert.match(result.error.message, /User Prompt/);
+    assert.equal(result.error.reasonCode, 'KISMET_IMPORT_PARSE_FAILED');
+    assert.match(result.error.message, /user prompt/i);
   }
 });
 
@@ -100,7 +101,8 @@ test('parseResultFromText reports truncated json when closing brace is missing',
   const result = parseResultFromText('```json {"analysis":{"summary":"partial"}');
   assert.equal(result.ok, false);
   if (!result.ok) {
-    assert.match(result.error.message, /可能已被截断/);
+    assert.equal(result.error.reasonCode, 'KISMET_IMPORT_PARSE_FAILED');
     assert.equal(typeof result.error.diagnosticLength, 'number');
+    assert.equal((result.error.diagnosticLength || 0) > 0, true);
   }
 });

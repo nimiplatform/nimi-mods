@@ -203,7 +203,7 @@ const enLocale = {
     inputInvalid: 'Input validation failed: {{issues}}',
     inputInvalidHint: 'Check birth date, time, birth city, and consent switches.',
     natalAiSchemaInvalid: 'AI output schema validation failed: {{issues}}',
-    natalAiSchemaInvalidHint: 'Ensure the output only contains `analysis` and `keyNodes`.',
+    natalAiSchemaInvalidHint: 'Ensure the output contains complete `analysis`, `keyNodes`, and valid city recommendation fields.',
     natalResultSchemaInvalid: 'Natal result schema validation failed: {{issues}}',
     natalResultSchemaInvalidHint: 'Make sure the imported content is a complete natal JSON payload.',
     dailyResultSchemaInvalid: 'Daily fortune schema validation failed: {{issues}}',

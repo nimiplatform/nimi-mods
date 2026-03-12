@@ -137,8 +137,8 @@ export const KismetRecommendedCitySchema = z.object({
 export const KismetNatalAiOutputSchema = z.object({
   analysis: NatalAnalysisTextSchema,
   keyNodes: z.array(KismetAiKeyNodeSchema).min(5).max(15),
-  recommendedCities: z.array(KismetRecommendedCitySchema).min(3).max(3),
-  citySummary: z.string().min(1).max(40),
+  recommendedCities: z.array(KismetRecommendedCitySchema).max(3).default([]),
+  citySummary: z.string().max(40).default(''),
 }).refine((value) => value.keyNodes[0]?.age === 1, {
   message: 'keyNodes must start from age 1',
 }).refine((value) => (value.keyNodes[value.keyNodes.length - 1]?.age || 0) >= 95, {
@@ -202,7 +202,7 @@ export const KismetNatalAnalysisResultSchema = z.object({
   analysis: NatalAnalysisTextSchema,
   keyNodes: z.array(KismetAiKeyNodeSchema).min(5).max(15),
   chartData: z.array(ChartDataPointSchema).length(100),
-  recommendedCities: z.array(KismetRecommendedCitySchema).min(3).max(3),
+  recommendedCities: z.array(KismetRecommendedCitySchema).max(3).default([]),
   citySummary: z.string().max(40).optional(),
 }).refine((value) => value.chartData[0]?.age === 1 && value.chartData[99]?.age === 100, {
   message: 'chartData must span ages 1..100',

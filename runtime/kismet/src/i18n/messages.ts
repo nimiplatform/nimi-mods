@@ -9,8 +9,14 @@ export function kismetMessage(
   values?: MessageValues,
 ): string {
   const i18n = getI18n() || i18next;
-  return String(i18n.t(`kismet:${key}`, {
+  const translated = i18n.t(`kismet:${key}`, {
     ...(values || {}),
     defaultValue: fallback,
-  }));
+  });
+
+  if (typeof translated === 'string' && translated.trim() && translated !== 'undefined' && translated !== `kismet:${key}`) {
+    return translated;
+  }
+
+  return fallback;
 }
