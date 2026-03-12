@@ -33,7 +33,6 @@ const zhLocale = {
     intentDating: '寻找浪漫关系',
     intentFriendship: '寻找有意义的友谊',
     intentSocialExplore: '探索社交互动',
-    'intentSocial-explore': '探索社交互动',
     intentProfessional: '建立职业网络',
     next: '继续',
   },

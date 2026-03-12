@@ -96,7 +96,7 @@ export function DailyOutfitPage() {
   const [photoUrl, setPhotoUrl] = useState('');
   const [photoFileName, setPhotoFileName] = useState('');
 
-  const [occasionInput, setOccasionInput] = useState('office coffee catch-up');
+  const [occasionInput, setOccasionInput] = useState(() => t('placeholders.occasionInput'));
   const [uploadError, setUploadError] = useState('');
 
   const handleSaveProfile = () => {
@@ -161,7 +161,7 @@ export function DailyOutfitPage() {
         itemIds: [],
         date: new Date().toISOString().slice(0, 10),
         occasion,
-        notes: 'Logged from Daily Outfit recommendations',
+        notes: t('state.wearLogNote'),
       });
     });
   };

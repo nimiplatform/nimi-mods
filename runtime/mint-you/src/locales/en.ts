@@ -33,7 +33,6 @@ const enLocale = {
     intentDating: 'Looking for romantic connections',
     intentFriendship: 'Looking for meaningful friendships',
     intentSocialExplore: 'Exploring social interactions',
-    'intentSocial-explore': 'Exploring social interactions',
     intentProfessional: 'Building professional networks',
     next: 'Continue',
   },

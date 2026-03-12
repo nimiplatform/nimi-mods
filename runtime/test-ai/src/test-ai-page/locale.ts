@@ -15,8 +15,8 @@ import {
 export type TestAiLocale = typeof enLocale | typeof zhLocale;
 
 export function createInitialImageWorkflowDraftState(
-  prompt: string = zhLocale.image.defaultPrompt,
-  negativePrompt: string = zhLocale.image.defaultNegativePrompt,
+  prompt: string = enLocale.image.defaultPrompt,
+  negativePrompt: string = enLocale.image.defaultNegativePrompt,
 ): ImageWorkflowDraftState {
   return {
     prompt,

@@ -84,8 +84,8 @@ export function EventDetailDrawer(props: EventDetailDrawerProps) {
               }),
             })}
           >
-            <option value="PRIMARY">PRIMARY</option>
-            <option value="SECONDARY">SECONDARY</option>
+            <option value="PRIMARY">{t('eventGraphEditor.primary')}</option>
+            <option value="SECONDARY">{t('eventGraphEditor.secondary')}</option>
           </select>
         </label>
         <label className="text-xs text-gray-700">
@@ -109,9 +109,9 @@ export function EventDetailDrawer(props: EventDetailDrawerProps) {
               });
             }}
           >
-            <option value="PAST">PAST</option>
-            <option value="ONGOING">ONGOING</option>
-            <option value="FUTURE">FUTURE</option>
+            <option value="PAST">{t('eventDetail.horizonPast')}</option>
+            <option value="ONGOING">{t('eventDetail.horizonOngoing')}</option>
+            <option value="FUTURE">{t('eventDetail.horizonFuture')}</option>
           </select>
         </label>
         <label className="text-xs text-gray-700">

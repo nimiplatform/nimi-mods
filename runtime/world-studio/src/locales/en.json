@@ -363,7 +363,10 @@
     "dependencyEventIdsPlaceholder": "event-id-1, event-id-2",
     "addEvidenceFromText": "Add Evidence from Event Text",
     "addEvidenceHint": "Quickly inject summary/cause/process/result as evidence.",
-    "missingEvidence": "PRIMARY events with `PAST` or `ONGOING` horizon require evidence refs."
+    "missingEvidence": "PRIMARY events with `PAST` or `ONGOING` horizon require evidence refs.",
+    "horizonPast": "Past",
+    "horizonOngoing": "Ongoing",
+    "horizonFuture": "Future"
   },
   "evidenceEditor": {
     "title": "Evidence Refs",
@@ -443,8 +446,8 @@
     "moveDown": "Move Down",
     "collapse": "Collapse",
     "expand": "Expand",
-    "primary": "PRIMARY",
-    "secondary": "SECONDARY",
+    "primary": "Primary",
+    "secondary": "Secondary",
     "primaryMissingEvidence": "PRIMARY MISSING EVIDENCE",
     "selected": "SELECTED",
     "primaryEvents": "Primary Events",

@@ -363,7 +363,10 @@
     "dependencyEventIdsPlaceholder": "event-id-1, event-id-2",
     "addEvidenceFromText": "从事件文本补入证据",
     "addEvidenceHint": "可快速把摘要 / 原因 / 过程 / 结果注入为证据。",
-    "missingEvidence": "层级为 PRIMARY 且地平线为 `PAST` 或 `ONGOING` 的事件必须带证据引用。"
+    "missingEvidence": "层级为 PRIMARY 且地平线为 `PAST` 或 `ONGOING` 的事件必须带证据引用。",
+    "horizonPast": "过去",
+    "horizonOngoing": "进行中",
+    "horizonFuture": "未来"
   },
   "evidenceEditor": {
     "title": "证据引用",

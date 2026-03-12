@@ -66,6 +66,7 @@ const zhLocale = {
     colors: '白色、海军蓝',
     styleTags: '极简、通勤',
     material: '棉',
+    occasionInput: '办公室咖啡会面',
   },
   common: {
     uploadFailed: '上传失败',
@@ -99,6 +100,7 @@ const zhLocale = {
     formality: '正式度',
     statusActive: '启用中',
     statusRetired: '已退役',
+    wearLogNote: '来自每日穿搭推荐的记录',
   },
   options: {
     genders: {

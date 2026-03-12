@@ -87,6 +87,12 @@ const enLocale = {
   },
   Compatibility: {
     title: 'Compatibility',
+    comingSoonHint: 'The compatibility ritual is still sealed — it will be available once the star tracks align.',
+    ritualTitle: 'Not Yet Revealed',
+    ritualLine1Pre: 'The compatibility ritual is currently ',
+    ritualLine1Highlight: 'sealed',
+    ritualLine1Post: '.',
+    ritualLine2: 'This feature will open once the star tracks align. At that time, you can derive five-element compatibility from confirmed natal profiles.',
     savedProfiles: 'Local Profiles',
     manualMode: 'Manual target input',
     targetTitle: 'Target Birth Intake',
@@ -154,6 +160,10 @@ const enLocale = {
     chartTitle: 'Life K-Line',
     mapTitle: 'City Affinity Map',
     analysisTitle: 'Narrative Analysis',
+    zodiacFortuneTitle: 'Annual Fortune Cycle',
+    zodiac_wealth: 'Wealth',
+    zodiac_relationship: 'Relationship',
+    zodiac_career: 'Career',
   },
   AnalysisReport: {
     summary: 'Overall',

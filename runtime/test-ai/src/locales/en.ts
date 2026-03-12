@@ -115,6 +115,7 @@ const enLocale = {
     precise: 'Precise',
     creative: 'Creative',
     maxTokens: 'Max Tokens',
+    maxTokensAuto: 'Auto',
     models: 'Models',
     noModelData: 'No model options available yet.',
     connectorModelDataMissing: 'Connector catalog is missing model data.',

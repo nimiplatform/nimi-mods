@@ -66,6 +66,7 @@ const enLocale = {
     colors: 'white, navy',
     styleTags: 'minimal, business',
     material: 'cotton',
+    occasionInput: 'office coffee catch-up',
   },
   common: {
     uploadFailed: 'Upload failed',
@@ -99,6 +100,7 @@ const enLocale = {
     formality: 'formality',
     statusActive: 'active',
     statusRetired: 'retired',
+    wearLogNote: 'Logged from Daily Outfit recommendations',
   },
   options: {
     genders: {

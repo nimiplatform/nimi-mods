@@ -64,7 +64,7 @@ export function TextGeneratePanel(props: TextGeneratePanelProps) {
   const temperatureValue = Number.isFinite(Number(temperature))
     ? Math.max(0, Math.min(2, Number(temperature)))
     : 1;
-  const quickTokenOptions = ['Auto', '1024', '2048', '4096'] as const;
+  const quickTokenOptions = ['auto', '1024', '2048', '4096'] as const;
   const modelMenuOptions = modelOptions.length > 0 ? modelOptions : (activeModel ? [activeModel] : []);
   const modelDisplayName = activeModel || effectiveBinding?.model || effectiveBinding?.modelId || locale.route.selectModel;
   const sourceOptions: RouteSelectOption[] = [
@@ -306,17 +306,18 @@ export function TextGeneratePanel(props: TextGeneratePanelProps) {
                     <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400">{locale.textGenerate.maxTokens}</div>
                     <div className="flex flex-wrap gap-2">
                       {quickTokenOptions.map((option) => {
-                        const active = option === 'Auto' ? !asString(maxTokens) : maxTokens === option;
+                        const isAuto = option === 'auto';
+                        const active = isAuto ? !asString(maxTokens) : maxTokens === option;
                         return (
                           <button
                             key={option}
                             type="button"
-                            onClick={() => setMaxTokens(option === 'Auto' ? '' : option)}
+                            onClick={() => setMaxTokens(isAuto ? '' : option)}
                             className={active
                               ? 'rounded-full bg-[#111827] px-3 py-1.5 text-xs text-white'
                               : 'rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 transition hover:border-gray-300 hover:text-gray-900'}
                           >
-                            {option}
+                            {isAuto ? locale.textGenerate.maxTokensAuto : option}
                           </button>
                         );
                       })}

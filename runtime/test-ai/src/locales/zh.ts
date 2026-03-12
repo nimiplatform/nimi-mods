@@ -115,6 +115,7 @@ const zhLocale = {
     precise: '更严谨',
     creative: '更发散',
     maxTokens: '最大 Token',
+    maxTokensAuto: '自动',
     models: '模型',
     noModelData: '暂时还没有可选模型。',
     connectorModelDataMissing: '连接器目录缺少模型数据。',

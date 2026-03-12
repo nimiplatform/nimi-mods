@@ -72,7 +72,7 @@ function RouteChip({ label, value }: { label: string; value: RouteDisplay }) {
   const sourceLabel = value.source === 'auto' ? t('common.autoRoute')
     : value.source === 'cloud' ? t('common.cloud')
     : t('common.local');
-  const modelLabel = value.model || '(auto)';
+  const modelLabel = value.model || t('common.auto');
 
   return (
     <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-1 text-[11px] text-gray-600">
