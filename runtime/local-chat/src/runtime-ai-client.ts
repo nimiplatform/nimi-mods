@@ -1,5 +1,11 @@
-import type { ModRuntimeClient, ModRuntimeResolvedBinding } from '@nimiplatform/sdk/mod/runtime';
+import {
+  buildLocalImageWorkflowExtensions,
+  type ModRuntimeClient,
+  type ModRuntimeLocalArtifactRecord,
+  type ModRuntimeResolvedBinding,
+} from '@nimiplatform/sdk/mod/runtime';
 import type { RuntimeCanonicalCapability, RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
+import { emitLocalChatLog } from './logging.js';
 
 type LocalChatFinishReason =
   | 'stop'
@@ -31,6 +37,7 @@ export type LocalChatAiImageRequest = LocalChatAiRouteInput & {
   model?: string;
   referenceImages?: string[];
   extensions?: Record<string, unknown>;
+  timeoutMs?: number;
 };
 
 export type LocalChatAiVideoRequest = LocalChatAiRouteInput & {
@@ -153,6 +160,184 @@ function resolveCapability(
   fallback: RuntimeCanonicalCapability = 'text.generate',
 ): RuntimeCanonicalCapability {
   return capability || fallback;
+}
+
+const LOCAL_CHAT_LOCAL_IMAGE_MODEL_ID = 'z_image_turbo';
+const LOCAL_CHAT_LOCAL_IMAGE_FAMILY = 'z-image';
+const LOCAL_CHAT_LOCAL_IMAGE_SIZE = '512x512';
+const LOCAL_CHAT_LOCAL_IMAGE_STEP = 8;
+const LOCAL_CHAT_LOCAL_IMAGE_TIMEOUT_MS = 600_000;
+
+function normalizeLocalImageModelId(value: unknown): string {
+  let normalized = String(value ?? '').trim().toLowerCase();
+  if (normalized.startsWith('localai/')) normalized = normalized.slice('localai/'.length).trim();
+  if (normalized.startsWith('local/')) normalized = normalized.slice('local/'.length).trim();
+  return normalized;
+}
+
+function metadataString(metadata: Record<string, unknown> | undefined, key: string): string {
+  if (!metadata) return '';
+  const direct = metadata[key];
+  if (typeof direct === 'string') {
+    return direct.trim();
+  }
+  if (direct && typeof direct === 'object') {
+    const record = direct as Record<string, unknown>;
+    if (typeof record.stringValue === 'string') {
+      return record.stringValue.trim();
+    }
+    const kind = record.kind;
+    if (kind && typeof kind === 'object') {
+      const kindRecord = kind as Record<string, unknown>;
+      if (kindRecord.oneofKind === 'stringValue' && typeof kindRecord.stringValue === 'string') {
+        return kindRecord.stringValue.trim();
+      }
+    }
+  }
+  const fields = metadata.fields;
+  if (fields && typeof fields === 'object') {
+    return metadataString(fields as Record<string, unknown>, key);
+  }
+  return '';
+}
+
+function isSelectableLocalArtifact(artifact: ModRuntimeLocalArtifactRecord): boolean {
+  return artifact.status === 'active' || artifact.status === 'installed';
+}
+
+function localArtifactSortValue(artifact: ModRuntimeLocalArtifactRecord): [number, number, string] {
+  const familyPriority = metadataString(artifact.metadata, 'family').toLowerCase() === LOCAL_CHAT_LOCAL_IMAGE_FAMILY
+    ? 0
+    : 1;
+  const statusPriority = artifact.status === 'active'
+    ? 0
+    : artifact.status === 'installed'
+      ? 1
+      : 9;
+  return [familyPriority, statusPriority, artifact.artifactId];
+}
+
+function pickLocalImageCompanionArtifact(
+  artifacts: ModRuntimeLocalArtifactRecord[],
+  kind: 'vae' | 'llm',
+): ModRuntimeLocalArtifactRecord | null {
+  const matches = artifacts
+    .filter((artifact) => artifact.engine.toLowerCase() === 'localai')
+    .filter(isSelectableLocalArtifact)
+    .filter((artifact) => artifact.kind === kind)
+    .sort((left, right) => {
+      const leftKey = localArtifactSortValue(left);
+      const rightKey = localArtifactSortValue(right);
+      if (leftKey[0] !== rightKey[0]) return leftKey[0] - rightKey[0];
+      if (leftKey[1] !== rightKey[1]) return leftKey[1] - rightKey[1];
+      return leftKey[2].localeCompare(rightKey[2]);
+    });
+  return matches[0] || null;
+}
+
+function shouldInjectLocalImageWorkflow(input: {
+  route: Awaited<ReturnType<LocalChatAiClient['resolveRoute']>>;
+  requestedModel?: string;
+}): boolean {
+  if (input.route.source !== 'local') return false;
+  const resolvedModel = normalizeLocalImageModelId(
+    input.requestedModel
+    || input.route.model
+    || input.route.modelId
+    || input.route.localModelId,
+  );
+  if (resolvedModel !== LOCAL_CHAT_LOCAL_IMAGE_MODEL_ID) {
+    return false;
+  }
+  const engine = String(input.route.engine || input.route.provider || '').trim().toLowerCase();
+  return !engine || engine === 'localai' || engine === 'local';
+}
+
+async function resolveLocalImageExtensions(input: {
+  runtimeClient: ModRuntimeClient;
+  route: Awaited<ReturnType<LocalChatAiClient['resolveRoute']>>;
+  requestedModel?: string;
+  extensions?: Record<string, unknown>;
+}): Promise<Record<string, unknown> | undefined> {
+  if (!shouldInjectLocalImageWorkflow({
+    route: input.route,
+    requestedModel: input.requestedModel,
+  })) {
+    return input.extensions;
+  }
+
+  emitLocalChatLog({
+    level: 'debug',
+    message: 'local-chat:image-localai-workflow:inject:start',
+    details: {
+      routeSource: input.route.source,
+      provider: input.route.provider,
+      engine: input.route.engine,
+      routeModel: input.route.model,
+      requestedModel: input.requestedModel || '',
+    },
+  });
+
+  const artifacts = await input.runtimeClient.local.listArtifacts({ engine: 'localai' });
+  const vaeArtifact = pickLocalImageCompanionArtifact(artifacts, 'vae');
+  const llmArtifact = pickLocalImageCompanionArtifact(artifacts, 'llm');
+  if (!vaeArtifact || !llmArtifact) {
+    emitLocalChatLog({
+      level: 'error',
+      message: 'local-chat:image-localai-workflow:inject:companions-missing',
+      details: {
+        routeModel: input.route.model,
+        requestedModel: input.requestedModel || '',
+        selectableArtifacts: artifacts
+          .filter(isSelectableLocalArtifact)
+          .map((artifact) => ({
+            artifactId: artifact.artifactId,
+            localArtifactId: artifact.localArtifactId,
+            kind: artifact.kind,
+            status: artifact.status,
+            family: metadataString(artifact.metadata, 'family'),
+          })),
+      },
+    });
+    throw new Error(
+      'Local image route requires installed companion artifacts (VAE and LLM). Verify z_image_ae and qwen3_4b_companion in Runtime and try again.',
+    );
+  }
+
+  const baseExtensions: Record<string, unknown> = {
+    ...(input.extensions || {}),
+    size: LOCAL_CHAT_LOCAL_IMAGE_SIZE,
+  };
+  delete baseExtensions.aspectRatio;
+
+  const resolvedExtensions = buildLocalImageWorkflowExtensions({
+    components: [
+      { slot: 'vae_path', localArtifactId: vaeArtifact.localArtifactId },
+      { slot: 'llm_path', localArtifactId: llmArtifact.localArtifactId },
+    ],
+    profileOverrides: {
+      step: LOCAL_CHAT_LOCAL_IMAGE_STEP,
+    },
+  }, baseExtensions);
+
+  emitLocalChatLog({
+    level: 'info',
+    message: 'local-chat:image-localai-workflow:inject:ready',
+    details: {
+      routeModel: input.route.model,
+      requestedModel: input.requestedModel || '',
+      injectedSize: LOCAL_CHAT_LOCAL_IMAGE_SIZE,
+      injectedStep: LOCAL_CHAT_LOCAL_IMAGE_STEP,
+      vaeArtifactId: vaeArtifact.artifactId,
+      vaeLocalArtifactId: vaeArtifact.localArtifactId,
+      llmArtifactId: llmArtifact.artifactId,
+      llmLocalArtifactId: llmArtifact.localArtifactId,
+      inheritedStyle: typeof baseExtensions.style === 'string' ? baseExtensions.style : '',
+      inheritedQuality: typeof baseExtensions.quality === 'string' ? baseExtensions.quality : '',
+    },
+  });
+
+  return resolvedExtensions;
 }
 
 function createRawTextPreview(text: string): string | null {
@@ -550,43 +735,171 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
     },
     generateImage: async (input) => {
       const route = await resolveRoute(input);
-      const response = await runtimeClient.media.image.generate({
-        prompt: input.prompt,
-        negativePrompt: input.negativePrompt,
-        model: input.model || route.model || undefined,
-        referenceImages: input.referenceImages,
-        binding: input.routeBinding,
-        extensions: input.extensions,
-      });
-      return {
-        images: response.artifacts.map((artifact) => ({
-          uri: artifact.uri || undefined,
-          b64Json: artifact.bytes && artifact.bytes.length > 0 ? encodeBase64(artifact.bytes) : undefined,
-          mimeType: artifact.mimeType || undefined,
-        })),
-        traceId: String(response.trace?.traceId || '').trim(),
+      const useLocalImageWorkflow = shouldInjectLocalImageWorkflow({
         route,
-      };
+        requestedModel: input.model,
+      });
+      const inputTimeoutMs = Number(input.timeoutMs || 0);
+      const resolvedTimeoutMs = useLocalImageWorkflow
+        ? Math.max(
+          Number.isFinite(inputTimeoutMs) && inputTimeoutMs > 0 ? inputTimeoutMs : 0,
+          LOCAL_CHAT_LOCAL_IMAGE_TIMEOUT_MS,
+        )
+        : (Number.isFinite(inputTimeoutMs) && inputTimeoutMs > 0 ? inputTimeoutMs : undefined);
+      try {
+        const extensions = await resolveLocalImageExtensions({
+          runtimeClient,
+          route,
+          requestedModel: input.model,
+          extensions: input.extensions,
+        });
+        emitLocalChatLog({
+          level: 'info',
+          message: 'local-chat:image-generate:request',
+          details: {
+            routeSource: route.source,
+            provider: route.provider,
+            engine: route.engine,
+            routeModel: route.model,
+            requestedModel: input.model || '',
+            promptChars: input.prompt.length,
+            hasNegativePrompt: Boolean(String(input.negativePrompt || '').trim()),
+            hasReferenceImages: Array.isArray(input.referenceImages) && input.referenceImages.length > 0,
+            extensionKeys: Object.keys(extensions || {}),
+            size: typeof extensions?.size === 'string' ? extensions.size : '',
+            aspectRatio: typeof extensions?.aspectRatio === 'string' ? extensions.aspectRatio : '',
+            style: typeof extensions?.style === 'string' ? extensions.style : '',
+            quality: typeof extensions?.quality === 'string' ? extensions.quality : '',
+            componentCount: Array.isArray(extensions?.components) ? extensions.components.length : 0,
+            profileOverrides: extensions?.profile_overrides && typeof extensions.profile_overrides === 'object'
+              ? extensions.profile_overrides
+              : null,
+            timeoutMs: resolvedTimeoutMs || 0,
+            dispatchModel: route.source === 'local'
+              ? (route.model || input.model || '')
+              : (input.model || route.model || ''),
+          },
+        });
+        const resolvedImageModel = route.source === 'local'
+          ? (route.model || input.model || undefined)
+          : (input.model || route.model || undefined);
+        const response = await runtimeClient.media.image.generate({
+          prompt: input.prompt,
+          negativePrompt: input.negativePrompt,
+          model: resolvedImageModel,
+          referenceImages: input.referenceImages,
+          binding: input.routeBinding,
+          extensions,
+          timeoutMs: resolvedTimeoutMs,
+        });
+        const traceId = String(response.trace?.traceId || '').trim();
+        emitLocalChatLog({
+          level: 'info',
+          message: 'local-chat:image-generate:response',
+          details: {
+            routeSource: route.source,
+            routeModel: route.model,
+            traceId,
+            artifactCount: response.artifacts.length,
+            mimeTypes: response.artifacts.map((artifact) => String(artifact.mimeType || '').trim()).filter(Boolean),
+          },
+        });
+        return {
+          images: response.artifacts.map((artifact) => ({
+            uri: artifact.uri || undefined,
+            b64Json: artifact.bytes && artifact.bytes.length > 0 ? encodeBase64(artifact.bytes) : undefined,
+            mimeType: artifact.mimeType || undefined,
+          })),
+          traceId,
+          route,
+        };
+      } catch (error) {
+        emitLocalChatLog({
+          level: 'error',
+          message: 'local-chat:image-generate:failed',
+          details: {
+            routeSource: route.source,
+            provider: route.provider,
+            engine: route.engine,
+            routeModel: route.model,
+            requestedModel: input.model || '',
+            error: error instanceof Error ? error.message : String(error || 'unknown error'),
+            reasonCode: (
+              error
+              && typeof error === 'object'
+              && 'reasonCode' in error
+            ) ? String((error as { reasonCode?: unknown }).reasonCode || '') : '',
+          },
+        });
+        throw error;
+      }
     },
     generateVideo: async (input) => {
       const route = await resolveRoute(input);
-      const response = await runtimeClient.media.video.generate({
-        mode: input.mode,
-        prompt: input.prompt,
-        negativePrompt: input.negativePrompt,
-        model: input.model || route.model || undefined,
-        content: input.content,
-        options: input.options,
-        binding: input.routeBinding,
-      });
-      return {
-        videos: response.artifacts.map((artifact) => ({
-          uri: artifact.uri || undefined,
-          mimeType: artifact.mimeType || undefined,
-        })),
-        traceId: String(response.trace?.traceId || '').trim(),
-        route,
-      };
+      try {
+        emitLocalChatLog({
+          level: 'info',
+          message: 'local-chat:video-generate:request',
+          details: {
+            routeSource: route.source,
+            provider: route.provider,
+            engine: route.engine,
+            routeModel: route.model,
+            requestedModel: input.model || '',
+            mode: input.mode,
+            contentCount: Array.isArray(input.content) ? input.content.length : 0,
+            hasPrompt: Boolean(String(input.prompt || '').trim()),
+          },
+        });
+        const response = await runtimeClient.media.video.generate({
+          mode: input.mode,
+          prompt: input.prompt,
+          negativePrompt: input.negativePrompt,
+          model: input.model || route.model || undefined,
+          content: input.content,
+          options: input.options,
+          binding: input.routeBinding,
+        });
+        const traceId = String(response.trace?.traceId || '').trim();
+        emitLocalChatLog({
+          level: 'info',
+          message: 'local-chat:video-generate:response',
+          details: {
+            routeSource: route.source,
+            routeModel: route.model,
+            traceId,
+            artifactCount: response.artifacts.length,
+            mimeTypes: response.artifacts.map((artifact) => String(artifact.mimeType || '').trim()).filter(Boolean),
+          },
+        });
+        return {
+          videos: response.artifacts.map((artifact) => ({
+            uri: artifact.uri || undefined,
+            mimeType: artifact.mimeType || undefined,
+          })),
+          traceId,
+          route,
+        };
+      } catch (error) {
+        emitLocalChatLog({
+          level: 'error',
+          message: 'local-chat:video-generate:failed',
+          details: {
+            routeSource: route.source,
+            provider: route.provider,
+            engine: route.engine,
+            routeModel: route.model,
+            requestedModel: input.model || '',
+            error: error instanceof Error ? error.message : String(error || 'unknown error'),
+            reasonCode: (
+              error
+              && typeof error === 'object'
+              && 'reasonCode' in error
+            ) ? String((error as { reasonCode?: unknown }).reasonCode || '') : '',
+          },
+        });
+        throw error;
+      }
     },
     transcribeAudio: async (input) => {
       const route = await resolveRoute(input);

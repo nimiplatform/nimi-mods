@@ -104,6 +104,10 @@ export function useLocalChatPageState() {
   const aiClient = useMemo(() => createLocalChatAiClient(runtimeClient), [runtimeClient]);
   const runtimeInspector = useMemo(() => createModRuntimeInspector(LOCAL_CHAT_MOD_ID), []);
 
+  useEffect(() => {
+    console.info('[local-chat] media-debug-build active: 2026-03-12-local-image-route-fix');
+  }, []);
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const inputTextRef = useRef('');
   const inputRef = useRef<HTMLTextAreaElement>(null);

@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
+import { emitLocalChatLog } from '../../logging.js';
 import type { ChatMessage } from '../../types.js';
 import type {
   LocalChatDefaultSettings,
@@ -225,6 +226,21 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
     messageMeta: input.messageMeta,
     resolvedRoute,
   })]);
+
+  emitLocalChatLog({
+    level: 'info',
+    message: 'local-chat:media-execution:start',
+    details: {
+      pendingMessageId: intent.pendingMessageId,
+      mediaKind: prepared.spec.kind,
+      intentSource: intent.source,
+      plannerTrigger: intent.plannerTrigger,
+      routeSource: resolvedRoute.source,
+      routeModel: resolvedRoute.model,
+      localModelId: resolvedRoute.localModelId || '',
+      compiledModel: prepared.compiled.runtimePayload.model || '',
+    },
+  });
 
   if (prepared.spec.kind === 'image') {
     const result = await runImageTurn({

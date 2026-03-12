@@ -1,4 +1,5 @@
 import type { LocalChatDefaultSettings } from '../../state/index.js';
+import { emitLocalChatLog } from '../../logging.js';
 import {
   isMediaGenerationAllowed,
   isPromptLikelyNsfw,
@@ -156,7 +157,7 @@ export async function runVideoTurn(input: {
         source: input.resolvedRoute.source,
         connectorId: input.resolvedRoute.connectorId || '',
         model: input.resolvedRoute.model,
-        localModelId: input.resolvedRoute.model,
+        ...(input.resolvedRoute.localModelId ? { localModelId: input.resolvedRoute.localModelId } : {}),
       }
       : await input.aiClient.resolveRoute({
         capability: 'video.generate',
@@ -182,6 +183,18 @@ export async function runVideoTurn(input: {
 
     const pinnedRouteBinding = toPinnedRouteBinding(resolvedRoute);
     const referenceImageUrl = String(input.referenceImageUrl || '').trim();
+    emitLocalChatLog({
+      level: 'info',
+      message: 'local-chat:video-turn:request',
+      details: {
+        routeSource: resolvedRoute.source,
+        routeModel: resolvedRoute.model,
+        localModelId: 'localModelId' in resolvedRoute ? String(resolvedRoute.localModelId || '') : '',
+        requestedModel: pinnedRouteBinding.model || routeConfig.model || '',
+        mode: referenceImageUrl ? 'i2v-reference' : 't2v',
+        hasReferenceImage: Boolean(referenceImageUrl),
+      },
+    });
     const generated = await input.aiClient.generateVideo({
       capability: 'video.generate',
       routeBinding: pinnedRouteBinding,
@@ -237,6 +250,14 @@ export async function runVideoTurn(input: {
       routeModel: String(generated.route.model || '').trim() || undefined,
     };
   } catch (error) {
+    emitLocalChatLog({
+      level: 'error',
+      message: 'local-chat:video-turn:failed',
+      details: {
+        routeSource: resolvedRouteSource,
+        error: error instanceof Error ? error.message : String(error || 'unknown error'),
+      },
+    });
     return {
       status: 'failed',
       reasonCode: 'LOCAL_CHAT_MEDIA_GENERATE_FAILED',

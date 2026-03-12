@@ -13,6 +13,26 @@ export function emitLocalChatLog(options: {
   details?: Record<string, unknown>;
 }): void {
   const { level = 'info', message, flowId, source, costMs, details } = options;
+  if (
+    (message.startsWith('local-chat:image-')
+      || message.startsWith('local-chat:video-')
+      || message.startsWith('local-chat:media-'))
+    && typeof console !== 'undefined'
+  ) {
+    const consoleMethod = level === 'debug'
+      ? console.debug
+      : level === 'warn'
+        ? console.warn
+          : level === 'error'
+            ? console.error
+            : console.info;
+    const prefix = message.startsWith('local-chat:video-')
+      ? '[local-chat:video]'
+      : message.startsWith('local-chat:media-')
+        ? '[local-chat:media]'
+        : '[local-chat:image]';
+    consoleMethod(`${prefix} ${message}`, details || {});
+  }
   try {
     emitRuntimeLog({
       level,

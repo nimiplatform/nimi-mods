@@ -396,3 +396,166 @@ test('local-chat runtime ai client: synthesizeSpeech falls back to unary tts whe
   assert.equal(result.mimeType, 'audio/wav');
   assert.equal(result.traceId, 'trace-unary');
 });
+
+test('local-chat runtime ai client: local z-image route injects companions and fixed local overrides', async () => {
+  const captured: {
+    model?: string;
+    extensions?: Record<string, unknown>;
+    timeoutMs?: number;
+  } = {};
+  let listedArtifactsCount = 0;
+  const runtimeClient = {
+    route: {
+      resolve: async () => ({
+        source: 'local' as const,
+        provider: 'localai',
+        engine: 'localai',
+        model: 'localai/z_image_turbo',
+        localModelId: '01-model',
+        connectorId: '',
+      }),
+    },
+    local: {
+      listArtifacts: async () => {
+        listedArtifactsCount += 1;
+        return [
+          {
+            localArtifactId: 'vae-1',
+            artifactId: 'z_image_ae',
+            kind: 'vae',
+            engine: 'localai',
+            entry: 'vae/diffusion_pytorch_model.safetensors',
+            files: ['vae/diffusion_pytorch_model.safetensors'],
+            license: 'apache-2.0',
+            source: { repo: 'repo', revision: 'main' },
+            hashes: {},
+            status: 'installed',
+            installedAt: '2026-03-12T00:00:00Z',
+            updatedAt: '2026-03-12T00:00:00Z',
+            metadata: { family: 'z-image' },
+          },
+          {
+            localArtifactId: 'llm-1',
+            artifactId: 'qwen3_4b_companion',
+            kind: 'llm',
+            engine: 'localai',
+            entry: 'Qwen3-4B-Q4_K_M.gguf',
+            files: ['Qwen3-4B-Q4_K_M.gguf'],
+            license: 'apache-2.0',
+            source: { repo: 'repo', revision: 'main' },
+            hashes: {},
+            status: 'installed',
+            installedAt: '2026-03-12T00:00:00Z',
+            updatedAt: '2026-03-12T00:00:00Z',
+            metadata: { family: 'z-image' },
+          },
+        ];
+      },
+    },
+    media: {
+      image: {
+        generate: async (input: { model?: string; extensions?: Record<string, unknown>; timeoutMs?: number }) => {
+          captured.model = input.model;
+          captured.extensions = input.extensions;
+          captured.timeoutMs = input.timeoutMs;
+          return {
+            artifacts: [{
+              bytes: Uint8Array.from([1, 2, 3]),
+              mimeType: 'image/png',
+            }],
+            trace: {
+              traceId: 'trace-local-image',
+            },
+          };
+        },
+      },
+    },
+  } as unknown as ModRuntimeClient;
+
+  const aiClient = createLocalChatAiClient(runtimeClient);
+  const result = await aiClient.generateImage({
+    prompt: '生成一张图',
+    routeBinding: {
+      source: 'local',
+      connectorId: '',
+      model: 'z_image_turbo',
+      localModelId: 'z_image_turbo',
+    },
+    extensions: {
+      style: 'photorealistic',
+      aspectRatio: '9:16',
+    },
+  });
+
+  assert.equal(listedArtifactsCount, 1);
+  assert.equal(captured.model, 'localai/z_image_turbo');
+  assert.equal(captured.extensions?.size, '512x512');
+  assert.equal('aspectRatio' in (captured.extensions || {}), false);
+  assert.equal(captured.extensions?.style, 'photorealistic');
+  assert.deepEqual(captured.extensions?.profile_overrides, { step: 8 });
+  assert.deepEqual(captured.extensions?.components, [
+    { slot: 'vae_path', localArtifactId: 'vae-1' },
+    { slot: 'llm_path', localArtifactId: 'llm-1' },
+  ]);
+  assert.equal(captured.timeoutMs, 600_000);
+  assert.equal(result.traceId, 'trace-local-image');
+  assert.equal(result.images.length, 1);
+});
+
+test('local-chat runtime ai client: cloud image route keeps original request payload', async () => {
+  const captured: {
+    model?: string;
+    extensions?: Record<string, unknown>;
+    timeoutMs?: number;
+  } = {};
+  let listedArtifactsCount = 0;
+  const runtimeClient = {
+    route: {
+      resolve: async () => createResolvedRoute(),
+    },
+    local: {
+      listArtifacts: async () => {
+        listedArtifactsCount += 1;
+        return [];
+      },
+    },
+    media: {
+      image: {
+        generate: async (input: { model?: string; extensions?: Record<string, unknown>; timeoutMs?: number }) => {
+          captured.model = input.model;
+          captured.extensions = input.extensions;
+          captured.timeoutMs = input.timeoutMs;
+          return {
+            artifacts: [{
+              uri: 'https://example.com/image.png',
+              mimeType: 'image/png',
+            }],
+            trace: {
+              traceId: 'trace-cloud-image',
+            },
+          };
+        },
+      },
+    },
+  } as unknown as ModRuntimeClient;
+
+  const aiClient = createLocalChatAiClient(runtimeClient);
+  const result = await aiClient.generateImage({
+    prompt: '生成一张云端图',
+    routeBinding: createBinding(),
+    extensions: {
+      size: '1536x1024',
+      style: 'cinematic',
+    },
+  });
+
+  assert.equal(listedArtifactsCount, 0);
+  assert.equal(captured.model, 'gemini-2.5-flash');
+  assert.deepEqual(captured.extensions, {
+    size: '1536x1024',
+    style: 'cinematic',
+  });
+  assert.equal(captured.timeoutMs, undefined);
+  assert.equal(result.traceId, 'trace-cloud-image');
+  assert.equal(result.images[0]?.uri, 'https://example.com/image.png');
+});

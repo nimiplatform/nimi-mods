@@ -158,7 +158,7 @@ export async function runImageTurn(input: {
         source: input.resolvedRoute.source,
         connectorId: input.resolvedRoute.connectorId || '',
         model: input.resolvedRoute.model,
-        localModelId: input.resolvedRoute.model,
+        ...(input.resolvedRoute.localModelId ? { localModelId: input.resolvedRoute.localModelId } : {}),
       }
       : await input.aiClient.resolveRoute({
         capability: 'image.generate',

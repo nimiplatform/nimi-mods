@@ -4,7 +4,7 @@ export type ExplicitMediaRequest = {
   sourceText: string;
 };
 
-const VIDEO_NOUN_RE = /\b(?:video|clip|movie|film|animation|gif)\b|(?:视频|短视频|短片|影片|镜头|动图)/i;
+const VIDEO_NOUN_RE = /\b(?:video|clip|movie|film|animation|gif)\b|(?:视频|短视频|短片|影片|动图)/i;
 const IMAGE_NOUN_RE = /\b(?:image|picture|photo|illustration|artwork|portrait|wallpaper)\b|(?:图片|图|照片|插画|头像|壁纸)/i;
 const REQUEST_VERB_RE = /\b(?:send|show|make|create|generate|draw|render|give)\b|(?:发|给|来|做|生成|画|出|整|弄)/i;
 const DIRECT_REQUEST_RE = /\b(?:can you|could you|please|send me|show me|make me|create me|generate me|draw me|render me)\b|(?:给我|帮我|替我|发我|来个|来一|来段|来张|发张|发个|做个|做张|整点|生成个|生成张|画张)/i;

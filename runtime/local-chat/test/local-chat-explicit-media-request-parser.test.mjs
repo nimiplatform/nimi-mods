@@ -21,6 +21,12 @@ test('explicit media request parser prefers video when both image and video are 
   assert.equal(parsed?.kind, 'video');
 });
 
+test('explicit media request parser keeps photo requests as image when prompt mentions looking at the camera', () => {
+  const parsed = parseExplicitMediaRequest('给我发一张你坐在床边看着镜头的照片');
+  assert.ok(parsed);
+  assert.equal(parsed?.kind, 'image');
+});
+
 test('explicit media request parser ignores negative requests', () => {
   const parsed = parseExplicitMediaRequest('先别发图，也不要做视频');
   assert.equal(parsed, null);
