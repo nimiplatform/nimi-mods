@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { clearModSdkHost, setModSdkHost } from '@nimiplatform/sdk/mod/host';
+import { clearModSdkHost, setModSdkHost } from '../../../shared/testing/mod-sdk-host.js';
 import {
   TEST_AI_NAV_SLOT,
   TEST_AI_ROUTE_SLOT,

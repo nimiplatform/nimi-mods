@@ -3,14 +3,8 @@
   "compilerOptions": {
     "baseUrl": "..",
     "paths": {
-      "@nimiplatform/sdk/mod/utils": [
-        "./scripts/stubs/sdk-mod-utils.ts"
-      ],
-      "@nimiplatform/sdk/mod/logging": [
-        "./scripts/stubs/sdk-mod-logging.ts"
-      ],
-      "@nimiplatform/sdk/mod/runtime-route": [
-        "./scripts/stubs/sdk-mod-runtime-route.ts"
+      "@nimiplatform/sdk/mod": [
+        "./scripts/stubs/sdk-mod.ts"
       ]
     }
   }

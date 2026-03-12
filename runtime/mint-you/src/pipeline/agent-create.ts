@@ -1,227 +1,152 @@
-import type { HookClient } from '@nimiplatform/sdk/mod/types';
-import {
-  MINTYOU_DATA_API_AGENTS_CREATE,
-  MINTYOU_REASON,
-} from '../contracts.js';
+import { MINTYOU_DATA_API_AGENTS_CREATE, MINTYOU_REASON, } from '../contracts.js';
 import { emitMintYouLog } from '../logging.js';
 import { extractCreateAgentId } from '../realm-contract.js';
-import type {
-  BasicInfo,
-  TraitExtractionResult,
-  DnaSynthesisOutput,
-  MintYouResult,
-} from '../types.js';
-import type {
-  DnaPrimaryType,
-  DnaSecondaryTrait,
-  RelationshipMode,
-  FormalityValue,
-  SentimentValue,
-  MbtiValue,
-} from '../contracts.js';
+import type { BasicInfo, TraitExtractionResult, DnaSynthesisOutput, MintYouResult, } from '../types.js';
+import type { DnaPrimaryType, DnaSecondaryTrait, RelationshipMode, FormalityValue, SentimentValue, MbtiValue, } from '../contracts.js';
 import { mintYouMessage } from '../i18n/messages.js';
 import { assembleCreateAgentDto } from './dto-assemble.js';
 import { generateHandle } from '../utils/slug.js';
-
+import { type HookClient } from "@nimiplatform/sdk/mod";
 const MAX_HANDLE_RETRIES = 3;
-
 type AgentCreateInput = {
-  hookClient: HookClient;
-  basicInfo: BasicInfo;
-  traitResult: TraitExtractionResult;
-  dnaSynthesis: DnaSynthesisOutput;
-  interests: string[];
-  worldId: string;
-  referenceImageUrl?: string | null;
-  selfReportedMbti?: MbtiValue | null;
-  traitOverrides?: {
-    dnaPrimary?: DnaPrimaryType;
-    dnaSecondary?: DnaSecondaryTrait[];
-    relationshipMode?: RelationshipMode;
-    formality?: FormalityValue;
-    sentiment?: SentimentValue;
-  } | null;
-  existingAgentId?: string | null;
+    hookClient: HookClient;
+    basicInfo: BasicInfo;
+    traitResult: TraitExtractionResult;
+    dnaSynthesis: DnaSynthesisOutput;
+    interests: string[];
+    worldId: string;
+    referenceImageUrl?: string | null;
+    selfReportedMbti?: MbtiValue | null;
+    traitOverrides?: {
+        dnaPrimary?: DnaPrimaryType;
+        dnaSecondary?: DnaSecondaryTrait[];
+        relationshipMode?: RelationshipMode;
+        formality?: FormalityValue;
+        sentiment?: SentimentValue;
+    } | null;
+    existingAgentId?: string | null;
 };
-
 type AgentCreateResult = {
-  agentId: string;
+    agentId: string;
 };
-
 function isHandleConflictError(error: unknown): boolean {
-  const msg = error instanceof Error ? error.message : String(error || '');
-  return /(\b409\b|conflict|already exists|already taken|duplicate key|handle[_\s-]?(taken|exists|unavailable)|mintyou_handle_unavailable)/i.test(msg);
-}
-
-function isAgentLimitError(error: unknown): boolean {
-  const msg = error instanceof Error ? error.message : String(error || '');
-  return msg.includes('LIMIT') || msg.includes('limit') || msg.includes('maximum');
-}
-
-async function tryCreateAgent(
-  hookClient: HookClient,
-  dto: Record<string, unknown>,
-): Promise<MintYouResult<AgentCreateResult>> {
-  try {
-    const response = await hookClient.data.query({
-      capability: MINTYOU_DATA_API_AGENTS_CREATE,
-      query: dto,
-    });
-
-    const agentId = extractCreateAgentId(response);
-    if (!agentId) {
-      return {
-        ok: false,
-        error: {
-          reasonCode: MINTYOU_REASON.AGENT_CREATE_FAILED,
-          message: mintYouMessage(
-            'Messages.agentCreateMissingId',
-            'Agent creation failed: creator.agents.create returned no agent id.',
-          ),
-          actionHint: mintYouMessage(
-            'Messages.agentCreateMissingIdHint',
-            'Check backend response shape and runtime capability wiring.',
-          ),
-        },
-      };
-    }
-    return { ok: true, data: { agentId } };
-  } catch (error) {
-    if (isHandleConflictError(error)) {
-      return {
-        ok: false,
-        error: {
-          reasonCode: MINTYOU_REASON.HANDLE_UNAVAILABLE,
-          message: mintYouMessage('Messages.handleTaken', 'Handle is already taken.'),
-          actionHint: mintYouMessage('Messages.handleRetrying', 'Retrying automatically with a new handle.'),
-        },
-      };
-    }
-    if (isAgentLimitError(error)) {
-      return {
-        ok: false,
-        error: {
-          reasonCode: MINTYOU_REASON.AGENT_LIMIT_REACHED,
-          message: mintYouMessage(
-            'Messages.agentLimitReached',
-            'You have reached the maximum number of agents (5).',
-          ),
-          actionHint: mintYouMessage(
-            'Messages.agentLimitReachedHint',
-            'Remove an existing agent before creating a new one.',
-          ),
-        },
-      };
-    }
     const msg = error instanceof Error ? error.message : String(error || '');
-    return {
-      ok: false,
-      error: {
-        reasonCode: MINTYOU_REASON.AGENT_CREATE_FAILED,
-        message: mintYouMessage(
-          'Messages.agentCreateFailed',
-          'Agent creation failed: {{detail}}',
-          { detail: msg },
-        ),
-        actionHint: mintYouMessage(
-          'Messages.agentCreateFailedHint',
-          'Check agent creation payload and backend availability.',
-        ),
-      },
-    };
-  }
+    return /(\b409\b|conflict|already exists|already taken|duplicate key|handle[_\s-]?(taken|exists|unavailable)|mintyou_handle_unavailable)/i.test(msg);
 }
-
-export async function createAgent(
-  input: AgentCreateInput,
-): Promise<MintYouResult<AgentCreateResult>> {
-  const {
-    hookClient,
-    basicInfo,
-    traitResult,
-    dnaSynthesis,
-    interests,
-    worldId,
-    referenceImageUrl,
-    selfReportedMbti,
-    traitOverrides,
-    existingAgentId,
-  } = input;
-
-  // Idempotency guard: if already created in this session, return existing
-  if (existingAgentId) {
-    emitMintYouLog({
-      level: 'info',
-      message: 'action:agent-create:idempotent-skip',
-      source: 'createAgent',
-      details: { agentId: existingAgentId },
-    });
-    return { ok: true, data: { agentId: existingAgentId } };
-  }
-
-  // Retry loop: generate handle + create agent, retry on handle conflict
-  for (let attempt = 0; attempt < MAX_HANDLE_RETRIES; attempt++) {
-    const handle = generateHandle(basicInfo.displayName);
-
-    const dto = assembleCreateAgentDto({
-      handle,
-      basicInfo,
-      traitResult,
-      dnaSynthesis,
-      interests,
-      worldId,
-      referenceImageUrl,
-      selfReportedMbti,
-      traitOverrides,
-    });
-
-    const result = await tryCreateAgent(
-      hookClient,
-      dto as unknown as Record<string, unknown>,
-    );
-
-    if (result.ok) {
-      emitMintYouLog({
-        level: 'info',
-        message: 'action:agent-create:done',
-        source: 'createAgent',
-        details: { agentId: result.data.agentId, handle, attempt },
-      });
-      return result;
+function isAgentLimitError(error: unknown): boolean {
+    const msg = error instanceof Error ? error.message : String(error || '');
+    return msg.includes('LIMIT') || msg.includes('limit') || msg.includes('maximum');
+}
+async function tryCreateAgent(hookClient: HookClient, dto: Record<string, unknown>): Promise<MintYouResult<AgentCreateResult>> {
+    try {
+        const response = await hookClient.data.query({
+            capability: MINTYOU_DATA_API_AGENTS_CREATE,
+            query: dto,
+        });
+        const agentId = extractCreateAgentId(response);
+        if (!agentId) {
+            return {
+                ok: false,
+                error: {
+                    reasonCode: MINTYOU_REASON.AGENT_CREATE_FAILED,
+                    message: mintYouMessage('Messages.agentCreateMissingId', 'Agent creation failed: creator.agents.create returned no agent id.'),
+                    actionHint: mintYouMessage('Messages.agentCreateMissingIdHint', 'Check backend response shape and runtime capability wiring.'),
+                },
+            };
+        }
+        return { ok: true, data: { agentId } };
     }
-
-    // Only retry on handle conflict
-    if (result.error.reasonCode !== MINTYOU_REASON.HANDLE_UNAVAILABLE) {
-      emitMintYouLog({
-        level: 'error',
-        message: 'action:agent-create:error',
-        source: 'createAgent',
-        details: { reasonCode: result.error.reasonCode, attempt },
-      });
-      return result;
+    catch (error) {
+        if (isHandleConflictError(error)) {
+            return {
+                ok: false,
+                error: {
+                    reasonCode: MINTYOU_REASON.HANDLE_UNAVAILABLE,
+                    message: mintYouMessage('Messages.handleTaken', 'Handle is already taken.'),
+                    actionHint: mintYouMessage('Messages.handleRetrying', 'Retrying automatically with a new handle.'),
+                },
+            };
+        }
+        if (isAgentLimitError(error)) {
+            return {
+                ok: false,
+                error: {
+                    reasonCode: MINTYOU_REASON.AGENT_LIMIT_REACHED,
+                    message: mintYouMessage('Messages.agentLimitReached', 'You have reached the maximum number of agents (5).'),
+                    actionHint: mintYouMessage('Messages.agentLimitReachedHint', 'Remove an existing agent before creating a new one.'),
+                },
+            };
+        }
+        const msg = error instanceof Error ? error.message : String(error || '');
+        return {
+            ok: false,
+            error: {
+                reasonCode: MINTYOU_REASON.AGENT_CREATE_FAILED,
+                message: mintYouMessage('Messages.agentCreateFailed', 'Agent creation failed: {{detail}}', { detail: msg }),
+                actionHint: mintYouMessage('Messages.agentCreateFailedHint', 'Check agent creation payload and backend availability.'),
+            },
+        };
     }
-
-    emitMintYouLog({
-      level: 'warn',
-      message: 'action:agent-create:handle-conflict-retry',
-      source: 'createAgent',
-      details: { handle, attempt },
-    });
-  }
-
-  return {
-    ok: false,
-    error: {
-      reasonCode: MINTYOU_REASON.HANDLE_UNAVAILABLE,
-      message: mintYouMessage(
-        'Messages.uniqueHandleFailed',
-        'Failed to generate a unique handle after {{attempts}} attempts.',
-        { attempts: MAX_HANDLE_RETRIES },
-      ),
-      actionHint: mintYouMessage(
-        'Messages.uniqueHandleRetryHint',
-        'Retry creation. The system will generate a new handle automatically.',
-      ),
-    },
-  };
+}
+export async function createAgent(input: AgentCreateInput): Promise<MintYouResult<AgentCreateResult>> {
+    const { hookClient, basicInfo, traitResult, dnaSynthesis, interests, worldId, referenceImageUrl, selfReportedMbti, traitOverrides, existingAgentId, } = input;
+    // Idempotency guard: if already created in this session, return existing
+    if (existingAgentId) {
+        emitMintYouLog({
+            level: 'info',
+            message: 'action:agent-create:idempotent-skip',
+            source: 'createAgent',
+            details: { agentId: existingAgentId },
+        });
+        return { ok: true, data: { agentId: existingAgentId } };
+    }
+    // Retry loop: generate handle + create agent, retry on handle conflict
+    for (let attempt = 0; attempt < MAX_HANDLE_RETRIES; attempt++) {
+        const handle = generateHandle(basicInfo.displayName);
+        const dto = assembleCreateAgentDto({
+            handle,
+            basicInfo,
+            traitResult,
+            dnaSynthesis,
+            interests,
+            worldId,
+            referenceImageUrl,
+            selfReportedMbti,
+            traitOverrides,
+        });
+        const result = await tryCreateAgent(hookClient, dto as unknown as Record<string, unknown>);
+        if (result.ok) {
+            emitMintYouLog({
+                level: 'info',
+                message: 'action:agent-create:done',
+                source: 'createAgent',
+                details: { agentId: result.data.agentId, handle, attempt },
+            });
+            return result;
+        }
+        // Only retry on handle conflict
+        if (result.error.reasonCode !== MINTYOU_REASON.HANDLE_UNAVAILABLE) {
+            emitMintYouLog({
+                level: 'error',
+                message: 'action:agent-create:error',
+                source: 'createAgent',
+                details: { reasonCode: result.error.reasonCode, attempt },
+            });
+            return result;
+        }
+        emitMintYouLog({
+            level: 'warn',
+            message: 'action:agent-create:handle-conflict-retry',
+            source: 'createAgent',
+            details: { handle, attempt },
+        });
+    }
+    return {
+        ok: false,
+        error: {
+            reasonCode: MINTYOU_REASON.HANDLE_UNAVAILABLE,
+            message: mintYouMessage('Messages.uniqueHandleFailed', 'Failed to generate a unique handle after {{attempts}} attempts.', { attempts: MAX_HANDLE_RETRIES }),
+            actionHint: mintYouMessage('Messages.uniqueHandleRetryHint', 'Retry creation. The system will generate a new handle automatically.'),
+        },
+    };
 }
