@@ -46,5 +46,5 @@
 ## 3. No Over-Design Guard
 
 - `LC-DOM-020`: No direct provider private audio/text endpoint contract.
-- `LC-DOM-021`: No import from `@nimiplatform/sdk/mod/host` in business paths.
+- `LC-DOM-021`: No host wiring import in business paths.
 - `LC-DOM-022`: No UI-only protocol bypass of registered hook capabilities.

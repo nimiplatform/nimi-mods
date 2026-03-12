@@ -9,8 +9,8 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { createNimiAiProvider } from '@nimiplatform/sdk/ai-provider';
-import { Runtime, createRuntimeClient } from '@nimiplatform/sdk';
-import { clearModSdkHost, setModSdkHost } from '@nimiplatform/sdk/mod/host';
+import { Runtime, createRuntimeClient } from '@nimiplatform/sdk/runtime';
+import { clearModSdkHost, setModSdkHost } from '../../../shared/testing/mod-sdk-host.js';
 import { runTextTurn } from '../src/hooks/turn-send/text-turn-runner.ts';
 
 type LiveProviderConfig = {

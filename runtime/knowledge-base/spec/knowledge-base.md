@@ -82,6 +82,6 @@ knowledge-base/
 |-------|-----------|
 | UI | React 19 + Tailwind 4 + Radix UI (Dialog, Progress, Tooltip) |
 | State | Zustand + IndexedDB (`knowledge-base-db` v1) |
-| AI | `@nimiplatform/sdk/mod/runtime` (`runtime.ai.text.generate/stream`, `runtime.ai.embedding.generate`) |
+| AI | `@nimiplatform/sdk/mod` (`runtime.ai.text.generate/stream`, `runtime.ai.embedding.generate`) |
 | Vector Search | In-memory cosine similarity (VectorStore class) |
 | Routing | Tab-based (Documents / Chat / Settings) via Zustand `activeTab` |

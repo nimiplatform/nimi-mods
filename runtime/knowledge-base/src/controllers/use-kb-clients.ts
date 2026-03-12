@@ -1,264 +1,208 @@
 // ---------------------------------------------------------------------------
 // Client factory hook — creates SDK clients, route snapshots, and adapters
 // ---------------------------------------------------------------------------
-
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { createHookClient } from '@nimiplatform/sdk/mod/hook';
-import { createModRuntimeClient, type ModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
-import type { HookClient } from '@nimiplatform/sdk/mod/types';
-import {
-  parseRuntimeRouteOptions,
-  type RuntimeRouteBinding,
-  type RuntimeRouteOptionsSnapshot,
-} from '@nimiplatform/sdk/mod/runtime-route';
 import { KB_MOD_ID } from '../contracts.js';
 import { createLlmClientAdapter } from '../adapters/llm-adapter.js';
 import { createEmbeddingClientAdapter } from '../adapters/embedding-adapter.js';
 import type { LlmClient, EmbeddingClient, KBSettings, KBRoutePreference } from '../types.js';
 import { createKBFlowId, emitKBLog } from '../logging.js';
-
+import { createHookClient, createModRuntimeClient, type ModRuntimeClient, type HookClient, parseRuntimeRouteOptions, type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot } from "@nimiplatform/sdk/mod";
 type RouteCapability = 'text.generate' | 'text.embed';
-
 export function useHookClient(): HookClient {
-  return useMemo(() => createHookClient(KB_MOD_ID), []);
+    return useMemo(() => createHookClient(KB_MOD_ID), []);
 }
-
 export function useRuntimeClient(): ModRuntimeClient {
-  return useMemo(() => createModRuntimeClient(KB_MOD_ID), []);
+    return useMemo(() => createModRuntimeClient(KB_MOD_ID), []);
 }
-
 function asString(value: unknown): string {
-  return String(value || '').trim();
+    return String(value || '').trim();
 }
-
-function ensureRouteOptionsSnapshotShape(
-  snapshot: RuntimeRouteOptionsSnapshot | null,
-): RuntimeRouteOptionsSnapshot | null {
-  if (!snapshot) {
-    return null;
-  }
-  return {
-    ...snapshot,
-    local: {
-      models: snapshot.local?.models || [],
-      defaultEndpoint: snapshot.local?.defaultEndpoint,
-    },
-    connectors: Array.isArray(snapshot.connectors) ? snapshot.connectors : [],
-  };
-}
-
-function resolveTokenApiBindingFromOptions(
-  options: RuntimeRouteOptionsSnapshot | null,
-  preferredConnectorId: string,
-  preferredModel: string,
-): RuntimeRouteBinding | undefined {
-  if (!options) return undefined;
-  const targetConnectorId = asString(preferredConnectorId);
-  const selectedConnectorId = options.selected.source === 'cloud'
-    ? asString(options.selected.connectorId)
-    : '';
-  const connector = (
-    (targetConnectorId ? options.connectors.find((item) => item.id === targetConnectorId) : null)
-    || (selectedConnectorId ? options.connectors.find((item) => item.id === selectedConnectorId) : null)
-    || options.connectors[0]
-    || null
-  );
-  const connectorId = asString(connector?.id || targetConnectorId || selectedConnectorId);
-
-  const preferred = asString(preferredModel);
-  const selectedModel = options.selected.source === 'cloud'
-    ? asString(options.selected.model)
-    : '';
-  const connectorModels = connector?.models || [];
-  const model = (
-    (preferred && (connectorModels.length === 0 || connectorModels.includes(preferred)) ? preferred : '')
-    || (selectedModel && (connectorModels.length === 0 || connectorModels.includes(selectedModel)) ? selectedModel : '')
-    || asString(connectorModels[0])
-    || preferred
-    || selectedModel
-  );
-
-  if (!connectorId || !model) {
-    return undefined;
-  }
-
-  return {
-    source: 'cloud',
-    connectorId,
-    model,
-  };
-}
-
-function resolveLocalRuntimeBindingFromOptions(
-  options: RuntimeRouteOptionsSnapshot | null,
-  preferredModel: string,
-): RuntimeRouteBinding | undefined {
-  if (!options) return undefined;
-  const targetModel = asString(preferredModel);
-  const selectedModel = options?.selected.source === 'local'
-    ? asString(options.selected.model)
-    : '';
-  const localModels = options?.local?.models || [];
-  const matchedModel = localModels.find((item) => {
-    const model = asString(item.model);
-    const localModelId = asString(item.localModelId);
-    return (targetModel && (model === targetModel || localModelId === targetModel))
-      || (selectedModel && (model === selectedModel || localModelId === selectedModel));
-  }) || null;
-  const fallbackModel = matchedModel || localModels[0] || null;
-  const model = asString(matchedModel?.model || targetModel || selectedModel || fallbackModel?.model);
-  const localModelId = asString(matchedModel?.localModelId || fallbackModel?.localModelId);
-  if (!model) {
-    return undefined;
-  }
-  return {
-    source: 'local',
-    connectorId: '',
-    model,
-    ...(localModelId ? { localModelId } : {}),
-    ...(asString(fallbackModel?.engine) ? { engine: asString(fallbackModel?.engine) } : {}),
-  };
-}
-
-function resolveConfiguredBinding(
-  preference: KBRoutePreference,
-  options: RuntimeRouteOptionsSnapshot | null,
-): RuntimeRouteBinding | undefined {
-  if (preference.source === 'auto') return undefined;
-  if (preference.source === 'cloud') {
-    return resolveTokenApiBindingFromOptions(options, preference.connectorId, preference.model);
-  }
-  return resolveLocalRuntimeBindingFromOptions(options, preference.model);
-}
-
-export function useKBClients(
-  runtimeClient: ModRuntimeClient,
-  settings: KBSettings,
-) {
-  const [chatRouteOptions, setChatRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
-  const [embeddingRouteOptions, setEmbeddingRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
-
-  const loadRouteOptions = useCallback(async (capability: RouteCapability): Promise<RuntimeRouteOptionsSnapshot | null> => {
-    const flowId = createKBFlowId(`route-options-${capability}`);
-    try {
-      const options = ensureRouteOptionsSnapshotShape(
-        parseRuntimeRouteOptions(await runtimeClient.route.listOptions({ capability }), {
-          includeResolvedDefault: true,
-        }),
-      );
-      if (!options) {
-        throw new Error('KB_ROUTE_OPTIONS_INVALID');
-      }
-
-      emitKBLog({
-        level: 'info',
-        message: 'route-options:loaded',
-        flowId,
-        source: 'useKBClients.loadRouteOptions',
-        details: {
-          capability,
-          selectedSource: options.selected.source,
-          selectedConnectorId: options.selected.connectorId || null,
-          selectedModel: options.selected.model || null,
-          connectorsCount: options.connectors.length,
-          localModelsCount: options.local?.models.length || 0,
-        },
-      });
-      if (capability === 'text.generate') {
-        setChatRouteOptions(options);
-      } else {
-        setEmbeddingRouteOptions(options);
-      }
-      return options;
-    } catch (error) {
-      emitKBLog({
-        level: 'warn',
-        message: 'route-options:query-failed',
-        flowId,
-        source: 'useKBClients.loadRouteOptions',
-        details: {
-          capability,
-          error: error instanceof Error ? error.message : String(error || ''),
-        },
-      });
-      if (capability === 'text.generate') {
-        setChatRouteOptions(null);
-      } else {
-        setEmbeddingRouteOptions(null);
-      }
-      return null;
+function ensureRouteOptionsSnapshotShape(snapshot: RuntimeRouteOptionsSnapshot | null): RuntimeRouteOptionsSnapshot | null {
+    if (!snapshot) {
+        return null;
     }
-  }, [runtimeClient]);
-
-  const refreshRouteOptions = useCallback(async () => {
-    await Promise.all([
-      loadRouteOptions('text.generate'),
-      loadRouteOptions('text.embed'),
+    return {
+        ...snapshot,
+        local: {
+            models: snapshot.local?.models || [],
+            defaultEndpoint: snapshot.local?.defaultEndpoint,
+        },
+        connectors: Array.isArray(snapshot.connectors) ? snapshot.connectors : [],
+    };
+}
+function resolveTokenApiBindingFromOptions(options: RuntimeRouteOptionsSnapshot | null, preferredConnectorId: string, preferredModel: string): RuntimeRouteBinding | undefined {
+    if (!options)
+        return undefined;
+    const targetConnectorId = asString(preferredConnectorId);
+    const selectedConnectorId = options.selected.source === 'cloud'
+        ? asString(options.selected.connectorId)
+        : '';
+    const connector = ((targetConnectorId ? options.connectors.find((item) => item.id === targetConnectorId) : null)
+        || (selectedConnectorId ? options.connectors.find((item) => item.id === selectedConnectorId) : null)
+        || options.connectors[0]
+        || null);
+    const connectorId = asString(connector?.id || targetConnectorId || selectedConnectorId);
+    const preferred = asString(preferredModel);
+    const selectedModel = options.selected.source === 'cloud'
+        ? asString(options.selected.model)
+        : '';
+    const connectorModels = connector?.models || [];
+    const model = ((preferred && (connectorModels.length === 0 || connectorModels.includes(preferred)) ? preferred : '')
+        || (selectedModel && (connectorModels.length === 0 || connectorModels.includes(selectedModel)) ? selectedModel : '')
+        || asString(connectorModels[0])
+        || preferred
+        || selectedModel);
+    if (!connectorId || !model) {
+        return undefined;
+    }
+    return {
+        source: 'cloud',
+        connectorId,
+        model,
+    };
+}
+function resolveLocalRuntimeBindingFromOptions(options: RuntimeRouteOptionsSnapshot | null, preferredModel: string): RuntimeRouteBinding | undefined {
+    if (!options)
+        return undefined;
+    const targetModel = asString(preferredModel);
+    const selectedModel = options?.selected.source === 'local'
+        ? asString(options.selected.model)
+        : '';
+    const localModels = options?.local?.models || [];
+    const matchedModel = localModels.find((item) => {
+        const model = asString(item.model);
+        const localModelId = asString(item.localModelId);
+        return (targetModel && (model === targetModel || localModelId === targetModel))
+            || (selectedModel && (model === selectedModel || localModelId === selectedModel));
+    }) || null;
+    const fallbackModel = matchedModel || localModels[0] || null;
+    const model = asString(matchedModel?.model || targetModel || selectedModel || fallbackModel?.model);
+    const localModelId = asString(matchedModel?.localModelId || fallbackModel?.localModelId);
+    if (!model) {
+        return undefined;
+    }
+    return {
+        source: 'local',
+        connectorId: '',
+        model,
+        ...(localModelId ? { localModelId } : {}),
+        ...(asString(fallbackModel?.engine) ? { engine: asString(fallbackModel?.engine) } : {}),
+    };
+}
+function resolveConfiguredBinding(preference: KBRoutePreference, options: RuntimeRouteOptionsSnapshot | null): RuntimeRouteBinding | undefined {
+    if (preference.source === 'auto')
+        return undefined;
+    if (preference.source === 'cloud') {
+        return resolveTokenApiBindingFromOptions(options, preference.connectorId, preference.model);
+    }
+    return resolveLocalRuntimeBindingFromOptions(options, preference.model);
+}
+export function useKBClients(runtimeClient: ModRuntimeClient, settings: KBSettings) {
+    const [chatRouteOptions, setChatRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
+    const [embeddingRouteOptions, setEmbeddingRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
+    const loadRouteOptions = useCallback(async (capability: RouteCapability): Promise<RuntimeRouteOptionsSnapshot | null> => {
+        const flowId = createKBFlowId(`route-options-${capability}`);
+        try {
+            const options = ensureRouteOptionsSnapshotShape(parseRuntimeRouteOptions(await runtimeClient.route.listOptions({ capability }), {
+                includeResolvedDefault: true,
+            }));
+            if (!options) {
+                throw new Error('KB_ROUTE_OPTIONS_INVALID');
+            }
+            emitKBLog({
+                level: 'info',
+                message: 'route-options:loaded',
+                flowId,
+                source: 'useKBClients.loadRouteOptions',
+                details: {
+                    capability,
+                    selectedSource: options.selected.source,
+                    selectedConnectorId: options.selected.connectorId || null,
+                    selectedModel: options.selected.model || null,
+                    connectorsCount: options.connectors.length,
+                    localModelsCount: options.local?.models.length || 0,
+                },
+            });
+            if (capability === 'text.generate') {
+                setChatRouteOptions(options);
+            }
+            else {
+                setEmbeddingRouteOptions(options);
+            }
+            return options;
+        }
+        catch (error) {
+            emitKBLog({
+                level: 'warn',
+                message: 'route-options:query-failed',
+                flowId,
+                source: 'useKBClients.loadRouteOptions',
+                details: {
+                    capability,
+                    error: error instanceof Error ? error.message : String(error || ''),
+                },
+            });
+            if (capability === 'text.generate') {
+                setChatRouteOptions(null);
+            }
+            else {
+                setEmbeddingRouteOptions(null);
+            }
+            return null;
+        }
+    }, [runtimeClient]);
+    const refreshRouteOptions = useCallback(async () => {
+        await Promise.all([
+            loadRouteOptions('text.generate'),
+            loadRouteOptions('text.embed'),
+        ]);
+    }, [loadRouteOptions]);
+    useEffect(() => {
+        void refreshRouteOptions();
+        const timer = setInterval(() => {
+            void refreshRouteOptions();
+        }, 15000);
+        return () => clearInterval(timer);
+    }, [refreshRouteOptions]);
+    const configuredChatBinding = useMemo(() => resolveConfiguredBinding({
+        source: settings.chatRouteSource,
+        connectorId: settings.chatConnectorId,
+        model: settings.chatModel,
+    }, chatRouteOptions), [settings.chatRouteSource, settings.chatConnectorId, settings.chatModel, chatRouteOptions]);
+    const configuredEmbeddingBinding = useMemo(() => resolveConfiguredBinding({
+        source: settings.embeddingRouteSource,
+        connectorId: settings.embeddingConnectorId,
+        model: settings.embeddingModel,
+    }, embeddingRouteOptions), [
+        settings.embeddingRouteSource,
+        settings.embeddingConnectorId,
+        settings.embeddingModel,
+        embeddingRouteOptions,
     ]);
-  }, [loadRouteOptions]);
-
-  useEffect(() => {
-    void refreshRouteOptions();
-    const timer = setInterval(() => {
-      void refreshRouteOptions();
-    }, 15000);
-    return () => clearInterval(timer);
-  }, [refreshRouteOptions]);
-
-  const configuredChatBinding = useMemo(
-    () => resolveConfiguredBinding({
-      source: settings.chatRouteSource,
-      connectorId: settings.chatConnectorId,
-      model: settings.chatModel,
-    }, chatRouteOptions),
-    [settings.chatRouteSource, settings.chatConnectorId, settings.chatModel, chatRouteOptions],
-  );
-
-  const configuredEmbeddingBinding = useMemo(
-    () => resolveConfiguredBinding({
-      source: settings.embeddingRouteSource,
-      connectorId: settings.embeddingConnectorId,
-      model: settings.embeddingModel,
-    }, embeddingRouteOptions),
-    [
-      settings.embeddingRouteSource,
-      settings.embeddingConnectorId,
-      settings.embeddingModel,
-      embeddingRouteOptions,
-    ],
-  );
-
-  const llmClient: LlmClient = useMemo(
-    () => createLlmClientAdapter(runtimeClient, {
-      resolveRoute: () => ({
-        binding: configuredChatBinding || chatRouteOptions?.selected,
-      }),
-    }),
-    [
-      runtimeClient,
-      configuredChatBinding,
-      chatRouteOptions,
-    ],
-  );
-
-  const embeddingClient: EmbeddingClient = useMemo(
-    () => createEmbeddingClientAdapter(runtimeClient, {
-      resolveRoute: () => ({
-        binding: configuredEmbeddingBinding || embeddingRouteOptions?.selected,
-      }),
-    }),
-    [
-      runtimeClient,
-      configuredEmbeddingBinding,
-      embeddingRouteOptions,
-    ],
-  );
-
-  return {
-    llmClient,
-    embeddingClient,
-    chatRouteOptions,
-    embeddingRouteOptions,
-    refreshRouteOptions,
-  };
+    const llmClient: LlmClient = useMemo(() => createLlmClientAdapter(runtimeClient, {
+        resolveRoute: () => ({
+            binding: configuredChatBinding || chatRouteOptions?.selected,
+        }),
+    }), [
+        runtimeClient,
+        configuredChatBinding,
+        chatRouteOptions,
+    ]);
+    const embeddingClient: EmbeddingClient = useMemo(() => createEmbeddingClientAdapter(runtimeClient, {
+        resolveRoute: () => ({
+            binding: configuredEmbeddingBinding || embeddingRouteOptions?.selected,
+        }),
+    }), [
+        runtimeClient,
+        configuredEmbeddingBinding,
+        embeddingRouteOptions,
+    ]);
+    return {
+        llmClient,
+        embeddingClient,
+        chatRouteOptions,
+        embeddingRouteOptions,
+        refreshRouteOptions,
+    };
 }

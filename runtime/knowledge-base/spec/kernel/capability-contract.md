@@ -22,7 +22,7 @@ KB mod 消费三种 runtime 能力：
 - `runtime.ai.text.stream`：RAG 流式回答生成。
 - `runtime.ai.embedding.generate`：chunk embedding + query embedding。
 
-调用入口统一为 `@nimiplatform/sdk/mod/runtime`（`createModRuntimeClient`）。
+调用入口统一为 `@nimiplatform/sdk/mod`（`createModRuntimeClient`）。
 
 路由策略：
 - Chat route：`auto`（cloud-first）| `cloud` | `local`，由 `KBSettings.chatRouteSource` 控制。

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { clearModSdkHost, setModSdkHost } from '@nimiplatform/sdk/mod/host';
+import { clearModSdkHost, setModSdkHost } from '../../../shared/testing/mod-sdk-host.js';
 
 import {
   resetTextTurnStreamHealthForTests,

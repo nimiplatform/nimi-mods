@@ -8,7 +8,10 @@ Capability registry in `tables/capabilities.yaml` must match manifest and runtim
 
 ## LC-CAP-002 Allowed SDK Surfaces
 
-Local-Chat business paths may use only stable `@nimiplatform/sdk/mod/*` exports.
+Local-Chat business paths may use only the stable mod SDK surface:
+- `@nimiplatform/sdk/mod`
+- `@nimiplatform/sdk/mod/shell`
+- `@nimiplatform/sdk/mod/lifecycle`
 
 ## LC-CAP-003 Speech Capability Governance
 

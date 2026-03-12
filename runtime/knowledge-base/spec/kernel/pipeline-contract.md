@@ -47,7 +47,7 @@
 
 将 chunk 文本批量转换为向量。
 
-- 通过 `@nimiplatform/sdk/mod/runtime` 的 `runtime.ai.embedding.generate` 调用。
+- 通过 `@nimiplatform/sdk/mod` 的 `runtime.ai.embedding.generate` 调用。
 - 单批上限 BATCH_SIZE = 32 个 chunk。
 - 批次间 yield（`setTimeout(0)`）防止 UI 线程阻塞。
 - 每批完成后回调 `onEmbeddingProgress` 报告进度。

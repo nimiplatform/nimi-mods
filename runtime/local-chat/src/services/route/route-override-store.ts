@@ -1,58 +1,48 @@
-import { asRecord, loadLocalStorageJson, removeLocalStorageKey, saveLocalStorageJson } from '@nimiplatform/sdk/mod/utils';
-import { type RuntimeRouteBinding } from '@nimiplatform/sdk/mod/runtime-route';
-
+import { asRecord, loadLocalStorageJson, removeLocalStorageKey, saveLocalStorageJson, type RuntimeRouteBinding } from "@nimiplatform/sdk/mod";
 const LOCAL_CHAT_ROUTE_OVERRIDE_STORAGE_KEY = 'nimi.local-chat.route-override.v1';
-
 export function dedupeModelIds(models: string[]): string[] {
-  return Array.from(new Set(
-    (Array.isArray(models) ? models : [])
-      .map((model) => String(model || '').trim())
-      .filter(Boolean),
-  ));
+    return Array.from(new Set((Array.isArray(models) ? models : [])
+        .map((model) => String(model || '').trim())
+        .filter(Boolean)));
 }
-
 export function loadLocalChatRouteBinding(): RuntimeRouteBinding | null {
-  return loadLocalStorageJson<RuntimeRouteBinding | null>(
-    LOCAL_CHAT_ROUTE_OVERRIDE_STORAGE_KEY,
-    null,
-    (parsed) => {
-      if (!parsed || typeof parsed !== 'object') {
-        return null;
-      }
-      const record = asRecord(parsed);
-      const source = String(record.source || '').trim();
-      const connectorId = String(record.connectorId || '').trim();
-      const model = String(record.model || '').trim();
-      if (!source || !model) return null;
-      const normalizedSource = source === 'cloud' ? 'cloud' : 'local';
-      return {
-        source: normalizedSource,
-        connectorId,
-        model,
-        localModelId: normalizedSource === 'local'
-          ? (String(record.localModelId || '').trim() || undefined)
-          : undefined,
-        engine: normalizedSource === 'local'
-          ? (String(record.engine || '').trim() || undefined)
-          : undefined,
-      };
-    },
-  );
+    return loadLocalStorageJson<RuntimeRouteBinding | null>(LOCAL_CHAT_ROUTE_OVERRIDE_STORAGE_KEY, null, (parsed) => {
+        if (!parsed || typeof parsed !== 'object') {
+            return null;
+        }
+        const record = asRecord(parsed);
+        const source = String(record.source || '').trim();
+        const connectorId = String(record.connectorId || '').trim();
+        const model = String(record.model || '').trim();
+        if (!source || !model)
+            return null;
+        const normalizedSource = source === 'cloud' ? 'cloud' : 'local';
+        return {
+            source: normalizedSource,
+            connectorId,
+            model,
+            localModelId: normalizedSource === 'local'
+                ? (String(record.localModelId || '').trim() || undefined)
+                : undefined,
+            engine: normalizedSource === 'local'
+                ? (String(record.engine || '').trim() || undefined)
+                : undefined,
+        };
+    });
 }
-
 export function persistLocalChatRouteBinding(value: RuntimeRouteBinding | null): void {
-  if (!value) {
-    removeLocalStorageKey(LOCAL_CHAT_ROUTE_OVERRIDE_STORAGE_KEY);
-    return;
-  }
-  saveLocalStorageJson(LOCAL_CHAT_ROUTE_OVERRIDE_STORAGE_KEY, value);
+    if (!value) {
+        removeLocalStorageKey(LOCAL_CHAT_ROUTE_OVERRIDE_STORAGE_KEY);
+        return;
+    }
+    saveLocalStorageJson(LOCAL_CHAT_ROUTE_OVERRIDE_STORAGE_KEY, value);
 }
-
-export function pickChatModelForConnector(
-  connector: { vendor?: string; models: string[] } | null,
-  fallback: string,
-): string {
-  if (!connector) return fallback;
-  const models = dedupeModelIds(connector.models);
-  return models[0] || fallback;
+export function pickChatModelForConnector(connector: {
+    vendor?: string;
+    models: string[];
+} | null, fallback: string): string {
+    if (!connector)
+        return fallback;
+    const models = dedupeModelIds(connector.models);
+    return models[0] || fallback;
 }
