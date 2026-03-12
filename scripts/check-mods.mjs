@@ -55,6 +55,57 @@ function parseTsconfig(modDir) {
   return JSON.parse(readFileSync(tsconfigPath, 'utf8'));
 }
 
+function listSourceTsFiles(modDir) {
+  const candidates = [path.join(modDir, 'index.ts'), path.join(modDir, 'src')];
+  const results = [];
+
+  for (const candidate of candidates) {
+    if (!existsSync(candidate)) {
+      continue;
+    }
+    const stats = readdirOrFile(candidate);
+    if (stats.kind === 'file') {
+      results.push(candidate);
+      continue;
+    }
+    const pendingDirs = [candidate];
+    while (pendingDirs.length > 0) {
+      const currentDir = pendingDirs.pop();
+      if (!currentDir) {
+        continue;
+      }
+      const entries = readdirSync(currentDir, { withFileTypes: true });
+      for (const entry of entries) {
+        const absolutePath = path.join(currentDir, entry.name);
+        if (entry.isDirectory()) {
+          pendingDirs.push(absolutePath);
+          continue;
+        }
+        if (entry.isFile() && /\.(ts|tsx)$/.test(entry.name)) {
+          results.push(absolutePath);
+        }
+      }
+    }
+  }
+
+  return [...new Set(results)].sort((left, right) => left.localeCompare(right));
+}
+
+function readdirOrFile(targetPath) {
+  try {
+    const entries = readdirSync(targetPath, { withFileTypes: true });
+    return {
+      kind: 'dir',
+      entries,
+    };
+  } catch {
+    return {
+      kind: 'file',
+      entries: [],
+    };
+  }
+}
+
 function hasUiCapabilities(manifest) {
   const capabilities = Array.isArray(manifest?.capabilities) ? manifest.capabilities : [];
   return capabilities.some((capability) => String(capability || '').startsWith('ui.register.'));
@@ -62,6 +113,7 @@ function hasUiCapabilities(manifest) {
 
 function validateIconAsset(modDir, manifest, errors) {
   if (!Object.prototype.hasOwnProperty.call(manifest, 'iconAsset')) {
+    errors.push('manifest.iconAsset is required for runtime mods');
     return;
   }
   const iconAsset = String(manifest.iconAsset || '').trim();
@@ -89,6 +141,34 @@ function validateIconAsset(modDir, manifest, errors) {
   }
   if (!existsSync(resolved)) {
     errors.push(`manifest.iconAsset file does not exist: ${iconAsset}`);
+  }
+}
+
+function validateManifestLegacyFields(manifest, errors) {
+  if (Object.prototype.hasOwnProperty.call(manifest, 'icon')) {
+    errors.push('manifest.icon is forbidden; use manifest.iconAsset only');
+  }
+  if (Object.prototype.hasOwnProperty.call(manifest, 'permissions')) {
+    errors.push('manifest.permissions is forbidden; use manifest.capabilities');
+  }
+}
+
+function validateSourceLegacyFields(modDir, errors) {
+  const sourceFiles = listSourceTsFiles(modDir);
+  for (const sourcePath of sourceFiles) {
+    const content = readFileSync(sourcePath, 'utf8');
+    const relativePath = path.relative(modDir, sourcePath);
+    if (/\b[A-Z0-9_]+_PERMISSIONS\b/.test(content)) {
+      errors.push(`source must not declare or export *_PERMISSIONS aliases: ${relativePath}`);
+    }
+    if (relativePath === path.join('src', 'manifest.ts')) {
+      if (/\bicon\s*:/.test(content)) {
+        errors.push('src/manifest.ts must not declare icon; use iconAsset only');
+      }
+      if (/\bpermissions\s*:/.test(content)) {
+        errors.push('src/manifest.ts must not declare permissions; use capabilities');
+      }
+    }
   }
 }
 
@@ -169,6 +249,7 @@ function validateMod(modName) {
     }
 
     validateRuntimeModPackage(modName, modDir, packageJson, errors);
+    validateManifestLegacyFields(manifest, errors);
     validateIconAsset(modDir, manifest, errors);
 
     if (hasUiCapabilities(manifest)) {
@@ -218,6 +299,8 @@ function validateMod(modName) {
       : '';
     errors.push(`src must be TypeScript-only; remove .js files in src/: ${preview}${remainder}`);
   }
+
+  validateSourceLegacyFields(modDir, errors);
 
   return errors;
 }
