@@ -9,7 +9,7 @@ import { buildLocalChatTurnContextKey } from '../src/hooks/turn-send/context-key
 import { runLocalChatTurnSend } from '../src/hooks/turn-send/send-flow.ts';
 import { resetTextTurnStreamHealthForTests } from '../src/hooks/turn-send/text-turn-runner.ts';
 import { resolveStageConversationSlice } from '../src/components/layout/stage-dialogue-card.tsx';
-import { resetLocalChatConversationLedgerForTests } from '../src/session-store.ts';
+import { resetLocalChatConversationLedgerForTests } from '../src/state/index.ts';
 import { type ModRuntimeDependencySnapshot } from "@nimiplatform/sdk/mod";
 class MemoryStorage implements Storage {
     private store = new Map<string, string>();

@@ -4,7 +4,7 @@ import type {
   LocalChatCachedMediaAsset,
   LocalChatMediaArtifactShadow,
   LocalChatMediaGenerationSpec,
-} from './types.js';
+} from '../types.js';
 import type {
   DerivedInteractionProfile,
   FirstBeatResult,
@@ -32,8 +32,57 @@ import type {
   LocalChatTurnWithBeats,
   RelationMemorySlot,
   VoiceConversationMode,
-} from './state/ledger-types.js';
-import { createUlid } from './utils/ulid.js';
+} from '../state/ledger-types.js';
+import { createUlid } from '../utils/ulid.js';
+
+import {
+  nowIso,
+  trimString,
+  asIsoString,
+  normalizeConversationRecord,
+  normalizeTurnRecord,
+  normalizeBeatRecord,
+  normalizeInteractionSnapshot,
+  normalizeRelationMemorySlot,
+  normalizeInteractionRecallDoc,
+  normalizeMediaAssetRecord,
+  normalizeCachedMediaAsset,
+  normalizeMediaSpec,
+  normalizeMediaShadow,
+  cloneConversation,
+  cloneTurnRecord,
+  cloneStoredBeat,
+  cloneInteractionSnapshot,
+  cloneRelationMemorySlot,
+  cloneInteractionRecallDoc,
+  cloneMediaAssetRecord,
+} from './normalizers.js';
+
+import {
+  LOCAL_CHAT_SESSION_UPDATED_EVENT,
+  STORE_CONVERSATIONS,
+  STORE_TURNS,
+  STORE_BEATS,
+  STORE_MEDIA_ASSETS,
+  STORE_INTERACTION_SNAPSHOTS,
+  STORE_RELATION_MEMORY_SLOTS,
+  STORE_RECALL_INDEX,
+  getLedgerCache,
+  resetLedgerCache,
+  ensureLedgerHydrated,
+  persistMutation,
+  emitSessionUpdated,
+  openLedgerDatabase,
+  transactionDone,
+} from './ledger-db.js';
+
+import {
+  lexicalScore,
+  findBestRelationMemoryMatch,
+  shouldResolveRelationMemorySlot,
+  pruneRelationMemorySlots,
+  withPreservedOverride,
+} from './relation-memory.js';
 
 export type {
   DerivedInteractionProfile,
@@ -62,44 +111,6 @@ export type {
   LocalChatTurnWithBeats,
   RelationMemorySlot,
   VoiceConversationMode,
-} from './state/ledger-types.js';
-
-const LOCAL_CHAT_LEDGER_DB_NAME = 'nimi.local-chat.ledger.v3';
-const LOCAL_CHAT_LEDGER_DB_VERSION = 1;
-const LOCAL_CHAT_SESSION_UPDATED_EVENT = 'local-chat:session-updated';
-const LEGACY_LOCAL_CHAT_SESSION_STORE_KEY = 'nimi.local-chat.sessions.v2';
-const STORE_CONVERSATIONS = 'conversations';
-const STORE_TURNS = 'turns';
-const STORE_BEATS = 'beats';
-const STORE_MEDIA_ASSETS = 'mediaAssets';
-const STORE_INTERACTION_SNAPSHOTS = 'interactionSnapshots';
-const STORE_RELATION_MEMORY_SLOTS = 'relationMemorySlots';
-const STORE_RECALL_INDEX = 'recallIndex';
-const EXACT_HISTORY_TURN_LIMIT = 8;
-
-type StoreName =
-  | typeof STORE_CONVERSATIONS
-  | typeof STORE_TURNS
-  | typeof STORE_BEATS
-  | typeof STORE_MEDIA_ASSETS
-  | typeof STORE_INTERACTION_SNAPSHOTS
-  | typeof STORE_RELATION_MEMORY_SLOTS
-  | typeof STORE_RECALL_INDEX;
-
-type LedgerCache = {
-  hydrated: boolean;
-  conversationsById: Map<string, LocalChatConversationRecord>;
-  turnsById: Map<string, LocalChatTurnRecord>;
-  beatsById: Map<string, LocalChatStoredBeat>;
-  mediaAssetsById: Map<string, LocalChatMediaAssetRecord>;
-  interactionSnapshotsByConversationId: Map<string, InteractionSnapshot>;
-  relationMemorySlotsById: Map<string, RelationMemorySlot>;
-  recallIndexById: Map<string, InteractionRecallDoc>;
-};
-
-type LedgerMutation = {
-  puts?: Partial<Record<StoreName, unknown[]>>;
-  deletes?: Partial<Record<StoreName, IDBValidKey[]>>;
 };
 
 export type LocalChatTargetPreview = {
@@ -153,58 +164,7 @@ type BeatInsertInput = {
   mediaShadow?: LocalChatMediaArtifactShadow;
 };
 
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
-function emptyLedgerCache(): LedgerCache {
-  return {
-    hydrated: false,
-    conversationsById: new Map(),
-    turnsById: new Map(),
-    beatsById: new Map(),
-    mediaAssetsById: new Map(),
-    interactionSnapshotsByConversationId: new Map(),
-    relationMemorySlotsById: new Map(),
-    recallIndexById: new Map(),
-  };
-}
-
-let ledgerCache: LedgerCache = emptyLedgerCache();
-let openDatabasePromise: Promise<IDBDatabase | null> | null = null;
-let hydratePromise: Promise<void> | null = null;
-
-function isIndexedDbAvailable(): boolean {
-  return typeof indexedDB !== 'undefined' && indexedDB !== null;
-}
-
-function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error('LOCAL_CHAT_LEDGER_IDB_REQUEST_FAILED'));
-  });
-}
-
-function transactionDone(transaction: IDBTransaction): Promise<void> {
-  return new Promise((resolve, reject) => {
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error || new Error('LOCAL_CHAT_LEDGER_IDB_TX_FAILED'));
-    transaction.onabort = () => reject(transaction.error || new Error('LOCAL_CHAT_LEDGER_IDB_TX_ABORTED'));
-  });
-}
-
-function trimString(value: unknown): string {
-  return String(value || '').trim();
-}
-
-function asArray(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [];
-}
-
-function asIsoString(value: unknown, fallback: string): string {
-  const normalized = trimString(value);
-  return normalized || fallback;
-}
+const EXACT_HISTORY_TURN_LIMIT = 8;
 
 function matchesViewerId(recordViewerId: string, viewerId?: string): boolean {
   const normalizedViewerId = trimString(viewerId);
@@ -232,308 +192,6 @@ function sortConversationRecords(records: LocalChatConversationRecord[]): LocalC
   ));
 }
 
-function normalizeBeatKind(value: unknown): LocalChatStoredBeat['kind'] {
-  return value === 'voice' || value === 'image' || value === 'video' ? value : 'text';
-}
-
-function normalizeDeliveryStatus(value: unknown): LocalChatStoredBeat['deliveryStatus'] {
-  return value === 'pending' || value === 'blocked' || value === 'failed' ? value : 'ready';
-}
-
-function normalizeBeatMedia(value: unknown): LocalChatStoredBeat['media'] {
-  if (!value || typeof value !== 'object') return undefined;
-  const media = value as Record<string, unknown>;
-  const normalized: LocalChatStoredBeat['media'] = {};
-  const uri = trimString(media.uri);
-  const mimeType = trimString(media.mimeType);
-  const previewUri = trimString(media.previewUri);
-  const width = Number(media.width);
-  const height = Number(media.height);
-  const durationSeconds = Number(media.durationSeconds);
-  if (uri) normalized.uri = uri;
-  if (mimeType) normalized.mimeType = mimeType;
-  if (previewUri) normalized.previewUri = previewUri;
-  if (Number.isFinite(width) && width > 0) normalized.width = Math.round(width);
-  if (Number.isFinite(height) && height > 0) normalized.height = Math.round(height);
-  if (Number.isFinite(durationSeconds) && durationSeconds > 0) normalized.durationSeconds = durationSeconds;
-  return Object.keys(normalized).length > 0 ? normalized : undefined;
-}
-
-function normalizeContextTrace(value: unknown): LocalChatContextTrace | undefined {
-  if (!value || typeof value !== 'object') return undefined;
-  return value as LocalChatContextTrace;
-}
-
-function normalizeMediaSpec(value: unknown): LocalChatMediaGenerationSpec | undefined {
-  if (!value || typeof value !== 'object') return undefined;
-  return value as LocalChatMediaGenerationSpec;
-}
-
-function normalizeMediaShadow(value: unknown): LocalChatMediaArtifactShadow | undefined {
-  if (!value || typeof value !== 'object') return undefined;
-  return value as LocalChatMediaArtifactShadow;
-}
-
-function normalizeCachedMediaAsset(value: unknown): LocalChatCachedMediaAsset | null {
-  if (!value || typeof value !== 'object') return null;
-  const record = value as Record<string, unknown>;
-  const executionCacheKey = trimString(record.executionCacheKey);
-  const specHash = trimString(record.specHash);
-  const renderUri = trimString(record.renderUri);
-  const mimeType = trimString(record.mimeType);
-  if (!executionCacheKey || !specHash || !renderUri || !mimeType) {
-    return null;
-  }
-  const createdAt = asIsoString(record.createdAt, nowIso());
-  return {
-    executionCacheKey,
-    specHash,
-    kind: record.kind === 'video' ? 'video' : 'image',
-    renderUri,
-    mimeType,
-    routeSource: record.routeSource === 'cloud' ? 'cloud' : 'local',
-    ...(trimString(record.connectorId) ? { connectorId: trimString(record.connectorId) } : {}),
-    ...(trimString(record.model) ? { model: trimString(record.model) } : {}),
-    createdAt,
-    lastHitAt: asIsoString(record.lastHitAt, createdAt),
-  };
-}
-
-function normalizeMediaAssetRecord(value: unknown): LocalChatMediaAssetRecord | null {
-  if (!value || typeof value !== 'object') return null;
-  const record = value as Record<string, unknown>;
-  const cached = normalizeCachedMediaAsset(record);
-  if (!cached) return null;
-  return {
-    ...cached,
-    id: trimString(record.id) || `media_${createUlid()}`,
-    conversationId: trimString(record.conversationId) || null,
-    turnId: trimString(record.turnId) || null,
-    beatId: trimString(record.beatId) || null,
-  };
-}
-
-function normalizeTurnAudit(value: unknown): LocalChatTurnAudit | undefined {
-  if (!value || typeof value !== 'object') return undefined;
-  const record = value as Record<string, unknown>;
-  return {
-    id: trimString(record.id) || `audit_${createUlid()}`,
-    targetId: trimString(record.targetId),
-    worldId: trimString(record.worldId) || null,
-    latencyMs: Number(record.latencyMs) || 0,
-    error: trimString(record.error) || null,
-    createdAt: asIsoString(record.createdAt, nowIso()),
-  };
-}
-
-function normalizeInteractionSnapshot(value: unknown): InteractionSnapshot | null {
-  if (!value || typeof value !== 'object') return null;
-  const record = value as Record<string, unknown>;
-  const conversationId = trimString(record.conversationId);
-  if (!conversationId) return null;
-  const updatedAt = asIsoString(record.updatedAt, nowIso());
-  const relationshipStateRaw = trimString(record.relationshipState);
-  const relationshipState: InteractionSnapshot['relationshipState'] = relationshipStateRaw === 'friendly'
-    || relationshipStateRaw === 'warm'
-    || relationshipStateRaw === 'intimate'
-    ? relationshipStateRaw
-    : 'new';
-  const emotionalTemperatureRaw = trimString(record.emotionalTemperature);
-  const emotionalTemperature: InteractionSnapshot['emotionalTemperature'] = emotionalTemperatureRaw === 'steady'
-    || emotionalTemperatureRaw === 'warm'
-    || emotionalTemperatureRaw === 'heated'
-    ? emotionalTemperatureRaw
-    : 'low';
-  return {
-    conversationId,
-    relationshipState,
-    activeScene: asArray(record.activeScene).map(trimString).filter(Boolean),
-    emotionalTemperature,
-    assistantCommitments: asArray(record.assistantCommitments).map(trimString).filter(Boolean),
-    userPrefs: asArray(record.userPrefs).map(trimString).filter(Boolean),
-    openLoops: asArray(record.openLoops).map(trimString).filter(Boolean),
-    topicThreads: asArray(record.topicThreads).map(trimString).filter(Boolean),
-    lastResolvedTurnId: trimString(record.lastResolvedTurnId) || null,
-    conversationDirective: trimString(record.conversationDirective) || null,
-    updatedAt,
-  };
-}
-
-function normalizeRelationMemorySlot(value: unknown): RelationMemorySlot | null {
-  if (!value || typeof value !== 'object') return null;
-  const record = value as Record<string, unknown>;
-  const id = trimString(record.id);
-  const targetId = trimString(record.targetId);
-  const viewerId = trimString(record.viewerId);
-  const slotType = trimString(record.slotType) as RelationMemorySlot['slotType'];
-  const key = trimString(record.key);
-  const normalizedSlotType = slotType === 'boundary'
-    || slotType === 'rapport'
-    || slotType === 'promise'
-    || slotType === 'recurringCue'
-    || slotType === 'taboo'
-    ? slotType
-    : 'preference';
-  if (!id || !targetId || !viewerId || !key) return null;
-  return {
-    id,
-    targetId,
-    viewerId,
-    slotType: normalizedSlotType,
-    key,
-    value: trimString(record.value),
-    confidence: Number.isFinite(Number(record.confidence)) ? Number(record.confidence) : 0,
-    portability: record.portability === 'portable' || record.portability === 'blocked'
-      ? record.portability
-      : 'local-only',
-    sensitivity: record.sensitivity === 'safe' || record.sensitivity === 'intimate'
-      ? record.sensitivity
-      : 'personal',
-    userOverride: record.userOverride === 'never-sync' || record.userOverride === 'force-portable'
-      ? record.userOverride
-      : 'inherit',
-    updatedAt: asIsoString(record.updatedAt, nowIso()),
-  };
-}
-
-function normalizeInteractionRecallDoc(value: unknown): InteractionRecallDoc | null {
-  if (!value || typeof value !== 'object') return null;
-  const record = value as Record<string, unknown>;
-  const id = trimString(record.id);
-  const conversationId = trimString(record.conversationId);
-  const text = trimString(record.text);
-  if (!id || !conversationId || !text) return null;
-  const createdAt = asIsoString(record.createdAt, nowIso());
-  return {
-    id,
-    conversationId,
-    sourceTurnId: trimString(record.sourceTurnId) || null,
-    text,
-    createdAt,
-    updatedAt: asIsoString(record.updatedAt, createdAt),
-  };
-}
-
-function normalizeConversationRecord(value: unknown): LocalChatConversationRecord | null {
-  if (!value || typeof value !== 'object') return null;
-  const record = value as Record<string, unknown>;
-  const id = trimString(record.id);
-  const targetId = trimString(record.targetId);
-  const viewerId = trimString(record.viewerId);
-  if (!id || !targetId || !viewerId) return null;
-  const createdAt = asIsoString(record.createdAt, nowIso());
-  return {
-    id,
-    targetId,
-    viewerId,
-    worldId: trimString(record.worldId) || null,
-    title: trimString(record.title) || 'Session',
-    createdAt,
-    updatedAt: asIsoString(record.updatedAt, createdAt),
-    lastTurnSeq: Number(record.lastTurnSeq) > 0 ? Math.floor(Number(record.lastTurnSeq)) : 0,
-  };
-}
-
-function normalizeTurnRecord(value: unknown): LocalChatTurnRecord | null {
-  if (!value || typeof value !== 'object') return null;
-  const record = value as Record<string, unknown>;
-  const id = trimString(record.id);
-  const conversationId = trimString(record.conversationId);
-  if (!id || !conversationId) return null;
-  const createdAt = asIsoString(record.createdAt, nowIso());
-  return {
-    id,
-    conversationId,
-    seq: Number(record.seq) > 0 ? Math.floor(Number(record.seq)) : 0,
-    role: record.role === 'assistant' ? 'assistant' : 'user',
-    turnTxnId: trimString(record.turnTxnId) || null,
-    createdAt,
-    updatedAt: asIsoString(record.updatedAt, createdAt),
-    beatCount: Number(record.beatCount) > 0 ? Math.floor(Number(record.beatCount)) : 0,
-  };
-}
-
-function normalizeBeatRecord(value: unknown): LocalChatStoredBeat | null {
-  if (!value || typeof value !== 'object') return null;
-  const record = value as Record<string, unknown>;
-  const id = trimString(record.id);
-  const turnId = trimString(record.turnId);
-  const conversationId = trimString(record.conversationId);
-  if (!id || !turnId || !conversationId) return null;
-  const timestamp = asIsoString(record.timestamp, nowIso());
-  return {
-    id,
-    turnId,
-    turnSeq: Number(record.turnSeq) > 0 ? Math.floor(Number(record.turnSeq)) : 0,
-    conversationId,
-    role: record.role === 'assistant' ? 'assistant' : 'user',
-    beatIndex: Number(record.beatIndex) >= 0 ? Math.floor(Number(record.beatIndex)) : 0,
-    beatCount: Number(record.beatCount) > 0 ? Math.floor(Number(record.beatCount)) : 1,
-    kind: normalizeBeatKind(record.kind),
-    deliveryStatus: normalizeDeliveryStatus(record.deliveryStatus),
-    content: String(record.content || ''),
-    contextText: String(record.contextText || record.content || ''),
-    semanticSummary: trimString(record.semanticSummary) || null,
-    mediaSpec: normalizeMediaSpec(record.mediaSpec),
-    mediaShadow: normalizeMediaShadow(record.mediaShadow),
-    media: normalizeBeatMedia(record.media),
-    timestamp,
-    latencyMs: Number.isFinite(Number(record.latencyMs)) ? Number(record.latencyMs) : undefined,
-    meta: record.meta && typeof record.meta === 'object' ? record.meta as ChatMessageMeta : undefined,
-    promptTrace: normalizeContextTrace(record.promptTrace),
-    audit: normalizeTurnAudit(record.audit),
-  };
-}
-
-function cloneConversation(record: LocalChatConversationRecord): LocalChatConversationRecord {
-  return {
-    ...record,
-  };
-}
-
-function cloneTurnRecord(record: LocalChatTurnRecord): LocalChatTurnRecord {
-  return {
-    ...record,
-  };
-}
-
-function cloneStoredBeat(record: LocalChatStoredBeat): LocalChatStoredBeat {
-  return {
-    ...record,
-    ...(record.media ? { media: { ...record.media } } : {}),
-    ...(record.meta ? { meta: { ...record.meta } } : {}),
-  };
-}
-
-function cloneInteractionSnapshot(record: InteractionSnapshot): InteractionSnapshot {
-  return {
-    ...record,
-    activeScene: [...record.activeScene],
-    assistantCommitments: [...record.assistantCommitments],
-    userPrefs: [...record.userPrefs],
-    openLoops: [...record.openLoops],
-    topicThreads: [...record.topicThreads],
-  };
-}
-
-function cloneRelationMemorySlot(record: RelationMemorySlot): RelationMemorySlot {
-  return {
-    ...record,
-  };
-}
-
-function cloneInteractionRecallDoc(record: InteractionRecallDoc): InteractionRecallDoc {
-  return {
-    ...record,
-  };
-}
-
-function cloneMediaAssetRecord(record: LocalChatMediaAssetRecord): LocalChatMediaAssetRecord {
-  return {
-    ...record,
-  };
-}
-
 function sortTurnRecords(records: LocalChatTurnRecord[]): LocalChatTurnRecord[] {
   return [...records].sort((left, right) => (
     left.seq - right.seq
@@ -553,7 +211,7 @@ function sortStoredBeats(records: LocalChatStoredBeat[]): LocalChatStoredBeat[] 
 
 function turnsForConversation(conversationId: string): LocalChatTurnRecord[] {
   return sortTurnRecords(
-    [...ledgerCache.turnsById.values()].filter((turn) => turn.conversationId === conversationId),
+    [...getLedgerCache().turnsById.values()].filter((turn) => turn.conversationId === conversationId),
   );
 }
 
@@ -563,7 +221,7 @@ function findConversationForScope(input: {
 }): LocalChatConversationRecord | null {
   const scopeKey = buildConversationScopeKey(input.targetId, input.viewerId);
   return sortConversationRecords(
-    [...ledgerCache.conversationsById.values()].filter((conversation) => (
+    [...getLedgerCache().conversationsById.values()].filter((conversation) => (
       buildConversationScopeKey(conversation.targetId, conversation.viewerId) === scopeKey
     )),
   )[0] || null;
@@ -571,12 +229,12 @@ function findConversationForScope(input: {
 
 function beatsForTurn(turnId: string): LocalChatStoredBeat[] {
   return sortStoredBeats(
-    [...ledgerCache.beatsById.values()].filter((beat) => beat.turnId === turnId),
+    [...getLedgerCache().beatsById.values()].filter((beat) => beat.turnId === turnId),
   );
 }
 
 function mediaAssetsForConversation(conversationId: string): LocalChatMediaAssetRecord[] {
-  return [...ledgerCache.mediaAssetsById.values()]
+  return [...getLedgerCache().mediaAssetsById.values()]
     .filter((asset) => asset.conversationId === conversationId)
     .sort((left, right) => (
       compareIsoTimestamp(right.lastHitAt, left.lastHitAt)
@@ -657,179 +315,6 @@ function latestAuditFromSession(session: LocalChatSession | null): LocalChatTurn
   return null;
 }
 
-async function openLedgerDatabase(): Promise<IDBDatabase | null> {
-  if (!isIndexedDbAvailable()) return null;
-  if (openDatabasePromise) return openDatabasePromise;
-  openDatabasePromise = new Promise<IDBDatabase | null>((resolve, reject) => {
-    const request = indexedDB.open(LOCAL_CHAT_LEDGER_DB_NAME, LOCAL_CHAT_LEDGER_DB_VERSION);
-    request.onupgradeneeded = () => {
-      const database = request.result;
-      if (!database.objectStoreNames.contains(STORE_CONVERSATIONS)) {
-        const store = database.createObjectStore(STORE_CONVERSATIONS, { keyPath: 'id' });
-        store.createIndex('byTargetId', 'targetId', { unique: false });
-        store.createIndex('byTargetUpdatedAt', ['targetId', 'updatedAt'], { unique: false });
-      }
-      if (!database.objectStoreNames.contains(STORE_TURNS)) {
-        const store = database.createObjectStore(STORE_TURNS, { keyPath: 'id' });
-        store.createIndex('byConversationId', 'conversationId', { unique: false });
-        store.createIndex('byConversationSeq', ['conversationId', 'seq'], { unique: false });
-      }
-      if (!database.objectStoreNames.contains(STORE_BEATS)) {
-        const store = database.createObjectStore(STORE_BEATS, { keyPath: 'id' });
-        store.createIndex('byConversationId', 'conversationId', { unique: false });
-        store.createIndex('byTurnId', 'turnId', { unique: false });
-        store.createIndex('byConversationTurnBeat', ['conversationId', 'turnSeq', 'beatIndex'], { unique: false });
-      }
-      if (!database.objectStoreNames.contains(STORE_MEDIA_ASSETS)) {
-        const store = database.createObjectStore(STORE_MEDIA_ASSETS, { keyPath: 'id' });
-        store.createIndex('byConversationId', 'conversationId', { unique: false });
-        store.createIndex('byTurnId', 'turnId', { unique: false });
-        store.createIndex('byBeatId', 'beatId', { unique: false });
-        store.createIndex('byExecutionCacheKey', 'executionCacheKey', { unique: false });
-      }
-      if (!database.objectStoreNames.contains(STORE_INTERACTION_SNAPSHOTS)) {
-        database.createObjectStore(STORE_INTERACTION_SNAPSHOTS, { keyPath: 'conversationId' });
-      }
-      if (!database.objectStoreNames.contains(STORE_RELATION_MEMORY_SLOTS)) {
-        const store = database.createObjectStore(STORE_RELATION_MEMORY_SLOTS, { keyPath: 'id' });
-        store.createIndex('byTargetViewer', ['targetId', 'viewerId'], { unique: false });
-      }
-      if (!database.objectStoreNames.contains(STORE_RECALL_INDEX)) {
-        const store = database.createObjectStore(STORE_RECALL_INDEX, { keyPath: 'id' });
-        store.createIndex('byConversationId', 'conversationId', { unique: false });
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error('LOCAL_CHAT_LEDGER_OPEN_FAILED'));
-  });
-  return openDatabasePromise;
-}
-
-async function loadAllFromIndexedDb(): Promise<void> {
-  const database = await openLedgerDatabase();
-  if (!database) {
-    ledgerCache.hydrated = true;
-    return;
-  }
-  const transaction = database.transaction(
-    [
-      STORE_CONVERSATIONS,
-      STORE_TURNS,
-      STORE_BEATS,
-      STORE_MEDIA_ASSETS,
-      STORE_INTERACTION_SNAPSHOTS,
-      STORE_RELATION_MEMORY_SLOTS,
-      STORE_RECALL_INDEX,
-    ],
-    'readonly',
-  );
-  const [conversations, turns, beats, mediaAssets, interactionSnapshots, relationMemorySlots, recallIndex] = await Promise.all([
-    requestToPromise(transaction.objectStore(STORE_CONVERSATIONS).getAll()),
-    requestToPromise(transaction.objectStore(STORE_TURNS).getAll()),
-    requestToPromise(transaction.objectStore(STORE_BEATS).getAll()),
-    requestToPromise(transaction.objectStore(STORE_MEDIA_ASSETS).getAll()),
-    requestToPromise(transaction.objectStore(STORE_INTERACTION_SNAPSHOTS).getAll()),
-    requestToPromise(transaction.objectStore(STORE_RELATION_MEMORY_SLOTS).getAll()),
-    requestToPromise(transaction.objectStore(STORE_RECALL_INDEX).getAll()),
-  ]);
-  await transactionDone(transaction);
-
-  ledgerCache = emptyLedgerCache();
-  conversations
-    .map((item) => normalizeConversationRecord(item))
-    .filter((item): item is LocalChatConversationRecord => Boolean(item))
-    .forEach((item) => {
-      ledgerCache.conversationsById.set(item.id, item);
-    });
-  turns
-    .map((item) => normalizeTurnRecord(item))
-    .filter((item): item is LocalChatTurnRecord => Boolean(item))
-    .forEach((item) => {
-      ledgerCache.turnsById.set(item.id, item);
-    });
-  beats
-    .map((item) => normalizeBeatRecord(item))
-    .filter((item): item is LocalChatStoredBeat => Boolean(item))
-    .forEach((item) => {
-      ledgerCache.beatsById.set(item.id, item);
-    });
-  mediaAssets
-    .map((item) => normalizeMediaAssetRecord(item))
-    .filter((item): item is LocalChatMediaAssetRecord => Boolean(item))
-    .forEach((item) => {
-      ledgerCache.mediaAssetsById.set(item.id, item);
-    });
-  interactionSnapshots
-    .map((item) => normalizeInteractionSnapshot(item))
-    .filter((item): item is InteractionSnapshot => Boolean(item))
-    .forEach((item) => {
-      ledgerCache.interactionSnapshotsByConversationId.set(item.conversationId, item);
-    });
-  relationMemorySlots
-    .map((item) => normalizeRelationMemorySlot(item))
-    .filter((item): item is RelationMemorySlot => Boolean(item))
-    .forEach((item) => {
-      ledgerCache.relationMemorySlotsById.set(item.id, item);
-    });
-  recallIndex
-    .map((item) => normalizeInteractionRecallDoc(item))
-    .filter((item): item is InteractionRecallDoc => Boolean(item))
-    .forEach((item) => {
-      ledgerCache.recallIndexById.set(item.id, item);
-    });
-  ledgerCache.hydrated = true;
-}
-
-async function ensureLedgerHydrated(): Promise<void> {
-  if (ledgerCache.hydrated) return;
-  if (typeof localStorage !== 'undefined') {
-    try {
-      localStorage.removeItem(LEGACY_LOCAL_CHAT_SESSION_STORE_KEY);
-    } catch {
-      // ignore legacy cleanup errors
-    }
-  }
-  if (hydratePromise) return hydratePromise;
-  hydratePromise = loadAllFromIndexedDb().finally(() => {
-    hydratePromise = null;
-  });
-  return hydratePromise;
-}
-
-function emitSessionUpdated(payload: { targetId: string; sessionId: string }): void {
-  if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return;
-  if (typeof CustomEvent !== 'function') return;
-  window.dispatchEvent(new CustomEvent(LOCAL_CHAT_SESSION_UPDATED_EVENT, {
-    detail: payload,
-  }));
-}
-
-async function persistMutation(mutation: LedgerMutation): Promise<void> {
-  const database = await openLedgerDatabase();
-  if (!database) return;
-  const storeNames = new Set<StoreName>();
-  Object.keys(mutation.puts || {}).forEach((key) => {
-    storeNames.add(key as StoreName);
-  });
-  Object.keys(mutation.deletes || {}).forEach((key) => {
-    storeNames.add(key as StoreName);
-  });
-  if (storeNames.size === 0) return;
-  const transaction = database.transaction([...storeNames], 'readwrite');
-  for (const storeName of storeNames) {
-    const store = transaction.objectStore(storeName);
-    const puts = mutation.puts?.[storeName] || [];
-    for (const row of puts) {
-      store.put(row);
-    }
-    const deletes = mutation.deletes?.[storeName] || [];
-    for (const key of deletes) {
-      store.delete(key);
-    }
-  }
-  await transactionDone(transaction);
-}
-
 function createProjectionTurnFromMessage(
   message: ChatMessage,
   promptTrace?: LocalChatPromptTrace | null,
@@ -871,204 +356,6 @@ function buildProjectionSession(session: LocalChatSession): LocalChatSession {
   };
 }
 
-function lexicalScore(haystack: string, query: string): number {
-  const normalizedHaystack = haystack.toLowerCase();
-  const normalizedQuery = query.toLowerCase();
-  if (!normalizedHaystack || !normalizedQuery) return 0;
-  const tokens = normalizedQuery
-    .split(/[\s,.;:!?/\\|()[\]{}"'`]+/)
-    .map((token) => token.trim())
-    .filter((token) => token.length >= 2);
-  if (tokens.length === 0) {
-    return normalizedHaystack.includes(normalizedQuery) ? 1 : 0;
-  }
-  let hits = 0;
-  for (const token of tokens) {
-    if (normalizedHaystack.includes(token)) hits += 1;
-  }
-  return hits / tokens.length;
-}
-
-const RELATION_MEMORY_RESOLUTION_RE = /已经|好了|完成|提醒了|办好了|安排好了|处理好了|搞定|兑现|实现|做到了|结束了|记住了|resolved|done|finished|handled|reminded/u;
-
-function normalizeMemoryText(value: string): string {
-  return trimString(value).replace(/\s+/g, ' ').toLowerCase();
-}
-
-function toMemoryBigrams(text: string): Set<string> {
-  const normalized = normalizeMemoryText(text).replace(/\s+/g, '');
-  const output = new Set<string>();
-  for (let index = 0; index < normalized.length - 1; index += 1) {
-    output.add(normalized.slice(index, index + 2));
-  }
-  return output;
-}
-
-function relationMemorySimilarity(left: string, right: string): number {
-  const normalizedLeft = normalizeMemoryText(left);
-  const normalizedRight = normalizeMemoryText(right);
-  if (!normalizedLeft || !normalizedRight) return 0;
-  if (normalizedLeft.includes(normalizedRight) || normalizedRight.includes(normalizedLeft)) {
-    return 1;
-  }
-  const leftBigrams = toMemoryBigrams(normalizedLeft);
-  const rightBigrams = toMemoryBigrams(normalizedRight);
-  if (leftBigrams.size === 0 || rightBigrams.size === 0) {
-    const leftChars = new Set([...normalizedLeft]);
-    const rightChars = new Set([...normalizedRight]);
-    let overlap = 0;
-    for (const char of leftChars) {
-      if (rightChars.has(char)) overlap += 1;
-    }
-    const union = new Set([...leftChars, ...rightChars]).size;
-    return union === 0 ? 0 : overlap / union;
-  }
-  let overlap = 0;
-  for (const gram of leftBigrams) {
-    if (rightBigrams.has(gram)) overlap += 1;
-  }
-  const union = new Set([...leftBigrams, ...rightBigrams]).size;
-  return union === 0 ? 0 : overlap / union;
-}
-
-function stripTemporalLead(text: string): string {
-  return trimString(text)
-    .replace(/^(?:之后|待会|回头|下次|稍后|再来|改天|晚点|别忘|说好了|有空|等你)\s*/u, '')
-    .trim();
-}
-
-function hasFocusedPhraseMatch(left: string, right: string): boolean {
-  const a = stripTemporalLead(left);
-  const b = stripTemporalLead(right);
-  if (!a || !b) return false;
-  const shorter = a.length <= b.length ? a : b;
-  const longer = shorter === a ? b : a;
-  for (let length = Math.min(4, shorter.length); length >= 3; length -= 1) {
-    for (let index = 0; index <= shorter.length - length; index += 1) {
-      const fragment = shorter.slice(index, index + length).trim();
-      if (fragment.length >= 3 && longer.includes(fragment)) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-function relationMemoryMatchThreshold(slotType: RelationMemorySlot['slotType']): number {
-  if (slotType === 'promise' || slotType === 'recurringCue') return 0.22;
-  if (slotType === 'boundary' || slotType === 'taboo') return 0.28;
-  return 0.36;
-}
-
-function relationMemoryCombinedText(slot: Pick<RelationMemorySlot, 'key' | 'value'>): string {
-  return trimString(`${slot.key} ${slot.value}`);
-}
-
-function relationMemoryPairScore(
-  left: Pick<RelationMemorySlot, 'slotType' | 'key' | 'value'>,
-  right: Pick<RelationMemorySlot, 'slotType' | 'key' | 'value'>,
-): number {
-  if (left.slotType !== right.slotType) return 0;
-  const keyScore = relationMemorySimilarity(left.key, right.key);
-  const valueScore = relationMemorySimilarity(left.value, right.value);
-  const combinedScore = relationMemorySimilarity(
-    relationMemoryCombinedText(left),
-    relationMemoryCombinedText(right),
-  );
-  return Math.max(
-    combinedScore,
-    (keyScore * 0.6) + (valueScore * 0.4),
-    lexicalScore(relationMemoryCombinedText(left), relationMemoryCombinedText(right)),
-  );
-}
-
-function findBestRelationMemoryMatch(
-  existingSlots: RelationMemorySlot[],
-  candidate: RelationMemorySlot,
-): RelationMemorySlot | null {
-  let bestMatch: RelationMemorySlot | null = null;
-  let bestScore = 0;
-  for (const slot of existingSlots) {
-    if (slot.slotType !== candidate.slotType) continue;
-    const score = relationMemoryPairScore(slot, candidate);
-    const threshold = relationMemoryMatchThreshold(candidate.slotType);
-    const focusedMatch = hasFocusedPhraseMatch(relationMemoryCombinedText(slot), relationMemoryCombinedText(candidate));
-    if (score < threshold && !focusedMatch) continue;
-    const effectiveScore = focusedMatch ? Math.max(score, threshold) : score;
-    if (effectiveScore > bestScore) {
-      bestScore = effectiveScore;
-      bestMatch = slot;
-    }
-  }
-  return bestMatch;
-}
-
-function shouldResolveRelationMemorySlot(slot: RelationMemorySlot, resolutionTexts: string[]): boolean {
-  if (slot.slotType !== 'promise' && slot.slotType !== 'recurringCue') {
-    return false;
-  }
-  const slotText = relationMemoryCombinedText(slot);
-  return resolutionTexts.some((text) => {
-    const normalizedText = trimString(text);
-    if (!normalizedText || !RELATION_MEMORY_RESOLUTION_RE.test(normalizedText)) {
-      return false;
-    }
-    return (
-      relationMemorySimilarity(slotText, normalizedText) >= relationMemoryMatchThreshold(slot.slotType)
-      || hasFocusedPhraseMatch(slotText, normalizedText)
-    );
-  });
-}
-
-function compareRelationMemoryRetention(left: RelationMemorySlot, right: RelationMemorySlot): number {
-  const retentionRank = (slot: RelationMemorySlot): number => {
-    if (slot.slotType === 'boundary' || slot.slotType === 'taboo') return 99;
-    if (slot.slotType === 'promise') return 4;
-    if (slot.slotType === 'preference') return 3;
-    if (slot.slotType === 'recurringCue') return 2;
-    if (slot.slotType === 'rapport') return 1;
-    return 0;
-  };
-  return (
-    retentionRank(left) - retentionRank(right)
-    || left.confidence - right.confidence
-    || left.updatedAt.localeCompare(right.updatedAt)
-  );
-}
-
-function pruneRelationMemorySlots(slots: RelationMemorySlot[], limit: number): {
-  kept: RelationMemorySlot[];
-  removed: RelationMemorySlot[];
-} {
-  if (slots.length <= limit) {
-    return {
-      kept: slots,
-      removed: [],
-    };
-  }
-  const ranked = [...slots].sort(compareRelationMemoryRetention);
-  const removed: RelationMemorySlot[] = [];
-  while (ranked.length > limit) {
-    const removableIndex = ranked.findIndex((slot) => slot.slotType !== 'boundary' && slot.slotType !== 'taboo');
-    if (removableIndex < 0) break;
-    removed.push(...ranked.splice(removableIndex, 1));
-  }
-  return {
-    kept: ranked,
-    removed,
-  };
-}
-
-function withPreservedOverride(next: RelationMemorySlot, previous?: RelationMemorySlot): RelationMemorySlot {
-  if (!previous) return next;
-  if (next.userOverride !== 'inherit') return next;
-  if (previous.userOverride === 'inherit') return next;
-  return {
-    ...next,
-    userOverride: previous.userOverride,
-  };
-}
-
 export function isSyncableRelationMemorySlot(slot: Pick<RelationMemorySlot, 'portability' | 'sensitivity' | 'userOverride'>): boolean {
   return slot.portability === 'portable'
     && slot.sensitivity !== 'intimate'
@@ -1084,7 +371,7 @@ export function warmUpLedgerHydration(): void {
 }
 
 export async function resetLocalChatConversationLedgerForTests(): Promise<void> {
-  ledgerCache = emptyLedgerCache();
+  resetLedgerCache();
   const database = await openLedgerDatabase();
   if (!database) return;
   const transaction = database.transaction(
@@ -1123,7 +410,7 @@ export async function listLocalChatSessions(targetId: string, viewerId?: string)
       ? [buildProjectionSession(projectConversationToSession(scopedConversation))]
       : [];
   }
-  return [...ledgerCache.conversationsById.values()]
+  return [...getLedgerCache().conversationsById.values()]
     .filter((conversation) => (
       conversation.targetId === normalizedTargetId
       && matchesViewerId(conversation.viewerId, viewerId)
@@ -1158,7 +445,7 @@ export async function listLocalChatTargetPreviews(viewerId?: string): Promise<Lo
 
 export async function listAllLocalChatSessions(viewerId?: string): Promise<LocalChatSession[]> {
   await ensureLedgerHydrated();
-  return [...ledgerCache.conversationsById.values()]
+  return [...getLedgerCache().conversationsById.values()]
     .filter((conversation) => matchesViewerId(conversation.viewerId, viewerId))
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
     .map((conversation) => buildProjectionSession(projectConversationToSession(conversation)));
@@ -1166,21 +453,21 @@ export async function listAllLocalChatSessions(viewerId?: string): Promise<Local
 
 export async function getLocalChatSession(sessionId: string, viewerId?: string): Promise<LocalChatSession | null> {
   await ensureLedgerHydrated();
-  const conversation = ledgerCache.conversationsById.get(trimString(sessionId));
+  const conversation = getLedgerCache().conversationsById.get(trimString(sessionId));
   if (!conversation || !matchesViewerId(conversation.viewerId, viewerId)) return null;
   return buildProjectionSession(projectConversationToSession(conversation));
 }
 
 export async function getLocalChatConversationRecord(sessionId: string, viewerId?: string): Promise<LocalChatConversationRecord | null> {
   await ensureLedgerHydrated();
-  const conversation = ledgerCache.conversationsById.get(trimString(sessionId));
+  const conversation = getLedgerCache().conversationsById.get(trimString(sessionId));
   if (!conversation || !matchesViewerId(conversation.viewerId, viewerId)) return null;
   return cloneConversation(conversation);
 }
 
 export async function listLocalChatTurnRecords(conversationId: string, viewerId?: string): Promise<LocalChatTurnWithBeats[]> {
   await ensureLedgerHydrated();
-  const conversation = ledgerCache.conversationsById.get(trimString(conversationId));
+  const conversation = getLedgerCache().conversationsById.get(trimString(conversationId));
   if (!conversation || !matchesViewerId(conversation.viewerId, viewerId)) return [];
   return turnsForConversation(conversation.id).map((turn) => buildTurnWithBeats(turn));
 }
@@ -1215,7 +502,7 @@ export async function createLocalChatSession(input: CreateConversationInput): Pr
     updatedAt: createdAt,
     lastTurnSeq: 0,
   };
-  ledgerCache.conversationsById.set(conversation.id, conversation);
+  getLedgerCache().conversationsById.set(conversation.id, conversation);
   await persistMutation({
     puts: {
       [STORE_CONVERSATIONS]: [conversation],
@@ -1233,7 +520,7 @@ export async function upsertLocalChatSession(session: UpsertConversationInput | 
   const requestedId = trimString(session.id);
   const targetId = trimString(session.targetId);
   const viewerId = trimString(session.viewerId) || 'viewer';
-  const existing = ledgerCache.conversationsById.get(requestedId);
+  const existing = getLedgerCache().conversationsById.get(requestedId);
   const scopedExisting = targetId
     ? findConversationForScope({
       targetId,
@@ -1252,7 +539,7 @@ export async function upsertLocalChatSession(session: UpsertConversationInput | 
     updatedAt: nowIso(),
     lastTurnSeq: base?.lastTurnSeq || 0,
   };
-  ledgerCache.conversationsById.set(next.id, next);
+  getLedgerCache().conversationsById.set(next.id, next);
   await persistMutation({
     puts: {
       [STORE_CONVERSATIONS]: [next],
@@ -1267,6 +554,7 @@ export async function upsertLocalChatSession(session: UpsertConversationInput | 
 
 export async function deleteLocalChatSession(sessionId: string): Promise<void> {
   await ensureLedgerHydrated();
+  const ledgerCache = getLedgerCache();
   const conversation = ledgerCache.conversationsById.get(trimString(sessionId));
   if (!conversation) return;
   ledgerCache.conversationsById.delete(conversation.id);
@@ -1306,6 +594,7 @@ export async function deleteLocalChatSession(sessionId: string): Promise<void> {
 
 export async function clearLocalChatSessionHistory(sessionId: string): Promise<void> {
   await ensureLedgerHydrated();
+  const ledgerCache = getLedgerCache();
   const conversation = ledgerCache.conversationsById.get(trimString(sessionId));
   if (!conversation) return;
 
@@ -1346,6 +635,7 @@ export async function clearLocalChatSessionHistory(sessionId: string): Promise<v
 
 export async function createLocalChatTurnRecord(input: TurnRecordInsertInput): Promise<LocalChatTurnRecord> {
   await ensureLedgerHydrated();
+  const ledgerCache = getLedgerCache();
   const conversation = ledgerCache.conversationsById.get(trimString(input.conversationId));
   if (!conversation) {
     throw new Error('LOCAL_CHAT_CONVERSATION_NOT_FOUND');
@@ -1388,6 +678,7 @@ export async function createLocalChatTurnRecord(input: TurnRecordInsertInput): P
 
 export async function appendBeatToLocalChatTurn(input: BeatInsertInput): Promise<LocalChatStoredBeat> {
   await ensureLedgerHydrated();
+  const ledgerCache = getLedgerCache();
   const conversation = ledgerCache.conversationsById.get(trimString(input.conversationId));
   const turn = ledgerCache.turnsById.get(trimString(input.turnId));
   if (!conversation || !turn || turn.conversationId !== conversation.id) {
@@ -1478,6 +769,7 @@ export async function patchLocalChatBeatArtifacts(input: {
   mediaShadow?: LocalChatMediaArtifactShadow;
 }): Promise<LocalChatSession | null> {
   await ensureLedgerHydrated();
+  const ledgerCache = getLedgerCache();
   const conversation = ledgerCache.conversationsById.get(trimString(input.sessionId));
   const beat = ledgerCache.beatsById.get(trimString(input.beatId));
   if (!conversation || !beat || beat.conversationId !== conversation.id) return null;
@@ -1525,7 +817,7 @@ export async function patchLocalChatBeatArtifacts(input: {
 
 export async function appendTurnsToSession(sessionId: string, turns: LocalChatTurn[]): Promise<LocalChatSession | null> {
   await ensureLedgerHydrated();
-  const conversation = ledgerCache.conversationsById.get(trimString(sessionId));
+  const conversation = getLedgerCache().conversationsById.get(trimString(sessionId));
   if (!conversation) return null;
   const grouped = new Map<string, LocalChatTurn[]>();
   for (const turn of turns) {
@@ -1588,7 +880,7 @@ export async function appendTurnsToSession(sessionId: string, turns: LocalChatTu
         beatCount: beat.beatCount,
       });
     }
-    currentConversation = ledgerCache.conversationsById.get(currentConversation.id)!;
+    currentConversation = getLedgerCache().conversationsById.get(currentConversation.id)!;
   }
   return projectConversationToSession(currentConversation);
 }
@@ -1613,7 +905,7 @@ export async function listLocalChatMediaAssets(input: {
   beatId?: string;
 } = {}): Promise<LocalChatMediaAssetRecord[]> {
   await ensureLedgerHydrated();
-  return [...ledgerCache.mediaAssetsById.values()]
+  return [...getLedgerCache().mediaAssetsById.values()]
     .filter((asset) => (
       (!input.conversationId || asset.conversationId === trimString(input.conversationId))
       && (!input.turnId || asset.turnId === trimString(input.turnId))
@@ -1633,7 +925,7 @@ export async function upsertLocalChatMediaAssetRecord(asset: LocalChatMediaAsset
   if (!normalized) {
     throw new Error('LOCAL_CHAT_MEDIA_ASSET_INVALID');
   }
-  ledgerCache.mediaAssetsById.set(normalized.id, normalized);
+  getLedgerCache().mediaAssetsById.set(normalized.id, normalized);
   await persistMutation({
     puts: {
       [STORE_MEDIA_ASSETS]: [normalized],
@@ -1646,7 +938,7 @@ export async function getLocalChatCachedMediaAsset(executionCacheKey: string): P
   await ensureLedgerHydrated();
   const normalizedKey = trimString(executionCacheKey);
   if (!normalizedKey) return null;
-  const record = [...ledgerCache.mediaAssetsById.values()]
+  const record = [...getLedgerCache().mediaAssetsById.values()]
     .filter((asset) => asset.executionCacheKey === normalizedKey)
     .sort((left, right) => (
       compareIsoTimestamp(right.lastHitAt, left.lastHitAt)
@@ -1681,7 +973,7 @@ export async function putLocalChatCachedMediaAsset(asset: LocalChatCachedMediaAs
     turnId: null,
     beatId: null,
   };
-  ledgerCache.mediaAssetsById.set(record.id, record);
+  getLedgerCache().mediaAssetsById.set(record.id, record);
   await persistMutation({
     puts: {
       [STORE_MEDIA_ASSETS]: [record],
@@ -1692,7 +984,7 @@ export async function putLocalChatCachedMediaAsset(asset: LocalChatCachedMediaAs
 
 export async function getLocalChatInteractionSnapshot(conversationId: string): Promise<InteractionSnapshot | null> {
   await ensureLedgerHydrated();
-  const snapshot = ledgerCache.interactionSnapshotsByConversationId.get(trimString(conversationId));
+  const snapshot = getLedgerCache().interactionSnapshotsByConversationId.get(trimString(conversationId));
   return snapshot ? cloneInteractionSnapshot(snapshot) : null;
 }
 
@@ -1702,7 +994,7 @@ export async function upsertLocalChatInteractionSnapshot(snapshot: InteractionSn
     ...snapshot,
     updatedAt: snapshot.updatedAt || nowIso(),
   };
-  ledgerCache.interactionSnapshotsByConversationId.set(normalized.conversationId, normalized);
+  getLedgerCache().interactionSnapshotsByConversationId.set(normalized.conversationId, normalized);
   await persistMutation({
     puts: {
       [STORE_INTERACTION_SNAPSHOTS]: [normalized],
@@ -1716,7 +1008,7 @@ export async function listLocalChatRelationMemorySlots(input: {
   viewerId: string;
 }): Promise<RelationMemorySlot[]> {
   await ensureLedgerHydrated();
-  return [...ledgerCache.relationMemorySlotsById.values()]
+  return [...getLedgerCache().relationMemorySlotsById.values()]
     .filter((entry) => (
       entry.targetId === trimString(input.targetId)
       && entry.viewerId === trimString(input.viewerId)
@@ -1731,6 +1023,7 @@ export async function replaceLocalChatRelationMemorySlots(input: {
   entries: RelationMemorySlot[];
 }): Promise<void> {
   await ensureLedgerHydrated();
+  const ledgerCache = getLedgerCache();
   const targetId = trimString(input.targetId);
   const viewerId = trimString(input.viewerId);
   const deleted: string[] = [];
@@ -1780,6 +1073,7 @@ export async function mergeLocalChatRelationMemorySlots(input: {
   maxEntries?: number;
 }): Promise<RelationMemorySlot[]> {
   await ensureLedgerHydrated();
+  const ledgerCache = getLedgerCache();
   const targetId = trimString(input.targetId);
   const viewerId = trimString(input.viewerId);
   const normalizedEntries = input.entries
@@ -1864,6 +1158,7 @@ export async function updateLocalChatRelationMemorySlot(input: {
   updater: (previous: RelationMemorySlot) => RelationMemorySlot;
 }): Promise<RelationMemorySlot | null> {
   await ensureLedgerHydrated();
+  const ledgerCache = getLedgerCache();
   const existing = ledgerCache.relationMemorySlotsById.get(trimString(input.id));
   if (!existing) {
     return null;
@@ -1890,6 +1185,7 @@ export async function deleteLocalChatRelationMemorySlot(input: {
   viewerId: string;
 }): Promise<void> {
   await ensureLedgerHydrated();
+  const ledgerCache = getLedgerCache();
   const existing = ledgerCache.relationMemorySlotsById.get(trimString(input.id));
   if (!existing) {
     return;
@@ -1911,6 +1207,7 @@ export async function clearLocalChatHiddenMemoryState(input: {
   viewerId: string;
 }): Promise<void> {
   await ensureLedgerHydrated();
+  const ledgerCache = getLedgerCache();
   const conversationId = trimString(input.conversationId);
   const targetId = trimString(input.targetId);
   const viewerId = trimString(input.viewerId);
@@ -1965,7 +1262,7 @@ export async function clearLocalChatHiddenMemoryState(input: {
 
 export async function listLocalChatRecallIndex(conversationId: string): Promise<InteractionRecallDoc[]> {
   await ensureLedgerHydrated();
-  return [...ledgerCache.recallIndexById.values()]
+  return [...getLedgerCache().recallIndexById.values()]
     .filter((doc) => doc.conversationId === trimString(conversationId))
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
     .map((doc) => cloneInteractionRecallDoc(doc));
@@ -1976,6 +1273,7 @@ export async function replaceLocalChatRecallIndex(input: {
   docs: InteractionRecallDoc[];
 }): Promise<void> {
   await ensureLedgerHydrated();
+  const ledgerCache = getLedgerCache();
   const conversationId = trimString(input.conversationId);
   const deleted: string[] = [];
   for (const [id, doc] of ledgerCache.recallIndexById.entries()) {

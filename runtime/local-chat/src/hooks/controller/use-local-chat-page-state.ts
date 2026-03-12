@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShellAuth, useShellNavigation, useShellRuntimeFields, useShellStatusBanner, } from '@nimiplatform/sdk/mod/shell';
 import { LOCAL_CHAT_MOD_ID } from '../../contracts.js';
-import type { LocalChatPromptTrace, LocalChatTurnAudit, VoiceConversationMode } from '../../session-store.js';
+import type { LocalChatPromptTrace, LocalChatTurnAudit, VoiceConversationMode } from '../../session-store/index.js';
 import type { ChatMessage } from '../../types.js';
 import { useLocalChatRuntimeRoute } from '../use-local-chat-runtime-route.js';
 import { useLocalChatSessions } from '../use-local-chat-sessions.js';
