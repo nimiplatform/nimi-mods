@@ -2,7 +2,6 @@ id: world.nimi.buddy
 name: Buddy
 version: 1.0.0
 kind: capability-mod
-icon: buddy
 iconAsset: ./assets/icon.svg
 entry: ./dist/mods/buddy/index.js
 styles:

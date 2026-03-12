@@ -25,5 +25,3 @@ export const TEST_AI_CAPABILITIES = [
   'ui.register.ui-extension.app.sidebar.mods',
   'ui.register.ui-extension.app.content.routes',
 ] as const;
-
-export const TEST_AI_PERMISSIONS = [...TEST_AI_CAPABILITIES];

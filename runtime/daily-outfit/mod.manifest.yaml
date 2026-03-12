@@ -2,7 +2,6 @@ id: world.nimi.daily-outfit
 name: Daily Outfit
 version: 1.0.0
 kind: capability-mod
-icon: daily-outfit
 iconAsset: ./assets/icon.svg
 entry: ./dist/mods/daily-outfit/index.js
 styles:

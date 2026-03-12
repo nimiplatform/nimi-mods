@@ -1,8 +1,8 @@
 import {
+  KISMET_CAPABILITIES,
   KISMET_MOD_ID,
   KISMET_NAV_SLOT,
   KISMET_ROUTE_SLOT,
-  KISMET_PERMISSIONS,
 } from './contracts.js';
 
 export const KISMET_MANIFEST = {
@@ -10,7 +10,6 @@ export const KISMET_MANIFEST = {
   name: 'Kismet',
   version: '1.0.0',
   description: 'BaZi destiny analysis workbench with candlestick chart visualization',
-  icon: 'kismet',
   iconAsset: './assets/icon.svg',
   author: { name: 'Nimi', url: 'https://nimi.xyz' },
   license: 'MIT',
@@ -21,7 +20,7 @@ export const KISMET_MANIFEST = {
     minVersion: '1.0.0',
     maxVersion: '2.x',
   },
-  capabilities: [...KISMET_PERMISSIONS],
+  capabilities: [...KISMET_CAPABILITIES],
   dependencies: [],
   hooks: {
     dataApis: [],

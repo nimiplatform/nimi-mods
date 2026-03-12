@@ -2,7 +2,7 @@ id: world.nimi.test-ai
 name: Test AI
 version: 1.0.0
 kind: capability-mod
-icon: local-chat
+iconAsset: ./assets/icon.svg
 entry: ./dist/mods/test-ai/index.js
 styles:
   - ./dist/mods/test-ai/index.css

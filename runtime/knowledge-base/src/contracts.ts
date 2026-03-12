@@ -50,8 +50,6 @@ export const KB_CAPABILITIES = [
   `ui.register.${KB_ROUTE_SLOT}`,
 ] as const;
 
-export const KB_PERMISSIONS = [...KB_CAPABILITIES] as const;
-
 // ---------------------------------------------------------------------------
 // Error / reason codes (SSOT §11.2)
 // ---------------------------------------------------------------------------

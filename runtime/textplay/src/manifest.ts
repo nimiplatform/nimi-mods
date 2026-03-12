@@ -1,4 +1,5 @@
 import {
+  TEXTPLAY_CAPABILITIES,
   TEXTPLAY_DATA_API_CREATOR_AGENTS_LIST,
   TEXTPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY,
   TEXTPLAY_DATA_API_WORLD_WORLDS_MINE,
@@ -9,7 +10,6 @@ import {
   TEXTPLAY_DATA_API_WORLD_SPINE_PUBLISH,
   TEXTPLAY_MOD_ID,
   TEXTPLAY_NAV_SLOT,
-  TEXTPLAY_PERMISSIONS,
   TEXTPLAY_ROUTE_SLOT,
 } from './contracts.js';
 
@@ -18,7 +18,6 @@ export const TEXTPLAY_MANIFEST = {
   name: 'TextPlay',
   version: '1.0.0',
   description: 'Narrative text renderer for interactive story play',
-  icon: 'textplay',
   iconAsset: './assets/icon.svg',
   author: { name: 'Nimi', url: 'https://nimi.xyz' },
   license: 'MIT',
@@ -29,7 +28,7 @@ export const TEXTPLAY_MANIFEST = {
     minVersion: '1.0.0',
     maxVersion: '2.x',
   },
-  capabilities: [...TEXTPLAY_PERMISSIONS],
+  capabilities: [...TEXTPLAY_CAPABILITIES],
   dependencies: [],
   hooks: {
     dataApis: [

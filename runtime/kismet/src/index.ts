@@ -4,10 +4,10 @@ import { registerModTranslations } from "@nimiplatform/sdk/mod";
 registerModTranslations('kismet', 'en', enLocale as Record<string, unknown>);
 registerModTranslations('kismet', 'zh', zhLocale as Record<string, unknown>);
 import { KISMET_MANIFEST } from './manifest.js';
-import { KISMET_CAPABILITIES, KISMET_MOD_ID, KISMET_PERMISSIONS, KISMET_NAV_SLOT, KISMET_ROUTE_SLOT, KISMET_AUDIT, KISMET_REASON, ANALYSIS_DIMENSIONS, } from './contracts.js';
+import { KISMET_CAPABILITIES, KISMET_MOD_ID, KISMET_NAV_SLOT, KISMET_ROUTE_SLOT, KISMET_AUDIT, KISMET_REASON, ANALYSIS_DIMENSIONS, } from './contracts.js';
 import { createKismetFlowId, emitKismetLog } from './logging.js';
 import { createKismetRuntimeMod, createRuntimeMod, getKismetRuntimeClient } from './runtime-mod.js';
-export { KISMET_CAPABILITIES, KISMET_MOD_ID, KISMET_PERMISSIONS, KISMET_NAV_SLOT, KISMET_ROUTE_SLOT, KISMET_AUDIT, KISMET_REASON, ANALYSIS_DIMENSIONS, createKismetRuntimeMod, createRuntimeMod, getKismetRuntimeClient, };
+export { KISMET_CAPABILITIES, KISMET_MOD_ID, KISMET_NAV_SLOT, KISMET_ROUTE_SLOT, KISMET_AUDIT, KISMET_REASON, ANALYSIS_DIMENSIONS, createKismetRuntimeMod, createRuntimeMod, getKismetRuntimeClient, };
 type ManifestValidationResult = {
     valid: boolean;
     issues: string[];

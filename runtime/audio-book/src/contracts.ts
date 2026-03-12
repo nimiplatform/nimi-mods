@@ -18,8 +18,6 @@ export const AUDIO_BOOK_CAPABILITIES = [
   'event.subscribe.ab:synthesis:progress',
 ] as const;
 
-export const AUDIO_BOOK_PERMISSIONS = [...AUDIO_BOOK_CAPABILITIES] as const;
-
 export const AUDIO_BOOK_ERROR_CODES = {
   IMPORT_EMPTY_TEXT: 'AB_IMPORT_EMPTY_TEXT',
   IMPORT_TOO_LARGE: 'AB_IMPORT_TOO_LARGE',

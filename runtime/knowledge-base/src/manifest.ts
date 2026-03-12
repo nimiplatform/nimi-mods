@@ -1,7 +1,7 @@
 import {
+  KB_CAPABILITIES,
   KB_MOD_ID,
   KB_NAV_SLOT,
-  KB_PERMISSIONS,
   KB_ROUTE_SLOT,
 } from './contracts.js';
 
@@ -20,7 +20,7 @@ export const KB_MANIFEST = {
     minVersion: '1.0.0',
     maxVersion: '2.x',
   },
-  capabilities: [...KB_PERMISSIONS],
+  capabilities: [...KB_CAPABILITIES],
   dependencies: [],
   hooks: {
     uiExtensions: [

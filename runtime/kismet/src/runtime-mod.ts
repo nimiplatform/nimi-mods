@@ -1,5 +1,5 @@
 import { createKismetFlowId, emitKismetLog } from './logging.js';
-import { KISMET_CAPABILITIES, KISMET_MOD_ID, KISMET_PERMISSIONS, } from './contracts.js';
+import { KISMET_CAPABILITIES, KISMET_MOD_ID, } from './contracts.js';
 import { registerKismetDataCapabilities } from './registrars/data.js';
 import { registerKismetUiExtensions } from './registrars/ui.js';
 import { type RuntimeModRegistration, createHookClient, createModRuntimeClient, type ModRuntimeClient } from "@nimiplatform/sdk/mod";
@@ -58,4 +58,4 @@ export function createKismetRuntimeMod(): RuntimeModRegistration {
     };
 }
 export const createRuntimeMod = createKismetRuntimeMod;
-export { KISMET_CAPABILITIES, KISMET_MOD_ID, KISMET_PERMISSIONS, };
+export { KISMET_CAPABILITIES, KISMET_MOD_ID, };

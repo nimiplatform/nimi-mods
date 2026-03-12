@@ -37,7 +37,6 @@ export {
 
 export {
   WORLD_STUDIO_CAPABILITIES,
-  WORLD_STUDIO_PERMISSIONS,
 } from './contracts/capabilities.js';
 
 export type * from './contracts/types/workspace.js';

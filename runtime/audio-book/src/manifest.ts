@@ -1,7 +1,7 @@
 import {
+  AUDIO_BOOK_CAPABILITIES,
   AUDIO_BOOK_MOD_ID,
   AUDIO_BOOK_NAV_SLOT,
-  AUDIO_BOOK_PERMISSIONS,
   AUDIO_BOOK_ROUTE_SLOT,
 } from './contracts.js';
 
@@ -20,7 +20,7 @@ export const AUDIO_BOOK_MANIFEST = {
     minVersion: '1.0.0',
     maxVersion: '2.x',
   },
-  capabilities: [...AUDIO_BOOK_PERMISSIONS],
+  capabilities: [...AUDIO_BOOK_CAPABILITIES],
   dependencies: [],
   hooks: {
     uiExtensions: [

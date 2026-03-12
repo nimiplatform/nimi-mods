@@ -1,4 +1,4 @@
-import { TEST_AI_CAPABILITIES, TEST_AI_MOD_ID, TEST_AI_PERMISSIONS, } from './contracts.js';
+import { TEST_AI_CAPABILITIES, TEST_AI_MOD_ID, } from './contracts.js';
 import { registerTestAiUiExtensions } from './registrars/ui.js';
 import { type RuntimeModRegistration, createHookClient, createModRuntimeClient } from "@nimiplatform/sdk/mod";
 let _runtimeClient: ReturnType<typeof createModRuntimeClient> | null = null;
@@ -25,4 +25,4 @@ export function createTestAiRuntimeMod(): RuntimeModRegistration {
     };
 }
 export const createRuntimeMod = createTestAiRuntimeMod;
-export { TEST_AI_CAPABILITIES, TEST_AI_MOD_ID, TEST_AI_PERMISSIONS, };
+export { TEST_AI_CAPABILITIES, TEST_AI_MOD_ID, };

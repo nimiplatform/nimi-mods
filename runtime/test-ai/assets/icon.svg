@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title>Test AI icon</title>
+  <desc>Diagnostic waveform inside a rounded square.</desc>
+  <rect width="128" height="128" rx="28" fill="#0f172a"/>
+  <rect x="12" y="12" width="104" height="104" rx="22" fill="#111827" stroke="#34d399" stroke-width="4"/>
+  <path d="M24 76h12l8-20 12 32 12-48 12 36 8-16h16" fill="none" stroke="#34d399" stroke-linecap="round" stroke-linejoin="round" stroke-width="8"/>
+  <circle cx="94" cy="36" r="8" fill="#f59e0b"/>
+</svg>

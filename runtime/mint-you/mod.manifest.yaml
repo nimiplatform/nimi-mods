@@ -2,7 +2,6 @@ id: world.nimi.mint-you
 name: Mint-You
 version: 1.0.0
 kind: capability-mod
-icon: mint-you
 iconAsset: ./assets/icon.svg
 entry: ./dist/mods/mint-you/index.js
 styles:

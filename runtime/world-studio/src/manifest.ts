@@ -1,7 +1,7 @@
 import {
+  WORLD_STUDIO_CAPABILITIES,
   WORLD_STUDIO_MOD_ID,
   WORLD_STUDIO_NAV_SLOT,
-  WORLD_STUDIO_PERMISSIONS,
   WORLD_STUDIO_ROUTE_SLOT,
 } from './contracts.js';
 
@@ -20,7 +20,7 @@ export const WORLD_STUDIO_MANIFEST = {
     minVersion: '1.0.0',
     maxVersion: '2.x',
   },
-  capabilities: [...WORLD_STUDIO_PERMISSIONS],
+  capabilities: [...WORLD_STUDIO_CAPABILITIES],
   dependencies: [],
   hooks: {
     uiExtensions: [

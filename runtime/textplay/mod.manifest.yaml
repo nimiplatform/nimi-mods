@@ -2,7 +2,6 @@ id: world.nimi.textplay
 name: TextPlay
 version: 1.0.0
 kind: capability-mod
-icon: textplay
 iconAsset: ./assets/icon.svg
 entry: ./dist/mods/textplay/index.js
 styles:

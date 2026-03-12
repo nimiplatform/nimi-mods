@@ -12,9 +12,9 @@ import {
   DAILY_OUTFIT_DATA_API_WARDROBE_UPDATE,
   DAILY_OUTFIT_DATA_API_WEARLOG_CREATE,
   DAILY_OUTFIT_DATA_API_WEARLOG_LIST,
+  DAILY_OUTFIT_CAPABILITIES,
   DAILY_OUTFIT_MOD_ID,
   DAILY_OUTFIT_NAV_SLOT,
-  DAILY_OUTFIT_PERMISSIONS,
   DAILY_OUTFIT_ROUTE_SLOT,
 } from './contracts.js';
 
@@ -23,7 +23,6 @@ export const DAILY_OUTFIT_MANIFEST = {
   name: 'Daily Outfit',
   version: '1.0.0',
   description: 'Local-first wardrobe planning and outfit history workspace.',
-  icon: 'daily-outfit',
   iconAsset: './assets/icon.svg',
   author: { name: 'Nimi', url: 'https://nimi.xyz' },
   license: 'MIT',
@@ -33,7 +32,7 @@ export const DAILY_OUTFIT_MANIFEST = {
     minVersion: '1.0.0',
     maxVersion: '2.x',
   },
-  capabilities: [...DAILY_OUTFIT_PERMISSIONS],
+  capabilities: [...DAILY_OUTFIT_CAPABILITIES],
   dependencies: [],
   hooks: {
     dataApis: [

@@ -59,5 +59,3 @@ export const WORLD_STUDIO_CAPABILITIES = [
   `ui.register.${WORLD_STUDIO_NAV_SLOT}`,
   `ui.register.${WORLD_STUDIO_ROUTE_SLOT}`,
 ] as const;
-
-export const WORLD_STUDIO_PERMISSIONS = [...WORLD_STUDIO_CAPABILITIES] as const;

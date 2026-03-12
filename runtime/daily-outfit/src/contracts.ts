@@ -38,5 +38,3 @@ export const DAILY_OUTFIT_CAPABILITIES = [
   `ui.register.${DAILY_OUTFIT_NAV_SLOT}`,
   `ui.register.${DAILY_OUTFIT_ROUTE_SLOT}`,
 ] as const;
-
-export const DAILY_OUTFIT_PERMISSIONS = [...DAILY_OUTFIT_CAPABILITIES] as const;

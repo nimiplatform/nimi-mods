@@ -4,10 +4,10 @@ import { registerModTranslations } from "@nimiplatform/sdk/mod";
 registerModTranslations('daily-outfit', 'en', enLocale as Record<string, unknown>);
 registerModTranslations('daily-outfit', 'zh', zhLocale as Record<string, unknown>);
 import { DAILY_OUTFIT_MANIFEST } from './manifest.js';
-import { DAILY_OUTFIT_CAPABILITIES, DAILY_OUTFIT_MOD_ID, DAILY_OUTFIT_NAV_SLOT, DAILY_OUTFIT_PERMISSIONS, DAILY_OUTFIT_ROUTE_SLOT, } from './contracts.js';
+import { DAILY_OUTFIT_CAPABILITIES, DAILY_OUTFIT_MOD_ID, DAILY_OUTFIT_NAV_SLOT, DAILY_OUTFIT_ROUTE_SLOT, } from './contracts.js';
 import { createDailyOutfitFlowId, emitDailyOutfitLog } from './logging.js';
 import { createDailyOutfitRuntimeMod, createRuntimeMod, getDailyOutfitHookClient, getDailyOutfitRuntimeClient, } from './runtime-mod.js';
-export { DAILY_OUTFIT_CAPABILITIES, DAILY_OUTFIT_MOD_ID, DAILY_OUTFIT_NAV_SLOT, DAILY_OUTFIT_PERMISSIONS, DAILY_OUTFIT_ROUTE_SLOT, createDailyOutfitFlowId, createDailyOutfitRuntimeMod, createRuntimeMod, emitDailyOutfitLog, getDailyOutfitHookClient, getDailyOutfitRuntimeClient, };
+export { DAILY_OUTFIT_CAPABILITIES, DAILY_OUTFIT_MOD_ID, DAILY_OUTFIT_NAV_SLOT, DAILY_OUTFIT_ROUTE_SLOT, createDailyOutfitFlowId, createDailyOutfitRuntimeMod, createRuntimeMod, emitDailyOutfitLog, getDailyOutfitHookClient, getDailyOutfitRuntimeClient, };
 type ManifestValidationResult = {
     valid: boolean;
     issues: string[];

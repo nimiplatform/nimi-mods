@@ -12,8 +12,6 @@ export const KISMET_CAPABILITIES = [
   `ui.register.${KISMET_NAV_SLOT}`,
   `ui.register.${KISMET_ROUTE_SLOT}`,
 ] as const;
-
-export const KISMET_PERMISSIONS = [...KISMET_CAPABILITIES] as const;
 export const KISMET_RUNTIME_TEXT_CAPABILITY = 'text.generate' as const;
 
 export const KISMET_AUDIT = {

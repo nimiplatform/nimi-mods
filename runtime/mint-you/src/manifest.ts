@@ -1,11 +1,11 @@
 import {
+  MINTYOU_CAPABILITIES,
   MINTYOU_MOD_ID,
   MINTYOU_NAV_SLOT,
   MINTYOU_ROUTE_SLOT,
   MINTYOU_DATA_API_AGENTS_CREATE,
   MINTYOU_DATA_API_WORLD_ACCESS_ME,
   MINTYOU_DATA_API_WORLD_OASIS_GET,
-  MINTYOU_PERMISSIONS,
 } from './contracts.js';
 
 export const MINTYOU_MANIFEST = {
@@ -13,7 +13,6 @@ export const MINTYOU_MANIFEST = {
   name: 'Mint-You',
   version: '1.0.0',
   description: 'Conversational social persona agent creator for OASIS-bound master-owned agents',
-  icon: 'mint-you',
   iconAsset: './assets/icon.svg',
   author: { name: 'Nimi', url: 'https://nimi.xyz' },
   license: 'MIT',
@@ -24,7 +23,7 @@ export const MINTYOU_MANIFEST = {
     minVersion: '1.0.0',
     maxVersion: '2.x',
   },
-  capabilities: [...MINTYOU_PERMISSIONS],
+  capabilities: [...MINTYOU_CAPABILITIES],
   dependencies: [],
   hooks: {
     dataApis: [
