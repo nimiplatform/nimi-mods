@@ -30,6 +30,7 @@ export const WORLD_STUDIO_CAPABILITIES = [
   'runtime.ai.text.generate',
   'runtime.ai.text.stream',
   'runtime.ai.embedding.generate',
+  'runtime.media.image.generate',
   'runtime.route.list.options',
   'runtime.route.resolve',
   `data.query.${WORLD_STUDIO_DATA_API_ACCESS_ME}`,

@@ -479,20 +479,20 @@ export async function runCreatePhase2(input: WorldStudioCreateActionsInput, opti
                 ? result.worldLorebooks.filter((item) => item && typeof item === 'object').length
                 : 0,
         });
-        if (missingDnaCharacters.length > 0) {
-            input.setNotice(worldStudioMessage('notice.synthesizeCompletedMissingDna', 'Synthesize completed, but missing DNA for: {{characters}}', { characters: missingDnaCharacters.join(', ') }));
-            input.setStatusBanner({
-                kind: 'warning',
+        const completionNotice = missingDnaCharacters.length > 0
+            ? worldStudioMessage('notice.synthesizeCompletedMissingDna', 'Synthesize completed, but missing DNA for: {{characters}}', { characters: missingDnaCharacters.join(', ') })
+            : worldStudioMessage('notice.synthesizeCompletedReady', 'Synthesize completed. Draft editor is ready.');
+        const completionBanner = missingDnaCharacters.length > 0
+            ? {
+                kind: 'warning' as const,
                 message: worldStudioMessage('banner.synthesizeCompletedWithDnaGaps', 'Synthesize completed with DNA gaps'),
-            });
-        }
-        else {
-            input.setNotice(worldStudioMessage('notice.synthesizeCompletedReady', 'Synthesize completed. Draft editor is ready.'));
-            input.setStatusBanner({
-                kind: 'success',
+            }
+            : {
+                kind: 'success' as const,
                 message: worldStudioMessage('banner.synthesizeCompleted', 'Synthesize completed'),
-            });
-        }
+            };
+        input.setNotice(completionNotice);
+        input.setStatusBanner(completionBanner);
         input.taskController.completeTask(taskId, worldStudioMessage('task.synthesizeCompleted', 'Synthesize completed'));
         diagLog('Phase2 COMPLETE', { taskId });
         void rebuildEmbeddingIndex(input, Array.isArray(result.worldLorebooks)
@@ -500,7 +500,16 @@ export async function runCreatePhase2(input: WorldStudioCreateActionsInput, opti
             : undefined)
             .then((embeddingResult) => {
             if (!embeddingResult.ok) {
-                input.setNotice(worldStudioMessage('notice.embeddingNeedsAttention', 'Embedding index needs attention: {{detail}}', { detail: embeddingResult.embeddingIndex.errorMessage || 'build failed' }));
+                const embeddingNotice = worldStudioMessage('notice.embeddingNeedsAttention', 'Embedding index needs attention: {{detail}}', { detail: embeddingResult.embeddingIndex.errorMessage || 'build failed' });
+                input.setNotice(missingDnaCharacters.length > 0
+                    ? `${completionNotice} ${embeddingNotice}`
+                    : embeddingNotice);
+                input.setStatusBanner({
+                    kind: 'warning',
+                    message: missingDnaCharacters.length > 0
+                        ? worldStudioMessage('banner.synthesizeCompletedWithDnaGapsAndEmbeddingAttention', 'Synthesize completed with DNA gaps and embedding attention needed')
+                        : (embeddingResult.embeddingIndex.errorMessage || worldStudioMessage('notice.embeddingFailed', 'Embedding index build failed.')),
+                });
             }
         })
             .catch((error) => {

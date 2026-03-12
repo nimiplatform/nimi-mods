@@ -205,6 +205,7 @@ test('world-studio phase2 can synthesize without full source text after refresh'
   };
 
   await runCreatePhase2(input);
+  await new Promise((resolve) => setTimeout(resolve, 0));
 
   assert.equal(Boolean(phase2), true);
   assert.equal(seenStructuredContext, true);
@@ -212,5 +213,7 @@ test('world-studio phase2 can synthesize without full source text after refresh'
   assert.equal(snapshotRef.current.agentSync.draftsByCharacter['汪淼'].handle, '~wangmiao');
   assert.equal(Boolean(snapshotRef.current.agentSync.draftsByCharacter['汪淼'].dna), false);
   assert.equal(String(lastNotice || '').includes('missing DNA'), true);
-  assert.equal(lastStatusBanner?.kind, 'warn');
+  assert.equal(String(lastNotice || '').includes('Embedding index needs attention'), true);
+  assert.equal(lastStatusBanner?.kind, 'warning');
+  assert.equal(String(lastStatusBanner?.message || '').includes('embedding'), true);
 });
