@@ -65,8 +65,9 @@ Factory returns `RuntimeModRegistration` and typically performs:
 Manifest is consumed by desktop runtime (`apps/desktop/src-tauri/src/runtime_mod/store.rs` + `apps/desktop/src/runtime/mod/discovery/manifest-capabilities.ts`).
 
 - required: `id`, `version`, `entry`, `capabilities`
-- optional: `name`, `description`, `dependencies`, `hooks`, `ai`, `icon`, `kind`
+- optional: `name`, `description`, `dependencies`, `hooks`, `ai`, `icon`, `iconAsset`, `kind`
 - `entry` must align with current build output: `./dist/mods/<mod-name>/index.js`
+- `iconAsset`, if present, must be a package-local relative `.svg` path and will be packed/cataloged for Desktop icon rendering
 
 Current built-in manifest style uses capability keys like:
 

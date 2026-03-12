@@ -81,7 +81,9 @@ allowed_sdk_surfaces:
     source_rule: DO-CAP-002
   - package: "@nimiplatform/sdk/mod/types"
     source_rule: DO-CAP-002
-  - package: "@nimiplatform/sdk/mod/ui"
+  - package: "@nimiplatform/sdk/mod/shell"
+    source_rule: DO-CAP-002
+  - package: "@nimiplatform/sdk/mod/lifecycle"
     source_rule: DO-CAP-002
   - package: "@nimiplatform/sdk/mod/logging"
     source_rule: DO-CAP-002

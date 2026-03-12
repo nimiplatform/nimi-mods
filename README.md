@@ -149,6 +149,7 @@ id: world.nimi.my-mod
 name: My Mod
 version: 0.1.0
 kind: capability-mod
+iconAsset: ./assets/icon.svg
 entry: ./dist/mods/my-mod/index.js
 styles:
   - ./dist/mods/my-mod/index.css
@@ -160,6 +161,7 @@ capabilities:
 Notes:
 
 - `entry` must point to the built JS file
+- `iconAsset`, if declared, must point to a package-local `.svg` file such as `./assets/icon.svg`
 - UI mods must also declare `styles`
 - capabilities must be explicit; do not use wildcard grants
 

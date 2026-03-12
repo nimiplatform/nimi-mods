@@ -60,6 +60,38 @@ function hasUiCapabilities(manifest) {
   return capabilities.some((capability) => String(capability || '').startsWith('ui.register.'));
 }
 
+function validateIconAsset(modDir, manifest, errors) {
+  if (!Object.prototype.hasOwnProperty.call(manifest, 'iconAsset')) {
+    return;
+  }
+  const iconAsset = String(manifest.iconAsset || '').trim();
+  if (!iconAsset) {
+    errors.push('manifest.iconAsset must be a non-empty relative path when declared');
+    return;
+  }
+  if (/^[a-z]+:\/\//i.test(iconAsset)) {
+    errors.push('manifest.iconAsset must not be a URL');
+    return;
+  }
+  if (path.isAbsolute(iconAsset)) {
+    errors.push('manifest.iconAsset must be a relative path');
+    return;
+  }
+  if (!iconAsset.toLowerCase().endsWith('.svg')) {
+    errors.push('manifest.iconAsset must point to an .svg file');
+    return;
+  }
+  const resolved = path.resolve(modDir, iconAsset);
+  const relative = path.relative(modDir, resolved);
+  if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
+    errors.push('manifest.iconAsset must stay within the mod directory');
+    return;
+  }
+  if (!existsSync(resolved)) {
+    errors.push(`manifest.iconAsset file does not exist: ${iconAsset}`);
+  }
+}
+
 function validateRuntimeModPackage(modName, modDir, packageJson, errors) {
   const scripts = packageJson?.scripts || {};
   for (const scriptName of ['build', 'dev', 'doctor', 'pack']) {
@@ -137,6 +169,7 @@ function validateMod(modName) {
     }
 
     validateRuntimeModPackage(modName, modDir, packageJson, errors);
+    validateIconAsset(modDir, manifest, errors);
 
     if (hasUiCapabilities(manifest)) {
       const stylePaths = Array.isArray(manifest.styles)
