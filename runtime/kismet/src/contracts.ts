@@ -1,4 +1,5 @@
 export const KISMET_MOD_ID = 'world.nimi.kismet';
+export const KISMET_TAB_ID = 'mod:kismet';
 
 export const KISMET_NAV_SLOT = 'ui-extension.app.sidebar.mods';
 export const KISMET_ROUTE_SLOT = 'ui-extension.app.content.routes';

@@ -73,7 +73,7 @@ export type TextplayShellProps = {
   runSnapshot: TextplayRunSnapshot | null;
   gapRefillApplied: boolean;
   deltaStatus: {
-    kind: 'info' | 'warn' | 'success' | 'error';
+    kind: 'info' | 'warning' | 'success' | 'error';
     message: string;
   } | null;
   failure: TextplayRenderFailure | null;
@@ -1076,7 +1076,7 @@ export function TextplayShell(props: TextplayShellProps) {
                     <div className={`mt-2 rounded px-2 py-1 text-[11px] ${
                       props.deltaStatus.kind === 'success'
                         ? 'bg-emerald-50 text-emerald-700'
-                        : props.deltaStatus.kind === 'warn'
+                        : props.deltaStatus.kind === 'warning'
                           ? 'bg-amber-50 text-amber-700'
                           : props.deltaStatus.kind === 'error'
                             ? 'bg-rose-50 text-rose-700'

@@ -14,7 +14,7 @@ export type ChatRouteSnapshot = {
 
 export type UseLocalChatRuntimeRouteInput = {
   runtimeClient: ModRuntimeClient['route'];
-  setStatusBanner: (input: { kind: 'warn' | 'error' | 'success' | 'info'; message: string }) => void;
+  setStatusBanner: (input: { kind: 'warning' | 'error' | 'success' | 'info'; message: string }) => void;
 };
 
 export type LocalChatRouteStateSetters = {

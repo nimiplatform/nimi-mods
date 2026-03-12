@@ -1,10 +1,12 @@
 import { type RuntimeModRegistration } from '@nimiplatform/sdk/mod/types';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
 import { createModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
+import { onRouteLifecycleChange } from '@nimiplatform/sdk/mod/lifecycle';
 import { createLocalChatFlowId, emitLocalChatLog } from './logging.js';
 import {
   LOCAL_CHAT_CAPABILITIES,
   LOCAL_CHAT_MOD_ID,
+  LOCAL_CHAT_TAB_ID,
 } from './contracts.js';
 import { registerLocalChatDataCapabilities, createLocalChatReadContextResolver } from './registrars/data.js';
 import { registerLocalChatUiExtensions } from './registrars/ui.js';
@@ -15,6 +17,8 @@ import { createLocalChatAiClient } from './runtime-ai-client.js';
 type FetchImpl = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
 export function createLocalChatRuntimeMod(): RuntimeModRegistration {
+  let unsubscribeLifecycle: (() => void) | null = null;
+
   return {
     modId: LOCAL_CHAT_MOD_ID,
     capabilities: [...LOCAL_CHAT_CAPABILITIES],
@@ -51,9 +55,17 @@ export function createLocalChatRuntimeMod(): RuntimeModRegistration {
           fetchImpl?: FetchImpl;
         },
       });
-      startLocalChatProactiveHeartbeat({
-        aiClient,
-        getReadContext,
+
+      const heartbeatInput = { aiClient, getReadContext };
+      startLocalChatProactiveHeartbeat(heartbeatInput);
+
+      // Lifecycle: stop heartbeat when inactive, restart when active
+      unsubscribeLifecycle = onRouteLifecycleChange(LOCAL_CHAT_TAB_ID, (state) => {
+        if (state === 'active') {
+          startLocalChatProactiveHeartbeat(heartbeatInput);
+        } else {
+          stopLocalChatProactiveHeartbeat();
+        }
       });
 
       emitLocalChatLog({
@@ -65,6 +77,8 @@ export function createLocalChatRuntimeMod(): RuntimeModRegistration {
       });
     },
     teardown: async () => {
+      unsubscribeLifecycle?.();
+      unsubscribeLifecycle = null;
       stopLocalChatProactiveHeartbeat();
     },
   };

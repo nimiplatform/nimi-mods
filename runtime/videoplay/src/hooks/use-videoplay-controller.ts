@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
 import { createModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
-import { useAppStore } from '@nimiplatform/sdk/mod/ui';
+import { useShellStatusBanner } from '@nimiplatform/sdk/mod/shell';
 import { createNarrativeEngineModule } from '../../../../modules/narrative-engine/src/index.js';
 import {
   VIDEOPLAY_DATA_API_ASSET_BATCH_UPSERT,
@@ -56,10 +56,6 @@ import {
   deriveWorkbenchStageProgress,
 } from '../workbench/stage-flow.js';
 import { createVideoPlayRuntimeAiClient } from '../runtime-ai-client.js';
-
-type AppStoreState = {
-  setStatusBanner?: (value: { kind: 'warn' | 'error' | 'success' | 'info'; message: string }) => void;
-};
 
 type ControllerError = {
   reasonCode: string;
@@ -171,7 +167,7 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
       };
     },
   }), [aiClient, hookClient]);
-  const setStatusBanner = useAppStore((state) => (state as AppStoreState).setStatusBanner);
+  const { showStatusBanner: setStatusBanner } = useShellStatusBanner();
 
   const [worldId, setWorldId] = useState('world-main');
   const [projectId, setProjectId] = useState('project-main');
@@ -384,7 +380,7 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
     } catch (queryError) {
       const message = queryError instanceof Error ? queryError.message : String(queryError || '');
       setStatusBanner?.({
-        kind: 'warn',
+        kind: 'warning',
         message: `VideoPlay state refresh failed: ${message}`,
       });
     }
@@ -523,7 +519,7 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
         message: 'No story selected.',
       };
       setError(blockingError);
-      setStatusBanner?.({ kind: 'warn', message: `${blockingError.reasonCode}: ${blockingError.actionHint}` });
+      setStatusBanner?.({ kind: 'warning', message: `${blockingError.reasonCode}: ${blockingError.actionHint}` });
       return;
     }
     if (!routeReady) {
@@ -533,7 +529,7 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
         message: 'Route not ready for at least one capability.',
       };
       setError(blockingError);
-      setStatusBanner?.({ kind: 'warn', message: `${blockingError.reasonCode}: ${blockingError.actionHint}` });
+      setStatusBanner?.({ kind: 'warning', message: `${blockingError.reasonCode}: ${blockingError.actionHint}` });
       return;
     }
     if (storyPackageLoading || !storyPackage) {
@@ -543,7 +539,7 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
         message: 'Story package is not ready.',
       };
       setError(baseError);
-      setStatusBanner?.({ kind: 'warn', message: `${baseError.reasonCode}: ${baseError.actionHint}` });
+      setStatusBanner?.({ kind: 'warning', message: `${baseError.reasonCode}: ${baseError.actionHint}` });
       return;
     }
     if ((mode === 'continue' || mode === 'rerun-step') && !effectiveCheckpoint) {
@@ -553,7 +549,7 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
         message: 'Checkpoint is not available.',
       };
       setError(blockingError);
-      setStatusBanner?.({ kind: 'warn', message: `${blockingError.reasonCode}: ${blockingError.actionHint}` });
+      setStatusBanner?.({ kind: 'warning', message: `${blockingError.reasonCode}: ${blockingError.actionHint}` });
       return;
     }
 
@@ -631,7 +627,7 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
         });
       } else if (result.status === 'CANCELED') {
         setStatusBanner?.({
-          kind: 'warn',
+          kind: 'warning',
           message: 'Run canceled.',
         });
       }
@@ -928,7 +924,7 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
       };
       setError(blockedError);
       setStatusBanner?.({
-        kind: 'warn',
+        kind: 'warning',
         message: `${blockedError.reasonCode}: ${blockedError.actionHint}`,
       });
       return;
@@ -974,7 +970,7 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
       };
       setError(blockedError);
       setStatusBanner?.({
-        kind: 'warn',
+        kind: 'warning',
         message: `${blockedError.reasonCode}: ${blockedError.actionHint}`,
       });
       return;

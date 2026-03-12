@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { useCallback, useEffect, useRef } from 'react';
+import { onRouteLifecycleChange } from '@nimiplatform/sdk/mod/lifecycle';
 import { useHookClient, useRuntimeClient, useAudioBookClients } from './use-audio-book-clients.js';
 import { useAudioBookUiState } from './use-audio-book-ui-state.js';
 import type { AudioBookStep } from './use-audio-book-ui-state.js';
@@ -27,6 +28,7 @@ import { pickTestSegments } from '../services/test-segment-picker.js';
 import { dbPutAudio, dbGetAudio } from '../state/indexed-db.js';
 import type { ScriptSegment, SegmentJob, VoiceCasting } from '../types.js';
 import { createLlmClientAdapter } from '../adapters/llm-adapter.js';
+import { AUDIO_BOOK_TAB_ID } from '../contracts.js';
 
 const FLOW_LOG_PREFIX = '[audio-book:flow]';
 
@@ -129,6 +131,17 @@ export function useAudioBookPageController() {
       console.info(FLOW_LOG_PREFIX, 'controller:unmounted');
     };
   }, [stopPlaybackAudio, stopPreviewAudio]);
+
+  // Lifecycle: pause/resume synthesis when tab goes inactive/active
+  useEffect(() => {
+    return onRouteLifecycleChange(AUDIO_BOOK_TAB_ID, (state) => {
+      if (state === 'active') {
+        synthControllerRef.current?.resume();
+      } else {
+        synthControllerRef.current?.pause();
+      }
+    });
+  }, []);
 
   useEffect(() => {
     console.info(FLOW_LOG_PREFIX, 'route:snapshot', {

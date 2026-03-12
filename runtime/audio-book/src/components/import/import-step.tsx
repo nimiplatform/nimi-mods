@@ -146,7 +146,7 @@ export function ImportStep(props: ImportStepProps) {
               className="flex w-full items-center justify-between px-4 py-2.5 text-left"
             >
               <p className="text-xs font-medium text-gray-700">
-                {t('import.statsChars', { count: stats.totalChars.toLocaleString() })} &middot; {t('import.statsChapters', { count: stats.totalChapters })}
+                {t('import.statsChars', { count: stats.totalChars })} &middot; {t('import.statsChapters', { count: stats.totalChapters })}
               </p>
               <svg
                 className={`h-4 w-4 text-gray-400 transition-transform ${statsExpanded ? 'rotate-180' : ''}`}
@@ -164,7 +164,7 @@ export function ImportStep(props: ImportStepProps) {
                       key={ch.index}
                       className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[10px] text-gray-600"
                     >
-                      {t('import.chapterLabel', { index: ch.index + 1, title: ch.title, count: ch.charCount.toLocaleString() })}
+                      {t('import.chapterLabel', { index: ch.index + 1, title: ch.title, count: ch.charCount })}
                     </span>
                   ))}
                 </div>

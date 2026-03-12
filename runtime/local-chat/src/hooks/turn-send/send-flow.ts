@@ -315,7 +315,7 @@ export async function runLocalChatTurnSend(input: {
   if (!text) return;
   if (!context.selectedTarget) {
     context.setStatusBanner({
-      kind: 'warn',
+      kind: 'warning',
       message: localChatMessage(
         'TurnFeedback.noAgentAvailable',
         'No Agent friend available. Please add an Agent friend in Contacts first.',
@@ -1091,7 +1091,7 @@ export async function runLocalChatTurnSend(input: {
       })
       .catch((scheduleError) => {
         context.setStatusBanner({
-          kind: 'warn',
+          kind: 'warning',
           message: scheduleError instanceof Error ? scheduleError.message : String(scheduleError || ''),
         });
       })

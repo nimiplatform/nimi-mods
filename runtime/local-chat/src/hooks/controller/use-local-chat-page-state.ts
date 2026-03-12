@@ -6,7 +6,12 @@ import {
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
 import { createModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
 import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
-import { useAppStore } from '@nimiplatform/sdk/mod/ui';
+import {
+  useShellAuth,
+  useShellNavigation,
+  useShellRuntimeFields,
+  useShellStatusBanner,
+} from '@nimiplatform/sdk/mod/shell';
 import type { RuntimeCanonicalCapability } from '@nimiplatform/sdk/mod/runtime-route';
 import { LOCAL_CHAT_MOD_ID } from '../../contracts.js';
 import type { LocalChatPromptTrace, LocalChatTurnAudit, VoiceConversationMode } from '../../session-store.js';
@@ -55,19 +60,6 @@ type RuntimeFieldsMap = {
   [key: string]: unknown;
 };
 
-type AppStoreRuntimeSelectorShape = {
-  runtimeFields: RuntimeFieldsMap;
-  setRuntimeField: (field: string, value: string) => void;
-  setStatusBanner: (input: {
-    kind: 'info' | 'error' | 'success' | 'warn';
-    message: string;
-    actionLabel?: string;
-    onAction?: () => void;
-  }) => void;
-  setActiveTab: (tab: string) => void;
-  navigateToProfile: (profileId: string | null, tab: 'profile' | 'agent-detail') => void;
-};
-
 const DEFAULT_TTS_VOICE = 'alloy';
 const DEFAULT_TTS_FORMAT = 'mp3';
 const DEPENDENCY_SNAPSHOT_INITIAL_DELAY_MS = 30_000;
@@ -96,14 +88,16 @@ function createDependencySnapshotFailure(input: {
 }
 
 export function useLocalChatPageState() {
-  const runtimeFields = useAppStore((s) => (s as AppStoreRuntimeSelectorShape).runtimeFields);
-  const setRuntimeField = useAppStore((s) => (s as AppStoreRuntimeSelectorShape).setRuntimeField);
-  const setStatusBanner = useAppStore((s) => (s as AppStoreRuntimeSelectorShape).setStatusBanner);
-  const setActiveTab = useAppStore((s) => (s as AppStoreRuntimeSelectorShape).setActiveTab);
-  const navigateToProfile = useAppStore((s) => (s as AppStoreRuntimeSelectorShape).navigateToProfile);
-  const currentUser = useAppStore(
-    (s) => (s as { auth?: { user?: Record<string, unknown> | null } }).auth?.user || null,
-  );
+  const {
+    runtimeFields,
+    setRuntimeField,
+  } = useShellRuntimeFields() as {
+    runtimeFields: RuntimeFieldsMap;
+    setRuntimeField: (field: string, value: string | number | boolean) => void;
+  };
+  const { showStatusBanner: setStatusBanner } = useShellStatusBanner();
+  const { setActiveTab, navigateToProfile } = useShellNavigation();
+  const { user: currentUser } = useShellAuth();
 
   const hookClient = useMemo(() => createHookClient(LOCAL_CHAT_MOD_ID), []);
   const runtimeClient = useMemo(() => createModRuntimeClient(LOCAL_CHAT_MOD_ID), []);
@@ -686,7 +680,7 @@ export function useLocalChatPageState() {
       const connectorId = String(effectiveTtsConnectorId || '').trim();
       if (isVoiceUnsupportedTtsFailure(reasonCode, actionHint)) {
         setStatusBanner({
-          kind: 'warn',
+          kind: 'warning',
           message: localChatMessage(
             'VoiceFeedback.unsupported',
             'Current voice is not supported by the selected TTS model. Please choose another voice or refresh voice list.',

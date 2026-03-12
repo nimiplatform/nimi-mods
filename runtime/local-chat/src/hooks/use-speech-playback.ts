@@ -145,7 +145,7 @@ export function useSpeechPlayback(input: {
   selectedTarget: LocalChatTarget | null;
   synthesizeVoice: (text: string) => Promise<LocalChatAudioPlaybackSource>;
   setStatusBanner: (payload: {
-    kind: 'warn' | 'error' | 'info' | 'success';
+    kind: 'warning' | 'error' | 'info' | 'success';
     message: string;
     actionLabel?: string;
     onAction?: () => void;
@@ -228,7 +228,7 @@ export function useSpeechPlayback(input: {
       clearVoiceAudio();
       setPlayingVoiceMessageId(null);
       input.setStatusBanner({
-        kind: 'warn',
+        kind: 'warning',
         message: localChatMessage('VoiceFeedback.playbackFailed', 'Voice playback failed: {{code}}', {
           code: TTS_PLAYBACK_ERROR_CODE,
         }),
@@ -408,7 +408,7 @@ export function useSpeechPlayback(input: {
       const actionHint = extractTtsFailureActionHint(error);
       if (isVoiceUnsupportedTtsFailure(reasonCode, actionHint)) {
         input.setStatusBanner({
-          kind: 'warn',
+          kind: 'warning',
           message: localChatMessage(
             'VoiceFeedback.unsupported',
             'Current voice is not supported by the selected TTS model. Please choose another voice or refresh voice list.',
@@ -420,7 +420,7 @@ export function useSpeechPlayback(input: {
         });
       } else {
         input.setStatusBanner({
-          kind: 'warn',
+          kind: 'warning',
           message: localChatMessage('VoiceFeedback.playbackFailed', 'Voice playback failed: {{code}}', {
             code: TTS_PLAYBACK_ERROR_CODE,
           }),

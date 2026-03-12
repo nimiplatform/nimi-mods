@@ -269,7 +269,7 @@ export async function executePhase1ExtractionLoop(
       input.taskController.cancelTask(taskId, worldStudioMessage('task.extractionCanceled', 'Extraction canceled'));
       input.setNotice(worldStudioMessage('notice.extractionCanceled', 'Extraction canceled.'));
       input.setStatusBanner({
-        kind: 'warn',
+        kind: 'warning',
         message: worldStudioMessage('banner.extractionCanceled', 'Extraction canceled'),
       });
       diagLog('Phase1 canceled', { taskId });
@@ -387,7 +387,7 @@ export async function executePhase1ExtractionLoop(
           'Extraction completed with warnings. Confirm checkpoints before synthesize.',
         ));
       input.setStatusBanner({
-        kind: 'warn',
+        kind: 'warning',
         message: worldStudioMessage('banner.extractionCompletedWithWarnings', 'Extraction completed with warnings'),
       });
       emitWorldStudioLog({
@@ -412,7 +412,7 @@ export async function executePhase1ExtractionLoop(
         ));
       input.setError(`WORLD_STUDIO_PHASE1_QUALITY_GATE_BLOCKED: ${effectiveResult.qualityGate.reasons.join(' | ')}`);
       input.setStatusBanner({
-        kind: 'warn',
+        kind: 'warning',
         message: worldStudioMessage('banner.extractionQualityGateBlocked', 'Extraction finished with quality gate block'),
       });
       emitWorldStudioLog({
@@ -469,7 +469,7 @@ export async function executePhase1ExtractionLoop(
       input.taskController.cancelTask(taskId, worldStudioMessage('task.extractionCanceled', 'Extraction canceled'));
       input.setNotice(worldStudioMessage('notice.extractionCanceled', 'Extraction canceled.'));
       input.setStatusBanner({
-        kind: 'warn',
+        kind: 'warning',
         message: worldStudioMessage('banner.extractionCanceled', 'Extraction canceled'),
       });
       diagLog('Phase1 canceled during catch', {
@@ -587,7 +587,7 @@ export async function executePhase1ExtractionLoop(
             'Extraction completed after adaptive chunk shrink with warnings. Confirm checkpoints.',
           ));
           input.setStatusBanner({
-            kind: 'warn',
+            kind: 'warning',
             message: worldStudioMessage('banner.extractionCompletedWithWarnings', 'Extraction completed with warnings'),
           });
         } else {
@@ -597,7 +597,7 @@ export async function executePhase1ExtractionLoop(
           ));
           input.setError(`WORLD_STUDIO_PHASE1_QUALITY_GATE_BLOCKED: ${effectiveRetriedResult.qualityGate.reasons.join(' | ')}`);
           input.setStatusBanner({
-            kind: 'warn',
+            kind: 'warning',
             message: worldStudioMessage('banner.extractionQualityGateBlocked', 'Extraction finished with quality gate block'),
           });
         }

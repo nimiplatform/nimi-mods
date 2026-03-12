@@ -43,6 +43,8 @@ export interface ModelManager {
   stopAudio(): void;
   handleTap(clientX: number, clientY: number): void;
   resize(width: number, height: number): void;
+  pauseBackgroundWork(): void;
+  resumeBackgroundWork(): void;
   destroy(): void;
 }
 
@@ -348,6 +350,21 @@ export function createModelManager(
     applyModelLayout(viewport.width || width, viewport.height || height);
   }
 
+  function pauseBackgroundWork() {
+    clearIdleMotionLoop();
+    clearSpeakingMotionLoop();
+    animCtrl?.pause();
+  }
+
+  function resumeBackgroundWork() {
+    animCtrl?.resume();
+    if (speaking) {
+      restartSpeakingMotionLoop(currentEmotion);
+    } else {
+      restartIdleMotionLoop();
+    }
+  }
+
   function destroy() {
     clearIdleMotionLoop();
     clearSpeakingMotionLoop();
@@ -381,6 +398,8 @@ export function createModelManager(
     stopAudio,
     handleTap,
     resize,
+    pauseBackgroundWork,
+    resumeBackgroundWork,
     destroy,
   };
 }

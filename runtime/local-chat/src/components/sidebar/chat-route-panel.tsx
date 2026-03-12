@@ -1,6 +1,6 @@
 import React from 'react';
 import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
-import { useAppStore } from '@nimiplatform/sdk/mod/ui';
+import { useShellNavigation } from '@nimiplatform/sdk/mod/shell';
 import { normalizeRuntimeRouteSource, type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod/runtime-route';
 import { resolveCommittedChatModelQuery } from '../../hooks/runtime-route/override-actions.js';
 
@@ -29,7 +29,7 @@ const CHEVRON_ICON = (
 
 export function ChatRoutePanel(props: Props) {
   const { t } = useModTranslation('local-chat');
-  const setActiveTab = useAppStore((state) => (state as { setActiveTab: (tab: string) => void }).setActiveTab);
+  const { setActiveTab } = useShellNavigation();
   const {
     open,
     onToggle,

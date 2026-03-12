@@ -76,7 +76,7 @@ export type UseLocalChatTurnSendInput = {
   setLatestPromptTrace: (trace: LocalChatPromptTrace | null) => void;
   setLatestTurnAudit: (audit: LocalChatTurnAudit | null) => void;
   setStatusBanner: (input: {
-    kind: 'warn' | 'error' | 'success' | 'info';
+    kind: 'warning' | 'error' | 'success' | 'info';
     message: string;
     actionLabel?: string;
     onAction?: () => void;

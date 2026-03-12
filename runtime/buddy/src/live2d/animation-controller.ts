@@ -34,6 +34,20 @@ export class AnimationController {
     this.tick();
   }
 
+  pause() {
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+  }
+
+  resume() {
+    if (this.rafId !== null) return;
+    if (this.plugins.length === 0) return;
+    this.lastTime = performance.now();
+    this.tick();
+  }
+
   private tick = () => {
     const now = performance.now();
     const dt = (now - this.lastTime) / 1000; // seconds

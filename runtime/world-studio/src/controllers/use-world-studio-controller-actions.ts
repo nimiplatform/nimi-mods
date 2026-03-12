@@ -31,7 +31,7 @@ type UseWorldStudioControllerActionsInput = {
     mutations: WorldStudioMutations;
     queries: WorldStudioResourceQueries;
     setStatusBanner: (input: {
-      kind: 'success' | 'warn' | 'info' | 'error';
+      kind: 'success' | 'warning' | 'info' | 'error';
       message: string;
     }) => void;
     setError: (value: string | null) => void;

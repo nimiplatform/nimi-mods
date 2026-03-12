@@ -1,4 +1,5 @@
 export const LOCAL_CHAT_MOD_ID = 'world.nimi.local-chat';
+export const LOCAL_CHAT_TAB_ID = 'mod:local-chat';
 
 export const LOCAL_CHAT_UI_SLOT = 'ui-extension.runtime.devtools.panel';
 export const LOCAL_CHAT_NAV_SLOT = 'ui-extension.app.sidebar.mods';

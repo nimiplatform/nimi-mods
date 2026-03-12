@@ -101,7 +101,7 @@ export async function runRebuildEmbeddingIndex(input: WorldStudioCreateActionsIn
     return;
   }
   input.setStatusBanner({
-    kind: 'warn',
+    kind: 'warning',
     message: result.embeddingIndex.errorMessage || worldStudioMessage('notice.embeddingFailed', 'Embedding index build failed.'),
   });
 }
@@ -518,7 +518,7 @@ export async function runCreatePhase2(
         { characters: missingDnaCharacters.join(', ') },
       ));
       input.setStatusBanner({
-        kind: 'warn',
+        kind: 'warning',
         message: worldStudioMessage('banner.synthesizeCompletedWithDnaGaps', 'Synthesize completed with DNA gaps'),
       });
     } else {
@@ -563,7 +563,7 @@ export async function runCreatePhase2(
       input.taskController.cancelTask(taskId, worldStudioMessage('task.synthesizeCanceled', 'Synthesize canceled'));
       input.setNotice(worldStudioMessage('notice.synthesizeCanceled', 'Synthesize canceled.'));
       input.setStatusBanner({
-        kind: 'warn',
+        kind: 'warning',
         message: worldStudioMessage('banner.synthesizeCanceled', 'Synthesize canceled'),
       });
       diagLog('Phase2 canceled', {

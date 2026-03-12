@@ -21,7 +21,7 @@ export type WorldStudioMutations = ReturnType<typeof useWorldStudioMutations>;
 export type WorldStudioQueries = ReturnType<typeof useWorldStudioResourceQueries>;
 
 export type StatusBannerInput = {
-  kind: 'success' | 'warn' | 'info' | 'error';
+  kind: 'success' | 'warning' | 'info' | 'error';
   message: string;
 };
 

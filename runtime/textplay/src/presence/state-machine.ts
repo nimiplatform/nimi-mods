@@ -114,6 +114,9 @@ export function createTextplayPresenceMachine(config?: Partial<TextplayPresenceC
     collectSince: (mark: number) => reports.slice(Math.max(0, mark)),
     getAllReports: () => [...reports],
     resetTimers,
+    pauseTimers: () => {
+      clearTimers();
+    },
     destroy: () => {
       clearTimers();
     },

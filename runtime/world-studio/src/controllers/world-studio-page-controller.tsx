@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
 import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
-import { useAppStore } from '@nimiplatform/sdk/mod/ui';
+import {
+  useShellAuth,
+  useShellBootstrap,
+  useShellNavigation,
+  useShellStatusBanner,
+} from '@nimiplatform/sdk/mod/shell';
 import { WORLD_STUDIO_MOD_ID } from '../contracts.js';
 import { createWorldStudioFlowId, emitWorldStudioLog } from '../logging.js';
 import { useWorldStudioBootstrap } from '../hooks/use-world-studio-bootstrap.js';
@@ -27,28 +32,16 @@ function isRouteConfigBlockingNotice(message: string | null): boolean {
   );
 }
 
-type RuntimeUser = {
-  id?: string | number | null;
-} | null;
-type WorldStudioAppStoreState = {
-  auth: { user: RuntimeUser };
-  bootstrapReady: boolean;
-  activeTab?: string;
-  setActiveTab: (tab: string) => void;
-  setStatusBanner: (input: { kind: 'success' | 'warn' | 'info' | 'error'; message: string }) => void;
-};
-
 export function useWorldStudioPageContent() {
   const { t } = useModTranslation('world-studio');
   const hookClient = useMemo(() => createHookClient(WORLD_STUDIO_MOD_ID), []);
   const runtimeClient = useMemo(() => getWorldStudioRuntimeClient(), []);
   const aiClient = useMemo(() => createWorldStudioRuntimeAiClient(runtimeClient), [runtimeClient]);
   const flowId = useMemo(() => createWorldStudioFlowId('world-studio-page'), []);
-  const runtimeUser = useAppStore((state) => (state as WorldStudioAppStoreState).auth.user);
-  const bootstrapReady = useAppStore((state) => (state as WorldStudioAppStoreState).bootstrapReady);
-  const activeTab = useAppStore((state) => String((state as WorldStudioAppStoreState).activeTab || ''));
-  const setActiveTab = useAppStore((state) => (state as WorldStudioAppStoreState).setActiveTab);
-  const setStatusBanner = useAppStore((state) => (state as WorldStudioAppStoreState).setStatusBanner);
+  const { user: runtimeUser } = useShellAuth();
+  const { ready: bootstrapReady } = useShellBootstrap();
+  const { activeTab, setActiveTab } = useShellNavigation();
+  const { showStatusBanner: setStatusBanner } = useShellStatusBanner();
   const userId = String((runtimeUser && runtimeUser.id) || '').trim();
   const storeBindings = useWorldStudioStoreBindings(userId);
   const ui = useWorldStudioPageUiState();

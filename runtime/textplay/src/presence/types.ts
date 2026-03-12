@@ -21,5 +21,6 @@ export type TextplayPresenceMachine = {
   collectSince: (mark: number) => TextplayPresenceReport[];
   getAllReports: () => TextplayPresenceReport[];
   resetTimers: () => void;
+  pauseTimers: () => void;
   destroy: () => void;
 };

@@ -6,7 +6,7 @@ import type { LocalChatAiClient } from '../runtime-ai-client.js';
 type VoiceInputState = 'idle' | 'recording' | 'transcribing' | 'failed';
 
 type StatusBannerPayload = {
-  kind: 'warn' | 'error' | 'info' | 'success';
+  kind: 'warning' | 'error' | 'info' | 'success';
   message: string;
   actionLabel?: string;
   onAction?: () => void;
@@ -171,7 +171,7 @@ export function useSpeechTranscribe(input: UseSpeechTranscribeInput) {
     }
 
     input.setStatusBanner({
-      kind: 'warn',
+      kind: 'warning',
       message: `${detail} (${reasonCode}).`,
       ...(actionLabel && onAction ? { actionLabel, onAction } : {}),
     });

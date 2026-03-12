@@ -22,7 +22,7 @@ type UseLocalChatTargetsInput = {
   };
   viewerId: string;
   runtimeAgentId: string;
-  setStatusBanner: (input: { kind: 'warn' | 'error' | 'success' | 'info'; message: string }) => void;
+  setStatusBanner: (input: { kind: 'warning' | 'error' | 'success' | 'info'; message: string }) => void;
 };
 
 const LOCAL_PREVIEW_MAX_LENGTH = 96;

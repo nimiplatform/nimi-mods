@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useUiExtensionContext } from '@nimiplatform/sdk/mod/ui';
+import { useShellRuntimeFields } from '@nimiplatform/sdk/mod/shell';
 import { parseRuntimeRouteOptions, type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot, type RuntimeRouteSource } from '@nimiplatform/sdk/mod/runtime-route';
 import type { RouteSourceDisplay } from '../types.js';
 import { useKismetStore } from '../state/kismet-store.js';
@@ -158,7 +158,7 @@ export function useKismetRoute() {
     routeOptionsLoading, setRouteOptionsLoading,
     routeOptionsError, setRouteOptionsError,
   } = useKismetStore();
-  const { runtimeFields, setRuntimeFields } = useUiExtensionContext();
+  const { runtimeFields, setRuntimeFields } = useShellRuntimeFields();
   const [checking, setChecking] = useState(false);
   const mountedRef = useRef(false);
 
@@ -446,3 +446,4 @@ export function useKismetRoute() {
     clearOverride,
   };
 }
+import { KISMET_TAB_ID } from '../contracts.js';

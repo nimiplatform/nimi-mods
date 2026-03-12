@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
 import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
 import { createModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
+import { onRouteLifecycleChange } from '@nimiplatform/sdk/mod/lifecycle';
 import type {
   RuntimeCanonicalCapability,
   RuntimeRouteBinding,
@@ -10,6 +11,7 @@ import type {
 } from '@nimiplatform/sdk/mod/runtime-route';
 import {
   MOD_ID,
+  TAB_ID,
   REST_REMINDER_INTERVAL_MS,
   REST_REMINDER_IDLE_RESET_MS,
   DEFAULT_BUDDY_MODEL_ID,
@@ -340,6 +342,17 @@ export function useBuddyController(
       if (restTimerRef.current) clearTimeout(restTimerRef.current);
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     };
+  }, []);
+
+  // Lifecycle: pause background work (RAF, motion timers) when tab is inactive
+  useEffect(() => {
+    return onRouteLifecycleChange(TAB_ID, (state) => {
+      if (state === 'active') {
+        managerRef.current?.resumeBackgroundWork();
+      } else {
+        managerRef.current?.pauseBackgroundWork();
+      }
+    });
   }, []);
 
   const mountCanvas = useCallback((canvas: HTMLCanvasElement) => {

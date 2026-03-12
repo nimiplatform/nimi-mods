@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
-import { useAppStore } from '@nimiplatform/sdk/mod/ui';
+import { useShellNavigation } from '@nimiplatform/sdk/mod/shell';
 import { filterModelOptions } from '@nimiplatform/sdk/mod/model-options';
 import { resolveModelsForScenario } from '../../services/route/connector-model-capabilities.js';
 
@@ -57,7 +57,7 @@ const CHEVRON_ICON = (
 
 export function VoicePanel(props: Props) {
   const { t } = useModTranslation('local-chat');
-  const setActiveTab = useAppStore((state) => (state as { setActiveTab: (tab: string) => void }).setActiveTab);
+  const { setActiveTab } = useShellNavigation();
   const {
     open,
     onToggle,

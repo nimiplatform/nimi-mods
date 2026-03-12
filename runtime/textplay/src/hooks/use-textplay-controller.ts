@@ -1,17 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createHookClient } from '@nimiplatform/sdk/mod/hook';
 import { createModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
+import { onRouteLifecycleChange } from '@nimiplatform/sdk/mod/lifecycle';
 import type {
   RuntimeRouteBinding,
   RuntimeRouteOptionsSnapshot,
   RuntimeRouteSource,
 } from '@nimiplatform/sdk/mod/runtime-route';
-import { useAppStore } from '@nimiplatform/sdk/mod/ui';
+import {
+  useShellAuth,
+  useShellRuntimeFields,
+  useShellStatusBanner,
+} from '@nimiplatform/sdk/mod/shell';
 import { createNarrativeEngineModule } from '../../../../modules/narrative-engine/src/index.js';
 import {
   TEXTPLAY_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST,
   TEXTPLAY_DATA_API_RENDER_PERSIST,
   TEXTPLAY_MOD_ID,
+  TEXTPLAY_TAB_ID,
   TEXTPLAY_REASON,
 } from '../contracts.js';
 import { queryTextplayChatRouteOptions } from '../data/route-options.js';
@@ -58,20 +64,6 @@ import {
   hasPersistenceWarning,
 } from './session-orchestrator.js';
 import { createTextplayRuntimeAiClient } from '../runtime-ai-client.js';
-
-type AppStoreShape = {
-  runtimeFields?: Record<string, unknown>;
-  setRuntimeField?: (field: string, value: string) => void;
-  setStatusBanner?: (input: {
-    kind: 'info' | 'error' | 'success' | 'warn';
-    message: string;
-    actionLabel?: string;
-    onAction?: () => void;
-  }) => void;
-  auth?: {
-    user?: Record<string, unknown> | null;
-  };
-};
 
 type PlayerProfileDraft = {
   playerName: string;
@@ -617,10 +609,9 @@ function firstNonEmptyText(values: unknown[]): string {
 }
 
 export function useTextplayController(): TextplayShellProps {
-  const runtimeFields = useAppStore((state) => ((state as AppStoreShape).runtimeFields || {}));
-  const setRuntimeField = useAppStore((state) => (state as AppStoreShape).setRuntimeField);
-  const setStatusBanner = useAppStore((state) => (state as AppStoreShape).setStatusBanner);
-  const authUser = useAppStore((state) => ((state as AppStoreShape).auth?.user || null));
+  const { runtimeFields, setRuntimeField } = useShellRuntimeFields();
+  const { showStatusBanner: setStatusBanner } = useShellStatusBanner();
+  const { user: authUser } = useShellAuth();
 
   const hookClient = useMemo(() => createHookClient(TEXTPLAY_MOD_ID), []);
   const runtimeClient = useMemo(() => createModRuntimeClient(TEXTPLAY_MOD_ID), []);
@@ -704,7 +695,7 @@ export function useTextplayController(): TextplayShellProps {
   const [runSnapshot, setRunSnapshot] = useState<TextplayRunSnapshot | null>(null);
   const [gapRefillApplied, setGapRefillApplied] = useState(false);
   const [deltaStatus, setDeltaStatus] = useState<{
-    kind: 'info' | 'warn' | 'success' | 'error';
+    kind: 'info' | 'warning' | 'success' | 'error';
     message: string;
   } | null>(null);
   const [failure, setFailure] = useState<TextplayShellProps['failure']>(null);
@@ -815,7 +806,7 @@ export function useTextplayController(): TextplayShellProps {
       setRouteLabel('unavailable');
       if (typeof setStatusBanner === 'function') {
         setStatusBanner({
-          kind: 'warn',
+          kind: 'warning',
           message: `TextPlay route unavailable: ${message}`,
         });
       }
@@ -1124,7 +1115,7 @@ export function useTextplayController(): TextplayShellProps {
       setStartupError(message || 'Failed to load startup package.');
       if (typeof setStatusBanner === 'function') {
         setStatusBanner({
-          kind: 'warn',
+          kind: 'warning',
           message: `TextPlay startup load failed: ${message || 'unknown error'}`,
         });
       }
@@ -1289,7 +1280,7 @@ export function useTextplayController(): TextplayShellProps {
       setStartupError(message || 'Failed to load story detail.');
       if (typeof setStatusBanner === 'function') {
         setStatusBanner({
-          kind: 'warn',
+          kind: 'warning',
           message: `TextPlay story detail load failed: ${message || 'unknown error'}`,
         });
       }
@@ -1356,7 +1347,7 @@ export function useTextplayController(): TextplayShellProps {
       setStartupError(message || 'Failed to load playable stories.');
       if (typeof setStatusBanner === 'function') {
         setStatusBanner({
-          kind: 'warn',
+          kind: 'warning',
           message: `TextPlay playable stories query failed: ${message || 'unknown error'}`,
         });
       }
@@ -1481,7 +1472,7 @@ export function useTextplayController(): TextplayShellProps {
       resetRunSurface();
       if (typeof setStatusBanner === 'function') {
         setStatusBanner({
-          kind: 'warn',
+          kind: 'warning',
           message: `TextPlay world list query failed: ${message || 'unknown error'}`,
         });
       }
@@ -1527,12 +1518,12 @@ export function useTextplayController(): TextplayShellProps {
     const targetRunId = (selectedRecordRunId || runId || '').trim();
     if (!targetRunId) {
       setDeltaStatus({
-        kind: 'warn',
+        kind: 'warning',
         message: 'Select a run first, then click Load Delta.',
       });
       if (typeof setStatusBanner === 'function') {
         setStatusBanner({
-          kind: 'warn',
+          kind: 'warning',
           message: 'Select a run first, then click Load Delta.',
         });
       }
@@ -1548,12 +1539,12 @@ export function useTextplayController(): TextplayShellProps {
     const recoveryPlayerId = (selected?.playerId || playerId).trim();
     if (!recoveryStoryId || !recoveryWorldId || !recoveryAgentId || !recoveryPlayerId) {
       setDeltaStatus({
-        kind: 'warn',
+        kind: 'warning',
         message: 'Missing story/world/agent/player context; select story again then retry Load Delta.',
       });
       if (typeof setStatusBanner === 'function') {
         setStatusBanner({
-          kind: 'warn',
+          kind: 'warning',
           message: 'Missing story/world/agent/player context; select story again then retry Load Delta.',
         });
       }
@@ -1574,11 +1565,11 @@ export function useTextplayController(): TextplayShellProps {
       }
       if (!summary.hasRecord) {
         setDeltaStatus({
-          kind: 'warn',
+          kind: 'warning',
           message: `No persisted run found for ${targetRunId}.`,
         });
         setStatusBanner({
-          kind: 'warn',
+          kind: 'warning',
           message: `Load Delta found no persisted run for ${targetRunId}. This usually means persistence did not keep this run locally.`,
         });
         return;
@@ -1609,7 +1600,7 @@ export function useTextplayController(): TextplayShellProps {
       });
       if (typeof setStatusBanner === 'function') {
         setStatusBanner({
-          kind: 'warn',
+          kind: 'warning',
           message: `TextPlay recovery query failed: ${error instanceof Error ? error.message : String(error || '')}`,
         });
       }
@@ -1692,7 +1683,7 @@ export function useTextplayController(): TextplayShellProps {
     })().catch((error) => {
       if (typeof setStatusBanner === 'function') {
         setStatusBanner({
-          kind: 'warn',
+          kind: 'warning',
           message: `Resume session failed: ${error instanceof Error ? error.message : String(error || '')}`,
         });
       }
@@ -1818,7 +1809,7 @@ export function useTextplayController(): TextplayShellProps {
       if (!activeStory) {
         if (typeof setStatusBanner === 'function') {
           setStatusBanner({
-            kind: 'warn',
+            kind: 'warning',
             message: 'Select a playable story before sending.',
           });
         }
@@ -1828,7 +1819,7 @@ export function useTextplayController(): TextplayShellProps {
       if (!started) {
         if (typeof setStatusBanner === 'function') {
           setStatusBanner({
-            kind: 'warn',
+            kind: 'warning',
             message: 'Click Start to generate opening narration before sending.',
           });
         }
@@ -1838,7 +1829,7 @@ export function useTextplayController(): TextplayShellProps {
       if (!normalizedPlayerId) {
         if (typeof setStatusBanner === 'function') {
           setStatusBanner({
-            kind: 'warn',
+            kind: 'warning',
             message: 'TextPlay requires playerId before sending.',
           });
         }
@@ -1848,7 +1839,7 @@ export function useTextplayController(): TextplayShellProps {
       if (!normalizedWorldId) {
         if (typeof setStatusBanner === 'function') {
           setStatusBanner({
-            kind: 'warn',
+            kind: 'warning',
             message: 'TextPlay requires worldId from runtime context before sending.',
           });
         }
@@ -1862,7 +1853,7 @@ export function useTextplayController(): TextplayShellProps {
       if (!normalizedPlayerName) {
         if (typeof setStatusBanner === 'function') {
           setStatusBanner({
-            kind: 'warn',
+            kind: 'warning',
             message: 'Player Name is required before sending.',
           });
         }
@@ -1887,7 +1878,7 @@ export function useTextplayController(): TextplayShellProps {
       if (!resolvedAgentId) {
         if (typeof setStatusBanner === 'function') {
           setStatusBanner({
-            kind: 'warn',
+            kind: 'warning',
             message: 'Primary agent binding is missing for this playable story.',
           });
         }
@@ -1992,7 +1983,7 @@ export function useTextplayController(): TextplayShellProps {
           if (typeof setStatusBanner === 'function') {
             setStatusBanner({
               kind: hasPersistenceWarning(result.meta.warnings)
-                ? 'warn'
+                ? 'warning'
                 : 'success',
               message: result.meta.warnings.length > 0
                 ? 'TextPlay rendered with persistence warning.'
@@ -2057,7 +2048,7 @@ export function useTextplayController(): TextplayShellProps {
 
         if (typeof setStatusBanner === 'function') {
           setStatusBanner({
-            kind: result.reasonCode === TEXTPLAY_REASON.RUN_CANCELED ? 'warn' : 'error',
+            kind: result.reasonCode === TEXTPLAY_REASON.RUN_CANCELED ? 'warning' : 'error',
             message: `${result.reasonCode}: ${result.actionHint}`,
           });
         }
@@ -2274,7 +2265,7 @@ export function useTextplayController(): TextplayShellProps {
           if (typeof setStatusBanner === 'function') {
             setStatusBanner({
               kind: hasPersistenceWarning(result.meta.warnings)
-                ? 'warn'
+                ? 'warning'
                 : 'info',
               message: result.meta.warnings.length > 0
                 ? 'TextPlay initiative rendered with persistence warning.'
@@ -2331,7 +2322,7 @@ export function useTextplayController(): TextplayShellProps {
 
         if (typeof setStatusBanner === 'function') {
           setStatusBanner({
-            kind: result.reasonCode === TEXTPLAY_REASON.RUN_CANCELED ? 'warn' : 'error',
+            kind: result.reasonCode === TEXTPLAY_REASON.RUN_CANCELED ? 'warning' : 'error',
             message: `${result.reasonCode}: ${result.actionHint}`,
           });
         }
@@ -2401,7 +2392,7 @@ export function useTextplayController(): TextplayShellProps {
       if (!activeStory) {
         if (typeof setStatusBanner === 'function') {
           setStatusBanner({
-            kind: 'warn',
+            kind: 'warning',
             message: 'Select a playable story before start.',
           });
         }
@@ -2410,7 +2401,7 @@ export function useTextplayController(): TextplayShellProps {
       if (!normalizedPlayerName) {
         if (typeof setStatusBanner === 'function') {
           setStatusBanner({
-            kind: 'warn',
+            kind: 'warning',
             message: 'Player Name is required before start.',
           });
         }
@@ -2419,7 +2410,7 @@ export function useTextplayController(): TextplayShellProps {
       if (!normalizedPlayerId || !normalizedWorldId) {
         if (typeof setStatusBanner === 'function') {
           setStatusBanner({
-            kind: 'warn',
+            kind: 'warning',
             message: 'Missing player/world binding for story start.',
           });
         }
@@ -2579,7 +2570,7 @@ export function useTextplayController(): TextplayShellProps {
           });
           if (typeof setStatusBanner === 'function') {
             setStatusBanner({
-              kind: 'warn',
+              kind: 'warning',
               message: `TextPlay recap failed: ${error instanceof Error ? error.message : String(error || '')}`,
             });
           }
@@ -2597,7 +2588,7 @@ export function useTextplayController(): TextplayShellProps {
       if (!resolvedAgentId) {
         if (typeof setStatusBanner === 'function') {
           setStatusBanner({
-            kind: 'warn',
+            kind: 'warning',
             message: 'Primary agent binding is missing for this playable story.',
           });
         }
@@ -2707,7 +2698,7 @@ export function useTextplayController(): TextplayShellProps {
           if (typeof setStatusBanner === 'function') {
             setStatusBanner({
               kind: hasPersistenceWarning(result.meta.warnings)
-                ? 'warn'
+                ? 'warning'
                 : 'success',
               message: result.meta.warnings.length > 0
                 ? 'TextPlay started with persistence warning.'
@@ -2764,7 +2755,7 @@ export function useTextplayController(): TextplayShellProps {
 
         if (typeof setStatusBanner === 'function') {
           setStatusBanner({
-            kind: result.reasonCode === TEXTPLAY_REASON.RUN_CANCELED ? 'warn' : 'error',
+            kind: result.reasonCode === TEXTPLAY_REASON.RUN_CANCELED ? 'warning' : 'error',
             message: `${result.reasonCode}: ${result.actionHint}`,
           });
         }
@@ -2856,7 +2847,7 @@ export function useTextplayController(): TextplayShellProps {
     })().catch((error) => {
       if (typeof setStatusBanner === 'function') {
         setStatusBanner({
-          kind: 'warn',
+          kind: 'warning',
           message: `TextPlay refresh failed: ${error instanceof Error ? error.message : String(error || '')}`,
         });
       }
@@ -2971,7 +2962,7 @@ export function useTextplayController(): TextplayShellProps {
       if (!canWriteClipboard) {
         if (typeof setStatusBanner === 'function') {
           setStatusBanner({
-            kind: 'warn',
+            kind: 'warning',
             message: 'Clipboard unavailable in this runtime. Copy Diag is not supported here.',
           });
         }
@@ -2987,7 +2978,7 @@ export function useTextplayController(): TextplayShellProps {
     })().catch((error) => {
       if (typeof setStatusBanner === 'function') {
         setStatusBanner({
-          kind: 'warn',
+          kind: 'warning',
           message: `Copy diagnostics failed: ${error instanceof Error ? error.message : String(error || '')}`,
         });
       }
@@ -3210,6 +3201,17 @@ export function useTextplayController(): TextplayShellProps {
   useEffect(() => () => {
     presenceMachine.destroy();
     abortRef.current?.abort();
+  }, [presenceMachine]);
+
+  // Lifecycle: pause/resume presence timers when tab goes inactive/active
+  useEffect(() => {
+    return onRouteLifecycleChange(TEXTPLAY_TAB_ID, (state) => {
+      if (state === 'active') {
+        presenceMachine.resetTimers();
+      } else {
+        presenceMachine.pauseTimers();
+      }
+    });
   }, [presenceMachine]);
 
   const storyStarted = records.length > 0;

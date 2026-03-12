@@ -112,7 +112,7 @@ export async function resolveRouteSnapshot(input: {
   } catch (error) {
     input.setRouteSnapshot(null);
     input.setStatusBanner({
-      kind: 'warn',
+      kind: 'warning',
       message: error instanceof Error ? error.message : String(error || ''),
     });
   }
@@ -181,7 +181,7 @@ export async function runRouteHealthCheck(input: {
   routeBinding: RuntimeRouteBinding | null;
   setCheckingHealth: (value: boolean) => void;
   setHealthStatus: (value: 'idle' | 'checking' | 'healthy' | 'unreachable') => void;
-  setStatusBanner?: (value: { kind: 'warn' | 'error' | 'success' | 'info'; message: string }) => void;
+  setStatusBanner?: (value: { kind: 'warning' | 'error' | 'success' | 'info'; message: string }) => void;
 }) {
   input.setCheckingHealth(true);
   input.setHealthStatus('checking');
@@ -205,7 +205,7 @@ export async function runRouteHealthCheck(input: {
         )
         : '';
       input.setStatusBanner({
-        kind: 'warn',
+        kind: 'warning',
         message: localChatMessage(
           'TurnFeedback.routeHealthDegraded',
           'Route health degraded ({{reasonCode}}){{actionSuffix}}',
