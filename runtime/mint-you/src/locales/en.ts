@@ -1,4 +1,8 @@
 const enLocale = {
+  nav: {
+    label: 'Mint-You',
+    loading: 'Mint-You loading...',
+  },
   Page: {
     title: 'Mint-You',
     subtitle: 'Create your social persona through personality profiling',

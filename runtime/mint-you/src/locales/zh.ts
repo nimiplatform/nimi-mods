@@ -1,4 +1,8 @@
 const zhLocale = {
+  nav: {
+    label: 'Mint-You',
+    loading: 'Mint-You 加载中...',
+  },
   Page: {
     title: 'Mint-You',
     subtitle: '通过性格测评创建你的社交人格',

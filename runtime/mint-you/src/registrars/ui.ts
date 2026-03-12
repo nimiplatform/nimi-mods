@@ -1,9 +1,12 @@
 import React, { Suspense } from 'react';
+import { getPromptLocale } from '@nimiplatform/sdk/mod/i18n';
 import type { HookClient } from '@nimiplatform/sdk/mod/types';
 import {
   MINTYOU_NAV_SLOT,
   MINTYOU_ROUTE_SLOT,
 } from '../contracts.js';
+import enLocale from '../locales/en.js';
+import zhLocale from '../locales/zh.js';
 
 const LazyMintYouPage = React.lazy(async () => {
   const module = await import('../ui/mint-you-page.js');
@@ -16,6 +19,7 @@ export async function registerMintYouUiExtensions(input: {
   hookClient: HookClient;
 }): Promise<void> {
   const { hookClient } = input;
+  const locale = getPromptLocale() === 'zh' ? zhLocale : enLocale;
 
   await hookClient.ui.register({
     slot: MINTYOU_NAV_SLOT,
@@ -23,7 +27,7 @@ export async function registerMintYouUiExtensions(input: {
     extension: {
       type: 'nav-item',
       tabId: 'mod:mint-you',
-      label: 'Mint-You',
+      label: locale.nav.label,
       badge: 'MOD',
       icon: 'mint-you',
       strategy: 'append',
@@ -45,7 +49,7 @@ export async function registerMintYouUiExtensions(input: {
             {
               className: 'm-4 rounded-xl border border-gray-200 bg-white p-3 text-xs text-gray-600',
             },
-            'Mint-You loading...',
+            locale.nav.loading,
           ),
         },
         React.createElement(LazyMintYouPage),
