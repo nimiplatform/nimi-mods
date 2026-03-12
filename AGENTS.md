@@ -80,19 +80,14 @@ Use explicit capability keys. Do not use wildcard grants.
 
 ## SDK Imports
 
-Use subpath imports from `@nimiplatform/sdk/mod`:
+Use the stable mod business surface from `@nimiplatform/sdk/mod`.
+Use dedicated facades only when needed:
 
-- `@nimiplatform/sdk/mod/hook`
-- `@nimiplatform/sdk/mod/runtime`
-- `@nimiplatform/sdk/mod/types`
-- `@nimiplatform/sdk/mod/ui`
-- `@nimiplatform/sdk/mod/logging`
-- `@nimiplatform/sdk/mod/i18n`
-- `@nimiplatform/sdk/mod/settings`
-- `@nimiplatform/sdk/mod/utils`
+- `@nimiplatform/sdk/mod`
+- `@nimiplatform/sdk/mod/shell`
+- `@nimiplatform/sdk/mod/lifecycle`
 
-Avoid root import (`@nimiplatform/sdk/mod`) in mod code.
-`@nimiplatform/sdk/mod/host` is host wiring surface, not mod business API.
+Do not use `@nimiplatform/sdk/mod/ui`, `@nimiplatform/sdk/mod/host`, or any SDK internal source path in mod business code.
 
 ## Prohibited Imports / APIs
 

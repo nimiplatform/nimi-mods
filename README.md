@@ -170,8 +170,7 @@ Notes:
 Example `src/runtime-mod.ts`:
 
 ```ts
-import type { RuntimeModRegistration } from '@nimiplatform/sdk/mod/types';
-import { createHookClient } from '@nimiplatform/sdk/mod/hook';
+import { createHookClient, type RuntimeModRegistration } from '@nimiplatform/sdk/mod';
 
 const MOD_ID = 'world.nimi.my-mod';
 
@@ -242,10 +241,9 @@ If you use portal UI like dialogs or tooltips, the portal content also needs a m
 
 Use these in mod code:
 
-- `@nimiplatform/sdk/mod/hook`
-- `@nimiplatform/sdk/mod/runtime`
-- `@nimiplatform/sdk/mod/types`
-- other `@nimiplatform/sdk/mod/*` subpaths when needed
+- `@nimiplatform/sdk/mod`
+- `@nimiplatform/sdk/mod/shell`
+- `@nimiplatform/sdk/mod/lifecycle`
 
 Avoid these in runtime mod source:
 
@@ -253,6 +251,8 @@ Avoid these in runtime mod source:
 - `@nimiplatform/sdk/runtime`
 - `@tauri-apps/*`
 - Desktop source imports
+- `@nimiplatform/sdk/mod/ui`
+- `@nimiplatform/sdk/mod/host`
 - `../../sdk/src/*`
 
 ## Build and validation commands
