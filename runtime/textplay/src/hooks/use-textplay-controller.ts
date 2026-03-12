@@ -64,6 +64,10 @@ import {
   hasPersistenceWarning,
 } from './session-orchestrator.js';
 import { createTextplayRuntimeAiClient } from '../runtime-ai-client.js';
+import {
+  loadTextplayRouteBinding,
+  persistTextplayRouteBinding,
+} from '../route-override-store.js';
 
 type PlayerProfileDraft = {
   playerName: string;
@@ -671,7 +675,7 @@ export function useTextplayController(): TextplayShellProps {
   const [selectedHistoryRunId, setSelectedHistoryRunId] = useState<string | null>(null);
 
   const [chatRouteOptions, setChatRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
-  const [binding, setRouteBinding] = useState<RuntimeRouteBinding | null>(null);
+  const [binding, setRouteBinding] = useState<RuntimeRouteBinding | null>(() => loadTextplayRouteBinding());
   const [routeLabel, setRouteLabel] = useState<string>('unresolved');
 
   const [stories, setStories] = useState<TextplayStorySummary[]>([]);
@@ -739,6 +743,10 @@ export function useTextplayController(): TextplayShellProps {
   useEffect(() => {
     startupPackageRef.current = startupPackage;
   }, [startupPackage]);
+
+  useEffect(() => {
+    persistTextplayRouteBinding(binding);
+  }, [binding]);
 
   const resetRunSurface = useCallback(() => {
     setRecords([]);
