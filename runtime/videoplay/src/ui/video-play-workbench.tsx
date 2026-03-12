@@ -118,31 +118,21 @@ function sourceModeLabel(mode: VideoStorySourceMode): string {
   return mode === 'textplay-enriched-story' ? 'enriched' : 'canonical';
 }
 
-function workbenchStageLabel(stage: VideoPlayWorkbenchStage): string {
-  switch (stage) {
-    case 'story-source':
-      return 'Story Source';
-    case 'casting':
-      return 'Casting';
-    case 'script':
-      return 'Script';
-    case 'storyboard':
-      return 'Storyboard';
-    case 'voice':
-      return 'Voice';
-    case 'selection':
-      return 'Selection';
-    case 'audio':
-      return 'Audio';
-    case 'video':
-      return 'Video';
-    case 'qc':
-      return 'QC';
-    case 'publish':
-      return 'Publish';
-    default:
-      return stage;
-  }
+const STAGE_KEY_MAP: Record<string, string> = {
+  'story-source': 'storySource',
+  'casting': 'casting',
+  'script': 'script',
+  'storyboard': 'storyboard',
+  'voice': 'voice',
+  'selection': 'selection',
+  'audio': 'audio',
+  'video': 'video',
+  'qc': 'qc',
+  'publish': 'publish',
+};
+
+function workbenchStageLabelKey(stage: VideoPlayWorkbenchStage): string {
+  return STAGE_KEY_MAP[stage] || stage;
 }
 
 function packageCoverageText(pkg: VideoStoryPackage): string {
@@ -378,8 +368,8 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
               <p className={`text-xs font-medium ${statusTone(props.runStatus)}`}>{props.runStatus}</p>
             </div>
             <p className="mt-1 text-xs text-gray-500">
-              Next step: <span className="font-medium text-gray-700">{props.nextStep || 'none'}</span>
-              {props.lastRebuildScope ? ` · last rebuild scope: ${props.lastRebuildScope}` : ''}
+              {t('pipeline.nextStep', { step: props.nextStep || t('state.none') })}
+              {props.lastRebuildScope ? t('pipeline.lastRebuildScope', { scope: props.lastRebuildScope }) : ''}
             </p>
             <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
               {props.workbenchStages.map((stage) => (
@@ -393,7 +383,7 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
                       : 'border-gray-200 bg-white hover:bg-gray-50'
                   }`}
                 >
-                  <p className="font-medium text-gray-900">{workbenchStageLabel(stage.stage)}</p>
+                  <p className="font-medium text-gray-900">{t(`stages.${workbenchStageLabelKey(stage.stage)}`)}</p>
                   <p className={stage.status === 'ready' ? 'text-emerald-600' : stage.status === 'blocked' ? 'text-rose-600' : 'text-slate-500'}>
                     {stage.status}
                   </p>
@@ -402,11 +392,12 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
               ))}
             </div>
             <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700">
-              <p>Selected stage: <span className="font-medium">{workbenchStageLabel(props.selectedWorkbenchStage)}</span></p>
-              <p>mapped steps: <span className="font-medium">{formatStageStepList(props.selectedWorkbenchStage)}</span></p>
+              <p>{t('pipeline.selectedStage', { stage: t(`stages.${workbenchStageLabelKey(props.selectedWorkbenchStage)}`) })}</p>
+              <p>{t('pipeline.mappedSteps', { steps: formatStageStepList(props.selectedWorkbenchStage) })}</p>
               <p>
-                advance: {props.stageAdvancePlan.allowed ? 'allowed' : 'blocked'}
-                {props.stageAdvancePlan.allowed ? ` · stepBudget=${props.stageAdvancePlan.stepBudget}` : ''}
+                {props.stageAdvancePlan.allowed
+                  ? t('pipeline.advanceAllowed', { budget: props.stageAdvancePlan.stepBudget })
+                  : t('pipeline.advanceBlocked')}
               </p>
               {selectedStageRow ? <p className="text-gray-500">{formatStageStepStatuses(selectedStageRow)}</p> : null}
               {!props.stageAdvancePlan.allowed && props.stageAdvancePlan.actionHint ? (
@@ -438,32 +429,32 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
               </p>
             </div>
             <p className="mt-1 text-xs text-gray-500">
-              Creator edits stay stage-scoped. Use rerun-step to re-enter any pipeline step after confirming rebuild impact.
+              {t('workbench.editHint')}
             </p>
             {props.rebuildPreview ? (
               <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800">
-                <p className="font-medium">Rebuild impact preview</p>
-                <p>operation={props.rebuildPreview.operationType}</p>
-                <p>scope={props.rebuildPreview.scope}</p>
-                <p>recommended rerun={props.rebuildPreview.recommendedRerunStep}</p>
+                <p className="font-medium">{t('workbench.rebuildImpactPreview')}</p>
+                <p>{t('workbench.rebuildOperation', { operation: props.rebuildPreview.operationType })}</p>
+                <p>{t('workbench.rebuildScope', { scope: props.rebuildPreview.scope })}</p>
+                <p>{t('workbench.rebuildRecommendedRerun', { step: props.rebuildPreview.recommendedRerunStep })}</p>
                 {isPipelineStep(props.rebuildPreview.recommendedRerunStep) ? (
-                  <p>recommended chain step is available in manual rerun control.</p>
+                  <p>{t('workbench.rebuildChainStepAvailable')}</p>
                 ) : null}
-                <p>confirmed={props.rebuildPreview.confirmed ? 'yes' : 'no'}</p>
+                <p>{t('workbench.rebuildConfirmed', { value: props.rebuildPreview.confirmed ? t('workbench.rebuildConfirmedYes') : t('workbench.rebuildConfirmedNo') })}</p>
                 {!props.rebuildPreview.confirmed ? (
                   <button
                     type="button"
                     onClick={props.onConfirmRebuildPreview}
                     className="mt-1 rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-medium text-amber-800 hover:bg-amber-100"
                   >
-                    Confirm Rebuild Scope
+                    {t('workbench.confirmRebuildScope')}
                   </button>
                 ) : null}
               </div>
             ) : null}
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
               <label className="text-xs text-gray-600">
-                Rerun Step
+                {t('workbench.rerunStepLabel')}
                 <select
                   value={props.rerunStep}
                   onChange={(event) => props.onRerunStepChange(event.target.value as VideoPlayPipelineStep)}
@@ -542,14 +533,14 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
             <h3 className="text-sm font-semibold text-gray-900">{t('label.storyPackageDiagnostics')}</h3>
             {props.storyPackage ? (
               <>
-                <p className="text-xs text-gray-600">story: {props.storyPackage.storyId}</p>
-                <p className="text-xs text-gray-600">sourceMode: {sourceModeLabel(props.storyPackage.sourceMode)}</p>
-                <p className="text-xs text-gray-600">loadedAt: {props.storyPackage.snapshot.loadedAt}</p>
-                <p className="text-xs text-gray-600">contextCoverage: {packageCoverageText(props.storyPackage)}</p>
-                <p className="text-xs text-gray-600">gapWarnings: {props.storyPackage.snapshot.gapWarnings.join(', ') || 'none'}</p>
+                <p className="text-xs text-gray-600">{t('diagnostics.story', { storyId: props.storyPackage.storyId })}</p>
+                <p className="text-xs text-gray-600">{t('diagnostics.sourceMode', { mode: sourceModeLabel(props.storyPackage.sourceMode) })}</p>
+                <p className="text-xs text-gray-600">{t('diagnostics.loadedAt', { time: props.storyPackage.snapshot.loadedAt })}</p>
+                <p className="text-xs text-gray-600">{t('diagnostics.contextCoverage', { coverage: packageCoverageText(props.storyPackage) })}</p>
+                <p className="text-xs text-gray-600">{t('diagnostics.gapWarnings', { warnings: props.storyPackage.snapshot.gapWarnings.join(', ') || t('state.none') })}</p>
                 {props.storyPackage.sourceMode === 'textplay-enriched-story' ? (
                   <p className="text-xs text-amber-700">
-                    enriched gate: window must contain UserTurn or AgentInitiative.
+                    {t('diagnostics.enrichedGateNote')}
                   </p>
                 ) : null}
               </>
@@ -559,12 +550,12 @@ export function VideoPlayWorkbench(props: VideoPlayWorkbenchProps) {
           </section>
 
           <section className="mt-3 space-y-2 rounded-lg border border-gray-200 p-3">
-            <h3 className="text-sm font-semibold text-gray-900">Quality Gates</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{t('gate.qualityGates')}</h3>
             {props.selectedEpisode?.quality.gates.map((gate) => (
               <div key={gate.gate} className="rounded-md border border-gray-200 px-2 py-1 text-xs">
                 <p className="font-medium text-gray-900">{gate.gate}</p>
-                <p className={gate.passed ? 'text-emerald-600' : 'text-rose-600'}>{gate.passed ? 'passed' : 'failed'}</p>
-                <p className="text-gray-500">value={gate.value} min={gate.min ?? '-'} max={gate.max ?? '-'}</p>
+                <p className={gate.passed ? 'text-emerald-600' : 'text-rose-600'}>{gate.passed ? t('gate.passed') : t('gate.failed')}</p>
+                <p className="text-gray-500">{t('gate.value', { value: gate.value, min: gate.min ?? '-', max: gate.max ?? '-' })}</p>
                 <p className="text-gray-500">{gate.reasonCode}</p>
               </div>
             ))}
