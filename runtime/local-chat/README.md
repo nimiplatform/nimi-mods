@@ -26,7 +26,7 @@ This runtime mod provides hook-based local provider chat capabilities for the De
 Design boundary:
 
 - Desktop host does not import local-chat business logic directly.
-- Local-chat imports host integration only through `@nimiplatform/sdk/mod/*`.
+- Local-chat imports host integration only through `@nimiplatform/sdk/mod`, plus `@nimiplatform/sdk/mod/shell` or `@nimiplatform/sdk/mod/lifecycle` when needed.
 - Model selection is not edited in local-chat page; it is resolved from `nimi.runtime.llm-config.v10` `routing.chat`.
 - Model selection supports mod-owned override in local-chat page and does not overwrite global AI Runtime defaults.
 - Data reads are GET-only. This mod performs no Nimi write operations.

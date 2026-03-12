@@ -78,11 +78,11 @@ required_capabilities:
     purpose: Content route page
     source_rule: KB-CAP-001
 allowed_sdk_surfaces:
-  - package: "@nimiplatform/sdk/mod/runtime"
+  - package: "@nimiplatform/sdk/mod"
     apis:
       - createModRuntimeClient
     source_rule: KB-CAP-002
-  - package: "@nimiplatform/sdk/mod/hook"
+  - package: "@nimiplatform/sdk/mod"
     source_rule: KB-CAP-002
 forbidden_patterns:
   - pattern: sdk-mod-host-direct-import

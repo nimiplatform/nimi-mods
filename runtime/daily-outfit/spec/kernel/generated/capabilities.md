@@ -69,7 +69,7 @@ required_capabilities:
     purpose: 主内容路由页面
     source_rule: DO-CAP-001
 allowed_sdk_surfaces:
-  - package: "@nimiplatform/sdk/mod/runtime"
+  - package: "@nimiplatform/sdk/mod"
     apis:
       - createModRuntimeClient
       - ai.text.generate
@@ -77,19 +77,19 @@ allowed_sdk_surfaces:
       - ai.image.analyze
       - ai.image.generate
     source_rule: DO-CAP-002
-  - package: "@nimiplatform/sdk/mod/hook"
+  - package: "@nimiplatform/sdk/mod"
     source_rule: DO-CAP-002
-  - package: "@nimiplatform/sdk/mod/types"
+  - package: "@nimiplatform/sdk/mod"
     source_rule: DO-CAP-002
   - package: "@nimiplatform/sdk/mod/shell"
     source_rule: DO-CAP-002
   - package: "@nimiplatform/sdk/mod/lifecycle"
     source_rule: DO-CAP-002
-  - package: "@nimiplatform/sdk/mod/logging"
+  - package: "@nimiplatform/sdk/mod"
     source_rule: DO-CAP-002
-  - package: "@nimiplatform/sdk/mod/i18n"
+  - package: "@nimiplatform/sdk/mod"
     source_rule: DO-CAP-002
-  - package: "@nimiplatform/sdk/mod/settings"
+  - package: "@nimiplatform/sdk/mod"
     source_rule: DO-CAP-002
 forbidden_patterns:
   - pattern: sdk-mod-host-direct-import

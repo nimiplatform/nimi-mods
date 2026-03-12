@@ -59,7 +59,7 @@ Read these first:
 
 Non-negotiable boundaries:
 
-- mods must stay on `@nimiplatform/sdk/mod/*`
+- mods must stay on `@nimiplatform/sdk/mod`, plus `@nimiplatform/sdk/mod/shell` or `@nimiplatform/sdk/mod/lifecycle` only when needed
 - mods must not bypass hook/runtime boundaries
 - runtime UI mods must declare `styles[]`
 - no `../../sdk/src` path aliases

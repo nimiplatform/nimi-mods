@@ -82,7 +82,7 @@ required_capabilities:
   - key: ui.register.ui-extension.runtime.devtools.panel
     source_rule: LC-CAP-001
 allowed_sdk_surfaces:
-  - package: "@nimiplatform/sdk/mod/runtime"
+  - package: "@nimiplatform/sdk/mod"
     apis:
       - ai.text.generate
       - ai.text.stream
@@ -96,7 +96,7 @@ allowed_sdk_surfaces:
       - route.resolve
       - route.checkHealth
     source_rule: LC-CAP-002
-  - package: "@nimiplatform/sdk/mod/hook"
+  - package: "@nimiplatform/sdk/mod"
     source_rule: LC-CAP-002
 forbidden_patterns:
   - pattern: sdk-mod-host-direct-import
