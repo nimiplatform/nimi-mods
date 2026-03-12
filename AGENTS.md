@@ -69,14 +69,7 @@ Manifest is consumed by desktop runtime (`apps/desktop/src-tauri/src/runtime_mod
 - `entry` must align with current build output: `./dist/mods/<mod-name>/index.js`
 - `iconAsset`, if present, must be a package-local relative `.svg` path and will be packed/cataloged for Desktop icon rendering
 
-Current built-in manifest style uses capability keys like:
-
-- `runtime.ai.text.generate`
-- `data.register.data-api.local-chat.sessions.list`
-- `data.query.data-api.local-chat.sessions.list`
-- `ui.register.ui-extension.app.sidebar.mods`
-
-Use explicit capability keys. Do not use wildcard grants.
+Use explicit capability keys (see `apps/desktop/src/runtime/mod/discovery/manifest-capabilities.ts` for current format). Do not use wildcard grants.
 
 ## SDK Imports
 
@@ -98,24 +91,7 @@ Do not use `@nimiplatform/sdk/mod/ui`, `@nimiplatform/sdk/mod/host`, or any SDK 
 
 ## Hook API (V2)
 
-Use `hook.<domain>` clients:
-
-- `hook.event.subscribe/publish`
-- `hook.data.register/query`
-- `hook.ui.register`
-- `hook.turn.register`
-- `hook.interMod.registerHandler/request`
-- `hook.profile.*`, `hook.audit`, `hook.meta`
-- `hook.audit`, `hook.meta`
-
-Use `runtime.<domain>` clients for runtime-facing AI/media/voice work:
-
-- `runtime.route.*`
-- `runtime.ai.*`
-- `runtime.media.*`
-- `runtime.voice.*`
-
-Do not use legacy `hook.eventBus` / `hook.dataApi` / `hook.uiExtension` naming.
+Use `hook.<domain>` and `runtime.<domain>` clients from `@nimiplatform/sdk/mod`. Do not use legacy `hook.eventBus` / `hook.dataApi` / `hook.uiExtension` naming.
 
 ## Build and Dev Commands
 
@@ -135,10 +111,6 @@ pnpm run check
 pnpm run check:spec
 pnpm run verify
 ```
-
-Desktop-side local development is not env-driven as a primary workflow. Add a dev source directory in `Settings > Mod Developer`, then point it at `nimi-mods/runtime` or a specific runtime mod directory.
-
-Environment-variable overrides are CI / internal compatibility only. They are not the supported third-party author path and must not be reintroduced as the primary Desktop integration model.
 
 ## Quality Rules
 
