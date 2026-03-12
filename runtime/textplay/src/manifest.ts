@@ -1,16 +1,12 @@
 import {
+  TEXTPLAY_DATA_API_CREATOR_AGENTS_LIST,
   TEXTPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY,
-  TEXTPLAY_DATA_API_RENDER_PERSIST,
-  TEXTPLAY_DATA_API_SESSIONS_MINE,
-  TEXTPLAY_DATA_API_WORLD_ACCESS_ME,
   TEXTPLAY_DATA_API_WORLD_WORLDS_MINE,
   TEXTPLAY_DATA_API_WORLD_EVENTS_LIST,
   TEXTPLAY_DATA_API_WORLD_LOREBOOKS_LIST,
   TEXTPLAY_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST,
   TEXTPLAY_DATA_API_WORLD_SCENES_LIST,
-  TEXTPLAY_DATA_API_WORLD_SATELLITES_BY_SPINE_LIST,
-  TEXTPLAY_DATA_API_WORLD_SATELLITES_CREATE,
-  TEXTPLAY_DATA_API_WORLD_SPINE_GET_OR_CREATE,
+  TEXTPLAY_DATA_API_WORLD_SPINE_PUBLISH,
   TEXTPLAY_MOD_ID,
   TEXTPLAY_NAV_SLOT,
   TEXTPLAY_PERMISSIONS,
@@ -38,52 +34,36 @@ export const TEXTPLAY_MANIFEST = {
   hooks: {
     dataApis: [
       {
-        name: TEXTPLAY_DATA_API_WORLD_ACCESS_ME,
-        description: 'Read world access contract required by narrative compile context assembly',
-      },
-      {
         name: TEXTPLAY_DATA_API_WORLD_WORLDS_MINE,
-        description: 'Read account world list required by world-first playable story selection',
+        description: 'Read account world list required by entry selection',
       },
       {
         name: TEXTPLAY_DATA_API_WORLD_EVENTS_LIST,
-        description: 'Read world event facts required by narrative compile context assembly',
+        description: 'Read world event entry materials required by story start',
       },
       {
         name: TEXTPLAY_DATA_API_WORLD_LOREBOOKS_LIST,
-        description: 'Read world lorebook facts required by narrative compile context assembly',
+        description: 'Read world lorebooks required by startup package assembly',
       },
       {
         name: TEXTPLAY_DATA_API_WORLD_SCENES_LIST,
-        description: 'Read world scene context required by story startup package assembly',
+        description: 'Read world scenes required by startup package assembly',
       },
       {
         name: TEXTPLAY_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST,
         description: 'Read narrative contexts required by story startup package and prompt policy assembly',
       },
       {
-        name: TEXTPLAY_DATA_API_WORLD_SPINE_GET_OR_CREATE,
-        description: 'Resolve canonical narrative spine id for world+agent persistence scope',
+        name: TEXTPLAY_DATA_API_WORLD_SPINE_PUBLISH,
+        description: 'Publish final narrative draft into story-scoped narrative spine on Stop',
       },
       {
-        name: TEXTPLAY_DATA_API_WORLD_SATELLITES_BY_SPINE_LIST,
-        description: 'Read persisted run snapshots by narrative spine scope',
-      },
-      {
-        name: TEXTPLAY_DATA_API_WORLD_SATELLITES_CREATE,
-        description: 'Write persisted run snapshots as narrative satellites',
+        name: TEXTPLAY_DATA_API_CREATOR_AGENTS_LIST,
+        description: 'Read creator agent profiles for entry agent selection',
       },
       {
         name: TEXTPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY,
         description: 'Read agent memory recall required by narrative compile context assembly',
-      },
-      {
-        name: TEXTPLAY_DATA_API_RENDER_PERSIST,
-        description: 'Persist and query textplay render records with run snapshots',
-      },
-      {
-        name: TEXTPLAY_DATA_API_SESSIONS_MINE,
-        description: 'Read paginated history sessions for continue flow via single-query aggregation',
       },
     ],
     uiExtensions: [

@@ -92,7 +92,7 @@ export function buildNarrativeRenderInput(input: {
       contextCoverage: input.snapshot.contextCoverage,
     },
     player: {
-      id: input.turn.playerId,
+      id: input.turn.userId,
     },
     scene: {
       place: input.snapshot.place,
@@ -103,7 +103,7 @@ export function buildNarrativeRenderInput(input: {
       summary: agentSummary,
     },
     playerAnchor: {
-      id: input.turn.playerId,
+      id: input.turn.userId,
     },
     sceneAnchor: {
       place: input.snapshot.place,

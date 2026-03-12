@@ -45,9 +45,10 @@ export type NarrativeContextSnapshot = {
 };
 export type NarrativeTurnInput = {
     storyId: string;
+    entryEventId?: string;
     worldId: string;
     agentId: string;
-    playerId: string;
+    userId: string;
     triggerSource: NarrativeTriggerSource;
     userMessage?: string;
     systemContext?: Record<string, unknown>;
@@ -67,9 +68,10 @@ export type NarrativeTurnInput = {
 };
 export type NarrativeTurnInputNormalized = {
     storyId: string;
+    entryEventId: string;
     worldId: string;
     agentId: string;
-    playerId: string;
+    userId: string;
     triggerSource: NarrativeTriggerSource;
     userMessage: string;
     systemContext: Record<string, unknown>;
@@ -190,7 +192,7 @@ export type NarrativeTurnRecord = {
     storyId: string;
     worldId: string;
     agentId: string;
-    playerId: string;
+    userId: string;
     triggerSource: NarrativeTriggerSource;
     status: NarrativeTurnStatus;
     reasonCode: NarrativeReasonCode | null;
@@ -242,6 +244,16 @@ export type NarrativeStoreState = {
         inputHash: string;
         response: NarrativeTurnResponse;
     }>;
+};
+export type NarrativeStorySnapshot = {
+    version: 1;
+    storyId: string;
+    turnIds: string[];
+    latestTurnId: string | null;
+    turns: Record<string, NarrativeTurnRecord>;
+    projections: Record<string, NarrativeRenderInput>;
+    spineEvents: NarrativeSpineEvent[];
+    contexts: NarrativeContextScopes;
 };
 export type NarrativeStepResult<T> = {
     ok: boolean;

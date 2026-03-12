@@ -67,12 +67,16 @@ export function toTimestampMs(value: unknown): number {
     return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function extractStoryEntryEventId(storyId: string): string {
-    const parts = toString(storyId).split('.');
-    if (parts.length < 3) {
-        return '';
+export function resolveTurnEntryEventId(turn: NarrativeTurnInputNormalized): string {
+    return toString(turn.entryEventId);
+}
+
+export function resolveRequestedStoryContextId(turn: NarrativeTurnInputNormalized): string {
+    const entryEventId = resolveTurnEntryEventId(turn);
+    if (entryEventId) {
+        return `story.${toString(turn.worldId)}.${entryEventId}`;
     }
-    return toString(parts[parts.length - 1]);
+    return toString(turn.storyId);
 }
 
 export function toRecordArray(value: unknown): Array<Record<string, unknown>> {
@@ -171,7 +175,7 @@ export function extractActors(input: {
     scene: Record<string, unknown> | null;
     turn: NarrativeTurnInputNormalized;
 }): string[] {
-    const actors: string[] = [input.turn.agentId, input.turn.playerId];
+    const actors: string[] = [input.turn.agentId, input.turn.userId];
     for (const event of input.worldEvents) {
         const fields = [
             ...toStringArray(event.characterRefs),
@@ -262,7 +266,7 @@ export function selectTimelineEvents(input: {
         if (refs.includes(input.turn.agentId)) {
             score += 12;
         }
-        if (refs.includes(input.turn.playerId)) {
+        if (refs.includes(input.turn.userId)) {
             score += 10;
         }
         return {
@@ -299,7 +303,7 @@ export function selectFutureEvents(input: {
         if (refs.includes(input.turn.agentId)) {
             score += 12;
         }
-        if (refs.includes(input.turn.playerId)) {
+        if (refs.includes(input.turn.userId)) {
             score += 10;
         }
         return {

@@ -182,7 +182,7 @@ export function buildTextplayPrompt(input: {
     `Story ID: ${input.normalized.storyId}`,
     `Turn ID: ${input.normalized.turnId}`,
     `Trigger Source: ${triggerSource || '(unknown)'}`,
-    `Player ID: ${input.normalized.playerId}`,
+    `User ID: ${input.normalized.userId}`,
     `Player Name: ${playerName || '(unspecified)'}`,
     `Player Identity: ${firstNonEmpty([playerIdentity, openingPlayerIdentity, openingPlayerRole]) || '(unspecified)'}`,
     `Opening Mode: ${openingMode || 'normal'}`,

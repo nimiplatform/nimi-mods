@@ -90,7 +90,7 @@ export async function ensureNarrativeContext(input: {
   storyId: string;
   worldId: string;
   agentId: string;
-  playerId: string;
+  userId: string;
   systemPayload?: Record<string, unknown>;
 }): Promise<NarrativeContextResolveResponse> {
   const current = await queryNarrativeContextResolve({

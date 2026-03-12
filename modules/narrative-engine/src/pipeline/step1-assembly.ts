@@ -20,9 +20,10 @@ import {
     extractFuturePressure,
     extractMemorySnippets,
     extractSceneMaterial,
-    extractStoryEntryEventId,
     extractWorldviewRules,
     pickLatestScopeRow,
+    resolveRequestedStoryContextId,
+    resolveTurnEntryEventId,
     selectFutureEvents,
     selectLorebooks,
     selectRelationRows,
@@ -75,10 +76,10 @@ export function resolveNarrativeScopes(input: {
         rows: input.rows,
         scope: 'CANON',
     });
-    const entryEventId = extractStoryEntryEventId(input.turn.storyId);
+    const entryEventId = resolveTurnEntryEventId(input.turn);
     const anchorResolution = resolveNarrativeContextStoryAnchor({
         rows: input.rows,
-        requestedStoryId: input.turn.storyId,
+        requestedStoryId: resolveRequestedStoryContextId(input.turn),
         primaryAgentId: input.turn.agentId,
         participantIds: uniqueStrings(input.worldEvents.flatMap((event) => toStringArray(event.characterRefs))),
         locationRefs: uniqueStrings(input.worldEvents.flatMap((event) => toStringArray(event.locationRefs))),
@@ -107,7 +108,7 @@ export function resolveNarrativeScopes(input: {
         rows: input.rows,
         resolvedStoryId: anchorResolution.resolvedStoryId,
         primaryAgentId: input.turn.agentId,
-        playerId: input.turn.playerId,
+        userId: input.turn.userId,
         candidateAgentIds: relationCandidateAgentIds,
     });
     const canonScope = {
@@ -304,7 +305,7 @@ export async function runNarrativeStep1Assembly(input: {
                 value: null,
             };
         }
-        const entryEventId = extractStoryEntryEventId(input.turn.storyId);
+        const entryEventId = resolveTurnEntryEventId(input.turn);
         const timelineEvents = selectTimelineEvents({
             worldEvents,
             turn: input.turn,

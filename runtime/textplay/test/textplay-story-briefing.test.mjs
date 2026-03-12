@@ -1,26 +1,40 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildOpeningSystemPayload } from '../src/hooks/story-briefing.ts';
+import { buildContextualUserMessage, buildOpeningSystemPayload } from '../src/hooks/story-briefing.ts';
+
+function createEntry() {
+  return {
+    entryEventId: 'evt-primary',
+    worldId: 'world-1',
+    title: 'Storm Harbor Incident',
+    summary: 'Harbor order breaks under heavy rain.',
+    materialSummary: 'The target event has not happened yet.',
+    participants: ['agent-1', 'agent-2'],
+    characterRefs: ['agent-1', 'agent-2'],
+    eventHorizon: 'PAST',
+    entryMode: 'PRE_EVENT',
+    updatedAt: '2026-03-02T09:00:00.000Z',
+    playable: true,
+    cause: 'Contraband dispute',
+    process: 'Negotiation collapses on the pier.',
+    result: 'Local order fractures',
+    timeRef: 'night-watch',
+    locationRefs: ['scene-docks'],
+    recommendedSceneId: 'scene-docks',
+  };
+}
 
 function createStartupPackage() {
   return {
-    storyId: 'story.world-1.evt-primary',
+    storyId: 'story_01KXTEXTPLAYBRIEFING1234567',
     worldId: 'world-1',
     entryEventId: 'evt-primary',
     entry: {
-      title: 'Storm Harbor Incident',
-      summary: 'Harbor order breaks under heavy rain.',
-      cause: 'Contraband dispute',
-      process: 'Negotiation collapses on the pier.',
-      result: 'Local order fractures',
-      timeRef: 'night-watch',
-      locationRefs: ['scene-docks'],
-      characterRefs: ['agent-1', 'player-1'],
-      recommendedSceneId: 'scene-docks',
+      ...createEntry(),
     },
     cast: {
       primaryAgentId: 'agent-1',
-      participants: ['agent-1', 'player-1'],
+      participants: ['agent-1', 'agent-2'],
     },
     background: {
       summary: 'The harbor is tense and rain-soaked.',
@@ -36,23 +50,21 @@ function createStartupPackage() {
           score: 10,
         },
       ],
-      contexts: [
-        {
-          id: 'ctx-story',
-          scope: 'STORY',
-          scopeKey: 'story:world-1:evt-primary',
-          storyId: 'story.world-1.evt-primary',
-          narrativeSetting: {},
-          narrativeState: {},
-        },
-      ],
+      contexts: [],
       recallSource: 'none',
     },
     narrativeScopes: {
       CANON: {},
-      STORY: {},
-      SUBJECT: {},
-      RELATION: {},
+      STORY: {
+        phase: 'rising',
+        objective: 'Keep the inspection line from collapsing',
+      },
+      SUBJECT: {
+        playerBackground: 'You know every service ladder in the harbor.',
+      },
+      RELATION: {
+        playerRole: 'Embedded observer',
+      },
     },
     recommendedEntryTurn: null,
     startupPolicy: {
@@ -71,7 +83,7 @@ function createStartupPackage() {
       },
     },
     snapshot: {
-      storyId: 'story.world-1.evt-primary',
+      storyId: 'story_01KXTEXTPLAYBRIEFING1234567',
       entryEventId: 'evt-primary',
       primaryAgentId: 'agent-1',
       version: 'h-test',
@@ -80,8 +92,8 @@ function createStartupPackage() {
       contextCoverage: {
         canon: true,
         story: true,
-        subject: false,
-        relation: false,
+        subject: true,
+        relation: true,
         scene: true,
       },
       gapWarnings: [],
@@ -89,36 +101,11 @@ function createStartupPackage() {
   };
 }
 
-function createStory(eventHorizon) {
-  return {
-    storyId: 'story.world-1.evt-primary',
-    worldId: 'world-1',
-    entryEventId: 'evt-primary',
-    title: 'Storm Harbor Incident',
-    summary: 'Storm pressure rises over the harbor……',
-    materialSummary: 'Harbor order breaks under heavy rain while the target event still lies ahead.',
-    primaryAgentId: 'agent-1',
-    participants: ['agent-1', 'player-1'],
-    updatedAt: '2026-03-02T09:00:00.000Z',
-    eventHorizon,
-    entryMode: 'PRE_EVENT',
-    playable: true,
-    agentBindingMissing: false,
-    cause: 'Contraband dispute',
-    process: 'Negotiation collapses on the pier.',
-    result: 'Local order fractures',
-    timeRef: 'night-watch',
-    locationRefs: ['scene-docks'],
-    characterRefs: ['agent-1', 'player-1'],
-    recommendedSceneId: 'scene-docks',
-  };
-}
-
-test('opening payload keeps event horizon for aftermath stories', () => {
+test('opening payload keeps PRE_EVENT semantics and injects user identity context', () => {
   const payload = buildOpeningSystemPayload({
-    story: createStory('PAST'),
+    entry: createEntry(),
     startup: createStartupPackage(),
-    playerId: 'player-1',
+    userId: 'user-1',
     playerName: 'Han Yun',
     playerIdentity: 'Dock courier',
   });
@@ -126,21 +113,19 @@ test('opening payload keeps event horizon for aftermath stories', () => {
   assert.equal(payload.opening.entryMode, 'PRE_EVENT');
   assert.equal(payload.opening.entryEventHorizon, 'PAST');
   assert.equal(payload.opening.targetEventMaterialOnly, true);
-  assert.match(payload.opening.instruction, /发生前/);
-  assert.doesNotMatch(payload.opening.instruction, /目标事件已经发生/);
+  assert.equal(payload.opening.userId, 'user-1');
+  assert.match(payload.opening.instruction, /发生前的临界阶段/);
+  assert.match(payload.opening.background, /Han Yun/);
+  assert.match(payload.opening.background, /Dock courier/);
 });
 
-test('opening payload uses live-conflict instructions for ongoing stories', () => {
-  const payload = buildOpeningSystemPayload({
-    story: createStory('ONGOING'),
-    startup: createStartupPackage(),
-    playerId: 'player-1',
+test('contextual user message prepends player identity when provided', () => {
+  const message = buildContextualUserMessage({
     playerName: 'Han Yun',
     playerIdentity: 'Dock courier',
+    userMessage: 'I step toward the signal mast.',
   });
 
-  assert.equal(payload.opening.entryMode, 'PRE_EVENT');
-  assert.equal(payload.opening.entryEventHorizon, 'ONGOING');
-  assert.match(payload.opening.instruction, /发生前/);
-  assert.match(payload.opening.instruction, /进行中素材带/);
+  assert.match(message, /^\[Han Yun（Dock courier）\]:/);
+  assert.match(message, /I step toward the signal mast/);
 });

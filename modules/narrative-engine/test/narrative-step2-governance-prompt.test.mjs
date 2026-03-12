@@ -8,7 +8,7 @@ function makeTurn() {
     storyId: 'story.world.event-2',
     worldId: 'world-1',
     agentId: 'agent-1',
-    playerId: 'player-1',
+    userId: 'user-1',
     triggerSource: 'UserTurn',
     userMessage: '我尝试潜入钟楼查看暗号来源。',
     systemContext: {},

@@ -123,6 +123,60 @@ export type TextplayWorldSummary = {
   updatedAt: string;
 };
 
+export type TextplayAgentOption = {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+};
+
+export type TextplayEntrySummary = {
+  entryEventId: string;
+  worldId: string;
+  title: string;
+  summary: string;
+  materialSummary: string;
+  participants: string[];
+  characterRefs: string[];
+  eventHorizon: 'PAST' | 'ONGOING' | 'FUTURE';
+  entryMode: 'PRE_EVENT';
+  updatedAt: string;
+  playable: boolean;
+};
+
+export type TextplayEntryDetail = TextplayEntrySummary & {
+  cause: string;
+  process: string;
+  result: string;
+  timeRef: string;
+  locationRefs: string[];
+  recommendedSceneId: string | null;
+};
+
+export type TextplayDraftStatus = 'active' | 'paused';
+
+export type TextplayDraftRecord = {
+  key: string;
+  worldScope: string;
+  userId: string;
+  worldId: string;
+  storyId: string;
+  agentId: string;
+  entryEventId: string;
+  sessionId: string;
+  status: TextplayDraftStatus;
+  playerName: string;
+  playerIdentity: string;
+  entryTitle: string;
+  agentName: string;
+  agentAvatar: string | null;
+  startupPackage: TextplayStartupPackage;
+  engineSnapshot: import('../../../modules/narrative-engine/src/index.js').NarrativeStorySnapshot;
+  records: TextplayPersistRecord[];
+  routeOverride: import('@nimiplatform/sdk/mod').RuntimeRouteBinding | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type TextplayStorySummary = {
   storyId: string;
   worldId: string;
@@ -189,6 +243,8 @@ export type TextplayStartupPackage = {
   entry: {
     title: string;
     summary: string;
+    eventHorizon: 'PAST' | 'ONGOING' | 'FUTURE';
+    entryMode: 'PRE_EVENT';
     cause: string;
     process: string;
     result: string;
@@ -251,7 +307,8 @@ export type TextplayPersistRecord = {
   runId: string;
   traceId: string;
   triggerSource: TextplayTriggerSource;
-  playerId: string;
+  userId: string;
+  playerName?: string;
   playerIdentity?: string;
   userMessage: string;
   systemPayload: Record<string, unknown> | null;
@@ -286,7 +343,7 @@ export type TextplayNormalizedRenderInput = {
   runId: string;
   traceId: string;
   triggerSource: TextplayTriggerSource;
-  playerId: string;
+  userId: string;
   playerName: string;
   playerIdentity: string;
   userMessage: string;

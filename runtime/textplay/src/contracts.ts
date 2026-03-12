@@ -4,38 +4,27 @@ export const TEXTPLAY_TAB_ID = 'mod:textplay';
 export const TEXTPLAY_NAV_SLOT = 'ui-extension.app.sidebar.mods';
 export const TEXTPLAY_ROUTE_SLOT = 'ui-extension.app.content.routes';
 
-export const TEXTPLAY_DATA_API_WORLD_ACCESS_ME = 'data-api.world.access.me';
 export const TEXTPLAY_DATA_API_WORLD_WORLDS_MINE = 'data-api.world.worlds.mine';
 export const TEXTPLAY_DATA_API_WORLD_EVENTS_LIST = 'data-api.world.events.list';
 export const TEXTPLAY_DATA_API_WORLD_LOREBOOKS_LIST = 'data-api.world.lorebooks.list';
 export const TEXTPLAY_DATA_API_WORLD_SCENES_LIST = 'data-api.world.scenes.list';
 export const TEXTPLAY_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST = 'data-api.world.narrative-contexts.list';
-export const TEXTPLAY_DATA_API_WORLD_SPINE_GET_OR_CREATE = 'data-api.world.spine.get-or-create';
-export const TEXTPLAY_DATA_API_WORLD_SATELLITES_BY_SPINE_LIST = 'data-api.world.satellites.by-spine.list';
-export const TEXTPLAY_DATA_API_WORLD_SATELLITES_CREATE = 'data-api.world.satellites.create';
+export const TEXTPLAY_DATA_API_WORLD_SPINE_PUBLISH = 'data-api.world.spine.publish';
+export const TEXTPLAY_DATA_API_CREATOR_AGENTS_LIST = 'data-api.creator.agents.list';
 export const TEXTPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY = 'data-api.core.agent.memory.recall.for-entity';
-export const TEXTPLAY_DATA_API_RENDER_PERSIST = 'data-api.textplay.render.persist';
-export const TEXTPLAY_DATA_API_SESSIONS_MINE = 'data-api.textplay.sessions.mine';
 
 export const TEXTPLAY_CAPABILITIES = [
   'runtime.ai.text.generate',
   'runtime.route.list.options',
   'runtime.route.resolve',
-  'runtime.route.check.health',
-  `data.query.${TEXTPLAY_DATA_API_WORLD_ACCESS_ME}`,
   `data.query.${TEXTPLAY_DATA_API_WORLD_WORLDS_MINE}`,
   `data.query.${TEXTPLAY_DATA_API_WORLD_EVENTS_LIST}`,
   `data.query.${TEXTPLAY_DATA_API_WORLD_LOREBOOKS_LIST}`,
   `data.query.${TEXTPLAY_DATA_API_WORLD_SCENES_LIST}`,
   `data.query.${TEXTPLAY_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST}`,
-  `data.query.${TEXTPLAY_DATA_API_WORLD_SPINE_GET_OR_CREATE}`,
-  `data.query.${TEXTPLAY_DATA_API_WORLD_SATELLITES_BY_SPINE_LIST}`,
-  `data.query.${TEXTPLAY_DATA_API_WORLD_SATELLITES_CREATE}`,
+  `data.query.${TEXTPLAY_DATA_API_WORLD_SPINE_PUBLISH}`,
+  `data.query.${TEXTPLAY_DATA_API_CREATOR_AGENTS_LIST}`,
   `data.query.${TEXTPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY}`,
-  `data.register.${TEXTPLAY_DATA_API_RENDER_PERSIST}`,
-  `data.query.${TEXTPLAY_DATA_API_RENDER_PERSIST}`,
-  `data.register.${TEXTPLAY_DATA_API_SESSIONS_MINE}`,
-  `data.query.${TEXTPLAY_DATA_API_SESSIONS_MINE}`,
   `ui.register.${TEXTPLAY_NAV_SLOT}`,
   `ui.register.${TEXTPLAY_ROUTE_SLOT}`,
 ] as const;

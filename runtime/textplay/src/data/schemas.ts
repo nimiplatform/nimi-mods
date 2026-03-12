@@ -9,7 +9,7 @@ export const NarrativeTriggerSourceSchema = z.enum([
 export const NarrativeTurnLatestRequestSchema = z.strictObject({
   storyId: z.string().min(1),
   triggerSource: NarrativeTriggerSourceSchema,
-  playerId: z.string().min(1),
+  userId: z.string().min(1),
   traceId: z.string().min(1),
   runId: z.string().min(1),
   userMessage: z.string().min(1).optional(),
@@ -168,9 +168,10 @@ export const NarrativeContextResolveResponseSchema = z.strictObject({
 
 export const NarrativeTurnResultUpsertRequestSchema = z.strictObject({
   storyId: z.string().min(1),
+  entryEventId: z.string().min(1).optional(),
   worldId: z.string().min(1),
   agentId: z.string().min(1),
-  playerId: z.string().min(1),
+  userId: z.string().min(1),
   triggerSource: NarrativeTriggerSourceSchema,
   userMessage: z.string().optional(),
   systemContext: z.record(z.string(), z.unknown()).optional(),
@@ -415,7 +416,8 @@ const PersistRecordInputSchema = z.strictObject({
   runId: z.string().min(1),
   traceId: z.string().min(1),
   triggerSource: NarrativeTriggerSourceSchema,
-  playerId: z.string().min(1),
+  userId: z.string().min(1),
+  playerName: z.string().optional(),
   playerIdentity: z.string().optional(),
   userMessage: z.string(),
   systemPayload: z.record(z.string(), z.unknown()).nullable(),
@@ -428,7 +430,7 @@ const PersistRecordInputSchema = z.strictObject({
 });
 
 export const TextplayHistorySessionMineQuerySchema = z.strictObject({
-  playerId: z.string().min(1),
+  userId: z.string().min(1),
   worldId: z.string().min(1).optional(),
   limit: z.number().int().min(1).max(200).optional(),
   cursor: z.string().min(1).optional(),
@@ -470,7 +472,7 @@ export const TextplayPersistQuerySchema = z.discriminatedUnion('op', [
     storyId: z.string().min(1).optional(),
     worldId: z.string().min(1).optional(),
     agentId: z.string().min(1).optional(),
-    playerId: z.string().min(1).optional(),
+    userId: z.string().min(1).optional(),
     afterSeq: z.number().int().min(0).optional(),
     limit: z.number().int().min(1).max(500).optional(),
   }),
@@ -479,23 +481,24 @@ export const TextplayPersistQuerySchema = z.discriminatedUnion('op', [
     storyId: z.string().min(1),
     worldId: z.string().min(1).optional(),
     agentId: z.string().min(1).optional(),
-    playerId: z.string().min(1).optional(),
+    userId: z.string().min(1).optional(),
     limit: z.number().int().min(1).max(200).optional(),
   }),
   z.strictObject({
     op: z.literal('listByScope'),
     worldId: z.string().min(1),
     agentId: z.string().min(1),
-    playerId: z.string().min(1).optional(),
+    userId: z.string().min(1).optional(),
     limit: z.number().int().min(1).max(500).optional(),
   }),
 ]);
 
 export const TextplayRenderRequestSchema = z.strictObject({
   storyId: z.string().min(1),
+  entryEventId: z.string().min(1),
   worldId: z.string().min(1),
   agentId: z.string().min(1),
-  playerId: z.string().min(1),
+  userId: z.string().min(1),
   playerName: z.string().optional(),
   playerIdentity: z.string().optional(),
   triggerSource: NarrativeTriggerSourceSchema,

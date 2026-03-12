@@ -1,21 +1,31 @@
-import type { TextplayShellProps } from '../components/textplay-shell.js';
-import type { NarrativeTurnWindowResponse, TextplayRenderRequest } from '../data/schemas.js';
-import type { TextplayPersistRecord, TextplayStoryDetail } from '../types.js';
+import type {
+  TextplayEntryDetail,
+  TextplayPersistRecord,
+  TextplayStartupPackage,
+} from '../types.js';
 
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== 'object') {
-    return null;
-  }
-  return value as Record<string, unknown>;
+type InitiativeDirectorMessage = {
+  strategy: 'open-thread' | 'pending-event' | 'pressure' | 'agenda' | 'fallback';
+  directive: string;
+};
+
+function toText(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
 }
 
-function toTrimmedString(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : '';
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values.map((item) => item.trim()).filter(Boolean))];
 }
 
 function firstNonEmptyText(values: unknown[]): string {
   for (const value of values) {
-    const text = toTrimmedString(value);
+    const text = toText(value);
     if (text) {
       return text;
     }
@@ -23,285 +33,94 @@ function firstNonEmptyText(values: unknown[]): string {
   return '';
 }
 
-function truncateForPrompt(value: string, maxChars: number): string {
-  const text = String(value || '').replace(/\s+/g, ' ').trim();
-  if (!text) {
-    return '';
-  }
-  if (text.length <= maxChars) {
-    return text;
-  }
-  return `${text.slice(0, maxChars)}...`;
-}
-
 function toStringArray(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => toTrimmedString(item))
-      .filter((item) => item.length > 0);
-  }
-  const text = toTrimmedString(value);
-  if (!text) {
-    return [];
-  }
-  return text
-    .split(/[\n;；|]/g)
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
+  return Array.isArray(value)
+    ? value.map((item) => toText(item)).filter(Boolean)
+    : [];
 }
 
-function uniqueStrings(values: string[]): string[] {
-  return [...new Set(values.map((item) => item.trim()).filter((item) => item.length > 0))];
+function buildOpeningInstruction(entry: TextplayEntryDetail): string {
+  return [
+    '从目标事件真正发生前的临界阶段切入。',
+    '目标事件标题、摘要、起因、过程、结果与时间锚点仅作为 canonical 素材参考，不等于本轮开场中已经发生。',
+    '开场只允许建立现场、处境、压力与可行动钩子，不提前泄露终局。',
+    `目标事件：${entry.title}`,
+  ].join(' ');
 }
 
-type StoryNarrativeContext = {
-  sceneLabel: string;
-  playerRole: string;
-  playerBackground: string;
-  currentSituation: string;
+function deriveStoryNarrativeContext(startup: TextplayStartupPackage): {
   storyScope: Record<string, unknown>;
   subjectScope: Record<string, unknown>;
   relationScope: Record<string, unknown>;
-};
-
-export function deriveStoryNarrativeContext(input: {
-  story: TextplayStoryDetail;
-  startup: NonNullable<TextplayShellProps['startupPackage']>;
-}): StoryNarrativeContext {
-  const storyScope = asRecord(input.startup.narrativeScopes.STORY) || {};
-  const subjectScope = asRecord(input.startup.narrativeScopes.SUBJECT) || {};
-  const relationScope = asRecord(input.startup.narrativeScopes.RELATION) || {};
-  const selectedScene = input.startup.materials.scenes.find((scene) => scene.id === input.startup.entry.recommendedSceneId)
-    || input.startup.materials.scenes[0]
-    || null;
-  const sceneLabel = firstNonEmptyText([
-    selectedScene?.name,
-    selectedScene?.id,
-    input.startup.entry.locationRefs[0],
-  ]) || '未知地点';
-
-  const playerRole = firstNonEmptyText([
-    relationScope.playerRole,
-    relationScope.playerIdentity,
-    relationScope.relationType,
-    relationScope.role,
-    subjectScope.playerRole,
-    subjectScope.identity,
-    subjectScope.role,
-  ]) || '未明身份的到访者';
-
-  const playerBackground = firstNonEmptyText([
-    relationScope.playerBackground,
-    relationScope.background,
-    relationScope.summary,
-    subjectScope.playerBackground,
-    subjectScope.background,
-    subjectScope.summary,
-    input.story.materialSummary,
-  ]);
-
-  const currentSituation = [
-    input.startup.entry.summary,
-    input.startup.entry.cause ? `缘起：${input.startup.entry.cause}` : '',
-    input.startup.entry.process ? `局势：${input.startup.entry.process}` : '',
-    input.startup.entry.timeRef ? `时点：${input.startup.entry.timeRef}` : '',
-    `地点：${sceneLabel}`,
-  ].filter((line) => line.trim().length > 0).join('；');
-
+  playerRole: string;
+  playerBackground: string;
+  currentSituation: string;
+} {
+  const storyScope = asRecord(startup.narrativeScopes.STORY);
+  const subjectScope = asRecord(startup.narrativeScopes.SUBJECT);
+  const relationScope = asRecord(startup.narrativeScopes.RELATION);
   return {
-    sceneLabel,
-    playerRole,
-    playerBackground,
-    currentSituation,
     storyScope,
     subjectScope,
     relationScope,
+    playerRole: firstNonEmptyText([
+      relationScope.playerRole,
+      relationScope.playerIdentity,
+      subjectScope.playerRole,
+      subjectScope.playerIdentity,
+    ]),
+    playerBackground: firstNonEmptyText([
+      relationScope.playerBackground,
+      subjectScope.playerBackground,
+      subjectScope.background,
+    ]),
+    currentSituation: firstNonEmptyText([
+      relationScope.currentSituation,
+      subjectScope.currentSituation,
+      storyScope.currentSituation,
+      storyScope.phase,
+    ]),
   };
 }
 
-function buildRecapTimelineFromTurnWindow(
-  turns: NarrativeTurnWindowResponse['turns'],
-): string {
-  if (!Array.isArray(turns) || turns.length === 0) {
-    return '';
-  }
-
-  const ordered = [...turns]
-    .sort((left, right) => {
-      const leftIndex = Number.isFinite(left.turnIndex) ? Number(left.turnIndex) : Number.MAX_SAFE_INTEGER;
-      const rightIndex = Number.isFinite(right.turnIndex) ? Number(right.turnIndex) : Number.MAX_SAFE_INTEGER;
-      if (leftIndex !== rightIndex) {
-        return leftIndex - rightIndex;
-      }
-      return toTrimmedString(left.createdAt).localeCompare(toTrimmedString(right.createdAt));
-    })
-    .slice(-8);
-
-  const lines: string[] = [];
-  let idx = 0;
-  for (const turn of ordered) {
-    const source = toTrimmedString(turn.triggerSource);
-    const userAction = truncateForPrompt(toTrimmedString(turn.userMessage), 120);
-    const visibleEvents = (Array.isArray(turn.spineEvents) ? turn.spineEvents : [])
-      .filter((event) => event.visibility !== 'internal')
-      .map((event) => truncateForPrompt(toTrimmedString(event.summary), 180))
-      .filter((item) => item.length > 0)
-      .slice(0, 2);
-
-    const eventSummary = visibleEvents.length > 0 ? visibleEvents.join(' / ') : '（无可见事件）';
-    idx += 1;
-    if (source === 'UserTurn') {
-      lines.push(`${idx}. 玩家行动：${userAction || '（未记录）'}；公开结果：${eventSummary}`);
-      continue;
-    }
-    if (source === 'AgentInitiative') {
-      lines.push(`${idx}. 世界推进：${eventSummary}`);
-      continue;
-    }
-    lines.push(`${idx}. 系统推进：${eventSummary}`);
-  }
-
-  return lines.join('\n');
-}
-
-function buildRecapTimelineFromPersistRecords(records: TextplayPersistRecord[]): string {
-  const recent = [...records]
-    .filter((record) => String(record.text || '').trim().length > 0)
-    .slice(0, 8)
-    .reverse();
-  if (recent.length === 0) {
-    return '(暂无历史事件)';
-  }
-  return recent.map((record, index) => {
-    const userAction = truncateForPrompt(record.userMessage, 120);
-    const narrative = truncateForPrompt(record.text, 180);
-    if (record.triggerSource === 'UserTurn') {
-      return `${index + 1}. 玩家行动：${userAction || '（未记录）'}\n   结果：${narrative || '（未记录）'}`;
-    }
-    if (record.triggerSource === 'AgentInitiative') {
-      return `${index + 1}. 世界推进：${narrative || '（未记录）'}`;
-    }
-    return `${index + 1}. 系统推进：${narrative || '（未记录）'}`;
-  }).join('\n');
-}
-
-export function buildStoryRecapPrompt(input: {
-  story: TextplayStoryDetail;
-  startup: NonNullable<TextplayShellProps['startupPackage']>;
-  playerName: string;
-  playerIdentity: string;
-  records: TextplayPersistRecord[];
-  canonicalTurns: NarrativeTurnWindowResponse['turns'];
-}): string {
-  const context = deriveStoryNarrativeContext({
-    story: input.story,
-    startup: input.startup,
-  });
-  const resolvedIdentity = firstNonEmptyText([
-    input.playerIdentity,
-    context.playerRole,
-  ]) || '未明身份';
-  const canonicalTimeline = buildRecapTimelineFromTurnWindow(input.canonicalTurns);
-  const timeline = canonicalTimeline || buildRecapTimelineFromPersistRecords(input.records);
-
-  const lines = [
-    '你是 TextPlay 的前情提要生成器。',
-    '任务：根据已发生内容生成“前情提要”，帮助玩家续玩。',
-    '硬性要求：',
-    '- 只允许复述材料中已经发生的内容，不得新增剧情，不得剧透未来结果。',
-    '- 第三人称有限视角，贴近玩家可感知信息。',
-    '- 3-6句，约150-280字，中文。',
-    '- 最后一句必须给出可行动的下一步钩子。',
-    '',
-    `故事：${input.story.title}`,
-    `目标事件：${input.startup.entry.summary || input.story.materialSummary || input.story.summary}`,
-    `玩家称呼：${input.playerName || '你'}`,
-    `玩家身份：${resolvedIdentity}`,
-    `背景：${truncateForPrompt(input.startup.background.summary || input.story.materialSummary || input.story.summary, 260) || '(暂无)'}`,
-    `当前局势：${truncateForPrompt(context.currentSituation, 260) || '(暂无)'}`,
-    `当前位置：${context.sceneLabel}`,
-    '',
-    `已发生片段（按时间顺序，来源：${canonicalTimeline ? 'canonical narrative turn window' : 'persisted records fallback'}）：`,
-    timeline,
-    '',
-    '输出：仅输出前情提要正文，不要标题，不要列表符号。',
-  ];
-  return lines.join('\n');
-}
-
-function buildOpeningInstruction(
-  story: TextplayStoryDetail,
-): string {
-  const commonLines = [
-    '你正在生成故事开场段落。',
-    '必须自然交代玩家是谁、为何在场、当前处境，并给出一个可行动的起手钩子。',
-    'Fresh story start 一律从目标事件真正发生前的临界阶段切入。',
-    '目标事件标题、摘要、起因、过程、结果、时间锚点都只是 canonical 素材，不是本次开场里已经发生的既定事实。',
-    '故事是否逼近、偏离或改写该目标事件，取决于玩家输入与后续叙事推进。',
-    '不得把目标事件直接写成已经完成，也不得默认沿原剧情结果直线推进。',
-  ];
-  if (story.eventHorizon === 'PAST') {
-    return [
-      ...commonLines,
-      '上游 world truth 中该目标事件已有既有版本，但这里只能把既有版本当作素材参考，不能把既有结果当前置结局。',
-      '只允许描述开场前已发生的背景与当下可见信息，严禁把“事件已完成”写成玩家当前现实。',
-    ].join('');
-  }
-  if (story.eventHorizon === 'ONGOING') {
-    return [
-      ...commonLines,
-      '上游 world truth 中该目标事件处于进行中素材带，但本次 fresh start 仍从其真正爆发前切入。',
-      '只能描写玩家此刻可见的前兆、压力与导火索，不得把 live conflict 当作已经正式开始的既定事实。',
-    ].join('');
-  }
-  return [
-    ...commonLines,
-    '当前处于目标事件发生前的临界阶段，只允许描述已发生背景与当下可见信息。',
-    '严禁剧透未来走向或提前揭示最终结果。',
-  ].join('');
-}
-
 export function buildOpeningSystemPayload(input: {
-  story: TextplayStoryDetail;
-  startup: NonNullable<TextplayShellProps['startupPackage']>;
-  playerId: string;
+  entry: TextplayEntryDetail;
+  startup: TextplayStartupPackage;
+  userId: string;
   playerName: string;
   playerIdentity: string;
 }): Record<string, unknown> {
-  const context = deriveStoryNarrativeContext({
-    story: input.story,
-    startup: input.startup,
-  });
+  const context = deriveStoryNarrativeContext(input.startup);
   const resolvedIdentity = firstNonEmptyText([
     input.playerIdentity,
     context.playerRole,
   ]) || '未明身份的到访者';
 
   const openingBackground = [
-    input.startup.background.summary || input.story.materialSummary || input.story.summary,
+    input.startup.background.summary || input.entry.materialSummary || input.entry.summary,
     `玩家身份：${input.playerName || '你'}（${resolvedIdentity}）`,
     context.playerBackground ? `玩家背景：${context.playerBackground}` : '',
     context.currentSituation ? `当前处境：${context.currentSituation}` : '',
-  ].filter((line) => line.trim().length > 0).join('\n');
+  ].filter(Boolean).join('\n');
 
   return {
     opening: {
       mode: 'story-start',
-      instruction: buildOpeningInstruction(input.story),
-      playerId: input.playerId,
+      instruction: buildOpeningInstruction(input.entry),
+      userId: input.userId,
       playerName: input.playerName,
       playerIdentity: resolvedIdentity,
       playerRole: context.playerRole,
       playerBackground: context.playerBackground,
-      storyId: input.story.storyId,
-      storyTitle: input.story.title,
-      entryMode: input.story.entryMode,
-      entryEventId: input.story.entryEventId,
-      entryEventHorizon: input.story.eventHorizon,
+      storyId: input.startup.storyId,
+      storyTitle: input.entry.title,
+      entryMode: input.startup.entry.entryMode,
+      entryEventId: input.startup.entryEventId,
+      entryEventHorizon: input.startup.entry.eventHorizon,
       targetEventMaterialOnly: true,
-      entrySummary: input.startup.entry.summary || input.story.materialSummary || input.story.summary,
-      phase: context.storyScope.phase || 'opening',
-      objective: context.storyScope.objective || 'advance-story',
+      entrySummary: input.startup.entry.summary || input.entry.materialSummary || input.entry.summary,
+      phase: toText(context.storyScope.phase) || 'opening',
+      objective: toText(context.storyScope.objective) || 'advance-story',
       background: openingBackground,
       currentSituation: context.currentSituation,
       recommendedSceneId: input.startup.entry.recommendedSceneId,
@@ -310,61 +129,42 @@ export function buildOpeningSystemPayload(input: {
   };
 }
 
-type InitiativeDirectorMessage = {
-  strategy: 'open-thread' | 'pending-event' | 'pressure' | 'agenda' | 'fallback';
-  directive: string;
-};
-
-function collectInitiativeHooks(startup: NonNullable<TextplayShellProps['startupPackage']>): {
+function collectInitiativeHooks(startup: TextplayStartupPackage): {
   openThreads: string[];
   pendingEvents: string[];
   pressures: string[];
   agendas: string[];
 } {
-  const storyScope = asRecord(startup.narrativeScopes.STORY) || {};
-  const storyNarrativeState = asRecord(storyScope.narrativeState) || {};
-  const storyContextRows = startup.materials.contexts
-    .filter((context) => context.scope === 'STORY' && (!context.storyId || context.storyId === startup.storyId));
+  const storyScope = asRecord(startup.narrativeScopes.STORY);
+  const storyContexts = startup.materials.contexts.filter((item) => item.scope === 'STORY');
 
-  const fromStoryScope = (key: string): string[] => uniqueStrings([
-    ...toStringArray(storyScope[key]),
-    ...toStringArray(storyNarrativeState[key]),
-  ]);
-  const fromStoryContexts = (key: string): string[] => uniqueStrings(
-    storyContextRows.flatMap((row) => {
-      const rowState = asRecord(row.narrativeState) || {};
-      const rowSetting = asRecord(row.narrativeSetting) || {};
-      return [
-        ...toStringArray(rowState[key]),
-        ...toStringArray(rowSetting[key]),
-      ];
-    }),
+  const fromScope = (key: string): string[] => uniqueStrings(toStringArray(storyScope[key]));
+  const fromContexts = (key: string): string[] => uniqueStrings(
+    storyContexts.flatMap((item) => [
+      ...toStringArray(asRecord(item.narrativeState)[key]),
+      ...toStringArray(asRecord(item.narrativeSetting)[key]),
+    ]),
   );
 
-  const openThreads = uniqueStrings([
-    ...fromStoryScope('openThreads'),
-    ...fromStoryContexts('openThreads'),
-  ]);
-  const pendingEvents = uniqueStrings([
-    ...fromStoryScope('pendingEvents'),
-    ...fromStoryContexts('pendingEvents'),
-  ]);
-  const pressures = uniqueStrings([
-    ...fromStoryScope('conflicts'),
-    ...fromStoryScope('threats'),
-    ...fromStoryContexts('conflicts'),
-    ...fromStoryContexts('threats'),
-  ]);
-  const agendas = uniqueStrings([
-    ...fromStoryScope('npcsWithAgenda'),
-    ...fromStoryContexts('npcsWithAgenda'),
-  ]);
-
   return {
-    openThreads,
-    pendingEvents,
-    pressures,
-    agendas,
+    openThreads: uniqueStrings([
+      ...fromScope('openThreads'),
+      ...fromContexts('openThreads'),
+    ]),
+    pendingEvents: uniqueStrings([
+      ...fromScope('pendingEvents'),
+      ...fromContexts('pendingEvents'),
+    ]),
+    pressures: uniqueStrings([
+      ...fromScope('conflicts'),
+      ...fromScope('threats'),
+      ...fromContexts('conflicts'),
+      ...fromContexts('threats'),
+    ]),
+    agendas: uniqueStrings([
+      ...fromScope('npcsWithAgenda'),
+      ...fromContexts('npcsWithAgenda'),
+    ]),
   };
 }
 
@@ -372,27 +172,24 @@ function appearsInRecentHistory(input: {
   candidate: string;
   records: TextplayPersistRecord[];
 }): boolean {
-  const token = toTrimmedString(input.candidate).toLowerCase().slice(0, 18);
+  const token = toText(input.candidate).toLowerCase().slice(0, 18);
   if (!token) {
     return false;
   }
-  const recent = input.records.slice(0, 6);
-  for (const record of recent) {
-    const combined = `${record.userMessage || ''}\n${record.text || ''}`.toLowerCase();
-    if (combined.includes(token)) {
-      return true;
-    }
-  }
-  return false;
+  const recent = input.records.slice(-6);
+  return recent.some((record) => (
+    `${record.userMessage || ''}\n${record.text || ''}`.toLowerCase().includes(token)
+  ));
 }
 
 export function buildInitiativeDirectorMessage(input: {
-  startup: NonNullable<TextplayShellProps['startupPackage']>;
+  startup: TextplayStartupPackage;
   records: TextplayPersistRecord[];
   playerName: string;
 }): InitiativeDirectorMessage {
   const hooks = collectInitiativeHooks(input.startup);
-  const playerName = toTrimmedString(input.playerName) || '玩家';
+  const playerName = toText(input.playerName) || '玩家';
+
   const pickFresh = (items: string[]): string => {
     for (const item of items) {
       if (!appearsInRecentHistory({ candidate: item, records: input.records })) {
@@ -439,6 +236,7 @@ export function buildInitiativeDirectorMessage(input: {
     input.startup.entry.cause,
     input.startup.entry.summary,
   ]) || '局势暗流正在积聚';
+
   return {
     strategy: 'fallback',
     directive: `【世界推进】基于“${fallbackSeed}”制造新的现场变化，不要直接结束目标事件，并给${playerName}一个清晰的下一步行动入口。`,
@@ -450,37 +248,16 @@ export function buildContextualUserMessage(input: {
   playerIdentity: string;
   userMessage: string;
 }): string {
-  const userMessage = toTrimmedString(input.userMessage);
+  const userMessage = toText(input.userMessage);
   if (!userMessage) {
     return '';
   }
-  const playerName = toTrimmedString(input.playerName);
-  const playerIdentity = toTrimmedString(input.playerIdentity);
+  const playerName = toText(input.playerName);
+  const playerIdentity = toText(input.playerIdentity);
   if (!playerName && !playerIdentity) {
     return userMessage;
   }
   const role = playerIdentity ? `（${playerIdentity}）` : '';
   const speaker = playerName || '玩家';
   return `[${speaker}${role}]: ${userMessage}`;
-}
-
-export function withPlayerContextSystemPayload(input: {
-  basePayload?: Record<string, unknown>;
-  playerId: string;
-  playerName: string;
-  playerIdentity: string;
-}): TextplayRenderRequest['systemPayload'] {
-  const playerId = toTrimmedString(input.playerId);
-  if (!playerId) {
-    return input.basePayload;
-  }
-  const merged: Record<string, unknown> = {
-    ...(input.basePayload || {}),
-    playerContext: {
-      playerId,
-      playerName: toTrimmedString(input.playerName) || undefined,
-      playerIdentity: toTrimmedString(input.playerIdentity) || undefined,
-    },
-  };
-  return merged;
 }

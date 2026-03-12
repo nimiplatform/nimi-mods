@@ -309,11 +309,11 @@ export function pickNarrativeRelationContextRow(input: {
   rows: NarrativeContextRowLike[];
   resolvedStoryId: string | null;
   primaryAgentId: string;
-  playerId?: string;
+  userId?: string;
   candidateAgentIds?: string[];
 }): NarrativeContextRowLike | null {
   const primaryAgentId = toString(input.primaryAgentId);
-  const playerId = toString(input.playerId);
+  const userId = toString(input.userId);
   const candidateAgentIds = uniqueStrings(input.candidateAgentIds || []).filter((item) => item !== primaryAgentId);
   if (!primaryAgentId) {
     return null;
@@ -344,7 +344,7 @@ export function pickNarrativeRelationContextRow(input: {
         resolvedStoryId: input.resolvedStoryId,
       });
 
-      if (otherType === 'PLAYER' && playerId && otherId === playerId) {
+      if (otherType === 'PLAYER' && userId && otherId === userId) {
         score += 200;
       }
       if (otherType === 'AGENT' && candidateAgentIds.includes(otherId)) {

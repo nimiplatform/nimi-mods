@@ -9,6 +9,7 @@ import type {
   NarrativeReplayResult,
   NarrativeRunEvent,
   NarrativeSpineEvent,
+  NarrativeStorySnapshot,
   NarrativeStoreState,
   NarrativeTurnRecord,
   NarrativeTurnResponse,
@@ -89,6 +90,77 @@ export function resetNarrativeRepositoryForTests(): void {
 
 export function readNarrativeStoreForDiagnostics(): NarrativeStoreState {
   return ensureStore();
+}
+
+export function exportStoryState(storyId: string): NarrativeStorySnapshot {
+  const state = ensureStore();
+  const turnIds = [...(state.turnIdsByStoryId[storyId] || [])];
+  const turns: Record<string, NarrativeTurnRecord> = {};
+  const projections: Record<string, NarrativeRenderInput> = {};
+
+  for (const turnId of turnIds) {
+    const turn = state.turnsById[turnId];
+    if (!turn) {
+      continue;
+    }
+    turns[turnId] = turn;
+    const projection = state.projectionsByTurnId[turnId];
+    if (projection) {
+      projections[turnId] = projection;
+    }
+  }
+
+  return {
+    version: 1,
+    storyId,
+    turnIds,
+    latestTurnId: state.latestTurnIdByStoryId[storyId] || null,
+    turns,
+    projections,
+    spineEvents: [...(state.spineByStoryId[storyId] || [])],
+    contexts: resolveNarrativeContext(storyId),
+  };
+}
+
+export function resetStoryState(storyId: string): void {
+  const state = ensureStore();
+  const turnIds = [...(state.turnIdsByStoryId[storyId] || [])];
+  delete state.contextsByStoryId[storyId];
+  delete state.turnIdsByStoryId[storyId];
+  delete state.latestTurnIdByStoryId[storyId];
+  delete state.spineByStoryId[storyId];
+
+  for (const turnId of turnIds) {
+    delete state.turnsById[turnId];
+    delete state.projectionsByTurnId[turnId];
+  }
+
+  commitStore();
+}
+
+export function hydrateStoryState(snapshot: NarrativeStorySnapshot): void {
+  resetStoryState(snapshot.storyId);
+  const state = ensureStore();
+  state.contextsByStoryId[snapshot.storyId] = {
+    CANON: { ...snapshot.contexts.CANON },
+    STORY: { ...snapshot.contexts.STORY },
+    SUBJECT: { ...snapshot.contexts.SUBJECT },
+    RELATION: { ...snapshot.contexts.RELATION },
+  };
+  state.turnIdsByStoryId[snapshot.storyId] = [...snapshot.turnIds];
+  if (snapshot.latestTurnId) {
+    state.latestTurnIdByStoryId[snapshot.storyId] = snapshot.latestTurnId;
+  }
+  state.spineByStoryId[snapshot.storyId] = [...snapshot.spineEvents];
+
+  for (const [turnId, turn] of Object.entries(snapshot.turns)) {
+    state.turnsById[turnId] = turn;
+  }
+  for (const [turnId, projection] of Object.entries(snapshot.projections)) {
+    state.projectionsByTurnId[turnId] = projection;
+  }
+
+  commitStore();
 }
 
 export function resolveNarrativeContext(storyId: string): NarrativeContextScopes {

@@ -77,7 +77,7 @@ function resolveTurnConsistency(input: {
 }): {
   storyId: string;
   turnId: string;
-  playerId: string;
+  userId: string;
   playerName: string;
   playerIdentity: string;
   agentId: string;
@@ -138,14 +138,14 @@ function resolveTurnConsistency(input: {
     });
   }
 
-  const projectionPlayerId = normalizeId(projection.player.id);
-  const requestPlayerId = normalizeId(input.request.playerId);
-  const canonicalPlayerId = projectionPlayerId || requestPlayerId;
-  if (!canonicalPlayerId) {
+  const projectionUserId = normalizeId(projection.player.id);
+  const requestUserId = normalizeId(input.request.userId);
+  const canonicalUserId = projectionUserId || requestUserId;
+  if (!canonicalUserId) {
     throw new TextplayPipelineError({
       reasonCode: TEXTPLAY_REASON.INPUT_INVALID,
       actionHint: 'Repair narrative identity binding and retry.',
-      message: 'TEXTPLAY_PLAYER_ID_EMPTY',
+      message: 'TEXTPLAY_USER_ID_EMPTY',
       stage: 'input',
       retryClass: 'non-retryable',
     });
@@ -205,7 +205,7 @@ function resolveTurnConsistency(input: {
   return {
     storyId: upsertStoryId || requestStoryId,
     turnId: upsertTurnId,
-    playerId: canonicalPlayerId,
+    userId: canonicalUserId,
     playerName: canonicalPlayerName,
     playerIdentity: canonicalPlayerIdentity,
     agentId: canonicalAgentId,
@@ -285,7 +285,7 @@ export function normalizeTextplayRenderInput(input: {
     runId: normalizeId(input.request.runId),
     traceId: normalizeId(input.request.traceId),
     triggerSource: consistency.triggerSource,
-    playerId: consistency.playerId,
+    userId: consistency.userId,
     playerName: consistency.playerName,
     playerIdentity: consistency.playerIdentity,
     userMessage: String(input.request.userMessage || input.projection.userMessage || ''),
@@ -308,7 +308,7 @@ export function normalizeTextplayRenderInput(input: {
     agentId: normalized.agentId,
     turnId: normalized.turnId,
     triggerSource: normalized.triggerSource,
-    playerId: normalized.playerId,
+    userId: normalized.userId,
     playerName: normalized.playerName,
     playerIdentity: normalized.playerIdentity,
     userMessage: normalized.userMessage,

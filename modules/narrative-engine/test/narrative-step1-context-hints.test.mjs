@@ -6,10 +6,11 @@ const NOW_MS = Date.parse('2026-03-03T00:00:00.000Z');
 
 function makeTurn() {
   return {
-    storyId: 'story.world.event-1',
+    storyId: 'story_01KXTEXTPLAYSTEP1ENTRY123456789',
+    entryEventId: 'event-past-1',
     worldId: 'world-1',
     agentId: 'agent-1',
-    playerId: 'player-1',
+    userId: 'user-1',
     triggerSource: 'UserTurn',
     userMessage: '我先观察局势，再决定是否动手。',
     systemContext: {},
@@ -102,7 +103,7 @@ test('step1 compiles hidden future notes and advance hints for stagnation contro
         },
         {
           scope: 'STORY',
-          storyId: 'story.world.event-1',
+          storyId: 'story.world-1.event-past-1',
           narrativeSetting: {
             initiativePolicy: {
               cooldownSeconds: 180,
@@ -175,7 +176,7 @@ test('step1 detects rhythm monotony when 3+ of last 5 spine events share same ty
     ]}),
     queryNarrativeContexts: async () => ({ items: [
       { scope: 'CANON', narrativeSetting: { worldviewRules: ['夜禁'] }, narrativeState: {}, updatedAt: '2026-03-02T10:00:00.000Z' },
-      { scope: 'STORY', storyId: 'story.world.event-1', narrativeSetting: {}, narrativeState: { phase: 'rising', objective: '突围', tension: 0.5, openThreads: [] }, updatedAt: '2026-03-02T10:10:00.000Z' },
+      { scope: 'STORY', storyId: 'story.world-1.event-past-1', narrativeSetting: {}, narrativeState: { phase: 'rising', objective: '突围', tension: 0.5, openThreads: [] }, updatedAt: '2026-03-02T10:10:00.000Z' },
     ]}),
     queryAgentMemoryRecall: async () => ({ core: [], e2e: [] }),
   });
@@ -203,7 +204,7 @@ test('step1 does not generate rhythm hints when no spine history provided', asyn
     ]}),
     queryNarrativeContexts: async () => ({ items: [
       { scope: 'CANON', narrativeSetting: { worldviewRules: ['夜禁'] }, narrativeState: {}, updatedAt: '2026-03-02T10:00:00.000Z' },
-      { scope: 'STORY', storyId: 'story.world.event-1', narrativeSetting: {}, narrativeState: { phase: 'rising', objective: '突围', tension: 0.5, openThreads: [] }, updatedAt: '2026-03-02T10:10:00.000Z' },
+      { scope: 'STORY', storyId: 'story.world-1.event-past-1', narrativeSetting: {}, narrativeState: { phase: 'rising', objective: '突围', tension: 0.5, openThreads: [] }, updatedAt: '2026-03-02T10:10:00.000Z' },
     ]}),
     queryAgentMemoryRecall: async () => ({ core: [], e2e: [] }),
   });

@@ -1,6 +1,5 @@
 import { TEXTPLAY_CAPABILITIES, TEXTPLAY_MOD_ID, } from './contracts.js';
 import { createTextplayFlowId, emitTextplayLog, } from './logging.js';
-import { registerTextplayDataCapabilities } from './registrars/data.js';
 import { registerTextplayUiExtensions } from './registrars/ui.js';
 import { createHookClient, type RuntimeModRegistration } from "@nimiplatform/sdk/mod";
 export function createTextplayRuntimeMod(): RuntimeModRegistration {
@@ -18,7 +17,6 @@ export function createTextplayRuntimeMod(): RuntimeModRegistration {
                 flowId,
                 source: 'createTextplayRuntimeMod.setup',
             });
-            await registerTextplayDataCapabilities({ hookClient });
             await registerTextplayUiExtensions({ hookClient });
             emitTextplayLog({
                 level: 'info',

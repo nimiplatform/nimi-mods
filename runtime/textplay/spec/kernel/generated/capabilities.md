@@ -17,10 +17,6 @@ required_capabilities:
     source_rule: T-CAP-003
   - key: runtime.route.resolve
     source_rule: T-CAP-003
-  - key: runtime.route.check.health
-    source_rule: T-CAP-003
-  - key: data.query.data-api.world.access.me
-    source_rule: T-CAP-003
   - key: data.query.data-api.world.worlds.mine
     source_rule: T-CAP-003
   - key: data.query.data-api.world.events.list
@@ -31,22 +27,12 @@ required_capabilities:
     source_rule: T-CAP-003
   - key: data.query.data-api.world.narrative-contexts.list
     source_rule: T-CAP-003
-  - key: data.query.data-api.world.spine.get-or-create
+  - key: data.query.data-api.world.spine.publish
     source_rule: T-CAP-003
-  - key: data.query.data-api.world.satellites.by-spine.list
-    source_rule: T-CAP-003
-  - key: data.query.data-api.world.satellites.create
+  - key: data.query.data-api.creator.agents.list
     source_rule: T-CAP-003
   - key: data.query.data-api.core.agent.memory.recall.for-entity
     source_rule: T-CAP-003
-  - key: data.register.data-api.textplay.render.persist
-    source_rule: T-CAP-004
-  - key: data.query.data-api.textplay.render.persist
-    source_rule: T-CAP-004
-  - key: data.register.data-api.textplay.sessions.mine
-    source_rule: T-CAP-004
-  - key: data.query.data-api.textplay.sessions.mine
-    source_rule: T-CAP-004
   - key: ui.register.ui-extension.app.sidebar.mods
     source_rule: T-CAP-001
   - key: ui.register.ui-extension.app.content.routes
@@ -61,6 +47,9 @@ forbidden_patterns:
     source_rule: T-CAP-002
   - pattern: cross-mod-narrative-data-api-query
     reason: TextPlay must use shared narrative-engine module instead of cross-mod data-api query
+    source_rule: T-CAP-003
+  - pattern: draft-publish-during-active-turn
+    reason: TextPlay writes realm narrative artifacts only on Stop publish, never during active draft turns
     source_rule: T-CAP-003
   - pattern: raw-narrative-fact-rewrite
     reason: violates renderer read-only fact boundary

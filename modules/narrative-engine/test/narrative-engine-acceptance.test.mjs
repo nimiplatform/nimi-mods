@@ -232,9 +232,10 @@ function makeCoreOutput(options = {}) {
 function makeTurnInput(options = {}) {
   return {
     storyId: String(options.storyId || 'story-1'),
+    entryEventId: typeof options.entryEventId === 'undefined' ? undefined : String(options.entryEventId),
     worldId: String(options.worldId || 'world-1'),
     agentId: String(options.agentId || 'agent-1'),
-    playerId: String(options.playerId || 'player-1'),
+    userId: String(options.userId || 'user-1'),
     triggerSource: options.triggerSource || 'UserTurn',
     userMessage: String(options.userMessage || 'hello'),
     systemContext: options.systemContext || { mood: 'neutral' },

@@ -28,20 +28,23 @@ function buildActionHintForInputInvalid(error: unknown): string {
     return issueMessage || 'Fix turn input fields and retry.';
 }
 function normalizeTurnInput(input: NarrativeTurnInput): NarrativeTurnInputNormalized {
-    const nowMs = Number.isFinite(input.nowMs) ? Number(input.nowMs) : Date.now();
-    const traceId = String(input.traceId || '').trim() || createUlid(nowMs);
-    const runId = String(input.runId || '').trim() || createUlid(nowMs + 4);
-    const taskIdRaw = String(input.taskId || '').trim() || createUlid(nowMs + 5);
-    const taskId = taskIdRaw === runId ? createUlid(nowMs + 6) : taskIdRaw;
-    return {
-        storyId: String(input.storyId || '').trim(),
-        worldId: String(input.worldId || '').trim(),
-        agentId: String(input.agentId || '').trim(),
-        playerId: String(input.playerId || '').trim(),
-        triggerSource: input.triggerSource,
-        userMessage: String(input.userMessage || '').trim(),
-        systemContext: asRecord(input.systemContext),
-        idempotencyKey: String(input.idempotencyKey || '').trim() || createUlid(nowMs + 1),
+  const nowMs = Number.isFinite(input.nowMs) ? Number(input.nowMs) : Date.now();
+  const traceId = String(input.traceId || '').trim() || createUlid(nowMs);
+  const runId = String(input.runId || '').trim() || createUlid(nowMs + 4);
+  const taskIdRaw = String(input.taskId || '').trim() || createUlid(nowMs + 5);
+  const taskId = taskIdRaw === runId ? createUlid(nowMs + 6) : taskIdRaw;
+  const systemContext = asRecord(input.systemContext);
+  const openingPayload = asRecord(systemContext.opening);
+  return {
+    storyId: String(input.storyId || '').trim(),
+    entryEventId: String(input.entryEventId || openingPayload.entryEventId || '').trim(),
+    worldId: String(input.worldId || '').trim(),
+    agentId: String(input.agentId || '').trim(),
+    userId: String(input.userId || '').trim(),
+    triggerSource: input.triggerSource,
+    userMessage: String(input.userMessage || '').trim(),
+    systemContext,
+    idempotencyKey: String(input.idempotencyKey || '').trim() || createUlid(nowMs + 1),
         capability: input.capability || 'text.generate',
         binding: asRecord(input.binding),
         turnId: String(input.turnId || '').trim() || createUlid(nowMs + 2),

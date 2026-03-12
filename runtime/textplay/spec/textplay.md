@@ -1,7 +1,7 @@
 # TextPlay Domain Spec
 
 > Status: Draft
-> Date: 2026-03-02
+> Date: 2026-03-12
 > Scope: Text renderer increments only.
 
 ## 0. Normative Imports
@@ -23,6 +23,8 @@
 - `TXT-004`: Persistence failure is non-blocking for returned render output.
 - `TXT-005`: Presence transitions must emit auditable report events.
 - `TXT-006`: Run recovery must preserve idempotent side effects and terminal-state monotonicity.
+- `TXT-007`: `WorldEvent` is entry material only; runtime story instance identity is `story_${ulid}` generated on explicit `Start`.
+- `TXT-008`: TextPlay uses `userId` as account identity. `playerName` and `playerIdentity` describe the user's in-story persona only.
 
 ## 2. Domain Increments
 
@@ -33,26 +35,27 @@
 - `TXT-014`: Render output must always include `text` and `meta`.
 - `TXT-015`: Initiative events reset idle/away timers in presence state machine.
 - `TXT-016`: Resume with checkpoint hash mismatch is fail-close.
-- `TXT-017`: Playable story catalog is derived from `data-api.world.events.list`, keeps `PRIMARY` events only, preserves upstream `eventHorizon` as canonical target-event metadata, and excludes `FUTURE` events from direct player-facing selection by default.
-- `TXT-017A`: Player-facing story introduction is teaser-only: one or two background clauses with trailing ellipsis. Canonical target-event details stay in startup/prompt materials and are not fully dumped in catalog UI.
-- `TXT-018`: Story startup package is assembled from world events, scenes, narrative-contexts, lorebooks, agent memory recall, and optional narrative latest turn lookup.
-- `TXT-019`: Send action is blocked when no selected story or startup package is not ready.
-- `TXT-023`: Story switch resets run surface state and reloads persisted records by selected story id.
-- `TXT-024`: Runtime binding uses single primary agent id for turn execution and keeps other participants as context-only metadata.
-- `TXT-025`: Story startup package must include `startupPolicy` and snapshot `contextCoverage/gapWarnings` diagnostics.
-- `TXT-026`: Frontend auto tick may trigger `AgentInitiative` only when presence/cooldown/maxConsecutive policies are satisfied.
-- `TXT-027`: Missing `CANON/STORY` context is fail-close; missing `SUBJECT/RELATION/scene` is degraded with warnings. `SUBJECT/RELATION` lookup may use exact-story match, resolved stable non-event story anchor, or storyless baseline only; cross-story fallback is forbidden.
-- `TXT-028`: Story selection is world-scoped and requires selecting account world first.
-- `TXT-029`: Fresh story requires explicit Start action that triggers one opening `SystemEvent` render before player input is accepted; fresh entry starts from the selected target event's pre-threshold rather than treating canonical event details as already happened opening facts.
-- `TXT-030`: Left context panel must be independently scrollable to preserve access to session controls on small viewports.
-- `TXT-031`: Tension pacing constraints are injected into render prompt based on `pacingContext.tensionBand` (HIGH/MODERATE/LOW).
-- `TXT-032`: Event type rendering guidance is appended per-event as `Rendering hint` when the event carries a recognized `type` field.
-- `TXT-033`: Unknown or missing event `type` degrades gracefully — no rendering hint appended, event renders with visibility tag only.
-- `TXT-034`: Desktop route registration must request `immersive` shell mode so the three-pane TextPlay workspace renders without nested host chrome collapse after the zero-bundle mod host split.
-- `TXT-035`: Desktop workspace must preserve simultaneous visibility of context, timeline, and diagnostics panes at desktop host widths; vertical stacking is only allowed below the desktop breakpoint.
+- `TXT-017`: Player-facing entry catalog is derived from `data-api.world.events.list`, keeps `PRIMARY` events only, preserves upstream `eventHorizon` as canonical target-event metadata, and excludes `FUTURE` events from direct player-facing selection by default.
+- `TXT-018`: `Start` generates fresh `storyId = story_${ulid}` and `sessionId = session_${ulid}`. `entryEventId` is preserved separately and never reused as runtime story identity.
+- `TXT-019`: Entry agent is user-selected from `characterRefs`. When only one character ref exists it auto-selects; when none exist `Start` is disabled. TextPlay does not resolve fallback primary-agent chains.
+- `TXT-020`: Story startup package is assembled from entry detail, scenes, narrative-contexts, lorebooks, agent memory recall, and startup policy/material diagnostics.
+- `TXT-021`: TextPlay persists active drafts locally first. Local draft storage uses IndexedDB when available and may fall back to in-memory Map without blocking play.
+- `TXT-022`: `Start`, `Resume`, and draft switching must auto-save the previously active story as `paused` before hydrating another draft. UI exposes at most one active session at a time.
+- `TXT-023`: `Restart` resets only the current story draft and narrative-engine story state, preserves the same `storyId`, `sessionId`, `agentId`, and `startupPackage`, then reruns opening.
+- `TXT-024`: `Stop` performs a single fire-and-forget publish to `data-api.world.spine.publish`; publish success or failure cannot block session teardown. Local draft and story state are always cleared afterwards.
+- `TXT-025`: Published realm archive is not used as the continue source for current UI. Continue/resume truth comes only from local drafts.
+- `TXT-026`: Story startup package must include `startupPolicy` and snapshot `contextCoverage/gapWarnings` diagnostics.
+- `TXT-027`: Frontend auto tick may trigger `AgentInitiative` only when presence/cooldown/maxConsecutive policies are satisfied.
+- `TXT-028`: Missing `CANON/STORY` context is fail-close; missing `SUBJECT/RELATION/scene` is degraded with warnings. STORY-context lookup still uses template story ids derived from `WorldEvent`.
+- `TXT-029`: Fresh story requires explicit `Start` action that triggers one opening `SystemEvent` render before player input is accepted; fresh entry starts from the selected target event's pre-threshold rather than treating canonical event details as already happened opening facts.
+- `TXT-030`: Route Config moves into a right-side settings drawer; `Session Health`, `Debug Trace`, and remote history panels are not part of the main TextPlay workspace.
+- `TXT-031`: Desktop route registration must request `immersive` shell mode so the two-column TextPlay workspace renders without nested host chrome collapse after the zero-bundle mod host split.
+- `TXT-032`: Tension pacing constraints are injected into render prompt based on `pacingContext.tensionBand` (HIGH/MODERATE/LOW).
+- `TXT-033`: Event type rendering guidance is appended per-event as `Rendering hint` when the event carries a recognized `type` field.
+- `TXT-034`: Unknown or missing event `type` degrades gracefully — no rendering hint appended, event renders with visibility tag only.
 
 ## 3. No Over-Design Guard
 
-- `TXT-020`: No renderer-side world fact persistence contract is introduced.
-- `TXT-021`: No model vendor-specific binding is introduced in domain doc.
-- `TXT-022`: No fallback compatibility path is introduced.
+- `TXT-040`: No renderer-side world fact persistence contract is introduced outside the single publish endpoint.
+- `TXT-041`: No model vendor-specific binding is introduced in domain doc.
+- `TXT-042`: No fallback compatibility path is introduced.

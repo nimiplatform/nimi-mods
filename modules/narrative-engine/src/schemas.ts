@@ -44,9 +44,10 @@ export const NarrativeCoreOutputSchema = z.object({
 
 export const NarrativeTurnInputSchema = z.object({
   storyId: z.string().min(1),
+  entryEventId: z.string().min(1).optional(),
   worldId: z.string().min(1),
   agentId: z.string().min(1),
-  playerId: z.string().min(1),
+  userId: z.string().min(1),
   triggerSource: NarrativeTriggerSourceSchema,
   userMessage: z.string().optional(),
   systemContext: z.record(z.string(), z.unknown()).optional(),

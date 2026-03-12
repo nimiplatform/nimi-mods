@@ -1,600 +1,718 @@
-import React, { useEffect, useState } from 'react';
-import type { TextplayHistorySession, TextplayPersistRecord, TextplayPresenceReport, TextplayPresenceState, TextplayRenderFailure, TextplayStoryDetail, TextplayStoryBrief, TextplayStorySnapshot, TextplayStorySummary, TextplayWorldSummary, TextplayRunEvent, TextplayRunSnapshot, TextplayStartupPackage, TextplayWarning, } from '../types.js';
-import { TextplayVisualStyles } from './textplay-visual-styles.js';
-import { type RuntimeRouteSource } from "@nimiplatform/sdk/mod";
-import { rightPanelSectionHeader, formatRunEvent, formatRecordTitle, formatTriggerSourceLabel, triggerSourceBadgeClass, formatRouteLabelFromRecord, formatHistorySessionTitle, formatHistorySessionUpdatedAt, findLastStepError, normalizeUserTurnMessage, formatTimelineStageLabel, formatTimelineResponseLabel, responsePanelClass, renderOpeningCard, renderStorySummary, } from './textplay-shell-helpers.js';
-export type TextplayShellProps = {
-    storyId: string;
-    worldId: string;
-    agentId: string;
-    playerId: string;
-    playerName: string;
-    playerIdentity: string;
-    routeLabel: string;
-    worlds: TextplayWorldSummary[];
-    selectedWorldId: string | null;
-    worldsLoading: boolean;
-    worldsError: string | null;
-    historySessions: TextplayHistorySession[];
-    historyLoading: boolean;
-    historyError: string | null;
-    selectedHistoryRunId: string | null;
-    stories: TextplayStorySummary[];
-    selectedStoryId: string | null;
-    selectedStory: TextplayStoryDetail | null;
-    startupPackage: TextplayStartupPackage | null;
-    startupLoading: boolean;
-    startupError: string | null;
-    storyBrief: TextplayStoryBrief | null;
-    storySnapshot: TextplayStorySnapshot | null;
-    presenceState: TextplayPresenceState;
-    presenceReports: TextplayPresenceReport[];
-    inputText: string;
-    inputPlaceholder: string;
-    storyStarted: boolean;
-    sessionPaused: boolean;
-    isRunning: boolean;
-    canStartStory: boolean;
-    canSend: boolean;
-    canTogglePause: boolean;
-    canContinueHistory: boolean;
-    canSelectStory: boolean;
-    routeSource: RuntimeRouteSource;
-    routeConnectorId: string;
-    routeModel: string;
-    routeConnectors: Array<{
-        id: string;
-        label: string;
-        models: string[];
-    }>;
-    routeModelOptions: string[];
-    bindingActive: boolean;
-    runId: string | null;
-    records: TextplayPersistRecord[];
-    selectedRecordRunId: string | null;
-    lastRenderedText: string;
-    runEvents: TextplayRunEvent[];
-    warnings: TextplayWarning[];
-    runSnapshot: TextplayRunSnapshot | null;
-    gapRefillApplied: boolean;
-    deltaStatus: {
-        kind: 'info' | 'warning' | 'success' | 'error';
-        message: string;
-    } | null;
-    failure: TextplayRenderFailure | null;
-    pendingUserTurn: {
-        message: string;
-        runId: string;
-        traceId: string;
-        status: 'rendering' | 'failed';
-        reasonCode?: string;
-    } | null;
-    setPlayerName: (value: string) => void;
-    setPlayerIdentity: (value: string) => void;
-    setInputText: (value: string) => void;
-    onInputFocus: () => void;
-    onInputBlur: () => void;
-    onStartStory: () => void;
-    onToggleSessionPause: () => void;
-    onSend: () => void;
-    onCancel: () => void;
-    onRefresh: () => void;
-    onCopyDiagnostics: () => void;
-    onInitiativeReceived: () => void;
-    onRequestHistorySessions: () => void;
-    onSelectHistorySession: (runId: string) => void;
-    onContinueHistorySession: () => void;
-    onSelectWorld: (worldId: string) => void;
-    onSelectStory: (storyId: string) => void;
-    onSelectRecord: (runId: string) => void;
-    onLoadRecoveryDelta: () => void;
-    onRouteSourceChange: (source: RuntimeRouteSource) => void;
-    onRouteConnectorChange: (connectorId: string) => void;
-    onRouteModelChange: (model: string) => void;
-    onClearRouteBinding: () => void;
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  filterModelOptions,
+  normalizeRuntimeRouteSource,
+  useModTranslation,
+  type RuntimeRouteBinding,
+  type RuntimeRouteOptionsSnapshot,
+} from "@nimiplatform/sdk/mod";
+import type {
+  TextplayAgentOption,
+  TextplayDraftRecord,
+  TextplayEntryDetail,
+  TextplayEntrySummary,
+  TextplayPersistRecord,
+  TextplayWorldSummary,
+} from '../types.js';
+
+type BannerNotice = {
+  kind: 'info' | 'success' | 'warning' | 'error';
+  message: string;
 };
-type TextplayRightPanelSection = 'health' | 'route' | 'debug' | null;
-export function TextplayShell(props: TextplayShellProps) {
-    const routeModelListId = 'textplay-route-model-list';
-    const activeConnector = props.routeConnectors.find((item) => item.id === props.routeConnectorId) || null;
-    const timelineRecords = [...props.records].sort((left, right) => left.updatedAt.localeCompare(right.updatedAt));
-    const selectedHistorySession = props.historySessions.find((item) => item.runId === props.selectedHistoryRunId)
-        || props.historySessions[0]
-        || null;
-    const transientRecapText = props.storyBrief?.mode === 'recap'
-        ? String(props.storyBrief.text || '').trim()
-        : '';
-    const selectedRecord = props.records.find((record) => record.runId === props.selectedRecordRunId) || null;
-    const pendingUserTurn = props.pendingUserTurn && props.pendingUserTurn.message.trim().length > 0
-        ? props.pendingUserTurn
-        : null;
-    const lastErrorEvent = findLastStepError(props.failure?.runEvents || props.runEvents);
-    const diagnosticReasonCode = props.failure?.reasonCode || lastErrorEvent?.reasonCode || '';
-    const diagnosticTraceId = props.failure?.traceId
-        || selectedRecord?.traceId
-        || '';
-    const diagnosticStep = lastErrorEvent?.step || '';
-    const playerNameMissingForStart = Boolean(props.selectedStoryId)
-        && !props.storyStarted
-        && props.playerName.trim().length === 0;
-    const [sessionEntryExpanded, setSessionEntryExpanded] = useState<boolean>(() => !props.storyStarted);
-    const [sessionEntryTab, setSessionEntryTab] = useState<'continue' | 'new'>(() => (props.storyStarted ? 'continue' : 'new'));
-    const [openRightPanelSection, setOpenRightPanelSection] = useState<TextplayRightPanelSection>('health');
-    useEffect(() => {
-        if (props.storyStarted) {
-            setSessionEntryExpanded(false);
-            return;
-        }
-        setSessionEntryExpanded(true);
-    }, [props.storyStarted]);
-    useEffect(() => {
-        if (!props.storyStarted && props.historySessions.length === 0) {
-            setSessionEntryTab('new');
-        }
-    }, [props.historySessions.length, props.storyStarted]);
-    const onToggleSessionEntry = () => {
-        const next = !sessionEntryExpanded;
-        setSessionEntryExpanded(next);
-        if (next) {
-            setSessionEntryTab('continue');
-            props.onRequestHistorySessions();
-        }
+
+export type TextplayShellProps = {
+  userId: string;
+  worlds: TextplayWorldSummary[];
+  worldsLoading: boolean;
+  worldsError: string | null;
+  selectedWorldId: string;
+  setSelectedWorldId: (worldId: string) => void;
+  entries: TextplayEntrySummary[];
+  entriesLoading: boolean;
+  entriesError: string | null;
+  selectedEntryEventId: string;
+  setSelectedEntryEventId: (entryEventId: string) => void;
+  selectedEntry: TextplayEntryDetail | null;
+  agentOptions: TextplayAgentOption[];
+  agentOptionsLoading: boolean;
+  selectedAgentId: string;
+  setSelectedAgentId: (agentId: string) => void;
+  playerName: string;
+  setPlayerName: (value: string) => void;
+  playerIdentity: string;
+  setPlayerIdentity: (value: string) => void;
+  drafts: TextplayDraftRecord[];
+  draftsLoading: boolean;
+  draftsError: string | null;
+  selectedDraftKey: string | null;
+  setSelectedDraftKey: (key: string | null) => void;
+  activeDraft: TextplayDraftRecord | null;
+  inputText: string;
+  setInputText: (value: string) => void;
+  isRunning: boolean;
+  onStart: () => void;
+  onPause: () => void;
+  onResumeActive: () => void;
+  onResumeDraft: (draftKey: string) => void;
+  onRestartDraft: (draftKey: string) => void;
+  onStop: () => void;
+  onSend: () => void;
+  onCancel: () => void;
+  canStart: boolean;
+  canSend: boolean;
+  routeOptions: RuntimeRouteOptionsSnapshot | null;
+  routeLoading: boolean;
+  routeError: string | null;
+  routeBinding: RuntimeRouteBinding | null;
+  effectiveRouteBinding: RuntimeRouteBinding | null;
+  onRouteSourceChange: (source: 'local' | 'cloud') => void;
+  onRouteConnectorChange: (connectorId: string) => void;
+  onRouteModelChange: (model: string) => void;
+  onRouteClear: () => void;
+  onRouteReload: () => void;
+  notice: BannerNotice | null;
+};
+
+function cn(...values: Array<string | false | null | undefined>): string {
+  return values.filter(Boolean).join(' ');
+}
+
+function toDisplayText(value: string | null | undefined, fallback: string): string {
+  const normalized = String(value || '').trim();
+  return normalized || fallback;
+}
+
+function formatUpdatedAt(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function triggerSourceLabel(triggerSource: TextplayPersistRecord['triggerSource']): string {
+  if (triggerSource === 'SystemEvent') return 'Opening';
+  if (triggerSource === 'AgentInitiative') return 'World Event';
+  return 'Narrative Turn';
+}
+
+function triggerSourceTone(triggerSource: TextplayPersistRecord['triggerSource']): string {
+  if (triggerSource === 'SystemEvent') return 'border-emerald-200 bg-emerald-50 text-emerald-900';
+  if (triggerSource === 'AgentInitiative') return 'border-violet-200 bg-violet-50 text-violet-900';
+  return 'border-slate-200 bg-white text-slate-900';
+}
+
+function RouteConfigDrawer(props: {
+  open: boolean;
+  onClose: () => void;
+  routeOptions: RuntimeRouteOptionsSnapshot | null;
+  routeLoading: boolean;
+  routeError: string | null;
+  routeBinding: RuntimeRouteBinding | null;
+  effectiveRouteBinding: RuntimeRouteBinding | null;
+  onRouteSourceChange: (source: 'local' | 'cloud') => void;
+  onRouteConnectorChange: (connectorId: string) => void;
+  onRouteModelChange: (model: string) => void;
+  onRouteClear: () => void;
+  onRouteReload: () => void;
+}) {
+  const { t } = useModTranslation('textplay');
+  const effectiveBinding = props.effectiveRouteBinding || {
+    source: 'local' as const,
+    connectorId: '',
+    model: '',
+  };
+  const connectors = props.routeOptions?.connectors || [];
+  const selectedSource = effectiveBinding.source;
+  const selectedConnectorId = selectedSource === 'cloud'
+    ? (effectiveBinding.connectorId || connectors[0]?.id || '')
+    : '';
+  const selectedConnector = connectors.find((item) => item.id === selectedConnectorId) || null;
+  const modelOptionsRaw = selectedSource === 'local'
+    ? (props.routeOptions?.local.models.map((item) => item.model) || [])
+    : (selectedConnector?.models || []);
+  const modelOptions = useMemo(() => Array.from(new Set(modelOptionsRaw.filter(Boolean))), [modelOptionsRaw]);
+  const [modelQuery, setModelQuery] = useState(effectiveBinding.model || '');
+
+  useEffect(() => {
+    setModelQuery(effectiveBinding.model || '');
+  }, [effectiveBinding.model]);
+
+  useEffect(() => {
+    if (!props.open) {
+      return;
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        props.onClose();
+      }
     };
-    const onSelectSessionTab = (tab: 'continue' | 'new') => {
-        setSessionEntryTab(tab);
-        if (tab === 'continue') {
-            props.onRequestHistorySessions();
-        }
-    };
-    const onContinueSelectedSession = () => {
-        props.onContinueHistorySession();
-        setSessionEntryExpanded(false);
-    };
-    return (<div className="ui-sync-root textplay-shell-root flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:flex-row">
-      <TextplayVisualStyles />
-      <aside className="ui-sync-pane ui-sync-pane-side textplay-shell-side w-full overflow-y-auto border-b border-gray-200 bg-slate-50 p-3 md:w-64 md:border-b-0 md:border-r xl:w-80">
-        <div className="ui-sync-card rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Current Session</div>
-          {props.storyStarted ? (<div className="mt-3 space-y-1 text-xs text-slate-700">
-              <div>
-                World: {props.worlds.find((world) => world.id === props.worldId)?.name || props.worldId || '(unknown)'}
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [props.open, props.onClose]);
+
+  const filteredModels = useMemo(
+    () => filterModelOptions(modelOptions, modelQuery),
+    [modelOptions, modelQuery],
+  );
+
+  return (
+    <>
+      <div
+        className={cn(
+          'absolute inset-0 z-20 bg-slate-900/12 backdrop-blur-[1px] transition-opacity duration-300',
+          props.open ? 'opacity-100' : 'pointer-events-none opacity-0',
+        )}
+        onClick={props.onClose}
+        aria-hidden={!props.open}
+      />
+
+      <aside
+        className={cn(
+          'absolute inset-y-0 right-0 z-30 w-[360px] max-w-[92vw] border-l border-white/60 bg-[#f7fbfb] shadow-[-12px_0_28px_rgba(15,23,42,0.1)] transition-transform duration-300 ease-[cubic-bezier(0.2,0.7,0.2,1)]',
+          props.open ? 'translate-x-0' : 'pointer-events-none translate-x-full',
+        )}
+        aria-hidden={!props.open}
+      >
+        <div className="flex h-full flex-col">
+          <div className="flex items-center justify-between border-b border-gray-200 px-4 py-4">
+            <div>
+              <p className="text-sm font-semibold text-gray-900">{t('settings.title')}</p>
+              <p className="mt-1 text-xs text-gray-500">{t('settings.subtitle')}</p>
+            </div>
+            <button
+              type="button"
+              onClick={props.onClose}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600"
+              aria-label={t('settings.close')}
+            >
+              ×
+            </button>
+          </div>
+
+          <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+            {props.routeError ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <div>{t('settings.routeLoadFailed')}</div>
+                <div className="mt-1 break-all">{props.routeError}</div>
               </div>
-              <div>Story: {props.selectedStory?.title || props.storyId || '(unknown)'}</div>
-              <div>Player: {props.playerName || '(missing)'} · {props.playerIdentity || 'default'}</div>
-              <div>Status: {props.sessionPaused ? 'Paused' : 'Active'}</div>
-              <div>Run: {props.selectedRecordRunId || props.runId || '(none)'}</div>
-              <div>
-                Updated: {selectedRecord?.updatedAt ? formatHistorySessionUpdatedAt(selectedRecord.updatedAt) : '-'}
-              </div>
-            </div>) : (<div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs text-slate-500">
-              No active session.
-            </div>)}
-          {props.storyStarted ? (<div className="mt-3 grid grid-cols-2 gap-2">
-              <button type="button" className="ui-sync-btn ui-sync-btn-primary rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50" onClick={props.onStartStory} disabled={!props.canStartStory}>
-                {props.isRunning ? 'Recapping...' : 'Recap'}
-              </button>
-              <button type="button" className="ui-sync-btn ui-sync-btn-secondary rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50" onClick={props.onToggleSessionPause} disabled={!props.canTogglePause}>
-                {props.sessionPaused ? 'Resume' : 'Pause'}
-              </button>
-            </div>) : null}
-        </div>
+            ) : null}
 
-        <button type="button" className="ui-sync-btn ui-sync-btn-secondary mt-3 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50" onClick={onToggleSessionEntry}>
-          {sessionEntryExpanded ? 'Hide Session Entry' : 'Change Session'}
-        </button>
-
-        {sessionEntryExpanded ? (<div className="ui-sync-card ui-sync-card-inset mt-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Session Entry</div>
-
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button type="button" className={`ui-sync-btn rounded-lg border px-2 py-1.5 text-xs font-medium ${sessionEntryTab === 'continue'
-                ? 'ui-sync-btn-selected border-blue-300 bg-blue-50 text-blue-700'
-                : 'ui-sync-btn-secondary border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`} onClick={() => onSelectSessionTab('continue')}>
-                Continue
-              </button>
-              <button type="button" className={`ui-sync-btn rounded-lg border px-2 py-1.5 text-xs font-medium ${sessionEntryTab === 'new'
-                ? 'ui-sync-btn-selected border-blue-300 bg-blue-50 text-blue-700'
-                : 'ui-sync-btn-secondary border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`} onClick={() => onSelectSessionTab('new')}>
-                New
-              </button>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-gray-500">{t('settings.source')}</label>
+              <select
+                value={selectedSource}
+                onChange={(event) => props.onRouteSourceChange(normalizeRuntimeRouteSource(event.target.value))}
+                disabled={!props.routeOptions}
+                className="h-10 w-full rounded-2xl border border-gray-200 bg-white px-3 text-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-400"
+              >
+                <option value="local">{t('settings.sourceLocal')}</option>
+                <option value="cloud">{t('settings.sourceCloud')}</option>
+              </select>
             </div>
 
-            {sessionEntryTab === 'continue' ? (<>
-                <div className="mt-3 flex items-center justify-between">
-                  <div className="text-xs text-gray-600">History Session</div>
-                  <span className="ui-sync-pill rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
-                    history {props.historySessions.length}
-                  </span>
-                </div>
-                <select className="mt-1.5 w-full max-w-full truncate rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm" value={props.selectedHistoryRunId || ''} onChange={(event) => props.onSelectHistorySession(event.target.value)} disabled={props.isRunning || props.historyLoading || props.historySessions.length === 0}>
-                  <option value="" disabled>
-                    {props.historyLoading
-                    ? 'Loading history sessions...'
-                    : (props.historySessions.length > 0 ? 'Select session' : 'No historical session')}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-gray-500">{t('settings.connector')}</label>
+              <select
+                value={selectedConnectorId}
+                onChange={(event) => props.onRouteConnectorChange(event.target.value)}
+                disabled={!props.routeOptions || selectedSource !== 'cloud'}
+                className="h-10 w-full rounded-2xl border border-gray-200 bg-white px-3 text-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-400"
+              >
+                <option value="">{t('settings.connectorEmpty')}</option>
+                {connectors.map((connector) => (
+                  <option key={connector.id} value={connector.id}>
+                    {connector.label || connector.id}
                   </option>
-                  {props.historySessions.map((session) => (<option key={session.runId} value={session.runId}>
-                      {formatHistorySessionTitle(session)}
-                    </option>))}
-                </select>
+                ))}
+              </select>
+            </div>
 
-                {props.historyError ? (<div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-xs text-rose-700">
-                    {props.historyError}
-                  </div>) : null}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-gray-500">{t('settings.model')}</label>
+              <input
+                list="textplay-model-options"
+                value={modelQuery}
+                onChange={(event) => {
+                  const nextValue = event.target.value;
+                  setModelQuery(nextValue);
+                  if (modelOptions.includes(nextValue)) {
+                    props.onRouteModelChange(nextValue);
+                  }
+                }}
+                onBlur={() => {
+                  if (modelQuery && modelOptions.includes(modelQuery)) {
+                    props.onRouteModelChange(modelQuery);
+                    return;
+                  }
+                  setModelQuery(effectiveBinding.model || '');
+                }}
+                placeholder={t('settings.modelPlaceholder')}
+                disabled={!props.routeOptions}
+                className="h-10 w-full rounded-2xl border border-gray-200 bg-white px-3 text-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-400"
+              />
+              <datalist id="textplay-model-options">
+                {filteredModels.map((model) => (
+                  <option key={model} value={model} />
+                ))}
+              </datalist>
+              {props.routeLoading ? (
+                <p className="text-[11px] text-gray-500">{t('settings.loading')}</p>
+              ) : null}
+            </div>
 
-                {selectedHistorySession ? (<div className="ui-sync-soft-card mt-3 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 p-2.5">
-                    <div className="break-all text-xs font-medium leading-5 text-slate-800">
-                      {selectedHistorySession.storyTitle}
-                    </div>
-                    <div className="mt-1 text-[11px] text-slate-500">
-                      updated: {formatHistorySessionUpdatedAt(selectedHistorySession.updatedAt)}
-                    </div>
-                    <div className="mt-2 break-words text-xs leading-5 text-slate-700">
-                      {selectedHistorySession.preview}
-                    </div>
-                    <div className="mt-2 break-all text-[10px] text-slate-500">
-                      world: {selectedHistorySession.worldId} · story: {selectedHistorySession.storyId}
-                    </div>
-                  </div>) : (<div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs text-slate-500">
-                    No historical session for current player.
-                  </div>)}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={props.onRouteClear}
+                className="h-10 flex-1 rounded-2xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700"
+              >
+                {t('settings.useRuntimeDefault')}
+              </button>
+              <button
+                type="button"
+                onClick={props.onRouteReload}
+                className="h-10 rounded-2xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700"
+              >
+                {t('settings.reload')}
+              </button>
+            </div>
 
-                  <button type="button" className="ui-sync-btn ui-sync-btn-primary mt-3 w-full rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50" onClick={onContinueSelectedSession} disabled={!props.canContinueHistory}>
-                  {props.historyLoading ? 'Loading...' : 'Continue Selected Session'}
-                </button>
-              </>) : (<>
-                <label className="mt-3 block text-xs text-gray-600">
-                  World
-                  <select className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm" value={props.selectedWorldId || ''} onChange={(event) => props.onSelectWorld(event.target.value)} disabled={props.isRunning || props.worldsLoading || props.worlds.length === 0}>
-                    <option value="" disabled>
-                      {props.worlds.length > 0 ? 'Select world' : (props.worldsLoading ? 'Loading worlds...' : 'No world')}
-                    </option>
-                    {props.worlds.map((world) => (<option key={world.id} value={world.id}>
+            <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/80 px-3 py-2 text-xs leading-5 text-gray-500">
+              {props.routeBinding
+                ? t('settings.overrideActive')
+                : t('settings.overrideDefault')}
+            </div>
+          </div>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+function SessionCard(props: Pick<TextplayShellProps, 'activeDraft' | 'isRunning' | 'onPause' | 'onResumeActive' | 'onStop'>) {
+  const { t } = useModTranslation('textplay');
+  const activeDraft = props.activeDraft;
+  if (!activeDraft) {
+    return (
+      <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="text-sm font-semibold text-slate-900">{t('session.title')}</div>
+        <p className="mt-3 text-sm text-slate-500">{t('session.empty')}</p>
+      </section>
+    );
+  }
+
+  const paused = activeDraft.status === 'paused';
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold text-slate-900">{t('session.title')}</div>
+          <div className="mt-1 text-xs text-slate-500">{activeDraft.entryTitle}</div>
+        </div>
+        <div className={cn(
+          'rounded-full px-2.5 py-1 text-[11px] font-medium',
+          paused ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800',
+        )}>
+          {paused ? t('status.paused') : (props.isRunning ? t('status.running') : t('status.active'))}
+        </div>
+      </div>
+
+      <dl className="mt-4 space-y-2 text-sm">
+        <div className="flex items-center justify-between gap-3">
+          <dt className="text-slate-500">{t('labels.agent')}</dt>
+          <dd className="text-right text-slate-900">{activeDraft.agentName}</dd>
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <dt className="text-slate-500">{t('labels.playerName')}</dt>
+          <dd className="text-right text-slate-900">{activeDraft.playerName}</dd>
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <dt className="text-slate-500">{t('labels.playerIdentity')}</dt>
+          <dd className="text-right text-slate-900">{toDisplayText(activeDraft.playerIdentity, t('labels.unspecified'))}</dd>
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <dt className="text-slate-500">{t('labels.updatedAt')}</dt>
+          <dd className="text-right text-slate-900">{formatUpdatedAt(activeDraft.updatedAt)}</dd>
+        </div>
+      </dl>
+
+      <div className="mt-4 flex gap-2">
+        {paused ? (
+          <button
+            type="button"
+            onClick={props.onResumeActive}
+            disabled={props.isRunning}
+            className="h-10 flex-1 rounded-2xl bg-gradient-to-r from-[#4ECCA3] to-[#18B7D4] px-3 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {t('actions.resume')}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={props.onPause}
+            disabled={props.isRunning}
+            className="h-10 flex-1 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 disabled:opacity-50"
+          >
+            {t('actions.pause')}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={props.onStop}
+          disabled={props.isRunning}
+          className="h-10 flex-1 rounded-2xl border border-rose-200 bg-rose-50 px-3 text-sm font-medium text-rose-700 disabled:opacity-50"
+        >
+          {t('actions.stop')}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+export function TextplayShell(props: TextplayShellProps) {
+  const { t } = useModTranslation('textplay');
+  const [entryTab, setEntryTab] = useState<'new' | 'drafts'>('new');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const selectedDraft = props.drafts.find((item) => item.key === props.selectedDraftKey) || null;
+  const selectedEntryHasNoAgents = (props.selectedEntry?.characterRefs.length || 0) === 0 && Boolean(props.selectedEntry);
+  const autoSelectedAgent = props.agentOptions.length === 1 ? props.agentOptions[0] : null;
+
+  return (
+    <div className="relative flex h-full min-h-0 min-w-0 bg-[#f4f8f8] text-slate-900">
+      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className="min-h-0 overflow-y-auto border-b border-slate-200 bg-[#f7fbfb] p-4 lg:border-b-0 lg:border-r">
+          <div className="space-y-4">
+            <SessionCard
+              activeDraft={props.activeDraft}
+              isRunning={props.isRunning}
+              onPause={props.onPause}
+              onResumeActive={props.onResumeActive}
+              onStop={props.onStop}
+            />
+
+            <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold text-slate-900">{t('entry.title')}</div>
+                <div className="inline-flex rounded-full bg-slate-100 p-1 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setEntryTab('new')}
+                    className={cn(
+                      'rounded-full px-3 py-1 transition-colors',
+                      entryTab === 'new' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
+                    )}
+                  >
+                    {t('entry.tabs.new')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEntryTab('drafts')}
+                    className={cn(
+                      'rounded-full px-3 py-1 transition-colors',
+                      entryTab === 'drafts' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
+                    )}
+                  >
+                    {t('entry.tabs.drafts')}
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-500">{t('labels.world')}</label>
+                  <select
+                    value={props.selectedWorldId}
+                    onChange={(event) => props.setSelectedWorldId(event.target.value)}
+                    disabled={props.worldsLoading || props.worlds.length === 0}
+                    className="h-10 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                  >
+                    <option value="">{t('entry.selectWorld')}</option>
+                    {props.worlds.map((world) => (
+                      <option key={world.id} value={world.id}>
                         {world.name}
-                      </option>))}
+                      </option>
+                    ))}
                   </select>
-                </label>
-
-                {props.worldsError ? (<div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-xs text-rose-700">
-                    {props.worldsError}
-                  </div>) : null}
-
-                <label className="mt-3 block text-xs text-gray-600">
-                  Story
-                  <select className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm" value={props.selectedStoryId || ''} onChange={(event) => props.onSelectStory(event.target.value)} disabled={!props.canSelectStory || props.stories.length === 0 || !props.selectedWorldId}>
-                    <option value="" disabled>
-                      {props.stories.length > 0 ? 'Select a playable story' : 'No playable story'}
-                    </option>
-                    {props.stories.map((story) => (<option key={story.storyId} value={story.storyId}>
-                        {story.title}
-                      </option>))}
-                  </select>
-                </label>
-
-                {props.stories.length === 0 ? (<div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-800">
-                    No PRIMARY world events available for play.
-                  </div>) : null}
-
-                <div className="ui-sync-soft-card mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
-                  {renderStorySummary(props.selectedStory)}
+                  {props.worldsError ? (
+                    <p className="text-[11px] text-rose-600">{props.worldsError}</p>
+                  ) : null}
                 </div>
 
-                <div className="mt-3 text-xs text-gray-600">
-                  Player ID
-                  <div className="mt-1.5 break-all font-mono text-[11px] leading-5 text-slate-600">
-                    {props.playerId || '(missing)'}
+                {entryTab === 'new' ? (
+                  <>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-slate-500">{t('labels.entry')}</label>
+                      <select
+                        value={props.selectedEntryEventId}
+                        onChange={(event) => props.setSelectedEntryEventId(event.target.value)}
+                        disabled={!props.selectedWorldId || props.entriesLoading || props.entries.length === 0}
+                        className="h-10 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                      >
+                        <option value="">{t('entry.selectEntry')}</option>
+                        {props.entries.map((entry) => (
+                          <option key={entry.entryEventId} value={entry.entryEventId}>
+                            {entry.title}
+                          </option>
+                        ))}
+                      </select>
+                      {props.entriesError ? (
+                        <p className="text-[11px] text-rose-600">{props.entriesError}</p>
+                      ) : null}
+                    </div>
+
+                    {props.selectedEntry ? (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                        <div className="font-medium text-slate-900">{props.selectedEntry.title}</div>
+                        <p className="mt-2 leading-6">{props.selectedEntry.materialSummary}</p>
+                      </div>
+                    ) : null}
+
+                    {props.agentOptions.length > 1 ? (
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-slate-500">{t('labels.agent')}</label>
+                        <select
+                          value={props.selectedAgentId}
+                          onChange={(event) => props.setSelectedAgentId(event.target.value)}
+                          disabled={props.agentOptionsLoading}
+                          className="h-10 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                        >
+                          <option value="">{t('entry.selectAgent')}</option>
+                          {props.agentOptions.map((agent) => (
+                            <option key={agent.id} value={agent.id}>
+                              {agent.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : autoSelectedAgent ? (
+                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                        {t('entry.autoAgent')}: {autoSelectedAgent.name}
+                      </div>
+                    ) : null}
+
+                    {selectedEntryHasNoAgents ? (
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                        {t('entry.noAgentAvailable')}
+                      </div>
+                    ) : null}
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-slate-500">{t('labels.playerName')}</label>
+                      <input
+                        value={props.playerName}
+                        onChange={(event) => props.setPlayerName(event.target.value)}
+                        placeholder={t('entry.playerNamePlaceholder')}
+                        className="h-10 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-slate-500">{t('labels.playerIdentity')}</label>
+                      <input
+                        value={props.playerIdentity}
+                        onChange={(event) => props.setPlayerIdentity(event.target.value)}
+                        placeholder={t('entry.playerIdentityPlaceholder')}
+                        className="h-10 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={props.onStart}
+                      disabled={!props.canStart}
+                      className="h-11 w-full rounded-2xl bg-gradient-to-r from-[#4ECCA3] to-[#18B7D4] px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {t('actions.start')}
+                    </button>
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    {props.draftsLoading ? (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                        {t('drafts.loading')}
+                      </div>
+                    ) : null}
+                    {props.draftsError ? (
+                      <div className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                        {props.draftsError}
+                      </div>
+                    ) : null}
+                    {props.drafts.length === 0 && !props.draftsLoading ? (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                        {t('drafts.empty')}
+                      </div>
+                    ) : null}
+                    {props.drafts.map((draft) => {
+                      const isSelected = draft.key === selectedDraft?.key;
+                      return (
+                        <div
+                          key={draft.key}
+                          className={cn(
+                            'rounded-2xl border p-3 transition-colors',
+                            isSelected ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-slate-50',
+                          )}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => props.setSelectedDraftKey(draft.key)}
+                            className="w-full text-left"
+                          >
+                            <div className="text-sm font-medium text-slate-900">{draft.entryTitle}</div>
+                            <div className="mt-1 text-xs text-slate-500">{draft.agentName} · {draft.playerName}</div>
+                            <div className="mt-2 text-xs text-slate-500">{formatUpdatedAt(draft.updatedAt)}</div>
+                          </button>
+                          <div className="mt-3 flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => props.onResumeDraft(draft.key)}
+                              disabled={props.isRunning}
+                              className="h-9 flex-1 rounded-2xl bg-white px-3 text-sm font-medium text-slate-700 shadow-sm disabled:opacity-50"
+                            >
+                              {t('actions.resume')}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => props.onRestartDraft(draft.key)}
+                              disabled={props.isRunning}
+                              className="h-9 flex-1 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 disabled:opacity-50"
+                            >
+                              {t('actions.restart')}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div className="mt-0.5 text-[11px] text-slate-500">Auto-generated and read-only.</div>
-                </div>
+                )}
+              </div>
+            </section>
+          </div>
+        </aside>
 
-                <label className="mt-2 block text-xs text-gray-600">
-                  Player Name
-                  <input className={`mt-1.5 w-full rounded-lg border bg-white px-2.5 py-2 text-sm ${playerNameMissingForStart ? 'border-rose-300' : 'border-slate-300'}`} value={props.playerName} onChange={(event) => props.setPlayerName(event.target.value)} placeholder="输入你的角色名/称呼" disabled={props.isRunning} required aria-invalid={playerNameMissingForStart}/>
-                  {playerNameMissingForStart ? (<div className="mt-1 text-[11px] text-rose-600">Player Name is required before Start.</div>) : null}
-                </label>
+        <main className="relative flex min-h-0 min-w-0 flex-col overflow-hidden">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-slate-900">
+                {props.activeDraft ? props.activeDraft.entryTitle : t('timeline.title')}
+              </div>
+              <div className="mt-1 text-xs text-slate-500">
+                {props.activeDraft
+                  ? `${props.activeDraft.agentName} · ${props.activeDraft.playerName}`
+                  : t('timeline.subtitle')}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              className="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700"
+            >
+              <span>⚙</span>
+              <span>{t('actions.settings')}</span>
+            </button>
+          </div>
 
-                <label className="mt-2 block text-xs text-gray-600">
-                  Player Identity
-                  <input className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm" value={props.playerIdentity} onChange={(event) => props.setPlayerIdentity(event.target.value)} placeholder="例如：天南散修 / 玄门弟子 / 游历剑修" disabled={props.isRunning}/>
-                  <div className="mt-1 text-[11px] text-gray-500">用于叙事身份绑定；留空将使用剧情上下文默认身份。</div>
-                </label>
+          {props.notice ? (
+            <div className={cn(
+              'mx-4 mt-4 rounded-2xl border px-3 py-2 text-sm',
+              props.notice.kind === 'error' && 'border-rose-200 bg-rose-50 text-rose-700',
+              props.notice.kind === 'warning' && 'border-amber-200 bg-amber-50 text-amber-800',
+              props.notice.kind === 'success' && 'border-emerald-200 bg-emerald-50 text-emerald-800',
+              props.notice.kind === 'info' && 'border-sky-200 bg-sky-50 text-sky-700',
+            )}>
+              {props.notice.message}
+            </div>
+          ) : null}
 
-                {!props.storyStarted ? (<button type="button" className="ui-sync-btn ui-sync-btn-primary mt-3 w-full rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50" onClick={props.onStartStory} disabled={!props.canStartStory}>
-                    {props.isRunning ? 'Starting...' : 'Start'}
-                  </button>) : null}
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+            {!props.activeDraft ? (
+              <div className="flex h-full items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-white text-sm text-slate-500">
+                {t('timeline.empty')}
+              </div>
+            ) : props.activeDraft.records.length === 0 ? (
+              <div className="flex h-full items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-white text-sm text-slate-500">
+                {t('timeline.waitingOpening')}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {props.activeDraft.records.map((record) => (
+                  <article
+                    key={record.id}
+                    className={cn(
+                      'rounded-3xl border p-4 shadow-sm',
+                      triggerSourceTone(record.triggerSource),
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-semibold">{triggerSourceLabel(record.triggerSource)}</div>
+                      <div className="text-xs text-slate-500">{formatUpdatedAt(record.updatedAt)}</div>
+                    </div>
+                    {record.userMessage ? (
+                      <div className="mt-3 rounded-2xl bg-white/70 px-3 py-2 text-sm text-slate-700">
+                        {record.userMessage}
+                      </div>
+                    ) : null}
+                    <div className="mt-3 whitespace-pre-wrap text-[15px] leading-8">{record.text}</div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
 
-                <button type="button" className="ui-sync-btn ui-sync-btn-secondary mt-3 w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50" onClick={props.onRefresh}>
-                  Refresh
+          <div className="border-t border-slate-200 bg-white px-4 py-4">
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-3">
+              <textarea
+                value={props.inputText}
+                onChange={(event) => props.setInputText(event.target.value)}
+                placeholder={props.activeDraft
+                  ? (props.activeDraft.status === 'paused' ? t('timeline.pausedInputPlaceholder') : t('timeline.inputPlaceholder'))
+                  : t('timeline.noSessionPlaceholder')}
+                disabled={!props.activeDraft || props.activeDraft.status === 'paused' || props.isRunning}
+                className="min-h-[128px] w-full resize-none bg-transparent text-sm leading-7 text-slate-900 outline-none placeholder:text-slate-400 disabled:cursor-not-allowed"
+              />
+              <div className="mt-3 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={props.onCancel}
+                  disabled={!props.isRunning}
+                  className="h-10 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 disabled:opacity-50"
+                >
+                  {t('actions.cancel')}
                 </button>
-              </>)}
-          </div>) : null}
-      </aside>
-
-      <main className="ui-sync-pane ui-sync-pane-main textplay-shell-main flex min-h-0 min-w-0 flex-1 flex-col border-b border-gray-200 md:border-b-0 md:border-r">
-        <div className="border-b border-gray-200 px-3 py-2 text-xs text-gray-500">
-          Narrative Timeline ({timelineRecords.length})
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-auto bg-white">
-          <div className="space-y-3 p-3">
-            {transientRecapText ? (<section className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-                <div className="text-[11px] font-medium uppercase tracking-wide text-amber-700">
-                  Story Recap (Current)
-                </div>
-                <div className="mt-1 whitespace-pre-line text-sm leading-6 text-amber-900">
-                  {transientRecapText}
-                </div>
-              </section>) : null}
-
-            {pendingUserTurn ? (<section className={`rounded-xl border p-3 ${pendingUserTurn.status === 'failed'
-                ? 'border-rose-200 bg-rose-50'
-                : 'border-blue-200 bg-blue-50'}`}>
-                <div className="flex items-start justify-between gap-2">
-                  <div className={`text-[11px] font-medium uppercase tracking-wide ${pendingUserTurn.status === 'failed' ? 'text-rose-700' : 'text-blue-700'}`}>
-                    Pending Player Action
-                  </div>
-                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${pendingUserTurn.status === 'failed'
-                ? 'bg-rose-100 text-rose-700'
-                : 'bg-blue-100 text-blue-700'}`}>
-                    {pendingUserTurn.status === 'failed' ? 'render failed' : 'rendering'}
-                  </span>
-                </div>
-                <div className={`mt-1 whitespace-pre-line text-sm leading-6 ${pendingUserTurn.status === 'failed' ? 'text-rose-900' : 'text-blue-900'}`}>
-                  {pendingUserTurn.message}
-                </div>
-                <div className={`mt-2 text-[11px] ${pendingUserTurn.status === 'failed' ? 'text-rose-700' : 'text-blue-700'}`}>
-                  run={pendingUserTurn.runId} · traceId={pendingUserTurn.traceId}
-                </div>
-                {pendingUserTurn.reasonCode ? (<div className="mt-1 text-[11px] text-rose-700">
-                    reasonCode: {pendingUserTurn.reasonCode}
-                  </div>) : null}
-              </section>) : null}
-
-            {timelineRecords.length === 0 ? (<section className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm text-gray-500">
-                {!props.selectedStoryId
-                ? 'Select a playable story to load timeline.'
-                : (props.storyStarted
-                    ? 'No persisted timeline records yet.'
-                    : 'Click Start in Session Entry to generate opening narration and begin timeline.')}
-              </section>) : (<section className="space-y-2">
-                {timelineRecords.map((record) => {
-                const active = record.runId === props.selectedRecordRunId;
-                const routeLabel = formatRouteLabelFromRecord(record);
-                const userTurnMessage = record.triggerSource === 'UserTurn'
-                    ? normalizeUserTurnMessage(String(record.userMessage || ''))
-                    : '';
-                const responseText = String(record.text || '').trim();
-                const responseTextClass = record.triggerSource === 'AgentInitiative'
-                    ? 'text-violet-900'
-                    : record.triggerSource === 'SystemEvent'
-                        ? 'text-emerald-900'
-                        : 'text-slate-900';
-                const responseLabelClass = record.triggerSource === 'AgentInitiative'
-                    ? 'text-violet-700'
-                    : record.triggerSource === 'SystemEvent'
-                        ? 'text-emerald-700'
-                        : 'text-slate-600';
-                return (<button key={record.id} type="button" className={`w-full rounded-xl border px-3 py-2 text-left ${active
-                        ? 'border-blue-300 bg-blue-50'
-                        : 'border-gray-200 bg-white hover:bg-gray-50'}`} onClick={() => props.onSelectRecord(record.runId)}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="text-[11px] font-medium uppercase tracking-wide text-slate-700">
-                          {formatTimelineStageLabel(record)}
-                        </div>
-                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${triggerSourceBadgeClass(record.triggerSource)}`}>
-                          {formatTriggerSourceLabel(record.triggerSource)}
-                        </span>
-                      </div>
-                      <div className="mt-1 text-[11px] text-gray-500">
-                        turn={record.turnId} · run={record.runId}
-                      </div>
-                      <div className="mt-1 text-[11px] text-gray-500">
-                        status={record.runSnapshot.status} · seq={record.runSnapshot.lastSeq} · route={routeLabel}
-                      </div>
-                      {userTurnMessage ? (<div className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
-                          <div className="text-[11px] font-medium uppercase tracking-wide text-blue-700">
-                            {props.playerName || 'Player'} · Action
-                          </div>
-                          <div className="mt-1 whitespace-pre-line text-sm leading-6 text-blue-900">
-                            {userTurnMessage}
-                          </div>
-                        </div>) : null}
-                      <div className={`mt-2 rounded-lg border px-3 py-2 ${responsePanelClass(record)}`}>
-                        <div className={`text-[11px] font-medium uppercase tracking-wide ${responseLabelClass}`}>
-                          {formatTimelineResponseLabel(record)}
-                        </div>
-                        <div className={`mt-1 whitespace-pre-line text-sm leading-6 ${responseTextClass}`}>
-                          {responseText || '(empty response)'}
-                        </div>
-                      </div>
-                    </button>);
-            })}
-              </section>)}
-          </div>
-        </div>
-
-        <div className="border-t border-gray-200 bg-white p-3">
-          <div className="ui-sync-input-shell p-2">
-            <textarea className="h-24 w-full resize-none rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none" placeholder={props.inputPlaceholder} value={props.inputText} onFocus={props.onInputFocus} onBlur={props.onInputBlur} onChange={(event) => props.setInputText(event.target.value)} disabled={props.isRunning || !props.storyStarted}/>
-          </div>
-          <div className="mt-2 flex items-center justify-between">
-            <div className="text-xs text-gray-500">
-              {props.runId ? `Current run: ${props.runId}` : 'No active run'}
-            </div>
-            <div className="flex items-center gap-2">
-              <button type="button" className="ui-sync-btn ui-sync-btn-secondary rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50" onClick={props.onCancel} disabled={!props.isRunning}>
-                Cancel
-              </button>
-              <button type="button" className="ui-sync-btn ui-sync-btn-primary rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50" onClick={props.onSend} disabled={!props.canSend}>
-                {props.isRunning ? 'Rendering...' : 'Send'}
-              </button>
+                <button
+                  type="button"
+                  onClick={props.onSend}
+                  disabled={!props.canSend}
+                  className="h-10 rounded-2xl bg-gradient-to-r from-[#4ECCA3] to-[#18B7D4] px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {props.isRunning ? t('actions.running') : t('actions.send')}
+                </button>
+              </div>
             </div>
           </div>
+        </main>
+      </div>
 
-          {!props.selectedStoryId ? (<div className="mt-2 text-xs text-amber-700">Select a playable story before sending.</div>) : null}
-          {props.selectedStoryId && !props.storyStarted ? (<div className="mt-2 text-xs text-amber-700">
-              {props.playerName.trim()
-                ? 'Click Start in Session Entry to load background and opening narration before sending.'
-                : 'Player Name is required. Fill Player Name first, then click Start in Session Entry.'}
-            </div>) : null}
-          {props.storyStarted && props.sessionPaused ? (<div className="mt-2 text-xs text-amber-700">
-              Session is paused. Click Resume in Current Session to re-enable Send and auto progression.
-            </div>) : null}
-          {props.selectedStoryId && props.storyStarted && !props.sessionPaused ? (<div className="mt-2 text-xs text-gray-500">
-              Click Recap in Current Session to refresh a concise "previously on" summary before your next move.
-            </div>) : null}
-
-          {props.failure ? (<div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
-              {props.failure.reasonCode}: {props.failure.actionHint}
-            </div>) : null}
-        </div>
-      </main>
-
-      <aside className="ui-sync-pane ui-sync-pane-right textplay-shell-right w-full min-h-0 overflow-y-auto bg-slate-50 p-3 md:w-64 xl:w-80">
-        <div className="ui-sync-card min-h-0 rounded-[10px] border border-gray-200 bg-white">
-          <section className="px-3 py-3 text-xs">
-            {rightPanelSectionHeader({
-            title: 'Session Health',
-            open: openRightPanelSection === 'health',
-            onToggle: () => setOpenRightPanelSection((prev) => (prev === 'health' ? null : 'health')),
-        })}
-            {openRightPanelSection === 'health' ? (<div className="mt-3 space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-[11px] text-gray-500">Run status and warning overview.</div>
-                  <button type="button" className="rounded border border-gray-300 bg-white px-2 py-1 text-[11px] hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50" onClick={props.onLoadRecoveryDelta} disabled={!props.selectedRecordRunId && !props.runId}>
-                    Load Delta
-                  </button>
-                </div>
-
-                <div className="rounded-lg border border-gray-200 bg-white p-2 text-xs text-gray-600">
-                  <div>gapRefillApplied: {String(props.gapRefillApplied)}</div>
-                  {props.runSnapshot ? (<div className="mt-1">
-                      status={props.runSnapshot.status} · lastSeq={props.runSnapshot.lastSeq}
-                    </div>) : null}
-                  {props.deltaStatus ? (<div className={`mt-2 rounded px-2 py-1 text-[11px] ${props.deltaStatus.kind === 'success'
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : props.deltaStatus.kind === 'warning'
-                        ? 'bg-amber-50 text-amber-700'
-                        : props.deltaStatus.kind === 'error'
-                            ? 'bg-rose-50 text-rose-700'
-                            : 'bg-slate-100 text-slate-700'}`}>
-                      delta: {props.deltaStatus.message}
-                    </div>) : null}
-                </div>
-
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-2">
-                  <div className="text-xs font-medium text-amber-900">Warnings ({props.warnings.length})</div>
-                  <div className="mt-1 max-h-24 overflow-auto text-[11px] text-amber-800">
-                    {props.warnings.length === 0 ? 'none' : props.warnings.map((warning, index) => (<div key={`${warning.code}-${index}`}>{warning.code} · {warning.actionHint}</div>))}
-                  </div>
-                </div>
-              </div>) : null}
-          </section>
-
-          <section className="border-t border-gray-200 px-3 py-3 text-xs">
-            {rightPanelSectionHeader({
-            title: 'Route Config',
-            open: openRightPanelSection === 'route',
-            onToggle: () => setOpenRightPanelSection((prev) => (prev === 'route' ? null : 'route')),
-        })}
-            {openRightPanelSection === 'route' ? (<div className="mt-3 rounded-lg border border-gray-200 bg-white p-2 text-xs text-gray-600">
-                <label className="block">
-                  <div className="mb-1 text-gray-500">Source</div>
-                  <select className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-xs" value={props.routeSource} onChange={(event) => props.onRouteSourceChange(event.target.value === 'cloud' ? 'cloud' : 'local')}>
-                    <option value="local">local</option>
-                    <option value="cloud">cloud</option>
-                  </select>
-                </label>
-
-                {props.routeSource === 'cloud' ? (<label className="mt-2 block">
-                    <div className="mb-1 text-gray-500">Connector</div>
-                    <select className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-xs" value={props.routeConnectorId} onChange={(event) => props.onRouteConnectorChange(event.target.value)}>
-                      {props.routeConnectors.length === 0 ? (<option value="">No connector</option>) : null}
-                      {props.routeConnectors.map((connector) => (<option key={connector.id} value={connector.id}>
-                          {connector.label || connector.id}
-                        </option>))}
-                    </select>
-                  </label>) : null}
-
-                <label className="mt-2 block">
-                  <div className="mb-1 text-gray-500">Model</div>
-                  <input className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-xs" list={routeModelListId} value={props.routeModel} onChange={(event) => props.onRouteModelChange(event.target.value)} placeholder={props.routeSource === 'cloud' && !activeConnector ? 'Select connector first' : 'model id'}/>
-                  <datalist id={routeModelListId}>
-                    {props.routeModelOptions.map((model) => (<option key={`textplay-route-model-${model}`} value={model}/>))}
-                  </datalist>
-                </label>
-
-                <div className="mt-2 flex items-center justify-between">
-                  <div className="text-[11px] text-gray-500">
-                    override: {props.bindingActive ? 'on' : 'off'}
-                  </div>
-                  <button type="button" className="rounded border border-gray-300 bg-white px-2 py-1 text-[11px] hover:bg-gray-50" onClick={props.onClearRouteBinding}>
-                    Use Runtime Default
-                  </button>
-                </div>
-              </div>) : null}
-          </section>
-
-          <section className="border-t border-gray-200 px-3 py-3 text-xs">
-            {rightPanelSectionHeader({
-            title: 'Debug Trace',
-            open: openRightPanelSection === 'debug',
-            onToggle: () => setOpenRightPanelSection((prev) => (prev === 'debug' ? null : 'debug')),
-        })}
-            {openRightPanelSection === 'debug' ? (<div className="mt-3 space-y-3">
-                <div className="rounded-lg border border-gray-200 bg-white p-2 text-xs text-gray-600">
-                  <div className="text-[11px] font-medium uppercase tracking-wide text-gray-700">Story Snapshot</div>
-                  {props.storySnapshot ? (<div className="mt-2 space-y-1">
-                      <div>storyId: {props.storySnapshot.storyId}</div>
-                      <div>entryEventId: {props.storySnapshot.entryEventId}</div>
-                      <div>primaryAgentId: {props.storySnapshot.primaryAgentId || '(missing)'}</div>
-                      <div>version: {props.storySnapshot.version}</div>
-                      <div>source: {props.storySnapshot.source}</div>
-                      <div>loadedAt: {props.storySnapshot.loadedAt}</div>
-                      {props.startupPackage ? (<div>
-                          initiative: tick={props.startupPackage.startupPolicy.initiative.tickSeconds}s
-                          {' '}cooldown={props.startupPackage.startupPolicy.initiative.cooldownSeconds}s
-                          {' '}max={props.startupPackage.startupPolicy.initiative.maxConsecutive}
-                        </div>) : null}
-                      <div>
-                        coverage: canon={String(props.storySnapshot.contextCoverage.canon)}
-                        {' '}story={String(props.storySnapshot.contextCoverage.story)}
-                        {' '}subject={String(props.storySnapshot.contextCoverage.subject)}
-                        {' '}relation={String(props.storySnapshot.contextCoverage.relation)}
-                        {' '}scene={String(props.storySnapshot.contextCoverage.scene)}
-                      </div>
-                      <div>gapWarnings: {props.storySnapshot.gapWarnings.length}</div>
-                    </div>) : (<div className="mt-2">none</div>)}
-                </div>
-
-                <div className="rounded-lg border border-gray-200 bg-white p-2 text-xs text-gray-600">
-                  <div className="text-[11px] font-medium uppercase tracking-wide text-gray-700">Selected Turn Debug</div>
-                  {selectedRecord ? (<div className="mt-2 space-y-1 text-[11px]">
-                      <div>selectedRun: {selectedRecord.runId}</div>
-                      <div>selectedTurn: {selectedRecord.turnId}</div>
-                      <div>trigger: {selectedRecord.triggerSource}</div>
-                      <div>route: {formatRouteLabelFromRecord(selectedRecord)}</div>
-                      <div>traceId: {selectedRecord.traceId}</div>
-                      <div>promptTraceId: {selectedRecord.meta.promptTraceId || '(none)'}</div>
-                    </div>) : (<div className="mt-2 text-[11px] text-gray-500">none</div>)}
-                  {(diagnosticReasonCode || diagnosticTraceId || diagnosticStep) ? (<div className="mt-2 space-y-1 border-t border-gray-100 pt-2 text-[11px] text-rose-700">
-                      {diagnosticReasonCode ? <div>reasonCode: {diagnosticReasonCode}</div> : null}
-                      {diagnosticTraceId ? <div>traceId: {diagnosticTraceId}</div> : null}
-                      {diagnosticStep ? <div>step: {diagnosticStep}</div> : null}
-                    </div>) : null}
-                </div>
-
-                <div className="rounded-lg border border-gray-200 bg-white p-2">
-                  <div className="text-xs font-medium text-gray-800">Run Steps ({props.runEvents.length})</div>
-                  <div className="mt-1 text-[11px] text-gray-500">System pipeline events (not narrative cards).</div>
-                  <div className="mt-1 max-h-[40vh] overflow-auto text-[11px] text-gray-600">
-                    {props.runEvents.length === 0 ? 'none' : props.runEvents.map((event) => (<div key={`${event.runId}-${event.seq}`} className="mb-1 rounded border border-gray-100 bg-gray-50 px-2 py-1">
-                        {formatRunEvent(event)}
-                      </div>))}
-                  </div>
-                </div>
-              </div>) : null}
-          </section>
-        </div>
-      </aside>
-    </div>);
+      <RouteConfigDrawer
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        routeOptions={props.routeOptions}
+        routeLoading={props.routeLoading}
+        routeError={props.routeError}
+        routeBinding={props.routeBinding}
+        effectiveRouteBinding={props.effectiveRouteBinding}
+        onRouteSourceChange={props.onRouteSourceChange}
+        onRouteConnectorChange={props.onRouteConnectorChange}
+        onRouteModelChange={props.onRouteModelChange}
+        onRouteClear={props.onRouteClear}
+        onRouteReload={props.onRouteReload}
+      />
+    </div>
+  );
 }

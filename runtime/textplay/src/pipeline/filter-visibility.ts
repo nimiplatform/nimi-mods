@@ -11,12 +11,12 @@ const ACTOR_PRIORITY: Array<keyof Pick<TextplayProjectionEvent, 'thinker' | 'dec
 
 function isInternalVisibleToPlayer(input: {
   event: TextplayProjectionEvent;
-  playerId: string;
+  userId: string;
 }): boolean {
   for (const field of ACTOR_PRIORITY) {
     const actorId = String(input.event[field] || '').trim();
     if (!actorId) continue;
-    return actorId === input.playerId;
+    return actorId === input.userId;
   }
   return false;
 }
@@ -38,7 +38,7 @@ export function filterTextplayVisibility(input: {
     if (event.visibility === 'internal') {
       if (isInternalVisibleToPlayer({
         event,
-        playerId: input.normalized.playerId,
+        userId: input.normalized.userId,
       })) {
         visibleEvents.push(event);
       }

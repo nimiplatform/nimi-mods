@@ -131,9 +131,10 @@ function buildTurnResponse(input: {
 function toStepInputHash(input: NarrativeTurnInputNormalized): string {
   return createStableHash({
     storyId: input.storyId,
+    entryEventId: input.entryEventId,
     worldId: input.worldId,
     agentId: input.agentId,
-    playerId: input.playerId,
+    userId: input.userId,
     triggerSource: input.triggerSource,
     userMessage: input.userMessage,
     systemContext: input.systemContext,
@@ -157,6 +158,15 @@ function createUniqueSpineEventId(input: {
     attempt += 1;
   }
   return `evt-${createUlid(input.nowMs + input.index + 4_096)}`;
+}
+
+function toTemplateStoryId(worldId: string, entryEventId: string): string {
+  const normalizedWorldId = String(worldId || '').trim();
+  const normalizedEntryEventId = String(entryEventId || '').trim();
+  if (!normalizedWorldId || !normalizedEntryEventId) {
+    return '';
+  }
+  return `story.${normalizedWorldId}.${normalizedEntryEventId}`;
 }
 
 function rewriteConflictingSpineEventIds(input: {
@@ -220,7 +230,7 @@ function toTurnRecord(input: {
     storyId: input.normalized.storyId,
     worldId: input.normalized.worldId,
     agentId: input.normalized.agentId,
-    playerId: input.normalized.playerId,
+    userId: input.normalized.userId,
     triggerSource: input.normalized.triggerSource,
     status: input.status,
     reasonCode: input.reasonCode,
@@ -380,7 +390,7 @@ export async function processNarrativeTurn(input: {
       {
         worldId: normalized.worldId,
         storyId: normalized.storyId,
-        playerId: normalized.playerId,
+        userId: normalized.userId,
         agentId: normalized.agentId,
       },
     ),
@@ -466,11 +476,13 @@ export async function processNarrativeTurn(input: {
       NARRATIVE_ENGINE_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST,
       {
         worldId: normalized.worldId,
-        storyId: normalized.storyId,
+        ...(normalized.entryEventId
+          ? { storyId: toTemplateStoryId(normalized.worldId, normalized.entryEventId) }
+          : { storyId: normalized.storyId }),
       },
     ).then(async (scopedPayload) => {
       const scopedCount = countRowsLikePayload(scopedPayload);
-      const shouldFallbackToWorldScope = scopedCount === 0 && normalized.storyId.includes('.');
+      const shouldFallbackToWorldScope = scopedCount === 0;
       if (!shouldFallbackToWorldScope) {
         return scopedPayload;
       }
@@ -486,7 +498,7 @@ export async function processNarrativeTurn(input: {
       NARRATIVE_ENGINE_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY,
       {
         agentId: normalized.agentId,
-        entityId: normalized.playerId,
+        entityId: normalized.userId,
         topK: 10,
         queryText: normalized.userMessage,
       },

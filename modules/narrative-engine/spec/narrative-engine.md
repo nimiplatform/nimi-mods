@@ -1,7 +1,7 @@
 # Narrative-Engine Domain Spec
 
 > Status: Draft
-> Date: 2026-03-02
+> Date: 2026-03-12
 > Scope: Narrative business increments only. Cross-domain contracts stay in kernel.
 
 ## 0. Normative Imports
@@ -24,6 +24,7 @@
 - `NAR-005`: Narrative reject path must not write spine.
 - `NAR-006`: Narrative adjusted path must persist adjusted output and auditable check trace.
 - `NAR-007`: Narrative run state must be resumable under checkpoint contract; terminal state cannot rollback.
+- `NAR-008`: Account identity inside engine contracts is `userId`. Player-facing persona fields belong to caller domains.
 
 ## 2. Domain Increments
 
@@ -37,9 +38,12 @@
 - `NAR-017`: Step1 context assembly reads `worldEvents/lorebooks/scenes/narrative-contexts/memory` from realm boundaries and emits bounded snapshot.
 - `NAR-018`: Missing `CANON/STORY` is fail-close; missing `SUBJECT/RELATION/scene` keeps run approved with coverage warnings. Event-derived player-facing story ids may resolve via a stable non-event story anchor, but cross-event context borrowing remains forbidden.
 - `NAR-019`: Guard adjusts excessive tension jump with non-blocking `NARRATIVE_TENSION_JUMP_ADJUSTED`.
+- `NAR-020`: Narrative-Engine story state remains keyed by runtime `storyId` and supports caller-driven `exportStoryState`, `hydrateStoryState`, and `resetStoryState`.
+- `NAR-021`: Story snapshot export is intentionally bounded to turn ids, latest turn id, turn records, render projections, spine events, and narrative context scopes required for continuation.
+- `NAR-022`: Audit logs and idempotency caches are runtime execution artifacts, not part of portable story snapshot state.
 
 ## 3. No Over-Design Guard
 
-- `NAR-020`: This domain does not define renderer behavior.
-- `NAR-021`: This domain does not define realm storage internals.
-- `NAR-022`: This domain does not add compatibility shims.
+- `NAR-030`: This domain does not define renderer behavior.
+- `NAR-031`: This domain does not define realm storage internals.
+- `NAR-032`: This domain does not add compatibility shims.

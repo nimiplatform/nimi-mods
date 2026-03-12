@@ -1,488 +1,194 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadStoryStartupPackage } from '../src/data/story-catalog.ts';
+import { loadEntryStartupPackage } from '../src/data/startup-package.ts';
+import {
+  TEXTPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY,
+  TEXTPLAY_DATA_API_WORLD_LOREBOOKS_LIST,
+  TEXTPLAY_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST,
+  TEXTPLAY_DATA_API_WORLD_SCENES_LIST,
+} from '../src/contracts.ts';
 
 function createHookClient() {
   return {
     data: {
-      query: async ({ capability }) => {
-        if (capability === 'data-api.world.lorebooks.list') {
+      query: async ({ capability, query }) => {
+        if (capability === TEXTPLAY_DATA_API_WORLD_LOREBOOKS_LIST) {
+          assert.equal(query.worldId, 'world-1');
           return {
-            worldId: 'world-1',
             items: [
               {
                 id: 'lore-1',
-                key: 'storm.harbor',
-                name: 'Storm Harbor',
-                content: 'Harbor district with iron bells and rain.',
-                keywords: ['harbor', 'storm'],
-              },
-              {
-                id: 'lore-2',
-                key: 'random.misc',
-                content: 'Unrelated note',
-                keywords: ['misc'],
+                key: 'harbor-law',
+                name: 'Harbor Ordinance',
+                content: 'The harbor is under strict night curfew.',
+                keywords: ['harbor', 'curfew'],
               },
             ],
           };
         }
-
-        if (capability === 'data-api.world.scenes.list') {
+        if (capability === TEXTPLAY_DATA_API_WORLD_SCENES_LIST) {
+          assert.equal(query.worldId, 'world-1');
           return {
-            worldId: 'world-1',
             items: [
               {
                 id: 'scene-docks',
-                worldId: 'world-1',
                 name: 'Iron Docks',
                 description: 'Rain hammers the mooring towers.',
-                setting: { weather: 'rain' },
-                activeEntities: ['agent-1', 'player-1'],
-                updatedAt: '2026-03-02T09:00:00.000Z',
+                activeEntities: ['agent-1', 'user-1'],
+              },
+              {
+                id: 'scene-market',
+                name: 'Night Market',
+                description: 'Lanterns flicker under torn awnings.',
+                activeEntities: ['agent-9'],
               },
             ],
           };
         }
-
-        if (capability === 'data-api.world.narrative-contexts.list') {
+        if (capability === TEXTPLAY_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST) {
+          assert.equal(query.worldId, 'world-1');
           return {
-            worldId: 'world-1',
             items: [
               {
                 id: 'ctx-canon',
                 scope: 'CANON',
-                scopeKey: 'canon:world-1',
-                storyId: null,
-                narrativeSetting: { pacingPolicy: { curve: 'steady' } },
+                scopeKey: 'world:world-1:canon',
+                narrativeSetting: {
+                  worldviewRules: ['No one crosses the harbor cordon without scrutiny.'],
+                },
                 narrativeState: {},
+                updatedAt: '2026-03-02T09:00:00.000Z',
               },
               {
                 id: 'ctx-story',
                 scope: 'STORY',
-                scopeKey: 'story:world-1:evt-primary',
-                storyId: 'story.world-1.evt-primary',
+                scopeKey: 'story:world-1:evt-opening',
+                storyId: 'story.world-1.evt-opening',
                 narrativeSetting: {
-                  recommendedSceneId: 'scene-docks',
-                  initiativePolicy: { enabled: true, tickSeconds: 10, cooldownSeconds: 180, maxConsecutive: 3 },
-                  pacingPolicy: { targetTension: 0.6, tensionBand: [0.45, 0.75], beatDensity: 0.5, curve: 'steady-rise' },
+                  startupPolicy: {
+                    initiative: {
+                      enabled: true,
+                      tickSeconds: 12,
+                      cooldownSeconds: 160,
+                      maxConsecutive: 2,
+                      blockedPresenceStates: ['active'],
+                    },
+                    pacing: {
+                      targetTension: 0.72,
+                      tensionBand: [0.55, 0.85],
+                      beatDensity: 0.66,
+                      curve: 'surging',
+                    },
+                  },
                 },
                 narrativeState: {
-                  phase: 'in-progress',
-                  objective: 'Stabilize the negotiation',
-                  tension: 0.62,
-                  openThreads: ['missing cargo stamp'],
+                  phase: 'pre-crackdown',
+                  objective: 'Find the signal fire before the cordon seals',
+                  openThreads: ['Who sabotaged the inspection line?'],
                 },
+                updatedAt: '2026-03-02T09:10:00.000Z',
               },
               {
                 id: 'ctx-subject',
                 scope: 'SUBJECT',
-                scopeKey: 'subject:world-1:agent-1',
-                storyId: 'story.world-1.evt-primary',
+                scopeKey: 'subject:agent-1',
+                storyId: 'story.world-1.evt-opening',
                 subjectType: 'AGENT',
                 subjectId: 'agent-1',
-                narrativeSetting: { dramaticRole: 'mediator' },
-                narrativeState: { activeObjective: 'protect player' },
+                narrativeSetting: {
+                  playerIdentity: 'Courier informant',
+                },
+                narrativeState: {
+                  currentSituation: 'You stand near the signal mast while guards rotate shifts.',
+                },
+                updatedAt: '2026-03-02T09:20:00.000Z',
               },
               {
                 id: 'ctx-relation',
                 scope: 'RELATION',
-                scopeKey: 'relation:world-1:agent-1:player-1',
-                storyId: 'story.world-1.evt-primary',
+                scopeKey: 'relation:agent-1:user-1',
+                storyId: 'story.world-1.evt-opening',
                 subjectType: 'AGENT',
                 subjectId: 'agent-1',
                 targetSubjectType: 'PLAYER',
-                targetSubjectId: 'player-1',
-                narrativeSetting: { relationContract: 'uneasy-allies' },
-                narrativeState: { trust: 0.4 },
-              },
-            ],
-          };
-        }
-
-        if (capability === 'data-api.core.agent.memory.recall.for-entity') {
-          return {
-            recallSource: 'remote-only',
-            items: [
-              { content: 'The player once crossed this harbor at dawn.' },
-            ],
-            core: [
-              { summary: 'The guide distrusts sudden moves.' },
-            ],
-            e2e: [],
-          };
-        }
-
-        throw new Error(`unsupported-capability:${capability}`);
-      },
-    },
-  };
-}
-
-function createHookClientMissingStoryContext() {
-  return {
-    data: {
-      query: async ({ capability }) => {
-        if (capability === 'data-api.world.lorebooks.list') {
-          return { worldId: 'world-1', items: [] };
-        }
-        if (capability === 'data-api.world.scenes.list') {
-          return {
-            worldId: 'world-1',
-            items: [
-              {
-                id: 'scene-docks',
-                worldId: 'world-1',
-                name: 'Iron Docks',
-                description: 'Rain hammers the mooring towers.',
-                setting: { weather: 'rain' },
-                activeEntities: ['agent-1', 'player-1'],
-                updatedAt: '2026-03-02T09:00:00.000Z',
-              },
-            ],
-          };
-        }
-        if (capability === 'data-api.world.narrative-contexts.list') {
-          return {
-            worldId: 'world-1',
-            items: [
-              {
-                id: 'ctx-canon',
-                scope: 'CANON',
-                scopeKey: 'canon:world-1',
-                storyId: null,
-                narrativeSetting: { pacingPolicy: { curve: 'steady' } },
-                narrativeState: {},
-              },
-              {
-                id: 'ctx-story-other',
-                scope: 'STORY',
-                scopeKey: 'story:world-1:evt-other',
-                storyId: 'story.world-1.evt-other',
+                targetSubjectId: 'user-1',
                 narrativeSetting: {
-                  recommendedSceneId: 'scene-docks',
+                  playerRole: 'Embedded observer',
                 },
                 narrativeState: {
-                  phase: 'other-story',
+                  playerBackground: 'You have been trading information along the docks for months.',
                 },
+                updatedAt: '2026-03-02T09:30:00.000Z',
               },
             ],
           };
         }
-        if (capability === 'data-api.core.agent.memory.recall.for-entity') {
+        if (capability === TEXTPLAY_DATA_API_CORE_AGENT_MEMORY_RECALL_FOR_ENTITY) {
+          assert.deepEqual(query, {
+            agentId: 'agent-1',
+            entityId: 'user-1',
+            topK: 8,
+          });
           return {
-            recallSource: 'remote-only',
-            items: [],
+            items: [
+              { content: 'The agent remembers the courier’s habit of watching exits first.' },
+            ],
             core: [],
             e2e: [],
+            recallSource: 'remote',
           };
         }
-        throw new Error(`unsupported-capability:${capability}`);
+        throw new Error(`unexpected-capability:${capability}`);
       },
     },
   };
 }
 
-function createHookClientWithCrossStoryContextLeak() {
+function createEntryDetail() {
   return {
-    data: {
-      query: async ({ capability }) => {
-        if (capability === 'data-api.world.lorebooks.list') {
-          return { worldId: 'world-1', items: [] };
-        }
-        if (capability === 'data-api.world.scenes.list') {
-          return {
-            worldId: 'world-1',
-            items: [
-              {
-                id: 'scene-docks',
-                worldId: 'world-1',
-                name: 'Iron Docks',
-                description: 'Rain hammers the mooring towers.',
-                setting: { weather: 'rain' },
-                activeEntities: ['agent-1', 'player-1'],
-                updatedAt: '2026-03-02T09:00:00.000Z',
-              },
-            ],
-          };
-        }
-        if (capability === 'data-api.world.narrative-contexts.list') {
-          return {
-            worldId: 'world-1',
-            items: [
-              {
-                id: 'ctx-canon',
-                scope: 'CANON',
-                scopeKey: 'canon:world-1',
-                storyId: null,
-                narrativeSetting: { pacingPolicy: { curve: 'steady' } },
-                narrativeState: {},
-              },
-              {
-                id: 'ctx-story',
-                scope: 'STORY',
-                scopeKey: 'story:world-1:evt-primary',
-                storyId: 'story.world-1.evt-primary',
-                narrativeSetting: {
-                  recommendedSceneId: 'scene-docks',
-                },
-                narrativeState: {
-                  phase: 'in-progress',
-                },
-              },
-              {
-                id: 'ctx-subject-other',
-                scope: 'SUBJECT',
-                scopeKey: 'subject:world-1:agent-1:other',
-                storyId: 'story.world-1.evt-other',
-                subjectType: 'AGENT',
-                subjectId: 'agent-1',
-                narrativeSetting: { dramaticRole: 'saboteur' },
-                narrativeState: { activeObjective: 'mislead player' },
-              },
-              {
-                id: 'ctx-relation-other',
-                scope: 'RELATION',
-                scopeKey: 'relation:world-1:agent-1:player-1:other',
-                storyId: 'story.world-1.evt-other',
-                subjectType: 'AGENT',
-                subjectId: 'agent-1',
-                targetSubjectType: 'PLAYER',
-                targetSubjectId: 'player-1',
-                narrativeSetting: { relationContract: 'hostile' },
-                narrativeState: { trust: -0.6 },
-              },
-            ],
-          };
-        }
-        if (capability === 'data-api.core.agent.memory.recall.for-entity') {
-          return {
-            recallSource: 'remote-only',
-            items: [],
-            core: [],
-            e2e: [],
-          };
-        }
-        throw new Error(`unsupported-capability:${capability}`);
-      },
-    },
+    entryEventId: 'evt-opening',
+    worldId: 'world-1',
+    title: 'Opening Clash',
+    summary: 'The harbor is one breath away from rupture.',
+    materialSummary: 'The harbor is tense and the target event has not happened yet.',
+    participants: ['agent-1', 'agent-2'],
+    characterRefs: ['agent-1', 'agent-2'],
+    eventHorizon: 'PAST',
+    entryMode: 'PRE_EVENT',
+    updatedAt: '2026-03-02T10:00:00.000Z',
+    playable: true,
+    cause: 'Contraband dispute',
+    process: 'Negotiation collapses on the pier',
+    result: 'The cordon begins to harden',
+    timeRef: 'night-watch',
+    locationRefs: ['scene-docks'],
+    recommendedSceneId: 'scene-docks',
   };
 }
 
-function createHookClientWithMainlineStoryAnchor() {
-  return {
-    data: {
-      query: async ({ capability }) => {
-        if (capability === 'data-api.world.lorebooks.list') {
-          return {
-            worldId: 'world-1',
-            items: [
-              {
-                id: 'lore-1',
-                key: 'storm.harbor',
-                content: 'Harbor district with iron bells and rain.',
-                keywords: ['harbor', 'storm'],
-              },
-            ],
-          };
-        }
-
-        if (capability === 'data-api.world.scenes.list') {
-          return {
-            worldId: 'world-1',
-            items: [
-              {
-                id: 'scene-docks',
-                worldId: 'world-1',
-                name: 'Iron Docks',
-                description: 'Rain hammers the mooring towers.',
-                setting: { weather: 'rain' },
-                activeEntities: ['agent-1', 'agent-2', 'player-1'],
-                updatedAt: '2026-03-02T09:00:00.000Z',
-              },
-            ],
-          };
-        }
-
-        if (capability === 'data-api.world.narrative-contexts.list') {
-          return {
-            worldId: 'world-1',
-            items: [
-              {
-                id: 'ctx-canon',
-                scope: 'CANON',
-                scopeKey: 'canon:world-1',
-                storyId: null,
-                narrativeSetting: { pacingPolicy: { curve: 'steady' } },
-                narrativeState: {},
-              },
-              {
-                id: 'ctx-story-mainline',
-                scope: 'STORY',
-                scopeKey: 'story:world-mainline',
-                storyId: 'story:world-mainline',
-                narrativeSetting: {
-                  recommendedSceneId: 'scene-docks',
-                  castPolicy: {
-                    mandatorySubjectIds: ['agent-1', 'agent-2'],
-                  },
-                  initiativePolicy: { enabled: true, tickSeconds: 10, cooldownSeconds: 180, maxConsecutive: 3 },
-                  pacingPolicy: { targetTension: 0.68, tensionBand: [0.5, 0.8], beatDensity: 0.55, curve: 'steady-rise' },
-                },
-                narrativeState: {
-                  phase: 'in-progress',
-                  objective: 'Hold the harbor line',
-                  tension: 0.7,
-                  openThreads: ['hidden reinforcements'],
-                },
-              },
-              {
-                id: 'ctx-subject-mainline',
-                scope: 'SUBJECT',
-                scopeKey: 'subject:world-mainline:agent-1',
-                storyId: 'story:world-mainline',
-                subjectType: 'AGENT',
-                subjectId: 'agent-1',
-                narrativeSetting: { dramaticRole: 'mediator' },
-                narrativeState: { activeObjective: 'protect the line' },
-              },
-              {
-                id: 'ctx-relation-mainline',
-                scope: 'RELATION',
-                scopeKey: 'relation:world-mainline:agent-1:agent-2',
-                storyId: 'story:world-mainline',
-                subjectType: 'AGENT',
-                subjectId: 'agent-1',
-                targetSubjectType: 'AGENT',
-                targetSubjectId: 'agent-2',
-                narrativeSetting: { relationContract: 'cautious-allies' },
-                narrativeState: { trust: 0.3 },
-              },
-            ],
-          };
-        }
-
-        if (capability === 'data-api.core.agent.memory.recall.for-entity') {
-          return {
-            recallSource: 'remote-only',
-            items: [
-              { content: 'The player once crossed this harbor at dawn.' },
-            ],
-            core: [
-              { summary: 'The guide distrusts sudden moves.' },
-            ],
-            e2e: [],
-          };
-        }
-
-        throw new Error(`unsupported-capability:${capability}`);
-      },
-    },
-  };
-}
-
-const detail = {
-  storyId: 'story.world-1.evt-primary',
-  worldId: 'world-1',
-  entryEventId: 'evt-primary',
-  title: 'Storm Harbor Incident',
-  summary: 'Contraband pressure keeps building on the docks……',
-  materialSummary: 'A tense negotiation breaks under heavy rain while the target event still lies ahead.',
-  primaryAgentId: 'agent-1',
-  participants: ['agent-1', 'player-1'],
-  updatedAt: '2026-03-02T09:00:00.000Z',
-  eventHorizon: 'PAST',
-  entryMode: 'PRE_EVENT',
-  playable: true,
-  agentBindingMissing: false,
-  cause: 'Contraband dispute',
-  process: 'Negotiation escalates near docks',
-  result: 'Local order fractures',
-  timeRef: 'night-watch',
-  locationRefs: ['scene-docks'],
-  characterRefs: ['agent-1', 'player-1'],
-  recommendedSceneId: 'scene-docks',
-};
-
-test('startup package composes summary/material/objective/snapshot and supports fresh mode', async () => {
-  const startup = await loadStoryStartupPackage({
+test('loadEntryStartupPackage builds story-scoped startup package from entry, contexts, scenes and memory', async () => {
+  const startup = await loadEntryStartupPackage({
     hookClient: createHookClient(),
-    narrativeEngine: {
-      turnLatest: async () => {
-        throw new Error('NARRATIVE_TURN_LATEST_NOT_FOUND');
-      },
-    },
-    detail,
-    playerId: 'player-1',
+    detail: createEntryDetail(),
+    storyId: 'story_01KXTEXTPLAYENTRY1234567890',
+    agentId: 'agent-1',
+    userId: 'user-1',
   });
 
-  assert.equal(startup.storyId, detail.storyId);
-  assert.equal(startup.background.summary.includes('Contraband dispute'), true);
-  assert.equal(startup.narrativeScopes.STORY.phase, 'in-progress');
-  assert.equal(startup.narrativeScopes.STORY.objective, 'Stabilize the negotiation');
-  assert.equal(startup.materials.lorebooks.length > 0, true);
-  assert.equal(startup.materials.memories.length > 0, true);
-  assert.equal(startup.materials.scenes.length > 0, true);
-  assert.equal(startup.materials.contexts.length >= 4, true);
-  assert.equal(startup.recommendedEntryTurn, null);
-  assert.equal(startup.snapshot.entryEventId, detail.entryEventId);
-  assert.equal(startup.snapshot.contextCoverage.canon, true);
-  assert.equal(startup.snapshot.contextCoverage.story, true);
-  assert.equal(startup.startupPolicy.initiative.cooldownSeconds, 180);
-  assert.equal(startup.snapshot.version.startsWith('h'), true);
-});
-
-test('startup package fails close when STORY context is missing', async () => {
-  await assert.rejects(
-    async () => {
-      await loadStoryStartupPackage({
-        hookClient: createHookClientMissingStoryContext(),
-        narrativeEngine: {
-          turnLatest: async () => null,
-        },
-        detail,
-        playerId: 'player-1',
-      });
-    },
-    /TEXTPLAY_CONTEXT_MISSING_CRITICAL/,
-  );
-});
-
-test('startup package does not borrow SUBJECT or RELATION context from a different story', async () => {
-  const startup = await loadStoryStartupPackage({
-    hookClient: createHookClientWithCrossStoryContextLeak(),
-    narrativeEngine: {
-      turnLatest: async () => null,
-    },
-    detail,
-    playerId: 'player-1',
-  });
-
-  assert.equal(startup.snapshot.gapWarnings.includes('TEXTPLAY_CONTEXT_SUBJECT_MISSING_WARN'), true);
-  assert.equal(startup.snapshot.gapWarnings.includes('TEXTPLAY_CONTEXT_RELATION_MISSING_WARN'), true);
-  assert.equal(startup.materials.contexts.some((row) => row.id === 'ctx-subject-other'), false);
-  assert.equal(startup.materials.contexts.some((row) => row.id === 'ctx-relation-other'), false);
-});
-
-test('startup package accepts stable mainline context anchor and AGENT-to-AGENT relation rows', async () => {
-  const startup = await loadStoryStartupPackage({
-    hookClient: createHookClientWithMainlineStoryAnchor(),
-    narrativeEngine: {
-      turnLatest: async () => null,
-    },
-    detail: {
-      ...detail,
-      participants: ['agent-1', 'agent-2', 'player-1'],
-      characterRefs: ['agent-1', 'agent-2', 'player-1'],
-    },
-    playerId: 'player-1',
-  });
-
-  assert.equal(startup.snapshot.contextCoverage.story, true);
-  assert.equal(startup.snapshot.contextCoverage.subject, true);
-  assert.equal(startup.snapshot.contextCoverage.relation, true);
-  assert.equal(startup.snapshot.gapWarnings.includes('TEXTPLAY_CONTEXT_SUBJECT_MISSING_WARN'), false);
-  assert.equal(startup.snapshot.gapWarnings.includes('TEXTPLAY_CONTEXT_RELATION_MISSING_WARN'), false);
-  assert.equal(startup.materials.contexts.some((row) => row.id === 'ctx-story-mainline'), true);
-  assert.equal(startup.materials.contexts.some((row) => row.id === 'ctx-relation-mainline'), true);
-  assert.equal(startup.narrativeScopes.RELATION.relationContract, 'cautious-allies');
+  assert.equal(startup.storyId, 'story_01KXTEXTPLAYENTRY1234567890');
+  assert.equal(startup.entryEventId, 'evt-opening');
+  assert.equal(startup.cast.primaryAgentId, 'agent-1');
+  assert.deepEqual(startup.cast.participants, ['agent-1', 'agent-2']);
+  assert.equal(startup.entry.entryMode, 'PRE_EVENT');
+  assert.equal(startup.entry.eventHorizon, 'PAST');
+  assert.equal(startup.snapshot.storyId, 'story_01KXTEXTPLAYENTRY1234567890');
+  assert.equal(startup.snapshot.primaryAgentId, 'agent-1');
+  assert.equal(startup.startupPolicy.initiative.tickSeconds, 12);
+  assert.equal(startup.startupPolicy.pacing.curve, 'surging');
+  assert.match(startup.background.summary, /Rain hammers the mooring towers/);
+  assert.deepEqual(startup.materials.memories, [
+    'The agent remembers the courier’s habit of watching exits first.',
+  ]);
+  assert.equal(startup.materials.scenes[0].id, 'scene-docks');
+  assert.equal(startup.narrativeScopes.STORY.phase, 'pre-crackdown');
 });

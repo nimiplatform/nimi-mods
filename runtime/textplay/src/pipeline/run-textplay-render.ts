@@ -195,7 +195,7 @@ function buildStartFallbackProjection(input: {
   request: TextplayRenderExecutionInput['request'];
   storyId: string;
   turnId: string;
-  playerId: string;
+  userId: string;
   agentId: string;
 }): NarrativeProjectionRenderInputResponse {
   const opening = asRecord(asRecord(input.request.systemPayload).opening);
@@ -223,7 +223,7 @@ function buildStartFallbackProjection(input: {
     turnId: input.turnId,
     triggerSource: input.request.triggerSource,
     player: {
-      id: input.playerId,
+      id: input.userId,
       name: firstNonEmpty([
         opening.playerName,
         input.request.playerName,
@@ -283,7 +283,7 @@ export async function runTextplayRender(input: TextplayRenderExecutionInput): Pr
     storyId: input.request.storyId,
     worldId: input.request.worldId,
     agentId: input.request.agentId,
-    playerId: input.request.playerId,
+    userId: input.request.userId,
     playerName: input.request.playerName || '',
     playerIdentity: input.request.playerIdentity || '',
     runId: input.request.runId,
@@ -435,9 +435,10 @@ export async function runTextplayRender(input: TextplayRenderExecutionInput): Pr
       narrativeEngine: input.deps.narrativeEngine,
       request: {
         storyId: input.request.storyId,
+        entryEventId: input.request.entryEventId,
         worldId: input.request.worldId,
         agentId: input.request.agentId,
-        playerId: input.request.playerId,
+        userId: input.request.userId,
         triggerSource: input.request.triggerSource,
         userMessage: input.request.userMessage,
         systemContext: input.request.systemPayload,

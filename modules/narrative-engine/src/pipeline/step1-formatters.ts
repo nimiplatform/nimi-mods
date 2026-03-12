@@ -208,7 +208,7 @@ export function buildCompiledPromptContext(input: {
                 `storyId=${input.turn.storyId}`,
                 `worldId=${input.turn.worldId}`,
                 `agentId=${input.turn.agentId}`,
-                `playerId=${input.turn.playerId}`,
+                `userId=${input.turn.userId}`,
                 `triggerSource=${input.turn.triggerSource}`,
             ].join('\n')],
         ['route', [

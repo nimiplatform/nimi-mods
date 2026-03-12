@@ -178,14 +178,14 @@ export function parsePersistRecord(value: unknown): TextplayPersistRecord | null
     const turnId = toTrimmedString(record.turnId);
     const runId = toTrimmedString(record.runId);
     const traceId = toTrimmedString(record.traceId);
-    const playerId = toTrimmedString(record.playerId);
+    const userId = toTrimmedString(record.userId);
     const openingPayload = asRecord(asRecord(record.systemPayload)?.opening);
     const playerIdentity = firstNonEmptyText([
         record.playerIdentity,
         openingPayload?.playerIdentity,
         openingPayload?.playerRole,
     ]);
-    if (!storyId || !turnId || !runId || !traceId || !playerId) {
+    if (!storyId || !turnId || !runId || !traceId || !userId) {
         return null;
     }
     const runSnapshot = parseRunSnapshot(record.runSnapshot);
@@ -201,7 +201,7 @@ export function parsePersistRecord(value: unknown): TextplayPersistRecord | null
         runId,
         traceId,
         triggerSource: (toTrimmedString(record.triggerSource) || 'UserTurn') as TextplayPersistRecord['triggerSource'],
-        playerId,
+        userId,
         playerIdentity: playerIdentity || undefined,
         userMessage: typeof record.userMessage === 'string' ? record.userMessage : '',
         systemPayload: record.systemPayload && typeof record.systemPayload === 'object'
