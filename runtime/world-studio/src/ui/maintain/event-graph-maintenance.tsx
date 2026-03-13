@@ -26,9 +26,11 @@ type EventGraphMaintenanceProps = {
     onSyncModeChange: (mode: 'merge' | 'replace') => void;
     onSyncEvents: () => void;
     onDeleteFirstEvent: () => void;
+    showActions?: boolean;
 };
 export function EventGraphMaintenance(props: EventGraphMaintenanceProps) {
     const { t } = useModTranslation('world-studio');
+    const showActions = props.showActions !== false;
     const totalEvents = props.events.primary.length + props.events.secondary.length;
     const missingPrimaryEvidence = countPrimaryEventsMissingEvidence(props.events.primary);
     const primaryIds = new Set(props.events.primary.map((item) => String(item.id || '').trim()).filter(Boolean));
@@ -64,14 +66,14 @@ export function EventGraphMaintenance(props: EventGraphMaintenanceProps) {
             {t('eventGraphMaintenance.modeHint')}
           </div>
         </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60" onClick={props.onSyncEvents} disabled={props.working}>
-            {t('eventGraphMaintenance.syncEvents', { mode: props.syncMode })}
-          </button>
-          <button type="button" className="ui-sync-btn ui-sync-btn-secondary rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 disabled:opacity-60" onClick={props.onDeleteFirstEvent} disabled={props.working}>
-            {t('eventGraphMaintenance.deleteFirstEvent')}
-          </button>
-        </div>
+        {showActions ? (<div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60" onClick={props.onSyncEvents} disabled={props.working}>
+              {t('eventGraphMaintenance.syncEvents', { mode: props.syncMode })}
+            </button>
+            <button type="button" className="ui-sync-btn ui-sync-btn-secondary rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 disabled:opacity-60" onClick={props.onDeleteFirstEvent} disabled={props.working}>
+              {t('eventGraphMaintenance.deleteFirstEvent')}
+            </button>
+          </div>) : null}
       </section>
     </div>);
 }

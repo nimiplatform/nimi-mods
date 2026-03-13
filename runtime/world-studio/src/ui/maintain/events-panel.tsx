@@ -19,6 +19,7 @@ type EventsPanelProps = {
   onSyncModeChange: (mode: 'merge' | 'replace') => void;
   onSyncEvents: () => void;
   onDeleteFirstEvent: () => void;
+  showActions?: boolean;
 };
 
 export function EventsPanel(props: EventsPanelProps) {
@@ -47,6 +48,7 @@ export function EventsPanel(props: EventsPanelProps) {
       onDeleteFirstEvent={props.onDeleteFirstEvent}
       onLayoutChange={props.onEventGraphLayoutChange}
       onEventsChange={props.onEventsChange}
+      showActions={props.showActions}
     />
   );
 }

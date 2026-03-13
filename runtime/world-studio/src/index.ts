@@ -54,7 +54,9 @@ export function createWorldStudioRuntimeMod(): RuntimeModRegistration {
                 extension: {
                     type: 'tab-page',
                     tabId: WORLD_STUDIO_TAB_ID,
+                    shellMode: 'immersive',
                     strategy: 'append',
+                    modId: WORLD_STUDIO_MOD_ID,
                     component: () => React.createElement(Suspense, {
                         fallback: React.createElement('div', {
                             className: 'm-4 rounded-xl border border-gray-200 bg-white p-3 text-xs text-gray-600',

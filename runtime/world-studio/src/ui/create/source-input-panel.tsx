@@ -21,6 +21,7 @@ export function SourceInputPanel(props: SourceInputPanelProps) {
     const { t } = useModTranslation('world-studio');
     const hasFailedChunks = hasTerminalFailures(props.chunkTasks);
     const chunkPolicy = props.parseJob.chunkPolicy;
+    const showInlineActions = props.showInlineActions !== false;
     return (<section className="ui-sync-card ui-sync-card-inset p-4">
       <h3 className="text-sm font-semibold text-gray-900">{t('sourceInput.title')}</h3>
       <p className="mt-1 text-xs text-gray-500">
@@ -48,14 +49,14 @@ export function SourceInputPanel(props: SourceInputPanelProps) {
 
       <SourceInputProgressCard parseJob={props.parseJob}/>
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60" onClick={props.onRunPhase1} disabled={props.working}>
-          {t('sourceInput.runExtract')}
-        </button>
-        <button type="button" className="ui-sync-btn ui-sync-btn-selected rounded-md border border-brand-300 bg-white px-3 py-1.5 text-xs font-semibold text-brand-700 disabled:opacity-60" onClick={props.onRunFailedChunks} disabled={props.working || !hasFailedChunks || !props.onRunFailedChunks}>
-          {t('sourceInput.retryFailedChunks')}
-        </button>
-      </div>
+      {showInlineActions ? (<div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60" onClick={props.onRunPhase1} disabled={props.working}>
+            {t('sourceInput.runExtract')}
+          </button>
+          <button type="button" className="ui-sync-btn ui-sync-btn-selected rounded-md border border-brand-300 bg-white px-3 py-1.5 text-xs font-semibold text-brand-700 disabled:opacity-60" onClick={props.onRunFailedChunks} disabled={props.working || !hasFailedChunks || !props.onRunFailedChunks}>
+            {t('sourceInput.retryFailedChunks')}
+          </button>
+        </div>) : null}
       {props.expertMode ? (<>
           {chunkPolicy ? (<div className="ui-sync-toolbar mt-3 p-2.5">
               <p className="text-[11px] font-semibold text-slate-700">{t('sourceInput.adaptiveChunking')}</p>

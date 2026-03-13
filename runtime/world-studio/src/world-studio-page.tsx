@@ -10,7 +10,10 @@ import { useWorldStudioPageContent } from './controllers/world-studio-page-contr
 // Reloaded remote maintenance snapshot and replaced local unsaved changes.
 export function WorldStudioPage() {
   return (
-    <div data-nimi-mod-root="world-studio" className="h-full min-h-0">
+    <div
+      data-nimi-mod-root="world-studio"
+      className="flex h-full min-h-0 min-w-0 flex-1 overflow-hidden bg-[#eef7f5]"
+    >
       {useWorldStudioPageContent()}
     </div>
   );

@@ -27,5 +27,6 @@ export type SourceInputPanelProps = {
   retryErrorCode?: string | null;
   onClearRetryErrorCode?: () => void;
   expertMode?: boolean;
+  showInlineActions?: boolean;
   working: boolean;
 };

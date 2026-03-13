@@ -7,6 +7,4 @@ export * from './route-capability-controls.js';
 export * from './studio-status-card.js';
 export * from './maintenance-actions-card.js';
 export * from './workspace-panel.js';
-export * from './create-right-panel.js';
-export * from './maintain-right-panel.js';
 export * from './world-studio-route-config-card.js';

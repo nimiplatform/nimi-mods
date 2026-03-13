@@ -518,8 +518,7 @@ export function syncSnapshot(snapshot: WorldStudioWorkspaceSnapshot): WorldStudi
     const activeMaintainTab = (activeMaintainTabRaw === 'WORLD'
         || activeMaintainTabRaw === 'WORLDVIEW'
         || activeMaintainTabRaw === 'EVENTS'
-        || activeMaintainTabRaw === 'LOREBOOKS'
-        || activeMaintainTabRaw === 'MUTATIONS')
+        || activeMaintainTabRaw === 'LOREBOOKS')
         ? activeMaintainTabRaw as WorldStudioWorkspaceSnapshot['panel']['activeMaintainTab']
         : 'WORLD';
     const panel: WorldStudioWorkspaceSnapshot['panel'] = {

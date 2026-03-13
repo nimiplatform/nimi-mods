@@ -111,7 +111,7 @@ export type WorldStudioPanelState = {
   searchText: string;
   selectedWorldId: string;
   selectedDraftId: string;
-  activeMaintainTab: 'WORLD' | 'WORLDVIEW' | 'EVENTS' | 'LOREBOOKS' | 'MUTATIONS';
+  activeMaintainTab: 'WORLD' | 'WORLDVIEW' | 'EVENTS' | 'LOREBOOKS';
 };
 
 export type WorldStudioWorkspaceSnapshot = {

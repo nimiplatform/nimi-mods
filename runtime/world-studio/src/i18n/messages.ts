@@ -33,10 +33,15 @@ export function worldStudioMessage(
   values?: MessageValues,
 ): string {
   const i18n = getI18n() || i18next;
-  const translated = i18n.t(`world-studio:${key}`, {
-    ...(values || {}),
-    defaultValue: fallback,
-  });
+  let translated: unknown;
+  try {
+    translated = i18n.t(`world-studio:${key}`, {
+      ...(values || {}),
+      defaultValue: fallback,
+    });
+  } catch {
+    return interpolateFallback(fallback, values);
+  }
   if (isUsableMessage(translated, key)) {
     return translated;
   }

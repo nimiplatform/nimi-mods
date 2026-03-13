@@ -21,6 +21,7 @@
     "routeReady": "路由已就绪。"
   },
   "routeConfig": {
+    "sectionTitle": "模型路由",
     "intro": "世界拆解与日常聊天模型需求不同，请在此配置工坊专用 coarse/fine 路由。",
     "coarseSummary": "粗提取当前路由",
     "fineSummary": "精提取当前路由",
@@ -28,6 +29,8 @@
     "fineTitle": "精提取模型路由（FINE/SYNTHESIZE）",
     "resetAll": "重置所有覆盖",
     "ready": "路由已就绪，可返回工作流开始拆书。",
+    "readyShort": "路由已就绪",
+    "notReadyShort": "需要补全路由",
     "notReady": "请补全粗提取与精提取模型路由。诊断：",
     "notReadyWithDetail": "请补全粗提取与精提取模型路由。诊断：{{reasonCode}}（{{actionHint}}）",
     "embeddingIndexTitle": "Embedding 索引",
@@ -157,6 +160,9 @@
     "taskCanceled": "任务已取消",
     "taskPaused": "任务已暂停",
     "taskResumed": "任务已恢复",
+    "pause": "暂停",
+    "resume": "继续",
+    "cancel": "取消",
     "pauseRequested": "已请求暂停",
     "cancelRequested": "已请求取消",
     "taskPausedResume": "任务已暂停，可继续恢复。",
@@ -195,6 +201,7 @@
   "banner": {
     "embeddingRebuilt": "Embedding 索引已重建：{{entryCount}} 条",
     "synthesizeCompletedWithDnaGaps": "合成完成，但存在 DNA 缺口",
+    "synthesizeCompletedWithDnaGapsAndEmbeddingAttention": "合成完成，但存在 DNA 缺口且 Embedding 索引需要处理。",
     "synthesizeCompleted": "合成完成",
     "synthesizeCanceled": "已取消合成",
     "extractionPaused": "提取已暂停",
@@ -552,5 +559,165 @@
     "createDraft": "创建草稿",
     "publishDraft": "发布草稿",
     "draftId": "draftId：{{draftId}}"
+  },
+  "stage": {
+    "import": "导入",
+    "curate": "整理",
+    "generate": "生成",
+    "review": "审阅"
+  },
+  "shell": {
+    "workflowDrawer": "工作流",
+    "workflowDrawerTitle": "工作流",
+    "expertDrawer": "专家",
+    "expertDrawerTitle": "专家",
+    "settingsDrawer": "设置",
+    "settingsDrawerTitle": "设置",
+    "closeSettings": "关闭设置",
+    "closeSettingsOverlay": "关闭设置遮罩"
+  },
+  "settingsDrawer": {
+    "errorLabel": "错误"
+  },
+  "dirty": {
+    "world": "世界",
+    "worldview": "世界观",
+    "events": "事件",
+    "lorebooks": "知识条目",
+    "clean": "已保存",
+    "single": "1 处未保存修改",
+    "multiple": "{{count}} 处未保存修改"
+  },
+  "header": {
+    "currentWorld": "世界：{{name}}",
+    "currentWorldId": "世界：{{id}}",
+    "currentDraft": "草稿：{{id}}",
+    "currentDraftName": "草稿：{{name}}",
+    "newDraft": "新草稿"
+  },
+  "workflow": {
+    "workspaceTitle": "工作区",
+    "workspaceDescription": "在已发布世界与草稿工作区之间切换。",
+    "refresh": "刷新",
+    "publishedWorld": "世界",
+    "noWorldOption": "暂无世界",
+    "openMaintenance": "打开维护",
+    "draftWorkspace": "草稿",
+    "noDraftOption": "暂无草稿",
+    "draftStatus": "状态：{{status}}",
+    "newDraft": "新建草稿",
+    "continueDraft": "继续草稿",
+    "stageNavTitle": "工作流",
+    "stageNavDescription": "在主要创建阶段之间跳转。",
+    "sectionNavTitle": "内容",
+    "sectionNavDescription": "在世界、世界观、事件和知识条目之间切换。"
+  },
+  "maintainNav": {
+    "world": "世界",
+    "worldview": "世界观",
+    "events": "事件",
+    "lorebooks": "知识条目"
+  },
+  "statusSummary": {
+    "title": "状态",
+    "noActiveTask": "当前无活动任务",
+    "events": "主线 {{primary}} · 支线 {{secondary}}",
+    "evidence": "缺失证据：{{count}}"
+  },
+  "taskStrip": {
+    "pause": "暂停",
+    "resume": "继续",
+    "cancel": "取消",
+    "openDetails": "查看详情"
+  },
+  "stageAccess": {
+    "curate": "请先完成导入/提取，再进入检查点整理。",
+    "generate": {
+      "missingImport": "请先完成导入，再进入生成阶段。",
+      "blocked": "请先解决质量门禁阻断，再进入生成阶段。"
+    },
+    "review": "请先生成草稿，再进入审阅阶段。"
+  },
+  "create": {
+    "continueToCurate": "继续到整理",
+    "continueToGenerate": "继续到生成",
+    "generateDraft": "生成草稿",
+    "qualityGateBlockBody": "请先解决覆盖率与证据问题，再继续合成。",
+    "qualityGateBlockTitle": "质量门禁已阻断",
+    "refreshQualityGate": "刷新质量门禁",
+    "retryFailed": "重试失败分块",
+    "routeBlockerAction": "打开路由设置",
+    "routeBlockerBody": "在开始提取前，请先完成 coarse 与 fine 路由配置。",
+    "routeBlockerTitle": "路由尚未就绪",
+    "startExtraction": "开始提取",
+    "stage": {
+      "curate": {
+        "summary": "{{characters}} 个角色 · {{events}} 个主线事件"
+      },
+      "generate": {
+        "summary": "{{agents}} 个同步角色 · {{stories}} 条生成结果"
+      },
+      "import": {
+        "prepare": "准备素材与路由",
+        "result": "已提取 {{events}} 个事件",
+        "running": "{{count}} 个分块处理中"
+      },
+      "review": {
+        "edit": "草稿编辑中",
+        "publish": "可发布"
+      }
+    }
+  },
+  "review": {
+    "backToEdit": "返回编辑",
+    "finalChecklistLorebooks": "知识条目：{{count}}",
+    "finalChecklistPrimaryEvents": "主线事件：{{count}}",
+    "finalChecklistSecondaryEvents": "支线事件：{{count}}",
+    "finalChecklistTitle": "发布前清单",
+    "publish": "发布",
+    "publishReviewDescription": "冻结草稿，核对发布清单，然后将世界推进到维护态。",
+    "publishReviewTitle": "发布审阅",
+    "saveDraft": "保存草稿"
+  },
+  "maintain": {
+    "adoptRemoteSnapshot": "采用远端快照",
+    "conflictBody": "远端世界在当前快照加载后发生了变化。在继续信任本地编辑前，请先处理冲突。",
+    "conflictSnapshot": "远端快照：{{value}}",
+    "conflictTitle": "远端维护冲突",
+    "currentSection": "当前内容",
+    "forceSave": "强制保存",
+    "forceSyncEvents": "强制同步事件",
+    "headerLabel": "维护",
+    "reloadRemote": "刷新远端",
+    "reloadRemoteSnapshot": "重载远端快照",
+    "save": "保存",
+    "savedState": "本地编辑与当前快照已同步。",
+    "snapshotVersion": "快照：{{value}}",
+    "syncEvents": "同步事件",
+    "syncLorebooks": "同步知识条目",
+    "unsavedPanels": "未保存面板：{{value}}",
+    "untitledWorld": "未命名世界",
+    "worldId": "世界 ID：{{value}}"
+  },
+  "expertDrawer": {
+    "characterCoverage": "角色覆盖率：{{count}}%",
+    "chunkSummary": "终态分块：{{success}}/{{total}} 成功",
+    "diagnosticsSubtitle": "提取、覆盖率与剧情投影指标。",
+    "diagnosticsTitle": "诊断",
+    "historySubtitle": "当前世界的只读 mutation 审计历史。",
+    "historyTitle": "历史",
+    "locationCoverage": "地点覆盖率：{{count}}%",
+    "missingEvidence": "缺失证据：{{count}}",
+    "noActiveTask": "当前无活动任务",
+    "primaryEvents": "主线事件：{{count}}",
+    "routingSubtitle": "路由配置、Embedding 就绪状态与专家模式开关。",
+    "routingTitle": "路由",
+    "secondaryEvents": "支线事件：{{count}}",
+    "storyProjectionCount": "剧情投影：{{count}}",
+    "storyProjectionLatestAt": "最近投影时间：{{value}}",
+    "storyProjectionMissingContext": "缺失上下文：{{count}}",
+    "taskDetailsSubtitle": "实时任务状态、通知与恢复信息。",
+    "taskDetailsTitle": "任务详情",
+    "topFailure": "最高频失败：{{code}} × {{count}}"
   }
 }

@@ -21,6 +21,7 @@
     "routeReady": "Route is ready."
   },
   "routeConfig": {
+    "sectionTitle": "Model Routing",
     "intro": "World extraction and daily chat have different model requirements. Configure dedicated coarse/fine routes here.",
     "coarseSummary": "Current coarse route",
     "fineSummary": "Current fine route",
@@ -28,6 +29,8 @@
     "fineTitle": "Fine Route (FINE/SYNTHESIZE)",
     "resetAll": "Reset All Overrides",
     "ready": "Routes are ready. Return to workflow and continue.",
+    "readyShort": "Routes ready",
+    "notReadyShort": "Routing required",
     "notReady": "Please complete coarse/fine routing. Diagnostics:",
     "notReadyWithDetail": "Please complete coarse/fine routing. Diagnostics: {{reasonCode}} ({{actionHint}})",
     "embeddingIndexTitle": "Embedding Index",
@@ -58,7 +61,7 @@
     "refresh": "Refresh View",
     "conflictActions": "Conflict Actions",
     "remoteSnapshot": "Remote Snapshot",
-    "reloadRemote": "Reload Remote",
+    "reloadRemote": "Refresh Remote",
     "forceSave": "Force Save",
     "forceSyncEvents": "Force Sync Events",
     "adoptRemote": "Adopt Remote Snapshot"
@@ -157,6 +160,9 @@
     "taskCanceled": "Task canceled",
     "taskPaused": "Task paused",
     "taskResumed": "Task resumed",
+    "pause": "Pause",
+    "resume": "Resume",
+    "cancel": "Cancel",
     "pauseRequested": "Pause requested",
     "cancelRequested": "Cancel requested",
     "taskPausedResume": "Task paused. Resume to continue.",
@@ -195,6 +201,7 @@
   "banner": {
     "embeddingRebuilt": "Embedding index rebuilt: {{entryCount}} entries",
     "synthesizeCompletedWithDnaGaps": "Synthesize completed with DNA gaps",
+    "synthesizeCompletedWithDnaGapsAndEmbeddingAttention": "Synthesize completed with DNA gaps and embedding attention required.",
     "synthesizeCompleted": "Synthesize completed",
     "synthesizeCanceled": "Synthesize canceled",
     "extractionPaused": "Extraction paused",
@@ -552,5 +559,165 @@
     "createDraft": "Create Draft",
     "publishDraft": "Publish Draft",
     "draftId": "draftId: {{draftId}}"
+  },
+  "stage": {
+    "import": "Import",
+    "curate": "Curate",
+    "generate": "Generate",
+    "review": "Review"
+  },
+  "shell": {
+    "workflowDrawer": "Workflow",
+    "workflowDrawerTitle": "Workflow",
+    "expertDrawer": "Expert",
+    "expertDrawerTitle": "Expert",
+    "settingsDrawer": "Settings",
+    "settingsDrawerTitle": "Settings",
+    "closeSettings": "Close settings",
+    "closeSettingsOverlay": "Close settings overlay"
+  },
+  "settingsDrawer": {
+    "errorLabel": "Error"
+  },
+  "dirty": {
+    "world": "World",
+    "worldview": "Worldview",
+    "events": "Events",
+    "lorebooks": "Lorebooks",
+    "clean": "Saved",
+    "single": "1 unsaved change",
+    "multiple": "{{count}} unsaved changes"
+  },
+  "header": {
+    "currentWorld": "World: {{name}}",
+    "currentWorldId": "World: {{id}}",
+    "currentDraft": "Draft: {{id}}",
+    "currentDraftName": "Draft: {{name}}",
+    "newDraft": "New draft"
+  },
+  "workflow": {
+    "workspaceTitle": "Workspace",
+    "workspaceDescription": "Switch between published worlds and draft workspaces.",
+    "refresh": "Refresh",
+    "publishedWorld": "World",
+    "noWorldOption": "No world",
+    "openMaintenance": "Open maintenance",
+    "draftWorkspace": "Draft",
+    "noDraftOption": "No draft yet",
+    "draftStatus": "Status: {{status}}",
+    "newDraft": "New draft",
+    "continueDraft": "Continue draft",
+    "stageNavTitle": "Workflow",
+    "stageNavDescription": "Jump between the major creation stages.",
+    "sectionNavTitle": "Content",
+    "sectionNavDescription": "Switch between world, worldview, events, and lorebooks."
+  },
+  "maintainNav": {
+    "world": "World",
+    "worldview": "Worldview",
+    "events": "Events",
+    "lorebooks": "Lorebooks"
+  },
+  "statusSummary": {
+    "title": "Status",
+    "noActiveTask": "No active task",
+    "events": "Primary {{primary}} · Secondary {{secondary}}",
+    "evidence": "Missing evidence: {{count}}"
+  },
+  "taskStrip": {
+    "pause": "Pause",
+    "resume": "Resume",
+    "cancel": "Cancel",
+    "openDetails": "Open details"
+  },
+  "stageAccess": {
+    "curate": "Finish import before entering checkpoints.",
+    "generate": {
+      "missingImport": "Finish import before entering generation.",
+      "blocked": "Resolve quality gate blockers before entering generation."
+    },
+    "review": "Generate a draft before entering review."
+  },
+  "create": {
+    "continueToCurate": "Continue to Curate",
+    "continueToGenerate": "Continue to Generate",
+    "generateDraft": "Generate Draft",
+    "qualityGateBlockBody": "Resolve coverage and evidence issues before synthesis.",
+    "qualityGateBlockTitle": "Quality gate blocked",
+    "refreshQualityGate": "Refresh Quality Gate",
+    "retryFailed": "Retry Failed",
+    "routeBlockerAction": "Open Route Setup",
+    "routeBlockerBody": "Configure coarse and fine routes before extraction can start.",
+    "routeBlockerTitle": "Routing not ready",
+    "startExtraction": "Start Extraction",
+    "stage": {
+      "curate": {
+        "summary": "{{characters}} characters · {{events}} primary events"
+      },
+      "generate": {
+        "summary": "{{agents}} synced agents · {{stories}} generated items"
+      },
+      "import": {
+        "prepare": "Prepare source and routes",
+        "result": "{{events}} events extracted",
+        "running": "{{count}} chunks in flight"
+      },
+      "review": {
+        "edit": "Draft editing",
+        "publish": "Ready to publish"
+      }
+    }
+  },
+  "review": {
+    "backToEdit": "Back to Edit",
+    "finalChecklistLorebooks": "Lorebooks: {{count}}",
+    "finalChecklistPrimaryEvents": "Primary events: {{count}}",
+    "finalChecklistSecondaryEvents": "Secondary events: {{count}}",
+    "finalChecklistTitle": "Final checklist",
+    "publish": "Publish",
+    "publishReviewDescription": "Freeze the draft, validate the publish checklist, then push the world into maintenance mode.",
+    "publishReviewTitle": "Publish review",
+    "saveDraft": "Save Draft"
+  },
+  "maintain": {
+    "adoptRemoteSnapshot": "Adopt Remote Snapshot",
+    "conflictBody": "The remote world changed after this snapshot was loaded. Resolve the conflict before trusting local edits.",
+    "conflictSnapshot": "Remote snapshot: {{value}}",
+    "conflictTitle": "Remote maintenance conflict",
+    "currentSection": "Current content",
+    "forceSave": "Force Save",
+    "forceSyncEvents": "Force Sync Events",
+    "headerLabel": "Maintenance",
+    "reloadRemote": "Reload Remote",
+    "reloadRemoteSnapshot": "Reload Remote Snapshot",
+    "save": "Save",
+    "savedState": "Local edits are synced with the current snapshot.",
+    "snapshotVersion": "Snapshot: {{value}}",
+    "syncEvents": "Sync Events",
+    "syncLorebooks": "Sync Lorebooks",
+    "unsavedPanels": "Unsaved panels: {{value}}",
+    "untitledWorld": "Untitled world",
+    "worldId": "World ID: {{value}}"
+  },
+  "expertDrawer": {
+    "characterCoverage": "Character coverage: {{count}}%",
+    "chunkSummary": "Terminal chunks: {{success}}/{{total}} success",
+    "diagnosticsSubtitle": "Extraction, coverage, and story projection metrics.",
+    "diagnosticsTitle": "Diagnostics",
+    "historySubtitle": "Audit-only mutation history for the current world.",
+    "historyTitle": "History",
+    "locationCoverage": "Location coverage: {{count}}%",
+    "missingEvidence": "Missing evidence: {{count}}",
+    "noActiveTask": "No active task",
+    "primaryEvents": "Primary events: {{count}}",
+    "routingSubtitle": "Route configuration, embedding readiness, and expert-mode controls.",
+    "routingTitle": "Routing",
+    "secondaryEvents": "Secondary events: {{count}}",
+    "storyProjectionCount": "Story projections: {{count}}",
+    "storyProjectionLatestAt": "Latest projected at: {{value}}",
+    "storyProjectionMissingContext": "Missing context: {{count}}",
+    "taskDetailsSubtitle": "Live task state, notices, and recovery information.",
+    "taskDetailsTitle": "Task details",
+    "topFailure": "Top failure: {{code}} × {{count}}"
   }
 }

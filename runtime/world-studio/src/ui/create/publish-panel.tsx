@@ -14,6 +14,7 @@ type PublishPanelProps = {
     onPublishDraft: () => void;
     embedded?: boolean;
     showTitle?: boolean;
+    showActions?: boolean;
 };
 function StepBadge(props: {
     label: string;
@@ -32,6 +33,7 @@ export function PublishPanel(props: PublishPanelProps) {
     const { t } = useModTranslation('world-studio');
     const embedded = Boolean(props.embedded);
     const showTitle = props.showTitle !== false;
+    const showActions = props.showActions !== false;
     return (<section className={embedded ? '' : 'ui-sync-card ui-sync-card-inset m-3 p-3'}>
       {showTitle ? <h3 className="text-sm font-semibold text-gray-900">{t('publishPanel.title')}</h3> : null}
       <p className={`${showTitle ? 'mt-1 ' : ''}text-xs text-gray-500`}>{t('publishPanel.currentStep', { step: props.step })}</p>
@@ -60,14 +62,14 @@ export function PublishPanel(props: PublishPanelProps) {
         </p>
       </div>
 
-      <div className="mt-3 flex flex-col gap-2">
-        <button type="button" className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60" onClick={props.onSaveDraft} disabled={props.working || !props.hasPhase2}>
-          {props.draftId ? t('publishPanel.updateDraft') : t('publishPanel.createDraft')}
-        </button>
-        <button type="button" className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60" onClick={props.onPublishDraft} disabled={props.working || !props.draftId}>
-          {t('publishPanel.publishDraft')}
-        </button>
-      </div>
+      {showActions ? (<div className="mt-3 flex flex-col gap-2">
+          <button type="button" className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60" onClick={props.onSaveDraft} disabled={props.working || !props.hasPhase2}>
+            {props.draftId ? t('publishPanel.updateDraft') : t('publishPanel.createDraft')}
+          </button>
+          <button type="button" className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60" onClick={props.onPublishDraft} disabled={props.working || !props.draftId}>
+            {t('publishPanel.publishDraft')}
+          </button>
+        </div>) : null}
       {props.draftId ? <p className="mt-2 text-xs text-gray-500">{t('publishPanel.draftId', { draftId: props.draftId })}</p> : null}
     </section>);
 }

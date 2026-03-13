@@ -9,11 +9,16 @@ import { NoAccessPanel } from '../ui/no-access/no-access-panel.js';
 import { useWorldStudioPageUiState } from './use-world-studio-page-ui-state.js';
 import { useWorldStudioControllerContext, useWorldStudioStoreBindings, } from './world-studio-controller-context.js';
 import { useWorldStudioControllerActions } from './use-world-studio-controller-actions.js';
-import { buildWorldStudioViewModel } from './world-studio-view-model-builder.js';
-import { buildWorldStudioPanels } from './world-studio-panels.js';
+import { buildWorldStudioScreenModel } from './world-studio-screen-model-builder.js';
 import { createWorldStudioRuntimeAiClient } from '../runtime-ai-client.js';
 import { getWorldStudioRuntimeClient } from '../runtime-mod.js';
 import { createHookClient, useModTranslation } from "@nimiplatform/sdk/mod";
+import { useWorldStudioShellState } from './use-world-studio-shell-state.js';
+import { WorkflowDrawer } from '../ui/workflow-drawer.js';
+import { SettingsDrawer } from '../ui/settings-drawer.js';
+import { TaskProgressStrip } from '../ui/task-progress-strip.js';
+import { CreateWorkbench } from '../ui/create/create-workbench.js';
+import { MaintainWorkbench } from '../ui/maintain/maintain-workbench.js';
 function isRouteConfigBlockingNotice(message: string | null): boolean {
     if (!message)
         return false;
@@ -222,28 +227,35 @@ export function useWorldStudioPageContent() {
             return;
         void loadRuntimeRouteOptions();
     }, [activeTab, bootstrapReady, loadRuntimeRouteOptions]);
-    const viewModel = buildWorldStudioViewModel({
+    const landingTarget = ui.landing.target === 'MAINTAIN' ? 'MAINTAIN' : 'CREATE';
+    const shellState = useWorldStudioShellState();
+    const screenModel = buildWorldStudioScreenModel({
+        title: t('page.title'),
+        subtitle: landingTarget === 'CREATE' ? t('page.subtitleCreate') : t('page.subtitleMaintain'),
         ui,
         context,
-        loadLanding,
         actions,
         snapshot: storeBindings.snapshot,
         patchSnapshot: storeBindings.patchSnapshot,
         patchPanel: storeBindings.patchPanel,
         setCreateStep: storeBindings.setCreateStep,
+        loadLanding,
         sourceChunksRef,
+        layoutState: shellState,
         onOpenRuntimeSetup: () => {
             setActiveTab('runtime');
         },
     });
-    if (viewModel.base.landingLoading) {
+    if (screenModel.status.landingLoading) {
         return <div className="p-4 text-sm text-gray-600">{t('page.loading')}</div>;
     }
-    if (viewModel.base.landing.target === 'NO_ACCESS') {
-        return (<NoAccessPanel reason={viewModel.base.landing.reason} error={viewModel.base.error} onRetry={() => {
-                void viewModel.base.loadLanding();
+    if (screenModel.workflow.landing.target === 'NO_ACCESS') {
+        return (<NoAccessPanel reason={screenModel.workflow.landing.reason} error={screenModel.status.error} onRetry={() => {
+                void screenModel.actions.workflow.loadLanding();
             }}/>);
     }
-    const { leftPanel, mainPanel, rightPanel } = buildWorldStudioPanels(viewModel);
-    return (<WorldStudioShell title={t('page.title')} subtitle={viewModel.base.landing.target === 'CREATE' ? t('page.subtitleCreate') : t('page.subtitleMaintain')} leftPanel={leftPanel} mainPanel={mainPanel} rightPanel={rightPanel}/>);
+    const mainPanel = screenModel.workflow.landingTarget === 'CREATE'
+        ? (<CreateWorkbench workflow={screenModel.workflow} main={screenModel.main} routing={screenModel.routing} status={screenModel.status} actions={screenModel.actions}/>)
+        : (<MaintainWorkbench layout={screenModel.layout} workflow={screenModel.workflow} main={screenModel.main} status={screenModel.status} actions={screenModel.actions}/>);
+    return (<WorldStudioShell title={screenModel.layout.title} subtitle={screenModel.layout.subtitle} currentObjectLabel={screenModel.layout.currentObjectLabel} isDirty={screenModel.layout.dirtySummary.hasDirty} dirtyLabel={screenModel.layout.dirtySummary.shortLabel} settingsDrawerOpen={screenModel.layout.settingsDrawerOpen} onToggleSettingsDrawer={screenModel.layout.toggleSettingsDrawer} onCloseSettingsDrawer={() => screenModel.layout.setSettingsDrawerOpen(false)} taskStrip={<TaskProgressStrip status={screenModel.status} onPauseTask={screenModel.actions.task.pauseTask} onResumeTask={screenModel.actions.task.resumeTask} onCancelTask={screenModel.actions.task.cancelTask}/>} mainPanel={mainPanel} workflowSidebar={<WorkflowDrawer workflow={screenModel.workflow} actions={screenModel.actions}/>} settingsDrawer={<SettingsDrawer routing={screenModel.routing} actions={screenModel.actions}/>}/>);
 }
