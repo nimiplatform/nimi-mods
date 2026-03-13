@@ -14,6 +14,7 @@ import {
   recordNarrativeInitiativeFired,
   recordNarrativeNonInitiativeTurn,
 } from '../initiative/policy.js';
+import { enrichNarrativeCoreOutputCausality } from './causal-enrichment.js';
 import { buildNarrativeRenderInput } from '../projection/render-input.js';
 import { NarrativeRunEventLog } from '../run/event-log.js';
 import {
@@ -184,6 +185,7 @@ function rewriteConflictingSpineEventIds(input: {
   );
   let remappedCount = 0;
 
+  const rewrittenIds = new Map<string, string>();
   const events = input.events.map((event, index) => {
     const sourceId = String(event.id || '').trim();
     const needsRemap = !sourceId || usedIds.has(sourceId);
@@ -198,6 +200,9 @@ function rewriteConflictingSpineEventIds(input: {
       remappedCount += 1;
     }
     usedIds.add(nextId);
+    if (sourceId && sourceId !== nextId) {
+      rewrittenIds.set(sourceId, nextId);
+    }
     if (nextId === sourceId) {
       return event;
     }
@@ -208,7 +213,17 @@ function rewriteConflictingSpineEventIds(input: {
   });
 
   return {
-    events,
+    events: events.map((event) => {
+      if (!Array.isArray(event.sourceEventIds) || event.sourceEventIds.length === 0) {
+        return event;
+      }
+      const sourceEventIds = event.sourceEventIds
+        .map((eventId) => rewrittenIds.get(String(eventId || '').trim()) || String(eventId || '').trim())
+        .filter(Boolean);
+      return sourceEventIds.length > 0
+        ? { ...event, sourceEventIds: [...new Set(sourceEventIds)] }
+        : event;
+    }),
     remappedCount,
   };
 }
@@ -649,7 +664,12 @@ export async function processNarrativeTurn(input: {
     },
   });
 
-  const finalOutput = guard.output;
+  const finalOutput = enrichNarrativeCoreOutputCausality({
+    triggerSource: normalized.triggerSource,
+    snapshot: step1.value.snapshot,
+    recentSpineEvents,
+    coreOutput: guard.output,
+  });
   eventLog.startStep('write-spine');
   const spineRewrite = rewriteConflictingSpineEventIds({
     storyId: normalized.storyId,

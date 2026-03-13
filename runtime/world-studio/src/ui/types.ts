@@ -47,6 +47,7 @@ export type WorldMutationSummary = {
 export type WorldEventSummary = {
   id: string;
   worldId: string;
+  timelineSeq: number;
   level: 'PRIMARY' | 'SECONDARY';
   eventHorizon: 'PAST' | 'ONGOING' | 'FUTURE';
   parentEventId: string | null;

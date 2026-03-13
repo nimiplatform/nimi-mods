@@ -56,24 +56,31 @@ cases:
     primary_only: true
     reason_code: null
     source_rule: T-ACC-002
-  - id: TXT-008A-STORY-HIDES-FUTURE
+  - id: TXT-008A-STORY-TIMELINE-SEQ
+    description: Player-facing entry list follows canonical world-event timeline order via timelineSeq ascending.
+    expected_ok: true
+    canonical_timeline_order_required: true
+    reason_code: null
+    source_rule: T-ACC-002
+  - id: TXT-008B-STORY-HIDES-FUTURE
     description: Player-facing playable story list preserves upstream eventHorizon as canonical target-event metadata and hides FUTURE PRIMARY events by default.
     expected_ok: true
     future_hidden_by_default: true
     reason_code: null
     source_rule: T-ACC-002
-  - id: TXT-008B-STORY-ENTRY-PRE-EVENT
+  - id: TXT-008C-STORY-ENTRY-PRE-EVENT
     description: Fresh story entry starts before the selected target event even when canonical eventHorizon is PAST or ONGOING; canonical details remain material only.
     expected_ok: true
     fresh_entry_mode: PRE_EVENT
     target_event_material_only: true
     reason_code: null
     source_rule: T-ACC-002
-  - id: TXT-008C-STORY-TEASER-SUMMARY
-    description: Player-facing story summary is teaser-only and ends with ellipsis instead of exposing the full canonical target-event detail.
+  - id: TXT-008D-STORY-ENTRY-NON-SPOILER
+    description: Player-facing entry card shows lightweight backdrop and cut-in hook only; internal canonical material fields and technical horizon terms are hidden.
     expected_ok: true
-    teaser_only_summary: true
-    teaser_has_trailing_ellipsis: true
+    entry_backdrop_required: true
+    entry_hook_required: true
+    internal_material_fields_hidden: true
     reason_code: null
     source_rule: T-ACC-002
   - id: TXT-009-STARTUP-PACKAGE-FRESH
@@ -104,6 +111,12 @@ cases:
     description: Auto tick triggers AgentInitiative when idle threshold/cooldown/maxConsecutive allow it.
     expected_ok: true
     trigger_source: AgentInitiative
+    reason_code: null
+    source_rule: T-ACC-002
+  - id: TXT-013A-AUTO-INITIATIVE-AWAY-TICK
+    description: Away threshold triggers SystemEvent autonomous progression when presence remains away long enough.
+    expected_ok: true
+    trigger_source: SystemEvent
     reason_code: null
     source_rule: T-ACC-002
   - id: TXT-014-CONTEXT-CRITICAL-FAIL-CLOSE

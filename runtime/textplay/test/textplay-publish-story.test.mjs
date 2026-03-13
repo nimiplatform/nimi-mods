@@ -26,9 +26,11 @@ function createDraft() {
       entry: {
         entryEventId: 'evt-opening',
         worldId: 'world-1',
+        timelineSeq: 4,
         title: 'Opening Clash',
         summary: 'The harbor tenses before the breach.',
-        materialSummary: 'Material summary',
+        entryBackdrop: 'Rain-soaked docks and contraband pressure leave the harbor on edge.',
+        entryHook: '你将从目标事件真正发生前的临界时刻切入，亲手塑造之后的走向。',
         participants: ['agent-1', 'agent-2'],
         characterRefs: ['agent-1', 'agent-2'],
         eventHorizon: 'PAST',
@@ -57,7 +59,18 @@ function createDraft() {
       narrativeScopes: { CANON: {}, STORY: {}, SUBJECT: {}, RELATION: {} },
       recommendedEntryTurn: null,
       startupPolicy: {
-        initiative: { enabled: true, tickSeconds: 10, cooldownSeconds: 180, maxConsecutive: 3, blockedPresenceStates: ['active'] },
+        initiative: {
+          enabled: true,
+          tickSeconds: 10,
+          cooldownSeconds: 180,
+          maxConsecutive: 3,
+          idleSeconds: 120,
+          pausedSeconds: 180,
+          highTensionIdleSeconds: 180,
+          awaySeconds: 300,
+          highTensionThreshold: 0.7,
+          blockedPresenceStates: ['active'],
+        },
         pacing: { targetTension: 0.6, tensionBand: [0.45, 0.75], beatDensity: 0.5, curve: 'steady-rise' },
       },
       snapshot: {
@@ -116,6 +129,11 @@ function createDraft() {
         },
       ],
       contexts: { CANON: {}, STORY: {}, SUBJECT: {}, RELATION: {} },
+      initiativeState: {
+        lastFiredAt: null,
+        consecutive: 0,
+        lastSceneFingerprint: null,
+      },
     },
     records: [
       {

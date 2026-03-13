@@ -42,10 +42,10 @@ export async function syncEvents(context: WorldStudioMaintainActionContext, payl
             progress: 0.2,
         });
         const events = context.eventsGraph;
-        const eventUpserts = toWorldEventUpsertPayloadList([
-            ...events.primary,
-            ...events.secondary,
-        ]);
+        const eventUpserts = toWorldEventUpsertPayloadList({
+            primary: events.primary,
+            secondary: events.secondary,
+        });
         const data = asRecord(await context.mutations.syncEventsMutation.mutateAsync({
             worldId: context.selectedWorldId,
             eventUpserts,

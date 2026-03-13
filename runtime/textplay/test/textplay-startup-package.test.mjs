@@ -71,6 +71,11 @@ function createHookClient() {
                       tickSeconds: 12,
                       cooldownSeconds: 160,
                       maxConsecutive: 2,
+                      idleSeconds: 120,
+                      pausedSeconds: 180,
+                      highTensionIdleSeconds: 180,
+                      awaySeconds: 300,
+                      highTensionThreshold: 0.7,
                       blockedPresenceStates: ['active'],
                     },
                     pacing: {
@@ -148,9 +153,11 @@ function createEntryDetail() {
   return {
     entryEventId: 'evt-opening',
     worldId: 'world-1',
+    timelineSeq: 4,
     title: 'Opening Clash',
     summary: 'The harbor is one breath away from rupture.',
-    materialSummary: 'The harbor is tense and the target event has not happened yet.',
+    entryBackdrop: 'Contraband pressure and the tightening cordon leave the harbor one breath from rupture.',
+    entryHook: '你将从目标事件真正发生前的临界时刻切入，亲手塑造之后的走向。',
     participants: ['agent-1', 'agent-2'],
     characterRefs: ['agent-1', 'agent-2'],
     eventHorizon: 'PAST',
@@ -181,9 +188,12 @@ test('loadEntryStartupPackage builds story-scoped startup package from entry, co
   assert.deepEqual(startup.cast.participants, ['agent-1', 'agent-2']);
   assert.equal(startup.entry.entryMode, 'PRE_EVENT');
   assert.equal(startup.entry.eventHorizon, 'PAST');
+  assert.equal(startup.entry.timelineSeq, 4);
   assert.equal(startup.snapshot.storyId, 'story_01KXTEXTPLAYENTRY1234567890');
   assert.equal(startup.snapshot.primaryAgentId, 'agent-1');
   assert.equal(startup.startupPolicy.initiative.tickSeconds, 12);
+  assert.equal(startup.startupPolicy.initiative.idleSeconds, 120);
+  assert.equal(startup.startupPolicy.initiative.awaySeconds, 300);
   assert.equal(startup.startupPolicy.pacing.curve, 'surging');
   assert.match(startup.background.summary, /Rain hammers the mooring towers/);
   assert.deepEqual(startup.materials.memories, [

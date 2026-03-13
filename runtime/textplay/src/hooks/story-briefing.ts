@@ -97,7 +97,7 @@ export function buildOpeningSystemPayload(input: {
   ]) || '未明身份的到访者';
 
   const openingBackground = [
-    input.startup.background.summary || input.entry.materialSummary || input.entry.summary,
+    input.startup.background.summary || input.entry.entryBackdrop || input.entry.summary,
     `玩家身份：${input.playerName || '你'}（${resolvedIdentity}）`,
     context.playerBackground ? `玩家背景：${context.playerBackground}` : '',
     context.currentSituation ? `当前处境：${context.currentSituation}` : '',
@@ -118,7 +118,8 @@ export function buildOpeningSystemPayload(input: {
       entryEventId: input.startup.entryEventId,
       entryEventHorizon: input.startup.entry.eventHorizon,
       targetEventMaterialOnly: true,
-      entrySummary: input.startup.entry.summary || input.entry.materialSummary || input.entry.summary,
+      entrySummary: input.startup.entry.summary || input.entry.entryBackdrop || input.entry.summary,
+      entryHook: input.startup.entry.entryHook || input.entry.entryHook,
       phase: toText(context.storyScope.phase) || 'opening',
       objective: toText(context.storyScope.objective) || 'advance-story',
       background: openingBackground,
@@ -240,6 +241,34 @@ export function buildInitiativeDirectorMessage(input: {
   return {
     strategy: 'fallback',
     directive: `【世界推进】基于“${fallbackSeed}”制造新的现场变化，不要直接结束目标事件，并给${playerName}一个清晰的下一步行动入口。`,
+  };
+}
+
+export function buildInitiativeSystemPayload(input: {
+  startup: TextplayStartupPackage;
+  records: TextplayPersistRecord[];
+  playerName: string;
+  triggerSource: 'AgentInitiative' | 'SystemEvent';
+  presence: string;
+}): Record<string, unknown> {
+  const directive = buildInitiativeDirectorMessage({
+    startup: input.startup,
+    records: input.records,
+    playerName: input.playerName,
+  });
+  return {
+    initiative: {
+      triggerSource: input.triggerSource,
+      presence: input.presence,
+      strategy: directive.strategy,
+      directive: directive.directive,
+      storyId: input.startup.storyId,
+      entryEventId: input.startup.entryEventId,
+      primaryAgentId: input.startup.cast.primaryAgentId,
+      entrySummary: input.startup.entry.entryBackdrop || input.startup.entry.summary,
+      entryHook: input.startup.entry.entryHook,
+      background: input.startup.background.summary,
+    },
   };
 }
 

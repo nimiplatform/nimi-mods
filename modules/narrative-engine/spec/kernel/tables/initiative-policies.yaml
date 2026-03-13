@@ -18,6 +18,13 @@ cooldown:
 cooldown_window:
   cooldown_window_seconds: 180
   source_rule: N-INIT-006
+snapshot_runtime_state:
+  required_fields:
+    - lastFiredAt
+    - consecutive
+    - lastSceneFingerprint
+  restore_on_story_hydrate: true
+  source_rule: N-INIT-007
 fired_path:
   must_call: process_turn
   source_rule: N-INIT-004

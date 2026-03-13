@@ -132,9 +132,11 @@ export type TextplayAgentOption = {
 export type TextplayEntrySummary = {
   entryEventId: string;
   worldId: string;
+  timelineSeq: number;
   title: string;
   summary: string;
-  materialSummary: string;
+  entryBackdrop: string;
+  entryHook: string;
   participants: string[];
   characterRefs: string[];
   eventHorizon: 'PAST' | 'ONGOING' | 'FUTURE';
@@ -181,9 +183,11 @@ export type TextplayStorySummary = {
   storyId: string;
   worldId: string;
   entryEventId: string;
+  timelineSeq: number;
   title: string;
   summary: string;
-  materialSummary: string;
+  entryBackdrop: string;
+  entryHook: string;
   primaryAgentId: string;
   participants: string[];
   eventHorizon: 'PAST' | 'ONGOING' | 'FUTURE';
@@ -226,6 +230,11 @@ export type TextplayStartupPolicy = {
     tickSeconds: number;
     cooldownSeconds: number;
     maxConsecutive: number;
+    idleSeconds: number;
+    pausedSeconds: number;
+    highTensionIdleSeconds: number;
+    awaySeconds: number;
+    highTensionThreshold: number;
     blockedPresenceStates: TextplayPresenceState[];
   };
   pacing: {
@@ -241,8 +250,11 @@ export type TextplayStartupPackage = {
   worldId: string;
   entryEventId: string;
   entry: {
+    timelineSeq: number;
     title: string;
     summary: string;
+    entryBackdrop: string;
+    entryHook: string;
     eventHorizon: 'PAST' | 'ONGOING' | 'FUTURE';
     entryMode: 'PRE_EVENT';
     cause: string;

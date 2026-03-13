@@ -141,6 +141,9 @@ function asEventArray(value: unknown): EventNodeDraft[] {
         const temporalConfidence = Number(record.temporalConfidence);
         return {
             id: String(record.id || `${level.toLowerCase()}-${index + 1}`),
+            ...(Number.isFinite(Number(record.timelineSeq))
+                ? { timelineSeq: Math.max(1, Math.trunc(Number(record.timelineSeq))) }
+                : {}),
             level,
             eventHorizon,
             parentEventId: String(record.parentEventId || '').trim() || null,

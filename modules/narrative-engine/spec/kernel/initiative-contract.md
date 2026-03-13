@@ -25,3 +25,7 @@ Every initiative decision emits auditable event.
 ## N-INIT-006 Cooldown Window Baseline
 
 Default cooldown window is table-governed and uses a 180-second baseline unless explicitly overridden by product policy.
+
+## N-INIT-007 Snapshot Round-Trip
+
+Story snapshot export/hydrate must preserve initiative runtime state (`lastFiredAt`, `consecutive`, `lastSceneFingerprint`) so resume does not reset cooldown or max-consecutive guards.

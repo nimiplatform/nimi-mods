@@ -3,6 +3,7 @@ import {
   NARRATIVE_REASON_CODES,
 } from '../contracts.js';
 import type { NarrativeReasonCode } from '../contracts.js';
+import type { NarrativeInitiativeStateSnapshot } from '../types.js';
 
 type InitiativeState = {
   lastFiredAtByStoryId: Record<string, number>;
@@ -64,6 +65,58 @@ export function resetNarrativeInitiativePolicyForTests(): void {
     consecutiveByStoryId: {},
     lastSceneFingerprintByStoryId: {},
   };
+}
+
+export function readNarrativeInitiativeStoryState(storyId: string): NarrativeInitiativeStateSnapshot {
+  const normalizedStoryId = String(storyId || '').trim();
+  const state = loadInitiativeState();
+  return {
+    lastFiredAt: normalizedStoryId ? (state.lastFiredAtByStoryId[normalizedStoryId] || null) : null,
+    consecutive: normalizedStoryId ? (state.consecutiveByStoryId[normalizedStoryId] || 0) : 0,
+    lastSceneFingerprint: normalizedStoryId ? (state.lastSceneFingerprintByStoryId[normalizedStoryId] || null) : null,
+  };
+}
+
+export function hydrateNarrativeInitiativeStoryState(input: {
+  storyId: string;
+  state: NarrativeInitiativeStateSnapshot;
+}): void {
+  const storyId = String(input.storyId || '').trim();
+  if (!storyId) {
+    return;
+  }
+  const state = loadInitiativeState();
+  const lastFiredAt = Number(input.state.lastFiredAt);
+  if (Number.isFinite(lastFiredAt) && lastFiredAt > 0) {
+    state.lastFiredAtByStoryId[storyId] = lastFiredAt;
+  } else {
+    delete state.lastFiredAtByStoryId[storyId];
+  }
+  const consecutive = Number(input.state.consecutive);
+  if (Number.isFinite(consecutive) && consecutive > 0) {
+    state.consecutiveByStoryId[storyId] = Math.max(0, Math.floor(consecutive));
+  } else {
+    delete state.consecutiveByStoryId[storyId];
+  }
+  const lastSceneFingerprint = String(input.state.lastSceneFingerprint || '').trim();
+  if (lastSceneFingerprint) {
+    state.lastSceneFingerprintByStoryId[storyId] = lastSceneFingerprint;
+  } else {
+    delete state.lastSceneFingerprintByStoryId[storyId];
+  }
+  saveInitiativeState(state);
+}
+
+export function resetNarrativeInitiativeStoryState(storyId: string): void {
+  const normalizedStoryId = String(storyId || '').trim();
+  if (!normalizedStoryId) {
+    return;
+  }
+  const state = loadInitiativeState();
+  delete state.lastFiredAtByStoryId[normalizedStoryId];
+  delete state.consecutiveByStoryId[normalizedStoryId];
+  delete state.lastSceneFingerprintByStoryId[normalizedStoryId];
+  saveInitiativeState(state);
 }
 
 export type InitiativeDecision = {

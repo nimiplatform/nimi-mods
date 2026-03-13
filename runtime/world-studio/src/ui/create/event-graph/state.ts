@@ -30,6 +30,9 @@ export function normalizeEvent(value: Partial<EventNodeDraft>, fallbackLevel: 'P
   const temporalAfterEventIds = toStringList(value.temporalAfterEventIds);
   const base: EventNodeDraft = {
     id: String(value.id || makeEventId(level === 'PRIMARY' ? 'primary' : 'secondary')),
+    ...(Number.isFinite(Number(value.timelineSeq))
+      ? { timelineSeq: Math.max(1, Math.trunc(Number(value.timelineSeq))) }
+      : {}),
     level,
     eventHorizon,
     parentEventId: typeof value.parentEventId === 'string' && value.parentEventId.trim()

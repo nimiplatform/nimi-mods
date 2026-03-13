@@ -238,6 +238,9 @@ function normalizeEvent(item: EventNodeDraft, fallbackLevel: 'PRIMARY' | 'SECOND
     return {
         ...item,
         id: String(item.id || `${fallbackLevel.toLowerCase()}-${Math.random().toString(36).slice(2, 8)}`),
+        ...(Number.isFinite(Number(item.timelineSeq))
+            ? { timelineSeq: Math.max(1, Math.trunc(Number(item.timelineSeq))) }
+            : {}),
         level,
         eventHorizon,
         parentEventId: item.parentEventId || null,

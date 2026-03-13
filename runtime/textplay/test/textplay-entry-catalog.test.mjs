@@ -15,7 +15,7 @@ function createHookClient(rows) {
   };
 }
 
-test('listPlayableEntries returns PRIMARY non-future entries sorted by updatedAt desc', async () => {
+test('listPlayableEntries returns PRIMARY non-future entries sorted by timeline sequence', async () => {
   const rows = [
     {
       id: 'evt-secondary',
@@ -24,6 +24,7 @@ test('listPlayableEntries returns PRIMARY non-future entries sorted by updatedAt
       summary: 'Ignored because not primary.',
       level: 'SECONDARY',
       eventHorizon: 'PAST',
+      timelineSeq: 2,
       updatedAt: '2026-03-02T10:00:00.000Z',
       characterRefs: ['agent-2'],
     },
@@ -34,6 +35,7 @@ test('listPlayableEntries returns PRIMARY non-future entries sorted by updatedAt
       summary: 'Ignored because future.',
       level: 'PRIMARY',
       eventHorizon: 'FUTURE',
+      timelineSeq: 99,
       updatedAt: '2026-03-02T12:00:00.000Z',
       characterRefs: ['agent-3'],
     },
@@ -46,6 +48,7 @@ test('listPlayableEntries returns PRIMARY non-future entries sorted by updatedAt
       process: 'Conflict lines tighten',
       level: 'PRIMARY',
       eventHorizon: 'ONGOING',
+      timelineSeq: 8,
       updatedAt: '2026-03-02T14:00:00.000Z',
       characterRefs: ['agent-4', 'agent-5'],
     },
@@ -58,6 +61,7 @@ test('listPlayableEntries returns PRIMARY non-future entries sorted by updatedAt
       process: 'Rumors spread through the city',
       level: 'PRIMARY',
       eventHorizon: 'PAST',
+      timelineSeq: 3,
       updatedAt: '2026-03-02T09:00:00.000Z',
       characterRefs: ['agent-1'],
     },
@@ -68,12 +72,14 @@ test('listPlayableEntries returns PRIMARY non-future entries sorted by updatedAt
     worldId: 'world-1',
   });
 
-  assert.deepEqual(entries.map((item) => item.entryEventId), ['evt-late', 'evt-early']);
+  assert.deepEqual(entries.map((item) => item.entryEventId), ['evt-early', 'evt-late']);
   assert.equal(entries[0].entryMode, 'PRE_EVENT');
-  assert.equal(entries[0].eventHorizon, 'ONGOING');
+  assert.equal(entries[0].eventHorizon, 'PAST');
   assert.equal(entries[0].playable, true);
-  assert.deepEqual(entries[0].participants, ['agent-4', 'agent-5']);
-  assert.match(entries[0].materialSummary, /发生前的临界阶段切入/);
+  assert.deepEqual(entries[0].participants, ['agent-1']);
+  assert.equal(entries[0].timelineSeq, 3);
+  assert.match(entries[0].entryBackdrop, /Border unrest|Early Primary前的风暴正在积聚/);
+  assert.match(entries[0].entryHook, /发生前的临界时刻切入/);
 });
 
 test('getPlayableEntryDetail returns full detail and hides future-only entry', async () => {
@@ -90,6 +96,7 @@ test('getPlayableEntryDetail returns full detail and hides future-only entry', a
       locationRefs: ['scene-docks'],
       level: 'PRIMARY',
       eventHorizon: 'PAST',
+      timelineSeq: 4,
       updatedAt: '2026-03-02T10:00:00.000Z',
       characterRefs: ['agent-1', 'agent-2'],
     },
@@ -100,6 +107,7 @@ test('getPlayableEntryDetail returns full detail and hides future-only entry', a
       summary: 'Not directly playable.',
       level: 'PRIMARY',
       eventHorizon: 'FUTURE',
+      timelineSeq: 20,
       updatedAt: '2026-03-02T11:00:00.000Z',
       characterRefs: ['agent-3'],
     },
@@ -121,5 +129,8 @@ test('getPlayableEntryDetail returns full detail and hides future-only entry', a
   assert.equal(detail.recommendedSceneId, 'scene-docks');
   assert.deepEqual(detail.locationRefs, ['scene-docks']);
   assert.equal(detail.eventHorizon, 'PAST');
+  assert.equal(detail.timelineSeq, 4);
+  assert.match(detail.entryBackdrop, /Contraband dispute|scene-docks一带的局势正在发紧|night-watch前后的风声正在悄然扩散|Opening Clash前的风暴正在积聚/);
+  assert.match(detail.entryHook, /发生前的临界时刻切入/);
   assert.equal(futureDetail, null);
 });

@@ -35,7 +35,7 @@
 - `TXT-014`: Render output must always include `text` and `meta`.
 - `TXT-015`: Initiative events reset idle/away timers in presence state machine.
 - `TXT-016`: Resume with checkpoint hash mismatch is fail-close.
-- `TXT-017`: Player-facing entry catalog is derived from `data-api.world.events.list`, keeps `PRIMARY` events only, preserves upstream `eventHorizon` as canonical target-event metadata, and excludes `FUTURE` events from direct player-facing selection by default.
+- `TXT-017`: Player-facing entry catalog is derived from `data-api.world.events.list`, keeps `PRIMARY` events only, sorts by upstream `timelineSeq` ascending, preserves upstream `eventHorizon` as canonical target-event metadata, and excludes `FUTURE` events from direct player-facing selection by default.
 - `TXT-018`: `Start` generates fresh `storyId = story_${ulid}` and `sessionId = session_${ulid}`. `entryEventId` is preserved separately and never reused as runtime story identity.
 - `TXT-019`: Entry agent is user-selected from `characterRefs`. When only one character ref exists it auto-selects; when none exist `Start` is disabled. TextPlay does not resolve fallback primary-agent chains.
 - `TXT-020`: Story startup package is assembled from entry detail, scenes, narrative-contexts, lorebooks, agent memory recall, and startup policy/material diagnostics.
@@ -46,6 +46,7 @@
 - `TXT-025`: Published realm archive is not used as the continue source for current UI. Continue/resume truth comes only from local drafts.
 - `TXT-026`: Story startup package must include `startupPolicy` and snapshot `contextCoverage/gapWarnings` diagnostics.
 - `TXT-027`: Frontend auto tick may trigger `AgentInitiative` only when presence/cooldown/maxConsecutive policies are satisfied.
+- `TXT-027A`: Initiative scheduler must evaluate `idle`, `paused`, `high-tension idle`, and `away` thresholds from startup policy and map them to `AgentInitiative` or `SystemEvent` without blocking local draft persistence.
 - `TXT-028`: Missing `CANON/STORY` context is fail-close; missing `SUBJECT/RELATION/scene` is degraded with warnings. STORY-context lookup still uses template story ids derived from `WorldEvent`.
 - `TXT-029`: Fresh story requires explicit `Start` action that triggers one opening `SystemEvent` render before player input is accepted; fresh entry starts from the selected target event's pre-threshold rather than treating canonical event details as already happened opening facts.
 - `TXT-030`: Route Config moves into a right-side settings drawer; `Session Health`, `Debug Trace`, and remote history panels are not part of the main TextPlay workspace.
@@ -53,6 +54,7 @@
 - `TXT-032`: Tension pacing constraints are injected into render prompt based on `pacingContext.tensionBand` (HIGH/MODERATE/LOW).
 - `TXT-033`: Event type rendering guidance is appended per-event as `Rendering hint` when the event carries a recognized `type` field.
 - `TXT-034`: Unknown or missing event `type` degrades gracefully — no rendering hint appended, event renders with visibility tag only.
+- `TXT-035`: Entry card presentation is teaser-only: it derives a lightweight `entryBackdrop` and `entryHook` from canonical materials, but does not expose full canonical result/process dumps or internal horizon terminology to the player.
 
 ## 3. No Over-Design Guard
 

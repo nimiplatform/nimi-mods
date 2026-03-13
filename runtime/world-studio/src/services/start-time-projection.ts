@@ -135,6 +135,9 @@ function normalizeEventNode(value: unknown, fallbackLevel: 'PRIMARY' | 'SECONDAR
         : [];
     return {
         id: safeString(record.id) || fallbackId,
+        ...(Number.isFinite(Number(record.timelineSeq))
+            ? { timelineSeq: Math.max(1, Math.trunc(Number(record.timelineSeq))) }
+            : {}),
         level,
         eventHorizon,
         parentEventId: safeString(record.parentEventId) || null,

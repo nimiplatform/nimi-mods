@@ -35,9 +35,10 @@
 - `WS-DOM-017`: Phase2 synthesize must auto-retry once with compact budget on timeout or JSON-object parse failure before surfacing an error.
 - `WS-DOM-018`: Publish agent sync must normalize `dnaPrimary/dnaSecondary` into backend enum domain and omit non-enum values.
 - `WS-DOM-019`: Event graph, synthesize output, and event upsert payloads must preserve explicit `eventHorizon`; non-`FUTURE` `PRIMARY` events alone participate in evidence gating.
+- `WS-DOM-020`: World-Studio is the sole writer of canonical `WorldEvent.timelineSeq`; publish/sync must materialize temporal-order output into contiguous integer sequence values.
 
 ## 3. No Over-Design Guard
 
-- `WS-DOM-020`: No legacy compatibility pipeline is introduced.
-- `WS-DOM-021`: No narrative/textplay/videoplay behavior contract is redefined here.
-- `WS-DOM-022`: No vendor-specific route policy is introduced beyond runtime route binding contracts.
+- `WS-DOM-021`: No legacy compatibility pipeline is introduced.
+- `WS-DOM-022`: No narrative/textplay/videoplay behavior contract is redefined here.
+- `WS-DOM-023`: No vendor-specific route policy is introduced beyond runtime route binding contracts.

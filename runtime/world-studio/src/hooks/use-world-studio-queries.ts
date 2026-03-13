@@ -61,6 +61,7 @@ function toEventSummaryList(payload: unknown): WorldEventSummary[] {
         .map((item) => ({
         id: String(item.id || ''),
         worldId: String(item.worldId || ''),
+        timelineSeq: Number.isFinite(Number(item.timelineSeq)) ? Number(item.timelineSeq) : 0,
         level: String(item.level || 'PRIMARY') as WorldEventSummary['level'],
         eventHorizon: String(item.eventHorizon || 'PAST') as WorldEventSummary['eventHorizon'],
         parentEventId: toStringOrNull(item.parentEventId),

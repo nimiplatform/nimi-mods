@@ -56,6 +56,9 @@ function normalizeEvent(value: unknown, level: 'PRIMARY' | 'SECONDARY', index: n
     const temporalConfidence = Number(record.temporalConfidence);
     return {
         id: String(record.id || `${normalizedLevel.toLowerCase()}-${index + 1}`),
+        ...(Number.isFinite(Number(record.timelineSeq))
+            ? { timelineSeq: Math.max(1, Math.trunc(Number(record.timelineSeq))) }
+            : {}),
         level: normalizedLevel,
         eventHorizon,
         parentEventId: String(record.parentEventId || '').trim() || null,

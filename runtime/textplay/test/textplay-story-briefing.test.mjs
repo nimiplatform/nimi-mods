@@ -1,14 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildContextualUserMessage, buildOpeningSystemPayload } from '../src/hooks/story-briefing.ts';
+import {
+  buildContextualUserMessage,
+  buildInitiativeSystemPayload,
+  buildOpeningSystemPayload,
+} from '../src/hooks/story-briefing.ts';
 
 function createEntry() {
   return {
     entryEventId: 'evt-primary',
     worldId: 'world-1',
+    timelineSeq: 8,
     title: 'Storm Harbor Incident',
     summary: 'Harbor order breaks under heavy rain.',
-    materialSummary: 'The target event has not happened yet.',
+    entryBackdrop: 'Heavy rain and a contraband dispute push harbor order toward rupture.',
+    entryHook: '你将从目标事件真正发生前的临界时刻切入，亲手塑造之后的走向。',
     participants: ['agent-1', 'agent-2'],
     characterRefs: ['agent-1', 'agent-2'],
     eventHorizon: 'PAST',
@@ -73,6 +79,11 @@ function createStartupPackage() {
         tickSeconds: 10,
         cooldownSeconds: 180,
         maxConsecutive: 3,
+        idleSeconds: 120,
+        pausedSeconds: 180,
+        highTensionIdleSeconds: 180,
+        awaySeconds: 300,
+        highTensionThreshold: 0.7,
         blockedPresenceStates: ['composing', 'active'],
       },
       pacing: {
@@ -128,4 +139,18 @@ test('contextual user message prepends player identity when provided', () => {
 
   assert.match(message, /^\[Han Yun（Dock courier）\]:/);
   assert.match(message, /I step toward the signal mast/);
+});
+
+test('initiative payload frames autonomous progression around open pressure and presence', () => {
+  const payload = buildInitiativeSystemPayload({
+    startup: createStartupPackage(),
+    records: [],
+    playerName: 'Han Yun',
+    triggerSource: 'AgentInitiative',
+    presence: 'idle',
+  });
+
+  assert.equal(payload.initiative.triggerSource, 'AgentInitiative');
+  assert.equal(payload.initiative.presence, 'idle');
+  assert.match(payload.initiative.directive, /世界推进|冲突压力|角色动机/);
 });

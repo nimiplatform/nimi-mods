@@ -70,7 +70,11 @@ function scoreLorebook(input: {
   detail: TextplayEntryDetail;
 }): number {
   const titleTokens = tokenize(input.detail.title);
-  const summaryTokens = tokenize(input.detail.materialSummary || input.detail.summary);
+  const summaryTokens = tokenize([
+    input.detail.summary,
+    input.detail.entryBackdrop,
+    input.detail.entryHook,
+  ].filter(Boolean).join(' '));
   const tokens = unique([...titleTokens, ...summaryTokens]);
   const loreKey = toText(input.lorebook.key).toLowerCase();
   const loreName = toText(input.lorebook.name).toLowerCase();
@@ -94,7 +98,13 @@ function scoreScene(input: {
 }): number {
   const tokens = unique([
     ...tokenize(input.detail.title),
-    ...tokenize(input.detail.materialSummary || input.detail.summary),
+    ...tokenize([
+      input.detail.summary,
+      input.detail.entryBackdrop,
+      input.detail.entryHook,
+      input.detail.cause,
+      input.detail.process,
+    ].filter(Boolean).join(' ')),
     ...input.detail.locationRefs.map((item) => item.toLowerCase()),
   ]);
   const sceneId = toText(input.scene.id).toLowerCase();
@@ -112,7 +122,8 @@ function scoreScene(input: {
 function buildBackgroundSummary(detail: TextplayEntryDetail, sceneDescription: string): string {
   return [
     detail.title,
-    detail.materialSummary,
+    detail.entryBackdrop,
+    detail.entryHook,
     detail.cause ? `背景起因: ${detail.cause}` : '',
     detail.process ? `已知局势: ${detail.process}` : '',
     detail.timeRef ? `时间锚点: ${detail.timeRef}` : '',
@@ -127,6 +138,11 @@ function buildDefaultStartupPolicy(): TextplayStartupPolicy {
       tickSeconds: 10,
       cooldownSeconds: 180,
       maxConsecutive: 3,
+      idleSeconds: 120,
+      pausedSeconds: 180,
+      highTensionIdleSeconds: 180,
+      awaySeconds: 300,
+      highTensionThreshold: 0.7,
       blockedPresenceStates: ['composing', 'active'],
     },
     pacing: {
@@ -157,6 +173,21 @@ function mergeStartupPolicyFromContext(input: {
       maxConsecutive: Number.isFinite(Number(initiative.maxConsecutive))
         ? Number(initiative.maxConsecutive)
         : defaults.initiative.maxConsecutive,
+      idleSeconds: Number.isFinite(Number(initiative.idleSeconds))
+        ? Number(initiative.idleSeconds)
+        : defaults.initiative.idleSeconds,
+      pausedSeconds: Number.isFinite(Number(initiative.pausedSeconds))
+        ? Number(initiative.pausedSeconds)
+        : defaults.initiative.pausedSeconds,
+      highTensionIdleSeconds: Number.isFinite(Number(initiative.highTensionIdleSeconds))
+        ? Number(initiative.highTensionIdleSeconds)
+        : defaults.initiative.highTensionIdleSeconds,
+      awaySeconds: Number.isFinite(Number(initiative.awaySeconds))
+        ? Number(initiative.awaySeconds)
+        : defaults.initiative.awaySeconds,
+      highTensionThreshold: Number.isFinite(Number(initiative.highTensionThreshold))
+        ? Number(initiative.highTensionThreshold)
+        : defaults.initiative.highTensionThreshold,
       blockedPresenceStates: Array.isArray(initiative.blockedPresenceStates)
         ? (initiative.blockedPresenceStates
           .map((item) => String(item || '').trim())
@@ -405,8 +436,11 @@ export async function loadEntryStartupPackage(input: {
     worldId: input.detail.worldId,
     entryEventId: input.detail.entryEventId,
     entry: {
+      timelineSeq: input.detail.timelineSeq,
       title: input.detail.title,
-      summary: input.detail.materialSummary || input.detail.summary,
+      summary: input.detail.summary,
+      entryBackdrop: input.detail.entryBackdrop,
+      entryHook: input.detail.entryHook,
       eventHorizon: input.detail.eventHorizon,
       entryMode: input.detail.entryMode,
       cause: input.detail.cause,

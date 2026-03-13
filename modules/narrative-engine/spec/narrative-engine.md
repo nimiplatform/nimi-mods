@@ -39,8 +39,9 @@
 - `NAR-018`: Missing `CANON/STORY` is fail-close; missing `SUBJECT/RELATION/scene` keeps run approved with coverage warnings. Event-derived player-facing story ids may resolve via a stable non-event story anchor, but cross-event context borrowing remains forbidden.
 - `NAR-019`: Guard adjusts excessive tension jump with non-blocking `NARRATIVE_TENSION_JUMP_ADJUSTED`.
 - `NAR-020`: Narrative-Engine story state remains keyed by runtime `storyId` and supports caller-driven `exportStoryState`, `hydrateStoryState`, and `resetStoryState`.
-- `NAR-021`: Story snapshot export is intentionally bounded to turn ids, latest turn id, turn records, render projections, spine events, and narrative context scopes required for continuation.
+- `NAR-021`: Story snapshot export is intentionally bounded to turn ids, latest turn id, turn records, render projections, spine events, narrative context scopes, and initiative runtime state required for continuation.
 - `NAR-022`: Audit logs and idempotency caches are runtime execution artifacts, not part of portable story snapshot state.
+- `NAR-023`: Local causal enrichment runs after normalized/guarded LLM output is available and before spine write, so next-turn prompting can consume enriched `sourceEventIds` without waiting for realm publish.
 
 ## 3. No Over-Design Guard
 

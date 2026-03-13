@@ -31,16 +31,19 @@ import {
 } from '../draft-store.js';
 import { createTextplayFlowId, emitTextplayLog } from '../logging.js';
 import { runTextplayRender } from '../pipeline/run-textplay-render.js';
+import { createTextplayPresenceMachine } from '../presence/state-machine.js';
 import { createTextplayRuntimeAiClient } from '../runtime-ai-client.js';
 import { loadTextplayRouteBinding, persistTextplayRouteBinding } from '../route-override-store.js';
 import { createUlid } from '../utils/ulid.js';
-import { buildContextualUserMessage, buildOpeningSystemPayload } from './story-briefing.js';
+import { buildContextualUserMessage, buildInitiativeSystemPayload, buildOpeningSystemPayload } from './story-briefing.js';
+import { selectTextplayInitiativeScheduleDecision } from './initiative-scheduler.js';
 import type {
   TextplayAgentOption,
   TextplayDraftRecord,
   TextplayEntryDetail,
   TextplayEntrySummary,
   TextplayPersistRecord,
+  TextplayPresenceState,
   TextplayRenderResult,
   TextplayStartupPackage,
   TextplayWorldSummary,
@@ -61,6 +64,31 @@ function toErrorMessage(error: unknown): string {
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function toMs(value: unknown, fallback = Date.now()): number {
+  const numeric = Date.parse(String(value || ''));
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function toNonNegativeMs(value: number): number {
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function readDraftCurrentTension(draft: TextplayDraftRecord | null): number {
+  if (!draft) {
+    return 0;
+  }
+  const latestTurnId = draft.engineSnapshot.latestTurnId;
+  if (!latestTurnId) {
+    return 0;
+  }
+  const projection = draft.engineSnapshot.projections[latestTurnId];
+  const metrics = projection && typeof projection === 'object'
+    ? (projection as { metrics?: Record<string, unknown> }).metrics
+    : null;
+  const tension = Number(metrics?.tension);
+  return Number.isFinite(tension) ? Math.max(0, Math.min(1, tension)) : 0;
 }
 
 function createStoryId(): string {
@@ -119,9 +147,11 @@ function toEntryDetailFromStartup(startup: TextplayStartupPackage): TextplayEntr
   return {
     entryEventId: startup.entryEventId,
     worldId: startup.worldId,
+    timelineSeq: startup.entry.timelineSeq,
     title: startup.entry.title,
     summary: startup.entry.summary,
-    materialSummary: startup.entry.summary,
+    entryBackdrop: startup.entry.entryBackdrop,
+    entryHook: startup.entry.entryHook,
     participants: [...startup.cast.participants],
     characterRefs: [...startup.entry.characterRefs],
     eventHorizon: startup.entry.eventHorizon,
@@ -189,10 +219,53 @@ export function useTextplayController(): TextplayShellProps {
 
   const activeDraftRef = useRef<TextplayDraftRecord | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const presenceMachineRef = useRef<ReturnType<typeof createTextplayPresenceMachine> | null>(null);
+  const presenceStateRef = useRef<TextplayPresenceState>('active');
+  const presenceStateSinceRef = useRef<number>(Date.now());
+  const presenceReportMarkRef = useRef<number>(0);
+  const pausedSinceRef = useRef<number | null>(null);
+  const initiativeWarningAtRef = useRef<number>(0);
 
   useEffect(() => {
     activeDraftRef.current = activeDraft;
   }, [activeDraft]);
+
+  const dispatchPresenceEvent = useCallback((event: 'onUserComposing' | 'onUserPaused' | 'onUserActive' | 'onInitiativeReceived') => {
+    const machine = presenceMachineRef.current;
+    if (!machine) {
+      return presenceStateRef.current;
+    }
+    const previousState = presenceStateRef.current;
+    const nextState = machine.dispatch(event);
+    const nowMs = Date.now();
+    presenceStateRef.current = nextState;
+    if (event === 'onInitiativeReceived') {
+      presenceStateSinceRef.current = nowMs;
+      if (nextState === 'paused') {
+        pausedSinceRef.current = nowMs;
+      }
+      return nextState;
+    }
+    if (nextState !== previousState) {
+      presenceStateSinceRef.current = nowMs;
+    }
+    if (nextState === 'paused') {
+      pausedSinceRef.current = nowMs;
+    } else if (previousState === 'paused') {
+      pausedSinceRef.current = null;
+    }
+    return nextState;
+  }, []);
+
+  const collectPresenceReports = useCallback(() => {
+    const machine = presenceMachineRef.current;
+    if (!machine) {
+      return [];
+    }
+    const reports = machine.collectSince(presenceReportMarkRef.current);
+    presenceReportMarkRef.current = machine.mark();
+    return reports;
+  }, []);
 
   const effectiveRouteBinding = useMemo(
     () => routeBinding || routeOptions?.selected || null,
@@ -205,6 +278,58 @@ export function useTextplayController(): TextplayShellProps {
       showStatusBanner(next);
     }
   }, [showStatusBanner]);
+
+  useEffect(() => {
+    const machine = presenceMachineRef.current;
+    machine?.destroy();
+    presenceMachineRef.current = null;
+    presenceReportMarkRef.current = 0;
+    pausedSinceRef.current = null;
+    presenceStateSinceRef.current = Date.now();
+    presenceStateRef.current = 'active';
+
+    if (!activeDraft) {
+      return;
+    }
+
+    const policy = activeDraft.startupPackage.startupPolicy.initiative;
+    const initialState: TextplayPresenceState = activeDraft.status === 'paused' ? 'paused' : 'active';
+    const nextMachine = createTextplayPresenceMachine({
+      idleTimeoutSeconds: policy.idleSeconds,
+      awayTimeoutSeconds: policy.awaySeconds,
+      initialState,
+    });
+    presenceMachineRef.current = nextMachine;
+    presenceReportMarkRef.current = nextMachine.mark();
+    presenceStateRef.current = initialState;
+    const initialSince = activeDraft.status === 'paused'
+      ? toMs(activeDraft.updatedAt)
+      : Date.now();
+    presenceStateSinceRef.current = initialSince;
+    pausedSinceRef.current = activeDraft.status === 'paused' ? initialSince : null;
+
+    return () => {
+      nextMachine.destroy();
+      if (presenceMachineRef.current === nextMachine) {
+        presenceMachineRef.current = null;
+      }
+    };
+  }, [activeDraft?.key, activeDraft?.status, activeDraft?.updatedAt, activeDraft?.startupPackage.startupPolicy.initiative.awaySeconds, activeDraft?.startupPackage.startupPolicy.initiative.idleSeconds]);
+
+  useEffect(() => {
+    if (!activeDraft || !presenceMachineRef.current) {
+      return;
+    }
+    if (activeDraft.status === 'paused') {
+      dispatchPresenceEvent('onUserPaused');
+      return;
+    }
+    if (inputText.trim()) {
+      dispatchPresenceEvent('onUserComposing');
+      return;
+    }
+    dispatchPresenceEvent('onUserActive');
+  }, [activeDraft?.key, activeDraft?.status, dispatchPresenceEvent, inputText]);
 
   const refreshDraftsForWorld = useCallback(async (worldId: string) => {
     const normalizedWorldId = toText(worldId);
@@ -348,6 +473,7 @@ export function useTextplayController(): TextplayShellProps {
       userMessage?: string;
       systemPayload?: Record<string, unknown>;
       binding?: RuntimeRouteBinding | null;
+      presence?: TextplayPresenceState;
     };
   }): Promise<Extract<TextplayRenderResult, { ok: true }> | null> => {
     abortControllerRef.current?.abort();
@@ -368,6 +494,7 @@ export function useTextplayController(): TextplayShellProps {
           userMessage: input.request.userMessage,
           systemPayload: input.request.systemPayload,
           binding: asBindingRecord(input.request.binding || null),
+          presence: input.request.presence,
           runId: createUlid(),
           traceId: createUlid(),
         },
@@ -378,7 +505,7 @@ export function useTextplayController(): TextplayShellProps {
           narrativeEngine,
           abortSignal: abortController.signal,
         },
-        presenceReports: [],
+        presenceReports: collectPresenceReports(),
       });
       if (!result.ok) {
         if (input.draftSeed) {
@@ -406,7 +533,7 @@ export function useTextplayController(): TextplayShellProps {
       }
       setIsRunning(false);
     }
-  }, [aiClient, hookClient, narrativeEngine, pushNotice, runtimeClient, syncDraftSnapshot, t]);
+  }, [aiClient, collectPresenceReports, hookClient, narrativeEngine, pushNotice, runtimeClient, syncDraftSnapshot, t]);
 
   useEffect(() => {
     emitTextplayLog({
@@ -625,6 +752,7 @@ export function useTextplayController(): TextplayShellProps {
             playerIdentity: playerIdentity.trim(),
           }),
           binding: routeBinding,
+          presence: 'active',
         },
       });
 
@@ -804,6 +932,7 @@ export function useTextplayController(): TextplayShellProps {
             playerIdentity: draft.playerIdentity,
           }),
           binding: draft.routeOverride,
+          presence: 'active',
         },
       });
 
@@ -904,6 +1033,7 @@ export function useTextplayController(): TextplayShellProps {
         triggerSource: 'UserTurn',
         userMessage,
         binding: routeBinding,
+        presence: presenceStateRef.current,
       },
     });
     if (!renderSuccess) {
@@ -990,6 +1120,135 @@ export function useTextplayController(): TextplayShellProps {
       setInputText('');
     }
   }, [flowId, hookClient, pushNotice, refreshDraftsForWorld, routeBinding, selectedWorldId, t]);
+
+  useEffect(() => {
+    const draft = activeDraft;
+    if (!draft || isRunning) {
+      return;
+    }
+    const policy = draft.startupPackage.startupPolicy.initiative;
+    if (!policy.enabled) {
+      return;
+    }
+
+    let disposed = false;
+    let tickInFlight = false;
+
+    const tick = async () => {
+      if (disposed || tickInFlight) {
+        return;
+      }
+      const current = activeDraftRef.current;
+      if (!current || current.key !== draft.key || isRunning) {
+        return;
+      }
+
+      const nowMs = Date.now();
+      const presenceState = presenceStateRef.current;
+      const presenceElapsedMs = toNonNegativeMs(nowMs - presenceStateSinceRef.current);
+      const pausedElapsedMs = toNonNegativeMs(nowMs - (pausedSinceRef.current ?? nowMs));
+      const decision = selectTextplayInitiativeScheduleDecision({
+        status: current.status,
+        presenceState,
+        presenceElapsedMs,
+        pausedElapsedMs,
+        tension: readDraftCurrentTension(current),
+        policy,
+      });
+
+      if (!decision) {
+        return;
+      }
+
+      tickInFlight = true;
+      try {
+        const systemPayload = buildInitiativeSystemPayload({
+          startup: current.startupPackage,
+          records: current.records,
+          playerName: current.playerName,
+          triggerSource: decision.triggerSource,
+          presence: presenceState,
+        });
+        const renderSuccess = await executeRender({
+          draftSeed: current,
+          request: {
+            storyId: current.storyId,
+            entryEventId: current.entryEventId,
+            worldId: current.worldId,
+            agentId: current.agentId,
+            userId: current.userId,
+            playerName: current.playerName,
+            playerIdentity: current.playerIdentity,
+            triggerSource: decision.triggerSource,
+            systemPayload,
+            binding: current.routeOverride,
+            presence: presenceState,
+          },
+        });
+        if (!renderSuccess) {
+          return;
+        }
+
+        const snapshot = exportStoryState(current.storyId);
+        const record = buildPersistRecord({
+          request: {
+            storyId: current.storyId,
+            worldId: current.worldId,
+            agentId: current.agentId,
+            userId: current.userId,
+            playerName: current.playerName,
+            playerIdentity: current.playerIdentity,
+            triggerSource: decision.triggerSource,
+            systemPayload,
+          },
+          result: renderSuccess,
+        });
+        const timestamp = nowIso();
+        const saved = await saveDraft({
+          ...current,
+          status: current.status,
+          engineSnapshot: snapshot,
+          records: [...current.records, record],
+          routeOverride: current.routeOverride,
+          updatedAt: timestamp,
+        });
+        setActiveDraft(saved);
+        setSelectedDraftKey(saved.key);
+        dispatchPresenceEvent('onInitiativeReceived');
+        presenceStateSinceRef.current = nowMs;
+        if (saved.status === 'paused') {
+          pausedSinceRef.current = nowMs;
+        }
+      } catch (error) {
+        const currentMs = Date.now();
+        if (currentMs - initiativeWarningAtRef.current >= 60_000) {
+          initiativeWarningAtRef.current = currentMs;
+          emitTextplayLog({
+            level: 'warn',
+            message: 'textplay:initiative:tick-failed',
+            flowId,
+            source: 'useTextplayController.initiativeScheduler',
+            details: {
+              storyId: current.storyId,
+              reason: decision.reason,
+              error: toErrorMessage(error),
+            },
+          });
+        }
+      } finally {
+        tickInFlight = false;
+      }
+    };
+
+    const intervalId = setInterval(() => {
+      void tick();
+    }, Math.max(1, policy.tickSeconds) * 1000);
+
+    return () => {
+      disposed = true;
+      clearInterval(intervalId);
+    };
+  }, [activeDraft, dispatchPresenceEvent, executeRender, flowId, isRunning, saveDraft]);
 
   const onRouteSourceChange = useCallback((source: 'local' | 'cloud') => {
     if (source === 'cloud') {

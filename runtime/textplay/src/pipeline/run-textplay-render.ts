@@ -443,6 +443,7 @@ export async function runTextplayRender(input: TextplayRenderExecutionInput): Pr
         userMessage: input.request.userMessage,
         systemContext: input.request.systemPayload,
         binding: input.request.binding,
+        presence: input.request.presence,
         runId: input.request.runId,
         traceId: input.request.traceId,
         idempotencyKey: `textplay:${input.request.storyId}:${input.request.runId}`,

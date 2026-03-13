@@ -385,9 +385,9 @@ export function TextplayShell(props: TextplayShellProps) {
   const autoSelectedAgent = props.agentOptions.length === 1 ? props.agentOptions[0] : null;
 
   return (
-    <div className="relative flex h-full min-h-0 min-w-0 bg-[#f4f8f8] text-slate-900">
-      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="min-h-0 overflow-y-auto border-b border-slate-200 bg-[#f7fbfb] p-4 lg:border-b-0 lg:border-r">
+    <div className="relative flex h-full min-h-0 min-w-0 flex-1 w-full bg-[#f4f8f8] text-slate-900">
+      <div className="textplay-shell-root grid min-h-0 min-w-0 flex-1 grid-cols-1">
+        <aside className="textplay-shell-side min-h-0 overflow-y-auto border-b border-slate-200 bg-[#f7fbfb] p-4">
           <div className="space-y-4">
             <SessionCard
               activeDraft={props.activeDraft}
@@ -470,7 +470,10 @@ export function TextplayShell(props: TextplayShellProps) {
                     {props.selectedEntry ? (
                       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
                         <div className="font-medium text-slate-900">{props.selectedEntry.title}</div>
-                        <p className="mt-2 leading-6">{props.selectedEntry.materialSummary}</p>
+                        <p className="mt-2 leading-6">{props.selectedEntry.entryBackdrop}</p>
+                        {props.selectedEntry.entryHook ? (
+                          <p className="mt-2 text-xs leading-5 text-slate-500">{props.selectedEntry.entryHook}</p>
+                        ) : null}
                       </div>
                     ) : null}
 
@@ -596,7 +599,7 @@ export function TextplayShell(props: TextplayShellProps) {
           </div>
         </aside>
 
-        <main className="relative flex min-h-0 min-w-0 flex-col overflow-hidden">
+        <main className="textplay-shell-main relative flex min-h-0 min-w-0 flex-col overflow-hidden">
           <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
             <div className="min-w-0">
               <div className="text-sm font-semibold text-slate-900">

@@ -11,6 +11,14 @@ function toIsoOrNow(value: unknown): string {
   return toText(value) || new Date().toISOString();
 }
 
+function toTimelineSeq(value: unknown): number {
+  const numeric = Number(value);
+  if (!Number.isInteger(numeric) || numeric < 1) {
+    throw new TypeError('TEXTPLAY_ENTRY_TIMELINE_SEQ_REQUIRED');
+  }
+  return numeric;
+}
+
 function toStringList(value: unknown): string[] {
   return Array.isArray(value)
     ? value.map((item) => String(item || '').trim()).filter(Boolean)
@@ -29,28 +37,34 @@ function toEventHorizon(value: unknown): 'PAST' | 'ONGOING' | 'FUTURE' {
 }
 
 function buildEntrySummary(event: TextplayWorldEventRow): string {
-  const teaser = unique([
-    toText(event.cause),
-    toText(event.process),
+  return unique([
+    toText(event.title),
     toText(event.summary),
-  ]).filter(Boolean).slice(0, 2).join('；');
-  return teaser || '风暴将至，更多细节将在开场中展开……';
+  ]).filter(Boolean).join('：') || '风暴将至，更多细节将在开场中展开……';
 }
 
-function buildMaterialSummary(event: TextplayWorldEventRow, horizon: TextplayEntrySummary['eventHorizon']): string {
-  const title = toText(event.title) || toText(event.id) || '关键事件';
+function buildEntryBackdrop(event: TextplayWorldEventRow): string {
+  const title = toText(event.title);
+  const location = toStringList(event.locationRefs)[0] || '';
   const cause = toText(event.cause);
-  const process = toText(event.process);
-  const summary = toText(event.summary);
   const timeRef = toText(event.timeRef);
-  return [
-    `目标事件：${title}`,
-    cause ? `导火索：${cause}` : '',
-    process ? `关键局势：${process}` : '',
-    summary ? `原剧情素材：${summary}` : '',
-    timeRef ? `时间锚点：${timeRef}` : '',
-    `玩家入口：从该事件发生前的临界阶段切入（canonical horizon=${horizon} 仅作素材参考）。`,
-  ].filter(Boolean).join('；');
+  const backdrop = unique([
+    cause ? `${cause}正在酝酿` : '',
+    location ? `${location}一带的局势正在发紧` : '',
+    timeRef ? `${timeRef}前后的风声正在悄然扩散` : '',
+    title ? `${title}前的风暴正在积聚` : '',
+  ]).filter(Boolean).slice(0, 2).join('；');
+  return backdrop || '局势正在临界点前积蓄力量，更多细节将在开场中揭开。';
+}
+
+function buildEntryHook(horizon: TextplayEntrySummary['eventHorizon']): string {
+  if (horizon === 'ONGOING') {
+    return '你将从这场风暴尚未彻底定型的临界时刻切入，亲手决定它如何发展。';
+  }
+  if (horizon === 'FUTURE') {
+    return '你将从传闻与预兆仍在酝酿的时刻切入，抢先介入尚未发生的变局。';
+  }
+  return '你将从目标事件真正发生前的临界时刻切入，亲手塑造之后的走向。';
 }
 
 function toEntrySummary(worldId: string, event: TextplayWorldEventRow): TextplayEntrySummary {
@@ -58,9 +72,11 @@ function toEntrySummary(worldId: string, event: TextplayWorldEventRow): Textplay
   return {
     entryEventId: toText(event.id),
     worldId: toText(worldId) || toText(event.worldId),
+    timelineSeq: toTimelineSeq(event.timelineSeq),
     title: toText(event.title) || toText(event.id),
     summary: buildEntrySummary(event),
-    materialSummary: buildMaterialSummary(event, horizon),
+    entryBackdrop: buildEntryBackdrop(event),
+    entryHook: buildEntryHook(horizon),
     participants: unique(toStringList(event.characterRefs)),
     characterRefs: unique(toStringList(event.characterRefs)),
     eventHorizon: horizon,
@@ -99,7 +115,7 @@ function sortPrimaryEvents(rows: TextplayWorldEventRow[]): TextplayWorldEventRow
   return rows
     .filter((row) => toText(row.level).toUpperCase() === 'PRIMARY')
     .sort((left, right) => (
-      toIsoOrNow(right.updatedAt || right.createdAt).localeCompare(toIsoOrNow(left.updatedAt || left.createdAt))
+      toTimelineSeq(left.timelineSeq) - toTimelineSeq(right.timelineSeq)
       || toText(left.id).localeCompare(toText(right.id))
     ));
 }

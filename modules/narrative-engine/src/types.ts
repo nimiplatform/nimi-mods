@@ -245,6 +245,11 @@ export type NarrativeStoreState = {
         response: NarrativeTurnResponse;
     }>;
 };
+export type NarrativeInitiativeStateSnapshot = {
+    lastFiredAt: number | null;
+    consecutive: number;
+    lastSceneFingerprint: string | null;
+};
 export type NarrativeStorySnapshot = {
     version: 1;
     storyId: string;
@@ -254,6 +259,7 @@ export type NarrativeStorySnapshot = {
     projections: Record<string, NarrativeRenderInput>;
     spineEvents: NarrativeSpineEvent[];
     contexts: NarrativeContextScopes;
+    initiativeState: NarrativeInitiativeStateSnapshot;
 };
 export type NarrativeStepResult<T> = {
     ok: boolean;

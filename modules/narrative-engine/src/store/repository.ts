@@ -3,6 +3,12 @@ import {
   loadNarrativeStoreState,
   saveNarrativeStoreState,
 } from './persistence.js';
+import {
+  hydrateNarrativeInitiativeStoryState,
+  readNarrativeInitiativeStoryState,
+  resetNarrativeInitiativePolicyForTests,
+  resetNarrativeInitiativeStoryState,
+} from '../initiative/policy.js';
 import type {
   NarrativeContextScopes,
   NarrativeRenderInput,
@@ -86,6 +92,7 @@ function compareIsoDate(a: string, b: string): number {
 export function resetNarrativeRepositoryForTests(): void {
   writeGlobalStoreState(null);
   saveNarrativeStoreState(createEmptyNarrativeStoreState());
+  resetNarrativeInitiativePolicyForTests();
 }
 
 export function readNarrativeStoreForDiagnostics(): NarrativeStoreState {
@@ -119,6 +126,7 @@ export function exportStoryState(storyId: string): NarrativeStorySnapshot {
     projections,
     spineEvents: [...(state.spineByStoryId[storyId] || [])],
     contexts: resolveNarrativeContext(storyId),
+    initiativeState: readNarrativeInitiativeStoryState(storyId),
   };
 }
 
@@ -129,6 +137,7 @@ export function resetStoryState(storyId: string): void {
   delete state.turnIdsByStoryId[storyId];
   delete state.latestTurnIdByStoryId[storyId];
   delete state.spineByStoryId[storyId];
+  resetNarrativeInitiativeStoryState(storyId);
 
   for (const turnId of turnIds) {
     delete state.turnsById[turnId];
@@ -152,6 +161,10 @@ export function hydrateStoryState(snapshot: NarrativeStorySnapshot): void {
     state.latestTurnIdByStoryId[snapshot.storyId] = snapshot.latestTurnId;
   }
   state.spineByStoryId[snapshot.storyId] = [...snapshot.spineEvents];
+  hydrateNarrativeInitiativeStoryState({
+    storyId: snapshot.storyId,
+    state: snapshot.initiativeState,
+  });
 
   for (const [turnId, turn] of Object.entries(snapshot.turns)) {
     state.turnsById[turnId] = turn;

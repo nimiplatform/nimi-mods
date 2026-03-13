@@ -1,5 +1,6 @@
 import type { EventNodeDraft } from '../contracts.js';
 import { deriveNeedsEvidence, normalizeEventHorizon, } from './event-horizon.js';
+import { computeTemporalOrder } from './temporal-order.js';
 import { asRecord } from "@nimiplatform/sdk/mod";
 type WorldEventEvidenceRefPayload = {
     segmentId: string;
@@ -11,6 +12,7 @@ type WorldEventEvidenceRefPayload = {
 };
 export type WorldEventUpsertPayload = {
     id?: string;
+    timelineSeq: number;
     level: 'PRIMARY' | 'SECONDARY';
     eventHorizon?: 'PAST' | 'ONGOING' | 'FUTURE';
     parentEventId?: string;
@@ -37,6 +39,12 @@ function clamp01(value: number): number {
     if (!Number.isFinite(value))
         return 0;
     return Math.max(0, Math.min(1, value));
+}
+function normalizePositiveInt(value: unknown): number | null {
+    const numeric = Math.trunc(Number(value));
+    if (!Number.isFinite(numeric) || numeric < 1)
+        return null;
+    return numeric;
 }
 function toUniqueStringArray(value: unknown): string[] {
     if (!Array.isArray(value))
@@ -87,6 +95,10 @@ function normalizeEvidenceRefs(value: unknown): WorldEventEvidenceRefPayload[] {
 export function toWorldEventUpsertPayload(event: EventNodeDraft): WorldEventUpsertPayload {
     const record = asRecord(event);
     const id = toOptionalString(record.id);
+    const timelineSeq = normalizePositiveInt(record.timelineSeq);
+    if (timelineSeq == null) {
+        throw new Error(`WORLD_STUDIO_TIMELINE_SEQ_REQUIRED:${id || 'unknown-event'}`);
+    }
     const level = normalizeEventLevel(record.level);
     const eventHorizon = normalizeEventHorizon(record.eventHorizon, 'PAST');
     const title = toOptionalString(record.title) || 'Untitled Event';
@@ -110,6 +122,7 @@ export function toWorldEventUpsertPayload(event: EventNodeDraft): WorldEventUpse
     const confidence = Number(record.confidence);
     return {
         ...(id ? { id } : {}),
+        timelineSeq,
         level,
         eventHorizon,
         ...(parentEventId ? { parentEventId } : {}),
@@ -132,6 +145,28 @@ export function toWorldEventUpsertPayload(event: EventNodeDraft): WorldEventUpse
         }),
     };
 }
-export function toWorldEventUpsertPayloadList(events: EventNodeDraft[]): WorldEventUpsertPayload[] {
-    return (events || []).map((item) => toWorldEventUpsertPayload(item));
+function toTimelineSequencedEvents(events: {
+    primary: EventNodeDraft[];
+    secondary: EventNodeDraft[];
+}): EventNodeDraft[] {
+    const primary = Array.isArray(events.primary) ? events.primary : [];
+    const secondary = Array.isArray(events.secondary) ? events.secondary : [];
+    const order = computeTemporalOrder({ primary, secondary });
+    const timelineSeqById = new Map<string, number>();
+    order.orderedEventIds.forEach((eventId, index) => {
+        timelineSeqById.set(eventId, index + 1);
+    });
+    return [...primary, ...secondary].map((event) => {
+        const eventId = String(event.id || '').trim();
+        const timelineSeq = timelineSeqById.get(eventId);
+        return timelineSeq
+            ? { ...event, timelineSeq }
+            : event;
+    });
+}
+export function toWorldEventUpsertPayloadList(events: {
+    primary: EventNodeDraft[];
+    secondary: EventNodeDraft[];
+}): WorldEventUpsertPayload[] {
+    return toTimelineSequencedEvents(events).map((item) => toWorldEventUpsertPayload(item));
 }

@@ -173,6 +173,7 @@ export const NarrativeTurnResultUpsertRequestSchema = z.strictObject({
   agentId: z.string().min(1),
   userId: z.string().min(1),
   triggerSource: NarrativeTriggerSourceSchema,
+  presence: z.string().optional(),
   userMessage: z.string().optional(),
   systemContext: z.record(z.string(), z.unknown()).optional(),
   binding: z.record(z.string(), z.unknown()).optional(),
@@ -217,6 +218,7 @@ export const TextplayWorldMineListResponseSchema = z.union([
 export const TextplayWorldEventRowSchema = z.strictObject({
   id: z.string().min(1),
   worldId: z.string().optional(),
+  timelineSeq: z.number().int().positive(),
   level: z.string().optional(),
   eventHorizon: z.enum(['PAST', 'ONGOING', 'FUTURE']).optional(),
   title: z.string().optional(),
@@ -474,6 +476,7 @@ export const TextplayRenderRequestSchema = z.strictObject({
   worldId: z.string().min(1),
   agentId: z.string().min(1),
   userId: z.string().min(1),
+  presence: z.string().optional(),
   playerName: z.string().optional(),
   playerIdentity: z.string().optional(),
   triggerSource: NarrativeTriggerSourceSchema,
