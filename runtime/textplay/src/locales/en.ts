@@ -30,6 +30,8 @@ const enLocale = {
     subtitle: 'Start or resume a story draft to continue.',
     empty: 'No active session. Start a new story or resume a draft.',
     waitingOpening: 'Opening narration is being prepared.',
+    pendingLabel: 'Player Action',
+    pendingStatus: 'Sending',
     inputPlaceholder: 'Describe your next move...',
     pausedInputPlaceholder: 'Session is paused. Resume it before sending.',
     noSessionPlaceholder: 'Start or resume a story before sending.',

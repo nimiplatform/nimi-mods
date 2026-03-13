@@ -29,6 +29,27 @@ function unique(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
 }
 
+function ensureSentence(value: string): string {
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return '';
+  }
+  if (/[。！？.!?]$/.test(normalized)) {
+    return normalized;
+  }
+  const hasCjk = /[\u3400-\u9fff]/.test(normalized);
+  return `${normalized}${hasCjk ? '。' : '.'}`;
+}
+
+function firstSentence(value: string): string {
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return '';
+  }
+  const parts = normalized.split(/[。！？.!?]/).map((item) => item.trim()).filter(Boolean);
+  return ensureSentence(parts[0] || normalized);
+}
+
 function toEventHorizon(value: unknown): 'PAST' | 'ONGOING' | 'FUTURE' {
   const normalized = toText(value).toUpperCase();
   if (normalized === 'ONGOING') return 'ONGOING';
@@ -47,14 +68,26 @@ function buildEntryBackdrop(event: TextplayWorldEventRow): string {
   const title = toText(event.title);
   const location = toStringList(event.locationRefs)[0] || '';
   const cause = toText(event.cause);
+  const summary = toText(event.summary);
+  const process = toText(event.process);
   const timeRef = toText(event.timeRef);
-  const backdrop = unique([
-    cause ? `${cause}正在酝酿` : '',
-    location ? `${location}一带的局势正在发紧` : '',
-    timeRef ? `${timeRef}前后的风声正在悄然扩散` : '',
-    title ? `${title}前的风暴正在积聚` : '',
-  ]).filter(Boolean).slice(0, 2).join('；');
-  return backdrop || '局势正在临界点前积蓄力量，更多细节将在开场中揭开。';
+  const lead = firstSentence(cause) || firstSentence(summary) || firstSentence(process);
+  if (lead) {
+    return lead;
+  }
+  if (location && timeRef) {
+    return `${timeRef}前后，${location}的局势暗流涌动。`;
+  }
+  if (location) {
+    return `${location}的局势暗流涌动。`;
+  }
+  if (timeRef) {
+    return `${timeRef}前后，变局将起。`;
+  }
+  if (title) {
+    return `${title}之前，风暴已近。`;
+  }
+  return '风暴将至。';
 }
 
 function buildEntryHook(horizon: TextplayEntrySummary['eventHorizon']): string {

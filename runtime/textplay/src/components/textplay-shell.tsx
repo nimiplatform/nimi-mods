@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   filterModelOptions,
   normalizeRuntimeRouteSource,
@@ -11,6 +11,7 @@ import type {
   TextplayDraftRecord,
   TextplayEntryDetail,
   TextplayEntrySummary,
+  TextplayPendingUserTurn,
   TextplayPersistRecord,
   TextplayWorldSummary,
 } from '../types.js';
@@ -47,6 +48,7 @@ export type TextplayShellProps = {
   selectedDraftKey: string | null;
   setSelectedDraftKey: (key: string | null) => void;
   activeDraft: TextplayDraftRecord | null;
+  pendingUserTurn: TextplayPendingUserTurn | null;
   inputText: string;
   setInputText: (value: string) => void;
   isRunning: boolean;
@@ -379,10 +381,27 @@ export function TextplayShell(props: TextplayShellProps) {
   const { t } = useModTranslation('textplay');
   const [entryTab, setEntryTab] = useState<'new' | 'drafts'>('new');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const timelineBottomRef = useRef<HTMLDivElement | null>(null);
 
   const selectedDraft = props.drafts.find((item) => item.key === props.selectedDraftKey) || null;
   const selectedEntryHasNoAgents = (props.selectedEntry?.characterRefs.length || 0) === 0 && Boolean(props.selectedEntry);
   const autoSelectedAgent = props.agentOptions.length === 1 ? props.agentOptions[0] : null;
+  const timelineScrollKey = useMemo(() => {
+    const draftKey = props.activeDraft?.key || 'none';
+    const lastRecordId = props.activeDraft?.records[props.activeDraft.records.length - 1]?.id || '';
+    const pendingId = props.pendingUserTurn?.id || '';
+    return `${draftKey}:${lastRecordId}:${pendingId}`;
+  }, [props.activeDraft?.key, props.activeDraft?.records, props.pendingUserTurn?.id]);
+
+  useEffect(() => {
+    if (!props.activeDraft && !props.pendingUserTurn) {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      timelineBottomRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [props.activeDraft, props.pendingUserTurn, timelineScrollKey]);
 
   return (
     <div className="relative flex h-full min-h-0 min-w-0 flex-1 w-full bg-[#f4f8f8] text-slate-900">
@@ -471,9 +490,6 @@ export function TextplayShell(props: TextplayShellProps) {
                       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
                         <div className="font-medium text-slate-900">{props.selectedEntry.title}</div>
                         <p className="mt-2 leading-6">{props.selectedEntry.entryBackdrop}</p>
-                        {props.selectedEntry.entryHook ? (
-                          <p className="mt-2 text-xs leading-5 text-slate-500">{props.selectedEntry.entryHook}</p>
-                        ) : null}
                       </div>
                     ) : null}
 
@@ -664,6 +680,18 @@ export function TextplayShell(props: TextplayShellProps) {
                     <div className="mt-3 whitespace-pre-wrap text-[15px] leading-8">{record.text}</div>
                   </article>
                 ))}
+                {props.pendingUserTurn ? (
+                  <article className="rounded-3xl border border-sky-200 bg-sky-50 p-4 shadow-sm text-sky-900">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-semibold">{t('timeline.pendingLabel')}</div>
+                      <div className="text-xs text-sky-600">{t('timeline.pendingStatus')}</div>
+                    </div>
+                    <div className="mt-3 rounded-2xl bg-white/70 px-3 py-2 text-sm text-slate-700">
+                      {props.pendingUserTurn.userMessage}
+                    </div>
+                  </article>
+                ) : null}
+                <div ref={timelineBottomRef} />
               </div>
             )}
           </div>
@@ -673,6 +701,17 @@ export function TextplayShell(props: TextplayShellProps) {
               <textarea
                 value={props.inputText}
                 onChange={(event) => props.setInputText(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.nativeEvent.isComposing) {
+                    return;
+                  }
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    if (props.canSend) {
+                      props.onSend();
+                    }
+                  }
+                }}
                 placeholder={props.activeDraft
                   ? (props.activeDraft.status === 'paused' ? t('timeline.pausedInputPlaceholder') : t('timeline.inputPlaceholder'))
                   : t('timeline.noSessionPlaceholder')}

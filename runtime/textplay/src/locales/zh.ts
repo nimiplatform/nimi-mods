@@ -30,6 +30,8 @@ const zhLocale = {
     subtitle: '开始新故事，或恢复本地 draft。',
     empty: '当前没有活动 session。请开始新故事，或从 draft 列表恢复。',
     waitingOpening: '开场叙事准备中。',
+    pendingLabel: '玩家行动',
+    pendingStatus: '发送中',
     inputPlaceholder: '描述你的下一步行动...',
     pausedInputPlaceholder: '当前 session 已暂停，恢复后才能继续发送。',
     noSessionPlaceholder: '开始或恢复一个故事后，才能继续发送。',

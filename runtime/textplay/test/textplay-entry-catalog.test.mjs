@@ -78,7 +78,7 @@ test('listPlayableEntries returns PRIMARY non-future entries sorted by timeline 
   assert.equal(entries[0].playable, true);
   assert.deepEqual(entries[0].participants, ['agent-1']);
   assert.equal(entries[0].timelineSeq, 3);
-  assert.match(entries[0].entryBackdrop, /Border unrest|Early Primary前的风暴正在积聚/);
+  assert.equal(entries[0].entryBackdrop, 'Border unrest.');
   assert.match(entries[0].entryHook, /发生前的临界时刻切入/);
 });
 
@@ -130,7 +130,7 @@ test('getPlayableEntryDetail returns full detail and hides future-only entry', a
   assert.deepEqual(detail.locationRefs, ['scene-docks']);
   assert.equal(detail.eventHorizon, 'PAST');
   assert.equal(detail.timelineSeq, 4);
-  assert.match(detail.entryBackdrop, /Contraband dispute|scene-docks一带的局势正在发紧|night-watch前后的风声正在悄然扩散|Opening Clash前的风暴正在积聚/);
+  assert.equal(detail.entryBackdrop, 'Contraband dispute.');
   assert.match(detail.entryHook, /发生前的临界时刻切入/);
   assert.equal(futureDetail, null);
 });

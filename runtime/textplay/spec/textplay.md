@@ -54,7 +54,10 @@
 - `TXT-032`: Tension pacing constraints are injected into render prompt based on `pacingContext.tensionBand` (HIGH/MODERATE/LOW).
 - `TXT-033`: Event type rendering guidance is appended per-event as `Rendering hint` when the event carries a recognized `type` field.
 - `TXT-034`: Unknown or missing event `type` degrades gracefully — no rendering hint appended, event renders with visibility tag only.
-- `TXT-035`: Entry card presentation is teaser-only: it derives a lightweight `entryBackdrop` and `entryHook` from canonical materials, but does not expose full canonical result/process dumps or internal horizon terminology to the player.
+- `TXT-035`: Entry card presentation is teaser-only: it renders a single lightweight `entryBackdrop` sentence derived from canonical materials, but does not expose full canonical result/process dumps, repeated cut-in hook copy, or internal horizon terminology to the player.
+- `TXT-036`: Composer UX uses `Enter` to submit and `Shift+Enter` to insert a newline.
+- `TXT-037`: UserTurn submission is optimistic in the workspace: input clears immediately, a pending player-action card appears in timeline, and failed submissions restore the original text back into the composer.
+- `TXT-038`: Timeline auto-scrolls to the newest locally added card for the active session.
 
 ## 3. No Over-Design Guard
 

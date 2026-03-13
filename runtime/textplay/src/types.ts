@@ -156,6 +156,13 @@ export type TextplayEntryDetail = TextplayEntrySummary & {
 
 export type TextplayDraftStatus = 'active' | 'paused';
 
+export type TextplayPendingUserTurn = {
+  id: string;
+  rawInput: string;
+  userMessage: string;
+  createdAt: string;
+};
+
 export type TextplayDraftRecord = {
   key: string;
   worldScope: string;

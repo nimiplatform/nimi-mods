@@ -42,6 +42,7 @@ import type {
   TextplayDraftRecord,
   TextplayEntryDetail,
   TextplayEntrySummary,
+  TextplayPendingUserTurn,
   TextplayPersistRecord,
   TextplayPresenceState,
   TextplayRenderResult,
@@ -208,6 +209,7 @@ export function useTextplayController(): TextplayShellProps {
   const [selectedDraftKey, setSelectedDraftKey] = useState<string | null>(null);
   const [activeDraft, setActiveDraft] = useState<TextplayDraftRecord | null>(null);
 
+  const [pendingUserTurn, setPendingUserTurn] = useState<TextplayPendingUserTurn | null>(null);
   const [inputText, setInputText] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [notice, setNotice] = useState<BannerNotice | null>(null);
@@ -816,6 +818,7 @@ export function useTextplayController(): TextplayShellProps {
 
       setActiveDraft(draft);
       setSelectedDraftKey(draft.key);
+      setPendingUserTurn(null);
       setInputText('');
       pushNotice({
         kind: 'success',
@@ -865,6 +868,7 @@ export function useTextplayController(): TextplayShellProps {
     }
     const saved = await syncDraftSnapshot(current, 'active');
     setActiveDraft(saved);
+    setPendingUserTurn(null);
     pushNotice({
       kind: 'info',
       message: t('messages.sessionResumed'),
@@ -892,6 +896,7 @@ export function useTextplayController(): TextplayShellProps {
     setPlayerName(saved.playerName);
     setPlayerIdentity(saved.playerIdentity);
     setSelectedDraftKey(saved.key);
+    setPendingUserTurn(null);
     setInputText('');
     pushNotice({
       kind: 'info',
@@ -983,6 +988,7 @@ export function useTextplayController(): TextplayShellProps {
       setPlayerName(saved.playerName);
       setPlayerIdentity(saved.playerIdentity);
       setSelectedDraftKey(saved.key);
+      setPendingUserTurn(null);
       setInputText('');
       pushNotice({
         kind: 'success',
@@ -1015,56 +1021,75 @@ export function useTextplayController(): TextplayShellProps {
     if (!current || current.status === 'paused' || !inputText.trim()) {
       return;
     }
+    const rawInput = inputText.trim();
     const userMessage = buildContextualUserMessage({
       playerName: current.playerName,
       playerIdentity: current.playerIdentity,
-      userMessage: inputText.trim(),
+      userMessage: rawInput,
     });
-    const renderSuccess = await executeRender({
-      draftSeed: current,
-      request: {
-        storyId: current.storyId,
-        entryEventId: current.entryEventId,
-        worldId: current.worldId,
-        agentId: current.agentId,
-        userId: current.userId,
-        playerName: current.playerName,
-        playerIdentity: current.playerIdentity,
-        triggerSource: 'UserTurn',
-        userMessage,
-        binding: routeBinding,
-        presence: presenceStateRef.current,
-      },
+    setPendingUserTurn({
+      id: createUlid(),
+      rawInput,
+      userMessage,
+      createdAt: nowIso(),
     });
-    if (!renderSuccess) {
-      return;
-    }
-    const snapshot = exportStoryState(current.storyId);
-    const record = buildPersistRecord({
-      request: {
-        storyId: current.storyId,
-        worldId: current.worldId,
-        agentId: current.agentId,
-        userId: current.userId,
-        playerName: current.playerName,
-        playerIdentity: current.playerIdentity,
-        triggerSource: 'UserTurn',
-        userMessage,
-      },
-      result: renderSuccess,
-    });
-    const saved = await saveDraft({
-      ...current,
-      status: 'active',
-      engineSnapshot: snapshot,
-      records: [...current.records, record],
-      routeOverride: routeBinding,
-      updatedAt: nowIso(),
-    });
-    setActiveDraft(saved);
-    setSelectedDraftKey(saved.key);
     setInputText('');
-  }, [executeRender, inputText, routeBinding, saveDraft]);
+    try {
+      const renderSuccess = await executeRender({
+        draftSeed: current,
+        request: {
+          storyId: current.storyId,
+          entryEventId: current.entryEventId,
+          worldId: current.worldId,
+          agentId: current.agentId,
+          userId: current.userId,
+          playerName: current.playerName,
+          playerIdentity: current.playerIdentity,
+          triggerSource: 'UserTurn',
+          userMessage,
+          binding: routeBinding,
+          presence: presenceStateRef.current,
+        },
+      });
+      if (!renderSuccess) {
+        setPendingUserTurn(null);
+        setInputText(rawInput);
+        return;
+      }
+      const snapshot = exportStoryState(current.storyId);
+      const record = buildPersistRecord({
+        request: {
+          storyId: current.storyId,
+          worldId: current.worldId,
+          agentId: current.agentId,
+          userId: current.userId,
+          playerName: current.playerName,
+          playerIdentity: current.playerIdentity,
+          triggerSource: 'UserTurn',
+          userMessage,
+        },
+        result: renderSuccess,
+      });
+      const saved = await saveDraft({
+        ...current,
+        status: 'active',
+        engineSnapshot: snapshot,
+        records: [...current.records, record],
+        routeOverride: routeBinding,
+        updatedAt: nowIso(),
+      });
+      setActiveDraft(saved);
+      setSelectedDraftKey(saved.key);
+      setPendingUserTurn(null);
+    } catch (error) {
+      setPendingUserTurn(null);
+      setInputText(rawInput);
+      pushNotice({
+        kind: 'error',
+        message: `${t('messages.renderCrashed')} ${toErrorMessage(error)}`,
+      });
+    }
+  }, [executeRender, inputText, pushNotice, routeBinding, saveDraft, t]);
 
   const onCancel = useCallback(() => {
     abortControllerRef.current?.abort();
@@ -1117,6 +1142,7 @@ export function useTextplayController(): TextplayShellProps {
       }
       setActiveDraft(null);
       setSelectedDraftKey(null);
+      setPendingUserTurn(null);
       setInputText('');
     }
   }, [flowId, hookClient, pushNotice, refreshDraftsForWorld, routeBinding, selectedWorldId, t]);
@@ -1348,6 +1374,7 @@ export function useTextplayController(): TextplayShellProps {
     selectedDraftKey,
     setSelectedDraftKey,
     activeDraft,
+    pendingUserTurn,
     inputText,
     setInputText,
     isRunning,

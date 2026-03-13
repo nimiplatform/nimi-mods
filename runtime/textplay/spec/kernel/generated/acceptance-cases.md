@@ -76,10 +76,11 @@ cases:
     reason_code: null
     source_rule: T-ACC-002
   - id: TXT-008D-STORY-ENTRY-NON-SPOILER
-    description: Player-facing entry card shows lightweight backdrop and cut-in hook only; internal canonical material fields and technical horizon terms are hidden.
+    description: Player-facing entry card shows a single lightweight backdrop sentence only; internal canonical material fields, repeated cut-in hook copy, and technical horizon terms are hidden.
     expected_ok: true
     entry_backdrop_required: true
-    entry_hook_required: true
+    single_sentence_backdrop_required: true
+    entry_hook_visible: false
     internal_material_fields_hidden: true
     reason_code: null
     source_rule: T-ACC-002
@@ -147,6 +148,23 @@ cases:
     expected_ok: true
     immersive_shell_mode: true
     test_reference: textplay-ui-registration.test.mjs
+    source_rule: T-ACC-002
+  - id: TXT-018-COMPOSER-ENTER-SEND
+    description: Composer submits on Enter and preserves newline insertion on Shift+Enter.
+    expected_ok: true
+    enter_submits: true
+    shift_enter_newline: true
+    source_rule: T-ACC-002
+  - id: TXT-019-OPTIMISTIC-USER-TURN
+    description: UserTurn submission clears the composer immediately and shows a pending player-action card until render resolves.
+    expected_ok: true
+    optimistic_pending_card_required: true
+    failed_submit_restores_input: true
+    source_rule: T-ACC-002
+  - id: TXT-020-TIMELINE-AUTO-SCROLL
+    description: Timeline scroll position advances to the newest active-session card when player or system content is appended.
+    expected_ok: true
+    auto_scroll_required: true
     source_rule: T-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:textplay-kernel-docs
