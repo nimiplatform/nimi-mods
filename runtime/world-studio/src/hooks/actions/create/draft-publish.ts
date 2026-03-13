@@ -542,10 +542,10 @@ export async function publishWorldDraft(input: WorldStudioCreateActionsInput, _o
             });
         }
         if (visualBindingUpserts.length > 0) {
-            await input.mutations.syncVisualBindingsMutation.mutateAsync({
+            await input.mutations.syncMediaBindingsMutation.mutateAsync({
                 worldId,
                 bindingUpserts: visualBindingUpserts,
-                reason: 'Publish world visual assets from world-studio draft',
+                reason: 'Publish world media assets from world-studio draft',
             });
         }
         input.patchSnapshot({

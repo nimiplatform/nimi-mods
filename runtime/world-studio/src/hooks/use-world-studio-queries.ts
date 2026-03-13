@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { listMyWorlds, listWorldDrafts, listWorldEvents, getWorldMaintenance, listWorldLorebooks, listWorldVisualBindings, listWorldMutations, } from '../data.js';
+import { listMyWorlds, listWorldDrafts, listWorldEvents, getWorldMaintenance, listWorldLorebooks, listWorldMediaBindings, listWorldMutations, } from '../data.js';
 import type { WorldDraftSummary, WorldEventSummary, WorldMutationSummary, WorldSummary, } from '../ui/types.js';
 import { type HookClient } from "@nimiplatform/sdk/mod";
 function toRecord(value: unknown): Record<string, unknown> {
@@ -134,11 +134,11 @@ export function useWorldStudioResourceQueries(hookClient: HookClient, input: {
         retry: false,
         queryFn: async () => toMutationSummaryList(await listWorldMutations(hookClient, input.worldId)),
     });
-    const visualBindingsQuery = useQuery({
+    const mediaBindingsQuery = useQuery({
         queryKey: ['world-studio', 'visual-bindings', input.worldId],
         enabled: input.enabled && Boolean(input.worldId),
         retry: false,
-        queryFn: async () => await listWorldVisualBindings(hookClient, input.worldId),
+        queryFn: async () => await listWorldMediaBindings(hookClient, input.worldId),
     });
     return {
         draftsQuery,
@@ -147,6 +147,6 @@ export function useWorldStudioResourceQueries(hookClient: HookClient, input: {
         eventsQuery,
         lorebooksQuery,
         mutationsQuery,
-        visualBindingsQuery,
+        mediaBindingsQuery,
     };
 }

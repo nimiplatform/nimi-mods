@@ -18,10 +18,10 @@ export const WORLD_STUDIO_DATA_API_EVENTS_DELETE = 'data-api.world.events.delete
 export const WORLD_STUDIO_DATA_API_LOREBOOKS_LIST = 'data-api.world.lorebooks.list';
 export const WORLD_STUDIO_DATA_API_LOREBOOKS_BATCH_UPSERT = 'data-api.world.lorebooks.batch-upsert';
 export const WORLD_STUDIO_DATA_API_LOREBOOKS_DELETE = 'data-api.world.lorebooks.delete';
-export const WORLD_STUDIO_DATA_API_VISUAL_BINDINGS_LIST = 'data-api.world.visual-bindings.list';
+export const WORLD_STUDIO_DATA_API_VISUAL_BINDINGS_LIST = 'data-api.world.media-bindings.list';
 export const WORLD_STUDIO_DATA_API_VISUAL_BINDINGS_BATCH_UPSERT =
-  'data-api.world.visual-bindings.batch-upsert';
-export const WORLD_STUDIO_DATA_API_VISUAL_BINDINGS_DELETE = 'data-api.world.visual-bindings.delete';
+  'data-api.world.media-bindings.batch-upsert';
+export const WORLD_STUDIO_DATA_API_VISUAL_BINDINGS_DELETE = 'data-api.world.media-bindings.delete';
 export const WORLD_STUDIO_DATA_API_DRAFTS_LIST = 'data-api.world.drafts.list';
 export const WORLD_STUDIO_DATA_API_WORLDS_MINE = 'data-api.world.worlds.mine';
 export const WORLD_STUDIO_DATA_API_MUTATIONS_LIST = 'data-api.world.mutations.list';

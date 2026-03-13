@@ -33,7 +33,7 @@ export {
 } from './data/queries/creator-agents.js';
 
 export {
-  listWorldVisualBindings,
-  batchUpsertWorldVisualBindings,
-  deleteWorldVisualBinding,
-} from './data/queries/visual-bindings.js';
+  listWorldMediaBindings,
+  batchUpsertWorldMediaBindings,
+  deleteWorldMediaBinding,
+} from './data/queries/media-bindings.js';
