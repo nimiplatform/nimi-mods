@@ -1,0 +1,29 @@
+{
+  "name": "@nimiplatform/mod-music-score",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nimi-mod build",
+    "dev": "nimi-mod dev",
+    "doctor": "nimi-mod doctor",
+    "pack": "nimi-mod pack",
+    "watch": "nimi-mod dev",
+    "test": "npx tsx --test test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "verify": "pnpm run typecheck && pnpm run test && pnpm run build",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@spotify/basic-pitch": "^1.0.1",
+    "@nimiplatform/sdk": "file:../../../sdk",
+    "opensheetmusicdisplay": "^1.9.0",
+    "react": "19.2.3"
+  },
+  "devDependencies": {
+    "@nimiplatform/dev-tools": "file:../../../dev-tools",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.14",
+    "typescript": "^5.9.3"
+  }
+}

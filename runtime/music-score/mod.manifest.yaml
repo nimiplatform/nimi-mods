@@ -1,0 +1,14 @@
+id: world.nimi.music-score
+name: Music Score
+version: 0.1.0
+kind: capability-mod
+iconAsset: ./assets/icon.svg
+entry: ./dist/mods/music-score/index.js
+styles:
+  - ./dist/mods/music-score/index.css
+description: >
+  Upload music audio (MP3) and transcribe it to sheet music notation
+  using AI-powered pitch detection and automatic music transcription.
+capabilities:
+  - ui.register.ui-extension.app.sidebar.mods
+  - ui.register.ui-extension.app.content.routes

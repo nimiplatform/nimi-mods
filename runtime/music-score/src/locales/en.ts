@@ -1,0 +1,57 @@
+export const enLocale = {
+    nav: {
+        label: 'Music Score',
+        loading: 'Loading Music Score...',
+    },
+    upload: {
+        title: 'Upload Audio',
+        description: 'Drag & drop an audio file here, or click to select',
+        hint: 'Supports MP3, WAV, OGG, FLAC',
+        button: 'Select File',
+    },
+    progress: {
+        idle: 'Ready',
+        decoding: 'Decoding audio...',
+        loadingModel: 'Loading pitch detection model...',
+        detecting: 'Detecting pitches...',
+        quantizing: 'Quantizing notes...',
+        rendering: 'Rendering sheet music...',
+        complete: 'Complete',
+        error: 'Error',
+    },
+    controls: {
+        title: 'Parameters',
+        bpm: 'BPM',
+        bpmAuto: 'Auto',
+        timeSignature: 'Time Signature',
+        keySignature: 'Key',
+        quantizePrecision: 'Quantize Precision',
+        sixteenth: '16th note',
+        eighth: '8th note',
+        quarter: 'Quarter note',
+        apply: 'Re-process',
+    },
+    export: {
+        title: 'Export',
+        musicxml: 'MusicXML',
+        midi: 'MIDI',
+        pdf: 'PDF',
+    },
+    keys: {
+        'C': 'C Major / A Minor',
+        'G': 'G Major / E Minor',
+        'D': 'D Major / B Minor',
+        'A': 'A Major / F# Minor',
+        'E': 'E Major / C# Minor',
+        'B': 'B Major / G# Minor',
+        'F#': 'F# Major / D# Minor',
+        'F': 'F Major / D Minor',
+        'Bb': 'Bb Major / G Minor',
+        'Eb': 'Eb Major / C Minor',
+        'Ab': 'Ab Major / F Minor',
+        'Db': 'Db Major / Bb Minor',
+        'Gb': 'Gb Major / Eb Minor',
+    },
+};
+
+export type MusicScoreLocale = typeof enLocale;
