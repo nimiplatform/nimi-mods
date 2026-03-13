@@ -36,7 +36,7 @@ export function MintYouShell() {
     const { t } = useModTranslation('mint-you');
     const currentStep = useMintYouStore((s) => s.currentStep);
     const [settingsOpen, setSettingsOpen] = React.useState(false);
-    return (<div className="ui-sync-root relative flex h-full min-h-0 overflow-hidden">
+    return (<div className="ui-sync-root relative flex h-full min-h-0 min-w-0 w-full flex-1 overflow-hidden">
       <MintYouVisualStyles />
       <div className="ui-sync-pane ui-sync-pane-main flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="mx-4 mt-4 flex items-center gap-3">

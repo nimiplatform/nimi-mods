@@ -107,6 +107,13 @@ cases:
     expected_ok: true
     reason_code: null
     source_rule: MY-ACC-002
+  - id: MY-029-IMMERSIVE-WORKSPACE-SHELL
+    description: Desktop route registration requests immersive shell mode and the Mint-You page root keeps the standard full-screen workspace container contract.
+    expected_ok: true
+    immersive_shell_mode: true
+    full_screen_page_root: true
+    test_reference: mint-you-ui-registration.test.ts
+    source_rule: MY-ACC-002
   - id: MY-026-PHOTO-REQUEST-DECLINED
     description: When User B declines a photo reveal request, requester receives non-blocking declined status.
     expected_ok: true

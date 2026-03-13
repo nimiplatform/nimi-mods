@@ -32,6 +32,7 @@ export async function registerMintYouUiExtensions(input: {
         extension: {
             type: 'tab-page',
             tabId: 'mod:mint-you',
+            shellMode: 'immersive',
             strategy: 'append',
             component: () => React.createElement(Suspense, {
                 fallback: React.createElement('div', {
