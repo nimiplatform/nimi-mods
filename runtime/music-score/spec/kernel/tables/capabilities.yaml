@@ -1,0 +1,16 @@
+# Authoritative capability declarations for music-score mod
+# Rule: MS-CAP-002
+
+capabilities:
+  - slot: ui-extension.app.sidebar.mods
+    purpose: Sidebar navigation entry for music-score
+    registration_order: 1
+
+  - slot: ui-extension.app.content.routes
+    purpose: Tab-page route with immersive shell mode
+    registration_order: 2
+
+constraints:
+  - id: MS-CAP-001
+    rule: No runtime.ai.* or runtime.media.* capabilities consumed
+    reason: All audio processing runs client-side via bundled libraries

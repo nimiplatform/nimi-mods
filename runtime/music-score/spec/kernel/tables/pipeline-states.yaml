@@ -1,0 +1,37 @@
+# Authoritative pipeline state machine for music-score mod
+# Rule: MS-PIPE-001
+
+states:
+  - name: idle
+    description: No file loaded, awaiting user upload
+    transitions: [decoding]
+
+  - name: decoding
+    description: Decoding audio file to AudioBuffer (mono, 22050 Hz)
+    transitions: [loading-model, error]
+
+  - name: loading-model
+    description: Loading BasicPitch TensorFlow.js model from CDN
+    transitions: [detecting, error]
+    fallback: On model load failure, falls back to ACF monophonic detection (MS-PIPE-002)
+
+  - name: detecting
+    description: Running ML pitch detection (or ACF fallback)
+    transitions: [quantizing, error]
+
+  - name: quantizing
+    description: Quantizing raw note events to musical grid
+    transitions: [rendering, error]
+    re_entrant: true  # MS-PIPE-003
+
+  - name: rendering
+    description: Building MusicXML and rendering via OSMD
+    transitions: [complete, error]
+
+  - name: complete
+    description: Score rendered successfully, user can export or re-quantize
+    transitions: [quantizing]  # Re-quantize without re-detecting
+
+  - name: error
+    description: Pipeline failed, user can retry with new file
+    transitions: [idle]
