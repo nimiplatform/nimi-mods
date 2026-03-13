@@ -210,8 +210,9 @@ async function detectWithFallback(
 
 /**
  * Autocorrelation-based pitch detection for a single frame.
+ * @internal Exported for unit testing.
  */
-function detectPitchACF(
+export function detectPitchACF(
     frame: Float32Array,
     sampleRate: number,
 ): { frequency: number; amplitude: number } {
@@ -251,7 +252,7 @@ function detectPitchACF(
     return { frequency, amplitude: rms };
 }
 
-function frequencyToMidi(freq: number): number {
+export function frequencyToMidi(freq: number): number {
     return 69 + 12 * Math.log2(freq / 440);
 }
 

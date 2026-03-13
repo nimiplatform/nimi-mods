@@ -231,7 +231,8 @@ function detectKeySignature(notes: NoteEvent[]): number {
     return bestFifths;
 }
 
-function pearsonCorrelation(a: readonly number[], b: readonly number[]): number {
+/** @internal Exported for unit testing. */
+export function pearsonCorrelation(a: readonly number[], b: readonly number[]): number {
     const n = a.length;
     let sumA = 0, sumB = 0, sumA2 = 0, sumB2 = 0, sumAB = 0;
     for (let i = 0; i < n; i++) {
@@ -252,7 +253,8 @@ function pearsonCorrelation(a: readonly number[], b: readonly number[]): number 
 // Utilities
 // ---------------------------------------------------------------------------
 
-function snapToGrid(value: number, gridSize: number): number {
+/** @internal Exported for unit testing. */
+export function snapToGrid(value: number, gridSize: number): number {
     return Math.round(value / gridSize) * gridSize;
 }
 
