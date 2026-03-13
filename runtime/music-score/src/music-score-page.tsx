@@ -62,6 +62,9 @@ export function MusicScorePage() {
         setScore(null);
         setConfig(defaultScoreConfig());
 
+        // MS-PIPE-001: transition through idle before starting new pipeline
+        updateStep('idle', 0);
+
         try {
             // Step 1: Decode audio
             updateStep('decoding', 0);

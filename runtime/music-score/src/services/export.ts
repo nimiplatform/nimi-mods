@@ -17,31 +17,39 @@ export function downloadMusicXml(xml: string, filename = 'score.musicxml'): void
 // MIDI export (Standard MIDI File, format 0)
 // ---------------------------------------------------------------------------
 
-export function buildMidiBlob(notes: NoteEvent[], bpm: number): Blob {
+function buildMidiBlob(notes: NoteEvent[], bpm: number): Blob {
     const bytes = buildMidiBytes(notes, bpm);
     return new Blob([bytes.buffer as ArrayBuffer], { type: 'audio/midi' });
 }
 
-export function downloadMidi(notes: NoteEvent[], bpm: number, filename = 'score.mid'): void {
+function downloadMidi(notes: NoteEvent[], bpm: number, filename = 'score.mid'): void {
     downloadBlob(buildMidiBlob(notes, bpm), filename);
 }
 
 /**
- * Build MIDI from quantized score — consistent with displayed MusicXML.
+ * Convert quantized score notes to NoteEvent[] with correct timing.
+ * Exported for testability (MS-ACC-005).
  */
-export function downloadMidiFromScore(score: QuantizedScore, filename = 'score.mid'): void {
+export function scoreNotesToNoteEvents(score: QuantizedScore): NoteEvent[] {
     const secondsPerBeat = 60 / score.config.bpm;
-    const noteEvents: NoteEvent[] = score.notes.map((n) => ({
+    return score.notes.map((n) => ({
         pitchMidi: n.pitchMidi,
         startTime: n.startBeat * secondsPerBeat,
         endTime: (n.startBeat + n.durationBeats) * secondsPerBeat,
         velocity: n.velocity,
         confidence: 1,
     }));
+}
+
+/**
+ * Build MIDI from quantized score — consistent with displayed MusicXML.
+ */
+export function downloadMidiFromScore(score: QuantizedScore, filename = 'score.mid'): void {
+    const noteEvents = scoreNotesToNoteEvents(score);
     downloadMidi(noteEvents, score.config.bpm, filename);
 }
 
-function buildMidiBytes(notes: NoteEvent[], bpm: number): Uint8Array {
+export function buildMidiBytes(notes: NoteEvent[], bpm: number): Uint8Array {
     const ticksPerQuarter = 480;
     const usPerBeat = Math.round(60_000_000 / bpm);
 
@@ -107,7 +115,7 @@ function buildMidiBytes(notes: NoteEvent[], bpm: number): Uint8Array {
     return new Uint8Array(result);
 }
 
-function encodeVariableLength(value: number): number[] {
+export function encodeVariableLength(value: number): number[] {
     if (value < 0) value = 0;
     const bytes: number[] = [];
     bytes.push(value & 0x7f);

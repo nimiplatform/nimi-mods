@@ -36,3 +36,26 @@ test('isExportable returns true for non-empty score', async () => {
     };
     assert.equal(isExportable(score), true);
 });
+
+test('deriveFilename handles file with multiple dots', async () => {
+    const { deriveFilename } = await import('../src/services/export.js');
+    assert.equal(deriveFilename('my.song.v2.mp3', 'mid'), 'my.song.v2.mid');
+});
+
+test('scoreNotesToNoteEvents converts quantized beats to seconds', async () => {
+    const { scoreNotesToNoteEvents } = await import('../src/services/export.js');
+    const score: QuantizedScore = {
+        config: { bpm: 60, timeSignature: [4, 4], keySignature: 0, quantizePrecision: 0.25 },
+        notes: [{
+            pitchMidi: 64, startBeat: 3, durationBeats: 2,
+            velocity: 90, measure: 0, beatInMeasure: 3,
+        }],
+        totalMeasures: 2,
+    };
+    const events = scoreNotesToNoteEvents(score);
+    assert.equal(events.length, 1);
+    // At 60 BPM: 1 beat = 1 second
+    assert.equal(events[0]!.startTime, 3.0);
+    assert.equal(events[0]!.endTime, 5.0);
+    assert.equal(events[0]!.velocity, 90);
+});
