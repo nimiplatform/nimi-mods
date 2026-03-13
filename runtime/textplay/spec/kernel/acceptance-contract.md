@@ -8,7 +8,7 @@ Acceptance behavior is authoritative in `tables/acceptance-cases.yaml`.
 
 ## T-ACC-002 Minimum Coverage
 
-Coverage includes render success path, internal visibility filtering, persistence warning, presence idle->away path, and immersive route registration for the desktop host shell.
+Coverage includes render success path, internal visibility filtering, persistence warning, presence idle->away path, locale-aware fallback rendering, route-config modal dialog accessibility, and immersive route registration for the desktop host shell.
 
 ## T-ACC-003 Verification Commands
 

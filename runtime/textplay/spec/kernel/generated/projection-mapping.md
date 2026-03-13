@@ -37,4 +37,9 @@ projection_mapping:
   - from: CoreOutput.metrics.tension
     to: RenderInput.pacingContext
     source_rule: T-FACT-006
+constraints:
+  tolerant_projection_shadow_diagnostics_required: true
+  malformed_non_critical_projection_branches_may_degrade_to_empty_values: true
+  required_story_and_turn_identity_fields_fail_close: true
+  source_rule: T-FACT-007
 ```

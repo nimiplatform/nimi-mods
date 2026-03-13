@@ -1,7 +1,7 @@
 # TextPlay Domain Spec
 
 > Status: Draft
-> Date: 2026-03-12
+> Date: 2026-03-13
 > Scope: Text renderer increments only.
 
 ## 0. Normative Imports
@@ -58,9 +58,12 @@
 - `TXT-036`: Composer UX uses `Enter` to submit and `Shift+Enter` to insert a newline.
 - `TXT-037`: UserTurn submission is optimistic in the workspace: input clears immediately, a pending player-action card appears in timeline, and failed submissions restore the original text back into the composer.
 - `TXT-038`: Timeline auto-scrolls to the newest locally added card for the active session.
+- `TXT-039`: Renderer fallback copy must follow the active UI locale. Current supported render locales are `en|zh`; any other locale degrades to `en`.
+- `TXT-040`: Projection render-input parsing may tolerate malformed non-critical branches by degrading them to empty values, but only if strict shadow validation emits diagnostics. Missing required story/turn identity fields remain fail-close.
+- `TXT-041`: Route Config drawer uses modal dialog semantics with focus containment and trigger-focus restore; dialog accessibility must not change workspace layout.
 
 ## 3. No Over-Design Guard
 
-- `TXT-040`: No renderer-side world fact persistence contract is introduced outside the single publish endpoint.
-- `TXT-041`: No model vendor-specific binding is introduced in domain doc.
-- `TXT-042`: No fallback compatibility path is introduced.
+- `TXT-050`: No renderer-side world fact persistence contract is introduced outside the single publish endpoint.
+- `TXT-051`: No model vendor-specific binding is introduced in domain doc.
+- `TXT-052`: No fallback compatibility path is introduced.

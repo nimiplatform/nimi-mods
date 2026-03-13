@@ -1,5 +1,11 @@
 import type { TextplayPresenceReport, TextplayPresenceState } from '../types.js';
-import type { TextplayPresenceConfig, TextplayPresenceEvent, TextplayPresenceMachine } from './types.js';
+import type {
+  TextplayPresenceConfig,
+  TextplayPresenceEvent,
+  TextplayPresenceMachine,
+  TextplayPresenceTransitionListener,
+  TextplayPresenceTransition,
+} from './types.js';
 import { createUlid } from '../utils/ulid.js';
 
 function nowIso(): string {
@@ -40,9 +46,16 @@ export function createTextplayPresenceMachine(config?: Partial<TextplayPresenceC
 
   let state: TextplayPresenceState = config?.initialState || 'active';
   const reports: TextplayPresenceReport[] = [];
+  const listeners = new Set<TextplayPresenceTransitionListener>();
 
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
   let awayTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const assertSynchronousListenerResult = (value: unknown) => {
+    if (value && typeof value === 'object' && typeof (value as { then?: unknown }).then === 'function') {
+      throw new Error('TEXTPLAY_PRESENCE_LISTENER_MUST_BE_SYNC');
+    }
+  };
 
   const clearTimers = () => {
     if (idleTimer) {
@@ -78,30 +91,54 @@ export function createTextplayPresenceMachine(config?: Partial<TextplayPresenceC
     fromState: TextplayPresenceState,
     toState: TextplayPresenceState,
     event: TextplayPresenceEvent,
+    atIso: string,
   ) => {
     reports.push({
       id: createUlid(),
-      at: nowIso(),
+      at: atIso,
       fromState,
       toState,
       event,
     });
   };
 
+  const emitTransition = (transition: TextplayPresenceTransition) => {
+    for (const listener of listeners) {
+      assertSynchronousListenerResult(listener(transition));
+    }
+  };
+
   const dispatch = (event: TextplayPresenceEvent): TextplayPresenceState => {
+    const previous = state;
+    const atMs = Date.now();
+    const atIso = new Date(atMs).toISOString();
+
     if (event === 'onInitiativeReceived') {
       resetTimers();
+      emitTransition({
+        previousState: previous,
+        nextState: state,
+        event,
+        atMs,
+        atIso,
+      });
       return state;
     }
 
     const nextState = resolveNextState(state, event);
-    const previous = state;
     if (nextState !== previous) {
       state = nextState;
-      pushReport(previous, nextState, event);
+      pushReport(previous, nextState, event, atIso);
     }
 
     resetTimers();
+    emitTransition({
+      previousState: previous,
+      nextState: state,
+      event,
+      atMs,
+      atIso,
+    });
     return state;
   };
 
@@ -110,6 +147,12 @@ export function createTextplayPresenceMachine(config?: Partial<TextplayPresenceC
   return {
     getState: () => state,
     dispatch,
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
     mark: () => reports.length,
     collectSince: (mark: number) => reports.slice(Math.max(0, mark)),
     getAllReports: () => [...reports],
@@ -118,6 +161,7 @@ export function createTextplayPresenceMachine(config?: Partial<TextplayPresenceC
       clearTimers();
     },
     destroy: () => {
+      listeners.clear();
       clearTimers();
     },
   };

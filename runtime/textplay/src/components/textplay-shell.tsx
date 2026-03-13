@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   filterModelOptions,
   normalizeRuntimeRouteSource,
@@ -15,6 +15,11 @@ import type {
   TextplayPersistRecord,
   TextplayWorldSummary,
 } from '../types.js';
+import { formatUpdatedAt, triggerSourceLabel } from '../ui-format.js';
+import {
+  focusRouteConfigDrawerTarget,
+  resolveRouteConfigDrawerFocusTarget,
+} from './route-config-drawer-focus.js';
 
 type BannerNotice = {
   kind: 'info' | 'success' | 'warning' | 'error';
@@ -84,23 +89,13 @@ function toDisplayText(value: string | null | undefined, fallback: string): stri
   return normalized || fallback;
 }
 
-function formatUpdatedAt(value: string): string {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
+function collectRouteConfigFocusableElements(container: HTMLElement | null): HTMLElement[] {
+  if (!container) {
+    return [];
   }
-  return parsed.toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function triggerSourceLabel(triggerSource: TextplayPersistRecord['triggerSource']): string {
-  if (triggerSource === 'SystemEvent') return 'Opening';
-  if (triggerSource === 'AgentInitiative') return 'World Event';
-  return 'Narrative Turn';
+  return Array.from(container.querySelectorAll<HTMLElement>(
+    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+  ));
 }
 
 function triggerSourceTone(triggerSource: TextplayPersistRecord['triggerSource']): string {
@@ -109,9 +104,10 @@ function triggerSourceTone(triggerSource: TextplayPersistRecord['triggerSource']
   return 'border-slate-200 bg-white text-slate-900';
 }
 
-function RouteConfigDrawer(props: {
+export function TextplayRouteConfigDrawer(props: {
   open: boolean;
   onClose: () => void;
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
   routeOptions: RuntimeRouteOptionsSnapshot | null;
   routeLoading: boolean;
   routeError: string | null;
@@ -124,6 +120,10 @@ function RouteConfigDrawer(props: {
   onRouteReload: () => void;
 }) {
   const { t } = useModTranslation('textplay');
+  const titleId = useId();
+  const drawerRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const previousOpenRef = useRef(props.open);
   const effectiveBinding = props.effectiveRouteBinding || {
     source: 'local' as const,
     connectorId: '',
@@ -146,17 +146,42 @@ function RouteConfigDrawer(props: {
   }, [effectiveBinding.model]);
 
   useEffect(() => {
-    if (!props.open) {
+    if (props.open) {
+      const frame = window.requestAnimationFrame(() => {
+        focusRouteConfigDrawerTarget(closeButtonRef.current);
+      });
+      previousOpenRef.current = props.open;
+      return () => window.cancelAnimationFrame(frame);
+    }
+    if (previousOpenRef.current) {
+      focusRouteConfigDrawerTarget(props.triggerRef.current);
+    }
+    previousOpenRef.current = props.open;
+    return undefined;
+  }, [props.open, props.triggerRef]);
+
+  const onDrawerKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      props.onClose();
       return;
     }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        props.onClose();
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [props.open, props.onClose]);
+    if (event.key !== 'Tab') {
+      return;
+    }
+
+    const focusableElements = collectRouteConfigFocusableElements(drawerRef.current);
+    const nextFocusTarget = resolveRouteConfigDrawerFocusTarget({
+      focusableElements,
+      activeElement: document.activeElement instanceof HTMLElement ? document.activeElement : null,
+      shiftKey: event.shiftKey,
+    });
+    if (!nextFocusTarget) {
+      return;
+    }
+    event.preventDefault();
+    focusRouteConfigDrawerTarget(nextFocusTarget);
+  };
 
   const filteredModels = useMemo(
     () => filterModelOptions(modelOptions, modelQuery),
@@ -174,20 +199,26 @@ function RouteConfigDrawer(props: {
         aria-hidden={!props.open}
       />
 
-      <aside
+      <div
+        ref={drawerRef}
         className={cn(
           'absolute inset-y-0 right-0 z-30 w-[360px] max-w-[92vw] border-l border-white/60 bg-[#f7fbfb] shadow-[-12px_0_28px_rgba(15,23,42,0.1)] transition-transform duration-300 ease-[cubic-bezier(0.2,0.7,0.2,1)]',
           props.open ? 'translate-x-0' : 'pointer-events-none translate-x-full',
         )}
         aria-hidden={!props.open}
+        aria-labelledby={titleId}
+        aria-modal="true"
+        onKeyDown={onDrawerKeyDown}
+        role="dialog"
       >
         <div className="flex h-full flex-col">
           <div className="flex items-center justify-between border-b border-gray-200 px-4 py-4">
             <div>
-              <p className="text-sm font-semibold text-gray-900">{t('settings.title')}</p>
+              <h2 id={titleId} className="text-sm font-semibold text-gray-900">{t('settings.title')}</h2>
               <p className="mt-1 text-xs text-gray-500">{t('settings.subtitle')}</p>
             </div>
             <button
+              ref={closeButtonRef}
               type="button"
               onClick={props.onClose}
               className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600"
@@ -292,13 +323,13 @@ function RouteConfigDrawer(props: {
             </div>
           </div>
         </div>
-      </aside>
+      </div>
     </>
   );
 }
 
 function SessionCard(props: Pick<TextplayShellProps, 'activeDraft' | 'isRunning' | 'onPause' | 'onResumeActive' | 'onStop'>) {
-  const { t } = useModTranslation('textplay');
+  const { t, i18n } = useModTranslation('textplay');
   const activeDraft = props.activeDraft;
   if (!activeDraft) {
     return (
@@ -340,7 +371,7 @@ function SessionCard(props: Pick<TextplayShellProps, 'activeDraft' | 'isRunning'
         </div>
         <div className="flex items-center justify-between gap-3">
           <dt className="text-slate-500">{t('labels.updatedAt')}</dt>
-          <dd className="text-right text-slate-900">{formatUpdatedAt(activeDraft.updatedAt)}</dd>
+          <dd className="text-right text-slate-900">{formatUpdatedAt(activeDraft.updatedAt, i18n.resolvedLanguage || i18n.language)}</dd>
         </div>
       </dl>
 
@@ -378,9 +409,10 @@ function SessionCard(props: Pick<TextplayShellProps, 'activeDraft' | 'isRunning'
 }
 
 export function TextplayShell(props: TextplayShellProps) {
-  const { t } = useModTranslation('textplay');
+  const { t, i18n } = useModTranslation('textplay');
   const [entryTab, setEntryTab] = useState<'new' | 'drafts'>('new');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const timelineBottomRef = useRef<HTMLDivElement | null>(null);
 
   const selectedDraft = props.drafts.find((item) => item.key === props.selectedDraftKey) || null;
@@ -585,7 +617,7 @@ export function TextplayShell(props: TextplayShellProps) {
                           >
                             <div className="text-sm font-medium text-slate-900">{draft.entryTitle}</div>
                             <div className="mt-1 text-xs text-slate-500">{draft.agentName} · {draft.playerName}</div>
-                            <div className="mt-2 text-xs text-slate-500">{formatUpdatedAt(draft.updatedAt)}</div>
+                            <div className="mt-2 text-xs text-slate-500">{formatUpdatedAt(draft.updatedAt, i18n.resolvedLanguage || i18n.language)}</div>
                           </button>
                           <div className="mt-3 flex gap-2">
                             <button
@@ -628,6 +660,7 @@ export function TextplayShell(props: TextplayShellProps) {
               </div>
             </div>
             <button
+              ref={settingsTriggerRef}
               type="button"
               onClick={() => setSettingsOpen(true)}
               className="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700"
@@ -669,8 +702,8 @@ export function TextplayShell(props: TextplayShellProps) {
                     )}
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <div className="text-sm font-semibold">{triggerSourceLabel(record.triggerSource)}</div>
-                      <div className="text-xs text-slate-500">{formatUpdatedAt(record.updatedAt)}</div>
+                      <div className="text-sm font-semibold">{triggerSourceLabel(record.triggerSource, t)}</div>
+                      <div className="text-xs text-slate-500">{formatUpdatedAt(record.updatedAt, i18n.resolvedLanguage || i18n.language)}</div>
                     </div>
                     {record.userMessage ? (
                       <div className="mt-3 rounded-2xl bg-white/70 px-3 py-2 text-sm text-slate-700">
@@ -741,9 +774,10 @@ export function TextplayShell(props: TextplayShellProps) {
         </main>
       </div>
 
-      <RouteConfigDrawer
+      <TextplayRouteConfigDrawer
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
+        triggerRef={settingsTriggerRef}
         routeOptions={props.routeOptions}
         routeLoading={props.routeLoading}
         routeError={props.routeError}

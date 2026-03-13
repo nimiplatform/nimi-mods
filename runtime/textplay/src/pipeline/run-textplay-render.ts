@@ -27,7 +27,7 @@ import { filterTextplayVisibility } from './filter-visibility.js';
 import { generateTextplayOutput } from './generate.js';
 import { normalizeTextplayRenderInput } from './normalize.js';
 import { persistTextplayRenderBestEffort } from './persist-best-effort.js';
-import type { TextplayPipelineStep, TextplayRenderExecutionInput } from './types.js';
+import type { TextplayPipelineStep, TextplayRenderExecutionInput, TextplayRenderLocale } from './types.js';
 import { wrapTextplayOutput } from './wrap-output.js';
 import { hashString } from '../utils/hash.js';
 
@@ -147,17 +147,43 @@ function shouldUseRenderableFallback(input: {
 function buildRenderableFallbackText(input: {
   normalized: TextplayNormalizedRenderInput;
   visibleEvents: TextplayNormalizedRenderInput['events'];
+  renderLocale: TextplayRenderLocale;
 }): string {
-  const playerName = String(input.normalized.playerName || '').trim() || '你';
+  const renderLocale = input.renderLocale;
+  const playerName = String(input.normalized.playerName || '').trim() || (renderLocale === 'zh' ? '你' : 'You');
   const playerIdentity = String(input.normalized.playerIdentity || '').trim();
-  const identityText = playerIdentity ? `（${playerIdentity}）` : '';
+  const identityText = playerIdentity
+    ? (renderLocale === 'zh' ? `（${playerIdentity}）` : ` (${playerIdentity})`)
+    : '';
   const userAction = truncateText(String(input.normalized.userMessage || ''), 90);
-  const sceneSummary = truncateText(String(input.normalized.sceneSummary || ''), 120) || '局势仍在震荡，线索交错未明';
+  const sceneSummary = truncateText(String(input.normalized.sceneSummary || ''), 120)
+    || (renderLocale === 'zh'
+      ? '局势仍在震荡，线索交错未明'
+      : 'The scene is still unstable, with competing clues pulling in different directions.');
   const pressure = input.visibleEvents
     .map((event) => truncateText(String(event.content || ''), 120))
     .filter((item) => item.length > 0)
     .slice(0, 2)
-    .join('；');
+    .join(renderLocale === 'zh' ? '；' : '; ');
+
+  if (renderLocale !== 'zh') {
+    const subjectLead = playerName === 'You' && !identityText
+      ? 'Your'
+      : `${playerName}${identityText}'s`;
+    if (input.normalized.triggerSource === 'UserTurn') {
+      return [
+        `${subjectLead} last move has sent ripples through the scene: ${userAction || 'the last choice is still unfolding'}.`,
+        pressure || sceneSummary,
+        'Nothing has settled yet, and the next response will decide where the scene tips.',
+      ].join(' ');
+    }
+
+    return [
+      sceneSummary,
+      pressure || 'Visible signs are still spreading, and the situation has not stabilized.',
+      `${playerName}${identityText} is being pulled forward by the shift in momentum, and the next choice will decide where it lands.`,
+    ].join(' ');
+  }
 
   if (input.normalized.triggerSource === 'UserTurn') {
     return [
@@ -609,6 +635,7 @@ export async function runTextplayRender(input: TextplayRenderExecutionInput): Pr
       const fallbackText = buildRenderableFallbackText({
         normalized,
         visibleEvents,
+        renderLocale: input.renderLocale,
       });
       warnings.push({
         code: TEXTPLAY_REASON.RENDER_FALLBACK_WARN,

@@ -160,6 +160,23 @@ cases:
     expected_ok: true
     auto_scroll_required: true
     source_rule: T-ACC-002
+  - id: TXT-021-LOCALE-AWARE-FALLBACK
+    description: Render fallback copy follows the active UI locale; supported locales normalize to en or zh before fallback text is built.
+    expected_ok: true
+    fallback_locale_matches_ui: true
+    supported_fallback_locales:
+      - en
+      - zh
+    test_reference: textplay-render-fallback.test.mjs
+    source_rule: T-ACC-002
+  - id: TXT-022-ROUTE-CONFIG-DIALOG-A11Y
+    description: Route Config drawer is exposed as a modal dialog, traps keyboard focus while open, and restores focus to the trigger when closed.
+    expected_ok: true
+    modal_dialog_required: true
+    focus_trap_required: true
+    focus_restore_required: true
+    test_reference: textplay-route-config-drawer-focus.test.mjs
+    source_rule: T-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:textplay-kernel-docs
     source_rule: T-ACC-003

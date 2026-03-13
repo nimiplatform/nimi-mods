@@ -32,6 +32,7 @@ import {
 import { createTextplayFlowId, emitTextplayLog } from '../logging.js';
 import { runTextplayRender } from '../pipeline/run-textplay-render.js';
 import { createTextplayPresenceMachine } from '../presence/state-machine.js';
+import { createTextplayPresenceSnapshot, reduceTextplayPresenceSnapshot } from '../presence/snapshot.js';
 import { createTextplayRuntimeAiClient } from '../runtime-ai-client.js';
 import { loadTextplayRouteBinding, persistTextplayRouteBinding } from '../route-override-store.js';
 import { createUlid } from '../utils/ulid.js';
@@ -104,6 +105,11 @@ function asBindingRecord(binding: RuntimeRouteBinding | null): Record<string, un
   return binding ? { ...binding } : undefined;
 }
 
+function normalizeTextplayRenderLocale(language: string | null | undefined): 'en' | 'zh' {
+  const normalized = String(language || '').trim().toLowerCase();
+  return normalized.startsWith('zh') ? 'zh' : 'en';
+}
+
 function buildPersistRecord(input: {
   request: {
     storyId: string;
@@ -169,7 +175,7 @@ function toEntryDetailFromStartup(startup: TextplayStartupPackage): TextplayEntr
 }
 
 export function useTextplayController(): TextplayShellProps {
-  const { t } = useModTranslation('textplay');
+  const { t, i18n } = useModTranslation('textplay');
   const hookClient = useMemo(() => createHookClient(TEXTPLAY_MOD_ID), []);
   const runtimeClient = useMemo(() => createModRuntimeClient(TEXTPLAY_MOD_ID), []);
   const aiClient = useMemo(() => createTextplayRuntimeAiClient(runtimeClient), [runtimeClient]);
@@ -218,6 +224,10 @@ export function useTextplayController(): TextplayShellProps {
   const [routeLoading, setRouteLoading] = useState(true);
   const [routeError, setRouteError] = useState<string | null>(null);
   const [routeBinding, setRouteBindingState] = useState<RuntimeRouteBinding | null>(() => loadTextplayRouteBinding());
+  const renderLocale = useMemo(
+    () => normalizeTextplayRenderLocale(i18n.resolvedLanguage || i18n.language),
+    [i18n.language, i18n.resolvedLanguage],
+  );
 
   const activeDraftRef = useRef<TextplayDraftRecord | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -237,26 +247,7 @@ export function useTextplayController(): TextplayShellProps {
     if (!machine) {
       return presenceStateRef.current;
     }
-    const previousState = presenceStateRef.current;
-    const nextState = machine.dispatch(event);
-    const nowMs = Date.now();
-    presenceStateRef.current = nextState;
-    if (event === 'onInitiativeReceived') {
-      presenceStateSinceRef.current = nowMs;
-      if (nextState === 'paused') {
-        pausedSinceRef.current = nowMs;
-      }
-      return nextState;
-    }
-    if (nextState !== previousState) {
-      presenceStateSinceRef.current = nowMs;
-    }
-    if (nextState === 'paused') {
-      pausedSinceRef.current = nowMs;
-    } else if (previousState === 'paused') {
-      pausedSinceRef.current = null;
-    }
-    return nextState;
+    return machine.dispatch(event);
   }, []);
 
   const collectPresenceReports = useCallback(() => {
@@ -286,9 +277,13 @@ export function useTextplayController(): TextplayShellProps {
     machine?.destroy();
     presenceMachineRef.current = null;
     presenceReportMarkRef.current = 0;
-    pausedSinceRef.current = null;
-    presenceStateSinceRef.current = Date.now();
-    presenceStateRef.current = 'active';
+    const resetSnapshot = createTextplayPresenceSnapshot({
+      state: 'active',
+      atMs: Date.now(),
+    });
+    presenceStateRef.current = resetSnapshot.state;
+    presenceStateSinceRef.current = resetSnapshot.stateSinceMs;
+    pausedSinceRef.current = resetSnapshot.pausedSinceMs;
 
     if (!activeDraft) {
       return;
@@ -303,14 +298,30 @@ export function useTextplayController(): TextplayShellProps {
     });
     presenceMachineRef.current = nextMachine;
     presenceReportMarkRef.current = nextMachine.mark();
-    presenceStateRef.current = initialState;
     const initialSince = activeDraft.status === 'paused'
       ? toMs(activeDraft.updatedAt)
       : Date.now();
-    presenceStateSinceRef.current = initialSince;
-    pausedSinceRef.current = activeDraft.status === 'paused' ? initialSince : null;
+    const initialSnapshot = createTextplayPresenceSnapshot({
+      state: initialState,
+      atMs: initialSince,
+    });
+    presenceStateRef.current = initialSnapshot.state;
+    presenceStateSinceRef.current = initialSnapshot.stateSinceMs;
+    pausedSinceRef.current = initialSnapshot.pausedSinceMs;
+
+    const unsubscribe = nextMachine.subscribe((transition) => {
+      const nextSnapshot = reduceTextplayPresenceSnapshot({
+        state: presenceStateRef.current,
+        stateSinceMs: presenceStateSinceRef.current,
+        pausedSinceMs: pausedSinceRef.current,
+      }, transition);
+      presenceStateRef.current = nextSnapshot.state;
+      presenceStateSinceRef.current = nextSnapshot.stateSinceMs;
+      pausedSinceRef.current = nextSnapshot.pausedSinceMs;
+    });
 
     return () => {
+      unsubscribe();
       nextMachine.destroy();
       if (presenceMachineRef.current === nextMachine) {
         presenceMachineRef.current = null;
@@ -484,6 +495,7 @@ export function useTextplayController(): TextplayShellProps {
     setIsRunning(true);
     try {
       const result = await runTextplayRender({
+        renderLocale,
         request: {
           storyId: input.request.storyId,
           entryEventId: input.request.entryEventId,
@@ -535,7 +547,7 @@ export function useTextplayController(): TextplayShellProps {
       }
       setIsRunning(false);
     }
-  }, [aiClient, collectPresenceReports, hookClient, narrativeEngine, pushNotice, runtimeClient, syncDraftSnapshot, t]);
+  }, [aiClient, collectPresenceReports, hookClient, narrativeEngine, pushNotice, renderLocale, runtimeClient, syncDraftSnapshot, t]);
 
   useEffect(() => {
     emitTextplayLog({
@@ -1241,10 +1253,6 @@ export function useTextplayController(): TextplayShellProps {
         setActiveDraft(saved);
         setSelectedDraftKey(saved.key);
         dispatchPresenceEvent('onInitiativeReceived');
-        presenceStateSinceRef.current = nowMs;
-        if (saved.status === 'paused') {
-          pausedSinceRef.current = nowMs;
-        }
       } catch (error) {
         const currentMs = Date.now();
         if (currentMs - initiativeWarningAtRef.current >= 60_000) {

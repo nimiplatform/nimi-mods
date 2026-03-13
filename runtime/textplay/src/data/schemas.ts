@@ -109,6 +109,21 @@ export const NarrativeProjectionRenderInputRequestSchema = z.strictObject({
 });
 
 const ProjectionVisibilitySchema = z.enum(['public', 'internal', 'sensory']);
+const NarrativeProjectionPlayerSchema = z.strictObject({
+  id: z.string().optional(),
+  name: z.string().optional(),
+  identity: z.string().optional(),
+});
+const NarrativeProjectionSceneSchema = z.strictObject({
+  summary: z.string().optional(),
+});
+const NarrativeProjectionAgentSchema = z.strictObject({
+  id: z.string().optional(),
+  summary: z.string().optional(),
+});
+const NarrativeProjectionWorldStyleSchema = z.strictObject({
+  summary: z.string().optional(),
+});
 
 export const NarrativeProjectionEventSchema = z.strictObject({
   eventId: z.string().min(1),
@@ -123,27 +138,30 @@ export const NarrativeProjectionEventSchema = z.strictObject({
   sourceEventIds: z.array(z.string().min(1)).optional(),
 }).passthrough();
 
+export const NarrativeProjectionRenderInputResponseStrictSchema = z.strictObject({
+  storyId: z.string().min(1),
+  turnId: z.string().min(1),
+  triggerSource: NarrativeTriggerSourceSchema.optional(),
+  player: NarrativeProjectionPlayerSchema,
+  userMessage: z.string().optional(),
+  systemPayload: z.union([z.record(z.string(), z.unknown()), z.null()]).optional().transform((value) => value ?? undefined),
+  scene: NarrativeProjectionSceneSchema,
+  agent: NarrativeProjectionAgentSchema,
+  worldStyle: NarrativeProjectionWorldStyleSchema,
+  events: z.array(NarrativeProjectionEventSchema),
+  metrics: z.record(z.string(), z.unknown()),
+}).passthrough();
+
 export const NarrativeProjectionRenderInputResponseSchema = z.strictObject({
   storyId: z.string().min(1),
   turnId: z.string().min(1),
   triggerSource: NarrativeTriggerSourceSchema.optional(),
-  player: z.strictObject({
-    id: z.string().optional(),
-    name: z.string().optional(),
-    identity: z.string().optional(),
-  }).catch({}),
+  player: NarrativeProjectionPlayerSchema.catch({}),
   userMessage: z.string().optional(),
   systemPayload: z.union([z.record(z.string(), z.unknown()), z.null()]).optional().transform((value) => value ?? undefined),
-  scene: z.strictObject({
-    summary: z.string().optional(),
-  }).catch({}),
-  agent: z.strictObject({
-    id: z.string().optional(),
-    summary: z.string().optional(),
-  }).catch({}),
-  worldStyle: z.strictObject({
-    summary: z.string().optional(),
-  }).catch({}),
+  scene: NarrativeProjectionSceneSchema.catch({}),
+  agent: NarrativeProjectionAgentSchema.catch({}),
+  worldStyle: NarrativeProjectionWorldStyleSchema.catch({}),
   events: z.array(NarrativeProjectionEventSchema).catch([]),
   metrics: z.record(z.string(), z.unknown()).catch({}),
 }).passthrough();

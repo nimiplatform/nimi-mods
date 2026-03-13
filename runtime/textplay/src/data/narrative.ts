@@ -7,6 +7,7 @@ import {
   NarrativeContextResolveResponseSchema,
   NarrativeProjectionRenderInputRequestSchema,
   NarrativeProjectionRenderInputResponseSchema,
+  NarrativeProjectionRenderInputResponseStrictSchema,
   NarrativeTurnWindowRequestSchema,
   NarrativeTurnWindowResponseSchema,
   NarrativeTurnResultUpsertRequestSchema,
@@ -25,6 +26,7 @@ import {
   type NarrativeTurnByIdResponse,
 } from './schemas.js';
 import { TextplayPipelineError } from '../pipeline/error.js';
+import { emitTextplayLog } from '../logging.js';
 
 function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error || '');
@@ -50,6 +52,62 @@ function hasContextPayload(scopes: NarrativeContextResolveResponse['scopes']): b
 function hasCriticalNarrativeContext(scopes: NarrativeContextResolveResponse['scopes']): boolean {
   return Object.keys(scopes.CANON).length > 0
     && Object.keys(scopes.STORY).length > 0;
+}
+
+export type NarrativeProjectionShadowValidationWarning = {
+  storyId: string;
+  turnId: string;
+  traceId: string;
+  issueCount: number;
+  issues: Array<{
+    path: string;
+    code: string;
+    message: string;
+  }>;
+};
+
+function summarizeProjectionIssues(input: {
+  issues: ReadonlyArray<{
+    path: Array<PropertyKey>;
+    code: string;
+    message: string;
+  }>;
+}): NarrativeProjectionShadowValidationWarning['issues'] {
+  return input.issues.slice(0, 5).map((issue) => ({
+    path: issue.path.length > 0 ? issue.path.map((segment) => String(segment)).join('.') : '<root>',
+    code: issue.code,
+    message: issue.message,
+  }));
+}
+
+export function parseNarrativeProjectionRenderInputResponse(input: {
+  payload: unknown;
+  request: NarrativeProjectionRenderInputRequest;
+  onShadowWarning?: (warning: NarrativeProjectionShadowValidationWarning) => void;
+}): NarrativeProjectionRenderInputResponse {
+  const strictParsed = NarrativeProjectionRenderInputResponseStrictSchema.safeParse(input.payload);
+  if (!strictParsed.success) {
+    input.onShadowWarning?.({
+      storyId: input.request.storyId,
+      turnId: input.request.turnId,
+      traceId: input.request.traceId,
+      issueCount: strictParsed.error.issues.length,
+      issues: summarizeProjectionIssues({ issues: strictParsed.error.issues }),
+    });
+  }
+
+  const parsed = NarrativeProjectionRenderInputResponseSchema.safeParse(input.payload);
+  if (!parsed.success) {
+    throw new TextplayPipelineError({
+      reasonCode: TEXTPLAY_REASON.INPUT_INVALID,
+      actionHint: 'Complete player, userMessage, and events, then retry.',
+      message: parsed.error.issues[0]?.message || 'TEXTPLAY_PROJECTION_RESPONSE_INVALID',
+      stage: 'input',
+      retryClass: 'non-retryable',
+    });
+  }
+
+  return parsed.data;
 }
 
 export async function queryNarrativeContextResolve(input: {
@@ -239,16 +297,16 @@ export async function queryNarrativeProjectionRenderInput(input: {
     throw toContextMissingError(error, 'narrative.projection.render-input');
   });
 
-  const parsed = NarrativeProjectionRenderInputResponseSchema.safeParse(payload);
-  if (!parsed.success) {
-    throw new TextplayPipelineError({
-      reasonCode: TEXTPLAY_REASON.INPUT_INVALID,
-      actionHint: 'Complete player, userMessage, and events, then retry.',
-      message: parsed.error.issues[0]?.message || 'TEXTPLAY_PROJECTION_RESPONSE_INVALID',
-      stage: 'input',
-      retryClass: 'non-retryable',
-    });
-  }
-
-  return parsed.data;
+  return parseNarrativeProjectionRenderInputResponse({
+    payload,
+    request: parsedRequest.data,
+    onShadowWarning: (warning) => {
+      emitTextplayLog({
+        level: 'warn',
+        message: 'textplay:narrative:projection-shadow-parse-failed',
+        source: 'data.queryNarrativeProjectionRenderInput',
+        details: warning,
+      });
+    },
+  });
 }

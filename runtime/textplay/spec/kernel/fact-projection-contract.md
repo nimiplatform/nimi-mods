@@ -25,3 +25,7 @@ Spine event `type` field is passed through projection into TextPlay render input
 ## T-FACT-006 Tension Metric Passthrough
 
 `CoreOutput.metrics.tension` is passed through to `RenderInput.pacingContext` with band classification (HIGH >= 0.7, MODERATE >= 0.4, LOW < 0.4).
+
+## T-FACT-007 Tolerant Projection Diagnostics
+
+Malformed non-critical projection branches may degrade to empty objects or arrays only when strict shadow validation still emits diagnostics. Required story and turn identity fields remain fail-close.

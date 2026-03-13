@@ -11,7 +11,9 @@ export type TextplayPipelineDependencies = {
     narrativeEngine: NarrativeEngineModule;
     abortSignal?: AbortSignal;
 };
+export type TextplayRenderLocale = 'en' | 'zh';
 export type TextplayRenderExecutionInput = {
+    renderLocale: TextplayRenderLocale;
     request: TextplayRenderRequest;
     deps: TextplayPipelineDependencies;
     presenceReports: TextplayPresenceReport[];
