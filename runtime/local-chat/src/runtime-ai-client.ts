@@ -16,6 +16,7 @@ export type LocalChatAiTextRequest = LocalChatAiRouteInput & {
     worldId?: string;
     agentId?: string;
     abortSignal?: AbortSignal;
+    debugLabel?: string;
 };
 export type LocalChatAiImageRequest = LocalChatAiRouteInput & {
     prompt: string;
@@ -132,15 +133,30 @@ export type LocalChatGenerateObjectFailureStage = 'call' | 'parse' | 'unknown';
 type LocalChatGenerateObjectFailureError = Error & {
     failureStage: Exclude<LocalChatGenerateObjectFailureStage, 'unknown'>;
     reasonCode: string;
+    actionHint: string | null;
     traceId: string | null;
+    finishReason: LocalChatFinishReason | null;
     rawTextPreview: string | null;
     rawTextChars: number;
     errorName: string | null;
 };
+type LocalChatGenerateObjectRequestSummary = {
+    debugLabel: string | null;
+    promptChars: number;
+    systemPromptChars: number;
+    promptPreview: string | null;
+    systemPromptPreview: string | null;
+    maxTokens: number | null;
+    temperature: number | null;
+    timeoutMs: number | null;
+    binding: Record<string, unknown> | null;
+};
 export type LocalChatGenerateObjectFailureDetails = {
     failureStage: LocalChatGenerateObjectFailureStage;
     reasonCode: string;
+    actionHint: string | null;
     traceId: string | null;
+    finishReason: LocalChatFinishReason | null;
     rawTextPreview: string | null;
     rawTextChars: number;
     errorName: string | null;
@@ -324,10 +340,87 @@ function createRawTextPreview(text: string): string | null {
     const normalized = String(text || '').replace(/\s+/g, ' ').trim();
     return normalized ? normalized.slice(0, 280) : null;
 }
+function normalizeNumber(value: unknown): number | null {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
+}
+function summarizeRouteBinding(binding: RuntimeRouteBinding | undefined): Record<string, unknown> | null {
+    if (!binding) {
+        return null;
+    }
+    return {
+        source: String(binding.source || '').trim() || null,
+        connectorId: String(binding.connectorId || '').trim() || null,
+        model: String(binding.model || '').trim() || null,
+        modelId: String(binding.modelId || '').trim() || null,
+        provider: String(binding.provider || '').trim() || null,
+        engine: String(binding.engine || '').trim() || null,
+        adapter: String(binding.adapter || '').trim() || null,
+        endpoint: String(binding.endpoint || '').trim() || null,
+        localModelId: String(binding.localModelId || '').trim() || null,
+        goRuntimeLocalModelId: String(binding.goRuntimeLocalModelId || '').trim() || null,
+        goRuntimeStatus: String(binding.goRuntimeStatus || '').trim() || null,
+    };
+}
+function createGenerateObjectRequestSummary(input: LocalChatAiTextRequest): LocalChatGenerateObjectRequestSummary {
+    return {
+        debugLabel: String(input.debugLabel || '').trim() || null,
+        promptChars: String(input.prompt || '').length,
+        systemPromptChars: String(input.systemPrompt || '').length,
+        promptPreview: createRawTextPreview(String(input.prompt || '')),
+        systemPromptPreview: createRawTextPreview(String(input.systemPrompt || '')),
+        maxTokens: normalizeNumber(input.maxTokens),
+        temperature: normalizeNumber(input.temperature),
+        timeoutMs: normalizeNumber(input.timeoutMs),
+        binding: summarizeRouteBinding(input.routeBinding),
+    };
+}
+function extractErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error || '');
+}
+function extractErrorCode(error: unknown): string | null {
+    if (error && typeof error === 'object' && 'code' in error) {
+        const code = String((error as { code?: unknown }).code || '').trim();
+        if (code) return code;
+    }
+    return null;
+}
+function extractErrorReasonCode(error: unknown): string {
+    if (error && typeof error === 'object' && 'reasonCode' in error) {
+        const direct = String((error as {
+            reasonCode?: unknown;
+        }).reasonCode || '').trim();
+        if (direct)
+            return direct;
+    }
+    return error instanceof Error ? error.message : String(error || '');
+}
+function extractErrorActionHint(error: unknown): string | null {
+    if (error && typeof error === 'object' && 'actionHint' in error) {
+        const direct = String((error as {
+            actionHint?: unknown;
+        }).actionHint || '').trim();
+        if (direct)
+            return direct;
+    }
+    return null;
+}
+function extractErrorTraceId(error: unknown): string | null {
+    if (error && typeof error === 'object' && 'traceId' in error) {
+        const direct = String((error as {
+            traceId?: unknown;
+        }).traceId || '').trim();
+        if (direct)
+            return direct;
+    }
+    return null;
+}
 function createGenerateObjectFailureError(input: {
     failureStage: Exclude<LocalChatGenerateObjectFailureStage, 'unknown'>;
     reasonCode: string;
+    actionHint?: string | null;
     traceId?: string | null;
+    finishReason?: LocalChatFinishReason | null;
     rawText?: string;
     error: unknown;
 }): LocalChatGenerateObjectFailureError {
@@ -337,7 +430,9 @@ function createGenerateObjectFailureError(input: {
     const rawText = String(input.rawText || '');
     wrapped.failureStage = input.failureStage;
     wrapped.reasonCode = String(input.reasonCode || wrapped.message);
+    wrapped.actionHint = String(input.actionHint || '').trim() || null;
     wrapped.traceId = String(input.traceId || '').trim() || null;
+    wrapped.finishReason = input.finishReason || null;
     wrapped.rawTextPreview = createRawTextPreview(rawText);
     wrapped.rawTextChars = rawText.length;
     wrapped.errorName = input.error instanceof Error ? input.error.name : null;
@@ -348,10 +443,13 @@ export function describeLocalChatGenerateObjectFailure(error: unknown): LocalCha
         const record = error as Record<string, unknown>;
         const failureStage = record.failureStage;
         if (failureStage === 'call' || failureStage === 'parse' || failureStage === 'unknown') {
+            const finishReason = String(record.finishReason || '').trim();
             return {
                 failureStage,
                 reasonCode: String(record.reasonCode || (error instanceof Error ? error.message : 'UNKNOWN_ERROR')),
+                actionHint: String(record.actionHint || '').trim() || null,
                 traceId: String(record.traceId || '').trim() || null,
+                finishReason: finishReason ? finishReason as LocalChatFinishReason : null,
                 rawTextPreview: String(record.rawTextPreview || '').trim() || null,
                 rawTextChars: Number.isFinite(Number(record.rawTextChars)) ? Math.max(0, Number(record.rawTextChars)) : 0,
                 errorName: String(record.errorName || (error instanceof Error ? error.name : '')).trim() || null,
@@ -361,7 +459,9 @@ export function describeLocalChatGenerateObjectFailure(error: unknown): LocalCha
     return {
         failureStage: 'unknown',
         reasonCode: error instanceof Error ? error.message : String(error || 'UNKNOWN_ERROR'),
+        actionHint: null,
         traceId: null,
+        finishReason: null,
         rawTextPreview: null,
         rawTextChars: 0,
         errorName: error instanceof Error ? error.name : null,
@@ -409,6 +509,37 @@ function concatBytes(parts: Uint8Array[]): Uint8Array {
     }
     return merged;
 }
+function emitGenerateObjectDiagnostic(options: {
+    level: 'info' | 'warn' | 'error';
+    phase: 'request' | 'response' | 'call-failed' | 'parse-failed';
+    summary: LocalChatGenerateObjectRequestSummary;
+    details?: Record<string, unknown>;
+}): void {
+    const { level, phase, summary, details } = options;
+    const consoleMethod = level === 'error'
+        ? console.error
+        : level === 'warn'
+            ? console.warn
+            : console.info;
+    const mergedDetails = {
+        debugLabel: summary.debugLabel,
+        promptChars: summary.promptChars,
+        systemPromptChars: summary.systemPromptChars,
+        promptPreview: summary.promptPreview,
+        systemPromptPreview: summary.systemPromptPreview,
+        maxTokens: summary.maxTokens,
+        temperature: summary.temperature,
+        timeoutMs: summary.timeoutMs,
+        binding: summary.binding,
+        ...(details || {}),
+    };
+    consoleMethod(`[local-chat:ai] generateObject:${phase}`, mergedDetails);
+    emitLocalChatLog({
+        level,
+        message: `local-chat:ai-generate-object:${phase}`,
+        details: mergedDetails,
+    });
+}
 export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalChatAiClient {
     const resolveRoute: LocalChatAiClient['resolveRoute'] = async (input) => {
         const binding = input?.routeBinding;
@@ -448,6 +579,12 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
         },
         generateObject: async (input) => {
             const parser = input.parse || parseJsonObject;
+            const requestSummary = createGenerateObjectRequestSummary(input);
+            emitGenerateObjectDiagnostic({
+                level: 'info',
+                phase: 'request',
+                summary: requestSummary,
+            });
             let textResult;
             try {
                 textResult = await runtimeClient.ai.text.generate({
@@ -460,23 +597,66 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
                 });
             }
             catch (error) {
+                emitGenerateObjectDiagnostic({
+                    level: 'error',
+                    phase: 'call-failed',
+                    summary: requestSummary,
+                    details: {
+                        error: extractErrorMessage(error),
+                        errorName: error instanceof Error ? error.name : null,
+                        errorCode: extractErrorCode(error),
+                        reasonCode: extractErrorReasonCode(error) || 'LOCAL_CHAT_AI_GENERATE_OBJECT_CALL_FAILED',
+                        actionHint: extractErrorActionHint(error),
+                        traceId: extractErrorTraceId(error),
+                    },
+                });
                 throw createGenerateObjectFailureError({
                     failureStage: 'call',
-                    reasonCode: error instanceof Error ? error.message : String(error || 'LOCAL_CHAT_AI_GENERATE_OBJECT_CALL_FAILED'),
+                    reasonCode: extractErrorReasonCode(error) || 'LOCAL_CHAT_AI_GENERATE_OBJECT_CALL_FAILED',
+                    actionHint: extractErrorActionHint(error),
+                    traceId: extractErrorTraceId(error),
                     error,
                 });
             }
             const text = String(textResult.text || '');
             const traceId = String(textResult.trace?.traceId || '').trim();
+            const finishReasonRaw = String(textResult.finishReason || '').trim();
+            const finishReason = finishReasonRaw ? finishReasonRaw as LocalChatFinishReason : null;
+            emitGenerateObjectDiagnostic({
+                level: 'info',
+                phase: 'response',
+                summary: requestSummary,
+                details: {
+                    traceId: traceId || null,
+                    finishReason,
+                    rawTextChars: text.length,
+                    rawTextPreview: createRawTextPreview(text),
+                },
+            });
             let object: Record<string, unknown>;
             try {
                 object = parser(text);
             }
             catch (error) {
+                emitGenerateObjectDiagnostic({
+                    level: 'error',
+                    phase: 'parse-failed',
+                    summary: requestSummary,
+                    details: {
+                        error: extractErrorMessage(error),
+                        errorName: error instanceof Error ? error.name : null,
+                        traceId: traceId || null,
+                        finishReason,
+                        rawTextChars: text.length,
+                        rawTextPreview: createRawTextPreview(text),
+                        rawText: text,
+                    },
+                });
                 throw createGenerateObjectFailureError({
                     failureStage: 'parse',
                     reasonCode: error instanceof Error ? error.message : String(error || 'LOCAL_CHAT_AI_GENERATE_OBJECT_PARSE_FAILED'),
                     traceId,
+                    finishReason,
                     rawText: text,
                     error,
                 });
@@ -614,6 +794,16 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
                             && 'reasonCode' in error) ? String((error as {
                             reasonCode?: unknown;
                         }).reasonCode || '') : '',
+                        actionHint: (error
+                            && typeof error === 'object'
+                            && 'actionHint' in error) ? String((error as {
+                            actionHint?: unknown;
+                        }).actionHint || '') : '',
+                        traceId: (error
+                            && typeof error === 'object'
+                            && 'traceId' in error) ? String((error as {
+                            traceId?: unknown;
+                        }).traceId || '') : '',
                     },
                 });
                 throw error;
@@ -682,6 +872,16 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
                             && 'reasonCode' in error) ? String((error as {
                             reasonCode?: unknown;
                         }).reasonCode || '') : '',
+                        actionHint: (error
+                            && typeof error === 'object'
+                            && 'actionHint' in error) ? String((error as {
+                            actionHint?: unknown;
+                        }).actionHint || '') : '',
+                        traceId: (error
+                            && typeof error === 'object'
+                            && 'traceId' in error) ? String((error as {
+                            traceId?: unknown;
+                        }).traceId || '') : '',
                     },
                 });
                 throw error;

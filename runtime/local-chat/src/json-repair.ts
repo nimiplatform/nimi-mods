@@ -21,18 +21,21 @@ export function extractJsonFromText(text: string): string {
  * - Raw control chars inside strings: escape them
  * - Unterminated strings: close them
  * - Unclosed arrays/objects: close them
+ * - Missing colon between object key and value
  * - Unquoted object keys: quote them
  * - Bare string values after colon: quote them
  * - Trailing commas before } or ]
  */
 export function repairJson(text: string): string {
-    let json = text;
-    json = sanitizeJsonStringLiterals(json);
-    json = balanceJsonContainers(json);
-    json = quoteBareJsonKeys(json);
-    json = quoteBareJsonValues(json);
-    json = json.replace(/,\s*([}\]])/g, '$1');
-    return json;
+  let json = text;
+  json = sanitizeJsonStringLiterals(json);
+  json = balanceJsonContainers(json);
+  json = insertMissingJsonKeySeparators(json);
+  json = quoteBareJsonKeys(json);
+  json = insertMissingJsonKeySeparators(json);
+  json = quoteBareJsonValues(json);
+  json = json.replace(/,\s*([}\]])/g, '$1');
+  return json;
 }
 export function sanitizeJsonStringLiterals(text: string): string {
     let sanitized = '';
@@ -145,12 +148,18 @@ export function balanceJsonContainers(text: string): string {
     return json;
 }
 export function quoteBareJsonKeys(text: string): string {
-    return text.replace(/([{,]\s*)([^"{\[\]},:\s][^:{},\[\]]*?)(\s*:)/g, (_match, prefix: string, key: string, suffix: string) => `${prefix}${JSON.stringify(String(key || '').trim())}${suffix}`);
+  return text.replace(/([{,]\s*)([^"{\[\]},:\s][^:{},\[\]]*?)(\s*:)/g, (_match, prefix: string, key: string, suffix: string) => `${prefix}${JSON.stringify(String(key || '').trim())}${suffix}`);
+}
+export function insertMissingJsonKeySeparators(text: string): string {
+  return text.replace(
+    /([{,]\s*(?:"(?:\\.|[^"\\])*"|[A-Za-z_\u00C0-\uFFFF][\w\-\u00C0-\uFFFF]*))(\s+)(?=(?:"|[{[]|-?\d|true\b|false\b|null\b|[A-Za-z_\u00C0-\uFFFF]))/gu,
+    (_match, property, whitespace) => `${property}:${whitespace}`,
+  );
 }
 export function quoteBareJsonValues(text: string): string {
-    return text.replace(/(:\s*)([^"{\[\]},\s][^,\]}]*)(?=\s*[,}\]])/g, (_match, prefix: string, rawValue: string) => {
-        const value = String(rawValue || '').trim();
-        if (!value) {
+  return text.replace(/(:\s*)([^"{\[\]},\s][^,\]}]*)(?=\s*[,}\]])/g, (_match, prefix: string, rawValue: string) => {
+    const value = String(rawValue || '').trim();
+    if (!value) {
             return prefix;
         }
         if (/^(?:true|false|null)$/u.test(value)) {

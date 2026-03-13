@@ -210,6 +210,18 @@ cases:
     reason_code: LOCAL_CHAT_CONTEXT_ASSEMBLE_OK
     test_reference: local-chat-context-assembler.test.ts
     source_rule: LC-ACC-002
+  - id: LC-037-MEDIA-CONTINUITY-SUMMARY
+    description: Ready/blocked/failed media turns persist concise continuity summary and must not write raw mediaPrompt back into continuity fields.
+    expected_ok: true
+    reason_code: LOCAL_CHAT_MEDIA_DELIVERY_OK
+    test_reference: local-chat-media-delivery-lifecycle.test.mjs
+    source_rule: LC-ACC-002
+  - id: LC-038-PERCEPTION-CONTEXT-BUDGET
+    description: Oversized recent media history must be compacted into a budgeted perception context that stays under the hard ceiling while preserving explicit media/voice intent cues.
+    expected_ok: true
+    reason_code: LOCAL_CHAT_CONTEXT_ASSEMBLE_OK
+    test_reference: local-chat-turn-perception.test.ts
+    source_rule: LC-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:local-chat-kernel-docs
     source_rule: LC-ACC-001

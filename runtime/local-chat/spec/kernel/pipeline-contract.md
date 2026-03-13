@@ -111,6 +111,8 @@ Send path must compile prompt context by profile:
 7. unresolved `openLoops / assistantCommitments / stable userPrefs` must receive continuity-aware priority during relation-memory selection for full-turn context
 8. prompt-injected `sessionRecall` must be a continuity-aware top-K subset, not a full dump of the stored recall index
 9. if the current user turn has already been persisted before prompt compile, `recentTurns` must not repeat that same input when `userInput` already carries it explicitly
+10. `turn-perception` must consume a budgeted compact continuity view; it must not inject raw media generation prompts back into perception context
+11. perception-side `recentTurns / relationMemory / snapshot` lanes must enforce stable per-lane budgets and a final hard ceiling before provider invocation
 
 ## LC-PIPE-012 Turn Bundle Persistence Pipeline
 
@@ -121,6 +123,7 @@ Session truth source must persist logical conversation bundles:
 3. each assistant turn persists as a single `assistant` bundle with ordered beats/segments
 4. assistant `text / voice / image / video` all attach to the same bundle when they belong to the same turn
 5. `pending` media must not enter continuity; `ready / blocked / failed` media must attach back to the assistant bundle
+6. persisted `ready / blocked / failed` image/video beats must write concise continuity summary into `contextText / semanticSummary`; raw `mediaPrompt` may remain in beat metadata for diagnostics, but must not be written back into continuity fields
 
 ## LC-PIPE-013 Interaction Snapshot Pipeline
 

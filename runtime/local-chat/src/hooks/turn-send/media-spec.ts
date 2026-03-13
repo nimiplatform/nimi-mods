@@ -138,8 +138,9 @@ function summarizeHints(hints: LocalChatMediaHints | undefined): string[] {
 }
 
 const SQUARE_IMAGE_CUE_RE = /(?:avatar|profile|selfie|icon|头像|大头照|自拍|证件照)/i;
-const LANDSCAPE_IMAGE_CUE_RE = /(?:landscape|wide(?:\s+shot)?|panorama|wallpaper|establishing\s+shot|horizon|横构图|横向|全景|远景|宽幅|壁纸|海边|街景|天际线)/i;
+const LANDSCAPE_IMAGE_CUE_RE = /(?:landscape|wide(?:\s+shot)?|panorama|wallpaper|establishing\s+shot|horizon|mountain|sky|cloud|cloudscape|forest|sea|ocean|lake|waterfall|canyon|valley|横构图|横向|全景|远景|宽幅|壁纸|海边|街景|天际线|山景|群山|山峦|山峰|天空|白云|云海|云雾|森林|海景|湖景|瀑布|峡谷|山谷)/i;
 const PORTRAIT_IMAGE_CUE_RE = /(?:portrait|close-?up|half-?body|full-?body|vertical|fashion\s+shot|竖构图|纵向|人像|特写|半身|全身|站姿|近景)/i;
+const NO_PEOPLE_NEGATIVE_CUE_RE = /(?:不要出现人物|不要人像|不要自拍|不要面部特写|no people|no portrait|no selfie|no face close-up)/i;
 const LONG_VIDEO_CUE_RE = /(?:walk|turn(?:\s+around)?|spin|dance|approach|reach|camera|tracking|follow|pan|zoom|sequence|转身|走向|走到|走过|迈步|舞动|抬手|镜头|跟拍|推进|拉远|片段|过程)/i;
 const SHORT_VIDEO_CUE_RE = /(?:blink|glance|smile|nod|breath|loop|idle|一瞬|眨眼|回眸|微笑|点头|轻轻一笑|短循环|轻晃)/i;
 const TRACKING_VIDEO_CUE_RE = /(?:tracking|follow|跟拍|追拍|跟随|随着)/i;
@@ -163,7 +164,6 @@ function collectMediaIntentDescriptors(input: {
     normalizeOptionalString(input.styleIntent),
     normalizeOptionalString(input.mood),
     normalizeOptionalString(input.hints?.composition),
-    ...(normalizeSortedStringList(input.hints?.negativeCues) || []),
     ...(normalizeSortedStringList(input.hints?.continuityRefs) || []),
   ].filter(Boolean).join('\n');
 }
@@ -237,6 +237,11 @@ function buildNegativePrompt(hints: LocalChatMediaHints | undefined): string | u
     return undefined;
   }
   return negativeCues.join(', ');
+}
+
+function isEnvironmentOnlySpec(spec: LocalChatMediaGenerationSpec): boolean {
+  const negativeCues = normalizeSortedStringList(spec.hints?.negativeCues) || [];
+  return negativeCues.some((cue) => NO_PEOPLE_NEGATIVE_CUE_RE.test(cue));
 }
 
 function inferImageStyle(styleIntent: string): string | undefined {
@@ -329,15 +334,20 @@ export function buildMediaGenerationSpec(input: {
 export function compileMediaExecution(
   spec: LocalChatMediaGenerationSpec,
 ): LocalChatCompiledMediaExecution {
+  const environmentOnly = isEnvironmentOnlySpec(spec);
   const lines = [
-    spec.kind === 'image'
-      ? '请生成一张延续当前聊天场景、保持同一角色稳定外观的图像。'
-      : '请生成一段延续当前聊天场景、保持同一角色稳定外观的短视频。',
+    environmentOnly
+      ? (spec.kind === 'image'
+        ? '请生成一张延续当前聊天场景的环境图像，重点表现用户请求的风景与天气，不要出现人物。'
+        : '请生成一段延续当前聊天场景的环境短视频，重点表现用户请求的风景与天气，不要出现人物。')
+      : (spec.kind === 'image'
+        ? '请生成一张延续当前聊天场景、保持同一角色稳定外观的图像。'
+        : '请生成一段延续当前聊天场景、保持同一角色稳定外观的短视频。'),
     `主体: ${spec.subject}`,
     `场景: ${spec.scene}`,
     `风格: ${spec.styleIntent}`,
     `情绪: ${spec.mood}`,
-    spec.hints?.continuityRefs?.length ? '要求: 不要换成另一位角色，保持外观、穿搭和氛围连续。' : '',
+    !environmentOnly && spec.hints?.continuityRefs?.length ? '要求: 不要换成另一位角色，保持外观、穿搭和氛围连续。' : '',
     ...summarizeHints(spec.hints),
   ].filter(Boolean);
   const compiledPromptText = lines.join('\n').trim();

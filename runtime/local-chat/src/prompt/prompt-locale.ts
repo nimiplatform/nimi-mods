@@ -514,6 +514,10 @@ intimacyCeiling rules:
     zh: '重要提醒：上一次你的输出不是合法 JSON，导致解析失败。这一次请严格只输出一个 JSON 对象，不要有任何其它文字、不要 markdown 代码块包裹、不要解释。以 { 开头，以 } 结尾。',
     en: 'Important: your previous output was not valid JSON and caused a parse failure. This time, strictly output a single JSON object only, no other text, no markdown code blocks, no explanations. Start with { and end with }.',
   },
+  'composer.retryReminderLength': {
+    zh: '重要提醒：上一次你的输出因为长度限制被截断了。这一次请输出更紧凑的合法 JSON，减少不必要的铺陈，但仍保持自然的多拍结构。不要有任何额外文字。以 { 开头，以 } 结尾。',
+    en: 'Important: your previous output was truncated by a length limit. This time, produce a tighter valid JSON object, reduce unnecessary elaboration, but still keep a natural multi-beat structure. No extra text. Start with { and end with }.',
+  },
   'composer.fieldExplain': {
     zh: '字段说明：',
     en: 'Field descriptions:',
@@ -714,6 +718,14 @@ intimacyCeiling rules:
     zh: '当前状态像正在对着镜头自然回应用户的一小段画面',
     en: 'Current state: a short clip of her naturally responding to the camera',
   },
+  'enricher.imageEnvironmentSubjectFallback': {
+    zh: '环境主体：山景、天空、云层或其他被请求的风景元素，不出现人物',
+    en: 'Environment subject: mountains, sky, clouds, or other requested scenery elements, with no people',
+  },
+  'enricher.videoEnvironmentSubjectFallback': {
+    zh: '环境主体：空间、天气与景观本身，不出现人物',
+    en: 'Environment subject: space, weather, and scenery itself, with no people',
+  },
   'enricher.expandAround': {
     zh: '围绕"{detail}"展开',
     en: 'Expand around "{detail}"',
@@ -730,6 +742,14 @@ intimacyCeiling rules:
     zh: '像她顺手录来的一小段自然短视频',
     en: 'Like a short natural video she casually recorded',
   },
+  'enricher.imageEnvironmentSceneFallback': {
+    zh: '以环境本身为主，突出风景、天气、云层和空间纵深，不要人物入镜',
+    en: 'Focus on the environment itself, emphasizing scenery, weather, clouds, and depth, with no people in frame',
+  },
+  'enricher.videoEnvironmentSceneFallback': {
+    zh: '以环境变化和空间氛围为主，像一段纯景别短视频，不要人物入镜',
+    en: 'Focus on environmental motion and atmosphere like a pure scenic clip, with no people in frame',
+  },
   'enricher.imageStyleFallback': {
     zh: '自然写实、生活流、高质量私聊照片质感',
     en: 'Natural, realistic, lifestyle, high-quality private chat photo feel',
@@ -737,6 +757,14 @@ intimacyCeiling rules:
   'enricher.videoStyleFallback': {
     zh: '自然写实、生活流、短视频质感，动作和表情要连贯',
     en: 'Natural, realistic, lifestyle, short video feel with smooth actions and expressions',
+  },
+  'enricher.imageEnvironmentStyleFallback': {
+    zh: '自然写实、风景摄影质感、强调空气感和空间层次',
+    en: 'Natural, realistic, scenic photography feel with atmosphere and spatial depth',
+  },
+  'enricher.videoEnvironmentStyleFallback': {
+    zh: '自然写实、环境叙事、镜头克制，突出天气与空间流动',
+    en: 'Natural, realistic, environment-driven storytelling with restrained camera movement',
   },
   'enricher.imageCompositionFallback': {
     zh: '主体清楚，镜头自然，像高质量但不摆拍的聊天照片',
@@ -746,6 +774,14 @@ intimacyCeiling rules:
     zh: '人物为主，动作自然，镜头稳定，像聊天里顺手录的一小段',
     en: 'Person-focused, natural movement, stable camera, like a casually recorded chat clip',
   },
+  'enricher.imageEnvironmentCompositionFallback': {
+    zh: '横构图或宽幅远景，优先表现山体、天空、云层和空间纵深',
+    en: 'Wide landscape framing that prioritizes mountains, sky, clouds, and spatial depth',
+  },
+  'enricher.videoEnvironmentCompositionFallback': {
+    zh: '环境全景或远景，镜头平稳缓慢，不要人物入镜',
+    en: 'Wide scenic framing with steady, slow camera movement and no people in frame',
+  },
   'enricher.imageNegCues': {
     zh: '多余人物|手部崩坏|过度磨皮|服装漂移|脸部失真',
     en: 'extra people|hand artifacts|over-smoothing|clothing drift|face distortion',
@@ -753,6 +789,10 @@ intimacyCeiling rules:
   'enricher.videoNegCues': {
     zh: '多余人物|动作突变|镜头乱晃|人物漂移|表情抽动',
     en: 'extra people|motion jumps|shaky camera|person drift|expression glitch',
+  },
+  'enricher.environmentNegCues': {
+    zh: '不要出现人物|不要人像|不要自拍|不要面部特写',
+    en: 'no people|no portrait|no selfie|no face close-up',
   },
   'enricher.continuityMediaPrefix': {
     zh: '延续最近媒体: {summary}',

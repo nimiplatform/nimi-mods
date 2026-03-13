@@ -571,3 +571,60 @@ test('first-beat prompt profile excludes warm-start and session recall while kee
   assert.equal(firstBeatCompiled.layerOrder.includes('platformWarmStart'), false);
   assert.equal(firstBeatCompiled.layerOrder.includes('sessionRecall'), false);
 });
+
+test('context assembler keeps media continuity summary without leaking raw media prompt back into recent turns', async () => {
+  await resetLocalChatConversationLedgerForTests();
+  const target = createTarget();
+  const session = await createLocalChatSession({
+    targetId: target.id,
+    viewerId: 'viewer.test',
+    worldId: target.worldId,
+    title: 'Aki',
+  });
+
+  const rawMediaPrompt = `RAW_MEDIA_PROMPT_MARKER:${'云海山风'.repeat(120)}`;
+  await appendTurnsToSession(session.id, [
+    {
+      id: 'turn-image-1',
+      turnId: 'turn-image-1',
+      turnSeq: 1,
+      beatIndex: 0,
+      beatCount: 1,
+      role: 'assistant',
+      kind: 'image',
+      content: '',
+      contextText: '[image] 灵界访客, 云海山巅 (温柔)',
+      semanticSummary: '[image] 灵界访客, 云海山巅 (温柔)',
+      timestamp: '2026-03-07T10:00:00.000Z',
+      meta: {
+        mediaStatus: 'ready',
+        mediaPrompt: rawMediaPrompt,
+      },
+    },
+  ]);
+
+  const packet = await assembleLocalChatContextPacket({
+    text: '我还想再看看你刚才那张图。',
+    viewerId: 'viewer.test',
+    viewerDisplayName: 'Viewer',
+    selectedTarget: target,
+    selectedSessionId: session.id,
+    allowMultiReply: true,
+    turnMode: 'explicit-media',
+    voiceConversationMode: 'off',
+  });
+  const compiled = buildLocalChatCompiledPrompt({
+    contextPacket: packet,
+  });
+
+  assert.equal(
+    packet.recentTurns.some((turn) => turn.lines.join(' ').includes('[image] 灵界访客, 云海山巅 (温柔)')),
+    true,
+  );
+  assert.equal(
+    packet.recentTurns.some((turn) => turn.lines.join(' ').includes('RAW_MEDIA_PROMPT_MARKER')),
+    false,
+  );
+  assert.equal(compiled.prompt.includes('[image] 灵界访客, 云海山巅 (温柔)'), true);
+  assert.equal(compiled.prompt.includes('RAW_MEDIA_PROMPT_MARKER'), false);
+});

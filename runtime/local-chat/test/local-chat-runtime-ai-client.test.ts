@@ -215,15 +215,44 @@ test('local-chat runtime ai client: generateObject repairs broken strings with r
         routeBinding: createBinding(),
     });
     const beats = result.object.beats as Array<Record<string, unknown>>;
+  assert.equal(beats.length, 1);
+  assert.equal(String(beats[0]?.text || '').includes('再慢慢说'), true);
+});
+test('local-chat runtime ai client: generateObject repairs missing colon between key and value', async () => {
+    const runtimeClient = {
+        route: {
+            resolve: async () => createResolvedRoute(),
+        },
+        ai: {
+            text: {
+                generate: async () => ({
+                    text: '{"beats":[{"text":"嗨，我刚随手拍了一张，你瞧瞧。","pauseMs":1200,"assetRequest" "image"}]}',
+                    trace: {
+                        traceId: 'trace-broken-json-4',
+                    },
+                }),
+            },
+        },
+    } as unknown as ModRuntimeClient;
+    const aiClient = createLocalChatAiClient(runtimeClient);
+    const result = await aiClient.generateObject({
+        prompt: 'repair missing colon',
+        routeBinding: createBinding(),
+    });
+    const beats = result.object.beats as Array<Record<string, unknown>>;
     assert.equal(beats.length, 1);
-    assert.equal(String(beats[0]?.text || '').includes('再慢慢说'), true);
+    assert.equal(beats[0]?.assetRequest, 'image');
 });
 test('local-chat runtime ai client: generateObject exposes call failure metadata', async () => {
     const runtimeClient = {
         ai: {
             text: {
                 generate: async () => {
-                    throw new Error('AI_PROVIDER_TIMEOUT');
+                    const error = new Error('provider request failed') as Error & Record<string, unknown>;
+                    error.reasonCode = 'AI_INPUT_INVALID';
+                    error.actionHint = 'check_input_and_extensions';
+                    error.traceId = 'trace-call-failed';
+                    throw error;
                 },
             },
         },
@@ -243,8 +272,10 @@ test('local-chat runtime ai client: generateObject exposes call failure metadata
         }
     }, /LOCAL_CHAT_AI_GENERATE_OBJECT_CALL_FAILED/);
     assert.equal(failure?.failureStage, 'call');
-    assert.equal(failure?.reasonCode, 'AI_PROVIDER_TIMEOUT');
-    assert.equal(failure?.traceId, null);
+    assert.equal(failure?.reasonCode, 'AI_INPUT_INVALID');
+    assert.equal(failure?.actionHint, 'check_input_and_extensions');
+    assert.equal(failure?.traceId, 'trace-call-failed');
+    assert.equal(failure?.finishReason, null);
     assert.equal(failure?.rawTextPreview, null);
     assert.equal(failure?.rawTextChars, 0);
 });
@@ -254,6 +285,7 @@ test('local-chat runtime ai client: generateObject exposes parse failure metadat
             text: {
                 generate: async () => ({
                     text: '先随便说一句，再给你 JSON',
+                    finishReason: 'length',
                     trace: {
                         traceId: 'trace-invalid-json',
                     },
@@ -280,7 +312,9 @@ test('local-chat runtime ai client: generateObject exposes parse failure metadat
     }, /LOCAL_CHAT_AI_GENERATE_OBJECT_PARSE_FAILED/);
     assert.equal(failure?.failureStage, 'parse');
     assert.equal(failure?.reasonCode, 'LOCAL_CHAT_AI_GENERATE_OBJECT_INVALID_JSON_OBJECT');
+    assert.equal(failure?.actionHint, null);
     assert.equal(failure?.traceId, 'trace-invalid-json');
+    assert.equal(failure?.finishReason, 'length');
     assert.equal(failure?.rawTextPreview, '先随便说一句，再给你 JSON');
     assert.equal(failure?.rawTextChars, '先随便说一句，再给你 JSON'.length);
 });

@@ -66,7 +66,30 @@ const ASSISTANT_OFFER_SIGNAL_RE = /\b(?:i(?:'ll| will)|let me|want me to|i can|h
 const VISUAL_SCENE_SIGNAL_RE = /\b(?:frame|portrait|photo|image|light|lighting|color|dress|street|rain|beach|room|window|night|sunset|cinematic|close-up|wide shot|selfie)\b|(?:画面|镜头|样子|神情|表情|穿着|光影|灯光|夜色|海边|房间|窗边|雨夜|照片|图片|身影|背影|颜色|氛围|构图|电影感|特写|远景|自拍)/i;
 const VIDEO_MOTION_SIGNAL_RE = /\b(?:walk|turn(?:\s+around)?|move|moving|spin|dance|approach|reach|camera|tracking|follow|pan|zoom|motion|sequence|clip|blink|glance|smile|nod|loop)\b|(?:走|转身|移动|舞动|迈步|靠近|抬手|镜头|跟拍|推进|拉远|动态|片段|过程|眨眼|回眸|微笑|点头|短循环)/i;
 const GENERIC_MEDIA_DESCRIPTOR_RE = /^(?:当前对话中的主体|贴合当前对话语境|自然、精致、贴合陪伴式对话|贴合当前交流氛围|自然|普通问候场景|generic greeting|scene fits image|visual scene)$/i;
-export function normalizeMediaDependencyStatus(snapshot: ModRuntimeDependencySnapshot | null): MediaDependencyStatus {
+function resolveEffectiveMediaRouteSource(input: {
+    kind: 'image' | 'video';
+    settings: LocalChatDefaultSettings;
+    fallbackRouteSource: MediaRouteSource;
+    resolvedRoute?: LocalChatResolvedMediaRoute | null;
+}): MediaRouteSource {
+    const resolvedSource = input.resolvedRoute?.source;
+    if (resolvedSource === 'local' || resolvedSource === 'cloud') {
+        return resolvedSource;
+    }
+    return resolveConfiguredMediaRouteSource({
+        kind: input.kind,
+        settings: input.settings,
+        fallbackRouteSource: input.fallbackRouteSource,
+    });
+}
+export function normalizeMediaDependencyStatus(input: {
+    snapshot: ModRuntimeDependencySnapshot | null;
+    routeSource: MediaRouteSource;
+}): MediaDependencyStatus {
+    if (input.routeSource === 'cloud') {
+        return 'ready';
+    }
+    const snapshot = input.snapshot;
     if (!snapshot)
         return 'unknown';
     if (snapshot.status === 'ready')
@@ -77,8 +100,14 @@ export function normalizeMediaDependencyStatus(snapshot: ModRuntimeDependencySna
         return 'degraded';
     return 'unknown';
 }
-export function isMediaDependencyReady(snapshot: ModRuntimeDependencySnapshot | null): boolean {
-    return snapshot?.status === 'ready';
+export function isMediaDependencyReady(input: {
+    snapshot: ModRuntimeDependencySnapshot | null;
+    routeSource: MediaRouteSource;
+}): boolean {
+    if (input.routeSource === 'cloud') {
+        return true;
+    }
+    return input.snapshot?.status === 'ready';
 }
 function resolveConfiguredMediaRouteSource(input: {
     kind: 'image' | 'video';
@@ -583,10 +612,34 @@ export async function decideMediaExecution(input: DecideMediaExecutionInput): Pr
             videoRouteReady = true;
         }
     }
-    const imageDependencyStatus = normalizeMediaDependencyStatus(input.imageDependencySnapshot);
-    const videoDependencyStatus = normalizeMediaDependencyStatus(input.videoDependencySnapshot);
-    const imageDependencyReady = isMediaDependencyReady(input.imageDependencySnapshot);
-    const videoDependencyReady = isMediaDependencyReady(input.videoDependencySnapshot);
+    const imageDependencyRouteSource = resolveEffectiveMediaRouteSource({
+        kind: 'image',
+        settings: input.defaultSettings,
+        fallbackRouteSource: input.fallbackRouteSource,
+        resolvedRoute: imageResolvedRoute,
+    });
+    const videoDependencyRouteSource = resolveEffectiveMediaRouteSource({
+        kind: 'video',
+        settings: input.defaultSettings,
+        fallbackRouteSource: input.fallbackRouteSource,
+        resolvedRoute: videoResolvedRoute,
+    });
+    const imageDependencyStatus = normalizeMediaDependencyStatus({
+        snapshot: input.imageDependencySnapshot,
+        routeSource: imageDependencyRouteSource,
+    });
+    const videoDependencyStatus = normalizeMediaDependencyStatus({
+        snapshot: input.videoDependencySnapshot,
+        routeSource: videoDependencyRouteSource,
+    });
+    const imageDependencyReady = isMediaDependencyReady({
+        snapshot: input.imageDependencySnapshot,
+        routeSource: imageDependencyRouteSource,
+    });
+    const videoDependencyReady = isMediaDependencyReady({
+        snapshot: input.videoDependencySnapshot,
+        routeSource: videoDependencyRouteSource,
+    });
     const explicitRequest = parseExplicitMediaRequest(input.userText);
     const recentMedia = summarizeRecentMedia(input.messages);
     const sceneLikelyNsfw = isPromptLikelyNsfw(`${input.userText}\n${input.assistantText}`);

@@ -14,6 +14,7 @@ import {
   waitForCondition,
   withLocalChatTestEnv,
 } from './helpers/local-chat-test-harness.ts';
+import { isPerceptionPrompt } from './helpers/prompt-matchers.mjs';
 
 function slotIncludesTerms(value: string, terms: string[]): boolean {
   return terms.every((term) => value.includes(term));
@@ -214,5 +215,110 @@ test('relation-memory override survives automatic slot regeneration on later tur
       viewerId: 'user.test',
     });
     assert.equal(slots.some((slot) => slot.id === preferenceSlot!.id && slot.userOverride === 'never-sync'), true);
+  });
+});
+
+test('send-flow keeps follow-up perception under budget even after a long media prompt turn', async () => {
+  const target = createTestTarget({
+    id: 'agent.local-chat.media-budget',
+    handle: '~media-budget',
+    displayName: 'Media Budget Bot',
+  });
+  await withLocalChatTestEnv({
+    targets: [target],
+  }, async () => {
+    const harness = createSendFlowHarness({
+      target,
+      defaultSettings: {
+        mediaAutonomy: 'explicit-only',
+        visualComfortLevel: 'natural-visuals',
+      },
+    });
+
+    const firstAi = createScriptedAiClient({
+      firstBeatText: '好，我给你找一张。',
+      perceptionResult: {
+        turnMode: 'explicit-media',
+        emotionalState: null,
+        relevantMemoryIds: [],
+        conversationDirective: null,
+        intimacyCeiling: 'warm',
+      },
+      planBeats: [
+        {
+          text: '先把这张递给你。',
+          intent: 'media',
+          relationMove: 'warm',
+          sceneMove: 'visual',
+          pauseMs: 420,
+          assetRequest: {
+            kind: 'image',
+            prompt: `RAW_MEDIA_PROMPT_MARKER:${'云海山风灵界夜色'.repeat(600)}`,
+          },
+        },
+      ],
+    });
+    const firstTurn = await harness.executeTurn({
+      userText: '我想看你的照片',
+      aiClient: firstAi.client,
+    });
+    const sessionId = firstTurn.sessionId;
+    assert.equal(firstTurn.messages.some((message) => message.kind === 'image'), true);
+
+    const secondBaseAi = createScriptedAiClient({
+      firstBeatText: '那我再给你一张。',
+      planBeats: [
+        {
+          text: '这一张会更近一些。',
+          intent: 'media',
+          relationMove: 'warm',
+          sceneMove: 'visual',
+          pauseMs: 360,
+          assetRequest: {
+            kind: 'image',
+            prompt: 'portrait by the night harbor',
+          },
+        },
+      ],
+    });
+    let perceptionPromptChars = 0;
+    const secondAi = {
+      ...secondBaseAi.client,
+      async generateObject(payload: Record<string, unknown>) {
+        if (isPerceptionPrompt(payload)) {
+          const prompt = String(payload.prompt || '');
+          perceptionPromptChars = prompt.length;
+          const object = {
+            turnMode: 'explicit-media',
+            emotionalState: null,
+            relevantMemoryIds: [],
+            conversationDirective: null,
+            intimacyCeiling: 'warm',
+          };
+          return {
+            object,
+            text: JSON.stringify(object),
+            traceId: 'trace-perception-budget',
+            promptTraceId: 'trace-perception-budget',
+            route: {
+              source: 'local',
+              model: 'chat-model',
+              localModelId: 'chat-model',
+            },
+          };
+        }
+        return secondBaseAi.client.generateObject(payload as never);
+      },
+    };
+
+    const secondTurn = await harness.executeTurn({
+      userText: '我还想看你的照片',
+      selectedSessionId: sessionId,
+      aiClient: secondAi as never,
+    });
+
+    assert.ok(perceptionPromptChars > 0);
+    assert.ok(perceptionPromptChars <= 9000);
+    assert.equal(secondTurn.messages.some((message) => message.kind === 'image'), true);
   });
 });

@@ -42,6 +42,8 @@
 - `LC-DOM-031`: Desktop route shell must remain full-height and self-contained: target space, stage view, chat view, and overlay drawers MUST size against the host content viewport and keep scrolling inside their own panels instead of leaking to the page root.
 - `LC-DOM-032`: Settings and profile drawers are independent scroll surfaces; opening a drawer MUST NOT horizontally shift or vertically resize the underlying target, stage, or chat shell.
 - `LC-DOM-033`: Target-space landing shell is intentionally minimal: the desktop entry state shows only the bubble field surface, and does not require a top hero, search field, or settings control row.
+- `LC-DOM-034`: Media execution prompts are generation-layer internals, not continuity truth; Local-Chat continuity persists concise summaries of what media was requested or delivered.
+- `LC-DOM-035`: `turn-perception` is a lightweight judgment path; it must preserve current user intent while applying stable budgets to recentTurns, relationMemory, and snapshot context.
 
 ## 3. No Over-Design Guard
 

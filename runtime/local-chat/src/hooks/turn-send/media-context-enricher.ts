@@ -25,6 +25,12 @@ const INTIMATE_RE = /\b(?:kiss|nude|lingerie|sensual|flirt|bedroom)\b|(?:暧昧|
 const EMOTIONAL_RE = /难过|好累|很累|委屈|抱抱|安慰|辛苦|孤单|miss you|tired|comfort/iu;
 const EXCITED_RE = /哈哈|好耶|太好了|卧槽|真的耶|笑死|wow|omg|excited|yay/iu;
 const NIGHT_RE = /夜|深夜|雨夜|窗边|房间|床边|灯光|夜聊|rain|night|window|room|bed|lamp/iu;
+const ENVIRONMENT_ONLY_RE = /(?:landscape(?:\s+only)?|scenery(?:\s+only)?|environment(?:\s+only)?|panorama|mountain|sky|cloud|cloudscape|horizon|forest|sea|ocean|lake|waterfall|canyon|valley|sunset|sunrise|aurora|风景|景色|山景|群山|山峦|山峰|天空|白云|云海|云雾|海景|湖景|森林|草原|雪山|瀑布|峡谷|山谷|地平线|天际线|星空|日落|日出|极光)/iu;
+const CHARACTER_FOCUS_RE = /(?:selfie|portrait|close-?up|half-?body|full-?body|face|eyes|smile|hair|outfit|pose|appearance|character|自拍|人像|特写|半身|全身|脸|表情|眼神|发型|穿搭|样子|角色|入镜|出镜|看看你|看你|你的样子|你的照片|你的自拍|你本人|你站在|她站在)/iu;
+const NO_PEOPLE_RE = /(?:不(?:要|用).{0,4}(?:人物|人像|人|角色|脸)|不要出镜|不要入镜|无人|空镜|纯风景|只看风景|只看山|只看天空|只看云|不拍人|不带人|no people|without people|no person|landscape only|scenery only|environment only)/iu;
+const EXPLICIT_CHARACTER_REQUEST_RE = /(?:自拍|人像|人物|角色|肖像|头像|半身|全身|特写|看看你|看你|你的样子|你的照片|你的自拍|你本人|你出镜|你入镜|把你也拍进去|带上你|with you|show yourself|your selfie|portrait of you|include you|person in frame|character portrait)/iu;
+
+type MediaFraming = 'character' | 'environment' | 'mixed';
 
 type SignalRule = {
   pattern: RegExp;
@@ -175,6 +181,49 @@ function buildWorldHint(target: LocalChatTarget, locale: PromptLocale): string {
   ], '，', 80);
 }
 
+function resolveMediaFraming(input: {
+  semanticIntent: MediaIntent;
+  userText: string;
+  assistantText: string;
+}): MediaFraming {
+  const userDescriptor = stripRequestBoilerplate(input.userText);
+  const userForbidsPeople = NO_PEOPLE_RE.test(userDescriptor);
+  const userRequestsCharacter = EXPLICIT_CHARACTER_REQUEST_RE.test(userDescriptor);
+  const userRequestsEnvironment = ENVIRONMENT_ONLY_RE.test(userDescriptor);
+  if (userForbidsPeople) {
+    return 'environment';
+  }
+  if (userRequestsCharacter) {
+    return 'character';
+  }
+  if (userRequestsEnvironment) {
+    return 'environment';
+  }
+  const descriptor = [
+    userDescriptor,
+    stripRequestBoilerplate(input.assistantText),
+    input.semanticIntent.subject,
+    input.semanticIntent.scene,
+    input.semanticIntent.styleIntent,
+    input.semanticIntent.hints?.composition,
+  ].map((value) => asString(value)).filter(Boolean).join('\n');
+  if (!descriptor) {
+    return 'character';
+  }
+  if (NO_PEOPLE_RE.test(descriptor)) {
+    return 'environment';
+  }
+  const environmentFocused = ENVIRONMENT_ONLY_RE.test(descriptor);
+  const characterFocused = CHARACTER_FOCUS_RE.test(descriptor);
+  if (environmentFocused && !characterFocused) {
+    return 'environment';
+  }
+  if (environmentFocused && characterFocused) {
+    return 'mixed';
+  }
+  return 'character';
+}
+
 function collectRuleHints(rules: SignalRule[], source: string): string[] {
   return rules
     .filter((rule) => rule.pattern.test(source))
@@ -206,14 +255,41 @@ function inferMood(input: {
   return joinUnique(moods, '，', 140) || pt(locale, 'enricher.defaultMood');
 }
 
+function isCharacterBoundSubject(input: {
+  subject: string;
+  anchorSubject: string;
+}): boolean {
+  const normalizedSubject = asString(input.subject);
+  if (!normalizedSubject) {
+    return false;
+  }
+  const anchorLead = asString(input.anchorSubject).split(/[，,;；]/u)[0] || '';
+  if (anchorLead && normalizedSubject.includes(anchorLead)) {
+    return true;
+  }
+  return /(?:她|他|TA|ta|人物|角色|人像|自拍|肖像|portrait|selfie|person|woman|man|girl|boy)/iu.test(normalizedSubject);
+}
+
 function buildSubject(input: {
   kind: MediaIntent['kind'];
   semanticIntent: MediaIntent;
   contextSnapshot: MediaContextSnapshot;
+  framing: MediaFraming;
   promptLocale?: PromptLocale;
 }): string {
   const locale = input.promptLocale || 'en';
   const semanticSubject = asString(input.semanticIntent.subject);
+  if (input.framing === 'environment') {
+    return joinUnique([
+      isMeaningfulDescriptor(semanticSubject) && !isCharacterBoundSubject({
+        subject: semanticSubject,
+        anchorSubject: input.contextSnapshot.visualAnchor.subject,
+      }) ? semanticSubject : '',
+      input.kind === 'image'
+        ? pt(locale, 'enricher.imageEnvironmentSubjectFallback')
+        : pt(locale, 'enricher.videoEnvironmentSubjectFallback'),
+    ], '；', 260);
+  }
   const fallbackPose = input.kind === 'image'
     ? pt(locale, 'enricher.imageFallbackPose')
     : pt(locale, 'enricher.videoFallbackPose');
@@ -230,6 +306,7 @@ function buildScene(input: {
   userText: string;
   assistantText: string;
   contextSnapshot: MediaContextSnapshot;
+  framing: MediaFraming;
   promptLocale?: PromptLocale;
 }): string {
   const locale = input.promptLocale || 'en';
@@ -242,7 +319,7 @@ function buildScene(input: {
   if (requestDetail) {
     sceneParts.push(pt(locale, 'enricher.expandAround', { detail: compactText(requestDetail, 84) }));
   }
-  if (input.contextSnapshot.recentTurnSummary !== '-') {
+  if (input.framing !== 'environment' && input.contextSnapshot.recentTurnSummary !== '-') {
     sceneParts.push(pt(locale, 'enricher.continuityLine', { summary: input.contextSnapshot.recentTurnSummary }));
   }
   const worldHint = buildWorldHint(input.target, locale);
@@ -250,9 +327,13 @@ function buildScene(input: {
     sceneParts.push(worldHint);
   }
   sceneParts.push(
-    input.kind === 'image'
-      ? pt(locale, 'enricher.imageSceneFallback')
-      : pt(locale, 'enricher.videoSceneFallback'),
+    input.framing === 'environment'
+      ? (input.kind === 'image'
+        ? pt(locale, 'enricher.imageEnvironmentSceneFallback')
+        : pt(locale, 'enricher.videoEnvironmentSceneFallback'))
+      : (input.kind === 'image'
+        ? pt(locale, 'enricher.imageSceneFallback')
+        : pt(locale, 'enricher.videoSceneFallback')),
   );
   return joinUnique(sceneParts, '；', 320);
 }
@@ -262,6 +343,7 @@ function buildStyleIntent(input: {
   semanticIntent: MediaIntent;
   cueSource: string;
   contextSnapshot: MediaContextSnapshot;
+  framing: MediaFraming;
   promptLocale?: PromptLocale;
 }): string {
   const locale = input.promptLocale || 'en';
@@ -270,12 +352,18 @@ function buildStyleIntent(input: {
   if (isMeaningfulDescriptor(semanticStyle)) {
     styleParts.push(semanticStyle);
   }
-  styleParts.push(...input.contextSnapshot.visualAnchor.styleHints);
+  if (input.framing !== 'environment') {
+    styleParts.push(...input.contextSnapshot.visualAnchor.styleHints);
+  }
   styleParts.push(...collectRuleHints(STYLE_RULES, input.cueSource));
   styleParts.push(
-    input.kind === 'image'
-      ? pt(locale, 'enricher.imageStyleFallback')
-      : pt(locale, 'enricher.videoStyleFallback'),
+    input.framing === 'environment'
+      ? (input.kind === 'image'
+        ? pt(locale, 'enricher.imageEnvironmentStyleFallback')
+        : pt(locale, 'enricher.videoEnvironmentStyleFallback'))
+      : (input.kind === 'image'
+        ? pt(locale, 'enricher.imageStyleFallback')
+        : pt(locale, 'enricher.videoStyleFallback')),
   );
   return joinUnique(styleParts, '，', 260);
 }
@@ -284,14 +372,19 @@ function buildComposition(input: {
   kind: MediaIntent['kind'];
   cueSource: string;
   currentComposition?: string;
+  framing: MediaFraming;
   promptLocale?: PromptLocale;
 }): string {
   const locale = input.promptLocale || 'en';
   const rules = input.kind === 'image' ? IMAGE_COMPOSITION_RULES : VIDEO_COMPOSITION_RULES;
   const ruleHints = collectRuleHints(rules, input.cueSource);
-  const fallback = input.kind === 'image'
-    ? pt(locale, 'enricher.imageCompositionFallback')
-    : pt(locale, 'enricher.videoCompositionFallback');
+  const fallback = input.framing === 'environment'
+    ? (input.kind === 'image'
+      ? pt(locale, 'enricher.imageEnvironmentCompositionFallback')
+      : pt(locale, 'enricher.videoEnvironmentCompositionFallback'))
+    : (input.kind === 'image'
+      ? pt(locale, 'enricher.imageCompositionFallback')
+      : pt(locale, 'enricher.videoCompositionFallback'));
   return joinUnique([
     input.currentComposition,
     ...ruleHints,
@@ -302,6 +395,7 @@ function buildComposition(input: {
 function buildNegativeCues(input: {
   kind: MediaIntent['kind'];
   hints?: LocalChatMediaHints;
+  framing: MediaFraming;
   promptLocale?: PromptLocale;
 }): string[] {
   const locale = input.promptLocale || 'en';
@@ -309,8 +403,12 @@ function buildNegativeCues(input: {
     ? pt(locale, 'enricher.imageNegCues')
     : pt(locale, 'enricher.videoNegCues');
   const defaults = rawDefaults.split('|');
+  const environmentOnlyDefaults = input.framing === 'environment'
+    ? pt(locale, 'enricher.environmentNegCues').split('|')
+    : [];
   return normalizeStringList([
     ...(input.hints?.negativeCues || []),
+    ...environmentOnlyDefaults,
     ...defaults,
   ], 8);
 }
@@ -318,9 +416,15 @@ function buildNegativeCues(input: {
 function buildContinuityRefs(input: {
   hints?: LocalChatMediaHints;
   contextSnapshot: MediaContextSnapshot;
+  framing: MediaFraming;
   promptLocale?: PromptLocale;
 }): string[] {
   const locale = input.promptLocale || 'en';
+  if (input.framing === 'environment') {
+    return normalizeStringList([
+      ...(input.hints?.continuityRefs || []),
+    ], 4);
+  }
   return normalizeStringList([
     ...(input.hints?.continuityRefs || []),
     ...input.contextSnapshot.visualAnchor.continuityRefs,
@@ -359,6 +463,11 @@ export function enrichMediaIntent(input: {
   promptLocale?: PromptLocale;
 }): MediaIntent {
   const locale = input.promptLocale || 'en';
+  const framing = resolveMediaFraming({
+    semanticIntent: input.semanticIntent,
+    userText: input.userText,
+    assistantText: input.assistantText,
+  });
   const cueSource = [
     input.userText,
     input.assistantText,
@@ -376,6 +485,7 @@ export function enrichMediaIntent(input: {
       kind: input.semanticIntent.kind,
       semanticIntent: input.semanticIntent,
       contextSnapshot: input.contextSnapshot,
+      framing,
       promptLocale: locale,
     }),
     scene: buildScene({
@@ -385,6 +495,7 @@ export function enrichMediaIntent(input: {
       userText: input.userText,
       assistantText: input.assistantText,
       contextSnapshot: input.contextSnapshot,
+      framing,
       promptLocale: locale,
     }),
     styleIntent: buildStyleIntent({
@@ -392,6 +503,7 @@ export function enrichMediaIntent(input: {
       semanticIntent: input.semanticIntent,
       cueSource,
       contextSnapshot: input.contextSnapshot,
+      framing,
       promptLocale: locale,
     }),
     mood: inferMood({
@@ -404,16 +516,19 @@ export function enrichMediaIntent(input: {
         kind: input.semanticIntent.kind,
         cueSource,
         currentComposition: input.semanticIntent.hints?.composition,
+        framing,
         promptLocale: locale,
       }),
       negativeCues: buildNegativeCues({
         kind: input.semanticIntent.kind,
         hints: input.semanticIntent.hints,
+        framing,
         promptLocale: locale,
       }),
       continuityRefs: buildContinuityRefs({
         hints: input.semanticIntent.hints,
         contextSnapshot: input.contextSnapshot,
+        framing,
         promptLocale: locale,
       }),
     },

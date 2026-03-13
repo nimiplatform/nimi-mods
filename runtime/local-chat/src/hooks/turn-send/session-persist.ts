@@ -12,6 +12,7 @@ import {
 } from '../../state/index.js';
 import { createSessionTurn } from '../../services/view/messages.js';
 import type { LocalChatScheduleCancelReason } from './types.js';
+import { buildMediaContinuitySummary } from './media-continuity-summary.js';
 
 const MAX_SEGMENT_DELAY_MS = 8_000;
 
@@ -85,20 +86,7 @@ export async function persistUserTurns(input: {
 
 function buildSegmentContextText(message: ChatMessage): string {
   if (message.kind === 'image' || message.kind === 'video') {
-    const shadowText = String(message.meta?.mediaShadow?.shadowText || '').trim();
-    const mediaPrompt = String(message.meta?.mediaPrompt || '').trim();
-    const status = String(message.meta?.mediaStatus || '').trim();
-    const statusLabel = status ? `${status} ` : '';
-    if (shadowText) {
-      return shadowText;
-    }
-    if (mediaPrompt) {
-      return `${statusLabel}${message.kind}: ${mediaPrompt}`.trim();
-    }
-    if (message.content.trim()) {
-      return `${statusLabel}${message.kind}: ${message.content}`.trim();
-    }
-    return `${statusLabel}${message.kind}`.trim();
+    return buildMediaContinuitySummary(message);
   }
   return String(message.content || '');
 }
@@ -107,12 +95,8 @@ function buildSegmentSemanticSummary(message: ChatMessage): string | null {
   if (message.kind !== 'image' && message.kind !== 'video') {
     return null;
   }
-  const shadowText = String(message.meta?.mediaShadow?.shadowText || '').trim();
-  if (shadowText) return shadowText;
-  const mediaPrompt = String(message.meta?.mediaPrompt || '').trim();
-  if (mediaPrompt) return mediaPrompt;
-  const content = String(message.content || '').trim();
-  return content || null;
+  const summary = buildMediaContinuitySummary(message);
+  return summary || null;
 }
 
 function toPersistedKind(kind: ChatMessageKind): PersistedAssistantMessageKind {

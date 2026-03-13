@@ -128,6 +128,7 @@ test('tail turn composer logs structured failure stage for generateObject errors
           const error = new Error('LOCAL_CHAT_AI_GENERATE_OBJECT_PARSE_FAILED') as Error & Record<string, unknown>;
           error.failureStage = 'parse';
           error.reasonCode = 'LOCAL_CHAT_AI_GENERATE_OBJECT_INVALID_JSON_OBJECT';
+          error.actionHint = 'emit_valid_json_only';
           error.traceId = 'trace-composer-parse';
           error.rawTextPreview = '{"beats":[';
           error.rawTextChars = 10;
@@ -157,11 +158,95 @@ test('tail turn composer logs structured failure stage for generateObject errors
     assert.equal(Boolean(failureLog), true);
     assert.equal(failureLog?.[1]?.failureStage, 'parse');
     assert.equal(failureLog?.[1]?.reasonCode, 'LOCAL_CHAT_AI_GENERATE_OBJECT_INVALID_JSON_OBJECT');
+    assert.equal(failureLog?.[1]?.actionHint, 'emit_valid_json_only');
     assert.equal(failureLog?.[1]?.traceId, 'trace-composer-parse');
     assert.equal(failureLog?.[1]?.rawTextPreview, '{"beats":[');
   } finally {
     console.error = originalConsoleError;
   }
+});
+
+test('tail turn composer increases explicit-media maxTokens after a length-truncated parse failure', async () => {
+  const calls: Array<{ maxTokens?: number; prompt?: string }> = [];
+
+  const plan = await composeInteractionTurnPlan({
+    aiClient: {
+      generateObject: async (input: { maxTokens?: number; prompt?: string }) => {
+        calls.push(input);
+        if (calls.length === 1) {
+          const error = new Error('LOCAL_CHAT_AI_GENERATE_OBJECT_PARSE_FAILED') as Error & Record<string, unknown>;
+          error.failureStage = 'parse';
+          error.reasonCode = 'JSON Parse error: Expected \':\' before value in object property definition';
+          error.traceId = 'trace-composer-length';
+          error.finishReason = 'length';
+          error.rawTextPreview = '{"beats":[{"text":"这便是我现在的模样","assetRe';
+          error.rawTextChars = 96;
+          error.errorName = 'SyntaxError';
+          throw error;
+        }
+        return {
+          object: {
+            beats: [
+              {
+                text: '你要真想看，我就挑一张现在的样子给你。',
+                intent: 'media',
+                relationMove: 'warm',
+                sceneMove: 'daily',
+                pauseMs: 700,
+                assetRequest: {
+                  kind: 'image',
+                  prompt: 'a realistic portrait',
+                },
+              },
+              {
+                text: '别笑我风里来雨里去，发梢总有些乱。',
+                intent: 'tease',
+                relationMove: 'warm',
+                sceneMove: 'daily',
+                pauseMs: 650,
+              },
+            ],
+          },
+          text: '',
+          traceId: 'trace-composer-length-retry',
+          promptTraceId: 'trace-composer-length-retry',
+          route: {
+            source: 'cloud',
+            model: 'gemini-2.5-flash',
+            provider: 'gemini',
+            connectorId: 'connector-1',
+            endpoint: '',
+            localOpenAiEndpoint: '',
+            localProviderEndpoint: '',
+            localModelId: '',
+            adapter: 'test',
+            capability: 'text.generate',
+          },
+        };
+      },
+    } as unknown as LocalChatTurnAiClient,
+    invokeInput: {
+      capability: 'text.generate',
+      prompt: 'raw prompt',
+      mode: 'STORY',
+      agentId: 'agent-1',
+    },
+    contextPacket: {
+      ...createContextPacket(),
+      promptLocale: 'zh',
+    } as LocalChatContextPacket,
+    userText: '我想看看你的照片',
+    turnId: 'turn-media-length',
+    turnMode: 'explicit-media',
+    deliveryStyle: 'natural',
+    sealedFirstBeatText: '你若想看，我就让你看看。',
+  });
+
+  assert.equal(plan.beats.length, 2);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0]?.maxTokens, 1800);
+  assert.equal(calls[1]?.maxTokens, 2400);
+  assert.match(String(calls[1]?.prompt || ''), /长度限制被截断/u);
 });
 
 test('tail turn composer strips trailing partial end markers from planned beat text', async () => {

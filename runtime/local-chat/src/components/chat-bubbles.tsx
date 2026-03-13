@@ -4,6 +4,20 @@ import type { MessageVisualPosition } from './layout/message-grouping.js';
 import { useModTranslation } from "@nimiplatform/sdk/mod";
 export type ChatBubbleDisplayContext = 'transcript' | 'stage';
 type StageMediaPreviewKind = 'image' | 'video' | 'image-pending' | 'video-pending';
+const DIALOG_FOCUSABLE_SELECTOR = [
+    'button:not([disabled])',
+    '[href]',
+    'input:not([disabled])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])',
+].join(',');
+function listDialogFocusableElements(root: HTMLElement | null): HTMLElement[] {
+    if (!root)
+        return [];
+    return Array.from(root.querySelectorAll<HTMLElement>(DIALOG_FOCUSABLE_SELECTOR))
+        .filter((element) => !element.hasAttribute('disabled') && element.getAttribute('aria-hidden') !== 'true');
+}
 function sanitizeLinkHref(href: string): string | null {
     const raw = String(href || '').trim();
     if (!raw)
@@ -264,10 +278,20 @@ export const ChatBubble = React.memo(function ChatBubble(props: {
     const [imagePreviewOpen, setImagePreviewOpen] = React.useState(false);
     const [imageLoadError, setImageLoadError] = React.useState(false);
     const [videoLoadError, setVideoLoadError] = React.useState(false);
+    const previewDialogRef = React.useRef<HTMLDivElement | null>(null);
+    const previewCloseButtonRef = React.useRef<HTMLButtonElement | null>(null);
+    const lastFocusedElementRef = React.useRef<HTMLElement | null>(null);
     const [resolvedMediaSize, setResolvedMediaSize] = React.useState<{
         width: number;
         height: number;
     } | null>(null);
+    const closeImagePreview = React.useCallback(() => {
+        setImagePreviewOpen(false);
+    }, []);
+    const handleOpenImagePreview = React.useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+        lastFocusedElementRef.current = event.currentTarget;
+        setImagePreviewOpen(true);
+    }, []);
     React.useEffect(() => {
         setImageLoadError(false);
         setVideoLoadError(false);
@@ -276,16 +300,59 @@ export const ChatBubble = React.memo(function ChatBubble(props: {
     React.useEffect(() => {
         if (!imagePreviewOpen)
             return undefined;
+        const dialog = previewDialogRef.current;
+        const doc = dialog?.ownerDocument || document;
+        if (!lastFocusedElementRef.current && doc.activeElement instanceof HTMLElement) {
+            lastFocusedElementRef.current = doc.activeElement;
+        }
+        const focusInitialTarget = () => {
+            const initialTarget = previewCloseButtonRef.current
+                || listDialogFocusableElements(dialog)[0]
+                || dialog;
+            initialTarget?.focus();
+        };
+        const focusTimer = window.setTimeout(focusInitialTarget, 0);
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
-                setImagePreviewOpen(false);
+                event.preventDefault();
+                closeImagePreview();
+                return;
+            }
+            if (event.key !== 'Tab')
+                return;
+            const focusables = listDialogFocusableElements(dialog);
+            if (focusables.length === 0) {
+                event.preventDefault();
+                dialog?.focus();
+                return;
+            }
+            const activeElement = doc.activeElement instanceof HTMLElement ? doc.activeElement : null;
+            const first = focusables[0] || null;
+            const last = focusables[focusables.length - 1] || null;
+            const activeInside = Boolean(activeElement && dialog?.contains(activeElement));
+            if (event.shiftKey) {
+                if (!activeInside || activeElement === first) {
+                    event.preventDefault();
+                    last?.focus();
+                }
+                return;
+            }
+            if (!activeInside || activeElement === last) {
+                event.preventDefault();
+                first?.focus();
             }
         };
-        window.addEventListener('keydown', onKeyDown);
+        doc.addEventListener('keydown', onKeyDown);
         return () => {
-            window.removeEventListener('keydown', onKeyDown);
+            window.clearTimeout(focusTimer);
+            doc.removeEventListener('keydown', onKeyDown);
+            const lastFocused = lastFocusedElementRef.current;
+            lastFocusedElementRef.current = null;
+            if (lastFocused && doc.contains(lastFocused)) {
+                lastFocused.focus();
+            }
         };
-    }, [imagePreviewOpen]);
+    }, [closeImagePreview, imagePreviewOpen]);
     const agentInitial = (String(agentName || 'A').trim().charAt(0) || 'A').toUpperCase();
     const userInitial = (String(userName || 'U').trim().charAt(0) || 'U').toUpperCase();
     const avatarNode = isUser ? (userAvatarUrl ? (<img src={userAvatarUrl} alt={userName || t('ChatBubble.roleUser')} className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-black/5"/>) : (<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-700 text-xs font-semibold text-white ring-1 ring-black/5">
@@ -340,7 +407,7 @@ export const ChatBubble = React.memo(function ChatBubble(props: {
                   <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-mint-600"/>
                   <span>{message.content || (isImagePending ? t('ChatBubble.generatingImage') : t('ChatBubble.generatingVideo'))}</span>
                 </div>
-              </div>) : isImage ? (mediaUri && !imageLoadError ? (<button type="button" onClick={() => setImagePreviewOpen(true)} className={`group block overflow-hidden rounded-[22px] border border-gray-200 shadow-[0_12px_24px_rgba(15,23,42,0.08)] ${displayContext === 'stage'
+              </div>) : isImage ? (mediaUri && !imageLoadError ? (<button type="button" onClick={handleOpenImagePreview} aria-label={t('ChatBubble.imagePreviewOpenLabel')} className={`group block overflow-hidden rounded-[22px] border border-gray-200 shadow-[0_12px_24px_rgba(15,23,42,0.08)] ${displayContext === 'stage'
                 ? 'bg-[radial-gradient(circle_at_center,_rgba(248,250,252,0.98),_rgba(226,232,240,0.84))]'
                 : 'bg-gray-50'}`} style={stageMediaFrameStyle}>
                   <img src={mediaUri} alt={message.content || t('ChatBubble.imagePlaceholder')} className={`transition-transform duration-300 group-hover:scale-[1.02] ${displayContext === 'stage'
@@ -374,8 +441,13 @@ export const ChatBubble = React.memo(function ChatBubble(props: {
         </div>
       </div>
 
-      {imagePreviewOpen && mediaUri ? (<div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-6" onClick={() => setImagePreviewOpen(false)} role="dialog" aria-modal="true" aria-label={t('ChatBubble.imagePreviewDialogLabel')}>
-          <img src={mediaUri} alt={message.content || t('ChatBubble.imagePlaceholder')} className="max-h-full max-w-full rounded-2xl object-contain shadow-2xl" onClick={(event) => event.stopPropagation()}/>
+      {imagePreviewOpen && mediaUri ? (<div ref={previewDialogRef} className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-6" onClick={closeImagePreview} role="dialog" aria-modal="true" aria-label={t('ChatBubble.imagePreviewDialogLabel')} tabIndex={-1}>
+          <div className="relative flex max-h-full max-w-full items-start justify-center" onClick={(event) => event.stopPropagation()}>
+            <button ref={previewCloseButtonRef} type="button" onClick={closeImagePreview} className="absolute right-3 top-3 z-[1] inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-2xl text-white shadow-lg transition hover:bg-black/75 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" aria-label={t('ChatBubble.imagePreviewCloseLabel')}>
+              <span aria-hidden>×</span>
+            </button>
+            <img src={mediaUri} alt={message.content || t('ChatBubble.imagePlaceholder')} className="max-h-full max-w-full rounded-2xl object-contain shadow-2xl"/>
+          </div>
         </div>) : null}
     </>);
 });

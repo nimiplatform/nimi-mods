@@ -141,6 +141,188 @@ test('media decision policy keeps explicit image request aligned with runtime pa
   assert.equal(result.promptTracePatch.plannerUsed, false);
 });
 
+test('media decision policy keeps scene-only explicit image requests focused on environment instead of forcing the character into frame', async () => {
+  const result = await decideMediaExecution({
+    aiClient: {
+      generateObject: async () => {
+        throw new Error('planner should not run for explicit request');
+      },
+    },
+    turnTxnId: 'txn-explicit-scene-only',
+    routeBinding: null,
+    defaultSettings: {
+      ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
+      imageRouteSource: 'local',
+    },
+    resolvedPolicy: createResolvedPolicy({
+      ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
+      imageRouteSource: 'local',
+    }, {
+      mediaPolicy: {
+        routeSource: 'local',
+      },
+    }),
+    userText: '给我来一张山、天空和白云的图片，只看风景，不要人物。',
+    assistantText: '这会儿山间都是云雾，天色也很开阔。',
+    target: createTarget(),
+    worldId: 'world.policy',
+    messages: [],
+    promptTrace: null,
+    nsfwPolicy: 'allowed',
+    fallbackRouteSource: 'local',
+    imageDependencySnapshot: createDependencySnapshot('image', 'ready'),
+    videoDependencySnapshot: createDependencySnapshot('video', 'missing'),
+    markerOverrideIntent: null,
+  });
+
+  assert.equal(result.kind, 'execute');
+  if (result.kind !== 'execute') {
+    return;
+  }
+  const compiledPrompt = result.prepared.compiled.compiledPromptText;
+  assert.doesNotMatch(compiledPrompt, /Policy Bot/u);
+  assert.doesNotMatch(compiledPrompt, /保持同一角色稳定外观|不要换成另一位角色/u);
+  assert.match(compiledPrompt, /no people|不要出现人物/u);
+  assert.equal(result.prepared.spec.requestedSize, '1536x1024');
+});
+
+test('media decision policy does not block cloud image planner execution when local dependency snapshot is still empty', async () => {
+  const result = await decideMediaExecution({
+    aiClient: {
+      generateObject: async () => ({
+        object: {
+          version: 'v1',
+          kind: 'image',
+          trigger: 'scene-enhancement',
+          confidence: 0.9,
+          prompt: '云雾缭绕的群山远景',
+          reason: 'misty mountain vista with strong visual scene detail',
+          subject: '被云雾环绕的远山',
+          scene: '层叠山脊与流动云海',
+          styleIntent: '真实写实风景照片',
+          nsfwIntent: 'none',
+        },
+        traceId: 'trace-cloud-image-planner',
+        route: {
+          source: 'cloud',
+          model: 'chat-cloud-model',
+        },
+      }),
+    },
+    turnTxnId: 'txn-cloud-image-null-dependency',
+    routeBinding: null,
+    defaultSettings: {
+      ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
+      imageRouteSource: 'cloud',
+      imageConnectorId: 'connector.cloud.image',
+      imageModel: 'gemini-3.1-flash-image-preview',
+    },
+    resolvedPolicy: createResolvedPolicy({
+      ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
+      imageRouteSource: 'cloud',
+      imageConnectorId: 'connector.cloud.image',
+      imageModel: 'gemini-3.1-flash-image-preview',
+    }, {
+      mediaPolicy: {
+        routeSource: 'cloud',
+      },
+      contentBoundary: {
+        routeSource: 'cloud',
+      },
+    }),
+    userText: '这里的云雾缭绕，你能让我也看看吗？',
+    assistantText: '我正站在山脊边上，云雾从脚下漫过去，画面很适合拍给你看。',
+    target: createTarget(),
+    worldId: 'world.policy',
+    messages: [],
+    promptTrace: null,
+    nsfwPolicy: 'allowed',
+    fallbackRouteSource: 'local',
+    imageDependencySnapshot: null,
+    videoDependencySnapshot: createDependencySnapshot('video', 'missing'),
+    markerOverrideIntent: null,
+  });
+
+  assert.equal(result.kind, 'execute');
+  if (result.kind !== 'execute') {
+    return;
+  }
+  assert.equal(result.intent.type, 'image');
+  assert.equal(result.resolvedRoute.source, 'cloud');
+  assert.equal(result.promptTracePatch.mediaExecutionStatus, 'pending');
+});
+
+test('media decision policy keeps scenic planner requests environment-only unless the user explicitly asks for a person', async () => {
+  const result = await decideMediaExecution({
+    aiClient: {
+      generateObject: async () => ({
+        object: {
+          version: 'v1',
+          kind: 'image',
+          trigger: 'scene-enhancement',
+          confidence: 0.91,
+          prompt: '灵界山川云海',
+          reason: 'mountain and cloudscape scene is visually strong',
+          subject: 'Policy Bot 站在山巅眺望云海',
+          scene: '层叠群山、天空和白云翻涌成海',
+          styleIntent: '写实山景，淡墨感氛围',
+          nsfwIntent: 'none',
+          hints: {
+            composition: 'wide panoramic establishing shot',
+          },
+        },
+        traceId: 'trace-scenic-planner-environment',
+        route: {
+          source: 'cloud',
+          model: 'chat-cloud-model',
+        },
+      }),
+    },
+    turnTxnId: 'txn-scenic-planner-environment',
+    routeBinding: null,
+    defaultSettings: {
+      ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
+      imageRouteSource: 'cloud',
+      imageConnectorId: 'connector.cloud.image',
+      imageModel: 'gemini-3.1-flash-image-preview',
+    },
+    resolvedPolicy: createResolvedPolicy({
+      ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
+      imageRouteSource: 'cloud',
+      imageConnectorId: 'connector.cloud.image',
+      imageModel: 'gemini-3.1-flash-image-preview',
+    }, {
+      mediaPolicy: {
+        routeSource: 'cloud',
+      },
+      contentBoundary: {
+        routeSource: 'cloud',
+      },
+    }),
+    userText: '听说灵界的山云雾缭绕，你能让我也看看吗？我想看山，看天，看白云！',
+    assistantText: '灵界的山川云海确实比别处要灵动些，此时雾气正浓，瞧着真像是一幅泼墨画卷呢。',
+    target: createTarget(),
+    worldId: 'world.policy',
+    messages: [],
+    promptTrace: null,
+    nsfwPolicy: 'allowed',
+    fallbackRouteSource: 'cloud',
+    imageDependencySnapshot: null,
+    videoDependencySnapshot: createDependencySnapshot('video', 'missing'),
+    markerOverrideIntent: null,
+  });
+
+  assert.equal(result.kind, 'execute');
+  if (result.kind !== 'execute') {
+    return;
+  }
+  const compiledPrompt = result.prepared.compiled.compiledPromptText;
+  assert.doesNotMatch(compiledPrompt, /Policy Bot|保持同一角色稳定外观|不要换成另一位角色/u);
+  assert.match(compiledPrompt, /不要出现人物|no people/u);
+  assert.equal(result.resolvedRoute.source, 'cloud');
+  assert.equal(result.prepared.spec.requestedSize, '1536x1024');
+});
+
 test('media decision policy returns planner execution decision when auto gate passes', async () => {
   const result = await decideMediaExecution({
     aiClient: {
@@ -199,6 +381,60 @@ test('media decision policy returns planner execution decision when auto gate pa
   assert.equal(result.promptTracePatch.plannerUsed, true);
   assert.equal(result.promptTracePatch.mediaDecisionSource, 'planner');
   assert.equal(result.promptTracePatch.mediaExecutionStatus, 'pending');
+});
+
+test('media decision policy still blocks local planner execution when local image dependency snapshot is missing', async () => {
+  const result = await decideMediaExecution({
+    aiClient: {
+      generateObject: async () => ({
+        object: {
+          version: 'v1',
+          kind: 'image',
+          trigger: 'scene-enhancement',
+          confidence: 0.9,
+          prompt: '电影感夜雨街头人像',
+          reason: 'rainy neon street portrait with clear visual detail',
+          subject: '站在霓虹雨夜街头、被灯光和雨水一起包住的她',
+          scene: '霓虹灯映着潮湿街道和玻璃反光的雨夜街边场景',
+          styleIntent: '电影感近景特写，强调灯光、雨丝、侧脸和氛围细节',
+          nsfwIntent: 'none',
+        },
+        traceId: 'trace-local-image-missing-dependency',
+        route: {
+          source: 'local',
+          model: 'chat-model',
+        },
+      }),
+    },
+    turnTxnId: 'txn-local-image-missing-dependency',
+    routeBinding: null,
+    defaultSettings: {
+      ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
+      imageRouteSource: 'local',
+    },
+    resolvedPolicy: createResolvedPolicy({
+      ...DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS,
+      imageRouteSource: 'local',
+    }, {
+      mediaPolicy: {
+        routeSource: 'local',
+      },
+    }),
+    userText: '刚刚那个霓虹雨夜、潮湿街道、玻璃反光和侧脸特写的画面像电影一样。',
+    assistantText: '我正靠在被霓虹灯照亮的窗边，雨水顺着玻璃往下滑，灯光把轮廓和神情都压得很有电影感。',
+    target: createTarget(),
+    worldId: 'world.policy',
+    messages: [],
+    promptTrace: null,
+    nsfwPolicy: 'allowed',
+    fallbackRouteSource: 'local',
+    imageDependencySnapshot: null,
+    videoDependencySnapshot: createDependencySnapshot('video', 'missing'),
+    markerOverrideIntent: null,
+  });
+
+  assert.equal(result.kind, 'none');
+  assert.equal(result.promptTracePatch.plannerBlockedReason, 'no-ready-media-route');
 });
 
 test('media decision policy blocks automatic high-risk visuals when relationship boundary is not close', async () => {

@@ -54,6 +54,8 @@ const enLocale = {
     imagePlaceholder: '[Image message - preview coming soon]',
     videoPlaceholder: '[Video message - preview coming soon]',
     imagePreviewDialogLabel: 'Image preview',
+    imagePreviewOpenLabel: 'Open image preview',
+    imagePreviewCloseLabel: 'Close image preview',
     streamingPlaceholder: 'Agent is typing...',
   },
   DefaultSettings: {
@@ -234,7 +236,7 @@ const enLocale = {
     stageMomentLabel: 'This Moment',
     stageFallback: 'Agent',
     stageWithBeats: '{{count}} reply beats in this turn',
-    stageHint: 'The current turn plays here first, while history stays below.',
+    stageHint: 'The current turn plays here first.',
     stageNoReply: 'The next in-character reply will land here first.',
     stageEmptyTitle: '{{name}} is already here',
     stageEmptyHint: 'Say something to {{name}} and this moment will come alive here.',

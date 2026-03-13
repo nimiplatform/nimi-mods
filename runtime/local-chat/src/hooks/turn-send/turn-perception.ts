@@ -1,8 +1,10 @@
 import type { LocalChatTurnMode } from '../../types.js';
 import type { InteractionSnapshot, RelationMemorySlot } from '../../state/index.js';
+import { describeLocalChatGenerateObjectFailure } from '../../runtime-ai-client.js';
 import type { LocalChatTurnAiClient } from './types.js';
 import type { TurnInvokeInput } from './request-builder.js';
 import { pt, type PromptLocale } from '../../prompt/prompt-locale.js';
+import { buildPerceptionCompactContext } from './perception-context.js';
 
 export type TurnPerceptionResult = {
   turnMode: LocalChatTurnMode;
@@ -18,53 +20,6 @@ export type TurnPerceptionResult = {
 
 function getPerceptionPromptTemplate(locale: PromptLocale): string {
   return pt(locale, 'perception.template');
-}
-
-function buildSnapshotContext(snapshot: InteractionSnapshot | null, locale: PromptLocale): string {
-  if (!snapshot) return pt(locale, 'perception.snapshotNew');
-  const parts = [
-    pt(locale, 'perception.relationship', { value: snapshot.relationshipState }),
-    pt(locale, 'perception.emotionalTemp', { value: snapshot.emotionalTemperature }),
-  ];
-  if (snapshot.topicThreads.length > 0) {
-    parts.push(pt(locale, 'perception.recentTopics', { value: snapshot.topicThreads.slice(0, 4).join('；') }));
-  }
-  if (snapshot.openLoops.length > 0) {
-    parts.push(pt(locale, 'perception.openLoops', { value: snapshot.openLoops.slice(0, 3).join('；') }));
-  }
-  if (snapshot.userPrefs.length > 0) {
-    parts.push(pt(locale, 'perception.userPrefs', { value: snapshot.userPrefs.slice(0, 3).join('；') }));
-  }
-  if (snapshot.assistantCommitments.length > 0) {
-    parts.push(pt(locale, 'perception.commitments', { value: snapshot.assistantCommitments.slice(0, 3).join('；') }));
-  }
-  return `${pt(locale, 'perception.snapshotPrefix')}\n${parts.join('\n')}`;
-}
-
-function buildMemoryContext(slots: RelationMemorySlot[], locale: PromptLocale): string {
-  if (slots.length === 0) return pt(locale, 'perception.memoryNone');
-  const lines = slots.map((slot) => `- [${slot.id}] (${slot.slotType}) ${slot.key}: ${slot.value}`);
-  return `${pt(locale, 'perception.memoryHeader')}\n${lines.join('\n')}`;
-}
-
-function buildRecentTurnsContext(recentTurns: Array<{ role: string; text: string }>, locale: PromptLocale): string {
-  if (recentTurns.length === 0) return pt(locale, 'perception.turnsNone');
-  const lines = recentTurns.map((turn) => `- ${turn.role}: ${turn.text}`);
-  return `${pt(locale, 'perception.turnsHeader')}\n${lines.join('\n')}`;
-}
-
-function buildPerceptionPrompt(input: {
-  userText: string;
-  snapshot: InteractionSnapshot | null;
-  memorySlots: RelationMemorySlot[];
-  recentTurns: Array<{ role: string; text: string }>;
-  promptLocale: PromptLocale;
-}): string {
-  return getPerceptionPromptTemplate(input.promptLocale)
-    .replace('{userText}', input.userText)
-    .replace('{recentTurnsContext}', buildRecentTurnsContext(input.recentTurns, input.promptLocale))
-    .replace('{snapshotContext}', buildSnapshotContext(input.snapshot, input.promptLocale))
-    .replace('{memoryContext}', buildMemoryContext(input.memorySlots, input.promptLocale));
 }
 
 function parseIntimacyCeiling(value: unknown, fallback: 'friendly' | 'warm' | 'intimate'): TurnPerceptionResult['intimacyCeiling'] {
@@ -164,18 +119,41 @@ export async function perceiveTurn(input: {
     };
   }
 
-  const prompt = buildPerceptionPrompt({
+  const promptLocale = input.promptLocale || 'en';
+  const promptTemplate = getPerceptionPromptTemplate(promptLocale);
+  const compactContext = buildPerceptionCompactContext({
     userText: input.userText,
     snapshot: input.snapshot,
     memorySlots: input.memorySlots,
     recentTurns: (input.recentTurns || []).slice(-5),
-    promptLocale: input.promptLocale || 'en',
+    promptLocale,
+    template: promptTemplate,
   });
+  const prompt = promptTemplate
+    .replace('{userText}', compactContext.promptParts.userText)
+    .replace('{recentTurnsContext}', compactContext.promptParts.recentTurnsContext)
+    .replace('{snapshotContext}', compactContext.promptParts.snapshotContext)
+    .replace('{memoryContext}', compactContext.promptParts.memoryContext);
 
   try {
-    console.log('[turn-perception] generateObject: calling...');
+    console.log('[turn-perception] generateObject: calling...', {
+      userTextChars: compactContext.trace.userTextChars,
+      userTextPreview: compactContext.promptParts.userText.slice(0, 160),
+      recentTurnsCount: (input.recentTurns || []).length,
+      memorySlotsCount: (input.memorySlots || []).length,
+      recentTurnsChars: compactContext.trace.recentTurnsChars,
+      relationMemoryChars: compactContext.trace.relationMemoryChars,
+      snapshotChars: compactContext.trace.snapshotChars,
+      promptChars: compactContext.trace.promptChars,
+      compactionApplied: compactContext.trace.compactionApplied,
+      cascadingReductionStep: compactContext.trace.cascadingReductionStep,
+      maxTokens: 1024,
+      temperature: 0.3,
+      routeBinding: input.invokeInput.routeBinding || null,
+    });
     const result = await input.aiClient.generateObject({
       ...input.invokeInput,
+      debugLabel: 'turn-perception',
       prompt,
       maxTokens: 1024,
       temperature: 0.3,
@@ -185,12 +163,31 @@ export async function perceiveTurn(input: {
       turnMode: parsed.turnMode,
       emotionalState: parsed.emotionalState?.detected || null,
       intimacyCeiling: parsed.intimacyCeiling,
+      traceId: result.traceId || null,
       rawText: result.text?.slice(0, 200),
+      rawTextChars: String(result.text || '').length,
     });
     return parsed;
   } catch (err) {
+    const failure = describeLocalChatGenerateObjectFailure(err);
     console.error('[turn-perception] generateObject: FAILED', {
       error: err instanceof Error ? err.message : String(err),
+      failureStage: failure.failureStage,
+      reasonCode: failure.reasonCode,
+      actionHint: failure.actionHint,
+      traceId: failure.traceId,
+      finishReason: failure.finishReason,
+      rawTextPreview: failure.rawTextPreview,
+      rawTextChars: failure.rawTextChars,
+      userTextChars: compactContext.trace.userTextChars,
+      userTextPreview: compactContext.promptParts.userText.slice(0, 160),
+      recentTurnsChars: compactContext.trace.recentTurnsChars,
+      relationMemoryChars: compactContext.trace.relationMemoryChars,
+      snapshotChars: compactContext.trace.snapshotChars,
+      promptChars: compactContext.trace.promptChars,
+      compactionApplied: compactContext.trace.compactionApplied,
+      cascadingReductionStep: compactContext.trace.cascadingReductionStep,
+      routeBinding: input.invokeInput.routeBinding || null,
       fallback: input.regexFallbackTurnMode || 'information',
     });
     // Fallback: use regex-based turnMode instead of hardcoded 'information'

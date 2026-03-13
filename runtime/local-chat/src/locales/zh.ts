@@ -54,6 +54,8 @@ const zhLocale = {
     imagePlaceholder: '[图片消息 - 预览即将上线]',
     videoPlaceholder: '[视频消息 - 预览即将上线]',
     imagePreviewDialogLabel: '图片预览',
+    imagePreviewOpenLabel: '打开图片预览',
+    imagePreviewCloseLabel: '关闭图片预览',
     streamingPlaceholder: 'Agent 正在输入...',
   },
   DefaultSettings: {
@@ -233,7 +235,7 @@ const zhLocale = {
     stageMomentLabel: '此刻',
     stageFallback: 'Agent',
     stageWithBeats: '这一轮已展开 {{count}} 个回应拍点',
-    stageHint: '这一轮的回应会优先在这里展开，历史记录会退到下方。',
+    stageHint: '这一轮的回应会优先在这里展开。',
     stageNoReply: '下一条角色回应会先出现在这里。',
     stageEmptyTitle: '{{name}} 已经在这里',
     stageEmptyHint: '和 {{name}} 说点什么吧，这一刻会先在这里发生。',

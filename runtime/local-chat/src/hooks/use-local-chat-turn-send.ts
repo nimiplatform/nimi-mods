@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { emitLocalChatLog } from '../logging.js';
 import { runLocalChatTurnSend } from './turn-send/send-flow.js';
 import type { TurnDeliveryScheduleHandle } from './turn-send/session-persist.js';
 import type { LocalChatScheduleCancelReason, UseLocalChatTurnSendInput } from './turn-send/types.js';
@@ -18,6 +19,13 @@ export function buildTurnSendContextKey(
     routeBinding: input.routeBinding || null,
     activeSchedule: activeSchedule || null,
   });
+}
+
+function isBenignTurnCancellation(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error || '');
+  return message === 'LOCAL_CHAT_TURN_SEND_ABORTED'
+    || message === 'LOCAL_CHAT_SCHEDULE_ABORTED'
+    || message === 'AbortError';
 }
 
 export function useLocalChatTurnSend(input: UseLocalChatTurnSendInput) {
@@ -56,8 +64,15 @@ export function useLocalChatTurnSend(input: UseLocalChatTurnSendInput) {
   const cancelPendingSchedule = useCallback((reason: LocalChatScheduleCancelReason) => {
     const active = activeScheduleRef.current;
     if (!active) return;
-    console.warn(`[turn-send] CANCELLING schedule: reason=${reason}, turnTxnId=${active.turnTxnId}`);
-    console.trace('[turn-send] cancel stack trace');
+    emitLocalChatLog({
+      level: 'debug',
+      message: 'local-chat:turn-send:schedule-cancelled',
+      source: 'useLocalChatTurnSend',
+      details: {
+        reason,
+        turnTxnId: active.turnTxnId,
+      },
+    });
     active.cancel(reason);
     activeScheduleRef.current = null;
     activeScheduleContextRef.current = null;
@@ -91,8 +106,17 @@ export function useLocalChatTurnSend(input: UseLocalChatTurnSendInput) {
     if (previousRun) {
       try {
         await previousRun;
-      } catch {
-        // Cancellation should not block the next send attempt.
+      } catch (error) {
+        if (!isBenignTurnCancellation(error)) {
+          emitLocalChatLog({
+            level: 'warn',
+            message: 'local-chat:turn-send:previous-run-failed',
+            source: 'useLocalChatTurnSend',
+            details: {
+              error: error instanceof Error ? error.message : String(error || 'unknown error'),
+            },
+          });
+        }
       }
     }
     const runToken = Symbol('local-chat-turn-send');

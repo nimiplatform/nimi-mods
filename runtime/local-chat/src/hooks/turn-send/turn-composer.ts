@@ -37,6 +37,20 @@ function clampBeatCount(turnMode: LocalChatTurnMode): number {
         return 2;
     return 4;
 }
+const DEFAULT_COMPOSER_MAX_TOKENS = 1200;
+const EXPLICIT_MEDIA_COMPOSER_MAX_TOKENS = 1800;
+const EXPLICIT_MEDIA_COMPOSER_LENGTH_RETRY_MAX_TOKENS = 2400;
+function resolveComposerMaxTokens(input: {
+    turnMode: LocalChatTurnMode;
+    lastFailureFinishReason: string | null;
+}): number {
+    if (input.turnMode !== 'explicit-media')
+        return DEFAULT_COMPOSER_MAX_TOKENS;
+    if (input.lastFailureFinishReason === 'length') {
+        return EXPLICIT_MEDIA_COMPOSER_LENGTH_RETRY_MAX_TOKENS;
+    }
+    return EXPLICIT_MEDIA_COMPOSER_MAX_TOKENS;
+}
 function toBigrams(text: string): Set<string> {
     const chars = text.replace(/\s+/g, '');
     const bigrams = new Set<string>();
@@ -252,21 +266,44 @@ export async function composeInteractionTurnPlan(input: {
         ...perceptionLines,
     ].join('\n');
     const TURN_COMPOSER_MAX_ATTEMPTS = 2;
+    let lastFailureFinishReason: string | null = null;
     for (let attempt = 1; attempt <= TURN_COMPOSER_MAX_ATTEMPTS; attempt++) {
+        const retryReminder = attempt === 1
+            ? ''
+            : '\n\n' + pt(locale, lastFailureFinishReason === 'length'
+                ? 'composer.retryReminderLength'
+                : 'composer.retryReminder');
+        const recentBeatCount = Array.isArray(input.recentBeatTexts) ? input.recentBeatTexts.length : 0;
         try {
-            console.log('[turn-composer] generateObject: calling...', { turnMode: input.turnMode, attempt });
+            const maxTokens = resolveComposerMaxTokens({
+                turnMode: input.turnMode,
+                lastFailureFinishReason,
+            });
+            const temperature = attempt === 1 ? 0.5 : 0.3;
+            console.log('[turn-composer] generateObject: calling...', {
+                turnMode: input.turnMode,
+                attempt,
+                promptChars: prompt.length + retryReminder.length,
+                sealedFirstBeatChars: input.sealedFirstBeatText.length,
+                recentBeatCount,
+                lastFailureFinishReason,
+                maxTokens,
+                temperature,
+                routeBinding: input.invokeInput.routeBinding || null,
+            });
             const result = await input.aiClient.generateObject({
                 ...input.invokeInput,
-                prompt: attempt === 1
-                    ? prompt
-                    : prompt + '\n\n' + pt(locale, 'composer.retryReminder'),
-                maxTokens: 1200,
-                temperature: attempt === 1 ? 0.5 : 0.3,
+                debugLabel: 'turn-composer',
+                prompt: prompt + retryReminder,
+                maxTokens,
+                temperature,
             });
             const rawBeats = (result.object as Record<string, unknown>)?.beats;
             console.log('[turn-composer] generateObject: success', {
                 beatCount: Array.isArray(rawBeats) ? rawBeats.length : 'non-array',
                 turnMode: input.turnMode,
+                traceId: result.traceId || null,
+                rawTextChars: String(result.text || '').length,
                 rawText: result.text?.slice(0, 200),
                 attempt,
             });
@@ -291,13 +328,21 @@ export async function composeInteractionTurnPlan(input: {
                 error: err instanceof Error ? err.message : String(err),
                 failureStage: failure.failureStage,
                 reasonCode: failure.reasonCode,
+                actionHint: failure.actionHint,
                 traceId: failure.traceId,
+                finishReason: failure.finishReason,
                 rawTextPreview: failure.rawTextPreview,
                 rawTextChars: failure.rawTextChars,
                 errorName: failure.errorName,
                 turnMode: input.turnMode,
+                promptChars: prompt.length + retryReminder.length,
+                sealedFirstBeatChars: input.sealedFirstBeatText.length,
+                recentBeatCount,
+                lastFailureFinishReason,
+                routeBinding: input.invokeInput.routeBinding || null,
                 attempt,
             });
+            lastFailureFinishReason = failure.finishReason;
             if (attempt >= TURN_COMPOSER_MAX_ATTEMPTS)
                 break;
             // Retry on parse failure only — call failures are likely transient network issues
