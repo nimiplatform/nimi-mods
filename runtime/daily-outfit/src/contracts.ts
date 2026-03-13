@@ -20,8 +20,9 @@ export const DAILY_OUTFIT_DATA_API_WEARLOG_CREATE = 'data-api.daily-outfit.wearl
 export const DAILY_OUTFIT_CAPABILITIES = [
   'runtime.ai.text.generate',
   'runtime.ai.text.stream',
-  'runtime.ai.image.analyze',
-  'runtime.ai.image.generate',
+  'runtime.media.image.generate',
+  'runtime.route.list.options',
+  'runtime.route.resolve',
   `data.register.${DAILY_OUTFIT_DATA_API_WARDROBE_LIST}`,
   `data.register.${DAILY_OUTFIT_DATA_API_WARDROBE_GET}`,
   `data.register.${DAILY_OUTFIT_DATA_API_WARDROBE_CREATE}`,

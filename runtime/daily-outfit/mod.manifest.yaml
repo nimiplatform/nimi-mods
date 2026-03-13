@@ -12,8 +12,9 @@ description: >
 capabilities:
   - runtime.ai.text.generate
   - runtime.ai.text.stream
-  - runtime.ai.image.analyze
-  - runtime.ai.image.generate
+  - runtime.media.image.generate
+  - runtime.route.list.options
+  - runtime.route.resolve
   - data.register.data-api.daily-outfit.wardrobe.list
   - data.register.data-api.daily-outfit.wardrobe.get
   - data.register.data-api.daily-outfit.wardrobe.create

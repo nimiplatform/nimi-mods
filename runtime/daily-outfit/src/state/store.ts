@@ -10,6 +10,10 @@ import type {
   WearLog,
   WearLogCreateInput,
 } from '../types.js';
+import {
+  loadDailyOutfitSnapshotFromIndexedDb,
+  persistDailyOutfitSnapshotToIndexedDb,
+} from './indexed-db.js';
 
 type DailyOutfitState = {
   garments: Map<string, GarmentItem>;
@@ -26,6 +30,10 @@ const state: DailyOutfitState = {
   profile: null,
 };
 let cachedSnapshot: DailyOutfitSnapshot | null = null;
+let hasHydratedFromPersistence = false;
+let pendingPersistBeforeHydration = false;
+let stateVersion = 0;
+let persistChain: Promise<void> = Promise.resolve();
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -35,6 +43,97 @@ function createId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function svgToDataUrl(svg: string): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+function renderDemoGarmentSvg(input: {
+  accent: string;
+  base: string;
+  label: string;
+  kind: 'top' | 'outerwear' | 'bottom' | 'shoes' | 'accessory';
+}): string {
+  const { accent, base, label, kind } = input;
+  const shapes = {
+    top: `
+      <path d="M180 110 250 74h100l70 36 36 88-48 28-24-54v302H216V172l-24 54-48-28z" fill="${base}"/>
+      <rect x="268" y="84" width="64" height="24" rx="12" fill="#f5efe9" opacity="0.95"/>
+      <rect x="212" y="238" width="196" height="14" rx="7" fill="${accent}" opacity="0.22"/>
+      <rect x="212" y="276" width="196" height="10" rx="5" fill="${accent}" opacity="0.18"/>
+    `,
+    outerwear: `
+      <path d="M172 104 242 66h116l70 38 22 104-50 16-20-74v332H220V150l-20 74-50-16z" fill="${base}"/>
+      <rect x="294" y="78" width="84" height="32" rx="16" fill="#efe6df"/>
+      <rect x="292" y="126" width="16" height="350" rx="8" fill="${accent}" opacity="0.55"/>
+      <rect x="228" y="202" width="72" height="18" rx="9" fill="${accent}" opacity="0.18"/>
+      <rect x="320" y="202" width="72" height="18" rx="9" fill="${accent}" opacity="0.18"/>
+    `,
+    bottom: `
+      <path d="M232 74h168l20 120-44 312H274l-36-210-36 210H100l20-312z" fill="${base}"/>
+      <rect x="230" y="88" width="172" height="18" rx="9" fill="${accent}" opacity="0.24"/>
+      <rect x="266" y="148" width="16" height="302" rx="8" fill="${accent}" opacity="0.18"/>
+      <rect x="352" y="148" width="16" height="302" rx="8" fill="${accent}" opacity="0.18"/>
+    `,
+    shoes: `
+      <path d="M106 328c34-4 64-18 92-44l52-50 48 14 42 52 98 24c26 6 40 18 40 34v20H106c-28 0-44-12-44-32 0-12 6-18 18-18z" fill="${base}"/>
+      <rect x="126" y="334" width="312" height="18" rx="9" fill="${accent}" opacity="0.22"/>
+      <rect x="150" y="278" width="74" height="12" rx="6" fill="${accent}" opacity="0.2"/>
+      <rect x="242" y="278" width="70" height="12" rx="6" fill="${accent}" opacity="0.2"/>
+    `,
+    accessory: `
+      <path d="M286 124c52 0 94 42 94 94s-42 94-94 94-94-42-94-94 42-94 94-94z" fill="${base}"/>
+      <circle cx="286" cy="218" r="44" fill="${accent}" opacity="0.22"/>
+      <rect x="274" y="70" width="24" height="62" rx="12" fill="${accent}" opacity="0.5"/>
+    `,
+  };
+  return `
+    <svg xmlns="http://www.w3.org/2000/svg" width="572" height="760" viewBox="0 0 572 760" fill="none">
+      <rect width="572" height="760" rx="44" fill="#fffdf9"/>
+      <circle cx="474" cy="104" r="54" fill="${accent}" opacity="0.08"/>
+      <circle cx="110" cy="636" r="84" fill="${accent}" opacity="0.06"/>
+      ${shapes[kind]}
+      <rect x="50" y="620" width="184" height="54" rx="27" fill="#f7efe8"/>
+      <text x="76" y="653" fill="#6b5c53" font-family="ui-sans-serif, system-ui" font-size="26" font-weight="600">${label}</text>
+    </svg>
+  `;
+}
+
+function createDemoGarment(input: {
+  id: string;
+  category: GarmentItem['category'];
+  subcategory: string;
+  colors: string[];
+  material: string;
+  styleTags: string[];
+  seasons: GarmentItem['seasons'];
+  formalityLevel: number;
+  accent: string;
+  base: string;
+  kind: 'top' | 'outerwear' | 'bottom' | 'shoes' | 'accessory';
+}): GarmentItem {
+  const imageUrl = svgToDataUrl(renderDemoGarmentSvg({
+    accent: input.accent,
+    base: input.base,
+    label: input.subcategory,
+    kind: input.kind,
+  }));
+  return {
+    id: input.id,
+    photoUrls: [imageUrl],
+    thumbnailUrl: imageUrl,
+    category: input.category,
+    subcategory: input.subcategory,
+    colors: input.colors,
+    material: input.material,
+    styleTags: input.styleTags,
+    seasons: input.seasons,
+    formalityLevel: input.formalityLevel,
+    status: 'active',
+    wearCount: 0,
+    createdAt: nowIso(),
+  };
+}
+
 function normalizeTextList(value: string): string[] {
   return value
     .split(',')
@@ -42,10 +141,31 @@ function normalizeTextList(value: string): string[] {
     .filter(Boolean);
 }
 
-function emitChange(): void {
+function notifyListeners(): void {
   cachedSnapshot = null;
   for (const listener of listeners) {
     listener();
+  }
+}
+
+function schedulePersist(): void {
+  const snapshot = getDailyOutfitSnapshot();
+  persistChain = persistChain
+    .catch(() => undefined)
+    .then(async () => {
+      await persistDailyOutfitSnapshotToIndexedDb(snapshot);
+    })
+    .catch(() => undefined);
+}
+
+function emitChange(): void {
+  stateVersion += 1;
+  cachedSnapshot = null;
+  notifyListeners();
+  if (hasHydratedFromPersistence) {
+    schedulePersist();
+  } else {
+    pendingPersistBeforeHydration = true;
   }
 }
 
@@ -473,6 +593,34 @@ export function toggleFavoriteOutfit(id: string): OutfitCombo | null {
   return next;
 }
 
+export function updateOutfitCollage(id: string, collageImageUrl: string): OutfitCombo | null {
+  const outfit = state.outfits.get(id);
+  if (!outfit) {
+    return null;
+  }
+  const next: OutfitCombo = {
+    ...outfit,
+    collageImageUrl: collageImageUrl.trim() || undefined,
+  };
+  state.outfits.set(id, next);
+  emitChange();
+  return next;
+}
+
+export function updateOutfitTryOn(id: string, tryOnImageUrl: string): OutfitCombo | null {
+  const outfit = state.outfits.get(id);
+  if (!outfit) {
+    return null;
+  }
+  const next: OutfitCombo = {
+    ...outfit,
+    tryOnImageUrl: tryOnImageUrl.trim() || undefined,
+  };
+  state.outfits.set(id, next);
+  emitChange();
+  return next;
+}
+
 export function seedProfileFromPreferences(input: {
   gender: UserProfile['gender'];
   ageGroup: UserProfile['ageGroup'];
@@ -496,6 +644,171 @@ export function seedProfileFromPreferences(input: {
   });
 }
 
+export function seedDemoWardrobe(): GarmentItem[] {
+  const demoGarments: GarmentItem[] = [
+    createDemoGarment({
+      id: 'demo-top-rose-knit',
+      category: 'top',
+      subcategory: 'rose knit top',
+      colors: ['rose', 'cream'],
+      material: 'cotton knit',
+      styleTags: ['minimal', 'soft', 'date'],
+      seasons: ['spring', 'autumn'],
+      formalityLevel: 3,
+      accent: '#d8a1a3',
+      base: '#e9b6bc',
+      kind: 'top',
+    }),
+    createDemoGarment({
+      id: 'demo-top-navy-shirt',
+      category: 'top',
+      subcategory: 'navy pinstripe shirt',
+      colors: ['navy', 'white'],
+      material: 'cotton blend',
+      styleTags: ['workwear', 'minimal', 'casual'],
+      seasons: ['spring', 'summer', 'autumn'],
+      formalityLevel: 2,
+      accent: '#6f93b5',
+      base: '#294766',
+      kind: 'top',
+    }),
+    createDemoGarment({
+      id: 'demo-outer-charcoal-jacket',
+      category: 'outerwear',
+      subcategory: 'charcoal denim jacket',
+      colors: ['charcoal', 'graphite'],
+      material: 'washed denim',
+      styleTags: ['street', 'layering', 'minimal'],
+      seasons: ['spring', 'autumn', 'winter'],
+      formalityLevel: 3,
+      accent: '#8d8f94',
+      base: '#3f4349',
+      kind: 'outerwear',
+    }),
+    createDemoGarment({
+      id: 'demo-bottom-sienna-trousers',
+      category: 'bottom',
+      subcategory: 'burnt sienna trousers',
+      colors: ['sienna', 'camel'],
+      material: 'soft twill',
+      styleTags: ['tailored', 'minimal', 'date'],
+      seasons: ['spring', 'autumn'],
+      formalityLevel: 3,
+      accent: '#d69c72',
+      base: '#b97749',
+      kind: 'bottom',
+    }),
+    createDemoGarment({
+      id: 'demo-bottom-cream-skirt',
+      category: 'bottom',
+      subcategory: 'cream midi skirt',
+      colors: ['cream', 'sand'],
+      material: 'satin blend',
+      styleTags: ['soft', 'feminine', 'date'],
+      seasons: ['spring', 'summer'],
+      formalityLevel: 4,
+      accent: '#d8c7a6',
+      base: '#efe3c7',
+      kind: 'bottom',
+    }),
+    createDemoGarment({
+      id: 'demo-shoes-leopard-sneakers',
+      category: 'shoes',
+      subcategory: 'leopard low sneakers',
+      colors: ['stone', 'taupe'],
+      material: 'canvas',
+      styleTags: ['casual', 'street', 'playful'],
+      seasons: ['spring', 'summer', 'autumn'],
+      formalityLevel: 2,
+      accent: '#b18c67',
+      base: '#d6c0ab',
+      kind: 'shoes',
+    }),
+    createDemoGarment({
+      id: 'demo-shoes-black-heels',
+      category: 'shoes',
+      subcategory: 'black slingback heels',
+      colors: ['black'],
+      material: 'leather',
+      styleTags: ['date', 'elevated', 'minimal'],
+      seasons: ['spring', 'summer', 'autumn'],
+      formalityLevel: 4,
+      accent: '#6f6f73',
+      base: '#1f1f22',
+      kind: 'shoes',
+    }),
+    createDemoGarment({
+      id: 'demo-accessory-red-flower',
+      category: 'accessory',
+      subcategory: 'crimson flower earrings',
+      colors: ['crimson', 'gold'],
+      material: 'resin',
+      styleTags: ['accent', 'date', 'playful'],
+      seasons: ['spring', 'summer'],
+      formalityLevel: 3,
+      accent: '#d94c54',
+      base: '#c92838',
+      kind: 'accessory',
+    }),
+  ];
+
+  for (const garment of demoGarments) {
+    if (!state.garments.has(garment.id)) {
+      state.garments.set(garment.id, garment);
+    }
+  }
+
+  if (!state.profile) {
+    state.profile = {
+      id: 'demo-profile',
+      gender: 'female',
+      ageGroup: '25-30',
+      selfieUrl: undefined,
+      styleWeights: {
+        minimal: 0.7,
+        date: 0.6,
+        soft: 0.55,
+        street: 0.35,
+      },
+      sceneFrequencies: {
+        date: 0.7,
+        dinner: 0.55,
+        weekend: 0.45,
+      },
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+  }
+
+  emitChange();
+  return demoGarments;
+}
+
 export function queryInsights(): DailyOutfitInsightSummary {
   return buildInsights();
 }
+
+function applyPersistedSnapshot(snapshot: DailyOutfitSnapshot): void {
+  state.garments = new Map(snapshot.garments.map((garment) => [garment.id, garment]));
+  state.outfits = new Map(snapshot.outfits.map((outfit) => [outfit.id, outfit]));
+  state.wearLogs = new Map(snapshot.wearLogs.map((wearLog) => [wearLog.id, wearLog]));
+  state.profile = snapshot.profile;
+}
+
+async function hydrateDailyOutfitStore(): Promise<void> {
+  try {
+    const snapshot = await loadDailyOutfitSnapshotFromIndexedDb();
+    if (snapshot && stateVersion === 0) {
+      applyPersistedSnapshot(snapshot);
+      notifyListeners();
+    }
+  } finally {
+    hasHydratedFromPersistence = true;
+    if (pendingPersistBeforeHydration) {
+      pendingPersistBeforeHydration = false;
+      schedulePersist();
+    }
+  }
+}
+
+void hydrateDailyOutfitStore();
