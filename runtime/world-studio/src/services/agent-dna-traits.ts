@@ -1,4 +1,4 @@
-const DNA_PRIMARY_TYPES = [
+export const DNA_PRIMARY_TYPES = [
   'CARING',
   'PLAYFUL',
   'INTELLECTUAL',
@@ -7,7 +7,7 @@ const DNA_PRIMARY_TYPES = [
   'ROMANTIC',
 ] as const;
 
-const DNA_SECONDARY_TRAITS = [
+export const DNA_SECONDARY_TRAITS = [
   'HUMOROUS',
   'SARCASTIC',
   'GENTLE',
@@ -22,8 +22,8 @@ const DNA_SECONDARY_TRAITS = [
   'ECCENTRIC',
 ] as const;
 
-type DnaPrimaryType = (typeof DNA_PRIMARY_TYPES)[number];
-type DnaSecondaryTrait = (typeof DNA_SECONDARY_TRAITS)[number];
+export type DnaPrimaryType = (typeof DNA_PRIMARY_TYPES)[number];
+export type DnaSecondaryTrait = (typeof DNA_SECONDARY_TRAITS)[number];
 
 const DNA_PRIMARY_SET = new Set<string>(DNA_PRIMARY_TYPES);
 const DNA_SECONDARY_SET = new Set<string>(DNA_SECONDARY_TRAITS);
