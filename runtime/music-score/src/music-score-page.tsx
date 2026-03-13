@@ -12,6 +12,16 @@ import { quantize, type QuantizedScore, type ScoreConfig, defaultScoreConfig } f
 import { buildMusicXml } from './services/musicxml-builder.js';
 import { downloadMusicXml, downloadMidiFromScore, exportPdf, deriveFilename, isExportable } from './services/export.js';
 
+function yieldToBrowser(): Promise<void> {
+    return new Promise((resolve) => {
+        if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+            window.requestAnimationFrame(() => resolve());
+            return;
+        }
+        setTimeout(resolve, 0);
+    });
+}
+
 export function MusicScorePage() {
     const locale = getPromptLocale() === 'zh' ? zhLocale : enLocale;
 
@@ -54,42 +64,42 @@ export function MusicScorePage() {
     // -----------------------------------------------------------------------
 
     const processFile = useCallback(async (file: File) => {
-        // Full state reset before processing new file
-        setSourceFilename(file.name);
-        setNoteEvents([]);
-        noteEventsRef.current = [];
-        setMusicXml(null);
-        setScore(null);
-        setConfig(defaultScoreConfig());
-
         // MS-PIPE-001: transition through idle before starting new pipeline
         updateStep('idle', 0);
+        await yieldToBrowser();
 
         try {
             // Step 1: Decode audio
             updateStep('decoding', 0);
+            await yieldToBrowser();
             const audioBuffer = await decodeAudioFile(file, (p) => updateStep('decoding', p));
 
             // Step 2 & 3: Pitch detection
             updateStep('loading-model', 0);
+            await yieldToBrowser();
             const notes = await detectPitches(audioBuffer, (p) => {
                 updateStep(p.phase, p.progress);
             });
 
-            setNoteEvents(notes);
-            noteEventsRef.current = notes;
-
             // Step 4: Quantize
             updateStep('quantizing', 0);
+            await yieldToBrowser();
             const quantized = quantize(notes);
-            setScore(quantized);
-            setConfig(quantized.config);
-            setAutoDetectedBpm(quantized.config.bpm);
             updateStep('quantizing', 100);
+            await yieldToBrowser();
 
             // Step 5: Generate MusicXML and render
             updateStep('rendering', 0);
+            await yieldToBrowser();
             const xml = buildMusicXml(quantized);
+            await yieldToBrowser();
+
+            setSourceFilename(file.name);
+            setNoteEvents(notes);
+            noteEventsRef.current = notes;
+            setScore(quantized);
+            setConfig(quantized.config);
+            setAutoDetectedBpm(quantized.config.bpm);
             setMusicXml(xml);
             updateStep('rendering', 100);
 
@@ -108,18 +118,20 @@ export function MusicScorePage() {
     // Re-process with updated config
     // -----------------------------------------------------------------------
 
-    const reprocess = useCallback(() => {
+    const reprocess = useCallback(async () => {
         const notes = noteEventsRef.current;
         if (notes.length === 0) return;
 
         try {
             updateStep('quantizing', 0);
+            await yieldToBrowser();
             const quantized = quantize(notes, config);
-            setScore(quantized);
             updateStep('quantizing', 100);
 
             updateStep('rendering', 0);
+            await yieldToBrowser();
             const xml = buildMusicXml(quantized);
+            setScore(quantized);
             setMusicXml(xml);
             updateStep('rendering', 100);
 
@@ -177,7 +189,7 @@ export function MusicScorePage() {
                         autoDetectedBpm={autoDetectedBpm}
                         disabled={isProcessing}
                         onChange={setConfig}
-                        onApply={reprocess}
+                        onApply={() => void reprocess()}
                     />
                 )}
 

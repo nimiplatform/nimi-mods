@@ -40,6 +40,12 @@ const BASIC_PITCH_MODEL_URL =
 /** Piano range MIDI bounds */
 const PIANO_MIN_MIDI = 21;
 const PIANO_MAX_MIDI = 108;
+const FALLBACK_PROGRESS_BATCH_SIZE = 32;
+const FALLBACK_YIELD_BATCH_SIZE = 64;
+
+function yieldToMainThread(): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, 0));
+}
 
 function filterPianoRange(notes: NoteEvent[]): NoteEvent[] {
     return notes.filter(
@@ -154,7 +160,7 @@ async function detectWithFallback(
 
     for (let i = 0; i < totalFrames; i++) {
         const offset = i * hopSize;
-        const frame = samples.slice(offset, offset + frameSize);
+        const frame = samples.subarray(offset, offset + frameSize);
 
         const { frequency, amplitude } = detectPitchACF(frame, sampleRate);
         const midi = frequency > 0 ? frequencyToMidi(frequency) : -1;
@@ -187,8 +193,12 @@ async function detectWithFallback(
             currentNote = null;
         }
 
-        if (i % 100 === 0) {
+        if (i % FALLBACK_PROGRESS_BATCH_SIZE === 0) {
             onProgress?.({ phase: 'detecting', progress: Math.round((i / totalFrames) * 100) });
+        }
+
+        if (i > 0 && i % FALLBACK_YIELD_BATCH_SIZE === 0) {
+            await yieldToMainThread();
         }
     }
 
