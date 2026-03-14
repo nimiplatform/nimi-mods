@@ -8,7 +8,7 @@ import { DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS, DEFAULT_LOCAL_CHAT_SETTINGS, type 
 import { buildLocalChatTurnContextKey } from '../../src/hooks/turn-send/context-key.ts';
 import { runLocalChatTurnSend } from '../../src/hooks/turn-send/send-flow.ts';
 import { resetLocalChatConversationLedgerForTests, } from '../../src/state/index.ts';
-import { type ModRuntimeDependencySnapshot } from "@nimiplatform/sdk/mod";
+import { type ModRuntimeLocalProfileSnapshot } from "@nimiplatform/sdk/mod";
 class MemoryStorage implements Storage {
     private store = new Map<string, string>();
     get length(): number {
@@ -123,15 +123,15 @@ export function createTestTarget(overrides: Partial<LocalChatTarget> = {}): Loca
 export function createDependencySnapshot(input: {
     capability: 'image' | 'video';
     status: 'ready' | 'missing' | 'degraded';
-}): ModRuntimeDependencySnapshot {
+}): ModRuntimeLocalProfileSnapshot {
     return {
         modId: 'local-chat',
         status: input.status,
         routeSource: 'local',
         warnings: [],
-        dependencies: input.status === 'ready'
+        entries: input.status === 'ready'
             ? [{
-                    dependencyId: `${input.capability}-model`,
+                    entryId: `${input.capability}-model`,
                     kind: 'model',
                     capability: input.capability,
                     required: true,
@@ -482,8 +482,8 @@ export function createSendFlowHarness(input: {
             selectedSessionId?: string;
             priorMessages?: Array<Record<string, unknown>>;
             defaultSettings?: Partial<typeof DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS>;
-            imageDependencySnapshot?: ModRuntimeDependencySnapshot | null;
-            videoDependencySnapshot?: ModRuntimeDependencySnapshot | null;
+            imageDependencySnapshot?: ModRuntimeLocalProfileSnapshot | null;
+            videoDependencySnapshot?: ModRuntimeLocalProfileSnapshot | null;
             aiClient: Pick<LocalChatAiClient, 'generateText' | 'generateObject' | 'streamText' | 'generateImage' | 'generateVideo' | 'resolveRoute'>;
         }) {
             state.inputText = exec.userText;

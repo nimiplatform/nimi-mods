@@ -10,7 +10,7 @@ import { runLocalChatTurnSend } from '../src/hooks/turn-send/send-flow.ts';
 import { resetTextTurnStreamHealthForTests } from '../src/hooks/turn-send/text-turn-runner.ts';
 import { resolveStageConversationSlice } from '../src/components/layout/stage-dialogue-card.tsx';
 import { resetLocalChatConversationLedgerForTests } from '../src/state/index.ts';
-import { type ModRuntimeDependencySnapshot } from "@nimiplatform/sdk/mod";
+import { type ModRuntimeLocalProfileSnapshot } from "@nimiplatform/sdk/mod";
 class MemoryStorage implements Storage {
     private store = new Map<string, string>();
     get length(): number {
@@ -62,15 +62,15 @@ function createTarget(): LocalChatTarget {
 function createDependencySnapshot(input: {
     capability: 'image' | 'video';
     status: 'ready' | 'missing' | 'degraded';
-}): ModRuntimeDependencySnapshot {
+}): ModRuntimeLocalProfileSnapshot {
     return {
         modId: 'local-chat',
         status: input.status,
         routeSource: 'local',
         warnings: [],
-        dependencies: input.status === 'ready'
+        entries: input.status === 'ready'
             ? [{
-                    dependencyId: `${input.capability}-model`,
+                    entryId: `${input.capability}-model`,
                     kind: 'model',
                     capability: input.capability,
                     required: true,
@@ -366,8 +366,8 @@ function createHarness() {
             userText: string;
             priorMessages?: Array<Record<string, unknown>>;
             defaultSettings?: Partial<typeof DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS>;
-            imageDependencySnapshot?: ModRuntimeDependencySnapshot | null;
-            videoDependencySnapshot?: ModRuntimeDependencySnapshot | null;
+            imageDependencySnapshot?: ModRuntimeLocalProfileSnapshot | null;
+            videoDependencySnapshot?: ModRuntimeLocalProfileSnapshot | null;
             aiClientOverrides?: Partial<{
                 streamText: ReturnType<typeof createTextStream>;
                 generateText: (input: Record<string, unknown>) => Promise<Record<string, unknown>>;

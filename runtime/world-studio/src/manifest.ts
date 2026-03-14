@@ -36,30 +36,35 @@ export const WORLD_STUDIO_MANIFEST = {
   },
   ai: {
     consume: ['chat', 'image'],
-    dependencies: {
-      required: [
-        {
-          dependencyId: 'world-studio/chat-qwen2.5-7b',
-          kind: 'model',
-          capability: 'chat',
-          modelId: 'qwen2.5-7b-instruct',
-          repo: 'Qwen/Qwen2.5-7B-Instruct-GGUF',
-          engine: 'openai-compatible',
-          title: 'Qwen2.5 7B Instruct (default)',
-        },
-      ],
-      optional: [
-        {
-          dependencyId: 'world-studio/image-token-node',
-          kind: 'node',
-          capability: 'image',
-          nodeId: 'image.generate.cloud',
-          title: 'Cloud image generation node',
-        },
-      ],
-      preferred: {
-        chat: 'world-studio/chat-qwen2.5-7b',
+    profiles: [
+      {
+        id: 'world-studio-default',
+        title: 'Default studio stack',
+        description: 'Balanced world-building stack with local chat and image generation node.',
+        recommended: true,
+        consumeCapabilities: ['chat', 'image'],
+        entries: [
+          {
+            entryId: 'world-studio/chat-qwen2.5-7b',
+            kind: 'model',
+            capability: 'chat',
+            modelId: 'qwen2.5-7b-instruct',
+            repo: 'Qwen/Qwen2.5-7B-Instruct-GGUF',
+            engine: 'openai-compatible',
+            title: 'Qwen2.5 7B Instruct (default)',
+            required: true,
+            preferred: true,
+          },
+          {
+            entryId: 'world-studio/image-token-node',
+            kind: 'node',
+            capability: 'image',
+            nodeId: 'image.generate.cloud',
+            title: 'Cloud image generation node',
+            required: true,
+          },
+        ],
       },
-    },
+    ],
   },
 } as const;

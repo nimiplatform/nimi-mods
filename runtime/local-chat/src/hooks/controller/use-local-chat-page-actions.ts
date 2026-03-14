@@ -104,7 +104,7 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
             scenario: 'audio.transcribe',
         });
         const chatCapabilityMatched = (() => {
-            const dependencyRows = dependencySnapshot?.dependencies || [];
+            const dependencyRows = dependencySnapshot?.entries || [];
             const chatRows = dependencyRows.filter((item) => item.capability === 'text.generate');
             if (chatRows.length > 0) {
                 return chatRows.some((item) => item.selected);
@@ -156,7 +156,7 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
         const isLocalSnapshotFailure = autoBoundSource === 'cloud'
             && dependencySnapshot?.reasonCode === ReasonCode.LOCAL_AI_DEPENDENCY_SNAPSHOT_FAILED;
         const capabilityMatchedFromSnapshot = (capability: 'text.generate' | 'audio.synthesize' | 'audio.transcribe'): boolean => {
-            const dependencyRows = dependencySnapshot?.dependencies || [];
+            const dependencyRows = dependencySnapshot?.entries || [];
             const rows = dependencyRows.filter((item) => item.capability === capability);
             if (rows.length === 0) {
                 if (capability === 'text.generate')

@@ -29,12 +29,12 @@ function createSdkRuntimeContext() {
       healthy: true,
       status: 'healthy',
     }),
-    getModAiDependencySnapshot: async () => ({
+    getModLocalProfileSnapshot: async () => ({
       modId: 'world.nimi.test-ai',
       status: 'ready',
       routeSource: 'mixed',
       warnings: [],
-      dependencies: [],
+      entries: [],
       repairActions: [],
       updatedAt: new Date().toISOString(),
     }),

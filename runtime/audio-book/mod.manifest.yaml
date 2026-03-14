@@ -22,41 +22,58 @@ ai:
   consume:
     - chat
     - tts
-  dependencies:
-    required:
-      - dependencyId: audio-book/chat-qwen2.5-7b
-        kind: model
-        capability: chat
-        modelId: qwen2.5-7b-instruct
-        repo: Qwen/Qwen2.5-7B-Instruct-GGUF
-        engine: openai-compatible
-        title: Qwen2.5 7B Instruct (analysis)
-    optional:
-      - dependencyId: audio-book/tts-token-node
-        kind: node
-        capability: tts
-        nodeId: speech.synthesize.cloud
-        title: Token API TTS node
-    alternatives:
-      - alternativeId: audio-book-tts-qwen3
-        preferredDependencyId: audio-book/tts-qwen3-1.7b
-        options:
-          - dependencyId: audio-book/tts-qwen3-1.7b
-            kind: service
-            capability: tts
-            serviceId: qwen-tts-python
-            modelId: Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign
-            repo: Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign
-            engine: qwen-tts-python
-            title: Qwen3 TTS 1.7B (recommended)
-          - dependencyId: audio-book/tts-qwen3-0.6b
-            kind: service
-            capability: tts
-            serviceId: qwen-tts-python
-            modelId: Qwen/Qwen3-TTS-12Hz-0.6B-VoiceDesign
-            repo: Qwen/Qwen3-TTS-12Hz-0.6B-VoiceDesign
-            engine: qwen-tts-python
-            title: Qwen3 TTS 0.6B
-    preferred:
-      chat: audio-book/chat-qwen2.5-7b
-      tts: audio-book/tts-qwen3-1.7b
+  profiles:
+    - id: audio-book-default
+      title: Default narration stack
+      description: Balanced audiobook stack with Qwen2.5 chat and Qwen3 TTS 1.7B.
+      recommended: true
+      consumeCapabilities:
+        - chat
+        - tts
+      entries:
+        - entryId: audio-book/chat-qwen2.5-7b
+          kind: model
+          capability: chat
+          modelId: qwen2.5-7b-instruct
+          repo: Qwen/Qwen2.5-7B-Instruct-GGUF
+          engine: openai-compatible
+          title: Qwen2.5 7B Instruct (analysis)
+          required: true
+          preferred: true
+        - entryId: audio-book/tts-qwen3-1.7b
+          kind: service
+          capability: tts
+          serviceId: qwen-tts-python
+          modelId: Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign
+          repo: Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign
+          engine: qwen-tts-python
+          title: Qwen3 TTS 1.7B (recommended)
+          required: true
+          preferred: true
+    - id: audio-book-compact
+      title: Compact narration stack
+      description: Smaller audiobook stack with Qwen2.5 chat and Qwen3 TTS 0.6B.
+      recommended: false
+      consumeCapabilities:
+        - chat
+        - tts
+      entries:
+        - entryId: audio-book/chat-qwen2.5-7b
+          kind: model
+          capability: chat
+          modelId: qwen2.5-7b-instruct
+          repo: Qwen/Qwen2.5-7B-Instruct-GGUF
+          engine: openai-compatible
+          title: Qwen2.5 7B Instruct (analysis)
+          required: true
+          preferred: true
+        - entryId: audio-book/tts-qwen3-0.6b
+          kind: service
+          capability: tts
+          serviceId: qwen-tts-python
+          modelId: Qwen/Qwen3-TTS-12Hz-0.6B-VoiceDesign
+          repo: Qwen/Qwen3-TTS-12Hz-0.6B-VoiceDesign
+          engine: qwen-tts-python
+          title: Qwen3 TTS 0.6B
+          required: true
+          preferred: true

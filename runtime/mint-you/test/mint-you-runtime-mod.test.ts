@@ -117,12 +117,12 @@ function createSdkRuntimeContext() {
       healthy: true,
       status: 'healthy',
     }),
-    getModAiDependencySnapshot: async () => ({
+    getModLocalProfileSnapshot: async () => ({
       modId: 'world.nimi.mint-you',
       status: 'ready',
       routeSource: 'unknown',
       warnings: [],
-      dependencies: [],
+      entries: [],
       repairActions: [],
       updatedAt: new Date().toISOString(),
     }),

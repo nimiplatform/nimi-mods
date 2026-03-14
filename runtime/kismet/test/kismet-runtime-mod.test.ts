@@ -31,12 +31,12 @@ function createSdkRuntimeContext() {
       healthy: true,
       status: 'healthy',
     }),
-    getModAiDependencySnapshot: async () => ({
+    getModLocalProfileSnapshot: async () => ({
       modId: 'world.nimi.kismet',
       status: 'ready',
       routeSource: 'unknown',
       warnings: [],
-      dependencies: [],
+      entries: [],
       repairActions: [],
       updatedAt: new Date().toISOString(),
     }),
@@ -199,21 +199,27 @@ test('kismet runtime mod setup registers runtime-aligned UI surfaces', async () 
   }
 });
 
-test('kismet manifest declares chat ai dependencies and cloud-chat requirement', () => {
+test('kismet manifest declares chat ai profile and cloud-chat requirement', () => {
   assert.deepEqual(
-    KISMET_MANIFEST.ai.dependencies.required,
+    KISMET_MANIFEST.ai.profiles,
     [{
-      dependencyId: 'kismet/chat-qwen2.5-7b',
-      kind: 'model',
-      capability: 'chat',
-      modelId: 'qwen2.5-7b-instruct',
-      repo: 'Qwen/Qwen2.5-7B-Instruct-GGUF',
-      engine: 'openai-compatible',
-      title: 'Qwen2.5 7B Instruct (analysis)',
+      id: 'kismet-default',
+      title: 'Default analysis stack',
+      description: 'Balanced local chat model for BaZi analysis.',
+      recommended: true,
+      consumeCapabilities: ['chat'],
+      entries: [{
+        entryId: 'kismet/chat-qwen2.5-7b',
+        kind: 'model',
+        capability: 'chat',
+        modelId: 'qwen2.5-7b-instruct',
+        repo: 'Qwen/Qwen2.5-7B-Instruct-GGUF',
+        engine: 'openai-compatible',
+        title: 'Qwen2.5 7B Instruct (analysis)',
+        required: true,
+        preferred: true,
+      }],
     }],
   );
-  assert.deepEqual(KISMET_MANIFEST.ai.dependencies.preferred, {
-    chat: 'kismet/chat-qwen2.5-7b',
-  });
   assert.deepEqual(KISMET_MANIFEST.requires, ['desktop-core-cloud-chat']);
 });

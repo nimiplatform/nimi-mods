@@ -12,7 +12,7 @@ import { buildMediaGenerationSpec, compileMediaExecution, createMediaSpecHash, t
 import { collectMediaContextSnapshot, enrichMediaIntent, type MediaContextSnapshot, } from './media-context-enricher.js';
 import { buildMediaSettingsRevision, isMediaRouteReady, preflightResolveMediaRoute, resolveMediaRouteConfig, resolveMediaRouteFromOptions, } from './media-route.js';
 import type { LocalChatResolvedMediaRoute } from '../../types.js';
-import { type ModRuntimeDependencySnapshot, type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot } from "@nimiplatform/sdk/mod";
+import { type ModRuntimeLocalProfileSnapshot, type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot } from "@nimiplatform/sdk/mod";
 type AssistantTurnMediaHistory = {
     timestampMs: number | null;
     hasMedia: boolean;
@@ -52,8 +52,8 @@ export type DecideMediaExecutionInput = {
     videoRouteOptionsRevision?: number;
     imageResolvedRoute?: LocalChatResolvedMediaRoute | null;
     videoResolvedRoute?: LocalChatResolvedMediaRoute | null;
-    imageDependencySnapshot: ModRuntimeDependencySnapshot | null;
-    videoDependencySnapshot: ModRuntimeDependencySnapshot | null;
+    imageDependencySnapshot: ModRuntimeLocalProfileSnapshot | null;
+    videoDependencySnapshot: ModRuntimeLocalProfileSnapshot | null;
     markerOverrideIntent: PendingMediaIntent | null;
 };
 const IMAGE_AUTO_CONFIDENCE_THRESHOLD = 0.82;
@@ -83,7 +83,7 @@ function resolveEffectiveMediaRouteSource(input: {
     });
 }
 export function normalizeMediaDependencyStatus(input: {
-    snapshot: ModRuntimeDependencySnapshot | null;
+    snapshot: ModRuntimeLocalProfileSnapshot | null;
     routeSource: MediaRouteSource;
 }): MediaDependencyStatus {
     if (input.routeSource === 'cloud') {
@@ -101,7 +101,7 @@ export function normalizeMediaDependencyStatus(input: {
     return 'unknown';
 }
 export function isMediaDependencyReady(input: {
-    snapshot: ModRuntimeDependencySnapshot | null;
+    snapshot: ModRuntimeLocalProfileSnapshot | null;
     routeSource: MediaRouteSource;
 }): boolean {
     if (input.routeSource === 'cloud') {

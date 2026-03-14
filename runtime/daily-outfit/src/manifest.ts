@@ -57,9 +57,6 @@ export const DAILY_OUTFIT_MANIFEST = {
   },
   ai: {
     consume: ['chat', 'image'],
-    dependencies: {
-      required: [],
-      optional: [],
-    },
+    profiles: [],
   },
 } as const;

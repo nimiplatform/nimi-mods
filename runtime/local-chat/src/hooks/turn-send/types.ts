@@ -3,7 +3,7 @@ import type { LocalChatTarget } from '../../data/index.js';
 import type { InteractionBeat, InteractionTurnPlan, LocalChatDefaultSettings, VoiceConversationMode, LocalChatPromptTrace, LocalChatSession, LocalChatTurnAudit, } from '../../state/index.js';
 import type { ChatMessage, LocalChatResolvedMediaRoute, LocalChatTurnMode } from '../../types.js';
 import type { LocalChatAiClient, LocalChatAudioPlaybackSource } from '../../runtime-ai-client.js';
-import { type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot, type ModRuntimeDependencySnapshot } from "@nimiplatform/sdk/mod";
+import { type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot, type ModRuntimeLocalProfileSnapshot } from "@nimiplatform/sdk/mod";
 export type ChatRouteSnapshot = {
     source: string;
     model: string;
@@ -62,8 +62,8 @@ export type UseLocalChatTurnSendInput = {
         actionLabel?: string;
         onAction?: () => void;
     }) => void;
-    imageDependencySnapshot?: ModRuntimeDependencySnapshot | null;
-    videoDependencySnapshot?: ModRuntimeDependencySnapshot | null;
+    imageDependencySnapshot?: ModRuntimeLocalProfileSnapshot | null;
+    videoDependencySnapshot?: ModRuntimeLocalProfileSnapshot | null;
     isTranscribing?: boolean;
     onOpenRuntimeSetup?: () => void;
     synthesizeVoice?: (text: string) => Promise<LocalChatAudioPlaybackSource>;

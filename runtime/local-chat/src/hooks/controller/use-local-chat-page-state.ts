@@ -22,7 +22,7 @@ import { createLocalChatAiClient } from '../../runtime-ai-client.js';
 import type { InteractionSnapshot } from '../../state/index.js';
 import { clearLocalChatHiddenMemoryState, getLocalChatInteractionSnapshot, } from '../../state/index.js';
 import { useLocalChatConversationViewMode } from './use-local-chat-conversation-view-mode.js';
-import { createModRuntimeInspector, type ModRuntimeDependencySnapshot, createHookClient, createModRuntimeClient, logRendererEvent, type RuntimeCanonicalCapability } from "@nimiplatform/sdk/mod";
+import { createModRuntimeInspector, type ModRuntimeLocalProfileSnapshot, createHookClient, createModRuntimeClient, logRendererEvent, type RuntimeCanonicalCapability } from "@nimiplatform/sdk/mod";
 type RuntimeFieldsMap = {
     mode?: 'STORY' | 'SCENE_TURN';
     targetType?: string;
@@ -38,14 +38,14 @@ function createDependencySnapshotFailure(input: {
     routeSourceHint?: 'cloud' | 'local';
     capability: RuntimeCanonicalCapability;
     error: unknown;
-}): ModRuntimeDependencySnapshot {
+}): ModRuntimeLocalProfileSnapshot {
     return {
         modId: LOCAL_CHAT_MOD_ID,
         status: 'missing',
         routeSource: input.routeSourceHint || 'unknown',
         reasonCode: ReasonCode.LOCAL_AI_DEPENDENCY_SNAPSHOT_FAILED,
         warnings: [input.error instanceof Error ? input.error.message : String(input.error || 'unknown error')],
-        dependencies: [],
+        entries: [],
         repairActions: [{
                 actionId: 'runtime:open-setup',
                 label: 'Open Runtime Setup',
@@ -93,9 +93,9 @@ export function useLocalChatPageState() {
     } | null>(null);
     const [latestPromptTrace, setLatestPromptTrace] = useState<LocalChatPromptTrace | null>(null);
     const [latestTurnAudit, setLatestTurnAudit] = useState<LocalChatTurnAudit | null>(null);
-    const [dependencySnapshot, setDependencySnapshot] = useState<ModRuntimeDependencySnapshot | null>(null);
-    const [imageDependencySnapshot, setImageDependencySnapshot] = useState<ModRuntimeDependencySnapshot | null>(null);
-    const [videoDependencySnapshot, setVideoDependencySnapshot] = useState<ModRuntimeDependencySnapshot | null>(null);
+    const [dependencySnapshot, setDependencySnapshot] = useState<ModRuntimeLocalProfileSnapshot | null>(null);
+    const [imageDependencySnapshot, setImageDependencySnapshot] = useState<ModRuntimeLocalProfileSnapshot | null>(null);
+    const [videoDependencySnapshot, setVideoDependencySnapshot] = useState<ModRuntimeLocalProfileSnapshot | null>(null);
     const [voiceConversationModeBySessionId, setVoiceConversationModeBySessionId] = useState<Record<string, VoiceConversationMode>>({});
     const [activeInteractionSnapshot, setActiveInteractionSnapshot] = useState<InteractionSnapshot | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -334,12 +334,12 @@ export function useLocalChatPageState() {
                 setDependencySnapshot((previous) => {
                     if (!previous)
                         return previous;
-                    const hasVoiceCapabilityRow = previous.dependencies.some((item) => (item.capability === 'audio.synthesize' || item.capability === 'audio.transcribe'));
+                    const hasVoiceCapabilityRow = previous.entries.some((item) => (item.capability === 'audio.synthesize' || item.capability === 'audio.transcribe'));
                     return hasVoiceCapabilityRow ? null : previous;
                 });
             }
             try {
-                const snapshot = await runtimeInspector.getDependencySnapshot(dependencyCapability, effectiveRouteSource);
+                const snapshot = await runtimeInspector.getLocalProfileSnapshot(dependencyCapability, effectiveRouteSource);
                 setDependencySnapshot(snapshot);
             }
             catch (error) {
@@ -349,7 +349,7 @@ export function useLocalChatPageState() {
                     routeSource: 'cloud',
                     reasonCode: ReasonCode.LOCAL_AI_DEPENDENCY_SNAPSHOT_FAILED,
                     warnings: [error instanceof Error ? error.message : String(error || 'unknown error')],
-                    dependencies: [],
+                    entries: [],
                     repairActions: [{
                             actionId: 'runtime:open-setup',
                             label: 'Open Runtime Setup',
@@ -383,7 +383,7 @@ export function useLocalChatPageState() {
             ? setImageDependencySnapshot
             : setVideoDependencySnapshot;
         try {
-            const snapshot = await runtimeInspector.getDependencySnapshot(capability, routeSourceHint);
+            const snapshot = await runtimeInspector.getLocalProfileSnapshot(capability, routeSourceHint);
             setSnapshot(snapshot);
         }
         catch (error) {

@@ -34,6 +34,4 @@ ai:
   consume:
     - chat
     - image
-  dependencies:
-    required: []
-    optional: []
+  profiles: []

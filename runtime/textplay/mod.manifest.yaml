@@ -25,12 +25,18 @@ capabilities:
 ai:
   consume:
     - chat
-  dependencies:
-    required:
-      - dependencyId: textplay/chat-default
-        kind: model
-        capability: chat
-        engine: openai-compatible
-        title: Default Chat Model (runtime-resolved)
-    preferred:
-      chat: textplay/chat-default
+  profiles:
+    - id: textplay-default
+      title: Default story stack
+      description: Runtime-resolved default chat model for story play.
+      recommended: true
+      consumeCapabilities:
+        - chat
+      entries:
+        - entryId: textplay/chat-default
+          kind: model
+          capability: chat
+          engine: openai-compatible
+          title: Default Chat Model (runtime-resolved)
+          required: true
+          preferred: true

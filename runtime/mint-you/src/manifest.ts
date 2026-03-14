@@ -53,9 +53,6 @@ export const MINTYOU_MANIFEST = {
   },
   ai: {
     consume: ['chat'],
-    dependencies: {
-      required: [],
-      optional: [],
-    },
+    profiles: [],
   },
 } as const;

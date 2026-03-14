@@ -36,44 +36,65 @@ export const KB_MANIFEST = {
   },
   ai: {
     consume: ['chat', 'embedding'],
-    dependencies: {
-      required: [
-        {
-          dependencyId: 'knowledge-base/chat-qwen2.5-7b',
-          kind: 'model',
-          capability: 'chat',
-          modelId: 'qwen2.5-7b-instruct',
-          repo: 'Qwen/Qwen2.5-7B-Instruct-GGUF',
-          engine: 'openai-compatible',
-          title: 'Qwen2.5 7B Instruct (default)',
-        },
-      ],
-      alternatives: [
-        {
-          alternativeId: 'knowledge-base-embedding-runtime',
-          preferredDependencyId: 'knowledge-base/embedding-localai',
-          options: [
-            {
-              dependencyId: 'knowledge-base/embedding-localai',
-              kind: 'node',
-              capability: 'embedding',
-              nodeId: 'embedding.generate.localai',
-              title: 'Local embedding node (LocalAI)',
-            },
-            {
-              dependencyId: 'knowledge-base/embedding-nexa',
-              kind: 'node',
-              capability: 'embedding',
-              nodeId: 'embedding.generate.nexa',
-              title: 'Local embedding node (Nexa)',
-            },
-          ],
-        },
-      ],
-      preferred: {
-        chat: 'knowledge-base/chat-qwen2.5-7b',
-        embedding: 'knowledge-base/embedding-localai',
+    profiles: [
+      {
+        id: 'knowledge-base-localai',
+        title: 'Default RAG stack',
+        description: 'Qwen2.5 chat with LocalAI embeddings.',
+        recommended: true,
+        consumeCapabilities: ['chat', 'embedding'],
+        entries: [
+          {
+            entryId: 'knowledge-base/chat-qwen2.5-7b',
+            kind: 'model',
+            capability: 'chat',
+            modelId: 'qwen2.5-7b-instruct',
+            repo: 'Qwen/Qwen2.5-7B-Instruct-GGUF',
+            engine: 'openai-compatible',
+            title: 'Qwen2.5 7B Instruct (default)',
+            required: true,
+            preferred: true,
+          },
+          {
+            entryId: 'knowledge-base/embedding-localai',
+            kind: 'node',
+            capability: 'embedding',
+            nodeId: 'embedding.generate.localai',
+            title: 'Local embedding node (LocalAI)',
+            required: true,
+            preferred: true,
+          },
+        ],
       },
-    },
+      {
+        id: 'knowledge-base-nexa',
+        title: 'Nexa embedding stack',
+        description: 'Qwen2.5 chat with Nexa embeddings.',
+        recommended: false,
+        consumeCapabilities: ['chat', 'embedding'],
+        entries: [
+          {
+            entryId: 'knowledge-base/chat-qwen2.5-7b',
+            kind: 'model',
+            capability: 'chat',
+            modelId: 'qwen2.5-7b-instruct',
+            repo: 'Qwen/Qwen2.5-7B-Instruct-GGUF',
+            engine: 'openai-compatible',
+            title: 'Qwen2.5 7B Instruct (default)',
+            required: true,
+            preferred: true,
+          },
+          {
+            entryId: 'knowledge-base/embedding-nexa',
+            kind: 'node',
+            capability: 'embedding',
+            nodeId: 'embedding.generate.nexa',
+            title: 'Local embedding node (Nexa)',
+            required: true,
+            preferred: true,
+          },
+        ],
+      },
+    ],
   },
 } as const;

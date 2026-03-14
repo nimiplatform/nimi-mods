@@ -176,7 +176,7 @@ function createRuntimeHost(runtime: Runtime, fixture: ReturnType<typeof loadGold
             checkedAt: new Date().toISOString(),
         }),
         getRuntimeHookRuntime: () => ({}) as never,
-        getModAiDependencySnapshot: async () => ({}) as never,
+        getModLocalProfileSnapshot: async () => ({}) as never,
         route: {
             listOptions: async ({ capability }) => ({
                 connectors: [],

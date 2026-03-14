@@ -28,7 +28,7 @@ audio-book/
     ├── index.ts              # validate manifest, export factory
     ├── runtime-mod.ts        # createAudioBookRuntimeMod()
     ├── contracts.ts          # MOD_ID, capabilities, slots, tab IDs, error codes
-    └── manifest.ts           # MANIFEST object (ai.dependencies, hooks)
+    └── manifest.ts           # MANIFEST object (ai.profiles, hooks)
 ```
 
 ### 2.2 注册 (runtime-mod.ts setup)
