@@ -14,7 +14,7 @@
 ## 1. Domain Invariants
 
 - `LC-DOM-001`: Local-Chat is desktop local session runtime, not cloud chat runtime.
-- `LC-DOM-002`: Session/turn persistence is local-only by default.
+- `LC-DOM-002`: Session/turn persistence is local-only by default and stored through host-provided mod storage.
 - `LC-DOM-003`: Route overrides are mod-scoped and must not mutate global runtime defaults.
 - `LC-DOM-004`: Assistant turn must include auditable diagnostics.
 - `LC-DOM-005`: Speech failures are non-blocking to text turn commit.

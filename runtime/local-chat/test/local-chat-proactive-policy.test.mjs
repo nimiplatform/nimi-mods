@@ -14,8 +14,8 @@ const BASE_INPUT = {
   nowMs: Date.now(),
 };
 
-test('local-chat proactive policy blocks when allowProactiveContact is disabled', () => {
-  const result = evaluateLocalChatProactivePolicy({
+test('local-chat proactive policy blocks when allowProactiveContact is disabled', async () => {
+  const result = await evaluateLocalChatProactivePolicy({
     ...BASE_INPUT,
     allowProactiveContact: false,
     targetId: `target-disabled-${Date.now().toString(36)}`,
@@ -26,8 +26,8 @@ test('local-chat proactive policy blocks when allowProactiveContact is disabled'
   assert.equal(result.actionHint, 'toggle-allow-proactive-contact');
 });
 
-test('local-chat proactive policy allows eligible target when wake strategy and idle window are valid', () => {
-  const result = evaluateLocalChatProactivePolicy({
+test('local-chat proactive policy allows eligible target when wake strategy and idle window are valid', async () => {
+  const result = await evaluateLocalChatProactivePolicy({
     ...BASE_INPUT,
     targetId: `target-allowed-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     nowMs: 1_736_352_000_000, // 2025-01-10T00:00:00.000Z

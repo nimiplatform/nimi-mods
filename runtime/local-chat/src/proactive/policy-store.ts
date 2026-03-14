@@ -1,10 +1,7 @@
-import {
-    createModKvStore,
-    createModStorageClient,
-} from "@nimiplatform/sdk/mod";
-import { LOCAL_CHAT_MOD_ID } from '../contracts.js';
+import type { ModKvStore } from "@nimiplatform/sdk/mod";
+import { createLocalChatHostKvStore } from '../storage/host-kv-store.js';
 const LOCAL_CHAT_PROACTIVE_POLICY_STORE_KEY = 'nimi.local-chat.proactive.policy.v1';
-let proactivePolicyStore: ReturnType<typeof createModKvStore> | null = null;
+let proactivePolicyStore: ModKvStore | null = null;
 type DailyCounter = {
     day: string;
     count: number;
@@ -19,10 +16,8 @@ const DEFAULT_POLICY_STORE_STATE: ProactivePolicyStoreState = {
 };
 function getPolicyStore() {
     if (!proactivePolicyStore) {
-        proactivePolicyStore = createModKvStore({
-            storage: createModStorageClient(LOCAL_CHAT_MOD_ID),
-            namespace: 'local-chat.proactive-policy',
-        });
+        // Proactive policy state stays in mod-scoped host storage alongside other local-chat local truth.
+        proactivePolicyStore = createLocalChatHostKvStore('local-chat.proactive-policy');
     }
     return proactivePolicyStore;
 }

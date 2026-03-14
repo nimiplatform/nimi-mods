@@ -34,7 +34,7 @@ function parseSession(raw: string | null): MintYouSession | null {
     }
 }
 /**
- * Trim session data before host sqlite persistence to avoid storing oversized transient blobs.
+ * Trim session data before host-backed mod storage persistence to avoid storing oversized transient blobs.
  * - Exclude data: URL photos (only keep in memory)
  * - Trim interview messages to most recent N
  * - Clamp memoryDigest length

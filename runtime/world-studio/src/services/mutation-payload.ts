@@ -11,6 +11,7 @@ const WORLD_STUDIO_ROUTE_OVERRIDE_STORAGE_KEY_PREFIX = 'nimi.world-studio.route-
 let routeBindingStore: ReturnType<typeof createModKvStore> | null = null;
 function getRouteBindingStore() {
     if (!routeBindingStore) {
+        // Route overrides are persisted through mod-scoped host storage, keyed per user.
         routeBindingStore = createModKvStore({
             storage: createModStorageClient(WORLD_STUDIO_MOD_ID),
             namespace: 'world-studio.route-overrides',

@@ -366,7 +366,7 @@ test('mint-you runtime mod setup registers profile filter and enforces photo vis
   }
 });
 
-test('mint-you photo auth stores directional cooldown in host sqlite storage', async () => {
+test('mint-you photo auth stores directional cooldown in host mod storage', async () => {
   const restoreLocalStorage = installLocalStorage();
   try {
     const { sdkRuntimeContext, runtimeHost } = createSdkRuntimeContext();

@@ -9,6 +9,7 @@ const TEXTPLAY_ROUTE_OVERRIDE_STORAGE_KEY = 'nimi.textplay.route-override.v1';
 let routeOverrideStore: ReturnType<typeof createModKvStore> | null = null;
 function getRouteOverrideStore() {
     if (!routeOverrideStore) {
+        // Route overrides stay mod-scoped and host-persisted; they do not mutate runtime defaults.
         routeOverrideStore = createModKvStore({
             storage: createModStorageClient(TEXTPLAY_MOD_ID),
             namespace: 'textplay.route-overrides',

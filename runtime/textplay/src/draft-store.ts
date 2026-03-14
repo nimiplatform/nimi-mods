@@ -22,6 +22,7 @@ let draftStateStore: ReturnType<typeof createModKvStore> | null = null;
 
 function getDraftStateStore() {
   if (!draftStateStore) {
+    // TextPlay keeps draft truth in host-scoped mod storage; this in-memory map is only a local cache.
     draftStateStore = createModKvStore({
       storage: createModStorageClient(TEXTPLAY_MOD_ID),
       namespace: 'textplay.drafts',

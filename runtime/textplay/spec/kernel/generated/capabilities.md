@@ -18,8 +18,10 @@ required_capabilities:
   - key: runtime.route.resolve
     source_rule: T-CAP-003
   - key: storage.sqlite.query
+    purpose: Read host-backed TextPlay draft and route-override state via the stable mod storage facade
     source_rule: T-CAP-002
   - key: storage.sqlite.execute
+    purpose: Persist host-backed TextPlay draft and route-override state via the stable mod storage facade
     source_rule: T-CAP-002
   - key: data.query.data-api.world.worlds.mine
     source_rule: T-CAP-003

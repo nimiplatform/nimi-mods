@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { createModKvStore, createModStorageClient } from '@nimiplatform/sdk/mod';
-import { LOCAL_CHAT_MOD_ID } from '../../contracts.js';
+import type { ModKvStore } from '@nimiplatform/sdk/mod';
+import { createLocalChatHostKvStore } from '../../storage/host-kv-store.js';
 
 export type LocalChatConversationViewMode = 'stage' | 'chat';
 
 const LOCAL_CHAT_VIEW_MODE_STORAGE_KEY = 'nimi.local-chat.view-mode.v1';
-const conversationViewModeStore = createModKvStore({
-  storage: createModStorageClient(LOCAL_CHAT_MOD_ID),
-  namespace: 'local-chat.view-mode',
-});
+let conversationViewModeStore: ModKvStore | null = null;
+
+function getConversationViewModeStore() {
+  if (!conversationViewModeStore) {
+    conversationViewModeStore = createLocalChatHostKvStore('local-chat.view-mode');
+  }
+  return conversationViewModeStore;
+}
 
 function buildStorageKey(viewerId: string, targetId: string): string {
   return `${LOCAL_CHAT_VIEW_MODE_STORAGE_KEY}:${viewerId}:${targetId}`;
@@ -21,7 +25,7 @@ async function readStoredViewMode(viewerId: string, targetId: string): Promise<L
     return null;
   }
   try {
-    const raw = String(await conversationViewModeStore.get(buildStorageKey(normalizedViewerId, normalizedTargetId)) || '').trim();
+    const raw = String(await getConversationViewModeStore().get(buildStorageKey(normalizedViewerId, normalizedTargetId)) || '').trim();
     return raw === 'chat' ? 'chat' : raw === 'stage' ? 'stage' : null;
   } catch {
     return null;
@@ -35,9 +39,9 @@ async function writeStoredViewMode(viewerId: string, targetId: string, mode: Loc
     return;
   }
   try {
-    await conversationViewModeStore.set(buildStorageKey(normalizedViewerId, normalizedTargetId), mode);
+    await getConversationViewModeStore().set(buildStorageKey(normalizedViewerId, normalizedTargetId), mode);
   } catch {
-    // Ignore persistence failures; mode still lives in memory.
+    // Ignore host-storage persistence failures; view mode still lives in memory.
   }
 }
 

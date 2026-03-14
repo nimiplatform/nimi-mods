@@ -4,7 +4,7 @@
 
 ## WS-ROUTE-001 Route Override Scope
 
-Route overrides are stage-based (`coarse`, `fine`) and persisted per-user with a mod-local key prefix.
+Route overrides are stage-based (`coarse`, `fine`) and persisted per-user with a mod-local key prefix through the host-provided mod storage facade.
 
 ## WS-ROUTE-002 Route Readiness Codes
 

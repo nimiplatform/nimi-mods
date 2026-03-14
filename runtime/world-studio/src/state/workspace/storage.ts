@@ -17,6 +17,7 @@ const lastPersistedSelectionStateByUser = new Map<string, {
 }>();
 function getWorkspaceSnapshotStore() {
     if (!workspaceSnapshotStore) {
+        // Workspace persistence remains a single host-backed snapshot; this round does not change its shape.
         workspaceSnapshotStore = createModKvStore({
             storage: createModStorageClient(WORLD_STUDIO_MOD_ID),
             namespace: 'world-studio.workspace',

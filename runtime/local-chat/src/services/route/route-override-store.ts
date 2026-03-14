@@ -1,18 +1,15 @@
 import {
     asRecord,
-    createModKvStore,
-    createModStorageClient,
+    type ModKvStore,
     type RuntimeRouteBinding,
 } from "@nimiplatform/sdk/mod";
-import { LOCAL_CHAT_MOD_ID } from '../../contracts.js';
+import { createLocalChatHostKvStore } from '../../storage/host-kv-store.js';
 const LOCAL_CHAT_ROUTE_OVERRIDE_STORAGE_KEY = 'nimi.local-chat.route-override.v1';
-let routeOverrideStore: ReturnType<typeof createModKvStore> | null = null;
+let routeOverrideStore: ModKvStore | null = null;
 function getRouteOverrideStore() {
     if (!routeOverrideStore) {
-        routeOverrideStore = createModKvStore({
-            storage: createModStorageClient(LOCAL_CHAT_MOD_ID),
-            namespace: 'local-chat.route-overrides',
-        });
+        // Route overrides are persisted locally for this mod only and do not mutate runtime-wide defaults.
+        routeOverrideStore = createLocalChatHostKvStore('local-chat.route-overrides');
     }
     return routeOverrideStore;
 }

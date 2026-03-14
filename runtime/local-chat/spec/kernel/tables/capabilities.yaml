@@ -52,8 +52,10 @@ required_capabilities:
   - key: runtime.route.check.health
     source_rule: LC-CAP-004
   - key: storage.sqlite.query
+    purpose: Read Local-Chat host-backed local truth through the stable mod storage facade
     source_rule: LC-CAP-001
   - key: storage.sqlite.execute
+    purpose: Persist Local-Chat host-backed local truth through the stable mod storage facade
     source_rule: LC-CAP-001
   - key: data.query.data-api.core.social.friends-with-details.list
     source_rule: LC-CAP-005

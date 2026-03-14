@@ -1,8 +1,4 @@
-import {
-  createModKvStore,
-  createModStorageClient,
-} from '@nimiplatform/sdk/mod';
-import { LOCAL_CHAT_MOD_ID } from '../contracts.js';
+import type { ModKvStore } from '@nimiplatform/sdk/mod';
 import type {
   InteractionRecallDoc,
   InteractionSnapshot,
@@ -21,7 +17,9 @@ import {
   normalizeRelationMemorySlot,
   normalizeTurnRecord,
 } from './normalizers.js';
+import { createLocalChatHostKvStore } from '../storage/host-kv-store.js';
 
+// Legacy schema ids are retained for continuity, but runtime persistence now uses host-backed mod storage snapshots.
 export const LOCAL_CHAT_LEDGER_DB_NAME = 'nimi.local-chat.ledger.v3';
 export const LOCAL_CHAT_LEDGER_DB_VERSION = 1;
 export const LOCAL_CHAT_SESSION_UPDATED_EVENT = 'local-chat:session-updated';
@@ -71,10 +69,14 @@ type PersistedLedgerSnapshot = {
   recallIndex: unknown[];
 };
 
-const ledgerStateStore = createModKvStore({
-  storage: createModStorageClient(LOCAL_CHAT_MOD_ID),
-  namespace: 'local-chat.ledger',
-});
+let ledgerStateStore: ModKvStore | null = null;
+
+function getLedgerStateStore() {
+  if (!ledgerStateStore) {
+    ledgerStateStore = createLocalChatHostKvStore('local-chat.ledger');
+  }
+  return ledgerStateStore;
+}
 
 function emptyLedgerCache(): LedgerCache {
   return {
@@ -113,7 +115,7 @@ function serializeLedgerSnapshot(): PersistedLedgerSnapshot {
 }
 
 async function persistLedgerSnapshot(): Promise<void> {
-  await ledgerStateStore.setJson(LEDGER_SNAPSHOT_KEY, serializeLedgerSnapshot());
+  await getLedgerStateStore().setJson(LEDGER_SNAPSHOT_KEY, serializeLedgerSnapshot());
 }
 
 function applyPersistedSnapshot(snapshot: PersistedLedgerSnapshot | null | undefined): void {
@@ -164,12 +166,13 @@ function applyPersistedSnapshot(snapshot: PersistedLedgerSnapshot | null | undef
 }
 
 export async function openLedgerDatabase(): Promise<boolean> {
-  await ledgerStateStore.get(LEDGER_SNAPSHOT_KEY);
+  await getLedgerStateStore().get(LEDGER_SNAPSHOT_KEY);
   return true;
 }
 
+// The exported name is preserved for compatibility; the backing store is the host storage snapshot, not browser IndexedDB.
 export async function loadAllFromIndexedDb(): Promise<void> {
-  const snapshot = await ledgerStateStore.getJson<PersistedLedgerSnapshot>(LEDGER_SNAPSHOT_KEY);
+  const snapshot = await getLedgerStateStore().getJson<PersistedLedgerSnapshot>(LEDGER_SNAPSHOT_KEY);
   applyPersistedSnapshot(snapshot);
 }
 
@@ -269,7 +272,7 @@ export async function persistMutation(mutation: LedgerMutation): Promise<void> {
 
 export async function clearLedgerPersistence(): Promise<void> {
   ledgerCache = emptyLedgerCache();
-  await ledgerStateStore.delete(LEDGER_SNAPSHOT_KEY);
+  await getLedgerStateStore().delete(LEDGER_SNAPSHOT_KEY);
 }
 
 export async function transactionDone(): Promise<void> {

@@ -28,10 +28,10 @@ required_capabilities:
     purpose: Intercept agent profile reads to filter referenceImageUrl based on photo authorization state
     source_rule: MY-CAP-005
   - key: storage.sqlite.query
-    purpose: Query host sqlite state for intake progress and photo authorization
+    purpose: Query host-provided mod storage state for intake progress and photo authorization through the stable storage facade
     source_rule: MY-CAP-002
   - key: storage.sqlite.execute
-    purpose: Persist intake session progress and photo authorization state in host sqlite
+    purpose: Persist intake session progress and photo authorization state through the host-provided mod storage facade
     source_rule: MY-CAP-002
   # UI registration
   - key: ui.register.ui-extension.app.sidebar.mods
