@@ -102,7 +102,7 @@ cases:
     reason_code: BUDDY_REST_REMINDER_TRIGGERED
     source_rule: BD-ACC-002
   - id: BD-018-HISTORY-PERSIST
-    description: 对话历史在页面切换后从 mod-state 恢复。
+    description: 对话历史在页面切换后从 Buddy 专属宿主 sqlite 恢复。
     expected_ok: true
     reason_code: null
     source_rule: BD-ACC-002

@@ -82,9 +82,9 @@ await hookClient.ui.register({
 
 | 层 | 工具 | 内容 | 生命周期 |
 |---|---|---|---|
-| **持久状态** | Zustand + IndexedDB | 项目列表、Script、CharacterProfile[]、VoiceCasting[]、SynthesisJob | 跨会话持久 |
+| **持久状态** | Zustand + host sqlite/files | 项目列表、Script、CharacterProfile[]、VoiceCasting[]、SynthesisJob、音频文件 | 跨会话持久 |
 | **临时 UI 状态** | `useAudioBookUiState()` | 当前 step、loading、进度、选中角色、播放状态、testMode | 页面级 |
-| **路由状态** | `useTtsRoute()` | connector 列表、chat/tts selection、model | 页面级，localStorage 持久化选择 |
+| **路由状态** | `useTtsRoute()` | connector 列表、chat/tts selection、model | 页面级，host sqlite 持久化选择 |
 
 ### 4.2 临时 UI 状态 (`useAudioBookUiState`)
 
@@ -130,7 +130,7 @@ type TtsRouteState = {
 
 - Connector / model 发现：调 `runtimeClient.route.listOptions({ capability })`，按 capability-scoped route snapshot 选择 binding。
 - Model 选择：直接消费 runtime 返回的 connector/model 集，不再硬编码 provider/vendor 偏好表。
-- 选择持久化于 `localStorage`（`audio-book:chat-connector`、`audio-book:tts-connector`）。
+- 选择持久化于 Audio Book 专属宿主 sqlite。
 
 ## 5. Adapter 层
 

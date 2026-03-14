@@ -56,7 +56,7 @@
 
 ## KB-PIPE-005 — 向量存储
 
-浏览器端 in-memory 向量检索 + IndexedDB 持久化。
+浏览器端 in-memory 向量检索 + mod host sqlite 持久化。
 
 - `VectorStore` 类维护 `Map<string, KBVector>` 内存索引。
 - `search(queryEmbedding, topK, threshold, documentIds?)` 执行余弦相似度全扫描。
@@ -64,6 +64,6 @@
 - 按 score 降序排列，过滤 `score < threshold`，取 `topK` 个结果。
 - `documentIds` 可选参数限定检索范围。
 - `removeByDocumentId(docId)` 支持级联清理。
-- IndexedDB database: `knowledge-base-db` v1，object stores: `documents`、`chunks`、`vectors`、`conversations`、`settings`。
+- 持久化后端：Knowledge Base 专属宿主 sqlite，逻辑上保存 `documents`、`chunks`、`vectors`、`conversations`、`settings`。
 - `vectors` store 使用 `documentId` 索引。
 - `Float32Array` 序列化为 `number[]` 存储，读取时恢复。

@@ -234,7 +234,7 @@ entities:
       - name: audioStorageKey
         type: string
         required: false
-        description: "IndexedDB key for audio Blob (format: ab:audio:{projectId}:{segmentId})"
+        description: "Host files relative path for audio blob (format: audio/{projectId}/{segmentId}.bin)"
       - name: durationMs
         type: integer
         required: false

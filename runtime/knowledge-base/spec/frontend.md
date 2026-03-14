@@ -45,9 +45,9 @@ KnowledgeBasePage
 
 ## State Management
 
-### Persistent State (Zustand → IndexedDB)
+### Persistent State (Zustand → Host SQLite)
 
-`useKnowledgeBaseStore` — 全局状态，`init()` 时从 IndexedDB 加载：
+`useKnowledgeBaseStore` — 全局状态，`init()` 时从宿主 sqlite 加载：
 
 - `documents: KBDocument[]` — 按 updatedAt 降序（KB-DOM-001）
 - `chunkMap: Map<string, KBChunk>` — 内存 fast lookup（KB-DOM-002）

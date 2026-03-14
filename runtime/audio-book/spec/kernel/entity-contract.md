@@ -15,7 +15,7 @@
 - 项目名称由用户命名，不可为空。
 - 项目状态遵循 `tables/project-states.yaml` 定义的状态机。
 - 一个项目包含 `sourceChapters`（按章节组织的原始文本）、`script`（分析产物）、`characters`（角色档案数组）、`voiceCastings`（声线分配数组）、`synthesisJob`（合成任务）和 `audioOutputs`（章节级音频输出元数据）。
-- 项目数据持久化于 IndexedDB，key 前缀为 `ab:project:{id}`。
+- 项目数据持久化于 Audio Book 专属宿主 sqlite。
 
 ## VS-ENT-002 — SourceChapter
 
@@ -96,7 +96,7 @@
 
 - `segmentId` 引用 ScriptSegment.id。
 - `status`: pending / running / done / failed。
-- `audioStorageKey`: IndexedDB 存储 key，音频以 Blob 对象存储（非 base64，避免体积膨胀）。
+- `audioStorageKey`: host files 相对路径，音频以二进制文件存储（非 base64，避免体积膨胀）。
 - `durationMs`: 音频时长（毫秒）。
 - `retryCount`: 失败重试次数，上限由 VS-SYNTH-003 定义。
 - `error`: 失败原因描述。

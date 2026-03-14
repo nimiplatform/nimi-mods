@@ -29,7 +29,7 @@
   playbackPosition: number     (当前 segment 内的播放进度, ms)
 
 播放循环:
-  1. 从 IndexedDB 加载当前 segment 的 audioUri
+  1. 从 host files 读取当前 segment 的音频字节
   2. 用 Audio API 播放 (new Audio(audioUri))
   3. 播放结束时，自动前进到下一个 segment
   4. 当前章节全部 segment 播放完毕后，自动切换到下一章节
@@ -129,7 +129,7 @@
 
 用户可选择导出单个章节的完整音频：
 
-1. 从 IndexedDB 加载该章节全部 segment 的 audioUri。
+1. 从 host files 读取该章节全部 segment 的音频字节。
 2. 使用 Web Audio API 依次 decode 为 AudioBuffer。
 3. 创建合并的 AudioBuffer（按 segment 顺序拼接）。
 4. Encode 为 mp3/wav。

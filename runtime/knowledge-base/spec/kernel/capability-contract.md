@@ -73,7 +73,7 @@ KB mod 消费三种 runtime 能力：
 
 ## KB-CAP-008 — 隐私与安全约束
 
-- 文档原文与分块文本仅存储在浏览器 IndexedDB，不离开设备。
+- 文档原文与分块文本仅存储在 Knowledge Base 专属宿主 sqlite，不离开设备。
 - Cloud-first（cloud）模式下 embedding 请求发送 chunk 文本到远端——设置页必须明示此行为。
 - 不得未经用户确认自动上传文档原文。
 - 对话历史仅本地存储。

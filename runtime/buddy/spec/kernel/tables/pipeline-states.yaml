@@ -84,7 +84,7 @@ text_turn_chain:
     source_rule: BD-PIPE-002
   - step: turn-persist
     order: 12
-    description: 对话轮次持久化到 mod-state
+    description: 对话轮次持久化到 Buddy 专属宿主 sqlite
     source_rule: BD-PIPE-006
 voice_input_chain:
   - step: mic-capture

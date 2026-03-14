@@ -42,19 +42,19 @@
 
 ## VS-SYNTH-004 — 音频存储
 
-- 合成成功的音频以 **Blob** 对象存储于 IndexedDB（非 base64 字符串，避免 ~33% 体积膨胀）。
-- 存储 key 格式：`ab:audio:{projectId}:{segmentId}`。
-- 播放时从 IndexedDB 读取 Blob → `URL.createObjectURL()` → 传给 Audio API。
+- 合成成功的音频以二进制文件写入 mod host `files/` 子树（非 base64 字符串，避免 ~33% 体积膨胀）。
+- 音频相对路径格式：`audio/{projectId}/{segmentId}.bin`。
+- 播放时从 host files 读取字节 → `Blob` → `URL.createObjectURL()` → 传给 Audio API。
 - 播放完毕后 `URL.revokeObjectURL()` 释放内存。
 - 音频格式默认 `mp3`（体积与质量的平衡）。
-- 单个项目的音频总存储量可能达到数百 MB，IndexedDB 容量由浏览器动态分配（通常上限 > 1GB）。
+- 单个项目的音频总存储量可能达到数百 MB，因此音频与结构化状态分离存储。
 
 ## VS-SYNTH-005 — 增量合成
 
 - 修改某个角色的声线后，仅需重新合成该角色的全部 segment。
 - 修改某个 segment 的文本后，仅需重新合成该单个 segment。
 - 增量合成时，未受影响的 segment 音频保留不动。
-- 重新合成的 segment 覆盖 IndexedDB 中的旧音频。
+- 重新合成的 segment 原子覆盖 host files 中的旧音频。
 
 ## VS-SYNTH-006 — 进度追踪
 

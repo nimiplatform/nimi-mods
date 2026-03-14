@@ -66,7 +66,7 @@ embedding_readiness:
     action_hint: retry
     source_rule: WS-ROUTE-004
 route_override_persistence:
-  storage_key_prefix: nimi.world-studio.route-override.v2
+  storage_backend: world-studio host sqlite route-override namespace
   scope: per-user per-mod
   fields:
     - coarse

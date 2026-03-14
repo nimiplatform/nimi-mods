@@ -19,7 +19,7 @@ audio-book (nimi-mod)
 ├── hook.ui.register                 → 侧边栏 + 内容页
 ├── hook.event.publish/subscribe     → 合成进度事件
 │
-├── IndexedDB                        → 项目数据 + 音频存储
+├── Host storage (`sqlite` + `files`) → 项目数据 + 音频存储
 └── Web Audio API                    → 播放 + 可选导出
 ```
 
@@ -110,7 +110,7 @@ audio-book (nimi-mod)
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| 存储方案 | IndexedDB | 音频数据量大 (100MB-1GB)，localStorage 5MB 上限不够 |
+| 存储方案 | Host sqlite + files | 结构化状态与大音频文件分离，且由宿主按 mod 隔离 |
 | 播放方式 | Segment 队列播放 | 避免音频拼接的内存压力，实现简单 |
 | 段落切分 | 按段落（非按句） | TTS 效果更自然，segment 数量更少 |
 | 音频格式 | mp3 | 体积与质量的平衡 |

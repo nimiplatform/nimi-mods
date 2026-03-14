@@ -45,7 +45,7 @@
 
 - 显示：章节数量、总字数、每章字数分布
 - 项目状态: `draft` → `imported`
-- 数据持久化到 IndexedDB
+- 数据持久化到 mod host sqlite / files
 
 ## 3. AI 分析 (Step 2)
 

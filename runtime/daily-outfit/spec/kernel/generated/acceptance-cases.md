@@ -142,7 +142,7 @@ cases:
     reason_code: null
     source_rule: DO-ACC-002
   - id: DO-070-LOCAL-STORAGE
-    description: 所有数据默认存储在本地 IndexedDB。
+    description: 所有数据默认存储在 Daily Outfit 专属宿主 sqlite。
     expected_ok: true
     reason_code: null
     source_rule: DO-ACC-002

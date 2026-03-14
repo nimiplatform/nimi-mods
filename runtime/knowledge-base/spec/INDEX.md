@@ -39,7 +39,7 @@ version: 1.0.0
 │  │         │              │               │                   │   │
 │  │  State Layer                                               │   │
 │  │  ┌─────────────────────────────────────────┐              │   │
-│  │  │  Zustand Store ←→ IndexedDB             │              │   │
+│  │  │  Zustand Store ←→ Host SQLite          │              │   │
 │  │  └─────────────────────────────────────────┘              │   │
 │  └──────────────────────────────────────────────────────────┘   │
 │                              │                                    │
@@ -139,7 +139,7 @@ version: 1.0.0
 
 | Decision | Rationale |
 |----------|-----------|
-| IndexedDB 而非 Runtime KnowledgeService | K-KNOW Phase 1 仅 in-memory + substring matching，KB 需要持久化向量存储 |
+| Host sqlite 而非 Runtime KnowledgeService | K-KNOW Phase 1 仅 in-memory + substring matching，KB 仍需由 Desktop mod host 提供独立持久化 |
 | 浏览器端余弦相似度全扫描 | 文档量在 Desktop 场景下有限（<1000 docs），O(n) 扫描足够 |
 | Cloud-first embedding（auto 模式） | Token-api 质量更高；local 作为离线 fallback |
 | Async generator RAG 管线 | 流式输出 + 进度回调，避免 UI 阻塞 |

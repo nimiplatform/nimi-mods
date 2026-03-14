@@ -139,7 +139,7 @@ codes:
   - code: AB_STORAGE_QUOTA_EXCEEDED
     category: storage
     severity: error
-    message: IndexedDB storage quota exceeded
+    message: Host storage write rejected due to unavailable capacity
     user_message_zh: 存储空间不足
     recoverable: false
     recovery: Delete old projects to free space
@@ -147,14 +147,14 @@ codes:
   - code: AB_STORAGE_WRITE_FAILED
     category: storage
     severity: error
-    message: Failed to write audio data to IndexedDB
+    message: Failed to write audio data to host storage
     user_message_zh: 音频数据写入失败
 
   # Playback errors
   - code: AB_PLAY_AUDIO_LOAD_FAILED
     category: playback
     severity: warning
-    message: Failed to load audio segment from IndexedDB
+    message: Failed to load audio segment from host storage
     user_message_zh: 音频加载失败
     recoverable: true
     recovery: Re-synthesize the segment

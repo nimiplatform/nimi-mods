@@ -39,7 +39,7 @@
 - `TXT-018`: `Start` generates fresh `storyId = story_${ulid}` and `sessionId = session_${ulid}`. `entryEventId` is preserved separately and never reused as runtime story identity.
 - `TXT-019`: Entry agent is user-selected from `characterRefs`. When only one character ref exists it auto-selects; when none exist `Start` is disabled. TextPlay does not resolve fallback primary-agent chains.
 - `TXT-020`: Story startup package is assembled from entry detail, scenes, narrative-contexts, lorebooks, agent memory recall, and startup policy/material diagnostics.
-- `TXT-021`: TextPlay persists active drafts locally first. Local draft storage uses IndexedDB when available and may fall back to in-memory Map without blocking play.
+- `TXT-021`: TextPlay persists active drafts locally first. Local draft storage uses TextPlay 专属宿主 sqlite；若持久化失败，仅降级当前会话，不阻塞 play。
 - `TXT-022`: `Start`, `Resume`, and draft switching must auto-save the previously active story as `paused` before hydrating another draft. UI exposes at most one active session at a time.
 - `TXT-023`: `Restart` resets only the current story draft and narrative-engine story state, preserves the same `storyId`, `sessionId`, `agentId`, and `startupPackage`, then reruns opening.
 - `TXT-024`: `Stop` performs a single fire-and-forget publish to `data-api.world.spine.publish`; publish success or failure cannot block session teardown. Local draft and story state are always cleared afterwards.

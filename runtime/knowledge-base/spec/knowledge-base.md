@@ -4,7 +4,7 @@
 
 ## Positioning
 
-Knowledge Base 是运行于 Nimi Desktop zero-bundle mod host 的私有本地知识库 runtime mod，提供文档摄入、语义检索、多轮 RAG 问答全链路。所有数据仅存储在浏览器 IndexedDB 中，不离开设备。
+Knowledge Base 是运行于 Nimi Desktop zero-bundle mod host 的私有本地知识库 runtime mod，提供文档摄入、语义检索、多轮 RAG 问答全链路。所有数据仅存储在 mod host sqlite 中，不离开设备。
 
 ## Module Map
 
@@ -31,7 +31,7 @@ knowledge-base/
 │   │   ├── query-rewriter.ts                     # Query rewriting（KB-RAG-002）
 │   │   ├── rag-pipeline.ts                       # RAG 主管线（KB-RAG-001, 003, 004）
 │   │   └── citation-parser.ts                    # 引用解析（KB-RAG-005）
-│   ├── state/                                    # Zustand + IndexedDB
+│   ├── state/                                    # Zustand + host sqlite
 │   │   ├── knowledge-base-store.ts               # 全局状态
 │   │   └── indexed-db.ts                         # 持久化 CRUD
 │   ├── registrars/
@@ -81,7 +81,7 @@ knowledge-base/
 | Layer | Technology |
 |-------|-----------|
 | UI | React 19 + Tailwind 4 + Radix UI (Dialog, Progress, Tooltip) |
-| State | Zustand + IndexedDB (`knowledge-base-db` v1) |
+| State | Zustand + host sqlite |
 | AI | `@nimiplatform/sdk/mod` (`runtime.ai.text.generate/stream`, `runtime.ai.embedding.generate`) |
 | Vector Search | In-memory cosine similarity (VectorStore class) |
 | Routing | Tab-based (Documents / Chat / Settings) via Zustand `activeTab` |

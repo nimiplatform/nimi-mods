@@ -33,7 +33,7 @@
 - `embedding` 使用 `Float32Array` 存储。
 - `documentId` 为冗余字段，用于按文档过滤检索范围。
 - `model` 记录生成向量的模型标识，供审计追溯。
-- IndexedDB 中以 `number[]` 序列化存储，读取时恢复为 `Float32Array`。
+- 宿主 sqlite 中以 `number[]` 序列化存储，读取时恢复为 `Float32Array`。
 
 ## KB-DOM-004 — KBConversation
 
@@ -64,7 +64,7 @@
 
 ## KB-DOM-007 — KBSettings
 
-设置控制分块、检索和路由行为，持久化到 IndexedDB `settings` store。
+设置控制分块、检索和路由行为，持久化到宿主 sqlite。
 
 - **分块参数**：`chunkSize`（128-2048 tokens）、`chunkOverlap`（0-256 tokens，必须小于 chunkSize）。
 - **检索参数**：`topK`（1-20）、`similarityThreshold`（0.0-1.0）、`maxContextChunks`。

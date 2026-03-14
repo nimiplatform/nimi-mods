@@ -56,7 +56,7 @@ async function synthesizeSegment(segment: ScriptSegment, casting: VoiceCasting):
     pitch: casting.pitch,
     emotion: segment.emotion ?? casting.emotion,
   });
-  // Store result.audioUri to IndexedDB
+  // Store synthesized audio bytes into host files storage
   // Update SegmentJob: status = done, audioUri, durationMs
 }
 ```
@@ -92,13 +92,13 @@ attempt 3 仍失败: SegmentJob → failed
 
 | Key 格式 | Value | 存储位置 |
 |----------|-------|---------|
-| `ab:audio:{projectId}:{segmentId}` | base64 data URI (mp3) | IndexedDB |
+| `audio/{projectId}/{segmentId}.bin` | audio bytes (mp3 payload) | Host files |
 
 ### 5.2 Job 状态存储
 
 | Key 格式 | Value | 存储位置 |
 |----------|-------|---------|
-| `vs:job:{projectId}` | SynthesisJob JSON | IndexedDB |
+| `vs:job:{projectId}` | SynthesisJob JSON | Host sqlite |
 
 ### 5.3 存储空间估算
 
@@ -108,7 +108,7 @@ attempt 3 仍失败: SegmentJob → failed
 | 中篇 (20万字) | ~2,000 | 100KB | ~200MB |
 | 长篇 (50万字) | ~5,000 | 100KB | ~500MB |
 
-IndexedDB 通常允许 1GB+ 存储，长篇小说在容量范围内。
+大体量音频由 host files 承载，结构化任务状态留在 host sqlite。
 
 ## 6. 增量合成 (VS-SYNTH-005)
 
@@ -117,7 +117,7 @@ IndexedDB 通常允许 1GB+ 存储，长篇小说在容量范围内。
 用户从 Step 5 回到 Step 3 修改角色 A 的声线后：
 1. 找到所有 `speaker = A` 的 SegmentJob。
 2. 将这些 SegmentJob 状态重置为 `pending`。
-3. 清空对应的 IndexedDB 音频数据。
+3. 清空对应的 host files 音频数据。
 4. 其他角色的 SegmentJob 和音频不受影响。
 5. SynthesisJob 状态 → `running`，仅执行 pending 的 segment。
 
@@ -125,7 +125,7 @@ IndexedDB 通常允许 1GB+ 存储，长篇小说在容量范围内。
 
 用户修改某个 segment 的文本后：
 1. 该 SegmentJob 状态重置为 `pending`。
-2. 清空对应的 IndexedDB 音频数据。
+2. 清空对应的 host files 音频数据。
 3. SynthesisJob 状态 → `running`，仅执行该 segment。
 
 ## 7. 进度追踪 (VS-SYNTH-006)
