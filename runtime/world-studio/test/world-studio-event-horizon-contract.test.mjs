@@ -73,7 +73,7 @@ test('phase2 synthesize preserves eventHorizon and derives evidence requirements
             description: 'Description',
           },
           worldview: {
-            timeModel: { currentNode: 't-1', timeline: [] },
+            timeModel: { timeFlowRatio: 1, calendarSystem: {} },
             spaceTopology: {},
             causality: {},
             coreSystem: {},

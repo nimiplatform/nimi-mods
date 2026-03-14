@@ -21,7 +21,11 @@ export type WorldSummary = {
   id: string;
   name: string;
   status: 'DRAFT' | 'PENDING_REVIEW' | 'ACTIVE' | 'SUSPENDED' | 'ARCHIVED';
+  tagline: string | null;
+  motto: string | null;
+  overview: string | null;
   description: string | null;
+  contentRating: string | null;
   updatedAt: string;
 };
 
@@ -69,6 +73,14 @@ export type WorldEventSummary = {
   updatedAt: string;
 };
 
+export type WorldStudioAgentStatsSummary = {
+  influenceTier: string | null;
+  interactionTier: string | null;
+  vitalityScore: number | null;
+  lastActiveAt: string | null;
+  engagementCount: number | null;
+};
+
 export type WorldStudioCreatorAgentSummary = {
   id: string;
   handle: string;
@@ -81,10 +93,14 @@ export type WorldStudioCreatorAgentSummary = {
   webhookUrl: string | null;
   capabilities: Record<string, unknown>;
   ownershipType: string | null;
+  importance: string | null;
   state: string | null;
   worldId: string | null;
+  activeWorldId: string | null;
   ownerWorldId: string | null;
   dna: Record<string, unknown> | null;
+  liveState: Record<string, unknown> | null;
+  stats: WorldStudioAgentStatsSummary | null;
 };
 
 export type WorldStudioMediaBindingSummary = {

@@ -63,7 +63,11 @@ function toWorldSummaryList(payload: unknown): WorldSummary[] {
       id: String(item.id || ''),
       name: String(item.name || 'Untitled World'),
       status: String(item.status || 'DRAFT') as WorldSummary['status'],
+      tagline: toStringOrNull(item.tagline),
+      motto: toStringOrNull(item.motto),
+      overview: toStringOrNull(item.overview),
       description: toStringOrNull(item.description),
+      contentRating: toStringOrNull(item.contentRating),
       updatedAt: String(item.updatedAt || ''),
     }))
     .filter((item) => Boolean(item.id));
@@ -132,6 +136,7 @@ function toCreatorAgentSummaryFromUser(
     return null;
   }
   const capabilities = toRecord(overrides?.capabilities || user.capabilities || agentProfile.dna);
+  const statsRaw = toRecord(agentProfile.stats || agent.stats);
   return {
     id,
     handle: String(user.handle || ''),
@@ -144,10 +149,24 @@ function toCreatorAgentSummaryFromUser(
     webhookUrl: toStringOrNull(user.webhookUrl),
     capabilities,
     ownershipType: toStringOrNull(agentProfile.ownershipType || agent.ownershipType),
+    importance: toStringOrNull(agentProfile.importance || agent.importance),
     state: toStringOrNull(agentProfile.state || agent.state),
     worldId: toStringOrNull(agentProfile.worldId || agent.worldId),
+    activeWorldId: toStringOrNull(agentProfile.activeWorldId || agent.activeWorldId),
     ownerWorldId: toStringOrNull(agentProfile.ownerWorldId || agent.ownerWorldId),
     dna: Object.keys(capabilities).length > 0 ? capabilities : null,
+    liveState: Object.keys(toRecord(agentProfile.liveState || agent.liveState)).length > 0
+      ? toRecord(agentProfile.liveState || agent.liveState)
+      : null,
+    stats: Object.keys(statsRaw).length > 0
+      ? {
+          influenceTier: toStringOrNull(statsRaw.influenceTier),
+          interactionTier: toStringOrNull(statsRaw.interactionTier),
+          vitalityScore: Number.isFinite(Number(statsRaw.vitalityScore)) ? Number(statsRaw.vitalityScore) : null,
+          lastActiveAt: toStringOrNull(statsRaw.lastActiveAt),
+          engagementCount: Number.isFinite(Number(statsRaw.engagementCount)) ? Number(statsRaw.engagementCount) : null,
+        }
+      : null,
   };
 }
 

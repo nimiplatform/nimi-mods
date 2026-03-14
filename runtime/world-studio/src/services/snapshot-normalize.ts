@@ -93,15 +93,21 @@ export function normalizeLandingTarget(rawTarget: unknown): WorldStudioLandingMo
     }
     return 'NO_ACCESS';
 }
-export function getTimeFlowRatioFromWorldPatch(worldPatch: Record<string, unknown>): string {
-    const ratio = worldPatch.timeFlowRatio;
+export function getTimeFlowRatioFromWorldviewPatch(worldviewPatch: Record<string, unknown>): string {
+    const timeModel = asRecord(worldviewPatch.timeModel);
+    const ratio = timeModel.timeFlowRatio;
     if (typeof ratio === 'number' && Number.isFinite(ratio)) {
         return String(ratio);
     }
     return '';
 }
-export function getCurrentTimeNodeFromWorldviewPatch(worldviewPatch: Record<string, unknown>): string {
+export function setTimeFlowRatioOnWorldviewPatch(worldviewPatch: Record<string, unknown>, ratio: number): Record<string, unknown> {
     const timeModel = asRecord(worldviewPatch.timeModel);
-    const currentNode = timeModel.currentNode;
-    return typeof currentNode === 'string' ? currentNode : '';
+    return {
+        ...worldviewPatch,
+        timeModel: {
+            ...timeModel,
+            timeFlowRatio: Number.isFinite(ratio) ? ratio : 1,
+        },
+    };
 }

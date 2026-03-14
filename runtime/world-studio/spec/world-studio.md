@@ -41,6 +41,9 @@
 - `WS-DOM-026`: Agents V1 is metadata-first: creator-agent readable fields may be shown, metadata fields may be edited, and unsupported core persona editing must remain an explicit future capability.
 - `WS-DOM-027`: Assets V1 manages `World Assets` and `Agent Assets` through `media-bindings` hydration and batch-upsert, without redefining backend media contracts.
 - `WS-DOM-028`: Successful publish lands in `MAINTAIN` and defaults the editor context to `World > Base`.
+- `WS-DOM-029`: World base maintenance must consume layered world truth fields (`tagline`, `motto`, `overview`, `contentRating`) instead of limiting editing to the pre-upgrade subset.
+- `WS-DOM-030`: Agents maintenance must read upgraded realm truth (`importance`, `activeWorldId`, `liveState`, `stats`) even when write support remains metadata-first.
+- `WS-DOM-031`: Deprecated `timeModel.currentNode` is not a World-Studio editing surface; time-rule editing stays on `worldview.timeModel`, while `World.clockConfig` and `Worldview.languages` must remain maintainable truth modules.
 
 ## 3. No Over-Design Guard
 

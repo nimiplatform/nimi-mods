@@ -48,7 +48,6 @@ type BuildWorldStudioScreenModelArgs = {
     onToggleAgentSyncCharacter: (name: string, checked: boolean) => void;
     onAgentDraftChange: (name: string, patch: Partial<WorldStudioWorkspaceSnapshot['agentSync']['draftsByCharacter'][string]>) => void;
     onTimeFlowRatioChange: (value: string) => void;
-    onCurrentTimeNodeChange: (value: string) => void;
     onFutureEventsTextChange: (value: string) => void;
     onSyncEvents: (payload?: { force?: boolean }) => Promise<void>;
     onSyncLorebooks: () => Promise<void>;
@@ -532,7 +531,6 @@ export function buildWorldStudioScreenModel(args: BuildWorldStudioScreenModelArg
     curate: buildCurateActions(args),
     generate: {
       onTimeFlowRatioChange: args.actions.onTimeFlowRatioChange,
-      onCurrentTimeNodeChange: args.actions.onCurrentTimeNodeChange,
       onFutureEventsTextChange: args.actions.onFutureEventsTextChange,
       onGenerateWorldCover: args.actions.onGenerateWorldCover,
       onGenerateCharacterPortrait: args.actions.onGenerateCharacterPortrait,
@@ -678,7 +676,6 @@ export function buildWorldStudioScreenModel(args: BuildWorldStudioScreenModelArg
       selectedAgentSyncCharacters: args.context.selectedAgentSyncCharacters,
       eventsGraph: args.context.eventsGraph,
       timeFlowRatio: args.context.timeFlowRatio,
-      currentTimeNode: args.context.currentTimeNode,
       importSubview,
       reviewSubview,
       working: args.context.working,

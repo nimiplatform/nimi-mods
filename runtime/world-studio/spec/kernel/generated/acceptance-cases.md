@@ -119,6 +119,18 @@ cases:
     description: Assets V1 hydrates world and agent media bindings into maintain state, refreshes them, and writes updates back via media-bindings batch upsert.
     expected_ok: true
     source_rule: WS-ACC-002
+  - id: WS-022-WORLD-TRUTH-LAYERED-COPY-FIELDS
+    description: World Base exposes layered world truth fields (`tagline`, `motto`, `overview`, `contentRating`) and keeps editable runtime clock state in `clockConfig`.
+    expected_ok: true
+    source_rule: WS-ACC-002
+  - id: WS-023-AGENT-TRUTH-READABLE-UPGRADE
+    description: Agents maintenance surfaces readable `importance`, `activeWorldId`, `liveState`, and `stats` when realm returns them, without pretending unsupported persona writes are available.
+    expected_ok: true
+    source_rule: WS-ACC-002
+  - id: WS-024-WORLDVIEW-LANGUAGES-NO-CURRENT-NODE
+    description: Worldview maintenance includes `languages`, and Create/maintain editors do not expose deprecated `timeModel.currentNode` inputs.
+    expected_ok: true
+    source_rule: WS-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:world-studio-kernel-docs
     source_rule: WS-ACC-003

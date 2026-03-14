@@ -372,6 +372,14 @@ export async function runCreatePhase2(input: WorldStudioCreateActionsInput, opti
         const normalizedWorldview = {
             ...asRecord(result.worldview),
         };
+        const legacyTimeFlowRatio = normalizedWorld.timeFlowRatio;
+        if (typeof legacyTimeFlowRatio === 'number' && Number.isFinite(legacyTimeFlowRatio)) {
+            normalizedWorldview.timeModel = {
+                ...asRecord(normalizedWorldview.timeModel),
+                timeFlowRatio: legacyTimeFlowRatio,
+            };
+            delete normalizedWorld.timeFlowRatio;
+        }
         const legacyWorldRules = asRecord(normalizedWorld.rules);
         if (Object.keys(legacyWorldRules).length > 0) {
             const currentCoreSystem = asRecord(normalizedWorldview.coreSystem);

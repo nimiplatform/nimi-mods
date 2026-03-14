@@ -120,11 +120,10 @@ test('world-studio phase2 can synthesize without full source text after refresh'
               name: 'World',
               description: 'Description',
               lore: '',
-              timeFlowRatio: 1,
               rules: {},
             },
             worldview: {
-              timeModel: { currentNode: 't-1', timeline: [] },
+              timeModel: { timeFlowRatio: 1, calendarSystem: {} },
               spaceTopology: {},
               causality: {},
               coreSystem: {},

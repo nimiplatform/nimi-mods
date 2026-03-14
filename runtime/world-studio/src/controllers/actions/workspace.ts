@@ -1,14 +1,13 @@
 import { useCallback } from 'react';
 import { evaluateQualityGate } from '../../engine/quality-gate.js';
 import { deriveCharacterCandidates, deriveStartTimeOptions } from '../../generation/phase1/derived-options.js';
-import { toUniqueStringArray } from '../../services/snapshot-normalize.js';
+import { setTimeFlowRatioOnWorldviewPatch, toUniqueStringArray } from '../../services/snapshot-normalize.js';
 import { projectEventsForSelectedStartTime } from '../../services/start-time-projection.js';
 import { buildPhase1ArtifactFromResult } from '../../services/phase1-artifact.js';
 import type { WorldStudioSnapshotPatch, WorldStudioWorkspaceSnapshot } from '../../contracts.js';
 import type { Phase1Result, Phase2Result } from '../../generation/pipeline.js';
 import { worldStudioMessage } from '../../i18n/messages.js';
 import { emitWorldStudioLog } from '../../logging.js';
-import { asRecord } from "@nimiplatform/sdk/mod";
 type UseWorldStudioWorkspaceControllerActionsInput = {
     snapshot: WorldStudioWorkspaceSnapshot;
     patchSnapshot: (patch: WorldStudioSnapshotPatch) => void;
@@ -150,22 +149,7 @@ export function useWorldStudioWorkspaceControllerActions(input: UseWorldStudioWo
     const onTimeFlowRatioChange = useCallback((value: string) => {
         const numeric = Number(value);
         input.patchSnapshot({
-            worldPatch: {
-                ...input.snapshot.worldPatch,
-                timeFlowRatio: Number.isFinite(numeric) ? numeric : 1,
-            },
-        });
-    }, [input]);
-    const onCurrentTimeNodeChange = useCallback((value: string) => {
-        const timeModel = asRecord(input.snapshot.worldviewPatch.timeModel);
-        input.patchSnapshot({
-            worldviewPatch: {
-                ...input.snapshot.worldviewPatch,
-                timeModel: {
-                    ...timeModel,
-                    currentNode: value,
-                },
-            },
+            worldviewPatch: setTimeFlowRatioOnWorldviewPatch(input.snapshot.worldviewPatch, numeric),
         });
     }, [input]);
     const onFutureEventsTextChange = useCallback((value: string) => {
@@ -251,7 +235,6 @@ export function useWorldStudioWorkspaceControllerActions(input: UseWorldStudioWo
     return {
         onRefreshPhase1QualityGate,
         onTimeFlowRatioChange,
-        onCurrentTimeNodeChange,
         onFutureEventsTextChange,
         onToggleAgentSyncCharacter,
         onAgentDraftChange,

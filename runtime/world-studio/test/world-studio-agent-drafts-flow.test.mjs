@@ -117,11 +117,10 @@ test('world-studio agent drafts flow persists phase2 drafts and publishes with d
               name: 'World',
               description: 'Description',
               lore: '',
-              timeFlowRatio: 1,
               rules: {},
             },
             worldview: {
-              timeModel: { currentNode: 't-1', timeline: [] },
+              timeModel: { timeFlowRatio: 1, calendarSystem: {} },
               spaceTopology: {},
               causality: {},
               coreSystem: {},

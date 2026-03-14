@@ -14,7 +14,7 @@ import { useWorldStudioRouteBindings } from '../hooks/use-world-studio-route-ove
 import { useWorldStudioStatusMetrics } from '../hooks/use-world-studio-status-metrics.js';
 import { isTaskBlockingStatus } from '../hooks/actions/task-control/state-machine.js';
 import { useWorldStudioWorkspaceStore } from '../state/workspace-store.js';
-import { getCurrentTimeNodeFromWorldviewPatch, getTimeFlowRatioFromWorldPatch, } from '../services/snapshot-normalize.js';
+import { getTimeFlowRatioFromWorldviewPatch } from '../services/snapshot-normalize.js';
 import { createHookClient, asRecord, type RuntimeRouteOptionsSnapshot } from "@nimiplatform/sdk/mod";
 type UseWorldStudioControllerContextInput = {
     hookClient: ReturnType<typeof createHookClient>;
@@ -95,8 +95,7 @@ export function useWorldStudioControllerContext(input: UseWorldStudioControllerC
             }),
         }
         : null);
-    const timeFlowRatio = getTimeFlowRatioFromWorldPatch(input.snapshot.worldPatch);
-    const currentTimeNode = getCurrentTimeNodeFromWorldviewPatch(input.snapshot.worldviewPatch);
+    const timeFlowRatio = getTimeFlowRatioFromWorldviewPatch(input.snapshot.worldviewPatch);
     const selectedAgentSyncCharacters = input.snapshot.agentSync.selectedCharacterIds.length > 0
         ? input.snapshot.agentSync.selectedCharacterIds
         : input.snapshot.selectedCharacters;
@@ -141,7 +140,6 @@ export function useWorldStudioControllerContext(input: UseWorldStudioControllerC
         expertMode: input.snapshot.taskState.expertMode,
         working,
         timeFlowRatio,
-        currentTimeNode,
         selectedAgentSyncCharacters,
         maintenanceEditorSnapshotVersion,
         storyProjectionSummary,

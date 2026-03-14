@@ -85,7 +85,6 @@ export type WorldStudioMainSlice = {
     secondary: EventNodeDraft[];
   };
   timeFlowRatio: string;
-  currentTimeNode: string;
   importSubview: WorldStudioImportSubview;
   reviewSubview: WorldStudioReviewSubview;
   working: boolean;
@@ -196,7 +195,6 @@ export type WorldStudioActionsSlice = {
   };
   generate: {
     onTimeFlowRatioChange: (value: string) => void;
-    onCurrentTimeNodeChange: (value: string) => void;
     onFutureEventsTextChange: (value: string) => void;
     onGenerateWorldCover: () => Promise<void>;
     onGenerateCharacterPortrait: (name: string) => Promise<void>;

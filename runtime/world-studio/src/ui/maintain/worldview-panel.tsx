@@ -42,15 +42,15 @@ export function WorldviewPanel(props: WorldviewPanelProps) {
     <section className="ui-sync-card ui-sync-card-inset p-4">
       <h3 className="text-sm font-semibold text-gray-900">{t('worldview.title')}</h3>
       <p className="mt-1 text-xs text-gray-500">
-        `world.rules` now belongs to `worldview.coreSystem.rules`, so worldview carries the whole rules surface.
+        {t('worldview.explainer')}
       </p>
       {missingModules.length > 0 ? (
         <div className="ui-sync-alert ui-sync-alert-warning mt-2 px-2.5 py-2 text-xs text-amber-800">
-          Missing required worldview modules: {missingModules.join(', ')}
+          {t('worldview.missingModules', { modules: missingModules.join(', ') })}
         </div>
       ) : (
         <div className="ui-sync-alert ui-sync-alert-success mt-2 px-2.5 py-2 text-xs text-emerald-800">
-          Required worldview modules are present.
+          {t('worldview.ready')}
         </div>
       )}
 
@@ -69,6 +69,9 @@ export function WorldviewPanel(props: WorldviewPanelProps) {
         }))} />
         <ModuleEditor label="coreSystem" value={worldview.coreSystem} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
           draft.coreSystem = next;
+        }))} />
+        <ModuleEditor label="languages" value={worldview.languages} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
+          draft.languages = next;
         }))} />
         <ModuleEditor label="existences" value={worldview.existences} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
           draft.existences = next;

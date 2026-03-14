@@ -293,7 +293,9 @@ function renderMaintainSection(props: MaintainWorkbenchProps): React.ReactElemen
     return (
       <WorldBasePanel
         worldPatch={props.main.snapshot.worldPatch}
+        worldviewPatch={props.main.snapshot.worldviewPatch}
         onWorldPatchChange={props.actions.maintain.onWorldPatchChange}
+        onWorldviewPatchChange={props.actions.maintain.onWorldviewPatchChange}
       />
     );
   }

@@ -40,7 +40,12 @@ export function DraftEditorPanel(props: DraftEditorPanelProps) {
         </p>
       </section>
 
-      <WorldBasePanel worldPatch={props.worldPatch} onWorldPatchChange={props.onWorldPatchChange}/>
+      <WorldBasePanel
+        worldPatch={props.worldPatch}
+        worldviewPatch={props.worldviewPatch}
+        onWorldPatchChange={props.onWorldPatchChange}
+        onWorldviewPatchChange={props.onWorldviewPatchChange}
+      />
 
       <WorldviewPanel worldviewPatch={props.worldviewPatch} onWorldviewPatchChange={props.onWorldviewPatchChange}/>
 

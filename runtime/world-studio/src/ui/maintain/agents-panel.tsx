@@ -100,7 +100,12 @@ export function AgentsRegistryPanel(props: {
             >
               <p className="text-sm font-semibold">{agent.displayName || agent.handle || agent.id}</p>
               <p className={`mt-1 text-xs ${agent.id === props.selectedAgentId ? 'text-slate-200' : 'text-slate-500'}`}>
-                @{agent.handle || 'unknown'} · {agent.state || 'UNKNOWN'} · {agent.ownershipType || 'UNKNOWN'}
+                @{agent.handle || 'unknown'} · {agent.state || 'UNKNOWN'} · {agent.ownershipType || 'UNKNOWN'} · {agent.importance || 'SECONDARY'}
+              </p>
+              <p className={`mt-1 text-[11px] ${agent.id === props.selectedAgentId ? 'text-slate-300' : 'text-slate-500'}`}>
+                {worldStudioMessage('agents.editor.activeWorld', 'Active world: {{value}}', {
+                  value: agent.activeWorldId || '-',
+                })}
               </p>
             </button>
           ))}
@@ -355,6 +360,8 @@ export function AgentEditorPanel(props: {
           <p>{worldStudioMessage('agents.editor.ownership', 'Ownership: {{value}}', { value: props.agent.ownershipType || '-' })}</p>
           <p>{worldStudioMessage('agents.editor.state', 'State: {{value}}', { value: props.agent.state || '-' })}</p>
           <p>{worldStudioMessage('agents.editor.world', 'World: {{value}}', { value: props.agent.worldId || '-' })}</p>
+          <p>{worldStudioMessage('agents.editor.activeWorld', 'Active world: {{value}}', { value: props.agent.activeWorldId || '-' })}</p>
+          <p>{worldStudioMessage('agents.editor.importance', 'Importance: {{value}}', { value: props.agent.importance || '-' })}</p>
         </div>
         <div className="rounded-[18px] border border-dashed border-slate-300 bg-slate-50 p-3 text-xs text-slate-600">
           <p className="font-semibold text-slate-800">
@@ -370,38 +377,81 @@ export function AgentEditorPanel(props: {
       </div>
 
       <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <div className="ui-sync-soft-card p-3 text-xs text-slate-700">
+          <p className="font-semibold text-slate-800">
+            {worldStudioMessage('agents.editor.statsTitle', 'Realm stats')}
+          </p>
+          <p className="mt-1">
+            {worldStudioMessage('agents.editor.influenceTier', 'Influence tier: {{value}}', {
+              value: props.agent.stats?.influenceTier || '-',
+            })}
+          </p>
+          <p>
+            {worldStudioMessage('agents.editor.interactionTier', 'Interaction tier: {{value}}', {
+              value: props.agent.stats?.interactionTier || '-',
+            })}
+          </p>
+          <p>
+            {worldStudioMessage('agents.editor.vitalityScore', 'Vitality score: {{value}}', {
+              value: props.agent.stats?.vitalityScore == null ? '-' : String(props.agent.stats.vitalityScore),
+            })}
+          </p>
+          <p>
+            {worldStudioMessage('agents.editor.engagementCount', 'Engagement count: {{value}}', {
+              value: props.agent.stats?.engagementCount == null ? '-' : String(props.agent.stats.engagementCount),
+            })}
+          </p>
+          <p>
+            {worldStudioMessage('agents.editor.lastActiveAt', 'Last active: {{value}}', {
+              value: props.agent.stats?.lastActiveAt || '-',
+            })}
+          </p>
+        </div>
+        <div className="ui-sync-soft-card p-3 text-xs text-slate-700">
+          <p className="font-semibold text-slate-800">
+            {worldStudioMessage('agents.editor.liveStateTitle', 'Live state')}
+          </p>
+          <textarea
+            className="mt-2 h-32 w-full rounded-md border border-gray-300 bg-gray-100 p-2 font-mono text-xs text-gray-600"
+            value={JSON.stringify(props.agent.liveState || {}, null, 2)}
+            readOnly
+          />
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
         <label className="text-xs text-gray-700">
-          <span className="mb-1 block font-medium">Display Name</span>
+          <span className="mb-1 block font-medium">{worldStudioMessage('agents.editor.displayName', 'Display Name')}</span>
           <input className="h-9 w-full rounded-md border border-gray-300 px-2 text-xs" value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
         </label>
         <label className="text-xs text-gray-700">
-          <span className="mb-1 block font-medium">Avatar URL</span>
+          <span className="mb-1 block font-medium">{worldStudioMessage('agents.editor.avatarUrl', 'Avatar URL')}</span>
           <input className="h-9 w-full rounded-md border border-gray-300 px-2 text-xs" value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} />
         </label>
         <label className="text-xs text-gray-700">
-          <span className="mb-1 block font-medium">Category</span>
+          <span className="mb-1 block font-medium">{worldStudioMessage('agents.editor.category', 'Category')}</span>
           <input className="h-9 w-full rounded-md border border-gray-300 px-2 text-xs" value={category} onChange={(event) => setCategory(event.target.value)} />
         </label>
         <label className="text-xs text-gray-700">
-          <span className="mb-1 block font-medium">Content Rating</span>
+          <span className="mb-1 block font-medium">{worldStudioMessage('agents.editor.contentRating', 'Content Rating')}</span>
           <input className="h-9 w-full rounded-md border border-gray-300 px-2 text-xs" value={contentRating} onChange={(event) => setContentRating(event.target.value)} />
         </label>
         <label className="text-xs text-gray-700 md:col-span-2">
-          <span className="mb-1 block font-medium">Bio</span>
+          <span className="mb-1 block font-medium">{worldStudioMessage('agents.editor.bio', 'Bio')}</span>
           <textarea className="h-24 w-full rounded-md border border-gray-300 p-2 text-xs" value={bio} onChange={(event) => setBio(event.target.value)} />
         </label>
         <label className="text-xs text-gray-700">
-          <span className="mb-1 block font-medium">Tags</span>
+          <span className="mb-1 block font-medium">{worldStudioMessage('agents.editor.tags', 'Tags')}</span>
           <input className="h-9 w-full rounded-md border border-gray-300 px-2 text-xs" value={tagsText} onChange={(event) => setTagsText(event.target.value)} />
         </label>
         <label className="text-xs text-gray-700">
-          <span className="mb-1 block font-medium">Webhook URL</span>
+          <span className="mb-1 block font-medium">{worldStudioMessage('agents.editor.webhookUrl', 'Webhook URL')}</span>
           <input className="h-9 w-full rounded-md border border-gray-300 px-2 text-xs" value={webhookUrl} onChange={(event) => setWebhookUrl(event.target.value)} />
         </label>
       </div>
 
       <label className="mt-3 block text-xs text-gray-700">
-        <span className="mb-1 block font-medium">Capabilities JSON</span>
+        <span className="mb-1 block font-medium">{worldStudioMessage('agents.editor.capabilitiesJson', 'Capabilities JSON')}</span>
         <textarea className="h-40 w-full rounded-md border border-gray-300 p-2 font-mono text-xs" value={capabilitiesText} onChange={(event) => setCapabilitiesText(event.target.value)} />
       </label>
       {jsonError ? (

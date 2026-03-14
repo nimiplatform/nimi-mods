@@ -470,10 +470,8 @@ export function CreateWorkbench(props: CreateWorkbenchProps) {
               selectedAgentSyncCharacters={props.main.selectedAgentSyncCharacters}
               agentDraftsByCharacter={snapshot.agentSync.draftsByCharacter}
               timeFlowRatio={props.main.timeFlowRatio}
-              currentTimeNode={props.main.currentTimeNode}
               futureEventsText={snapshot.futureEventsText}
               onTimeFlowRatioChange={props.actions.generate.onTimeFlowRatioChange}
-              onCurrentTimeNodeChange={props.actions.generate.onCurrentTimeNodeChange}
               onFutureEventsTextChange={props.actions.generate.onFutureEventsTextChange}
               onGenerateWorldCover={() => {
                 void props.actions.generate.onGenerateWorldCover();

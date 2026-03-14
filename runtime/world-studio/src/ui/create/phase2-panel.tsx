@@ -9,10 +9,8 @@ type Phase2PanelProps = {
     selectedAgentSyncCharacters: string[];
     agentDraftsByCharacter: Record<string, WorldStudioAgentDraft>;
     timeFlowRatio: string;
-    currentTimeNode: string;
     futureEventsText: string;
     onTimeFlowRatioChange: (value: string) => void;
-    onCurrentTimeNodeChange: (value: string) => void;
     onFutureEventsTextChange: (value: string) => void;
     onGenerateWorldCover: () => void;
     onGenerateCharacterPortrait: (name: string) => void;
@@ -65,14 +63,10 @@ export function Phase2Panel(props: Phase2PanelProps) {
           </div>
 
           <div className="ui-sync-toolbar p-3">
-            <div className="grid gap-3 lg:grid-cols-2">
+            <div className="grid gap-3 lg:grid-cols-1">
               <label className="text-xs text-gray-700">
                 {t('phase2Panel.timeFlowRatio')}
                 <input className="mt-1 h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-xs" value={props.timeFlowRatio} onChange={(event) => props.onTimeFlowRatioChange(event.target.value)} placeholder="1"/>
-              </label>
-              <label className="text-xs text-gray-700">
-                {t('phase2Panel.currentTimeNode')}
-                <input className="mt-1 h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-xs" value={props.currentTimeNode} onChange={(event) => props.onCurrentTimeNodeChange(event.target.value)} placeholder="timeline:0"/>
               </label>
             </div>
           </div>
