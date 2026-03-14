@@ -542,15 +542,6 @@ export function syncSnapshot(snapshot: WorldStudioWorkspaceSnapshot): WorldStudi
     };
     const worldPatch = asRecord(snapshot.worldPatch);
     const worldviewPatch = asRecord(snapshot.worldviewPatch);
-    const legacyTimeFlowRatio = worldPatch.timeFlowRatio;
-    if (typeof legacyTimeFlowRatio === 'number' && Number.isFinite(legacyTimeFlowRatio)) {
-        const timeModel = asRecord(worldviewPatch.timeModel);
-        worldviewPatch.timeModel = {
-            ...timeModel,
-            timeFlowRatio: legacyTimeFlowRatio,
-        };
-        delete worldPatch.timeFlowRatio;
-    }
     const eventsDraft = normalizeEventsDraft((snapshot.eventsDraft && (snapshot.eventsDraft.primary.length > 0 || snapshot.eventsDraft.secondary.length > 0))
         ? snapshot.eventsDraft
         : (snapshot.knowledgeGraph?.events || {}));

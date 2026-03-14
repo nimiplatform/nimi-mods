@@ -39,6 +39,7 @@
     "embeddingLastBuiltAt": "最近构建时间",
     "rebuildEmbeddingIndex": "重建 Embedding 索引",
     "goRuntime": "打开 AI Runtime",
+    "notConfigured": "未配置",
     "expertModeTitle": "专家模式",
     "expertModeDesc": "仅控制高级诊断和调优项显示，不影响模型路由配置。",
     "expertModeOn": "专家模式：已开启",
@@ -399,7 +400,7 @@
   "worldBase": {
     "title": "世界基础信息",
     "description": "用于编辑世界核心设定的结构化面板。",
-    "explainer": "这里编辑 WorldPatchDto 接收的最新世界 truth 字段；时间规则仍归 worldview.timeModel。",
+    "explainer": "这里维护世界身份卡和发布用说明文案；时间规则仍归 worldview.timeModel，时钟 truth 目前只在这里只读展示。",
     "name": "名称",
     "genre": "类型",
     "tagline": "副标题",
@@ -411,6 +412,13 @@
     "contentRating": "内容分级",
     "clockConfig": "时钟配置",
     "clockConfigDescription": "世界时钟锚点、暂停状态和纪元状态在这里作为 world truth 维护。",
+    "identityTitle": "世界身份卡",
+    "identityDescription": "把这个世界最核心、最适合展示和发布的身份信息维护清楚。",
+    "narrativeTitle": "世界说明",
+    "narrativeDescription": "集中维护帮助创作者和读者理解这个世界的长文本说明。",
+    "clockTitle": "运行时时钟状态",
+    "clockDescription": "这里展示世界当前的运行时时钟 truth，但本轮不在 Base 中直接编辑。",
+    "clockEmpty": "当前还没有可展示的运行时时钟状态。",
     "timeFlowRatio": "时间流速比",
     "descriptionField": "描述",
     "rules": "rules"
@@ -420,7 +428,19 @@
     "explainer": "`world.rules` 已归入 `worldview.coreSystem.rules`，`languages` 也在这里作为共享世界 truth 维护。",
     "requiredModules": "必填模块：`timeModel`、`spaceTopology`、`causality`、`coreSystem`。",
     "missingModules": "以下模块缺失或为空：{{modules}}",
-    "ready": "必填世界观模块已齐备。"
+    "ready": "必填世界观模块已齐备。",
+    "groups": {
+      "timeTitle": "时间与生命周期",
+      "timeDescription": "维护时间如何流动、如何建模，以及世界长期阶段如何被描述。",
+      "rulesTitle": "规则与因果",
+      "rulesDescription": "维护系统规则、限制条件和因果逻辑，让其他页面都能把它当作 canonical truth。",
+      "cultureTitle": "语言与存在",
+      "cultureDescription": "集中记录语言、生灵和资源，说明这个世界里“有什么”和“如何存在”。",
+      "structureTitle": "结构与视觉参考",
+      "structureDescription": "把空间拓扑、组织结构和视觉指导放在同一组里维护。",
+      "narrativeTitle": "叙事支撑",
+      "narrativeDescription": "把叙事钩子统一维护好，为草稿生成和发布审查提供稳定的故事骨架。"
+    }
   },
   "lorebooks": {
     "title": "知识条目 / Knowledge Base",
@@ -630,7 +650,7 @@
     "domainNavTitle": "维护域",
     "domainNavDescription": "在世界、角色、资产和发布视图之间切换。",
     "sectionNavTitle": "内容",
-    "sectionNavDescription": "在世界、世界观、事件和知识条目之间切换。"
+    "sectionNavDescription": "在当前维护域对应的分区之间切换。"
   },
   "domainNav": {
     "world": {
@@ -688,7 +708,21 @@
       "empty": "当前还没有世界归属角色。",
       "draftCandidatesTitle": "草稿候选角色",
       "draftCandidatesDescription": "这里会列出从草稿中提取出的角色，可提升为世界归属角色。",
-      "draftCandidatesEmpty": "当前没有可用的角色草稿候选。"
+      "draftCandidatesEmpty": "当前没有可用的角色草稿候选。",
+      "filters": {
+        "all": "全部",
+        "activeHere": "当前活跃"
+      },
+      "sortLabel": "排序",
+      "sortImportance": "重要度",
+      "sortName": "名称",
+      "statsHint": "状态：活跃度 {{value}}",
+      "summaryCards": {
+        "remoteAgents": "远端角色",
+        "pendingDrafts": "待补建草稿候选",
+        "activeHere": "当前世界活跃"
+      },
+      "pendingHint": "还有 {{count}} 个草稿候选尚未建立远端角色，素材同步前最好先补齐。"
     },
     "editor": {
       "title": "角色编辑",
@@ -710,6 +744,10 @@
       "engagementCount": "互动次数：{{value}}",
       "lastActiveAt": "最近活跃：{{value}}",
       "liveStateTitle": "实时状态",
+      "truthSection": "角色 truth",
+      "runtimeSection": "运行态信号",
+      "liveStateSection": "实时世界状态",
+      "metadataSection": "可写元数据",
       "displayName": "显示名",
       "avatarUrl": "头像 URL",
       "category": "分类",
@@ -722,33 +760,63 @@
     }
   },
   "assets": {
+    "missing": {
+      "none": "当前跟踪的素材槽位都已覆盖。"
+    },
     "synced": {
       "empty": "当前还没有已同步的媒体绑定。",
-      "noStorageRef": "缺少素材 storageRef"
+      "noStorageRef": "缺少素材 storageRef",
+      "description": "这些媒体绑定已经作为远端 world truth 存在。"
     },
     "world": {
       "generatedTitle": "已生成的世界素材",
+      "generatedDescription": "这里展示创建流或维护流已经生成出来的本地世界素材。",
       "cover": "世界封面：{{value}}",
       "noGeneratedCover": "还没有生成封面",
       "locationImages": "已生成地点图片：{{count}}",
-      "syncedTitle": "已同步的世界素材"
+      "syncedTitle": "已同步的世界素材",
+      "syncedDescription": "这些绑定已经持久化到远端，并会被运行时消费者读取。",
+      "missingTitle": "缺失或待同步覆盖",
+      "missingDescription": "这些世界素材槽位仍然缺生成结果或尚未完成同步。",
+      "summary": {
+        "generatedCover": "已生成封面",
+        "generatedLocations": "已生成地点图",
+        "syncedBindings": "已同步绑定"
+      }
     },
     "agent": {
       "generatedTitle": "已生成的角色素材",
+      "generatedDescription": "这里展示本地已生成的角色立绘，无论是否已经绑定到远端角色。",
       "emptyGenerated": "当前还没有生成角色立绘。",
       "remoteAgent": "远端角色：{{value}}",
       "notCreated": "未创建",
-      "syncedTitle": "已同步的角色素材"
+      "syncedTitle": "已同步的角色素材",
+      "syncedDescription": "这些绑定已经把远端角色槽位指向媒体素材。",
+      "missingTitle": "待补链接",
+      "missingDescription": "这些立绘还没找到对应的远端角色，因此无法完整同步。",
+      "summary": {
+        "generatedPortraits": "已生成立绘",
+        "linkedPortraits": "已匹配远端角色",
+        "syncedBindings": "已同步绑定"
+      }
     }
   },
   "releases": {
+    "shared": {
+      "none": "无"
+    },
     "drafts": {
       "title": "草稿",
       "description": "详细的草稿选择现在放在这里；左侧工作区只保留快捷入口。",
       "newDraft": "新建草稿",
       "empty": "当前没有草稿。",
       "statusLine": "状态：{{status}} · 更新时间：{{updatedAt}}",
-      "continue": "继续"
+      "continue": "继续",
+      "summary": {
+        "total": "草稿总数",
+        "active": "当前选中草稿",
+        "publishable": "已发布草稿"
+      }
     },
     "publish": {
       "title": "发布",
@@ -757,13 +825,21 @@
       "noWorldSelected": "未选择世界",
       "latestDraft": "当前选中的草稿：{{value}}",
       "noDraftSelected": "未选择草稿",
-      "openFlow": "打开发布流程"
+      "openFlow": "打开发布流程",
+      "maintainState": "维护状态：{{value}}",
+      "recommendationDirty": "进入发布审阅前，建议先保存或同步当前维护修改。",
+      "recommendationReady": "当前维护面已清爽，可在草稿准备好后直接回到发布审阅。"
     },
     "history": {
       "title": "历史",
       "description": "Mutation 历史现在是正式的发布视图，而不是隐藏的后台查询。",
       "empty": "当前还没有变更记录。",
-      "noTargetPath": "无目标路径"
+      "noTargetPath": "无目标路径",
+      "summary": {
+        "total": "变更数",
+        "latest": "最近变更",
+        "targets": "目标路径数"
+      }
     }
   },
   "taskStrip": {
@@ -845,7 +921,43 @@
     "syncAgentAssets": "同步角色素材",
     "unsavedPanels": "未保存面板：{{value}}",
     "untitledWorld": "未命名世界",
-    "worldId": "世界 ID：{{value}}"
+    "worldId": "世界 ID：{{value}}",
+    "section": {
+      "label": "当前分区说明",
+      "baseTitle": "世界身份卡",
+      "baseDescription": "维护最适合发布和展示的世界身份信息。",
+      "baseSummary": "把世界名称、分层文案、分类和描述上下文集中维护在这里。",
+      "worldviewTitle": "世界规则",
+      "worldviewDescription": "维护这个世界如何运作、如何组织，以及创作者该如何理解它。",
+      "worldviewSummary": "按时间规则、系统、文化、结构和叙事支撑来分组编辑。",
+      "eventsTitle": "世界时间线",
+      "eventsDescription": "这里维护的是发布后会被下游系统视为 canonical 的世界事件图。",
+      "eventsSummary": "同步前先确认图结构、证据要求和同步模式。",
+      "lorebooksTitle": "知识面",
+      "lorebooksDescription": "让知识条目保持清晰、可检索，并随时可同步。",
+      "lorebooksSummary": "先把可复用的知识行整理好，再在集合有效后整体同步。",
+      "registryTitle": "角色 roster",
+      "registryDescription": "看清哪些角色已经存在远端记录，哪些草稿候选还缺角色实体。",
+      "registrySummary": "这个总览帮助你判断下一步是补建、检查，还是继续编辑元数据。",
+      "editorTitle": "角色元数据",
+      "editorDescription": "查看可读角色 truth、运行态信号，并编辑当前真正可写的元数据字段。",
+      "editorSummary": "完整人格编辑仍是后续能力；这里专注于 truth 阅读和安全的元数据更新。",
+      "worldAssetsTitle": "世界素材覆盖",
+      "worldAssetsDescription": "对照查看已生成素材、已同步绑定和缺失的世界素材覆盖情况。",
+      "worldAssetsSummary": "下一步应该很直观：生成、同步，或做最终核对。",
+      "agentAssetsTitle": "角色素材覆盖",
+      "agentAssetsDescription": "查看哪些立绘已经映射到远端角色，哪些还差一层链接。",
+      "agentAssetsSummary": "这个分区用来补齐本地立绘和远端角色绑定之间的缺口。",
+      "draftsTitle": "草稿发布准备",
+      "draftsDescription": "跟踪有哪些草稿、当前活跃的是哪个，以及如何回到 create 流。",
+      "draftsSummary": "发布域应该像发布工作区，而不是隐藏的跳转面板。",
+      "publishTitle": "发布审阅交接",
+      "publishDescription": "根据当前维护状态，判断何时安全地重新进入发布审阅流程。",
+      "publishSummary": "这个分区应该回答：这个草稿现在是否适合离开维护，重新进入发布。",
+      "historyTitle": "发布历史",
+      "historyDescription": "把 mutation 历史当作发布时间线来读，而不是技术日志。",
+      "historySummary": "什么被改了、改在哪、什么时候改的，都应该一眼可扫。"
+    }
   },
   "expertDrawer": {
     "characterCoverage": "角色覆盖率：{{count}}%",

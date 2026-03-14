@@ -143,6 +143,84 @@ function MaintainObjectHeader(props: MaintainWorkbenchProps): React.ReactElement
   );
 }
 
+function SectionContextCard(props: {
+  workflow: WorldStudioWorkflowSlice;
+}): React.ReactElement {
+  const section = props.workflow.activeSection;
+  const sectionCopy: Record<string, { title: string; description: string; summary: string }> = {
+    BASE: {
+      title: worldStudioMessage('maintain.section.baseTitle', 'World identity'),
+      description: worldStudioMessage('maintain.section.baseDescription', 'Keep the canonical world card readable and publication-ready.'),
+      summary: worldStudioMessage('maintain.section.baseSummary', 'Edit the world name, layered copy, classification, and descriptive context in one place.'),
+    },
+    WORLDVIEW: {
+      title: worldStudioMessage('maintain.section.worldviewTitle', 'World rules'),
+      description: worldStudioMessage('maintain.section.worldviewDescription', 'Maintain how the world works, how it is structured, and how creators should reason about it.'),
+      summary: worldStudioMessage('maintain.section.worldviewSummary', 'Group edits by time rules, systems, culture, structure, and narrative support.'),
+    },
+    WORLD_EVENTS: {
+      title: worldStudioMessage('maintain.section.eventsTitle', 'World timeline'),
+      description: worldStudioMessage('maintain.section.eventsDescription', 'Curate the published event graph that downstream systems will treat as canonical world sequence.'),
+      summary: worldStudioMessage('maintain.section.eventsSummary', 'Review graph shape, evidence expectations, and sync mode before writing timeline truth.'),
+    },
+    LOREBOOKS: {
+      title: worldStudioMessage('maintain.section.lorebooksTitle', 'Knowledge surface'),
+      description: worldStudioMessage('maintain.section.lorebooksDescription', 'Keep lore entries coherent, queryable, and ready for sync.'),
+      summary: worldStudioMessage('maintain.section.lorebooksSummary', 'Add and curate reusable lore rows, then sync them once the set is valid.'),
+    },
+    REGISTRY: {
+      title: worldStudioMessage('maintain.section.registryTitle', 'Agent roster'),
+      description: worldStudioMessage('maintain.section.registryDescription', 'See which characters already exist remotely and which draft candidates still need an agent record.'),
+      summary: worldStudioMessage('maintain.section.registrySummary', 'The registry helps you decide whether the next step is create, review, or edit metadata.'),
+    },
+    EDITOR: {
+      title: worldStudioMessage('maintain.section.editorTitle', 'Agent metadata'),
+      description: worldStudioMessage('maintain.section.editorDescription', 'Inspect readable agent truth, watch runtime signal, and edit the metadata fields that are currently writable.'),
+      summary: worldStudioMessage('maintain.section.editorSummary', 'Full persona editing remains future-facing; this surface focuses on readable truth plus safe metadata updates.'),
+    },
+    WORLD_ASSETS: {
+      title: worldStudioMessage('maintain.section.worldAssetsTitle', 'World asset coverage'),
+      description: worldStudioMessage('maintain.section.worldAssetsDescription', 'Compare generated assets, synced media bindings, and missing world asset coverage.'),
+      summary: worldStudioMessage('maintain.section.worldAssetsSummary', 'The next step should be obvious: generate, sync, or verify.'),
+    },
+    AGENT_ASSETS: {
+      title: worldStudioMessage('maintain.section.agentAssetsTitle', 'Agent asset coverage'),
+      description: worldStudioMessage('maintain.section.agentAssetsDescription', 'Review which portraits already map to remote agents and which still need linkage.'),
+      summary: worldStudioMessage('maintain.section.agentAssetsSummary', 'Use this section to close the gap between local portraits and remote agent bindings.'),
+    },
+    DRAFTS: {
+      title: worldStudioMessage('maintain.section.draftsTitle', 'Draft release prep'),
+      description: worldStudioMessage('maintain.section.draftsDescription', 'Track which drafts exist, which one is active, and where to jump back into the create flow.'),
+      summary: worldStudioMessage('maintain.section.draftsSummary', 'Releases should feel like a release surface, not a hidden transport panel.'),
+    },
+    PUBLISH: {
+      title: worldStudioMessage('maintain.section.publishTitle', 'Publish review handoff'),
+      description: worldStudioMessage('maintain.section.publishDescription', 'Use the current maintenance state to decide when it is safe to jump back into publish review.'),
+      summary: worldStudioMessage('maintain.section.publishSummary', 'This section should answer whether the draft is ready to leave maintenance and re-enter publish flow.'),
+    },
+    HISTORY: {
+      title: worldStudioMessage('maintain.section.historyTitle', 'Release history'),
+      description: worldStudioMessage('maintain.section.historyDescription', 'Read mutation history as a release timeline instead of a hidden technical log.'),
+      summary: worldStudioMessage('maintain.section.historySummary', 'What changed, where it changed, and when it changed should all be easy to scan.'),
+    },
+  };
+  const active = sectionCopy[section] ?? {
+    title: worldStudioMessage('maintain.section.baseTitle', 'World identity'),
+    description: worldStudioMessage('maintain.section.baseDescription', 'Keep the canonical world card readable and publication-ready.'),
+    summary: worldStudioMessage('maintain.section.baseSummary', 'Edit the world name, layered copy, classification, and descriptive context in one place.'),
+  };
+  return (
+    <section className="rounded-[24px] border border-white/80 bg-white/88 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+        {worldStudioMessage('maintain.section.label', 'Section Context')}
+      </p>
+      <h3 className="mt-2 text-sm font-semibold text-slate-900">{active.title}</h3>
+      <p className="mt-1 text-xs text-slate-500">{active.description}</p>
+      <p className="mt-3 text-xs text-slate-600">{active.summary}</p>
+    </section>
+  );
+}
+
 function renderContextualActionBar(props: MaintainWorkbenchProps): React.ReactElement {
   const section = props.workflow.activeSection;
   const disabled = props.main.working || !props.workflow.selectedWorldId;
@@ -324,7 +402,7 @@ function renderMaintainSection(props: MaintainWorkbenchProps): React.ReactElemen
         onDeleteFirstEvent={() => {
           void props.actions.maintain.deleteFirstEvent();
         }}
-        showActions
+        showActions={false}
       />
     );
   }
@@ -340,7 +418,7 @@ function renderMaintainSection(props: MaintainWorkbenchProps): React.ReactElemen
         onDeleteFirstLorebook={() => {
           void props.actions.maintain.deleteFirstLorebook();
         }}
-        showActions
+        showActions={false}
       />
     );
   }
@@ -411,6 +489,8 @@ function renderMaintainSection(props: MaintainWorkbenchProps): React.ReactElemen
       <ReleasePublishPanel
         world={currentWorld}
         selectedDraftId={props.workflow.selectedDraftId}
+        dirtyLabel={props.layout.dirtySummary.shortLabel}
+        hasDirty={props.layout.dirtySummary.hasDirty}
         onOpenCreate={props.actions.workflow.openCreate}
       />
     );
@@ -432,6 +512,7 @@ export function MaintainWorkbench(props: MaintainWorkbenchProps) {
             onSelectSection={props.actions.workflow.selectMaintainSection}
           />
           <MaintainObjectHeader {...props} />
+          <SectionContextCard workflow={props.workflow} />
           <ConflictBanner status={props.status} actions={props.actions.maintain} working={props.main.working} />
           {renderMaintainSection(props)}
         </div>

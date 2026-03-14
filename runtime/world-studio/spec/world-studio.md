@@ -44,6 +44,11 @@
 - `WS-DOM-029`: World base maintenance must consume layered world truth fields (`tagline`, `motto`, `overview`, `contentRating`) instead of limiting editing to the pre-upgrade subset.
 - `WS-DOM-030`: Agents maintenance must read upgraded realm truth (`importance`, `activeWorldId`, `liveState`, `stats`) even when write support remains metadata-first.
 - `WS-DOM-031`: Deprecated `timeModel.currentNode` is not a World-Studio editing surface; time-rule editing stays on `worldview.timeModel`, while `World.clockConfig` and `Worldview.languages` must remain maintainable truth modules.
+- `WS-DOM-032`: World-Studio does not retain legacy top-level `world.timeFlowRatio` compatibility; all time-flow editing and projection reads use `worldview.timeModel.timeFlowRatio`.
+- `WS-DOM-033`: Maintain mode must present a consistent workbench rhythm (`section navigation -> object summary -> section context -> editor surface -> contextual action bar`) across `World`, `Agents`, `Assets`, and `Releases`.
+- `WS-DOM-034`: Assets maintenance must distinguish generated local assets, synced media bindings, and missing coverage so creators can tell whether the next action is generate, link, or sync.
+- `WS-DOM-035`: Releases maintenance must behave like a release surface, not a hidden transport panel; draft selection, publish entry, and mutation history must each have explicit reading context.
+- `WS-DOM-036`: `World.clockConfig` is a readable runtime truth surface in V2; until backend patch support exists, World-Studio must not present it as a writable Base editor field.
 
 ## 3. No Over-Design Guard
 

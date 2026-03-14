@@ -39,6 +39,7 @@
     "embeddingLastBuiltAt": "Last Built At",
     "rebuildEmbeddingIndex": "Rebuild Embedding Index",
     "goRuntime": "Open AI Runtime",
+    "notConfigured": "Not configured",
     "expertModeTitle": "Expert Mode",
     "expertModeDesc": "Controls advanced diagnostics/tuning visibility only. Routing behavior is unchanged.",
     "expertModeOn": "Expert Mode: ON",
@@ -399,7 +400,7 @@
   "worldBase": {
     "title": "World Base",
     "description": "Structured editor for core world settings.",
-    "explainer": "Base now edits the latest world truth fields accepted by WorldPatchDto, while time rules remain under worldview.timeModel.",
+    "explainer": "Base keeps the world card readable and publication-ready. Time rules stay under worldview.timeModel, while clock truth is shown here as read-only runtime state.",
     "name": "Name",
     "genre": "Genre",
     "tagline": "Tagline",
@@ -411,6 +412,13 @@
     "contentRating": "Content Rating",
     "clockConfig": "Clock Config",
     "clockConfigDescription": "Runtime clock anchors, pause state, and era state are maintained here as world truth.",
+    "identityTitle": "World identity",
+    "identityDescription": "Keep the canonical world card clear, distinctive, and ready for release surfaces.",
+    "narrativeTitle": "World framing",
+    "narrativeDescription": "Capture the longer-form copy that helps creators and readers understand what this world is about.",
+    "clockTitle": "Runtime clock state",
+    "clockDescription": "This runtime clock truth is currently readable here, but not editable from Base.",
+    "clockEmpty": "No runtime clock state is available yet for this world.",
     "timeFlowRatio": "Time Flow Ratio",
     "descriptionField": "Description",
     "rules": "rules"
@@ -420,7 +428,19 @@
     "explainer": "`world.rules` now belongs to `worldview.coreSystem.rules`, and `languages` is maintained as a shared worldview truth module.",
     "requiredModules": "Required modules: `timeModel`, `spaceTopology`, `causality`, `coreSystem`.",
     "missingModules": "Missing/empty modules: {{modules}}",
-    "ready": "All required worldview modules are ready."
+    "ready": "All required worldview modules are ready.",
+    "groups": {
+      "timeTitle": "Time and lifecycle",
+      "timeDescription": "Define how time moves, how it is modeled, and how long-running world phases are described.",
+      "rulesTitle": "Rules and causality",
+      "rulesDescription": "Capture the systems, constraints, and causality logic that other surfaces should treat as canonical.",
+      "cultureTitle": "Culture and existence",
+      "cultureDescription": "Record languages, beings, and resources that describe what can exist and how the world is inhabited.",
+      "structureTitle": "Structure and visual reference",
+      "structureDescription": "Maintain the world's topology, built structures, and visual guidance in one grouped surface.",
+      "narrativeTitle": "Narrative support",
+      "narrativeDescription": "Keep narrative hooks together so downstream drafting and release review have a stable storytelling spine."
+    }
   },
   "lorebooks": {
     "title": "Lorebooks / Knowledge Base",
@@ -630,7 +650,7 @@
     "domainNavTitle": "Maintenance Domains",
     "domainNavDescription": "Switch between world, agent, asset, and release maintenance views.",
     "sectionNavTitle": "Content",
-    "sectionNavDescription": "Switch between world, worldview, events, and lorebooks."
+    "sectionNavDescription": "Switch between the active domain's maintenance sections."
   },
   "domainNav": {
     "world": {
@@ -688,7 +708,21 @@
       "empty": "No world-owned agents are available yet.",
       "draftCandidatesTitle": "Draft candidates",
       "draftCandidatesDescription": "Characters extracted from the draft can be promoted into world-owned agents from here.",
-      "draftCandidatesEmpty": "No agent draft candidates are available."
+      "draftCandidatesEmpty": "No agent draft candidates are available.",
+      "filters": {
+        "all": "All",
+        "activeHere": "Active Here"
+      },
+      "sortLabel": "Sort",
+      "sortImportance": "Importance",
+      "sortName": "Name",
+      "statsHint": "Stats: vitality {{value}}",
+      "summaryCards": {
+        "remoteAgents": "Remote agents",
+        "pendingDrafts": "Pending draft candidates",
+        "activeHere": "Active in this world"
+      },
+      "pendingHint": "{{count}} draft candidates still need remote agents before assets can sync cleanly."
     },
     "editor": {
       "title": "Agent Editor",
@@ -710,6 +744,10 @@
       "engagementCount": "Engagement count: {{value}}",
       "lastActiveAt": "Last active: {{value}}",
       "liveStateTitle": "Live state",
+      "truthSection": "Agent truth",
+      "runtimeSection": "Runtime signal",
+      "liveStateSection": "Live world state",
+      "metadataSection": "Writable metadata",
       "displayName": "Display Name",
       "avatarUrl": "Avatar URL",
       "category": "Category",
@@ -722,33 +760,63 @@
     }
   },
   "assets": {
+    "missing": {
+      "none": "All tracked slots are covered."
+    },
     "synced": {
       "empty": "No synced media bindings yet.",
-      "noStorageRef": "No asset storageRef"
+      "noStorageRef": "No asset storageRef",
+      "description": "These bindings already exist remotely as world truth."
     },
     "world": {
       "generatedTitle": "Generated World Assets",
+      "generatedDescription": "These are local outputs produced during create or maintenance flows.",
       "cover": "World cover: {{value}}",
       "noGeneratedCover": "No generated cover yet",
       "locationImages": "Generated location images: {{count}}",
-      "syncedTitle": "Synced World Assets"
+      "syncedTitle": "Synced World Assets",
+      "syncedDescription": "These bindings are already persisted remotely and visible to runtime consumers.",
+      "missingTitle": "Missing or unsynced coverage",
+      "missingDescription": "These tracked world asset slots still need generation or sync before the world asset surface feels complete.",
+      "summary": {
+        "generatedCover": "Generated cover",
+        "generatedLocations": "Generated location images",
+        "syncedBindings": "Synced bindings"
+      }
     },
     "agent": {
       "generatedTitle": "Generated Agent Assets",
+      "generatedDescription": "These are local portrait outputs before or after they become remote media bindings.",
       "emptyGenerated": "No generated character portraits yet.",
       "remoteAgent": "Remote agent: {{value}}",
       "notCreated": "not created",
-      "syncedTitle": "Synced Agent Assets"
+      "syncedTitle": "Synced Agent Assets",
+      "syncedDescription": "These bindings already point remote agent slots at media assets.",
+      "missingTitle": "Pending linkage",
+      "missingDescription": "These generated portraits still need a remote agent match before sync can complete cleanly.",
+      "summary": {
+        "generatedPortraits": "Generated portraits",
+        "linkedPortraits": "Linked to remote agents",
+        "syncedBindings": "Synced bindings"
+      }
     }
   },
   "releases": {
+    "shared": {
+      "none": "None"
+    },
     "drafts": {
       "title": "Drafts",
       "description": "Detailed draft selection now lives here; the workspace drawer keeps only quick entry points.",
       "newDraft": "New Draft",
       "empty": "No drafts are available.",
       "statusLine": "Status: {{status}} · Updated: {{updatedAt}}",
-      "continue": "Continue"
+      "continue": "Continue",
+      "summary": {
+        "total": "Total drafts",
+        "active": "Selected draft",
+        "publishable": "Published drafts"
+      }
     },
     "publish": {
       "title": "Publish",
@@ -757,13 +825,21 @@
       "noWorldSelected": "No world selected",
       "latestDraft": "Latest selected draft: {{value}}",
       "noDraftSelected": "No draft selected",
-      "openFlow": "Open Publish Flow"
+      "openFlow": "Open Publish Flow",
+      "maintainState": "Maintain state: {{value}}",
+      "recommendationDirty": "Save or sync the current maintenance edits before entering the publish review flow.",
+      "recommendationReady": "The maintenance surface is clean. You can jump back into publish review when the draft is ready."
     },
     "history": {
       "title": "History",
       "description": "Mutation history is now a first-class release surface instead of a hidden background query.",
       "empty": "No mutations recorded yet.",
-      "noTargetPath": "no target path"
+      "noTargetPath": "no target path",
+      "summary": {
+        "total": "Mutations",
+        "latest": "Latest mutation",
+        "targets": "Distinct targets"
+      }
     }
   },
   "taskStrip": {
@@ -845,7 +921,43 @@
     "syncAgentAssets": "Sync Agent Assets",
     "unsavedPanels": "Unsaved panels: {{value}}",
     "untitledWorld": "Untitled world",
-    "worldId": "World ID: {{value}}"
+    "worldId": "World ID: {{value}}",
+    "section": {
+      "label": "Section Context",
+      "baseTitle": "World identity",
+      "baseDescription": "Keep the canonical world card readable and publication-ready.",
+      "baseSummary": "Edit the world name, layered copy, classification, and descriptive context in one place.",
+      "worldviewTitle": "World rules",
+      "worldviewDescription": "Maintain how the world works, how it is structured, and how creators should reason about it.",
+      "worldviewSummary": "Group edits by time rules, systems, culture, structure, and narrative support.",
+      "eventsTitle": "World timeline",
+      "eventsDescription": "Curate the published event graph that downstream systems will treat as canonical world sequence.",
+      "eventsSummary": "Review graph shape, evidence expectations, and sync mode before writing timeline truth.",
+      "lorebooksTitle": "Knowledge surface",
+      "lorebooksDescription": "Keep lore entries coherent, queryable, and ready for sync.",
+      "lorebooksSummary": "Add and curate reusable lore rows, then sync them once the set is valid.",
+      "registryTitle": "Agent roster",
+      "registryDescription": "See which characters already exist remotely and which draft candidates still need an agent record.",
+      "registrySummary": "The registry helps you decide whether the next step is create, review, or edit metadata.",
+      "editorTitle": "Agent metadata",
+      "editorDescription": "Inspect readable agent truth, watch runtime signal, and edit the metadata fields that are currently writable.",
+      "editorSummary": "Full persona editing remains future-facing; this surface focuses on readable truth plus safe metadata updates.",
+      "worldAssetsTitle": "World asset coverage",
+      "worldAssetsDescription": "Compare generated assets, synced media bindings, and missing world asset coverage.",
+      "worldAssetsSummary": "The next step should be obvious: generate, sync, or verify.",
+      "agentAssetsTitle": "Agent asset coverage",
+      "agentAssetsDescription": "Review which portraits already map to remote agents and which still need linkage.",
+      "agentAssetsSummary": "Use this section to close the gap between local portraits and remote agent bindings.",
+      "draftsTitle": "Draft release prep",
+      "draftsDescription": "Track which drafts exist, which one is active, and where to jump back into the create flow.",
+      "draftsSummary": "Releases should feel like a release surface, not a hidden transport panel.",
+      "publishTitle": "Publish review handoff",
+      "publishDescription": "Use the current maintenance state to decide when it is safe to jump back into publish review.",
+      "publishSummary": "This section should answer whether the draft is ready to leave maintenance and re-enter publish flow.",
+      "historyTitle": "Release history",
+      "historyDescription": "Read mutation history as a release timeline instead of a hidden technical log.",
+      "historySummary": "What changed, where it changed, and when it changed should all be easy to scan."
+    }
   },
   "expertDrawer": {
     "characterCoverage": "Character coverage: {{count}}%",

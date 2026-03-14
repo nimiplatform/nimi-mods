@@ -37,6 +37,16 @@ type AgentEditorDraftState = {
   capabilitiesText: string;
 };
 
+type RegistryFilter = 'ALL' | 'READY' | 'MISSING_REMOTE' | 'ACTIVE_HERE';
+type RegistrySort = 'DISPLAY_NAME' | 'IMPORTANCE';
+
+const IMPORTANCE_RANK: Record<string, number> = {
+  PRIMARY: 0,
+  SUPPORTING: 1,
+  SECONDARY: 2,
+  BACKGROUND: 3,
+};
+
 export function AgentsRegistryPanel(props: {
   world: WorldSummary | null;
   creatorAgents: WorldStudioCreatorAgentSummary[];
@@ -46,6 +56,8 @@ export function AgentsRegistryPanel(props: {
   onSelectAgent: (agentId: string) => void;
   onCreateAgentsFromDrafts: (characterNames?: string[]) => void;
 }): React.ReactElement {
+  const [filter, setFilter] = useState<RegistryFilter>('ALL');
+  const [sort, setSort] = useState<RegistrySort>('IMPORTANCE');
   const linkedAgentByCharacter = new Map(
     props.draftCharacterNames.map((characterName) => [
       characterName,
@@ -58,6 +70,36 @@ export function AgentsRegistryPanel(props: {
     ]),
   );
   const pendingCharacters = props.draftCharacterNames.filter((name) => !linkedAgentByCharacter.get(name));
+  const visibleAgents = props.creatorAgents
+    .filter((agent) => {
+      if (filter === 'READY') return true;
+      if (filter === 'MISSING_REMOTE') return false;
+      if (filter === 'ACTIVE_HERE') return agent.activeWorldId === props.world?.id;
+      return true;
+    })
+    .sort((left, right) => {
+      if (sort === 'DISPLAY_NAME') {
+        return String(left.displayName || left.handle || left.id).localeCompare(String(right.displayName || right.handle || right.id));
+      }
+      const leftRank = IMPORTANCE_RANK[String(left.importance || 'SECONDARY').toUpperCase()] ?? 99;
+      const rightRank = IMPORTANCE_RANK[String(right.importance || 'SECONDARY').toUpperCase()] ?? 99;
+      if (leftRank !== rightRank) return leftRank - rightRank;
+      return String(left.displayName || left.handle || left.id).localeCompare(String(right.displayName || right.handle || right.id));
+    });
+  const summaryCards = [
+    {
+      label: worldStudioMessage('agents.registry.summaryCards.remoteAgents', 'Remote agents'),
+      value: String(props.creatorAgents.length),
+    },
+    {
+      label: worldStudioMessage('agents.registry.summaryCards.pendingDrafts', 'Pending draft candidates'),
+      value: String(pendingCharacters.length),
+    },
+    {
+      label: worldStudioMessage('agents.registry.summaryCards.activeHere', 'Active in this world'),
+      value: String(props.creatorAgents.filter((agent) => agent.activeWorldId === props.world?.id).length),
+    },
+  ];
   return (
     <div className="space-y-4">
       <section className="ui-sync-card ui-sync-card-inset p-4">
@@ -73,21 +115,59 @@ export function AgentsRegistryPanel(props: {
               })}
             </p>
           </div>
-          <button
-            type="button"
-            className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
-            disabled={pendingCharacters.length === 0}
-            onClick={() => props.onCreateAgentsFromDrafts(pendingCharacters)}
-          >
-            {worldStudioMessage('agents.registry.createMissing', 'Create Missing Draft Agents')}
-          </button>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-3">
+          {summaryCards.map((card) => (
+            <div key={card.label} className="rounded-2xl bg-[#eef5f5] px-3 py-2 text-xs text-slate-700">
+              <p className="font-semibold">{card.value}</p>
+              <p className="mt-1">{card.label}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {([
+            ['ALL', worldStudioMessage('agents.registry.filters.all', 'All')],
+            ['ACTIVE_HERE', worldStudioMessage('agents.registry.filters.activeHere', 'Active Here')],
+          ] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                filter === value ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700'
+              }`}
+              onClick={() => setFilter(value)}
+            >
+              {label}
+            </button>
+          ))}
+          <div className="ml-auto flex items-center gap-2 text-xs text-slate-500">
+            <span>{worldStudioMessage('agents.registry.sortLabel', 'Sort')}</span>
+            <button
+              type="button"
+              className={`rounded-full border px-3 py-1 font-semibold ${
+                sort === 'IMPORTANCE' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700'
+              }`}
+              onClick={() => setSort('IMPORTANCE')}
+            >
+              {worldStudioMessage('agents.registry.sortImportance', 'Importance')}
+            </button>
+            <button
+              type="button"
+              className={`rounded-full border px-3 py-1 font-semibold ${
+                sort === 'DISPLAY_NAME' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700'
+              }`}
+              onClick={() => setSort('DISPLAY_NAME')}
+            >
+              {worldStudioMessage('agents.registry.sortName', 'Name')}
+            </button>
+          </div>
         </div>
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
-          {props.creatorAgents.length === 0 ? (
+          {visibleAgents.length === 0 ? (
             <p className="text-xs text-gray-500">
               {worldStudioMessage('agents.registry.empty', 'No world-owned agents are available yet.')}
             </p>
-          ) : props.creatorAgents.map((agent) => (
+          ) : visibleAgents.map((agent) => (
             <button
               key={agent.id}
               type="button"
@@ -105,6 +185,13 @@ export function AgentsRegistryPanel(props: {
               <p className={`mt-1 text-[11px] ${agent.id === props.selectedAgentId ? 'text-slate-300' : 'text-slate-500'}`}>
                 {worldStudioMessage('agents.editor.activeWorld', 'Active world: {{value}}', {
                   value: agent.activeWorldId || '-',
+                })}
+              </p>
+              <p className={`mt-1 text-[11px] ${agent.id === props.selectedAgentId ? 'text-slate-300' : 'text-slate-500'}`}>
+                {worldStudioMessage('agents.registry.statsHint', 'Stats: vitality {{value}}', {
+                  value: props.creatorAgents.find((candidate) => candidate.id === agent.id)?.stats?.vitalityScore == null
+                    ? '-'
+                    : String(props.creatorAgents.find((candidate) => candidate.id === agent.id)?.stats?.vitalityScore),
                 })}
               </p>
             </button>
@@ -140,6 +227,13 @@ export function AgentsRegistryPanel(props: {
             </span>
           ))}
         </div>
+        {pendingCharacters.length > 0 ? (
+          <p className="mt-3 text-xs text-slate-500">
+            {worldStudioMessage('agents.registry.pendingHint', '{{count}} draft candidates still need remote agents before assets can sync cleanly.', {
+              count: pendingCharacters.length,
+            })}
+          </p>
+        ) : null}
       </section>
     </div>
   );
@@ -323,7 +417,7 @@ export function AgentEditorPanel(props: {
       });
       delete draftCacheRef.current[agentId];
       localDirtyRef.current = false;
-      onDirtyChangeRef.current(false);
+      onDirtyChangeRef.current(Object.keys(draftCacheRef.current).length > 0);
     } catch (error) {
       setJsonError(error instanceof Error ? error.message : String(error));
     }
@@ -353,6 +447,9 @@ export function AgentEditorPanel(props: {
 
       <div className="mt-3 grid gap-3 md:grid-cols-2">
         <div className="ui-sync-soft-card p-3 text-xs text-slate-700">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            {worldStudioMessage('agents.editor.truthSection', 'Agent truth')}
+          </p>
           <p><span className="font-semibold">{worldStudioMessage('agents.editor.readable', 'Readable')}</span></p>
           <p className="mt-1">
             {worldStudioMessage('agents.editor.handle', 'Handle: @{{value}}', { value: props.agent.handle || 'unknown' })}
@@ -378,6 +475,9 @@ export function AgentEditorPanel(props: {
 
       <div className="mt-3 grid gap-3 md:grid-cols-2">
         <div className="ui-sync-soft-card p-3 text-xs text-slate-700">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            {worldStudioMessage('agents.editor.runtimeSection', 'Runtime signal')}
+          </p>
           <p className="font-semibold text-slate-800">
             {worldStudioMessage('agents.editor.statsTitle', 'Realm stats')}
           </p>
@@ -408,6 +508,9 @@ export function AgentEditorPanel(props: {
           </p>
         </div>
         <div className="ui-sync-soft-card p-3 text-xs text-slate-700">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            {worldStudioMessage('agents.editor.liveStateSection', 'Live world state')}
+          </p>
           <p className="font-semibold text-slate-800">
             {worldStudioMessage('agents.editor.liveStateTitle', 'Live state')}
           </p>
@@ -420,6 +523,11 @@ export function AgentEditorPanel(props: {
       </div>
 
       <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <div className="md:col-span-2">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            {worldStudioMessage('agents.editor.metadataSection', 'Editable metadata')}
+          </p>
+        </div>
         <label className="text-xs text-gray-700">
           <span className="mb-1 block font-medium">{worldStudioMessage('agents.editor.displayName', 'Display Name')}</span>
           <input className="h-9 w-full rounded-md border border-gray-300 px-2 text-xs" value={displayName} onChange={(event) => setDisplayName(event.target.value)} />

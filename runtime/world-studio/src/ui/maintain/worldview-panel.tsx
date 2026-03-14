@@ -28,6 +28,22 @@ function ModuleEditor(props: {
   );
 }
 
+function ModuleGroup(props: {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <section className="ui-sync-soft-card p-3">
+      <div className="mb-3">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{props.title}</h4>
+        <p className="mt-1 text-[11px] text-gray-500">{props.description}</p>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-2">{props.children}</div>
+    </section>
+  );
+}
+
 export function WorldviewPanel(props: WorldviewPanelProps) {
   const { t } = useModTranslation('world-studio');
   const worldview = props.worldviewPatch || {};
@@ -54,40 +70,54 @@ export function WorldviewPanel(props: WorldviewPanelProps) {
         </div>
       )}
 
-      <div className="mt-3 grid gap-3 lg:grid-cols-2">
-        <ModuleEditor label="lifecycle" value={worldview.lifecycle} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
-          draft.lifecycle = next;
-        }))} />
-        <ModuleEditor label="timeModel" value={worldview.timeModel} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
-          draft.timeModel = next;
-        }))} />
-        <ModuleEditor label="spaceTopology" value={worldview.spaceTopology} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
-          draft.spaceTopology = next;
-        }))} />
-        <ModuleEditor label="causality" value={worldview.causality} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
-          draft.causality = next;
-        }))} />
-        <ModuleEditor label="coreSystem" value={worldview.coreSystem} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
-          draft.coreSystem = next;
-        }))} />
-        <ModuleEditor label="languages" value={worldview.languages} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
-          draft.languages = next;
-        }))} />
-        <ModuleEditor label="existences" value={worldview.existences} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
-          draft.existences = next;
-        }))} />
-        <ModuleEditor label="resources" value={worldview.resources} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
-          draft.resources = next;
-        }))} />
-        <ModuleEditor label="structures" value={worldview.structures} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
-          draft.structures = next;
-        }))} />
-        <ModuleEditor label="visualGuide" value={worldview.visualGuide} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
-          draft.visualGuide = next;
-        }))} />
-        <ModuleEditor label="narrativeHooks" value={worldview.narrativeHooks} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
-          draft.narrativeHooks = next;
-        }))} />
+      <div className="mt-3 space-y-4">
+        <ModuleGroup title={t('worldview.groups.timeTitle')} description={t('worldview.groups.timeDescription')}>
+          <ModuleEditor label="timeModel" value={worldview.timeModel} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
+            draft.timeModel = next;
+          }))} />
+          <ModuleEditor label="lifecycle" value={worldview.lifecycle} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
+            draft.lifecycle = next;
+          }))} />
+        </ModuleGroup>
+
+        <ModuleGroup title={t('worldview.groups.rulesTitle')} description={t('worldview.groups.rulesDescription')}>
+          <ModuleEditor label="coreSystem" value={worldview.coreSystem} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
+            draft.coreSystem = next;
+          }))} />
+          <ModuleEditor label="causality" value={worldview.causality} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
+            draft.causality = next;
+          }))} />
+        </ModuleGroup>
+
+        <ModuleGroup title={t('worldview.groups.cultureTitle')} description={t('worldview.groups.cultureDescription')}>
+          <ModuleEditor label="languages" value={worldview.languages} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
+            draft.languages = next;
+          }))} />
+          <ModuleEditor label="existences" value={worldview.existences} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
+            draft.existences = next;
+          }))} />
+          <ModuleEditor label="resources" value={worldview.resources} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
+            draft.resources = next;
+          }))} />
+        </ModuleGroup>
+
+        <ModuleGroup title={t('worldview.groups.structureTitle')} description={t('worldview.groups.structureDescription')}>
+          <ModuleEditor label="spaceTopology" value={worldview.spaceTopology} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
+            draft.spaceTopology = next;
+          }))} />
+          <ModuleEditor label="structures" value={worldview.structures} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
+            draft.structures = next;
+          }))} />
+          <ModuleEditor label="visualGuide" value={worldview.visualGuide} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
+            draft.visualGuide = next;
+          }))} />
+        </ModuleGroup>
+
+        <ModuleGroup title={t('worldview.groups.narrativeTitle')} description={t('worldview.groups.narrativeDescription')}>
+          <ModuleEditor label="narrativeHooks" value={worldview.narrativeHooks} onChange={(next) => props.onWorldviewPatchChange(updateWorldview(worldview, (draft) => {
+            draft.narrativeHooks = next;
+          }))} />
+        </ModuleGroup>
       </div>
 
       <details className="ui-sync-code-panel mt-3 p-2">

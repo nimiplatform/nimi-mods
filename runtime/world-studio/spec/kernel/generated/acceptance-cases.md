@@ -120,7 +120,7 @@ cases:
     expected_ok: true
     source_rule: WS-ACC-002
   - id: WS-022-WORLD-TRUTH-LAYERED-COPY-FIELDS
-    description: World Base exposes layered world truth fields (`tagline`, `motto`, `overview`, `contentRating`) and keeps editable runtime clock state in `clockConfig`.
+    description: World Base exposes layered world truth fields (`tagline`, `motto`, `overview`, `contentRating`) and surfaces `clockConfig` as readable runtime truth without presenting it as a writable Base field.
     expected_ok: true
     source_rule: WS-ACC-002
   - id: WS-023-AGENT-TRUTH-READABLE-UPGRADE
@@ -129,6 +129,22 @@ cases:
     source_rule: WS-ACC-002
   - id: WS-024-WORLDVIEW-LANGUAGES-NO-CURRENT-NODE
     description: Worldview maintenance includes `languages`, and Create/maintain editors do not expose deprecated `timeModel.currentNode` inputs.
+    expected_ok: true
+    source_rule: WS-ACC-002
+  - id: WS-025-MAINTAIN-WORKBENCH-UNIFIED-RHYTHM
+    description: Maintain sections share a consistent workbench rhythm with section context copy and contextual primary actions instead of ad hoc panel-specific layouts.
+    expected_ok: true
+    source_rule: WS-ACC-002
+  - id: WS-026-ASSETS-GENERATED-SYNCED-MISSING
+    description: Assets maintenance distinguishes generated local assets, synced bindings, and missing coverage so creators can see whether generation or sync is the next action.
+    expected_ok: true
+    source_rule: WS-ACC-002
+  - id: WS-027-RELEASES-READING-SURFACE
+    description: Releases maintenance presents draft selection, publish entry, and mutation history as explicit reading surfaces with current-world context.
+    expected_ok: true
+    source_rule: WS-ACC-002
+  - id: WS-028-NO-LEGACY-TIME-FLOW-RATIO-COMPAT
+    description: World-Studio no longer migrates legacy top-level `world.timeFlowRatio`; only `worldview.timeModel.timeFlowRatio` is recognized as canonical.
     expected_ok: true
     source_rule: WS-ACC-002
 verification_commands:
