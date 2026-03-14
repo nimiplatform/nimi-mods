@@ -1,7 +1,7 @@
 import type { MintYouSession, BasicInfo, TraitExtractionResult, DnaSynthesisOutput, InterviewMessage, InterviewTurnSignal, SocialProfile, } from '../types.js';
 import type { MintYouPipelineStep, DnaPrimaryType, DnaSecondaryTrait, RelationshipMode, FormalityValue, SentimentValue, } from '../contracts.js';
 import { emitMintYouLog } from '../logging.js';
-import { readModState, removeModState, writeModState, } from './mod-state.js';
+import { readStoredState, removeStoredState, writeStoredState, } from './storage-state.js';
 import { type HookClient } from "@nimiplatform/sdk/mod";
 export const SESSION_VERSION = 4;
 const SESSION_KEY_PREFIX = 'mint-you:session:';
@@ -34,7 +34,7 @@ function parseSession(raw: string | null): MintYouSession | null {
     }
 }
 /**
- * Trim session data for persistence to stay within mod-state 512KB limit.
+ * Trim session data before host sqlite persistence to avoid storing oversized transient blobs.
  * - Exclude data: URL photos (only keep in memory)
  * - Trim interview messages to most recent N
  * - Clamp memoryDigest length
@@ -79,7 +79,7 @@ export async function saveSession(scopeKey: string, session: MintYouSession, opt
     const hookClient = options?.hookClient ?? null;
     if (!hookClient)
         return null;
-    const ok = await writeModState(hookClient.data, key, data);
+    const ok = await writeStoredState(hookClient.storage, key, data);
     if (!ok) {
         emitMintYouLog({
             level: 'warn',
@@ -98,7 +98,7 @@ export async function loadSession(scopeKey: string, options?: {
     const hookClient = options?.hookClient ?? null;
     if (!hookClient)
         return null;
-    const remote = await readModState(hookClient.data, key);
+    const remote = await readStoredState(hookClient.storage, key);
     return parseSession(remote);
 }
 export async function clearSession(scopeKey: string, options?: {
@@ -108,7 +108,7 @@ export async function clearSession(scopeKey: string, options?: {
     const hookClient = options?.hookClient ?? null;
     if (!hookClient)
         return;
-    await removeModState(hookClient.data, key);
+    await removeStoredState(hookClient.storage, key);
 }
 export function isSessionExpired(session: MintYouSession): boolean {
     const now = Date.now();

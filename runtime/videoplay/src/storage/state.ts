@@ -1,10 +1,12 @@
 import {
   VIDEOPLAY_DATA_API_ASSET_BATCH_UPSERT,
   VIDEOPLAY_DATA_API_EPISODE_UPSERT,
+  VIDEOPLAY_MOD_ID,
   VIDEOPLAY_DATA_API_RELEASE_PUBLISH,
   VIDEOPLAY_REASON,
   VIDEOPLAY_STORAGE_KEY,
 } from '../contracts.js';
+import { createModKvStore, createModStorageClient } from '@nimiplatform/sdk/mod';
 import { createUlid } from '../id.js';
 import { VideoPlayError } from '../errors.js';
 import {
@@ -24,35 +26,10 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-function loadLocalStorageJson<T>(key: string, fallback: T): T {
-  if (typeof globalThis.localStorage === 'undefined') {
-    return fallback;
-  }
-  try {
-    const raw = globalThis.localStorage.getItem(key);
-    if (!raw) {
-      return fallback;
-    }
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') {
-      return fallback;
-    }
-    return parsed as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function saveLocalStorageJson(key: string, value: unknown): void {
-  if (typeof globalThis.localStorage === 'undefined') {
-    return;
-  }
-  try {
-    globalThis.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Persistence is best effort in renderer storage layer.
-  }
-}
+const videoplayStateStore = createModKvStore({
+  storage: createModStorageClient(VIDEOPLAY_MOD_ID),
+  namespace: 'videoplay.state',
+});
 
 export function createInitialVideoPlayState(): VideoPlayStorageState {
   return {
@@ -70,9 +47,9 @@ export function createInitialVideoPlayState(): VideoPlayStorageState {
   };
 }
 
-export function loadVideoPlayState(): VideoPlayStorageState {
+export async function loadVideoPlayState(): Promise<VideoPlayStorageState> {
   const fallback = createInitialVideoPlayState();
-  const loaded = loadLocalStorageJson(VIDEOPLAY_STORAGE_KEY, fallback);
+  const loaded = await videoplayStateStore.getJson<VideoPlayStorageState>(VIDEOPLAY_STORAGE_KEY) || fallback;
   const parsed = VideoPlayStorageStateSchema.safeParse(loaded);
   if (!parsed.success) {
     return fallback;
@@ -80,7 +57,7 @@ export function loadVideoPlayState(): VideoPlayStorageState {
   return parsed.data;
 }
 
-export function saveVideoPlayState(state: VideoPlayStorageState): void {
+export async function saveVideoPlayState(state: VideoPlayStorageState): Promise<void> {
   const parsed = VideoPlayStorageStateSchema.safeParse(state);
   if (!parsed.success) {
     throw new VideoPlayError({
@@ -93,7 +70,7 @@ export function saveVideoPlayState(state: VideoPlayStorageState): void {
       },
     });
   }
-  saveLocalStorageJson(VIDEOPLAY_STORAGE_KEY, parsed.data);
+  await videoplayStateStore.setJson(VIDEOPLAY_STORAGE_KEY, parsed.data);
 }
 
 function idempotencyKeyFor(capability: string, operation: string, key: string): string {

@@ -17,6 +17,8 @@ export const TEXTPLAY_CAPABILITIES = [
   'runtime.ai.text.generate',
   'runtime.route.list.options',
   'runtime.route.resolve',
+  'storage.sqlite.query',
+  'storage.sqlite.execute',
   `data.query.${TEXTPLAY_DATA_API_WORLD_WORLDS_MINE}`,
   `data.query.${TEXTPLAY_DATA_API_WORLD_EVENTS_LIST}`,
   `data.query.${TEXTPLAY_DATA_API_WORLD_LOREBOOKS_LIST}`,

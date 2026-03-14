@@ -1,41 +1,41 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createModKvStore, createModStorageClient } from '@nimiplatform/sdk/mod';
+import { LOCAL_CHAT_MOD_ID } from '../../contracts.js';
 
 export type LocalChatConversationViewMode = 'stage' | 'chat';
 
 const LOCAL_CHAT_VIEW_MODE_STORAGE_KEY = 'nimi.local-chat.view-mode.v1';
+const conversationViewModeStore = createModKvStore({
+  storage: createModStorageClient(LOCAL_CHAT_MOD_ID),
+  namespace: 'local-chat.view-mode',
+});
 
 function buildStorageKey(viewerId: string, targetId: string): string {
   return `${LOCAL_CHAT_VIEW_MODE_STORAGE_KEY}:${viewerId}:${targetId}`;
 }
 
-function readStoredViewMode(viewerId: string, targetId: string): LocalChatConversationViewMode | null {
-  if (typeof window === 'undefined' || !window.localStorage) {
-    return null;
-  }
+async function readStoredViewMode(viewerId: string, targetId: string): Promise<LocalChatConversationViewMode | null> {
   const normalizedViewerId = String(viewerId || '').trim();
   const normalizedTargetId = String(targetId || '').trim();
   if (!normalizedViewerId || !normalizedTargetId) {
     return null;
   }
   try {
-    const raw = String(window.localStorage.getItem(buildStorageKey(normalizedViewerId, normalizedTargetId)) || '').trim();
+    const raw = String(await conversationViewModeStore.get(buildStorageKey(normalizedViewerId, normalizedTargetId)) || '').trim();
     return raw === 'chat' ? 'chat' : raw === 'stage' ? 'stage' : null;
   } catch {
     return null;
   }
 }
 
-function writeStoredViewMode(viewerId: string, targetId: string, mode: LocalChatConversationViewMode): void {
-  if (typeof window === 'undefined' || !window.localStorage) {
-    return;
-  }
+async function writeStoredViewMode(viewerId: string, targetId: string, mode: LocalChatConversationViewMode): Promise<void> {
   const normalizedViewerId = String(viewerId || '').trim();
   const normalizedTargetId = String(targetId || '').trim();
   if (!normalizedViewerId || !normalizedTargetId) {
     return;
   }
   try {
-    window.localStorage.setItem(buildStorageKey(normalizedViewerId, normalizedTargetId), mode);
+    await conversationViewModeStore.set(buildStorageKey(normalizedViewerId, normalizedTargetId), mode);
   } catch {
     // Ignore persistence failures; mode still lives in memory.
   }
@@ -58,8 +58,9 @@ export function useLocalChatConversationViewMode(input: {
       setConversationViewModeState('stage');
       return;
     }
-    const stored = readStoredViewMode(viewerId, targetId);
-    setConversationViewModeState(stored || 'stage');
+    void readStoredViewMode(viewerId, targetId).then((stored) => {
+      setConversationViewModeState(stored || 'stage');
+    });
   }, [storageKey, targetId, viewerId]);
 
   const setConversationViewMode = useCallback((mode: LocalChatConversationViewMode) => {
@@ -67,7 +68,7 @@ export function useLocalChatConversationViewMode(input: {
     if (!storageKey) {
       return;
     }
-    writeStoredViewMode(viewerId, targetId, mode);
+    void writeStoredViewMode(viewerId, targetId, mode);
   }, [storageKey, targetId, viewerId]);
 
   return {

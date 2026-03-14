@@ -22,7 +22,7 @@ export async function registerVideoPlayDataCapabilities(input: {
     await input.hookClient.data.register({
         capability: VIDEOPLAY_DATA_API_EPISODE_UPSERT,
         handler: async (query) => {
-            const state = loadVideoPlayState();
+            const state = await loadVideoPlayState();
             const payload = asRecord(query);
             const operation = String(payload.operation || '').trim();
             if (operation === 'upsert') {
@@ -30,7 +30,7 @@ export async function registerVideoPlayDataCapabilities(input: {
                     idempotencyKey: readRequiredString(payload, 'idempotencyKey'),
                     episode: asRecord(payload.episode) as never,
                 });
-                saveVideoPlayState(state);
+                await saveVideoPlayState(state);
                 return response;
             }
             if (operation === 'get') {
@@ -43,7 +43,7 @@ export async function registerVideoPlayDataCapabilities(input: {
             if (operation === 'upsert-candidate-selection') {
                 const episodeId = readRequiredString(payload, 'episodeId');
                 state.candidateSelectionByEpisodeId[episodeId] = payload.candidateSelection as never;
-                saveVideoPlayState(state);
+                await saveVideoPlayState(state);
                 return { ok: true };
             }
             if (operation === 'get-candidate-selection') {
@@ -55,7 +55,7 @@ export async function registerVideoPlayDataCapabilities(input: {
             if (operation === 'upsert-audio-design') {
                 const episodeId = readRequiredString(payload, 'episodeId');
                 state.audioDesignByEpisodeId[episodeId] = payload.audioDesign as never;
-                saveVideoPlayState(state);
+                await saveVideoPlayState(state);
                 return { ok: true };
             }
             if (operation === 'get-audio-design') {
@@ -67,7 +67,7 @@ export async function registerVideoPlayDataCapabilities(input: {
             if (operation === 'upsert-character-casting') {
                 const storyId = readRequiredString(payload, 'storyId');
                 state.characterCastingByStoryId[storyId] = payload.characterCasting as never;
-                saveVideoPlayState(state);
+                await saveVideoPlayState(state);
                 return { ok: true };
             }
             if (operation === 'get-character-casting') {
@@ -79,7 +79,7 @@ export async function registerVideoPlayDataCapabilities(input: {
             if (operation === 'upsert-scene-planning') {
                 const storyId = readRequiredString(payload, 'storyId');
                 state.scenePlanningByStoryId[storyId] = payload.scenePlanning as never;
-                saveVideoPlayState(state);
+                await saveVideoPlayState(state);
                 return { ok: true };
             }
             if (operation === 'get-scene-planning') {
@@ -94,7 +94,7 @@ export async function registerVideoPlayDataCapabilities(input: {
     await input.hookClient.data.register({
         capability: VIDEOPLAY_DATA_API_ASSET_BATCH_UPSERT,
         handler: async (query) => {
-            const state = loadVideoPlayState();
+            const state = await loadVideoPlayState();
             const payload = asRecord(query);
             const operation = String(payload.operation || '').trim();
             if (operation === 'upsert') {
@@ -104,7 +104,7 @@ export async function registerVideoPlayDataCapabilities(input: {
                     episodeId: readRequiredString(payload, 'episodeId'),
                     assets: assetsRaw as never,
                 });
-                saveVideoPlayState(state);
+                await saveVideoPlayState(state);
                 return response;
             }
             if (operation === 'list') {
@@ -116,7 +116,7 @@ export async function registerVideoPlayDataCapabilities(input: {
     await input.hookClient.data.register({
         capability: VIDEOPLAY_DATA_API_RELEASE_PUBLISH,
         handler: async (query) => {
-            const state = loadVideoPlayState();
+            const state = await loadVideoPlayState();
             const payload = asRecord(query);
             const operation = String(payload.operation || '').trim();
             if (operation === 'publish') {
@@ -125,7 +125,7 @@ export async function registerVideoPlayDataCapabilities(input: {
                     episodeId: readRequiredString(payload, 'episodeId'),
                     releasePackage: asRecord(payload.releasePackage) as never,
                 });
-                saveVideoPlayState(state);
+                await saveVideoPlayState(state);
                 return response;
             }
             if (operation === 'get') {

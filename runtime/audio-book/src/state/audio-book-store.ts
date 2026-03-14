@@ -3,6 +3,8 @@
 // ---------------------------------------------------------------------------
 
 import { create } from 'zustand';
+import { createModKvStore, createModStorageClient } from '@nimiplatform/sdk/mod';
+import { AUDIO_BOOK_MOD_ID } from '../contracts.js';
 import type {
   CharacterProfile,
   ProjectState,
@@ -21,24 +23,27 @@ import {
 } from './indexed-db.js';
 
 // ---------------------------------------------------------------------------
-// Project list meta (lightweight, persisted in localStorage)
+// Project list meta (lightweight, persisted in host storage)
 // ---------------------------------------------------------------------------
 
 type ProjectMeta = { id: string; name: string; state: ProjectState; updatedAt: string };
 
-const LS_KEY = 'audio-book:project-list';
+const PROJECT_LIST_KEY = 'audio-book:project-list';
+const projectListStore = createModKvStore({
+  storage: createModStorageClient(AUDIO_BOOK_MOD_ID),
+  namespace: 'audio-book.meta',
+});
 
-function readProjectListMeta(): ProjectMeta[] {
+async function readProjectListMeta(): Promise<ProjectMeta[]> {
   try {
-    const raw = localStorage.getItem(LS_KEY);
-    return raw ? JSON.parse(raw) : [];
+    return await projectListStore.getJson<ProjectMeta[]>(PROJECT_LIST_KEY) || [];
   } catch {
     return [];
   }
 }
 
-function writeProjectListMeta(list: ProjectMeta[]) {
-  localStorage.setItem(LS_KEY, JSON.stringify(list));
+async function writeProjectListMeta(list: ProjectMeta[]) {
+  await projectListStore.setJson(PROJECT_LIST_KEY, list);
 }
 
 function toMeta(p: VoiceProject): ProjectMeta {
@@ -64,7 +69,7 @@ type AudioBookStore = {
   synthesisJob: SynthesisJob | null;
 
   // Actions
-  loadProjectList: () => void;
+  loadProjectList: () => Promise<void>;
   openProject: (id: string) => Promise<void>;
   createProject: (name: string) => Promise<VoiceProject>;
   deleteProject: (id: string) => Promise<void>;
@@ -109,8 +114,8 @@ export const useAudioBookStore = create<AudioBookStore>((set, get) => ({
   voiceCastings: [],
   synthesisJob: null,
 
-  loadProjectList() {
-    set({ projects: readProjectListMeta() });
+  async loadProjectList() {
+    set({ projects: await readProjectListMeta() });
   },
 
   async openProject(id) {
@@ -131,7 +136,7 @@ export const useAudioBookStore = create<AudioBookStore>((set, get) => ({
     await dbPutProject(project);
     const meta = toMeta(project);
     const projects = [meta, ...get().projects];
-    writeProjectListMeta(projects);
+    await writeProjectListMeta(projects);
     set({
       projects,
       activeProjectId: project.id,
@@ -148,7 +153,7 @@ export const useAudioBookStore = create<AudioBookStore>((set, get) => ({
     await dbDeleteProject(id);
     await dbDeleteProjectAudio(id);
     const projects = get().projects.filter((p) => p.id !== id);
-    writeProjectListMeta(projects);
+    await writeProjectListMeta(projects);
     const wasActive = get().activeProjectId === id;
     set({
       projects,
@@ -171,7 +176,7 @@ export const useAudioBookStore = create<AudioBookStore>((set, get) => ({
     });
     // Update meta list
     const projects = get().projects.map((p) => (p.id === updated.id ? toMeta(updated) : p));
-    writeProjectListMeta(projects);
+    void writeProjectListMeta(projects);
     set({ projects });
   },
 

@@ -22,6 +22,8 @@ capabilities:
   - runtime.route.list.options
   - runtime.route.resolve
   - runtime.route.check.health
+  - storage.sqlite.query
+  - storage.sqlite.execute
   - data.register.data-api.local-chat.chat-targets.list
   - data.query.data-api.local-chat.chat-targets.list
   - data.register.data-api.local-chat.chat-target.detail

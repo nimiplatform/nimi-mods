@@ -12,6 +12,8 @@ capabilities:
   - runtime.ai.text.generate
   - runtime.route.list.options
   - runtime.route.resolve
+  - storage.sqlite.query
+  - storage.sqlite.execute
   - data.query.data-api.world.worlds.mine
   - data.query.data-api.world.events.list
   - data.query.data-api.world.lorebooks.list

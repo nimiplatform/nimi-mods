@@ -53,7 +53,8 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
     const [videoRouteOptions, setVideoRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
     const [ttsRouteOptions, setTtsRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
     const [sttRouteOptions, setSttRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
-    const [routeBinding, setRouteBinding] = useState<RuntimeRouteBinding | null>(() => loadLocalChatRouteBinding());
+    const [routeBinding, setRouteBinding] = useState<RuntimeRouteBinding | null>(null);
+    const [routeBindingHydrated, setRouteBindingHydrated] = useState(false);
     const routeOptionsLoadInFlightRef = useRef<Partial<Record<RouteOptionsCapability, Promise<RuntimeRouteOptionsSnapshot | null>>>>({});
     const setRouteOptionsSafely = useCallback((capability: RouteOptionsCapability, next: RuntimeRouteOptionsSnapshot | null) => {
         if (capability === 'text.generate') {
@@ -193,8 +194,28 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
         setRouteBinding(null);
     }, []);
     useEffect(() => {
-        persistLocalChatRouteBinding(routeBinding);
-    }, [routeBinding]);
+        let cancelled = false;
+        void loadLocalChatRouteBinding().then((value) => {
+            if (cancelled) {
+                return;
+            }
+            setRouteBinding(value);
+            setRouteBindingHydrated(true);
+        }).catch(() => {
+            if (!cancelled) {
+                setRouteBindingHydrated(true);
+            }
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+    useEffect(() => {
+        if (!routeBindingHydrated) {
+            return;
+        }
+        void persistLocalChatRouteBinding(routeBinding);
+    }, [routeBinding, routeBindingHydrated]);
     useEffect(() => {
         void refreshRouteSnapshot();
     }, [refreshRouteSnapshot]);

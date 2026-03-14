@@ -17,12 +17,21 @@ required_capabilities:
   - key: runtime.ai.text.stream
     purpose: 流式输出推荐理由
     source_rule: DO-CAP-005
-  - key: runtime.ai.image.analyze
-    purpose: 衣物照片视觉识别分类、自拍肤色体型分析
-    source_rule: DO-CAP-003
-  - key: runtime.ai.image.generate
+  - key: runtime.media.image.generate
     purpose: 虚拟试穿图生成
     source_rule: DO-CAP-004
+  - key: runtime.route.list.options
+    purpose: 注册本地路由候选项
+    source_rule: DO-CAP-001
+  - key: runtime.route.resolve
+    purpose: 将用户意图解析为 mod 内路由
+    source_rule: DO-CAP-001
+  - key: storage.sqlite.query
+    purpose: 查询本地衣橱状态
+    source_rule: DO-CAP-006
+  - key: storage.sqlite.execute
+    purpose: 持久化本地衣橱状态到宿主 sqlite
+    source_rule: DO-CAP-006
   - key: data.register.data-api.daily-outfit.wardrobe.list
     purpose: 查询衣橱列表
     source_rule: DO-CAP-006

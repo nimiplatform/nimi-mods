@@ -1,111 +1,80 @@
 // ---------------------------------------------------------------------------
-// IndexedDB wrapper for Audio Book persistence
-// ---------------------------------------------------------------------------
-// DB: 'audio-book' v1
-// Stores:
-//   'projects' — key: projectId, value: VoiceProject JSON
-//   'audio'    — key: '{projectId}:{segmentId}', value: Blob
-// ---------------------------------------------------------------------------
-
+// Host storage wrapper for Audio Book persistence
 import type { VoiceProject } from '../types.js';
+import { createModKvStore, createModStorageClient } from '@nimiplatform/sdk/mod';
+import { AUDIO_BOOK_MOD_ID } from '../contracts.js';
 
-const DB_NAME = 'audio-book';
-const DB_VERSION = 1;
-const STORE_PROJECTS = 'projects';
-const STORE_AUDIO = 'audio';
-
-let dbInstance: IDBDatabase | null = null;
-
-export function openDb(): Promise<IDBDatabase> {
-  if (dbInstance) return Promise.resolve(dbInstance);
-
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(STORE_PROJECTS)) {
-        db.createObjectStore(STORE_PROJECTS, { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains(STORE_AUDIO)) {
-        db.createObjectStore(STORE_AUDIO);
-      }
-    };
-
-    request.onsuccess = () => {
-      dbInstance = request.result;
-      resolve(dbInstance);
-    };
-
-    request.onerror = () => reject(request.error);
-  });
-}
+const projectStore = createModKvStore({
+  storage: createModStorageClient(AUDIO_BOOK_MOD_ID),
+  namespace: 'audio-book.projects',
+});
+const fileStorage = createModStorageClient(AUDIO_BOOK_MOD_ID).files;
 
 // ---------------------------------------------------------------------------
-// Project CRUD
-// ---------------------------------------------------------------------------
-
-function txStore(db: IDBDatabase, store: string, mode: IDBTransactionMode): IDBObjectStore {
-  return db.transaction(store, mode).objectStore(store);
+async function loadProjectMap(): Promise<Record<string, VoiceProject>> {
+  return await projectStore.getJson<Record<string, VoiceProject>>('projects') || {};
 }
 
-function idbRequest<T>(req: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
+async function saveProjectMap(projects: Record<string, VoiceProject>): Promise<void> {
+  await projectStore.setJson('projects', projects);
+}
+
+function audioPath(projectId: string, segmentId: string): string {
+  return `audio/${projectId}/${segmentId}.bin`;
+}
+
+async function listAudioPaths(projectId: string): Promise<string[]> {
+  const root = `audio/${projectId}`;
+  const entries = await fileStorage.list(root).catch(() => []);
+  return entries
+    .filter((entry) => entry.kind === 'file')
+    .map((entry) => entry.path);
+}
+
+export async function openDb(): Promise<null> {
+  return null;
 }
 
 export async function dbPutProject(project: VoiceProject): Promise<void> {
-  const db = await openDb();
-  await idbRequest(txStore(db, STORE_PROJECTS, 'readwrite').put(project));
+  const projects = await loadProjectMap();
+  projects[project.id] = project;
+  await saveProjectMap(projects);
 }
 
 export async function dbGetProject(projectId: string): Promise<VoiceProject | undefined> {
-  const db = await openDb();
-  return idbRequest(txStore(db, STORE_PROJECTS, 'readonly').get(projectId));
+  const projects = await loadProjectMap();
+  return projects[projectId];
 }
 
 export async function dbDeleteProject(projectId: string): Promise<void> {
-  const db = await openDb();
-  await idbRequest(txStore(db, STORE_PROJECTS, 'readwrite').delete(projectId));
+  const projects = await loadProjectMap();
+  delete projects[projectId];
+  await saveProjectMap(projects);
 }
 
 export async function dbListProjects(): Promise<VoiceProject[]> {
-  const db = await openDb();
-  return idbRequest(txStore(db, STORE_PROJECTS, 'readonly').getAll());
+  return Object.values(await loadProjectMap());
 }
 
 // ---------------------------------------------------------------------------
-// Audio blob storage
-// ---------------------------------------------------------------------------
-
-function audioKey(projectId: string, segmentId: string): string {
-  return `${projectId}:${segmentId}`;
-}
-
 export async function dbPutAudio(projectId: string, segmentId: string, blob: Blob): Promise<void> {
-  const db = await openDb();
-  await idbRequest(
-    txStore(db, STORE_AUDIO, 'readwrite').put(blob, audioKey(projectId, segmentId)),
-  );
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  await fileStorage.writeBytes(audioPath(projectId, segmentId), bytes);
 }
 
 export async function dbGetAudio(projectId: string, segmentId: string): Promise<Blob | undefined> {
-  const db = await openDb();
-  return idbRequest(
-    txStore(db, STORE_AUDIO, 'readonly').get(audioKey(projectId, segmentId)),
-  );
+  const bytes = await fileStorage.readBytes(audioPath(projectId, segmentId)).catch(() => null);
+  if (!bytes) {
+    return undefined;
+  }
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return new Blob([buffer]);
 }
 
 export async function dbDeleteProjectAudio(projectId: string): Promise<void> {
-  const db = await openDb();
-  const store = txStore(db, STORE_AUDIO, 'readwrite');
-  const allKeys: IDBValidKey[] = await idbRequest(store.getAllKeys());
-  const prefix = `${projectId}:`;
-  for (const key of allKeys) {
-    if (typeof key === 'string' && key.startsWith(prefix)) {
-      store.delete(key);
-    }
+  const paths = await listAudioPaths(projectId);
+  for (const path of paths) {
+    await fileStorage.delete(path);
   }
 }

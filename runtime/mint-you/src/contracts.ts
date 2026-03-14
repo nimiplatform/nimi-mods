@@ -15,7 +15,8 @@ export const MINTYOU_CAPABILITIES = [
   `data.query.${MINTYOU_DATA_API_WORLD_ACCESS_ME}`,
   `data.query.${MINTYOU_DATA_API_WORLD_OASIS_GET}`,
   MINTYOU_RUNTIME_PROFILE_READ_AGENT,
-  'data.store.mod-state',
+  'storage.sqlite.query',
+  'storage.sqlite.execute',
   `ui.register.${MINTYOU_NAV_SLOT}`,
   `ui.register.${MINTYOU_ROUTE_SLOT}`,
 ] as const;

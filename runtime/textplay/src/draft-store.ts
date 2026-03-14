@@ -1,11 +1,10 @@
+import { createModKvStore, createModStorageClient } from '@nimiplatform/sdk/mod';
 import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod';
 import type { NarrativeStorySnapshot } from '../../../modules/narrative-engine/src/index.js';
+import { TEXTPLAY_MOD_ID } from './contracts.js';
 import type { TextplayDraftRecord, TextplayDraftStatus, TextplayStartupPackage } from './types.js';
 
-const TEXTPLAY_DRAFT_DB_NAME = 'nimi.textplay.draft.v1';
-const TEXTPLAY_DRAFT_DB_VERSION = 1;
-const STORE_DRAFTS = 'drafts';
-const INDEX_WORLD_SCOPE = 'worldScope';
+const DRAFTS_STATE_KEY = 'drafts';
 
 type DraftRow = Omit<TextplayDraftRecord, 'startupPackage' | 'engineSnapshot' | 'records' | 'routeOverride'> & {
   startupPackage: TextplayStartupPackage;
@@ -18,11 +17,17 @@ function createMemoryStore() {
   return new Map<string, DraftRow>();
 }
 
-let dbPromise: Promise<IDBDatabase | null> | null = null;
 let memoryStore: Map<string, DraftRow> | null = null;
+let draftStateStore: ReturnType<typeof createModKvStore> | null = null;
 
-function hasIndexedDb(): boolean {
-  return typeof indexedDB !== 'undefined' && indexedDB !== null;
+function getDraftStateStore() {
+  if (!draftStateStore) {
+    draftStateStore = createModKvStore({
+      storage: createModStorageClient(TEXTPLAY_MOD_ID),
+      namespace: 'textplay.drafts',
+    });
+  }
+  return draftStateStore;
 }
 
 function toText(value: unknown): string {
@@ -32,21 +37,6 @@ function toText(value: unknown): string {
 function toNullableText(value: unknown): string | null {
   const normalized = toText(value);
   return normalized || null;
-}
-
-function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error('TEXTPLAY_DRAFT_STORE_REQUEST_FAILED'));
-  });
-}
-
-function transactionDone(transaction: IDBTransaction): Promise<void> {
-  return new Promise((resolve, reject) => {
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error || new Error('TEXTPLAY_DRAFT_STORE_TX_FAILED'));
-    transaction.onabort = () => reject(transaction.error || new Error('TEXTPLAY_DRAFT_STORE_TX_ABORTED'));
-  });
 }
 
 function normalizeDraftRow(value: unknown): DraftRow | null {
@@ -118,32 +108,18 @@ function normalizeDraftRow(value: unknown): DraftRow | null {
   };
 }
 
-async function openDatabase(): Promise<IDBDatabase | null> {
+async function loadDraftRows(): Promise<Map<string, DraftRow>> {
   if (memoryStore) {
-    return null;
+    return memoryStore;
   }
-  if (!hasIndexedDb()) {
-    memoryStore = createMemoryStore();
-    return null;
-  }
-  if (!dbPromise) {
-    dbPromise = new Promise<IDBDatabase | null>((resolve) => {
-      const request = indexedDB.open(TEXTPLAY_DRAFT_DB_NAME, TEXTPLAY_DRAFT_DB_VERSION);
-      request.onupgradeneeded = () => {
-        const db = request.result;
-        if (!db.objectStoreNames.contains(STORE_DRAFTS)) {
-          const store = db.createObjectStore(STORE_DRAFTS, { keyPath: 'key' });
-          store.createIndex(INDEX_WORLD_SCOPE, 'worldScope', { unique: false });
-        }
-      };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => {
-        memoryStore = createMemoryStore();
-        resolve(null);
-      };
-    });
-  }
-  return dbPromise;
+  const persisted = await getDraftStateStore().getJson<Record<string, DraftRow>>(DRAFTS_STATE_KEY);
+  memoryStore = new Map(Object.entries(persisted || {}));
+  return memoryStore;
+}
+
+async function flushDraftRows(): Promise<void> {
+  const store = await loadDraftRows();
+  await getDraftStateStore().setJson(DRAFTS_STATE_KEY, Object.fromEntries(store.entries()));
 }
 
 function sortDrafts(rows: DraftRow[]): DraftRow[] {
@@ -175,15 +151,9 @@ export async function saveTextplayDraft(record: TextplayDraftRecord): Promise<Te
   if (!normalized) {
     throw new Error('TEXTPLAY_DRAFT_INVALID');
   }
-  const db = await openDatabase();
-  if (!db) {
-    memoryStore ||= createMemoryStore();
-    memoryStore.set(normalized.key, normalized);
-    return normalized;
-  }
-  const tx = db.transaction(STORE_DRAFTS, 'readwrite');
-  tx.objectStore(STORE_DRAFTS).put(normalized);
-  await transactionDone(tx);
+  const store = await loadDraftRows();
+  store.set(normalized.key, normalized);
+  await flushDraftRows();
   return normalized;
 }
 
@@ -192,13 +162,8 @@ export async function loadTextplayDraft(key: string): Promise<TextplayDraftRecor
   if (!normalizedKey) {
     return null;
   }
-  const db = await openDatabase();
-  if (!db) {
-    return memoryStore?.get(normalizedKey) || null;
-  }
-  const tx = db.transaction(STORE_DRAFTS, 'readonly');
-  const raw = await requestToPromise(tx.objectStore(STORE_DRAFTS).get(normalizedKey));
-  return normalizeDraftRow(raw);
+  const store = await loadDraftRows();
+  return store.get(normalizedKey) || null;
 }
 
 export async function deleteTextplayDraft(key: string): Promise<void> {
@@ -206,14 +171,9 @@ export async function deleteTextplayDraft(key: string): Promise<void> {
   if (!normalizedKey) {
     return;
   }
-  const db = await openDatabase();
-  if (!db) {
-    memoryStore?.delete(normalizedKey);
-    return;
-  }
-  const tx = db.transaction(STORE_DRAFTS, 'readwrite');
-  tx.objectStore(STORE_DRAFTS).delete(normalizedKey);
-  await transactionDone(tx);
+  const store = await loadDraftRows();
+  store.delete(normalizedKey);
+  await flushDraftRows();
 }
 
 export async function listTextplayDraftsByWorldScope(worldScope: string): Promise<TextplayDraftRecord[]> {
@@ -221,16 +181,8 @@ export async function listTextplayDraftsByWorldScope(worldScope: string): Promis
   if (!normalizedScope) {
     return [];
   }
-  const db = await openDatabase();
-  if (!db) {
-    return sortDrafts(
-      Array.from(memoryStore?.values() || []).filter((row) => row.worldScope === normalizedScope),
-    );
-  }
-  const tx = db.transaction(STORE_DRAFTS, 'readonly');
-  const store = tx.objectStore(STORE_DRAFTS);
-  const index = store.index(INDEX_WORLD_SCOPE);
-  const rows = await requestToPromise(index.getAll(normalizedScope));
+  const store = await loadDraftRows();
+  const rows = Array.from(store.values()).filter((row) => row.worldScope === normalizedScope);
   return sortDrafts(
     rows
       .map((row) => normalizeDraftRow(row))

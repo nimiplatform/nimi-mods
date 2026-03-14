@@ -20,7 +20,8 @@ capabilities:
   - runtime.route.list.options
   - runtime.route.resolve
   - runtime.route.check.health
-  - data.store.mod-state
+  - storage.sqlite.query
+  - storage.sqlite.execute
   - ui.register.ui-extension.app.sidebar.mods
   - ui.register.ui-extension.app.content.routes
 

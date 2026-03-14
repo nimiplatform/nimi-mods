@@ -1,9 +1,22 @@
+import { createModKvStore, createModStorageClient } from '@nimiplatform/sdk/mod';
+import { KISMET_MOD_ID } from '../contracts.js';
 import type { KismetBirthInputV2, KismetCanonicalProfile, KismetFortuneStickResult, KismetLocalShareProfile, KismetNatalAnalysisResult } from '../types.js';
 import { createUlid } from '../utils/ulid.js';
 
 const STORAGE_KEY = 'nimi.kismet.local-share-profiles.v2';
 const PRIMARY_PROFILE_KEY = 'nimi.kismet.primary-profile.v1';
 const FORTUNE_STICK_KEY = 'nimi.kismet.fortune-stick.v1';
+let localShareStateStore: ReturnType<typeof createModKvStore> | null = null;
+
+function getLocalShareStateStore() {
+  if (!localShareStateStore) {
+    localShareStateStore = createModKvStore({
+      storage: createModStorageClient(KISMET_MOD_ID),
+      namespace: 'kismet.local-share',
+    });
+  }
+  return localShareStateStore;
+}
 
 export type KismetPrimaryProfile = {
   birthInput: KismetBirthInputV2;
@@ -12,31 +25,22 @@ export type KismetPrimaryProfile = {
   savedAt: string;
 };
 
-function canUseStorage(): boolean {
-  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
-}
+let primaryProfileCache: KismetPrimaryProfile | null = null;
+let fortuneStickCache: KismetCachedFortuneStick | null = null;
+let localProfilesCache: KismetLocalShareProfile[] = [];
 
 export function loadPrimaryProfile(): KismetPrimaryProfile | null {
-  if (!canUseStorage()) return null;
-  try {
-    const raw = window.localStorage.getItem(PRIMARY_PROFILE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as KismetPrimaryProfile;
-    if (parsed && parsed.birthInput && parsed.canonicalProfile) return parsed;
-    return null;
-  } catch {
-    return null;
-  }
+  return primaryProfileCache;
 }
 
-export function persistPrimaryProfile(profile: KismetPrimaryProfile): void {
-  if (!canUseStorage()) return;
-  window.localStorage.setItem(PRIMARY_PROFILE_KEY, JSON.stringify(profile));
+export async function persistPrimaryProfile(profile: KismetPrimaryProfile): Promise<void> {
+  primaryProfileCache = profile;
+  await getLocalShareStateStore().setJson(PRIMARY_PROFILE_KEY, profile);
 }
 
-export function clearPrimaryProfile(): void {
-  if (!canUseStorage()) return;
-  window.localStorage.removeItem(PRIMARY_PROFILE_KEY);
+export async function clearPrimaryProfile(): Promise<void> {
+  primaryProfileCache = null;
+  await getLocalShareStateStore().delete(PRIMARY_PROFILE_KEY);
 }
 
 export type KismetCachedFortuneStick = {
@@ -46,40 +50,27 @@ export type KismetCachedFortuneStick = {
 };
 
 export function loadCachedFortuneStick(): KismetCachedFortuneStick | null {
-  if (!canUseStorage()) return null;
-  try {
-    const raw = window.localStorage.getItem(FORTUNE_STICK_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as KismetCachedFortuneStick;
-    if (parsed && parsed.result && parsed.date) return parsed;
-    return null;
-  } catch {
-    return null;
-  }
+  return fortuneStickCache;
 }
 
-export function persistFortuneStick(cached: KismetCachedFortuneStick): void {
-  if (!canUseStorage()) return;
-  window.localStorage.setItem(FORTUNE_STICK_KEY, JSON.stringify(cached));
+export async function persistFortuneStick(cached: KismetCachedFortuneStick): Promise<void> {
+  fortuneStickCache = cached;
+  await getLocalShareStateStore().setJson(FORTUNE_STICK_KEY, cached);
 }
 
 export function loadLocalShareProfiles(): KismetLocalShareProfile[] {
-  if (!canUseStorage()) {
-    return [];
-  }
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) as KismetLocalShareProfile[] : [];
-  } catch {
-    return [];
-  }
+  return [...localProfilesCache];
 }
 
-export function persistLocalShareProfiles(profiles: KismetLocalShareProfile[]): void {
-  if (!canUseStorage()) {
-    return;
-  }
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
+export async function persistLocalShareProfiles(profiles: KismetLocalShareProfile[]): Promise<void> {
+  localProfilesCache = [...profiles];
+  await getLocalShareStateStore().setJson(STORAGE_KEY, profiles);
+}
+
+export async function hydrateLocalShareProfilesState(): Promise<void> {
+  primaryProfileCache = await getLocalShareStateStore().getJson<KismetPrimaryProfile>(PRIMARY_PROFILE_KEY);
+  fortuneStickCache = await getLocalShareStateStore().getJson<KismetCachedFortuneStick>(FORTUNE_STICK_KEY);
+  localProfilesCache = await getLocalShareStateStore().getJson<KismetLocalShareProfile[]>(STORAGE_KEY) || [];
 }
 
 export function createLocalShareProfile(displayName: string, canonicalProfile: KismetCanonicalProfile): KismetLocalShareProfile {

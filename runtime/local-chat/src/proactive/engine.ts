@@ -202,7 +202,7 @@ export async function runLocalChatProactiveHeartbeatCycle(
     ) || seed;
 
     const wakeStrategy = resolveLocalChatWakeStrategy(target);
-    const policy = evaluateLocalChatProactivePolicy({
+    const policy = await evaluateLocalChatProactivePolicy({
       allowProactiveContact: settings.allowProactiveContact,
       wakeStrategy,
       targetId: target.id,
@@ -633,7 +633,7 @@ export async function runLocalChatProactiveHeartbeatCycle(
         assistantTurnId: turnId,
         deliveredBeats: deliveredBeats.filter((beat) => deliveredBeatIds.has(beat.beatId)),
       });
-      recordLocalChatProactiveContact({
+      await recordLocalChatProactiveContact({
         targetId: target.id,
         atMs: nowMs,
       });

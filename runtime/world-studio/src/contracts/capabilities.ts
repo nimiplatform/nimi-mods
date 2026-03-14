@@ -33,6 +33,8 @@ export const WORLD_STUDIO_CAPABILITIES = [
   'runtime.media.image.generate',
   'runtime.route.list.options',
   'runtime.route.resolve',
+  'storage.sqlite.query',
+  'storage.sqlite.execute',
   `data.query.${WORLD_STUDIO_DATA_API_ACCESS_ME}`,
   `data.query.${WORLD_STUDIO_DATA_API_LANDING_RESOLVE}`,
   `data.query.${WORLD_STUDIO_DATA_API_DRAFT_CREATE}`,

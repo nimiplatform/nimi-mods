@@ -9,6 +9,8 @@ export const KISMET_CAPABILITIES = [
   'runtime.route.list.options',
   'runtime.route.resolve',
   'runtime.route.check.health',
+  'storage.sqlite.query',
+  'storage.sqlite.execute',
   `ui.register.${KISMET_NAV_SLOT}`,
   `ui.register.${KISMET_ROUTE_SLOT}`,
 ] as const;

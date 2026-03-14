@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { LandingState, WorldDraftSummary, WorldSummary } from '../ui/types.js';
 import type { Phase1Result } from '../generation/pipeline.js';
 import type { WorldStudioWorkspaceSnapshot } from '../contracts.js';
@@ -27,12 +27,19 @@ export function useWorldStudioStoreBindings(userId: string) {
     const hydrateForUser = useWorldStudioWorkspaceStore((state) => state.hydrateForUser);
     const persistForUser = useWorldStudioWorkspaceStore((state) => state.persistForUser);
     const resetSnapshot = useWorldStudioWorkspaceStore((state) => state.resetSnapshot);
+    const [storageHydrated, setStorageHydrated] = useState(false);
     useEffect(() => {
-        hydrateForUser(userId);
+        setStorageHydrated(false);
+        void hydrateForUser(userId).finally(() => {
+            setStorageHydrated(true);
+        });
     }, [hydrateForUser, userId]);
     useEffect(() => {
-        persistForUser(userId);
-    }, [persistForUser, snapshot, userId]);
+        if (!storageHydrated) {
+            return;
+        }
+        void persistForUser(userId);
+    }, [persistForUser, snapshot, storageHydrated, userId]);
     return {
         snapshot,
         patchSnapshot,
@@ -41,6 +48,7 @@ export function useWorldStudioStoreBindings(userId: string) {
         hydrateForUser,
         persistForUser,
         resetSnapshot,
+        storageHydrated,
     };
 }
 export function useWorldStudioControllerContext(input: UseWorldStudioControllerContextInput) {

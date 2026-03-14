@@ -223,7 +223,8 @@ export function useTextplayController(): TextplayShellProps {
   const [routeOptions, setRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
   const [routeLoading, setRouteLoading] = useState(true);
   const [routeError, setRouteError] = useState<string | null>(null);
-  const [routeBinding, setRouteBindingState] = useState<RuntimeRouteBinding | null>(() => loadTextplayRouteBinding());
+  const [routeBinding, setRouteBindingState] = useState<RuntimeRouteBinding | null>(null);
+  const [routeBindingHydrated, setRouteBindingHydrated] = useState(false);
   const renderLocale = useMemo(
     () => normalizeTextplayRenderLocale(i18n.resolvedLanguage || i18n.language),
     [i18n.language, i18n.resolvedLanguage],
@@ -241,6 +242,24 @@ export function useTextplayController(): TextplayShellProps {
   useEffect(() => {
     activeDraftRef.current = activeDraft;
   }, [activeDraft]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadTextplayRouteBinding().then((value) => {
+      if (cancelled) {
+        return;
+      }
+      setRouteBindingState(value);
+      setRouteBindingHydrated(true);
+    }).catch(() => {
+      if (!cancelled) {
+        setRouteBindingHydrated(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const dispatchPresenceEvent = useCallback((event: 'onUserComposing' | 'onUserPaused' | 'onUserActive' | 'onInitiativeReceived') => {
     const machine = presenceMachineRef.current;
@@ -383,7 +402,7 @@ export function useTextplayController(): TextplayShellProps {
 
   const applyRouteBinding = useCallback(async (next: RuntimeRouteBinding | null) => {
     setRouteBindingState(next);
-    persistTextplayRouteBinding(next);
+    await persistTextplayRouteBinding(next);
     const current = activeDraftRef.current;
     if (!current) {
       return;
@@ -415,6 +434,13 @@ export function useTextplayController(): TextplayShellProps {
       setRouteLoading(false);
     }
   }, [pushNotice, runtimeClient, t]);
+
+  useEffect(() => {
+    if (!routeBindingHydrated) {
+      return;
+    }
+    void persistTextplayRouteBinding(routeBinding);
+  }, [routeBinding, routeBindingHydrated]);
 
   const upsertStartupContext = useCallback(async (startup: TextplayStartupPackage) => {
     await narrativeEngine.contextResolve({
@@ -984,7 +1010,7 @@ export function useTextplayController(): TextplayShellProps {
       });
 
       setRouteBindingState(draft.routeOverride);
-      persistTextplayRouteBinding(draft.routeOverride);
+      await persistTextplayRouteBinding(draft.routeOverride);
       const saved = await saveDraft({
         ...draft,
         status: 'active',

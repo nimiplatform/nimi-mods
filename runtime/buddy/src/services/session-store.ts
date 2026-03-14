@@ -1,7 +1,6 @@
 import { BUDDY_SESSION_VERSION, DEFAULT_BUDDY_MODEL_ID, BUDDY_MODELS, type BuddyModelId, } from '../contracts.js';
 import type { ChatMessage } from './dialogue-engine.js';
-import { type HookClient, type RuntimeRouteBinding } from "@nimiplatform/sdk/mod";
-const MOD_STATE_CAPABILITY = 'data.store.mod-state';
+import { createModKvStore, type HookClient, type RuntimeRouteBinding } from "@nimiplatform/sdk/mod";
 const SESSION_KEY = 'buddy:session:default';
 export interface BuddySessionState {
     version: number;
@@ -13,22 +12,6 @@ export interface BuddySessionState {
     ttsBinding: RuntimeRouteBinding | null;
     sttBinding: RuntimeRouteBinding | null;
     updatedAt: number;
-}
-function extractStateValue(response: unknown): string | null {
-    if (typeof response === 'string')
-        return response;
-    if (!response || typeof response !== 'object')
-        return null;
-    const record = response as Record<string, unknown>;
-    if ('ok' in record && record.ok === false)
-        return null;
-    return typeof record.value === 'string' ? record.value : null;
-}
-function extractStateAck(response: unknown): boolean {
-    if (!response || typeof response !== 'object')
-        return true;
-    const record = response as Record<string, unknown>;
-    return typeof record.ok === 'boolean' ? record.ok : true;
 }
 const BUDDY_MODEL_ID_SET = new Set<string>(BUDDY_MODELS.map((model) => model.id));
 function isBuddyModelId(value: unknown): value is BuddyModelId {
@@ -90,11 +73,11 @@ export async function loadBuddySession(hookClient: HookClient | null): Promise<B
     if (!hookClient)
         return null;
     try {
-        const response = await hookClient.data.query({
-            capability: MOD_STATE_CAPABILITY,
-            query: { op: 'get', key: SESSION_KEY },
+        const store = createModKvStore({
+            storage: hookClient.storage,
+            namespace: 'buddy.session',
         });
-        const raw = extractStateValue(response);
+        const raw = await store.get(SESSION_KEY);
         if (!raw)
             return null;
         const parsed = JSON.parse(raw) as Record<string, unknown>;
@@ -125,6 +108,10 @@ export async function saveBuddySession(hookClient: HookClient | null, state: Omi
     if (!hookClient)
         return false;
     try {
+        const store = createModKvStore({
+            storage: hookClient.storage,
+            namespace: 'buddy.session',
+        });
         const payload = JSON.stringify({
             version: BUDDY_SESSION_VERSION,
             messages: state.messages.slice(-40),
@@ -136,11 +123,8 @@ export async function saveBuddySession(hookClient: HookClient | null, state: Omi
             sttBinding: serializeBinding(state.sttBinding),
             updatedAt: Date.now(),
         });
-        const response = await hookClient.data.query({
-            capability: MOD_STATE_CAPABILITY,
-            query: { op: 'set', key: SESSION_KEY, value: payload },
-        });
-        return extractStateAck(response);
+        await store.set(SESSION_KEY, payload);
+        return true;
     }
     catch {
         return false;

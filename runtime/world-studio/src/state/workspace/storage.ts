@@ -2,12 +2,28 @@ import type { WorldStudioWorkspaceSnapshot } from '../../contracts.js';
 import { cloneDefaultSnapshot } from './defaults.js';
 import { normalizeEventsDraft, normalizeLorebooksDraft, parseEventsDraftFromText, parseLorebooksDraftFromText, recoverTaskStateAfterReload, syncSnapshot, normalizeTaskState, } from './normalize.js';
 import { emitWorldStudioLog } from '../../logging.js';
-import { asRecord, loadLocalStorageJson, safeParseObject, saveLocalStorageJson } from "@nimiplatform/sdk/mod";
+import {
+    asRecord,
+    createModKvStore,
+    createModStorageClient,
+    safeParseObject,
+} from "@nimiplatform/sdk/mod";
+import { WORLD_STUDIO_MOD_ID } from '../../contracts.js';
 const STORAGE_PREFIX_V3 = 'nimi.world-studio.workspace.v3.';
+let workspaceSnapshotStore: ReturnType<typeof createModKvStore> | null = null;
 const lastPersistedSelectionStateByUser = new Map<string, {
     selectedCharacters: string[];
     agentSyncSelectedCharacterIds: string[];
 }>();
+function getWorkspaceSnapshotStore() {
+    if (!workspaceSnapshotStore) {
+        workspaceSnapshotStore = createModKvStore({
+            storage: createModStorageClient(WORLD_STUDIO_MOD_ID),
+            namespace: 'world-studio.workspace',
+        });
+    }
+    return workspaceSnapshotStore;
+}
 function diagLog(message: string, details?: Record<string, unknown>) {
     try {
         emitWorldStudioLog({
@@ -38,12 +54,12 @@ function computeSelectionDelta(before: string[], after: string[]): {
 function storageKeyForUser(userId: string): string {
     return `${STORAGE_PREFIX_V3}${String(userId || '').trim()}`;
 }
-export function readSnapshotFromStorage(userId: string): WorldStudioWorkspaceSnapshot | null {
+export async function readSnapshotFromStorage(userId: string): Promise<WorldStudioWorkspaceSnapshot | null> {
     const normalizedUserId = String(userId || '').trim();
-    if (!normalizedUserId || typeof window === 'undefined')
+    if (!normalizedUserId)
         return null;
     try {
-        const parsed = loadLocalStorageJson<Partial<WorldStudioWorkspaceSnapshot> | null>(storageKeyForUser(normalizedUserId), null, (value) => (value && typeof value === 'object' ? (value as Partial<WorldStudioWorkspaceSnapshot>) : null));
+        const parsed = await getWorkspaceSnapshotStore().getJson<Partial<WorldStudioWorkspaceSnapshot> | null>(storageKeyForUser(normalizedUserId));
         if (!parsed) {
             diagLog('storage read: no snapshot found', {
                 userId: normalizedUserId,
@@ -184,13 +200,13 @@ export function readSnapshotFromStorage(userId: string): WorldStudioWorkspaceSna
         return null;
     }
 }
-export function persistSnapshotToStorage(userId: string, snapshot: WorldStudioWorkspaceSnapshot): void {
+export async function persistSnapshotToStorage(userId: string, snapshot: WorldStudioWorkspaceSnapshot): Promise<void> {
     const normalizedUserId = String(userId || '').trim();
-    if (!normalizedUserId || typeof window === 'undefined')
+    if (!normalizedUserId)
         return;
     const synced = syncSnapshot(snapshot);
     const { worldPatchText: _worldPatchText, worldviewPatchText: _worldviewPatchText, eventsText: _eventsText, lorebooksText: _lorebooksText, ...persistable } = synced;
-    saveLocalStorageJson(storageKeyForUser(normalizedUserId), persistable);
+    void getWorkspaceSnapshotStore().setJson(storageKeyForUser(normalizedUserId), persistable);
     const normalizedSelectedCharacters = normalizeSelectionArray(synced.selectedCharacters);
     const normalizedAgentSyncSelectedCharacterIds = normalizeSelectionArray(synced.agentSync.selectedCharacterIds);
     const previousPersisted = lastPersistedSelectionStateByUser.get(normalizedUserId) || {

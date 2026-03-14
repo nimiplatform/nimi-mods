@@ -23,6 +23,8 @@ export const DAILY_OUTFIT_CAPABILITIES = [
   'runtime.media.image.generate',
   'runtime.route.list.options',
   'runtime.route.resolve',
+  'storage.sqlite.query',
+  'storage.sqlite.execute',
   `data.register.${DAILY_OUTFIT_DATA_API_WARDROBE_LIST}`,
   `data.register.${DAILY_OUTFIT_DATA_API_WARDROBE_GET}`,
   `data.register.${DAILY_OUTFIT_DATA_API_WARDROBE_CREATE}`,

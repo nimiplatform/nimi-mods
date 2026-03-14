@@ -1,229 +1,136 @@
-// ---------------------------------------------------------------------------
-// IndexedDB wrapper for Knowledge Base persistence (SSOT §9.6)
-// ---------------------------------------------------------------------------
-// DB: 'knowledge-base-db' v1
-// Stores:
-//   'documents'     — key: id, value: KBDocument
-//   'chunks'        — key: id, value: KBChunk, index: documentId
-//   'vectors'       — key: id, value: KBVector (embedding as Float32Array), index: documentId
-//   'conversations' — key: id, value: KBConversation
-//   'settings'      — key: 'default', value: KBSettings
-// ---------------------------------------------------------------------------
-
+import { createModKvStore, createModStorageClient } from '@nimiplatform/sdk/mod';
+import { KB_MOD_ID } from '../contracts.js';
 import type { KBDocument, KBChunk, KBVector, KBConversation, KBSettings } from '../types.js';
 
-const DB_NAME = 'knowledge-base-db';
-const DB_VERSION = 1;
-const STORE_DOCUMENTS = 'documents';
-const STORE_CHUNKS = 'chunks';
-const STORE_VECTORS = 'vectors';
-const STORE_CONVERSATIONS = 'conversations';
-const STORE_SETTINGS = 'settings';
+type KnowledgeBaseSnapshot = {
+  documents: KBDocument[];
+  chunks: KBChunk[];
+  vectors: Array<Omit<KBVector, 'embedding'> & { embedding: number[] }>;
+  conversations: KBConversation[];
+  settings?: KBSettings;
+};
 
-let dbInstance: IDBDatabase | null = null;
+const kbStateStore = createModKvStore({
+  storage: createModStorageClient(KB_MOD_ID),
+  namespace: 'knowledge-base.state',
+});
 
-export function openDb(): Promise<IDBDatabase> {
-  if (dbInstance) return Promise.resolve(dbInstance);
+const SNAPSHOT_KEY = 'snapshot';
 
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(STORE_DOCUMENTS)) {
-        db.createObjectStore(STORE_DOCUMENTS, { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains(STORE_CHUNKS)) {
-        const store = db.createObjectStore(STORE_CHUNKS, { keyPath: 'id' });
-        store.createIndex('documentId', 'documentId', { unique: false });
-      }
-      if (!db.objectStoreNames.contains(STORE_VECTORS)) {
-        const store = db.createObjectStore(STORE_VECTORS, { keyPath: 'id' });
-        store.createIndex('documentId', 'documentId', { unique: false });
-      }
-      if (!db.objectStoreNames.contains(STORE_CONVERSATIONS)) {
-        db.createObjectStore(STORE_CONVERSATIONS, { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains(STORE_SETTINGS)) {
-        db.createObjectStore(STORE_SETTINGS);
-      }
-    };
-
-    request.onsuccess = () => {
-      dbInstance = request.result;
-      resolve(dbInstance);
-    };
-
-    request.onerror = () => reject(request.error);
-  });
+async function loadSnapshot(): Promise<KnowledgeBaseSnapshot> {
+  return await kbStateStore.getJson<KnowledgeBaseSnapshot>(SNAPSHOT_KEY) || {
+    documents: [],
+    chunks: [],
+    vectors: [],
+    conversations: [],
+  };
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function txStore(db: IDBDatabase, store: string, mode: IDBTransactionMode): IDBObjectStore {
-  return db.transaction(store, mode).objectStore(store);
+async function saveSnapshot(snapshot: KnowledgeBaseSnapshot): Promise<void> {
+  await kbStateStore.setJson(SNAPSHOT_KEY, snapshot);
 }
 
-function idbRequest<T>(req: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
+export async function openDb(): Promise<null> {
+  return null;
 }
-
-function txMultiStore(db: IDBDatabase, stores: string[], mode: IDBTransactionMode): IDBTransaction {
-  return db.transaction(stores, mode);
-}
-
-// ---------------------------------------------------------------------------
-// Document CRUD
-// ---------------------------------------------------------------------------
 
 export async function dbPutDocument(doc: KBDocument): Promise<void> {
-  const db = await openDb();
-  await idbRequest(txStore(db, STORE_DOCUMENTS, 'readwrite').put(doc));
+  const snapshot = await loadSnapshot();
+  snapshot.documents = [
+    ...snapshot.documents.filter((item) => item.id !== doc.id),
+    doc,
+  ];
+  await saveSnapshot(snapshot);
 }
 
 export async function dbGetDocument(docId: string): Promise<KBDocument | undefined> {
-  const db = await openDb();
-  return idbRequest(txStore(db, STORE_DOCUMENTS, 'readonly').get(docId));
+  const snapshot = await loadSnapshot();
+  return snapshot.documents.find((item) => item.id === docId);
 }
 
 export async function dbListDocuments(): Promise<KBDocument[]> {
-  const db = await openDb();
-  return idbRequest(txStore(db, STORE_DOCUMENTS, 'readonly').getAll());
+  return (await loadSnapshot()).documents;
 }
 
 export async function dbDeleteDocument(docId: string): Promise<void> {
-  const db = await openDb();
-  const tx = txMultiStore(db, [STORE_DOCUMENTS, STORE_CHUNKS, STORE_VECTORS], 'readwrite');
-
-  // Delete document
-  tx.objectStore(STORE_DOCUMENTS).delete(docId);
-
-  // Delete associated chunks
-  const chunkIndex = tx.objectStore(STORE_CHUNKS).index('documentId');
-  const chunkKeys = await idbRequest(chunkIndex.getAllKeys(docId));
-  for (const key of chunkKeys) {
-    tx.objectStore(STORE_CHUNKS).delete(key);
-  }
-
-  // Delete associated vectors
-  const vectorIndex = tx.objectStore(STORE_VECTORS).index('documentId');
-  const vectorKeys = await idbRequest(vectorIndex.getAllKeys(docId));
-  for (const key of vectorKeys) {
-    tx.objectStore(STORE_VECTORS).delete(key);
-  }
-
-  await new Promise<void>((resolve, reject) => {
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
+  const snapshot = await loadSnapshot();
+  snapshot.documents = snapshot.documents.filter((item) => item.id !== docId);
+  snapshot.chunks = snapshot.chunks.filter((item) => item.documentId !== docId);
+  snapshot.vectors = snapshot.vectors.filter((item) => item.documentId !== docId);
+  await saveSnapshot(snapshot);
 }
 
-// ---------------------------------------------------------------------------
-// Chunk CRUD
-// ---------------------------------------------------------------------------
-
 export async function dbPutChunks(chunks: KBChunk[]): Promise<void> {
-  const db = await openDb();
-  const store = txStore(db, STORE_CHUNKS, 'readwrite');
-  for (const chunk of chunks) {
-    store.put(chunk);
-  }
-  await new Promise<void>((resolve, reject) => {
-    store.transaction.oncomplete = () => resolve();
-    store.transaction.onerror = () => reject(store.transaction.error);
-  });
+  const snapshot = await loadSnapshot();
+  const removedIds = new Set(chunks.map((item) => item.id));
+  snapshot.chunks = [
+    ...snapshot.chunks.filter((item) => !removedIds.has(item.id)),
+    ...chunks,
+  ];
+  await saveSnapshot(snapshot);
 }
 
 export async function dbGetChunksByDocumentId(documentId: string): Promise<KBChunk[]> {
-  const db = await openDb();
-  const store = txStore(db, STORE_CHUNKS, 'readonly');
-  const index = store.index('documentId');
-  return idbRequest(index.getAll(documentId));
+  return (await loadSnapshot()).chunks.filter((item) => item.documentId === documentId);
 }
 
 export async function dbGetAllChunks(): Promise<KBChunk[]> {
-  const db = await openDb();
-  return idbRequest(txStore(db, STORE_CHUNKS, 'readonly').getAll());
+  return (await loadSnapshot()).chunks;
 }
 
 export async function dbGetChunk(chunkId: string): Promise<KBChunk | undefined> {
-  const db = await openDb();
-  return idbRequest(txStore(db, STORE_CHUNKS, 'readonly').get(chunkId));
+  return (await loadSnapshot()).chunks.find((item) => item.id === chunkId);
 }
 
-// ---------------------------------------------------------------------------
-// Vector CRUD
-// ---------------------------------------------------------------------------
-
 export async function dbPutVectors(vectors: KBVector[]): Promise<void> {
-  const db = await openDb();
-  const store = txStore(db, STORE_VECTORS, 'readwrite');
-  for (const vector of vectors) {
-    // Serialize Float32Array to regular array for IndexedDB compatibility
-    const serialized = {
-      ...vector,
-      embedding: Array.from(vector.embedding),
-    };
-    store.put(serialized);
-  }
-  await new Promise<void>((resolve, reject) => {
-    store.transaction.oncomplete = () => resolve();
-    store.transaction.onerror = () => reject(store.transaction.error);
-  });
+  const snapshot = await loadSnapshot();
+  const removedIds = new Set(vectors.map((item) => item.id));
+  snapshot.vectors = [
+    ...snapshot.vectors.filter((item) => !removedIds.has(item.id)),
+    ...vectors.map((item) => ({
+      ...item,
+      embedding: Array.from(item.embedding),
+    })),
+  ];
+  await saveSnapshot(snapshot);
 }
 
 export async function dbGetAllVectors(): Promise<KBVector[]> {
-  const db = await openDb();
-  const raw: unknown[] = await idbRequest(txStore(db, STORE_VECTORS, 'readonly').getAll());
-  // Deserialize arrays back to Float32Array
-  return raw.map((item) => {
-    const record = item as Record<string, unknown>;
-    return {
-      ...record,
-      embedding: new Float32Array(record.embedding as number[]),
-    } as KBVector;
-  });
+  return (await loadSnapshot()).vectors.map((item) => ({
+    ...item,
+    embedding: new Float32Array(item.embedding),
+  }));
 }
 
-// ---------------------------------------------------------------------------
-// Conversation CRUD
-// ---------------------------------------------------------------------------
-
 export async function dbPutConversation(conv: KBConversation): Promise<void> {
-  const db = await openDb();
-  await idbRequest(txStore(db, STORE_CONVERSATIONS, 'readwrite').put(conv));
+  const snapshot = await loadSnapshot();
+  snapshot.conversations = [
+    ...snapshot.conversations.filter((item) => item.id !== conv.id),
+    conv,
+  ];
+  await saveSnapshot(snapshot);
 }
 
 export async function dbGetConversation(convId: string): Promise<KBConversation | undefined> {
-  const db = await openDb();
-  return idbRequest(txStore(db, STORE_CONVERSATIONS, 'readonly').get(convId));
+  return (await loadSnapshot()).conversations.find((item) => item.id === convId);
 }
 
 export async function dbListConversations(): Promise<KBConversation[]> {
-  const db = await openDb();
-  return idbRequest(txStore(db, STORE_CONVERSATIONS, 'readonly').getAll());
+  return (await loadSnapshot()).conversations;
 }
 
 export async function dbDeleteConversation(convId: string): Promise<void> {
-  const db = await openDb();
-  await idbRequest(txStore(db, STORE_CONVERSATIONS, 'readwrite').delete(convId));
+  const snapshot = await loadSnapshot();
+  snapshot.conversations = snapshot.conversations.filter((item) => item.id !== convId);
+  await saveSnapshot(snapshot);
 }
 
-// ---------------------------------------------------------------------------
-// Settings
-// ---------------------------------------------------------------------------
-
 export async function dbGetSettings(): Promise<KBSettings | undefined> {
-  const db = await openDb();
-  return idbRequest(txStore(db, STORE_SETTINGS, 'readonly').get('default'));
+  return (await loadSnapshot()).settings;
 }
 
 export async function dbPutSettings(settings: KBSettings): Promise<void> {
-  const db = await openDb();
-  await idbRequest(txStore(db, STORE_SETTINGS, 'readwrite').put(settings, 'default'));
+  const snapshot = await loadSnapshot();
+  snapshot.settings = settings;
+  await saveSnapshot(snapshot);
 }

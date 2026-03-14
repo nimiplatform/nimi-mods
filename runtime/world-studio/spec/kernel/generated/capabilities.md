@@ -42,6 +42,9 @@ capabilities:
     - runtime.ai.embedding.generate
     - runtime.route.list.options
     - runtime.route.resolve
+  storage:
+    - storage.sqlite.query
+    - storage.sqlite.execute
   data_query:
     - data.query.data-api.world.access.me
     - data.query.data-api.world.landing.resolve

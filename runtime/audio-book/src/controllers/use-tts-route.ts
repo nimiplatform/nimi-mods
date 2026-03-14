@@ -6,7 +6,8 @@
 //   3. Periodic polling to keep options fresh
 // ---------------------------------------------------------------------------
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { parseRuntimeRouteOptions, type RuntimeCanonicalCapability, type RuntimeRouteConnectorOption, type RuntimeRouteOptionsSnapshot, type ModRuntimeClient } from "@nimiplatform/sdk/mod";
+import { createModKvStore, createModStorageClient, parseRuntimeRouteOptions, type RuntimeCanonicalCapability, type RuntimeRouteConnectorOption, type RuntimeRouteOptionsSnapshot, type ModRuntimeClient } from "@nimiplatform/sdk/mod";
+import { AUDIO_BOOK_MOD_ID } from '../contracts.js';
 export type RouteSelection = {
     connectorId: string;
     routeSource: 'auto' | 'local' | 'cloud';
@@ -41,6 +42,12 @@ const OPENAI_TTS_MODEL_PREFERENCES = [
     'gpt-4o-mini-tts',
     'gpt-4o-audio-preview',
 ];
+const routeStateStore = createModKvStore({
+    storage: createModStorageClient(AUDIO_BOOK_MOD_ID),
+    namespace: 'audio-book.route',
+});
+const emptySelection: RouteSelection = { connectorId: '', routeSource: 'auto' };
+const persistedSelectionCache = new Map<string, RouteSelection>();
 function ensureRouteOptionsSnapshotShape(snapshot: RuntimeRouteOptionsSnapshot | null): RuntimeRouteOptionsSnapshot | null {
     if (!snapshot) {
         return null;
@@ -54,11 +61,10 @@ function ensureRouteOptionsSnapshotShape(snapshot: RuntimeRouteOptionsSnapshot |
         connectors: Array.isArray(snapshot.connectors) ? snapshot.connectors : [],
     };
 }
-function loadPersisted(key: string): RouteSelection {
+async function loadPersisted(key: string): Promise<RouteSelection> {
     try {
-        const raw = localStorage.getItem(key);
-        if (raw) {
-            const parsed = JSON.parse(raw);
+        const parsed = await routeStateStore.getJson<Record<string, unknown>>(key);
+        if (parsed) {
             const persistedModel = String(parsed.model || '').trim();
             return {
                 connectorId: String(parsed.connectorId || ''),
@@ -68,13 +74,25 @@ function loadPersisted(key: string): RouteSelection {
         }
     }
     catch { /* ignore */ }
-    return { connectorId: '', routeSource: 'auto' };
+    return { ...emptySelection };
 }
-function persist(key: string, selection: RouteSelection): void {
+async function persist(key: string, selection: RouteSelection): Promise<void> {
     try {
-        localStorage.setItem(key, JSON.stringify(selection));
+        persistedSelectionCache.set(key, selection);
+        await routeStateStore.setJson(key, selection);
     }
     catch { /* ignore */ }
+}
+const persistedSelectionCacheReady = Promise.all([
+    loadPersisted(STORAGE_KEY_CHAT).then((selection) => {
+        persistedSelectionCache.set(STORAGE_KEY_CHAT, selection);
+    }),
+    loadPersisted(STORAGE_KEY_TTS).then((selection) => {
+        persistedSelectionCache.set(STORAGE_KEY_TTS, selection);
+    }),
+]).then(() => undefined);
+function readPersistedSelectionSync(key: string): RouteSelection {
+    return persistedSelectionCache.get(key) || { ...emptySelection };
 }
 // ---------------------------------------------------------------------------
 async function loadRouteOptions(runtimeClient: ModRuntimeClient, capability: RuntimeCanonicalCapability): Promise<RuntimeRouteOptionsSnapshot | null> {
@@ -286,7 +304,7 @@ function hasModelOption(options: string[], model?: string): boolean {
     return options.includes(normalized);
 }
 function resolveSelection(connectors: RuntimeRouteConnectorOption[], fallback: RouteSelectionFallback, storageKey: string, modelPicker: (connectors: RuntimeRouteConnectorOption[], connectorId: string, fallbackModel: string) => string, modelOptionsGetter: (connectors: RuntimeRouteConnectorOption[], connectorId: string) => string[]): RouteSelection {
-    const persisted = loadPersisted(storageKey);
+    const persisted = readPersistedSelectionSync(storageKey);
     if (persisted.connectorId && connectors.some((c) => c.id === persisted.connectorId)) {
         const options = modelOptionsGetter(connectors, persisted.connectorId);
         const preferredPersistedModel = hasModelOption(options, persisted.model)
@@ -297,7 +315,7 @@ function resolveSelection(connectors: RuntimeRouteConnectorOption[], fallback: R
             routeSource: 'cloud',
             model: preferredPersistedModel || modelPicker(connectors, persisted.connectorId, fallback.model || ''),
         };
-        persist(storageKey, next);
+        void persist(storageKey, next);
         return next;
     }
     if (fallback.connectorId && connectors.some((c) => c.id === fallback.connectorId)) {
@@ -310,7 +328,7 @@ function resolveSelection(connectors: RuntimeRouteConnectorOption[], fallback: R
             routeSource: 'cloud',
             model: nextModel || undefined,
         };
-        persist(storageKey, next);
+        void persist(storageKey, next);
         return next;
     }
     if (connectors.length > 0) {
@@ -324,7 +342,7 @@ function resolveSelection(connectors: RuntimeRouteConnectorOption[], fallback: R
             routeSource: 'cloud',
             model: nextModel || undefined,
         };
-        persist(storageKey, selection);
+        void persist(storageKey, selection);
         return selection;
     }
     if (fallback.connectorId) {
@@ -333,7 +351,7 @@ function resolveSelection(connectors: RuntimeRouteConnectorOption[], fallback: R
             routeSource: 'cloud',
             model: fallback.model || undefined,
         };
-        persist(storageKey, selection);
+        void persist(storageKey, selection);
         return selection;
     }
     return { connectorId: '', routeSource: 'auto', model: undefined };
@@ -344,8 +362,8 @@ function resolveSelection(connectors: RuntimeRouteConnectorOption[], fallback: R
 export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
     const [chatConnectors, setChatConnectors] = useState<RuntimeRouteConnectorOption[]>([]);
     const [ttsConnectors, setTtsConnectors] = useState<RuntimeRouteConnectorOption[]>([]);
-    const [chatSelection, setChatSelection] = useState<RouteSelection>(() => loadPersisted(STORAGE_KEY_CHAT));
-    const [ttsSelection, setTtsSelection] = useState<RouteSelection>(() => loadPersisted(STORAGE_KEY_TTS));
+    const [chatSelection, setChatSelection] = useState<RouteSelection>(() => readPersistedSelectionSync(STORAGE_KEY_CHAT));
+    const [ttsSelection, setTtsSelection] = useState<RouteSelection>(() => readPersistedSelectionSync(STORAGE_KEY_TTS));
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const loadInFlightRef = useRef(new Map<RuntimeCanonicalCapability, Promise<RuntimeRouteOptionsSnapshot | null>>());
@@ -365,6 +383,12 @@ export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
     }, [runtimeClient]);
     useEffect(() => {
         let cancelled = false;
+        void persistedSelectionCacheReady.then(() => {
+            if (cancelled)
+                return;
+            setChatSelection(readPersistedSelectionSync(STORAGE_KEY_CHAT));
+            setTtsSelection(readPersistedSelectionSync(STORAGE_KEY_TTS));
+        });
         async function init() {
             const [resolvedChat, resolvedTts] = await Promise.all([
                 resolveRouteBinding(runtimeClient, 'text.generate'),
@@ -504,7 +528,7 @@ export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
                 if (previous.model === nextModel)
                     return previous;
                 const next: RouteSelection = { ...previous, model: nextModel };
-                persist(STORAGE_KEY_TTS, next);
+                void persist(STORAGE_KEY_TTS, next);
                 return next;
             });
         }
@@ -521,7 +545,7 @@ export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
             model: connectorId ? nextModel : undefined,
         };
         setChatSelection(selection);
-        persist(STORAGE_KEY_CHAT, selection);
+        void persist(STORAGE_KEY_CHAT, selection);
     }, [chatConnectors, chatSelection.model]);
     const selectChatModel = useCallback((model: string) => {
         const nextModel = normalizeModel(model);
@@ -536,7 +560,7 @@ export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
                 ...previous,
                 model: resolvedModel || undefined,
             };
-            persist(STORAGE_KEY_CHAT, next);
+            void persist(STORAGE_KEY_CHAT, next);
             return next;
         });
     }, [chatConnectors]);
@@ -550,7 +574,7 @@ export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
             model: connectorId ? nextModel : undefined,
         };
         setTtsSelection(selection);
-        persist(STORAGE_KEY_TTS, selection);
+        void persist(STORAGE_KEY_TTS, selection);
     }, [ttsConnectors, ttsSelection.model]);
     return useMemo(() => ({
         chatConnectors,

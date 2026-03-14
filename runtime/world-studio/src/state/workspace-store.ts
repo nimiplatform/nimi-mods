@@ -10,8 +10,8 @@ type WorldStudioWorkspaceStore = {
     setCreateStep: (step: WorldStudioCreateStep) => void;
     patchSnapshot: (patch: WorldStudioSnapshotPatch) => void;
     patchPanel: (patch: Partial<WorldStudioWorkspaceSnapshot['panel']>) => void;
-    hydrateForUser: (userId: string) => void;
-    persistForUser: (userId: string) => void;
+    hydrateForUser: (userId: string) => Promise<void>;
+    persistForUser: (userId: string) => Promise<void>;
     resetSnapshot: () => void;
 };
 function diagLog(message: string, details?: Record<string, unknown>) {
@@ -287,8 +287,8 @@ export const useWorldStudioWorkspaceStore = create<WorldStudioWorkspaceStore>((s
             },
         },
     })),
-    hydrateForUser: (userId) => {
-        const loaded = readSnapshotFromStorage(userId);
+    hydrateForUser: async (userId) => {
+        const loaded = await readSnapshotFromStorage(userId);
         if (loaded) {
             set({ snapshot: loaded });
         }
@@ -296,8 +296,8 @@ export const useWorldStudioWorkspaceStore = create<WorldStudioWorkspaceStore>((s
             set({ snapshot: cloneDefaultSnapshot() });
         }
     },
-    persistForUser: (userId) => {
-        persistSnapshotToStorage(userId, get().snapshot);
+    persistForUser: async (userId) => {
+        await persistSnapshotToStorage(userId, get().snapshot);
     },
     resetSnapshot: () => set({ snapshot: cloneDefaultSnapshot() }),
 }));

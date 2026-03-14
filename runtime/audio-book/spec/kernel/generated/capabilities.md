@@ -20,6 +20,24 @@ required_capabilities:
   - key: runtime.media.tts.synthesize
     purpose: Test synthesis and batch segment synthesis
     source_rule: VS-CAP-004
+  - key: storage.sqlite.query
+    purpose: Query project metadata and synthesis job state from host sqlite
+    source_rule: VS-CAP-004
+  - key: storage.sqlite.execute
+    purpose: Persist project metadata and synthesis job state into host sqlite
+    source_rule: VS-CAP-004
+  - key: storage.files.read
+    purpose: Read synthesized segment audio from the mod host files subtree
+    source_rule: VS-CAP-004
+  - key: storage.files.write
+    purpose: Persist synthesized segment audio into the mod host files subtree
+    source_rule: VS-CAP-004
+  - key: storage.files.delete
+    purpose: Delete stale synthesized segment audio from the mod host files subtree
+    source_rule: VS-CAP-004
+  - key: storage.files.list
+    purpose: List synthesized segment audio files for playback and cleanup
+    source_rule: VS-CAP-004
   - key: runtime.route.list.options
     purpose: Query available TTS route bindings
     source_rule: VS-CAP-003

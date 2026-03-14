@@ -23,6 +23,12 @@ required_capabilities:
   - key: runtime.route.list.options
     purpose: Query available text.generate / text.embed route options (15s polling)
     source_rule: KB-CAP-006
+  - key: storage.sqlite.query
+    purpose: Query persisted documents, vectors, conversations, and settings from host sqlite
+    source_rule: KB-CAP-002
+  - key: storage.sqlite.execute
+    purpose: Persist documents, vectors, conversations, and settings into host sqlite
+    source_rule: KB-CAP-002
   - key: data.register.data-api.knowledge-base.documents.list
     purpose: Register document list API
     source_rule: KB-CAP-003

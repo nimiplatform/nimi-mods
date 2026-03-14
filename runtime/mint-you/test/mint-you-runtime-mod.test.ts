@@ -62,8 +62,9 @@ function createSdkRuntimeContext() {
       ownerAgentId: string;
       worldId?: string;
       profile: Record<string, unknown>;
-    }) => Promise<{ referenceImageUrl?: string | null }> | { referenceImageUrl?: string | null };
+      }) => Promise<{ referenceImageUrl?: string | null }> | { referenceImageUrl?: string | null };
   }> = [];
+  const storage = new Map<string, string>();
 
   const runtime = {
     registerUIExtensionV2: async (input: { slot: string; extension: Record<string, unknown> }) => {
@@ -87,27 +88,55 @@ function createSdkRuntimeContext() {
       capability: string;
       query: Record<string, unknown>;
     }) => {
-      if (input.capability !== 'data.store.mod-state') {
-        throw new Error(`UNEXPECTED_DATA_QUERY:${input.capability}`);
-      }
-      const op = String(input.query.op || '');
-      const key = String(input.query.key || '');
-      if (!globalThis.localStorage) {
-        return { ok: false, reasonCode: 'MOD_STATE_UNAVAILABLE' };
-      }
-      const storageKey = `nimi:mod-state:${key}`;
-      if (op === 'get') {
-        return { ok: true, value: globalThis.localStorage.getItem(storageKey) };
-      }
-      if (op === 'set') {
-        globalThis.localStorage.setItem(storageKey, String(input.query.value || ''));
-        return { ok: true };
-      }
-      if (op === 'delete') {
-        globalThis.localStorage.removeItem(storageKey);
-        return { ok: true };
-      }
-      return { ok: false, reasonCode: 'MOD_STATE_INVALID_OP' };
+      throw new Error(`UNEXPECTED_DATA_QUERY:${input.capability}`);
+    },
+    storage: {
+      files: {
+        readText: async () => {
+          throw new Error('UNEXPECTED_STORAGE_FILE_READ');
+        },
+        writeText: async () => {
+          throw new Error('UNEXPECTED_STORAGE_FILE_WRITE');
+        },
+        readBytes: async () => {
+          throw new Error('UNEXPECTED_STORAGE_FILE_READ_BYTES');
+        },
+        writeBytes: async () => {
+          throw new Error('UNEXPECTED_STORAGE_FILE_WRITE_BYTES');
+        },
+        delete: async () => false,
+        list: async () => [],
+        stat: async () => null,
+      },
+      sqlite: {
+        query: async (input: { sql: string; params?: unknown[] }) => {
+          if (!input.sql.toLowerCase().includes('select value')) {
+            throw new Error(`UNEXPECTED_STORAGE_SQL_QUERY:${input.sql}`);
+          }
+          const namespace = String(input.params?.[0] || '');
+          const key = String(input.params?.[1] || '');
+          const stored = storage.get(`${namespace}:${key}`);
+          return stored == null ? [] : [{ value: stored }];
+        },
+        execute: async (input: { sql: string; params?: unknown[] }) => {
+          const sql = input.sql.toLowerCase();
+          const namespace = String(input.params?.[0] || '');
+          const key = String(input.params?.[1] || '');
+          if (sql.includes('create table if not exists mod_state_kv')) {
+            return { rowsAffected: 0, lastInsertRowid: 0 };
+          }
+          if (sql.includes('insert into mod_state_kv')) {
+            storage.set(`${namespace}:${key}`, String(input.params?.[2] || ''));
+            return { rowsAffected: 1, lastInsertRowid: 0 };
+          }
+          if (sql.includes('delete from mod_state_kv')) {
+            storage.delete(`${namespace}:${key}`);
+            return { rowsAffected: 1, lastInsertRowid: 0 };
+          }
+          throw new Error(`UNEXPECTED_STORAGE_SQL_EXECUTE:${input.sql}`);
+        },
+        transaction: async () => ({ rowsAffected: 0, lastInsertRowid: 0 }),
+      },
     },
   };
 
@@ -311,8 +340,8 @@ test('mint-you runtime mod setup registers profile filter and enforces photo vis
       });
       assert.equal(ownerView.referenceImageUrl, 'https://example.com/photo.png');
 
-      await requestPhoto(getMintYouHookClient().data, 'viewer-b', 'user-owner', 'world-1');
-      await respondToRequest(getMintYouHookClient().data, 'user-owner', 'viewer-b', 'world-1', true);
+      await requestPhoto(getMintYouHookClient().storage, 'viewer-b', 'user-owner', 'world-1');
+      await respondToRequest(getMintYouHookClient().storage, 'user-owner', 'viewer-b', 'world-1', true);
       const mutualView = await profileFilter({
         viewerUserId: 'viewer-b',
         ownerAgentId: 'agent-owner',
@@ -321,7 +350,7 @@ test('mint-you runtime mod setup registers profile filter and enforces photo vis
       });
       assert.equal(mutualView.referenceImageUrl, 'https://example.com/photo.png');
 
-      await revokeAccess(getMintYouHookClient().data, 'viewer-b', 'user-owner', 'world-1');
+      await revokeAccess(getMintYouHookClient().storage, 'viewer-b', 'user-owner', 'world-1');
       const revokedView = await profileFilter({
         viewerUserId: 'viewer-b',
         ownerAgentId: 'agent-owner',
@@ -337,7 +366,7 @@ test('mint-you runtime mod setup registers profile filter and enforces photo vis
   }
 });
 
-test('mint-you photo auth stores directional cooldown in mod-state', async () => {
+test('mint-you photo auth stores directional cooldown in host sqlite storage', async () => {
   const restoreLocalStorage = installLocalStorage();
   try {
     const { sdkRuntimeContext, runtimeHost } = createSdkRuntimeContext();
@@ -346,28 +375,28 @@ test('mint-you photo auth stores directional cooldown in mod-state', async () =>
 
     try {
       await mod.setup({ sdkRuntimeContext } as never);
-      const dataClient = getMintYouHookClient().data;
+      const storageClient = getMintYouHookClient().storage;
 
-      await requestPhoto(dataClient, 'user-a', 'user-b', 'world-1');
-      let snapshot = await readPhotoAuthSnapshot(dataClient, 'user-a', 'user-b', 'world-1');
+      await requestPhoto(storageClient, 'user-a', 'user-b', 'world-1');
+      let snapshot = await readPhotoAuthSnapshot(storageClient, 'user-a', 'user-b', 'world-1');
       assert.equal(snapshot.state, 'A_REQUESTED');
       assert.equal(snapshot.requestedBy, 'user-a');
       assert.equal(snapshot.canRequest, false);
 
-      await respondToRequest(dataClient, 'user-b', 'user-a', 'world-1', false);
-      snapshot = await readPhotoAuthSnapshot(dataClient, 'user-a', 'user-b', 'world-1');
+      await respondToRequest(storageClient, 'user-b', 'user-a', 'world-1', false);
+      snapshot = await readPhotoAuthSnapshot(storageClient, 'user-a', 'user-b', 'world-1');
       assert.equal(snapshot.state, 'DECLINED');
       assert.equal(snapshot.requestedBy, 'user-a');
       assert.equal(snapshot.canRequest, false);
       assert.ok(snapshot.cooldownRemainingMs > 0);
 
-      const reverseSnapshot = await readPhotoAuthSnapshot(dataClient, 'user-b', 'user-a', 'world-1');
+      const reverseSnapshot = await readPhotoAuthSnapshot(storageClient, 'user-b', 'user-a', 'world-1');
       assert.equal(reverseSnapshot.state, 'DECLINED');
       assert.equal(reverseSnapshot.canRequest, true);
       assert.equal(reverseSnapshot.cooldownRemainingMs, 0);
 
-      await requestPhoto(dataClient, 'user-b', 'user-a', 'world-1');
-      snapshot = await readPhotoAuthSnapshot(dataClient, 'user-b', 'user-a', 'world-1');
+      await requestPhoto(storageClient, 'user-b', 'user-a', 'world-1');
+      snapshot = await readPhotoAuthSnapshot(storageClient, 'user-b', 'user-a', 'world-1');
       assert.equal(snapshot.state, 'A_REQUESTED');
       assert.equal(snapshot.requestedBy, 'user-b');
     } finally {

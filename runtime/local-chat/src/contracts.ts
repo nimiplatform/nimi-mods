@@ -33,6 +33,8 @@ export const LOCAL_CHAT_CAPABILITIES = [
   'runtime.route.list.options',
   'runtime.route.resolve',
   'runtime.route.check.health',
+  'storage.sqlite.query',
+  'storage.sqlite.execute',
   `data.register.${LOCAL_CHAT_DATA_API_CHAT_TARGETS_LIST}`,
   `data.query.${LOCAL_CHAT_DATA_API_CHAT_TARGETS_LIST}`,
   `data.register.${LOCAL_CHAT_DATA_API_CHAT_TARGET_DETAIL}`,

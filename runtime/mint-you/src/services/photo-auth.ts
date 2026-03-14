@@ -1,6 +1,6 @@
 import type { PhotoAuthState, PhotoAuthRecord, PhotoAuthSnapshot, } from '../types.js';
-import { readModState, removeModState, writeModState, } from './mod-state.js';
-import { type HookDataClient } from "@nimiplatform/sdk/mod";
+import { readStoredState, removeStoredState, writeStoredState, } from './storage-state.js';
+import { type HookStorageClient } from "@nimiplatform/sdk/mod";
 const STORAGE_KEY_PREFIX = 'mint-you:photo-auth:';
 const COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
 const VALID_STATES = new Set<PhotoAuthState>(['NONE', 'A_REQUESTED', 'MUTUAL', 'DECLINED']);
@@ -42,18 +42,18 @@ function parseRecord(raw: string | null): PhotoAuthRecord | null {
         return null;
     }
 }
-async function loadRecord(dataClient: HookDataClient, userA: string, userB: string, worldId: string): Promise<PhotoAuthRecord | null> {
+async function loadRecord(storage: HookStorageClient, userA: string, userB: string, worldId: string): Promise<PhotoAuthRecord | null> {
     const key = getStorageKey(userA, userB, worldId);
-    const raw = await readModState(dataClient, key);
+    const raw = await readStoredState(storage, key);
     return parseRecord(raw);
 }
-async function saveRecord(dataClient: HookDataClient, userA: string, userB: string, worldId: string, record: PhotoAuthRecord): Promise<void> {
+async function saveRecord(storage: HookStorageClient, userA: string, userB: string, worldId: string, record: PhotoAuthRecord): Promise<void> {
     const key = getStorageKey(userA, userB, worldId);
-    await writeModState(dataClient, key, JSON.stringify(record));
+    await writeStoredState(storage, key, JSON.stringify(record));
 }
-async function removeRecord(dataClient: HookDataClient, userA: string, userB: string, worldId: string): Promise<void> {
+async function removeRecord(storage: HookStorageClient, userA: string, userB: string, worldId: string): Promise<void> {
     const key = getStorageKey(userA, userB, worldId);
-    await removeModState(dataClient, key);
+    await removeStoredState(storage, key);
 }
 function computeCanRequest(record: PhotoAuthRecord | null, requesterId: string): boolean {
     if (!record)
@@ -84,8 +84,8 @@ function computeCooldownRemaining(record: PhotoAuthRecord | null, requesterId: s
     const elapsed = Date.now() - record.declinedAt;
     return Math.max(0, COOLDOWN_MS - elapsed);
 }
-export async function readPhotoAuthSnapshot(dataClient: HookDataClient, currentUserId: string, otherUserId: string, worldId: string): Promise<PhotoAuthSnapshot> {
-    const record = await loadRecord(dataClient, currentUserId, otherUserId, worldId);
+export async function readPhotoAuthSnapshot(storage: HookStorageClient, currentUserId: string, otherUserId: string, worldId: string): Promise<PhotoAuthSnapshot> {
+    const record = await loadRecord(storage, currentUserId, otherUserId, worldId);
     return {
         state: record?.state ?? 'NONE',
         requestedBy: record?.requestedBy ?? null,
@@ -93,19 +93,19 @@ export async function readPhotoAuthSnapshot(dataClient: HookDataClient, currentU
         canRequest: computeCanRequest(record, currentUserId),
     };
 }
-export async function getAuthState(dataClient: HookDataClient, userA: string, userB: string, worldId: string): Promise<PhotoAuthState> {
-    return (await loadRecord(dataClient, userA, userB, worldId))?.state ?? 'NONE';
+export async function getAuthState(storage: HookStorageClient, userA: string, userB: string, worldId: string): Promise<PhotoAuthState> {
+    return (await loadRecord(storage, userA, userB, worldId))?.state ?? 'NONE';
 }
-export async function canRequest(dataClient: HookDataClient, requesterId: string, targetId: string, worldId: string): Promise<boolean> {
-    const record = await loadRecord(dataClient, requesterId, targetId, worldId);
+export async function canRequest(storage: HookStorageClient, requesterId: string, targetId: string, worldId: string): Promise<boolean> {
+    const record = await loadRecord(storage, requesterId, targetId, worldId);
     return computeCanRequest(record, requesterId);
 }
-export async function getCooldownRemaining(dataClient: HookDataClient, requesterId: string, otherId: string, worldId: string): Promise<number> {
-    const record = await loadRecord(dataClient, requesterId, otherId, worldId);
+export async function getCooldownRemaining(storage: HookStorageClient, requesterId: string, otherId: string, worldId: string): Promise<number> {
+    const record = await loadRecord(storage, requesterId, otherId, worldId);
     return computeCooldownRemaining(record, requesterId);
 }
-export async function requestPhoto(dataClient: HookDataClient, requesterId: string, targetId: string, worldId: string): Promise<PhotoAuthRecord> {
-    const existing = await loadRecord(dataClient, requesterId, targetId, worldId);
+export async function requestPhoto(storage: HookStorageClient, requesterId: string, targetId: string, worldId: string): Promise<PhotoAuthRecord> {
+    const existing = await loadRecord(storage, requesterId, targetId, worldId);
     if (!computeCanRequest(existing, requesterId)) {
         return existing ?? createNoneRecord(worldId);
     }
@@ -115,11 +115,11 @@ export async function requestPhoto(dataClient: HookDataClient, requesterId: stri
         declinedAt: null,
         worldId,
     };
-    await saveRecord(dataClient, requesterId, targetId, worldId, next);
+    await saveRecord(storage, requesterId, targetId, worldId, next);
     return next;
 }
-export async function respondToRequest(dataClient: HookDataClient, responderId: string, requesterId: string, worldId: string, accept: boolean): Promise<PhotoAuthRecord> {
-    const existing = await loadRecord(dataClient, responderId, requesterId, worldId);
+export async function respondToRequest(storage: HookStorageClient, responderId: string, requesterId: string, worldId: string, accept: boolean): Promise<PhotoAuthRecord> {
+    const existing = await loadRecord(storage, responderId, requesterId, worldId);
     if (!existing || existing.state !== 'A_REQUESTED' || existing.requestedBy !== requesterId) {
         return existing ?? createNoneRecord(worldId);
     }
@@ -136,16 +136,16 @@ export async function respondToRequest(dataClient: HookDataClient, responderId: 
             declinedAt: Date.now(),
             worldId,
         };
-    await saveRecord(dataClient, requesterId, responderId, worldId, next);
+    await saveRecord(storage, requesterId, responderId, worldId, next);
     return next;
 }
-export async function revokeAccess(dataClient: HookDataClient, userId: string, otherId: string, worldId: string): Promise<PhotoAuthRecord> {
-    await removeRecord(dataClient, userId, otherId, worldId);
+export async function revokeAccess(storage: HookStorageClient, userId: string, otherId: string, worldId: string): Promise<PhotoAuthRecord> {
+    await removeRecord(storage, userId, otherId, worldId);
     return createNoneRecord(worldId);
 }
-export async function canSeePhoto(dataClient: HookDataClient, viewerId: string, ownerId: string, worldId: string): Promise<boolean> {
+export async function canSeePhoto(storage: HookStorageClient, viewerId: string, ownerId: string, worldId: string): Promise<boolean> {
     if (viewerId === ownerId)
         return true;
-    const state = await getAuthState(dataClient, viewerId, ownerId, worldId);
+    const state = await getAuthState(storage, viewerId, ownerId, worldId);
     return state === 'MUTUAL';
 }

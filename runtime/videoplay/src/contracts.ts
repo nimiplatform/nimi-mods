@@ -23,6 +23,8 @@ export const VIDEOPLAY_CAPABILITIES = [
   'runtime.route.list.options',
   'runtime.route.resolve',
   'runtime.route.check.health',
+  'storage.sqlite.query',
+  'storage.sqlite.execute',
   `data.query.${VIDEOPLAY_DATA_API_WORLD_EVENTS_LIST}`,
   `data.query.${VIDEOPLAY_DATA_API_WORLD_LOREBOOKS_LIST}`,
   `data.query.${VIDEOPLAY_DATA_API_WORLD_SCENES_LIST}`,

@@ -15,6 +15,8 @@ capabilities:
   - runtime.media.image.generate
   - runtime.route.list.options
   - runtime.route.resolve
+  - storage.sqlite.query
+  - storage.sqlite.execute
   - data.register.data-api.daily-outfit.wardrobe.list
   - data.register.data-api.daily-outfit.wardrobe.get
   - data.register.data-api.daily-outfit.wardrobe.create

@@ -38,8 +38,11 @@ required_capabilities:
   - key: runtime.route.check.health
     purpose: 检查路由健康状态
     source_rule: BD-CAP-004
-  - key: data.store.mod-state
-    purpose: 持久化对话历史和用户偏好
+  - key: storage.sqlite.query
+    purpose: 查询本 mod 的宿主 sqlite 状态
+    source_rule: BD-CAP-001
+  - key: storage.sqlite.execute
+    purpose: 持久化对话历史和用户偏好到本 mod 的宿主 sqlite
     source_rule: BD-CAP-001
   - key: ui.register.ui-extension.app.sidebar.mods
     purpose: 侧边栏导航入口

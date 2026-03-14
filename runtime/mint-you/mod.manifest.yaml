@@ -18,7 +18,8 @@ capabilities:
   - data.query.data-api.world.access.me
   - data.query.data-api.world.oasis.get
   - runtime.profile.read.agent
-  - data.store.mod-state
+  - storage.sqlite.query
+  - storage.sqlite.execute
   - ui.register.ui-extension.app.sidebar.mods
   - ui.register.ui-extension.app.content.routes
 ai:

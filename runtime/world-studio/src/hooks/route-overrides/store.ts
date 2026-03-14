@@ -10,14 +10,33 @@ export function useWorldStudioRouteBindingStore(userId: string) {
     coarse: null,
     fine: null,
   });
+  const [bindingMapHydrated, setBindingMapHydrated] = useState(false);
 
   useEffect(() => {
-    setRouteBindingMap(loadWorldStudioRouteBindingMap(userId));
+    let cancelled = false;
+    setBindingMapHydrated(false);
+    void loadWorldStudioRouteBindingMap(userId).then((value) => {
+      if (cancelled) {
+        return;
+      }
+      setRouteBindingMap(value);
+      setBindingMapHydrated(true);
+    }).catch(() => {
+      if (!cancelled) {
+        setBindingMapHydrated(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [userId]);
 
   useEffect(() => {
-    persistWorldStudioRouteBindingMap(userId, bindingMap);
-  }, [bindingMap, userId]);
+    if (!bindingMapHydrated) {
+      return;
+    }
+    void persistWorldStudioRouteBindingMap(userId, bindingMap);
+  }, [bindingMap, bindingMapHydrated, userId]);
 
   return {
     bindingMap,

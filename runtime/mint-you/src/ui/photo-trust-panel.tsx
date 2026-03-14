@@ -27,7 +27,7 @@ export function PhotoTrustPanel({ currentUserId, otherUserId, worldId, otherHasP
     const [busy, setBusy] = useState(false);
     const refreshSnapshot = useCallback(async () => {
         const hookClient = getMintYouHookClient();
-        const next = await readPhotoAuthSnapshot(hookClient.data, currentUserId, otherUserId, worldId);
+        const next = await readPhotoAuthSnapshot(hookClient.storage, currentUserId, otherUserId, worldId);
         setSnapshot(next);
     }, [currentUserId, otherUserId, worldId]);
     useEffect(() => {
@@ -45,7 +45,7 @@ export function PhotoTrustPanel({ currentUserId, otherUserId, worldId, otherHasP
         setBusy(true);
         try {
             const hookClient = getMintYouHookClient();
-            await requestPhoto(hookClient.data, currentUserId, otherUserId, worldId);
+            await requestPhoto(hookClient.storage, currentUserId, otherUserId, worldId);
             await refreshSnapshot();
         }
         finally {
@@ -57,7 +57,7 @@ export function PhotoTrustPanel({ currentUserId, otherUserId, worldId, otherHasP
         setBusy(true);
         try {
             const hookClient = getMintYouHookClient();
-            await respondToRequest(hookClient.data, currentUserId, otherUserId, worldId, accept);
+            await respondToRequest(hookClient.storage, currentUserId, otherUserId, worldId, accept);
             await refreshSnapshot();
         }
         finally {
@@ -74,7 +74,7 @@ export function PhotoTrustPanel({ currentUserId, otherUserId, worldId, otherHasP
         setBusy(true);
         try {
             const hookClient = getMintYouHookClient();
-            await revokeAccess(hookClient.data, currentUserId, otherUserId, worldId);
+            await revokeAccess(hookClient.storage, currentUserId, otherUserId, worldId);
             await refreshSnapshot();
         }
         finally {

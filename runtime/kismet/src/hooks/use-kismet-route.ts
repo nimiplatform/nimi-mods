@@ -3,13 +3,24 @@ import { useShellRuntimeFields } from '@nimiplatform/sdk/mod/shell';
 import type { RouteSourceDisplay } from '../types.js';
 import { useKismetStore } from '../state/kismet-store.js';
 import { getKismetRouteClient } from '../runtime-mod.js';
-import { KISMET_RUNTIME_TEXT_CAPABILITY } from '../contracts.js';
+import { KISMET_MOD_ID, KISMET_RUNTIME_TEXT_CAPABILITY } from '../contracts.js';
 import { emitKismetLog } from '../logging.js';
-import { parseRuntimeRouteOptions, type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot, type RuntimeRouteSource } from "@nimiplatform/sdk/mod";
+import { createModKvStore, createModStorageClient, parseRuntimeRouteOptions, type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot, type RuntimeRouteSource } from "@nimiplatform/sdk/mod";
 const STORAGE_KEY = 'nimi.kismet.route-override.v1';
 const ROUTE_OPTIONS_QUERY_TIMEOUT_MS = 6000;
 const POLL_INTERVAL_WITH_CONNECTORS_MS = 10000;
 const POLL_INTERVAL_NO_CONNECTORS_MS = 30000;
+let kismetRouteStore: ReturnType<typeof createModKvStore> | null = null;
+function getKismetRouteStore() {
+    if (!kismetRouteStore) {
+        kismetRouteStore = createModKvStore({
+            storage: createModStorageClient(KISMET_MOD_ID),
+            namespace: 'kismet.route',
+        });
+    }
+    return kismetRouteStore;
+}
+let persistedOverrideCache: RuntimeRouteBinding | null = null;
 function isUsableRouteBinding(binding: RuntimeRouteBinding | null | undefined, options: RuntimeRouteOptionsSnapshot | null): boolean {
     if (!binding) {
         return false;
@@ -31,26 +42,25 @@ function isUsableRouteBinding(binding: RuntimeRouteBinding | null | undefined, o
     }
     return connector.models.length === 0 || connector.models.includes(model);
 }
-function loadPersistedOverride(): RuntimeRouteBinding | null {
-    try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw)
-            return null;
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object' && parsed.source && parsed.model) {
-            return parsed as RuntimeRouteBinding;
-        }
+async function hydratePersistedOverride(): Promise<RuntimeRouteBinding | null> {
+    const parsed = await getKismetRouteStore().getJson<Record<string, unknown>>(STORAGE_KEY);
+    if (parsed && typeof parsed === 'object' && parsed.source && parsed.model) {
+        persistedOverrideCache = parsed as RuntimeRouteBinding;
+        return persistedOverrideCache;
     }
-    catch { /* ignore */ }
+    persistedOverrideCache = null;
     return null;
 }
-function persistOverride(override: RuntimeRouteBinding | null) {
+function loadPersistedOverride(): RuntimeRouteBinding | null {
+    return persistedOverrideCache;
+}
+async function persistOverride(override: RuntimeRouteBinding | null) {
+    persistedOverrideCache = override;
     if (override) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(override));
+        await getKismetRouteStore().setJson(STORAGE_KEY, override);
+        return;
     }
-    else {
-        localStorage.removeItem(STORAGE_KEY);
-    }
+    await getKismetRouteStore().delete(STORAGE_KEY);
 }
 function normalizeTokenApiBinding(binding: RuntimeRouteBinding, connectors: RuntimeRouteOptionsSnapshot['connectors']): RuntimeRouteBinding {
     if (binding.source !== 'cloud' || connectors.length === 0) {
@@ -145,15 +155,21 @@ export function useKismetRoute() {
     const mountedRef = useRef(false);
     // Load persisted override on mount
     useEffect(() => {
-        const persisted = loadPersistedOverride();
-        console.log('[KISMET:route] persisted override from localStorage', persisted);
-        if (persisted)
-            setRouteBinding(persisted);
+        let cancelled = false;
+        void hydratePersistedOverride().then((persisted) => {
+            if (cancelled) {
+                return;
+            }
+            console.log('[KISMET:route] persisted route override', persisted);
+            if (persisted)
+                setRouteBinding(persisted);
+        });
         mountedRef.current = true;
+        return () => { cancelled = true; };
     }, [setRouteBinding]);
     // Persist override changes
     useEffect(() => {
-        persistOverride(routeBinding);
+        void persistOverride(routeBinding);
     }, [routeBinding]);
     const recoverFromMissingConnector = useCallback((binding: RuntimeRouteBinding | null | undefined): boolean => {
         let recovered = false;

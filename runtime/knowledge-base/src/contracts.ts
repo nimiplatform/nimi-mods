@@ -28,6 +28,8 @@ export const KB_CAPABILITIES = [
   'runtime.ai.text.stream',
   'runtime.ai.embedding.generate',
   'runtime.route.list.options',
+  'storage.sqlite.query',
+  'storage.sqlite.execute',
   // Data register + query pairs
   `data.register.${KB_DATA_API_DOCUMENTS_LIST}`,
   `data.query.${KB_DATA_API_DOCUMENTS_LIST}`,

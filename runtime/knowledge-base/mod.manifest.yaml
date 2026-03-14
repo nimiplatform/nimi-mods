@@ -14,6 +14,8 @@ capabilities:
   - runtime.ai.text.stream
   - runtime.ai.embedding.generate
   - runtime.route.list.options
+  - storage.sqlite.query
+  - storage.sqlite.execute
   # Data register + query pairs (8 APIs)
   - data.register.data-api.knowledge-base.documents.list
   - data.query.data-api.knowledge-base.documents.list

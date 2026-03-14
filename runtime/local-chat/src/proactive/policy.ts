@@ -60,9 +60,9 @@ function buildPolicyResult(
   };
 }
 
-export function evaluateLocalChatProactivePolicy(
+export async function evaluateLocalChatProactivePolicy(
   input: LocalChatProactiveGateInput,
-): LocalChatProactivePolicyResult {
+): Promise<LocalChatProactivePolicyResult> {
   if (!input.allowProactiveContact) {
     return buildPolicyResult(
       'LOCAL_CHAT_PROACTIVE_DISABLED_BY_USER_SETTING',
@@ -85,7 +85,7 @@ export function evaluateLocalChatProactivePolicy(
   }
 
   try {
-    const state = readProactivePolicyTargetState({
+    const state = await readProactivePolicyTargetState({
       targetId: input.targetId,
       nowMs: input.nowMs,
     });
@@ -114,12 +114,12 @@ export function evaluateLocalChatProactivePolicy(
   );
 }
 
-export function recordLocalChatProactiveContact(input: {
+export async function recordLocalChatProactiveContact(input: {
   targetId: string;
   atMs: number;
-}): void {
+}): Promise<void> {
   try {
-    markProactiveContactSent(input);
+    await markProactiveContactSent(input);
   } catch {
     // Proactive policy persistence failure must not break chat flow.
   }

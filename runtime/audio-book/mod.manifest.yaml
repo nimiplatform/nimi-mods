@@ -14,6 +14,12 @@ capabilities:
   - runtime.media.tts.synthesize
   - runtime.route.list.options
   - runtime.route.resolve
+  - storage.sqlite.query
+  - storage.sqlite.execute
+  - storage.files.read
+  - storage.files.write
+  - storage.files.delete
+  - storage.files.list
   - ui.register.ui-extension.app.sidebar.mods
   - ui.register.ui-extension.app.content.routes
   - event.publish.ab:synthesis:progress

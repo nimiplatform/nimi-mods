@@ -36,7 +36,7 @@ export async function registerMintYouDataCapabilities(input: {
                 return { referenceImageUrl: null };
             }
             return {
-                referenceImageUrl: await canSeePhoto(input.hookClient.data, viewer, owner, resolvedWorldId)
+                referenceImageUrl: await canSeePhoto(input.hookClient.storage, viewer, owner, resolvedWorldId)
                     ? referenceImageUrl
                     : null,
             };

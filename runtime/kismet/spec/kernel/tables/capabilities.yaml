@@ -16,6 +16,14 @@ capabilities:
     direction: consume
     purpose: verify configured route health for sidebar status and recovery
     source_rule: KIS-CAP-002
+  - key: storage.sqlite.query
+    direction: consume
+    purpose: query local profiles and route state from host sqlite
+    source_rule: KIS-CAP-002
+  - key: storage.sqlite.execute
+    direction: consume
+    purpose: persist local profiles and route state into host sqlite
+    source_rule: KIS-CAP-002
   - key: ui.register.ui-extension.app.sidebar.mods
     direction: consume
     purpose: register mod navigation
@@ -33,5 +41,5 @@ internal_assets:
     storage: mod-local checked-in data
     source_rule: KIS-CAP-004
   - asset: local-share-profiles
-    storage: browser localStorage
+    storage: mod host sqlite
     source_rule: KIS-COMP-001

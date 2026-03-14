@@ -21,6 +21,10 @@ required_capabilities:
     source_rule: V-CAP-003
   - key: runtime.route.check.health
     source_rule: V-CAP-003
+  - key: storage.sqlite.query
+    source_rule: V-CAP-004
+  - key: storage.sqlite.execute
+    source_rule: V-CAP-004
   - key: data.query.data-api.world.events.list
     source_rule: V-CAP-006
   - key: data.query.data-api.world.lorebooks.list

@@ -27,6 +27,7 @@ import {
 } from '../validation/validate-result.js';
 import {
   createLocalShareProfile,
+  hydrateLocalShareProfilesState,
   loadCachedFortuneStick,
   loadLocalShareProfiles,
   loadPrimaryProfile,
@@ -81,20 +82,27 @@ export function useKismetController() {
   const setLastAiRawResponse = useKismetStore((state) => state.setLastAiRawResponse);
 
   useEffect(() => {
-    setSavedProfiles(loadLocalShareProfiles());
-    const primary = loadPrimaryProfile();
-    if (primary) {
-      store.setPrimaryProfile(primary);
-      store.setConfirmedProfile(primary.canonicalProfile);
-      emitKismetLog({ message: 'kismet.primary-profile.restored', source: 'useKismetController' });
-    }
-    const cachedStick = loadCachedFortuneStick();
-    if (cachedStick) {
-      const today = resolveLocalDateString('Asia/Shanghai');
-      if (cachedStick.date === today) {
-        store.setFortuneStickResult(cachedStick.result);
+    let cancelled = false;
+    void hydrateLocalShareProfilesState().then(() => {
+      if (cancelled) {
+        return;
       }
-    }
+      setSavedProfiles(loadLocalShareProfiles());
+      const primary = loadPrimaryProfile();
+      if (primary) {
+        store.setPrimaryProfile(primary);
+        store.setConfirmedProfile(primary.canonicalProfile);
+        emitKismetLog({ message: 'kismet.primary-profile.restored', source: 'useKismetController' });
+      }
+      const cachedStick = loadCachedFortuneStick();
+      if (cachedStick) {
+        const today = resolveLocalDateString('Asia/Shanghai');
+        if (cachedStick.date === today) {
+          store.setFortuneStickResult(cachedStick.result);
+        }
+      }
+    });
+    return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setSavedProfiles]);
 
@@ -179,7 +187,7 @@ export function useKismetController() {
         natalResult,
         savedAt: new Date().toISOString(),
       };
-      persistPrimaryProfile(primary);
+      void persistPrimaryProfile(primary);
       store.setPrimaryProfile(primary);
       emitKismetLog({ message: KISMET_AUDIT.NATAL_GENERATE_SUCCEEDED, source: 'useKismetController' });
       return;
@@ -382,7 +390,7 @@ export function useKismetController() {
       setLastAiRawResponse(result.rawResponse);
       store.setRouteSource(result.routeSource);
       store.setFortuneStickResult(result.data);
-      persistFortuneStick({
+      void persistFortuneStick({
         result: result.data,
         date: dailyResult.date || resolveLocalDateString('Asia/Shanghai'),
         savedAt: new Date().toISOString(),
@@ -484,7 +492,7 @@ export function useKismetController() {
       canonicalProfile: profileToSave,
       savedAt: new Date().toISOString(),
     };
-    persistPrimaryProfile(primary);
+    void persistPrimaryProfile(primary);
     store.setPrimaryProfile(primary);
     store.setConfirmedProfile(profileToSave);
     emitKismetLog({ message: KISMET_AUDIT.LOCAL_PROFILE_SAVED, source: 'useKismetController' });
@@ -505,7 +513,7 @@ export function useKismetController() {
       );
       const nextProfiles = [profile, ...store.savedProfiles.filter((item) => item.displayName !== profile.displayName)];
       store.setSavedProfiles(nextProfiles);
-      persistLocalShareProfiles(nextProfiles);
+      void persistLocalShareProfiles(nextProfiles);
     }
   }, [savePrimaryProfile, store]);
 
@@ -515,7 +523,7 @@ export function useKismetController() {
     if (store.selectedSavedProfileId === profileId) {
       store.setSelectedSavedProfileId(null);
     }
-    persistLocalShareProfiles(nextProfiles);
+    void persistLocalShareProfiles(nextProfiles);
     emitKismetLog({ message: KISMET_AUDIT.LOCAL_PROFILE_REMOVED, source: 'useKismetController' });
   }, [store]);
 

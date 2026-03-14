@@ -1,5 +1,10 @@
-import { loadLocalStorageJson, saveLocalStorageJson } from "@nimiplatform/sdk/mod";
+import {
+    createModKvStore,
+    createModStorageClient,
+} from "@nimiplatform/sdk/mod";
+import { LOCAL_CHAT_MOD_ID } from '../contracts.js';
 const LOCAL_CHAT_PROACTIVE_POLICY_STORE_KEY = 'nimi.local-chat.proactive.policy.v1';
+let proactivePolicyStore: ReturnType<typeof createModKvStore> | null = null;
 type DailyCounter = {
     day: string;
     count: number;
@@ -12,6 +17,15 @@ const DEFAULT_POLICY_STORE_STATE: ProactivePolicyStoreState = {
     lastSentAtByTargetId: {},
     dailyByTargetId: {},
 };
+function getPolicyStore() {
+    if (!proactivePolicyStore) {
+        proactivePolicyStore = createModKvStore({
+            storage: createModStorageClient(LOCAL_CHAT_MOD_ID),
+            namespace: 'local-chat.proactive-policy',
+        });
+    }
+    return proactivePolicyStore;
+}
 function normalizeTargetId(value: unknown): string {
     return String(value || '').trim();
 }
@@ -60,22 +74,23 @@ function normalizePolicyStoreState(value: unknown): ProactivePolicyStoreState {
         dailyByTargetId,
     };
 }
-function loadPolicyStoreState(): ProactivePolicyStoreState {
-    return loadLocalStorageJson<ProactivePolicyStoreState>(LOCAL_CHAT_PROACTIVE_POLICY_STORE_KEY, { ...DEFAULT_POLICY_STORE_STATE }, normalizePolicyStoreState);
+async function loadPolicyStoreState(): Promise<ProactivePolicyStoreState> {
+    const raw = await getPolicyStore().getJson<ProactivePolicyStoreState>(LOCAL_CHAT_PROACTIVE_POLICY_STORE_KEY);
+    return normalizePolicyStoreState(raw || { ...DEFAULT_POLICY_STORE_STATE });
 }
-function persistPolicyStoreState(state: ProactivePolicyStoreState): void {
-    saveLocalStorageJson(LOCAL_CHAT_PROACTIVE_POLICY_STORE_KEY, state);
+async function persistPolicyStoreState(state: ProactivePolicyStoreState): Promise<void> {
+    await getPolicyStore().setJson(LOCAL_CHAT_PROACTIVE_POLICY_STORE_KEY, state);
 }
 function dayKeyFromMs(nowMs: number): string {
     return new Date(nowMs).toISOString().slice(0, 10);
 }
-export function readProactivePolicyTargetState(input: {
+export async function readProactivePolicyTargetState(input: {
     targetId: string;
     nowMs: number;
-}): {
+}): Promise<{
     lastSentAtMs: number;
     dailyCount: number;
-} {
+}> {
     const targetId = normalizeTargetId(input.targetId);
     if (!targetId) {
         return {
@@ -83,30 +98,30 @@ export function readProactivePolicyTargetState(input: {
             dailyCount: 0,
         };
     }
-    const state = loadPolicyStoreState();
+    const state = await loadPolicyStoreState();
     const today = dayKeyFromMs(input.nowMs);
     const daily = state.dailyByTargetId[targetId];
     const dailyCount = daily && daily.day === today ? daily.count : 0;
     if (daily && daily.day !== today) {
         state.dailyByTargetId[targetId] = { day: today, count: 0 };
-        persistPolicyStoreState(state);
+        await persistPolicyStoreState(state);
     }
     return {
         lastSentAtMs: Number(state.lastSentAtByTargetId[targetId] || 0),
         dailyCount,
     };
 }
-export function markProactiveContactSent(input: {
+export async function markProactiveContactSent(input: {
     targetId: string;
     atMs: number;
-}): void {
+}): Promise<void> {
     const targetId = normalizeTargetId(input.targetId);
     if (!targetId)
         return;
     const atMs = Number(input.atMs);
     if (!Number.isFinite(atMs) || atMs <= 0)
         return;
-    const state = loadPolicyStoreState();
+    const state = await loadPolicyStoreState();
     const today = dayKeyFromMs(atMs);
     const currentDaily = state.dailyByTargetId[targetId];
     const nextCount = currentDaily && currentDaily.day === today
@@ -117,5 +132,5 @@ export function markProactiveContactSent(input: {
         day: today,
         count: nextCount,
     };
-    persistPolicyStoreState(state);
+    await persistPolicyStoreState(state);
 }

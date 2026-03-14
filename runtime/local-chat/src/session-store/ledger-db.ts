@@ -1,3 +1,8 @@
+import {
+  createModKvStore,
+  createModStorageClient,
+} from '@nimiplatform/sdk/mod';
+import { LOCAL_CHAT_MOD_ID } from '../contracts.js';
 import type {
   InteractionRecallDoc,
   InteractionSnapshot,
@@ -29,6 +34,8 @@ export const STORE_INTERACTION_SNAPSHOTS = 'interactionSnapshots';
 export const STORE_RELATION_MEMORY_SLOTS = 'relationMemorySlots';
 export const STORE_RECALL_INDEX = 'recallIndex';
 
+const LEDGER_SNAPSHOT_KEY = 'ledger-snapshot';
+
 export type StoreName =
   | typeof STORE_CONVERSATIONS
   | typeof STORE_TURNS
@@ -51,8 +58,23 @@ export type LedgerCache = {
 
 export type LedgerMutation = {
   puts?: Partial<Record<StoreName, unknown[]>>;
-  deletes?: Partial<Record<StoreName, IDBValidKey[]>>;
+  deletes?: Partial<Record<StoreName, string[]>>;
 };
+
+type PersistedLedgerSnapshot = {
+  conversations: unknown[];
+  turns: unknown[];
+  beats: unknown[];
+  mediaAssets: unknown[];
+  interactionSnapshots: unknown[];
+  relationMemorySlots: unknown[];
+  recallIndex: unknown[];
+};
+
+const ledgerStateStore = createModKvStore({
+  storage: createModStorageClient(LOCAL_CHAT_MOD_ID),
+  namespace: 'local-chat.ledger',
+});
 
 function emptyLedgerCache(): LedgerCache {
   return {
@@ -68,7 +90,6 @@ function emptyLedgerCache(): LedgerCache {
 }
 
 let ledgerCache: LedgerCache = emptyLedgerCache();
-let openDatabasePromise: Promise<IDBDatabase | null> | null = null;
 let hydratePromise: Promise<void> | null = null;
 
 export function getLedgerCache(): LedgerCache {
@@ -79,140 +100,61 @@ export function resetLedgerCache(): void {
   ledgerCache = emptyLedgerCache();
 }
 
-function isIndexedDbAvailable(): boolean {
-  return typeof indexedDB !== 'undefined' && indexedDB !== null;
+function serializeLedgerSnapshot(): PersistedLedgerSnapshot {
+  return {
+    conversations: Array.from(ledgerCache.conversationsById.values()),
+    turns: Array.from(ledgerCache.turnsById.values()),
+    beats: Array.from(ledgerCache.beatsById.values()),
+    mediaAssets: Array.from(ledgerCache.mediaAssetsById.values()),
+    interactionSnapshots: Array.from(ledgerCache.interactionSnapshotsByConversationId.values()),
+    relationMemorySlots: Array.from(ledgerCache.relationMemorySlotsById.values()),
+    recallIndex: Array.from(ledgerCache.recallIndexById.values()),
+  };
 }
 
-export function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error('LOCAL_CHAT_LEDGER_IDB_REQUEST_FAILED'));
-  });
+async function persistLedgerSnapshot(): Promise<void> {
+  await ledgerStateStore.setJson(LEDGER_SNAPSHOT_KEY, serializeLedgerSnapshot());
 }
 
-export function transactionDone(transaction: IDBTransaction): Promise<void> {
-  return new Promise((resolve, reject) => {
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error || new Error('LOCAL_CHAT_LEDGER_IDB_TX_FAILED'));
-    transaction.onabort = () => reject(transaction.error || new Error('LOCAL_CHAT_LEDGER_IDB_TX_ABORTED'));
-  });
-}
-
-export async function openLedgerDatabase(): Promise<IDBDatabase | null> {
-  if (!isIndexedDbAvailable()) return null;
-  if (openDatabasePromise) return openDatabasePromise;
-  openDatabasePromise = new Promise<IDBDatabase | null>((resolve, reject) => {
-    const request = indexedDB.open(LOCAL_CHAT_LEDGER_DB_NAME, LOCAL_CHAT_LEDGER_DB_VERSION);
-    request.onupgradeneeded = () => {
-      const database = request.result;
-      if (!database.objectStoreNames.contains(STORE_CONVERSATIONS)) {
-        const store = database.createObjectStore(STORE_CONVERSATIONS, { keyPath: 'id' });
-        store.createIndex('byTargetId', 'targetId', { unique: false });
-        store.createIndex('byTargetUpdatedAt', ['targetId', 'updatedAt'], { unique: false });
-      }
-      if (!database.objectStoreNames.contains(STORE_TURNS)) {
-        const store = database.createObjectStore(STORE_TURNS, { keyPath: 'id' });
-        store.createIndex('byConversationId', 'conversationId', { unique: false });
-        store.createIndex('byConversationSeq', ['conversationId', 'seq'], { unique: false });
-      }
-      if (!database.objectStoreNames.contains(STORE_BEATS)) {
-        const store = database.createObjectStore(STORE_BEATS, { keyPath: 'id' });
-        store.createIndex('byConversationId', 'conversationId', { unique: false });
-        store.createIndex('byTurnId', 'turnId', { unique: false });
-        store.createIndex('byConversationTurnBeat', ['conversationId', 'turnSeq', 'beatIndex'], { unique: false });
-      }
-      if (!database.objectStoreNames.contains(STORE_MEDIA_ASSETS)) {
-        const store = database.createObjectStore(STORE_MEDIA_ASSETS, { keyPath: 'id' });
-        store.createIndex('byConversationId', 'conversationId', { unique: false });
-        store.createIndex('byTurnId', 'turnId', { unique: false });
-        store.createIndex('byBeatId', 'beatId', { unique: false });
-        store.createIndex('byExecutionCacheKey', 'executionCacheKey', { unique: false });
-      }
-      if (!database.objectStoreNames.contains(STORE_INTERACTION_SNAPSHOTS)) {
-        database.createObjectStore(STORE_INTERACTION_SNAPSHOTS, { keyPath: 'conversationId' });
-      }
-      if (!database.objectStoreNames.contains(STORE_RELATION_MEMORY_SLOTS)) {
-        const store = database.createObjectStore(STORE_RELATION_MEMORY_SLOTS, { keyPath: 'id' });
-        store.createIndex('byTargetViewer', ['targetId', 'viewerId'], { unique: false });
-      }
-      if (!database.objectStoreNames.contains(STORE_RECALL_INDEX)) {
-        const store = database.createObjectStore(STORE_RECALL_INDEX, { keyPath: 'id' });
-        store.createIndex('byConversationId', 'conversationId', { unique: false });
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error('LOCAL_CHAT_LEDGER_OPEN_FAILED'));
-  });
-  return openDatabasePromise;
-}
-
-export async function loadAllFromIndexedDb(): Promise<void> {
-  const database = await openLedgerDatabase();
-  if (!database) {
-    ledgerCache.hydrated = true;
-    return;
-  }
-  const transaction = database.transaction(
-    [
-      STORE_CONVERSATIONS,
-      STORE_TURNS,
-      STORE_BEATS,
-      STORE_MEDIA_ASSETS,
-      STORE_INTERACTION_SNAPSHOTS,
-      STORE_RELATION_MEMORY_SLOTS,
-      STORE_RECALL_INDEX,
-    ],
-    'readonly',
-  );
-  const [conversations, turns, beats, mediaAssets, interactionSnapshots, relationMemorySlots, recallIndex] = await Promise.all([
-    requestToPromise(transaction.objectStore(STORE_CONVERSATIONS).getAll()),
-    requestToPromise(transaction.objectStore(STORE_TURNS).getAll()),
-    requestToPromise(transaction.objectStore(STORE_BEATS).getAll()),
-    requestToPromise(transaction.objectStore(STORE_MEDIA_ASSETS).getAll()),
-    requestToPromise(transaction.objectStore(STORE_INTERACTION_SNAPSHOTS).getAll()),
-    requestToPromise(transaction.objectStore(STORE_RELATION_MEMORY_SLOTS).getAll()),
-    requestToPromise(transaction.objectStore(STORE_RECALL_INDEX).getAll()),
-  ]);
-  await transactionDone(transaction);
-
+function applyPersistedSnapshot(snapshot: PersistedLedgerSnapshot | null | undefined): void {
   ledgerCache = emptyLedgerCache();
-  conversations
+  (snapshot?.conversations || [])
     .map((item) => normalizeConversationRecord(item))
     .filter((item): item is LocalChatConversationRecord => Boolean(item))
     .forEach((item) => {
       ledgerCache.conversationsById.set(item.id, item);
     });
-  turns
+  (snapshot?.turns || [])
     .map((item) => normalizeTurnRecord(item))
     .filter((item): item is LocalChatTurnRecord => Boolean(item))
     .forEach((item) => {
       ledgerCache.turnsById.set(item.id, item);
     });
-  beats
+  (snapshot?.beats || [])
     .map((item) => normalizeBeatRecord(item))
     .filter((item): item is LocalChatStoredBeat => Boolean(item))
     .forEach((item) => {
       ledgerCache.beatsById.set(item.id, item);
     });
-  mediaAssets
+  (snapshot?.mediaAssets || [])
     .map((item) => normalizeMediaAssetRecord(item))
     .filter((item): item is LocalChatMediaAssetRecord => Boolean(item))
     .forEach((item) => {
       ledgerCache.mediaAssetsById.set(item.id, item);
     });
-  interactionSnapshots
+  (snapshot?.interactionSnapshots || [])
     .map((item) => normalizeInteractionSnapshot(item))
     .filter((item): item is InteractionSnapshot => Boolean(item))
     .forEach((item) => {
       ledgerCache.interactionSnapshotsByConversationId.set(item.conversationId, item);
     });
-  relationMemorySlots
+  (snapshot?.relationMemorySlots || [])
     .map((item) => normalizeRelationMemorySlot(item))
     .filter((item): item is RelationMemorySlot => Boolean(item))
     .forEach((item) => {
       ledgerCache.relationMemorySlotsById.set(item.id, item);
     });
-  recallIndex
+  (snapshot?.recallIndex || [])
     .map((item) => normalizeInteractionRecallDoc(item))
     .filter((item): item is InteractionRecallDoc => Boolean(item))
     .forEach((item) => {
@@ -221,15 +163,18 @@ export async function loadAllFromIndexedDb(): Promise<void> {
   ledgerCache.hydrated = true;
 }
 
+export async function openLedgerDatabase(): Promise<boolean> {
+  await ledgerStateStore.get(LEDGER_SNAPSHOT_KEY);
+  return true;
+}
+
+export async function loadAllFromIndexedDb(): Promise<void> {
+  const snapshot = await ledgerStateStore.getJson<PersistedLedgerSnapshot>(LEDGER_SNAPSHOT_KEY);
+  applyPersistedSnapshot(snapshot);
+}
+
 export async function ensureLedgerHydrated(): Promise<void> {
   if (ledgerCache.hydrated) return;
-  if (typeof localStorage !== 'undefined') {
-    try {
-      localStorage.removeItem(LEGACY_LOCAL_CHAT_SESSION_STORE_KEY);
-    } catch {
-      // ignore legacy cleanup errors
-    }
-  }
   if (hydratePromise) return hydratePromise;
   hydratePromise = loadAllFromIndexedDb().finally(() => {
     hydratePromise = null;
@@ -245,28 +190,92 @@ export function emitSessionUpdated(payload: { targetId: string; sessionId: strin
   }));
 }
 
-export async function persistMutation(mutation: LedgerMutation): Promise<void> {
-  const database = await openLedgerDatabase();
-  if (!database) return;
-  const storeNames = new Set<StoreName>();
-  Object.keys(mutation.puts || {}).forEach((key) => {
-    storeNames.add(key as StoreName);
-  });
-  Object.keys(mutation.deletes || {}).forEach((key) => {
-    storeNames.add(key as StoreName);
-  });
-  if (storeNames.size === 0) return;
-  const transaction = database.transaction([...storeNames], 'readwrite');
-  for (const storeName of storeNames) {
-    const store = transaction.objectStore(storeName);
-    const puts = mutation.puts?.[storeName] || [];
-    for (const row of puts) {
-      store.put(row);
+function applyMutationRows<T>(
+  target: Map<string, T>,
+  rows: unknown[] | undefined,
+  normalize: (value: unknown) => T | null,
+  keyOf: (value: T) => string,
+): void {
+  for (const row of rows || []) {
+    const normalized = normalize(row);
+    if (!normalized) {
+      continue;
     }
-    const deletes = mutation.deletes?.[storeName] || [];
-    for (const key of deletes) {
-      store.delete(key);
-    }
+    target.set(keyOf(normalized), normalized);
   }
-  await transactionDone(transaction);
+}
+
+function deleteMutationRows<T>(target: Map<string, T>, keys: string[] | undefined): void {
+  for (const key of keys || []) {
+    target.delete(String(key || '').trim());
+  }
+}
+
+export async function persistMutation(mutation: LedgerMutation): Promise<void> {
+  await ensureLedgerHydrated();
+  applyMutationRows(
+    ledgerCache.conversationsById,
+    mutation.puts?.[STORE_CONVERSATIONS],
+    normalizeConversationRecord,
+    (value) => value.id,
+  );
+  applyMutationRows(
+    ledgerCache.turnsById,
+    mutation.puts?.[STORE_TURNS],
+    normalizeTurnRecord,
+    (value) => value.id,
+  );
+  applyMutationRows(
+    ledgerCache.beatsById,
+    mutation.puts?.[STORE_BEATS],
+    normalizeBeatRecord,
+    (value) => value.id,
+  );
+  applyMutationRows(
+    ledgerCache.mediaAssetsById,
+    mutation.puts?.[STORE_MEDIA_ASSETS],
+    normalizeMediaAssetRecord,
+    (value) => value.id,
+  );
+  applyMutationRows(
+    ledgerCache.interactionSnapshotsByConversationId,
+    mutation.puts?.[STORE_INTERACTION_SNAPSHOTS],
+    normalizeInteractionSnapshot,
+    (value) => value.conversationId,
+  );
+  applyMutationRows(
+    ledgerCache.relationMemorySlotsById,
+    mutation.puts?.[STORE_RELATION_MEMORY_SLOTS],
+    normalizeRelationMemorySlot,
+    (value) => value.id,
+  );
+  applyMutationRows(
+    ledgerCache.recallIndexById,
+    mutation.puts?.[STORE_RECALL_INDEX],
+    normalizeInteractionRecallDoc,
+    (value) => value.id,
+  );
+
+  deleteMutationRows(ledgerCache.conversationsById, mutation.deletes?.[STORE_CONVERSATIONS]);
+  deleteMutationRows(ledgerCache.turnsById, mutation.deletes?.[STORE_TURNS]);
+  deleteMutationRows(ledgerCache.beatsById, mutation.deletes?.[STORE_BEATS]);
+  deleteMutationRows(ledgerCache.mediaAssetsById, mutation.deletes?.[STORE_MEDIA_ASSETS]);
+  deleteMutationRows(ledgerCache.interactionSnapshotsByConversationId, mutation.deletes?.[STORE_INTERACTION_SNAPSHOTS]);
+  deleteMutationRows(ledgerCache.relationMemorySlotsById, mutation.deletes?.[STORE_RELATION_MEMORY_SLOTS]);
+  deleteMutationRows(ledgerCache.recallIndexById, mutation.deletes?.[STORE_RECALL_INDEX]);
+
+  await persistLedgerSnapshot();
+}
+
+export async function clearLedgerPersistence(): Promise<void> {
+  ledgerCache = emptyLedgerCache();
+  await ledgerStateStore.delete(LEDGER_SNAPSHOT_KEY);
+}
+
+export async function transactionDone(): Promise<void> {
+  return;
+}
+
+export async function requestToPromise<T>(value: T): Promise<T> {
+  return value;
 }

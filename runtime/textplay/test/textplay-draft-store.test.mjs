@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { clearModSdkHost, setModSdkHost } from '../../../shared/testing/mod-sdk-host.js';
 import {
   buildTextplayDraftKey,
   buildTextplayDraftWorldScope,
@@ -8,6 +9,65 @@ import {
   loadTextplayDraft,
   saveTextplayDraft,
 } from '../src/draft-store.ts';
+
+function installRuntimeStorageHostMock() {
+  const storage = new Map();
+  setModSdkHost({
+    runtime: {
+      getRuntimeHookRuntime: () => ({
+        storage: {
+          files: {
+            readText: async () => {
+              throw new Error('UNEXPECTED_STORAGE_FILE_READ_TEXT');
+            },
+            writeText: async () => {
+              throw new Error('UNEXPECTED_STORAGE_FILE_WRITE_TEXT');
+            },
+            readBytes: async () => {
+              throw new Error('UNEXPECTED_STORAGE_FILE_READ_BYTES');
+            },
+            writeBytes: async () => {
+              throw new Error('UNEXPECTED_STORAGE_FILE_WRITE_BYTES');
+            },
+            delete: async () => false,
+            list: async () => [],
+            stat: async () => null,
+          },
+          sqlite: {
+            query: async (input) => {
+              const namespace = String(input.params?.[0] || '');
+              const key = String(input.params?.[1] || '');
+              const stored = storage.get(`${namespace}:${key}`);
+              return stored == null ? [] : [{ value: stored }];
+            },
+            execute: async (input) => {
+              const sql = String(input.sql || '').toLowerCase();
+              const namespace = String(input.params?.[0] || '');
+              const key = String(input.params?.[1] || '');
+              if (sql.includes('create table if not exists mod_state_kv')) {
+                return { rowsAffected: 0, lastInsertRowid: 0 };
+              }
+              if (sql.includes('insert into mod_state_kv')) {
+                storage.set(`${namespace}:${key}`, String(input.params?.[2] || ''));
+                return { rowsAffected: 1, lastInsertRowid: 0 };
+              }
+              if (sql.includes('delete from mod_state_kv') && sql.includes('where namespace = ?1 and key = ?2')) {
+                storage.delete(`${namespace}:${key}`);
+                return { rowsAffected: 1, lastInsertRowid: 0 };
+              }
+              throw new Error(`UNEXPECTED_STORAGE_SQL_EXECUTE:${input.sql}`);
+            },
+            transaction: async () => ({ rowsAffected: 0, lastInsertRowid: 0 }),
+          },
+        },
+      }),
+    },
+  });
+
+  return () => {
+    clearModSdkHost();
+  };
+}
 
 function createDraft(overrides = {}) {
   const userId = String(overrides.userId || 'user-1');
@@ -110,28 +170,33 @@ function createDraft(overrides = {}) {
 }
 
 test('draft-store saves, loads, lists by worldScope, and deletes drafts', async () => {
-  const draftA = createDraft({
-    storyId: 'story_01KXTEXTPLAYDRAFTA123456789',
-    updatedAt: '2026-03-02T10:00:00.000Z',
-  });
-  const draftB = createDraft({
-    storyId: 'story_01KXTEXTPLAYDRAFTB123456789',
-    sessionId: 'session_01KXTEXTPLAYDRAFTB123456789',
-    updatedAt: '2026-03-02T11:00:00.000Z',
-  });
+  const restore = installRuntimeStorageHostMock();
+  try {
+    const draftA = createDraft({
+      storyId: 'story_01KXTEXTPLAYDRAFTA123456789',
+      updatedAt: '2026-03-02T10:00:00.000Z',
+    });
+    const draftB = createDraft({
+      storyId: 'story_01KXTEXTPLAYDRAFTB123456789',
+      sessionId: 'session_01KXTEXTPLAYDRAFTB123456789',
+      updatedAt: '2026-03-02T11:00:00.000Z',
+    });
 
-  await saveTextplayDraft(draftA);
-  await saveTextplayDraft(draftB);
+    await saveTextplayDraft(draftA);
+    await saveTextplayDraft(draftB);
 
-  const loadedA = await loadTextplayDraft(draftA.key);
-  const drafts = await listTextplayDraftsByWorldScope(draftA.worldScope);
+    const loadedA = await loadTextplayDraft(draftA.key);
+    const drafts = await listTextplayDraftsByWorldScope(draftA.worldScope);
 
-  assert.equal(loadedA?.storyId, draftA.storyId);
-  assert.deepEqual(drafts.map((item) => item.storyId), [draftB.storyId, draftA.storyId]);
+    assert.equal(loadedA?.storyId, draftA.storyId);
+    assert.deepEqual(drafts.map((item) => item.storyId), [draftB.storyId, draftA.storyId]);
 
-  await deleteTextplayDraft(draftA.key);
-  await deleteTextplayDraft(draftB.key);
+    await deleteTextplayDraft(draftA.key);
+    await deleteTextplayDraft(draftB.key);
 
-  assert.equal(await loadTextplayDraft(draftA.key), null);
-  assert.deepEqual(await listTextplayDraftsByWorldScope(draftA.worldScope), []);
+    assert.equal(await loadTextplayDraft(draftA.key), null);
+    assert.deepEqual(await listTextplayDraftsByWorldScope(draftA.worldScope), []);
+  } finally {
+    restore();
+  }
 });

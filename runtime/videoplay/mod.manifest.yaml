@@ -18,6 +18,8 @@ capabilities:
   - runtime.route.list.options
   - runtime.route.resolve
   - runtime.route.check.health
+  - storage.sqlite.query
+  - storage.sqlite.execute
   - data.query.data-api.world.events.list
   - data.query.data-api.world.lorebooks.list
   - data.query.data-api.world.scenes.list

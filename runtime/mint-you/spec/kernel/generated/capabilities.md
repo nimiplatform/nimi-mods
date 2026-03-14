@@ -30,8 +30,11 @@ required_capabilities:
   - key: runtime.profile.read.agent
     purpose: Intercept agent profile reads to filter referenceImageUrl based on photo authorization state
     source_rule: MY-CAP-005
-  - key: data.store.mod-state
-    purpose: Persist intake session progress and photo authorization state
+  - key: storage.sqlite.query
+    purpose: Query host sqlite state for intake progress and photo authorization
+    source_rule: MY-CAP-002
+  - key: storage.sqlite.execute
+    purpose: Persist intake session progress and photo authorization state in host sqlite
     source_rule: MY-CAP-002
   - key: ui.register.ui-extension.app.sidebar.mods
     purpose: Sidebar navigation entry

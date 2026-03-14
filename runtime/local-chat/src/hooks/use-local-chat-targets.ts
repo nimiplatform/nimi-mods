@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LOCAL_CHAT_DATA_API_CHAT_TARGET_DETAIL, } from '../contracts.js';
+import { LOCAL_CHAT_DATA_API_CHAT_TARGET_DETAIL, LOCAL_CHAT_MOD_ID, } from '../contracts.js';
 import { CORE_DATA_API_FRIENDS_WITH_DETAILS_LIST, deriveLocalChatTargetsFromFriendsPayload, type LocalChatTarget, } from '../data/index.js';
 import { getLocalChatSessionUpdatedEventName, listLocalChatTargetPreviews, warmUpLedgerHydration, } from '../state/index.js';
-import { createRendererFlowId, logRendererEvent } from "@nimiplatform/sdk/mod";
+import { createModKvStore, createModStorageClient, createRendererFlowId, logRendererEvent } from "@nimiplatform/sdk/mod";
 type UseLocalChatTargetsInput = {
     hookClient: {
         data: {
@@ -21,29 +21,18 @@ type UseLocalChatTargetsInput = {
 };
 const LOCAL_PREVIEW_MAX_LENGTH = 96;
 const LOCAL_CHAT_LAST_TARGET_STORAGE_KEY = 'nimi.local-chat.last-target.v1';
-function readPersistedTargetId(viewerId: string): string {
-    if (typeof window === 'undefined' || !window.localStorage) {
-        return '';
-    }
-    try {
-        const raw = window.localStorage.getItem(`${LOCAL_CHAT_LAST_TARGET_STORAGE_KEY}:${viewerId}`);
-        return String(raw || '').trim();
-    }
-    catch {
-        return '';
-    }
-}
-function writePersistedTargetId(viewerId: string, targetId: string): void {
-    if (typeof window === 'undefined' || !window.localStorage) {
-        return;
-    }
+const targetStateStore = createModKvStore({
+    storage: createModStorageClient(LOCAL_CHAT_MOD_ID),
+    namespace: 'local-chat.targets',
+});
+async function writePersistedTargetId(viewerId: string, targetId: string): Promise<void> {
     const storageKey = `${LOCAL_CHAT_LAST_TARGET_STORAGE_KEY}:${viewerId}`;
     try {
         if (targetId) {
-            window.localStorage.setItem(storageKey, targetId);
+            await targetStateStore.set(storageKey, targetId);
             return;
         }
-        window.localStorage.removeItem(storageKey);
+        await targetStateStore.delete(storageKey);
     }
     catch {
         // Ignore storage write failures; selection still lives in memory.
@@ -137,7 +126,7 @@ export function useLocalChatTargets(input: UseLocalChatTargetsInput) {
         if (!targetId) {
             return;
         }
-        writePersistedTargetId(input.viewerId, targetId);
+        void writePersistedTargetId(input.viewerId, targetId);
     }, [input.viewerId, selectedTargetId]);
     const selectedTargetBase = useMemo(() => targets.find((target) => target.id === selectedTargetId) || null, [selectedTargetId, targets]);
     const selectedTarget = useMemo(() => {

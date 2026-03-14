@@ -14,7 +14,8 @@ export const MOD_CAPABILITIES = [
   'runtime.route.list.options',
   'runtime.route.resolve',
   'runtime.route.check.health',
-  'data.store.mod-state',
+  'storage.sqlite.query',
+  'storage.sqlite.execute',
   `ui.register.${NAV_SLOT}`,
   `ui.register.${ROUTE_SLOT}`,
 ] as const;

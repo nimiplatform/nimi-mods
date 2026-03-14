@@ -17,6 +17,10 @@ required_capabilities:
     source_rule: T-CAP-003
   - key: runtime.route.resolve
     source_rule: T-CAP-003
+  - key: storage.sqlite.query
+    source_rule: T-CAP-002
+  - key: storage.sqlite.execute
+    source_rule: T-CAP-002
   - key: data.query.data-api.world.worlds.mine
     source_rule: T-CAP-003
   - key: data.query.data-api.world.events.list

@@ -60,20 +60,19 @@ import {
 
 import {
   LOCAL_CHAT_SESSION_UPDATED_EVENT,
-  STORE_CONVERSATIONS,
-  STORE_TURNS,
   STORE_BEATS,
-  STORE_MEDIA_ASSETS,
+  STORE_CONVERSATIONS,
   STORE_INTERACTION_SNAPSHOTS,
-  STORE_RELATION_MEMORY_SLOTS,
+  STORE_MEDIA_ASSETS,
   STORE_RECALL_INDEX,
+  STORE_RELATION_MEMORY_SLOTS,
+  STORE_TURNS,
   getLedgerCache,
   resetLedgerCache,
+  clearLedgerPersistence,
   ensureLedgerHydrated,
   persistMutation,
   emitSessionUpdated,
-  openLedgerDatabase,
-  transactionDone,
 } from './ledger-db.js';
 
 import {
@@ -372,28 +371,7 @@ export function warmUpLedgerHydration(): void {
 
 export async function resetLocalChatConversationLedgerForTests(): Promise<void> {
   resetLedgerCache();
-  const database = await openLedgerDatabase();
-  if (!database) return;
-  const transaction = database.transaction(
-    [
-      STORE_CONVERSATIONS,
-      STORE_TURNS,
-      STORE_BEATS,
-      STORE_MEDIA_ASSETS,
-      STORE_INTERACTION_SNAPSHOTS,
-      STORE_RELATION_MEMORY_SLOTS,
-      STORE_RECALL_INDEX,
-    ],
-    'readwrite',
-  );
-  transaction.objectStore(STORE_CONVERSATIONS).clear();
-  transaction.objectStore(STORE_TURNS).clear();
-  transaction.objectStore(STORE_BEATS).clear();
-  transaction.objectStore(STORE_MEDIA_ASSETS).clear();
-  transaction.objectStore(STORE_INTERACTION_SNAPSHOTS).clear();
-  transaction.objectStore(STORE_RELATION_MEMORY_SLOTS).clear();
-  transaction.objectStore(STORE_RECALL_INDEX).clear();
-  await transactionDone(transaction);
+  await clearLedgerPersistence();
 }
 
 export async function listLocalChatSessions(targetId: string, viewerId?: string): Promise<LocalChatSession[]> {
