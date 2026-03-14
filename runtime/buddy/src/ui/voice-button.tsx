@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
+import { useModTranslation } from '@nimiplatform/sdk/mod';
 
 interface VoiceButtonProps {
   isRecording: boolean;

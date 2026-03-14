@@ -3,7 +3,7 @@ type BuddyLogLevel = 'debug' | 'info' | 'warn' | 'error';
 function isBuddyDebugEnabled(): boolean {
   try {
     return typeof window !== 'undefined'
-      && window.localStorage?.getItem('buddy.debug') === '1';
+      && new URLSearchParams(window.location.search).get('buddyDebug') === '1';
   } catch {
     return false;
   }

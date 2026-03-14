@@ -1,10 +1,10 @@
 import React from 'react';
-import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
 import type {
   RuntimeRouteBinding,
   RuntimeRouteOptionsSnapshot,
   RuntimeRouteSource,
-} from '@nimiplatform/sdk/mod/runtime-route';
+} from '@nimiplatform/sdk/mod';
+import { useModTranslation } from '@nimiplatform/sdk/mod';
 
 export interface RouteSelectorValue {
   label: string;

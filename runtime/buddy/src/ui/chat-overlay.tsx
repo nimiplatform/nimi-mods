@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
+import { useModTranslation } from '@nimiplatform/sdk/mod';
 import type { ChatMessage } from '../services/dialogue-engine.js';
 import { stripEmotionTags } from '../services/dialogue-engine.js';
 

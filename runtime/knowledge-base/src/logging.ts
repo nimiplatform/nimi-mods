@@ -1,11 +1,11 @@
 import { createRendererFlowId, logRendererEvent } from "@nimiplatform/sdk/mod";
-const KB_CONSOLE_DEBUG_KEY = 'nimi.kb.console.debug.v1';
 export function createKBFlowId(prefix: string): string {
     return createRendererFlowId(prefix.startsWith('kb') ? prefix : `kb-${prefix}`);
 }
 function isConsoleDebugEnabled(): boolean {
     try {
-        return localStorage.getItem(KB_CONSOLE_DEBUG_KEY) === '1';
+        return typeof window !== 'undefined'
+            && new URLSearchParams(window.location.search).get('kbDebug') === '1';
     }
     catch {
         return false;

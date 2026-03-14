@@ -1,15 +1,15 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { onRouteLifecycleChange } from '@nimiplatform/sdk/mod/lifecycle';
-import { createHookClient } from '@nimiplatform/sdk/mod/hook';
-import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
-import { logRendererEvent } from '@nimiplatform/sdk/mod/logging';
-import { createModRuntimeClient } from '@nimiplatform/sdk/mod/runtime';
-import type {
+import {
+  createHookClient,
+  createModRuntimeClient,
+  logRendererEvent,
   RuntimeCanonicalCapability,
   RuntimeRouteBinding,
   RuntimeRouteOptionsSnapshot,
   RuntimeRouteSource,
-} from '@nimiplatform/sdk/mod/runtime-route';
+  useModTranslation,
+} from '@nimiplatform/sdk/mod';
 import {
   MOD_ID,
   TAB_ID,

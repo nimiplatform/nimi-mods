@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useModTranslation } from '@nimiplatform/sdk/mod/i18n';
+import { useModTranslation } from '@nimiplatform/sdk/mod';
 import type { BuddyControllerState, BuddyControllerActions } from '../hooks/use-buddy-controller.js';
 import { Live2DCanvas } from './live2d-canvas.js';
 import { ChatOverlay } from './chat-overlay.js';
