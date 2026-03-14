@@ -1,7 +1,7 @@
 # World-Studio Domain Spec
 
 > Status: Draft
-> Date: 2026-03-02
+> Date: 2026-03-14
 > Scope: World-Studio business increments only.
 
 ## 0. Normative Imports
@@ -36,6 +36,11 @@
 - `WS-DOM-018`: Publish agent sync must normalize `dnaPrimary/dnaSecondary` into backend enum domain and omit non-enum values.
 - `WS-DOM-019`: Event graph, synthesize output, and event upsert payloads must preserve explicit `eventHorizon`; non-`FUTURE` `PRIMARY` events alone participate in evidence gating.
 - `WS-DOM-020`: World-Studio is the sole writer of canonical `WorldEvent.timelineSeq`; publish/sync must materialize temporal-order output into contiguous integer sequence values.
+- `WS-DOM-024`: Maintain information architecture is fixed to four domains (`World`, `Agents`, `Assets`, `Releases`); `World` sections are `Base`, `Worldview`, `WorldEvents`, `Lorebooks`.
+- `WS-DOM-025`: `world.rules` is not a world-base field; world rule editing belongs to `worldview.coreSystem.rules` in both synthesize output and maintenance editing.
+- `WS-DOM-026`: Agents V1 is metadata-first: creator-agent readable fields may be shown, metadata fields may be edited, and unsupported core persona editing must remain an explicit future capability.
+- `WS-DOM-027`: Assets V1 manages `World Assets` and `Agent Assets` through `media-bindings` hydration and batch-upsert, without redefining backend media contracts.
+- `WS-DOM-028`: Successful publish lands in `MAINTAIN` and defaults the editor context to `World > Base`.
 
 ## 3. No Over-Design Guard
 

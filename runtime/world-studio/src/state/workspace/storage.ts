@@ -9,7 +9,7 @@ import {
     safeParseObject,
 } from "@nimiplatform/sdk/mod";
 import { WORLD_STUDIO_MOD_ID } from '../../contracts.js';
-const STORAGE_PREFIX_V3 = 'nimi.world-studio.workspace.v3.';
+const STORAGE_PREFIX_V4 = 'nimi.world-studio.workspace.v4.';
 let workspaceSnapshotStore: ReturnType<typeof createModKvStore> | null = null;
 const lastPersistedSelectionStateByUser = new Map<string, {
     selectedCharacters: string[];
@@ -52,7 +52,7 @@ function computeSelectionDelta(before: string[], after: string[]): {
     };
 }
 function storageKeyForUser(userId: string): string {
-    return `${STORAGE_PREFIX_V3}${String(userId || '').trim()}`;
+    return `${STORAGE_PREFIX_V4}${String(userId || '').trim()}`;
 }
 export async function readSnapshotFromStorage(userId: string): Promise<WorldStudioWorkspaceSnapshot | null> {
     const normalizedUserId = String(userId || '').trim();

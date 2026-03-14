@@ -77,7 +77,7 @@ export async function syncEvents(context: WorldStudioMaintainActionContext, payl
             editorSnapshotVersion: String(data.editorSnapshotVersion || context.snapshot.editorSnapshotVersion || ''),
             unsavedChangesByPanel: {
                 ...context.snapshot.unsavedChangesByPanel,
-                events: false,
+                worldEvents: false,
             },
         });
         context.setStatusBanner({

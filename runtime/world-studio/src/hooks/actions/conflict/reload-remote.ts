@@ -25,11 +25,13 @@ export async function reloadRemoteForConflict(context: WorldStudioConflictAction
     const beforeSecondaryCount = context.snapshot.knowledgeGraph.events.secondary.length;
     const beforeLorebookCount = context.snapshot.lorebooksDraft.length;
     const beforeSnapshotVersion = context.snapshot.editorSnapshotVersion || '-';
-    const [maintenanceResult, eventsResult, lorebooksResult] = await Promise.all([
+    const [maintenanceResult, eventsResult, lorebooksResult, , creatorAgentsResult, mediaBindingsResult] = await Promise.all([
         context.queries.maintenanceQuery.refetch(),
         context.queries.eventsQuery.refetch(),
         context.queries.lorebooksQuery.refetch(),
         context.queries.mutationsQuery.refetch(),
+        context.queries.creatorAgentsQuery.refetch(),
+        context.queries.mediaBindingsQuery.refetch(),
     ]);
     const maintenancePayload = asRecord(maintenanceResult.data);
     const world = asRecord(maintenancePayload.world);
@@ -49,7 +51,22 @@ export async function reloadRemoteForConflict(context: WorldStudioConflictAction
     const lorebooksItems = Array.isArray(asRecord(lorebooksResult.data).items)
         ? (asRecord(lorebooksResult.data).items as unknown[])
         : [];
+    const creatorAgents = Array.isArray(creatorAgentsResult.data) ? (creatorAgentsResult.data as unknown[]) : [];
+    const worldOwnedAgents = creatorAgents
+        .filter((item) => String(asRecord(item).worldId || '').trim() === context.selectedWorldId)
+        .map((item) => asRecord(item));
+    const selectedAgentId = worldOwnedAgents.some((item) => String(item.id || '') === context.snapshot.panel.selectedAgentId)
+        ? context.snapshot.panel.selectedAgentId
+        : String(worldOwnedAgents[0]?.id || '');
     const resolvedSnapshotVersion = String(maintenancePayload.editorSnapshotVersion || world.updatedAt || '');
+    const hydrationKey = [
+        context.selectedWorldId,
+        resolvedSnapshotVersion,
+        String(eventItems.length),
+        String(lorebooksItems.length),
+        String(worldOwnedAgents.length),
+        String(Array.isArray(mediaBindingsResult.data) ? mediaBindingsResult.data.length : 0),
+    ].join(':');
     context.patchSnapshot({
         worldPatch: world,
         worldviewPatch: worldview,
@@ -66,18 +83,29 @@ export async function reloadRemoteForConflict(context: WorldStudioConflictAction
         },
         lorebooksDraft: lorebooksItems as WorldLorebookDraftRow[],
         editorSnapshotVersion: resolvedSnapshotVersion,
+        panel: {
+            ...context.snapshot.panel,
+            selectedAgentId,
+        },
         eventGraphLayout: {
             selectedEventId: String(primaryEvents[0]?.id || secondaryEvents[0]?.id || ''),
             expandedPrimaryIds: primaryEvents[0]?.id ? [String(primaryEvents[0].id)] : [],
         },
         unsavedChangesByPanel: {
-            world: false,
+            base: false,
             worldview: false,
-            events: false,
+            worldEvents: false,
             lorebooks: false,
+            agentRegistry: false,
+            agentEditor: false,
+            worldAssets: false,
+            agentAssets: false,
+            releaseDrafts: false,
+            releasePublish: false,
+            releaseHistory: false,
         },
     });
-    context.lastHydratedWorldIdRef.current = context.selectedWorldId;
+    context.lastHydratedWorldIdRef.current = hydrationKey;
     context.setError(null);
     const afterSnapshotVersion = resolvedSnapshotVersion || '-';
     const summary = formatConflictReloadSummary({

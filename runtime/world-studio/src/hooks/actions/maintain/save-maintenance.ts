@@ -43,7 +43,7 @@ export async function saveMaintenance(context: WorldStudioMaintainActionContext,
             editorSnapshotVersion: String(data.editorSnapshotVersion || context.snapshot.editorSnapshotVersion || ''),
             unsavedChangesByPanel: {
                 ...context.snapshot.unsavedChangesByPanel,
-                world: false,
+                base: false,
                 worldview: false,
             },
         });

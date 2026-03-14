@@ -117,6 +117,8 @@ export function useWorldStudioPageContent() {
             maintenanceQuery: { data: context.queries.maintenanceQuery.data },
             eventsQuery: { data: context.queries.eventsQuery.data },
             lorebooksQuery: { data: context.queries.lorebooksQuery.data },
+            creatorAgentsQuery: { data: context.queries.creatorAgentsQuery.data },
+            mediaBindingsQuery: { data: context.queries.mediaBindingsQuery.data },
         },
         setSourceMode: ui.setSourceMode,
         setFilePreviewText: ui.setFilePreviewText,
@@ -257,5 +259,5 @@ export function useWorldStudioPageContent() {
     const mainPanel = screenModel.workflow.landingTarget === 'CREATE'
         ? (<CreateWorkbench workflow={screenModel.workflow} main={screenModel.main} routing={screenModel.routing} status={screenModel.status} actions={screenModel.actions}/>)
         : (<MaintainWorkbench layout={screenModel.layout} workflow={screenModel.workflow} main={screenModel.main} status={screenModel.status} actions={screenModel.actions}/>);
-    return (<WorldStudioShell title={screenModel.layout.title} subtitle={screenModel.layout.subtitle} currentObjectLabel={screenModel.layout.currentObjectLabel} isDirty={screenModel.layout.dirtySummary.hasDirty} dirtyLabel={screenModel.layout.dirtySummary.shortLabel} settingsDrawerOpen={screenModel.layout.settingsDrawerOpen} onToggleSettingsDrawer={screenModel.layout.toggleSettingsDrawer} onCloseSettingsDrawer={() => screenModel.layout.setSettingsDrawerOpen(false)} taskStrip={<TaskProgressStrip status={screenModel.status} onPauseTask={screenModel.actions.task.pauseTask} onResumeTask={screenModel.actions.task.resumeTask} onCancelTask={screenModel.actions.task.cancelTask}/>} mainPanel={mainPanel} workflowSidebar={<WorkflowDrawer workflow={screenModel.workflow} actions={screenModel.actions}/>} settingsDrawer={<SettingsDrawer routing={screenModel.routing} actions={screenModel.actions}/>}/>);
+    return (<WorldStudioShell title={screenModel.layout.title} subtitle={screenModel.layout.subtitle} currentObjectLabel={screenModel.layout.currentObjectLabel} isDirty={screenModel.layout.dirtySummary.hasDirty} dirtyLabel={screenModel.layout.dirtySummary.shortLabel} settingsDrawerOpen={screenModel.layout.settingsDrawerOpen} onToggleSettingsDrawer={screenModel.layout.toggleSettingsDrawer} onCloseSettingsDrawer={() => screenModel.layout.setSettingsDrawerOpen(false)} taskStrip={<TaskProgressStrip status={screenModel.status} onPauseTask={screenModel.actions.task.pauseTask} onResumeTask={screenModel.actions.task.resumeTask} onCancelTask={screenModel.actions.task.cancelTask}/>} mainPanel={mainPanel} workflowSidebar={<WorkflowDrawer layout={screenModel.layout} workflow={screenModel.workflow} main={screenModel.main} routing={screenModel.routing} status={screenModel.status} actions={screenModel.actions}/>} settingsDrawer={<SettingsDrawer routing={screenModel.routing} actions={screenModel.actions}/>}/>);
 }

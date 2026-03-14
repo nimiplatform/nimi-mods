@@ -514,18 +514,31 @@ export function recoverTaskStateAfterReload(taskState: WorldStudioTaskState): Wo
 }
 export function syncSnapshot(snapshot: WorldStudioWorkspaceSnapshot): WorldStudioWorkspaceSnapshot {
     const panelInput = asRecord(snapshot.panel);
-    const activeMaintainTabRaw = String(panelInput.activeMaintainTab || 'WORLD').toUpperCase();
-    const activeMaintainTab = (activeMaintainTabRaw === 'WORLD'
-        || activeMaintainTabRaw === 'WORLDVIEW'
-        || activeMaintainTabRaw === 'EVENTS'
-        || activeMaintainTabRaw === 'LOREBOOKS')
-        ? activeMaintainTabRaw as WorldStudioWorkspaceSnapshot['panel']['activeMaintainTab']
+    const activeDomainRaw = String(panelInput.activeDomain || 'WORLD').toUpperCase();
+    const activeDomain = (activeDomainRaw === 'WORLD'
+        || activeDomainRaw === 'AGENTS'
+        || activeDomainRaw === 'ASSETS'
+        || activeDomainRaw === 'RELEASES')
+        ? activeDomainRaw as WorldStudioWorkspaceSnapshot['panel']['activeDomain']
         : 'WORLD';
+    const validSectionsByDomain: Record<WorldStudioWorkspaceSnapshot['panel']['activeDomain'], WorldStudioWorkspaceSnapshot['panel']['activeSection'][]> = {
+        WORLD: ['BASE', 'WORLDVIEW', 'WORLD_EVENTS', 'LOREBOOKS'],
+        AGENTS: ['REGISTRY', 'EDITOR'],
+        ASSETS: ['WORLD_ASSETS', 'AGENT_ASSETS'],
+        RELEASES: ['DRAFTS', 'PUBLISH', 'HISTORY'],
+    };
+    const fallbackSection: WorldStudioWorkspaceSnapshot['panel']['activeSection'] = validSectionsByDomain[activeDomain][0] || 'BASE';
+    const activeSectionRaw = String(panelInput.activeSection || fallbackSection).toUpperCase();
+    const activeSection = validSectionsByDomain[activeDomain].includes(activeSectionRaw as WorldStudioWorkspaceSnapshot['panel']['activeSection'])
+        ? activeSectionRaw as WorldStudioWorkspaceSnapshot['panel']['activeSection']
+        : fallbackSection;
     const panel: WorldStudioWorkspaceSnapshot['panel'] = {
         searchText: String(panelInput.searchText || ''),
         selectedWorldId: String(panelInput.selectedWorldId || ''),
         selectedDraftId: String(panelInput.selectedDraftId || ''),
-        activeMaintainTab,
+        activeDomain,
+        activeSection,
+        selectedAgentId: String(panelInput.selectedAgentId || ''),
     };
     const worldPatch = asRecord(snapshot.worldPatch);
     const worldviewPatch = asRecord(snapshot.worldviewPatch);
@@ -553,6 +566,19 @@ export function syncSnapshot(snapshot: WorldStudioWorkspaceSnapshot): WorldStudi
     }, {} as Record<string, WorldStudioAgentDraft>);
     const embeddingIndex = normalizeEmbeddingIndex(snapshot.embeddingIndex || {});
     const finalDraftAccumulator = normalizeFinalDraftAccumulator(snapshot.finalDraftAccumulator || {});
+    const unsavedChangesByPanel = {
+        base: Boolean(snapshot.unsavedChangesByPanel?.base),
+        worldview: Boolean(snapshot.unsavedChangesByPanel?.worldview),
+        worldEvents: Boolean(snapshot.unsavedChangesByPanel?.worldEvents),
+        lorebooks: Boolean(snapshot.unsavedChangesByPanel?.lorebooks),
+        agentRegistry: Boolean(snapshot.unsavedChangesByPanel?.agentRegistry),
+        agentEditor: Boolean(snapshot.unsavedChangesByPanel?.agentEditor),
+        worldAssets: Boolean(snapshot.unsavedChangesByPanel?.worldAssets),
+        agentAssets: Boolean(snapshot.unsavedChangesByPanel?.agentAssets),
+        releaseDrafts: Boolean(snapshot.unsavedChangesByPanel?.releaseDrafts),
+        releasePublish: Boolean(snapshot.unsavedChangesByPanel?.releasePublish),
+        releaseHistory: Boolean(snapshot.unsavedChangesByPanel?.releaseHistory),
+    };
     return {
         ...snapshot,
         panel,
@@ -573,5 +599,6 @@ export function syncSnapshot(snapshot: WorldStudioWorkspaceSnapshot): WorldStudi
             draftsByCharacter,
         },
         embeddingIndex,
+        unsavedChangesByPanel,
     };
 }

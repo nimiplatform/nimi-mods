@@ -99,6 +99,26 @@ cases:
     required_fields:
       - timelineSeq
     source_rule: WS-ACC-002
+  - id: WS-017-MAINTAIN-FOUR-DOMAIN-NAVIGATION
+    description: Maintain mode exposes World or Agents or Assets or Releases navigation and defaults published drafts to World Base.
+    expected_ok: true
+    source_rule: WS-ACC-002
+  - id: WS-018-WORLD-RULES-MOVED-TO-WORLDVIEW
+    description: World base editor must not write world.rules; rule editing belongs to worldview.coreSystem.rules.
+    expected_ok: true
+    source_rule: WS-ACC-002
+  - id: WS-019-CHECKPOINTS-PHASE1-OVERVIEW
+    description: Checkpoints panel includes collapsible phase1 overview covering extraction metrics, quality gate, narrative arc, character profiles, and expert diagnostics.
+    expected_ok: true
+    source_rule: WS-ACC-002
+  - id: WS-020-AGENTS-V1-METADATA-ONLY-EDITING
+    description: Agents editor renders readable creator-agent fields, allows metadata edits only, and surfaces core persona editing as a future capability notice.
+    expected_ok: true
+    source_rule: WS-ACC-002
+  - id: WS-021-ASSETS-V1-MEDIA-BINDINGS-ROUNDTRIP
+    description: Assets V1 hydrates world and agent media bindings into maintain state, refreshes them, and writes updates back via media-bindings batch upsert.
+    expected_ok: true
+    source_rule: WS-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:world-studio-kernel-docs
     source_rule: WS-ACC-003

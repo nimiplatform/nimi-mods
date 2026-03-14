@@ -366,6 +366,23 @@ export async function runCreatePhase2(input: WorldStudioCreateActionsInput, opti
             })),
         });
         input.setPhase2(result);
+        const normalizedWorld = {
+            ...asRecord(result.world),
+        };
+        const normalizedWorldview = {
+            ...asRecord(result.worldview),
+        };
+        const legacyWorldRules = asRecord(normalizedWorld.rules);
+        if (Object.keys(legacyWorldRules).length > 0) {
+            const currentCoreSystem = asRecord(normalizedWorldview.coreSystem);
+            normalizedWorldview.coreSystem = {
+                ...currentCoreSystem,
+                rules: Object.keys(asRecord(currentCoreSystem.rules)).length > 0
+                    ? currentCoreSystem.rules
+                    : legacyWorldRules,
+            };
+            delete normalizedWorld.rules;
+        }
         // Phase 2 worldEvents are discarded — Phase 1 extraction is the source of truth for events.
         // Phase 2 LLM tends to compress/lose events, so we preserve Phase 1 results.
         const draftsByCharacter = (result.agentDrafts || []).reduce((acc, item) => {
@@ -434,8 +451,8 @@ export async function runCreatePhase2(input: WorldStudioCreateActionsInput, opti
             // Ignore diagnostics sink failures in non-runtime environments (tests, headless execution).
         }
         input.patchSnapshot({
-            worldPatch: asRecord(result.world),
-            worldviewPatch: asRecord(result.worldview),
+            worldPatch: normalizedWorld,
+            worldviewPatch: normalizedWorldview,
             // eventsDraft: preserved from Phase 1 — not overwritten by Phase 2
             lorebooksDraft: Array.isArray(result.worldLorebooks)
                 ? result.worldLorebooks.filter((item) => item && typeof item === 'object') as WorldLorebookDraftRow[]
@@ -448,10 +465,17 @@ export async function runCreatePhase2(input: WorldStudioCreateActionsInput, opti
             },
             finalDraftAccumulator: result.finalDraftAccumulator || input.snapshot.finalDraftAccumulator,
             unsavedChangesByPanel: {
-                world: true,
+                base: true,
                 worldview: true,
-                events: true,
+                worldEvents: true,
                 lorebooks: true,
+                agentRegistry: false,
+                agentEditor: false,
+                worldAssets: false,
+                agentAssets: false,
+                releaseDrafts: false,
+                releasePublish: false,
+                releaseHistory: false,
             },
             parseJob: {
                 phase: 'done',

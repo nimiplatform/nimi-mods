@@ -141,7 +141,7 @@ export function useWorldStudioWorkspaceControllerActions(input: UseWorldStudioWo
             },
             unsavedChangesByPanel: {
                 ...input.snapshot.unsavedChangesByPanel,
-                events: true,
+                worldEvents: true,
             },
         });
         input.setError(null);

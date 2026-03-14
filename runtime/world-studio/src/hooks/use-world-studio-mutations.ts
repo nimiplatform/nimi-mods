@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { batchUpsertWorldMediaBindings, batchCreateCreatorAgents, batchUpsertWorldEvents, batchUpsertWorldLorebooks, createWorldDraft, deleteWorldEvent, deleteWorldLorebook, publishWorldDraft, updateWorldDraft, updateWorldMaintenance, } from '../data.js';
+import { batchUpsertWorldMediaBindings, batchCreateCreatorAgents, batchUpsertWorldEvents, batchUpsertWorldLorebooks, createCreatorAgent, createWorldDraft, deleteWorldEvent, deleteWorldLorebook, publishWorldDraft, updateCreatorAgent, updateWorldDraft, updateWorldMaintenance, } from '../data.js';
 import { type HookClient } from "@nimiplatform/sdk/mod";
 type SaveDraftInput = {
     draftId?: string;
@@ -104,6 +104,15 @@ export function useWorldStudioMutations(hookClient: HookClient) {
             continueOnError: input.continueOnError !== false,
         })),
     });
+    const createCreatorAgentMutation = useMutation({
+        mutationFn: async (input: Record<string, unknown>) => (await createCreatorAgent(hookClient, input)),
+    });
+    const updateCreatorAgentMutation = useMutation({
+        mutationFn: async (input: {
+            agentId: string;
+            patch: Record<string, unknown>;
+        }) => (await updateCreatorAgent(hookClient, input.agentId, input.patch)),
+    });
     return {
         saveDraftMutation,
         publishDraftMutation,
@@ -114,5 +123,7 @@ export function useWorldStudioMutations(hookClient: HookClient) {
         deleteLorebookMutation,
         deleteEventMutation,
         batchCreateCreatorAgentsMutation,
+        createCreatorAgentMutation,
+        updateCreatorAgentMutation,
     };
 }

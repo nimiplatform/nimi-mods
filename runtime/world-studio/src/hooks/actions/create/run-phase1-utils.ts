@@ -268,7 +268,7 @@ export function applyPhase1ResultSnapshot(input: WorldStudioCreateActionsInput, 
         },
         unsavedChangesByPanel: {
             ...input.snapshot.unsavedChangesByPanel,
-            events: true,
+            worldEvents: true,
         },
         parseJob: {
             phase: params.parsePhase,

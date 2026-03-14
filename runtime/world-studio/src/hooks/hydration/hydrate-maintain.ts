@@ -15,6 +15,12 @@ export type WorldStudioMaintainHydrationInput = {
         lorebooksQuery: {
             data: unknown;
         };
+        creatorAgentsQuery: {
+            data: unknown;
+        };
+        mediaBindingsQuery: {
+            data: unknown;
+        };
     };
     lastHydratedWorldIdRef: {
         current: string;
@@ -37,13 +43,30 @@ export function useWorldStudioMaintainHydration(input: WorldStudioMaintainHydrat
         const lorebooksPayload = asRecord(input.queries.lorebooksQuery.data);
         if (!Array.isArray(lorebooksPayload.items))
             return;
+        if (!Array.isArray(input.queries.creatorAgentsQuery.data))
+            return;
+        if (!Array.isArray(input.queries.mediaBindingsQuery.data))
+            return;
         const eventItems = input.queries.eventsQuery.data as unknown[];
         const lorebooksItems = lorebooksPayload.items as unknown[];
+        const creatorAgents = input.queries.creatorAgentsQuery.data as unknown[];
+        const mediaBindings = input.queries.mediaBindingsQuery.data as unknown[];
+        const worldOwnedAgents = creatorAgents
+            .filter((item) => {
+            const record = asRecord(item);
+            return String(record.worldId || '').trim() === input.selectedWorldId;
+        })
+            .map((item) => asRecord(item));
+        const selectedAgentId = worldOwnedAgents.some((item) => String(item.id || '') === input.snapshot.panel.selectedAgentId)
+            ? input.snapshot.panel.selectedAgentId
+            : String(worldOwnedAgents[0]?.id || '');
         const hydrationKey = [
             input.selectedWorldId,
             String(maintenancePayload.editorSnapshotVersion || ''),
             String(eventItems.length),
             String(lorebooksItems.length),
+            String(worldOwnedAgents.length),
+            String(mediaBindings.length),
         ].join(':');
         if (hydrationKey === input.lastHydratedWorldIdRef.current)
             return;
@@ -71,15 +94,26 @@ export function useWorldStudioMaintainHydration(input: WorldStudioMaintainHydrat
             },
             lorebooksDraft: lorebooksItems as WorldLorebookDraftRow[],
             editorSnapshotVersion: String(maintenancePayload.editorSnapshotVersion || ''),
+            panel: {
+                ...input.snapshot.panel,
+                selectedAgentId,
+            },
             eventGraphLayout: {
                 selectedEventId: String(primaryEvents[0]?.id || secondaryEvents[0]?.id || ''),
                 expandedPrimaryIds: primaryEvents[0]?.id ? [String(primaryEvents[0].id)] : [],
             },
             unsavedChangesByPanel: {
-                world: false,
+                base: false,
                 worldview: false,
-                events: false,
+                worldEvents: false,
                 lorebooks: false,
+                agentRegistry: false,
+                agentEditor: false,
+                worldAssets: false,
+                agentAssets: false,
+                releaseDrafts: false,
+                releasePublish: false,
+                releaseHistory: false,
             },
         });
         input.lastHydratedWorldIdRef.current = hydrationKey;
@@ -88,8 +122,11 @@ export function useWorldStudioMaintainHydration(input: WorldStudioMaintainHydrat
         input.patchSnapshot,
         input.queries.eventsQuery.data,
         input.queries.lorebooksQuery.data,
+        input.queries.creatorAgentsQuery.data,
+        input.queries.mediaBindingsQuery.data,
         input.queries.maintenanceQuery.data,
         input.selectedWorldId,
         input.snapshot.knowledgeGraph,
+        input.snapshot.panel,
     ]);
 }

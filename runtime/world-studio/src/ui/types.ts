@@ -69,6 +69,43 @@ export type WorldEventSummary = {
   updatedAt: string;
 };
 
+export type WorldStudioCreatorAgentSummary = {
+  id: string;
+  handle: string;
+  displayName: string;
+  avatarUrl: string | null;
+  bio: string | null;
+  tags: string[];
+  category: string | null;
+  contentRating: string | null;
+  webhookUrl: string | null;
+  capabilities: Record<string, unknown>;
+  ownershipType: string | null;
+  state: string | null;
+  worldId: string | null;
+  ownerWorldId: string | null;
+  dna: Record<string, unknown> | null;
+};
+
+export type WorldStudioMediaBindingSummary = {
+  id: string;
+  targetType: string;
+  targetId: string;
+  slot: string;
+  priority: number;
+  conditions: Record<string, unknown> | null;
+  tags: string[];
+  asset: {
+    id: string | null;
+    mediaType: string | null;
+    storageRef: string | null;
+    label: string | null;
+    provenance: string | null;
+    sourceRef: string | null;
+    tags: string[];
+  };
+};
+
 export type CreateResultState = {
   phase1: Phase1Result | null;
   phase2: Phase2Result | null;

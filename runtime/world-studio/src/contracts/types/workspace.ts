@@ -26,6 +26,31 @@ export type WorldStudioCreateStep =
   | 'DRAFT'
   | 'PUBLISH';
 
+export type WorldStudioMaintainDomain = 'WORLD' | 'AGENTS' | 'ASSETS' | 'RELEASES';
+export type WorldStudioWorldSection = 'BASE' | 'WORLDVIEW' | 'WORLD_EVENTS' | 'LOREBOOKS';
+export type WorldStudioAgentsSection = 'REGISTRY' | 'EDITOR';
+export type WorldStudioAssetsSection = 'WORLD_ASSETS' | 'AGENT_ASSETS';
+export type WorldStudioReleasesSection = 'DRAFTS' | 'PUBLISH' | 'HISTORY';
+export type WorldStudioMaintainSection =
+  | WorldStudioWorldSection
+  | WorldStudioAgentsSection
+  | WorldStudioAssetsSection
+  | WorldStudioReleasesSection;
+
+export type WorldStudioDirtySectionState = {
+  base: boolean;
+  worldview: boolean;
+  worldEvents: boolean;
+  lorebooks: boolean;
+  agentRegistry: boolean;
+  agentEditor: boolean;
+  worldAssets: boolean;
+  agentAssets: boolean;
+  releaseDrafts: boolean;
+  releasePublish: boolean;
+  releaseHistory: boolean;
+};
+
 export type WorldStudioTaskKind =
   | 'CREATE_PHASE1'
   | 'CREATE_PHASE2'
@@ -111,7 +136,9 @@ export type WorldStudioPanelState = {
   searchText: string;
   selectedWorldId: string;
   selectedDraftId: string;
-  activeMaintainTab: 'WORLD' | 'WORLDVIEW' | 'EVENTS' | 'LOREBOOKS';
+  activeDomain: WorldStudioMaintainDomain;
+  activeSection: WorldStudioMaintainSection;
+  selectedAgentId: string;
 };
 
 export type WorldStudioWorkspaceSnapshot = {
@@ -146,12 +173,7 @@ export type WorldStudioWorkspaceSnapshot = {
   embeddingIndex: WorldStudioEmbeddingIndex;
   taskState: WorldStudioTaskState;
   editorSnapshotVersion: string;
-  unsavedChangesByPanel: {
-    world: boolean;
-    worldview: boolean;
-    events: boolean;
-    lorebooks: boolean;
-  };
+  unsavedChangesByPanel: WorldStudioDirtySectionState;
 };
 
 type DeepPartial<T> = {

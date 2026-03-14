@@ -3,6 +3,10 @@ import { WorldBasePanel } from './world-base-panel.js';
 import { WorldviewPanel } from './worldview-panel.js';
 import { EventsPanel } from './events-panel.js';
 import { LorebooksPanel } from './lorebooks-panel.js';
+import { AgentsRegistryPanel, AgentEditorPanel } from './agents-panel.js';
+import { WorldAssetsPanel, AgentAssetsPanel } from './assets-panel.js';
+import { ReleaseDraftsPanel, ReleaseHistoryPanel, ReleasePublishPanel } from './releases-panel.js';
+import { SectionNav } from './section-nav.js';
 import { StickyActionBar } from '../sticky-action-bar.js';
 import type {
   WorldStudioActionsSlice,
@@ -11,6 +15,7 @@ import type {
   WorldStudioStatusSlice,
   WorldStudioWorkflowSlice,
 } from '../../controllers/world-studio-screen-model.js';
+import { worldStudioMessage } from '../../i18n/messages.js';
 import { useModTranslation } from "@nimiplatform/sdk/mod";
 
 type MaintainWorkbenchProps = {
@@ -138,102 +143,300 @@ function MaintainObjectHeader(props: MaintainWorkbenchProps): React.ReactElement
   );
 }
 
-export function MaintainWorkbench(props: MaintainWorkbenchProps) {
-  const section = props.workflow.maintainSection;
-  const { t } = useModTranslation('world-studio');
-
-  return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="min-h-0 flex-1 overflow-auto px-5 py-5">
-        <div className="space-y-4">
-          <MaintainObjectHeader {...props} />
-          <ConflictBanner status={props.status} actions={props.actions.maintain} working={props.main.working} />
-
-          <section className="rounded-[24px] border border-white/80 bg-white/82 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-              {t('maintain.currentSection', 'Current section')}
-            </p>
-            <p className="mt-2 text-lg font-semibold text-slate-900">{section}</p>
-          </section>
-
-          {section === 'WORLD' ? (
-            <WorldBasePanel
-              worldPatch={props.main.snapshot.worldPatch}
-              onWorldPatchChange={props.actions.maintain.onWorldPatchChange}
-            />
-          ) : null}
-
-          {section === 'WORLDVIEW' ? (
-            <WorldviewPanel
-              worldviewPatch={props.main.snapshot.worldviewPatch}
-              onWorldviewPatchChange={props.actions.maintain.onWorldviewPatchChange}
-            />
-          ) : null}
-
-          {section === 'EVENTS' ? (
-            <EventsPanel
-              events={props.main.eventsGraph}
-              syncMode={props.main.eventSyncMode}
-              editorSnapshotVersion={props.status.maintenanceEditorSnapshotVersion}
-              eventGraphLayout={props.main.snapshot.eventGraphLayout}
-              working={props.main.working}
-              onEventsChange={props.actions.maintain.onEventsChange}
-              onEventGraphLayoutChange={props.actions.maintain.onEventGraphLayoutChange}
-              onSyncModeChange={props.actions.maintain.onEventSyncModeChange}
-              onSyncEvents={() => {
-                void props.actions.maintain.syncEvents();
-              }}
-              onDeleteFirstEvent={() => undefined}
-              showActions={false}
-            />
-          ) : null}
-
-          {section === 'LOREBOOKS' ? (
-            <LorebooksPanel
-              lorebooksDraft={props.main.snapshot.lorebooksDraft}
-              working={props.main.working}
-              onLorebooksChange={props.actions.maintain.onLorebooksChange}
-              onSyncLorebooks={() => {
-                void props.actions.maintain.syncLorebooks();
-              }}
-              onDeleteFirstLorebook={() => undefined}
-              showActions={false}
-            />
-          ) : null}
-        </div>
-      </div>
-
-      <StickyActionBar>
+function renderContextualActionBar(props: MaintainWorkbenchProps): React.ReactElement {
+  const section = props.workflow.activeSection;
+  const disabled = props.main.working || !props.workflow.selectedWorldId;
+  if (section === 'BASE' || section === 'WORLDVIEW') {
+    return (
+      <button
+        type="button"
+        className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+        onClick={() => {
+          void props.actions.maintain.saveMaintenance();
+        }}
+        disabled={disabled}
+      >
+        {worldStudioMessage('maintain.save', 'Save')}
+      </button>
+    );
+  }
+  if (section === 'EDITOR') {
+    return (
+      <button
+        type="submit"
+        form="world-studio-agent-editor-form"
+        className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+        disabled={props.main.working || !props.workflow.selectedAgentId}
+      >
+        {worldStudioMessage('maintain.saveAgentMetadata', 'Save Agent Metadata')}
+      </button>
+    );
+  }
+  if (section === 'WORLD_EVENTS') {
+    return (
+      <>
         <button
           type="button"
           className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
           onClick={() => {
-            void props.actions.maintain.saveMaintenance();
+            void props.actions.maintain.syncEvents();
           }}
-          disabled={props.main.working || !props.workflow.selectedWorldId}
+          disabled={disabled}
         >
-          {t('maintain.save', 'Save')}
+          {worldStudioMessage('maintain.syncEvents', 'Sync Events')}
         </button>
         <button
           type="button"
           className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 disabled:opacity-60"
           onClick={() => {
-            void props.actions.maintain.syncEvents();
+            void props.actions.maintain.deleteFirstEvent();
           }}
-          disabled={props.main.working || !props.workflow.selectedWorldId}
+          disabled={disabled}
         >
-          {t('maintain.syncEvents', 'Sync Events')}
+          {worldStudioMessage('maintain.deleteFirstEvent', 'Delete First Event')}
         </button>
+      </>
+    );
+  }
+  if (section === 'LOREBOOKS') {
+    return (
+      <>
         <button
           type="button"
-          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 disabled:opacity-60"
+          className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
           onClick={() => {
             void props.actions.maintain.syncLorebooks();
           }}
-          disabled={props.main.working || !props.workflow.selectedWorldId}
+          disabled={disabled}
         >
-          {t('maintain.syncLorebooks', 'Sync Lorebooks')}
+          {worldStudioMessage('maintain.syncLorebooks', 'Sync Lorebooks')}
         </button>
+        <button
+          type="button"
+          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 disabled:opacity-60"
+          onClick={() => {
+            void props.actions.maintain.deleteFirstLorebook();
+          }}
+          disabled={disabled}
+        >
+          {worldStudioMessage('maintain.deleteFirstLorebook', 'Delete First Lorebook')}
+        </button>
+      </>
+    );
+  }
+  if (section === 'REGISTRY') {
+    return (
+      <>
+        <button
+          type="button"
+          className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+          onClick={() => {
+            void props.actions.maintain.createAgentsFromDrafts();
+          }}
+          disabled={disabled}
+        >
+          {worldStudioMessage('maintain.createMissingDraftAgents', 'Create Missing Draft Agents')}
+        </button>
+      </>
+    );
+  }
+  if (section === 'WORLD_ASSETS' || section === 'AGENT_ASSETS') {
+    return (
+      <>
+        <button
+          type="button"
+          className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+          onClick={() => {
+            void props.actions.maintain.syncMediaBindings(section);
+          }}
+          disabled={disabled}
+        >
+          {section === 'WORLD_ASSETS'
+            ? worldStudioMessage('maintain.syncWorldAssets', 'Sync World Assets')
+            : worldStudioMessage('maintain.syncAgentAssets', 'Sync Agent Assets')}
+        </button>
+      </>
+    );
+  }
+  if (section === 'DRAFTS') {
+    return (
+      <>
+        <button
+          type="button"
+          className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white"
+          onClick={() => props.actions.workflow.openCreate(null)}
+        >
+          {worldStudioMessage('releases.drafts.newDraft', 'New Draft')}
+        </button>
+      </>
+    );
+  }
+  if (section === 'PUBLISH') {
+    return (
+      <>
+        <button
+          type="button"
+          className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white"
+          onClick={() => props.actions.workflow.openCreate(props.workflow.selectedDraftId || null)}
+        >
+          {worldStudioMessage('releases.publish.openFlow', 'Open Publish Flow')}
+        </button>
+      </>
+    );
+  }
+  return <></>;
+}
+
+function renderMaintainSection(props: MaintainWorkbenchProps): React.ReactElement | null {
+  const section = props.workflow.activeSection;
+  if (section === 'BASE') {
+    return (
+      <WorldBasePanel
+        worldPatch={props.main.snapshot.worldPatch}
+        onWorldPatchChange={props.actions.maintain.onWorldPatchChange}
+      />
+    );
+  }
+  if (section === 'WORLDVIEW') {
+    return (
+      <WorldviewPanel
+        worldviewPatch={props.main.snapshot.worldviewPatch}
+        onWorldviewPatchChange={props.actions.maintain.onWorldviewPatchChange}
+      />
+    );
+  }
+  if (section === 'WORLD_EVENTS') {
+    return (
+      <EventsPanel
+        events={props.main.eventsGraph}
+        syncMode={props.main.eventSyncMode}
+        editorSnapshotVersion={props.status.maintenanceEditorSnapshotVersion}
+        eventGraphLayout={props.main.snapshot.eventGraphLayout}
+        working={props.main.working}
+        onEventsChange={props.actions.maintain.onEventsChange}
+        onEventGraphLayoutChange={props.actions.maintain.onEventGraphLayoutChange}
+        onSyncModeChange={props.actions.maintain.onEventSyncModeChange}
+        onSyncEvents={() => {
+          void props.actions.maintain.syncEvents();
+        }}
+        onDeleteFirstEvent={() => {
+          void props.actions.maintain.deleteFirstEvent();
+        }}
+        showActions
+      />
+    );
+  }
+  if (section === 'LOREBOOKS') {
+    return (
+      <LorebooksPanel
+        lorebooksDraft={props.main.snapshot.lorebooksDraft}
+        working={props.main.working}
+        onLorebooksChange={props.actions.maintain.onLorebooksChange}
+        onSyncLorebooks={() => {
+          void props.actions.maintain.syncLorebooks();
+        }}
+        onDeleteFirstLorebook={() => {
+          void props.actions.maintain.deleteFirstLorebook();
+        }}
+        showActions
+      />
+    );
+  }
+  if (section === 'REGISTRY') {
+    const draftCharacterNames = Array.from(new Set([
+      ...props.main.snapshot.selectedCharacters,
+      ...props.main.snapshot.agentSync.selectedCharacterIds,
+      ...Object.keys(props.main.snapshot.agentSync.draftsByCharacter || {}),
+    ]));
+    const currentWorld = props.workflow.worlds.find((world) => world.id === props.workflow.selectedWorldId) || null;
+    return (
+      <AgentsRegistryPanel
+        world={currentWorld}
+        creatorAgents={props.main.creatorAgents}
+        selectedAgentId={props.workflow.selectedAgentId}
+        draftCharacterNames={draftCharacterNames}
+        draftsByCharacter={props.main.snapshot.agentSync.draftsByCharacter}
+        onSelectAgent={props.actions.workflow.selectMaintainAgent}
+        onCreateAgentsFromDrafts={(characterNames) => {
+          void props.actions.maintain.createAgentsFromDrafts(characterNames);
+        }}
+      />
+    );
+  }
+  if (section === 'EDITOR') {
+    return (
+      <AgentEditorPanel
+        agent={props.main.selectedCreatorAgent}
+        onSave={(agentId, patch) => props.actions.maintain.updateCreatorAgentMetadata(agentId, patch)}
+        onDirtyChange={(dirty) => props.actions.maintain.setSectionDirty('agentEditor', dirty)}
+      />
+    );
+  }
+  if (section === 'WORLD_ASSETS') {
+    return (
+      <WorldAssetsPanel
+        mediaBindings={props.main.mediaBindings}
+        worldCoverUrl={typeof props.main.snapshot.assets.worldCover.imageUrl === 'string'
+          ? props.main.snapshot.assets.worldCover.imageUrl
+          : null}
+        locationImages={props.main.snapshot.assets.locationImages}
+      />
+    );
+  }
+  if (section === 'AGENT_ASSETS') {
+    return (
+      <AgentAssetsPanel
+        mediaBindings={props.main.mediaBindings}
+        creatorAgents={props.main.creatorAgents}
+        portraits={props.main.snapshot.assets.characterPortraits}
+        draftsByCharacter={props.main.snapshot.agentSync.draftsByCharacter}
+        worldId={props.workflow.selectedWorldId}
+      />
+    );
+  }
+  if (section === 'DRAFTS') {
+    return (
+      <ReleaseDraftsPanel
+        drafts={props.workflow.drafts}
+        selectedDraftId={props.workflow.selectedDraftId}
+        onOpenCreate={props.actions.workflow.openCreate}
+      />
+    );
+  }
+  if (section === 'PUBLISH') {
+    const currentWorld = props.workflow.worlds.find((world) => world.id === props.workflow.selectedWorldId) || null;
+    return (
+      <ReleasePublishPanel
+        world={currentWorld}
+        selectedDraftId={props.workflow.selectedDraftId}
+        onOpenCreate={props.actions.workflow.openCreate}
+      />
+    );
+  }
+  if (section === 'HISTORY') {
+    return <ReleaseHistoryPanel mutations={props.status.mutations} />;
+  }
+  return null;
+}
+
+export function MaintainWorkbench(props: MaintainWorkbenchProps) {
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="min-h-0 flex-1 overflow-auto px-5 py-5">
+        <div className="space-y-4">
+          <SectionNav
+            activeDomain={props.workflow.activeDomain}
+            activeSection={props.workflow.activeSection}
+            onSelectSection={props.actions.workflow.selectMaintainSection}
+          />
+          <MaintainObjectHeader {...props} />
+          <ConflictBanner status={props.status} actions={props.actions.maintain} working={props.main.working} />
+          {renderMaintainSection(props)}
+        </div>
+      </div>
+
+      <StickyActionBar>
+        {renderContextualActionBar(props)}
         <button
           type="button"
           className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700"
@@ -241,7 +444,7 @@ export function MaintainWorkbench(props: MaintainWorkbenchProps) {
             void props.actions.maintain.refreshResources();
           }}
         >
-          {t('maintain.reloadRemote', 'Refresh Remote')}
+          {worldStudioMessage('maintain.reloadRemote', 'Refresh Remote')}
         </button>
       </StickyActionBar>
     </div>

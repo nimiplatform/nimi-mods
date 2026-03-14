@@ -1,12 +1,20 @@
 import type {
   EventNodeDraft,
+  WorldStudioMaintainDomain,
+  WorldStudioMaintainSection,
   WorldStudioCreateStep,
   WorldStudioSnapshotPatch,
   WorldStudioTaskRecord,
   WorldStudioWorkspaceSnapshot,
 } from '../contracts.js';
 import type { Phase1Result, Phase2Result } from '../generation/pipeline.js';
-import type { WorldDraftSummary, WorldMutationSummary, WorldSummary } from '../ui/types.js';
+import type {
+  WorldDraftSummary,
+  WorldMutationSummary,
+  WorldStudioCreatorAgentSummary,
+  WorldStudioMediaBindingSummary,
+  WorldSummary,
+} from '../ui/types.js';
 import type { LandingState } from '../ui/types.js';
 import type { RetryScope } from '../services/event-graph-map.js';
 import type { SupportedEncoding } from '../engine/encoding.js';
@@ -20,7 +28,6 @@ import {
 export type WorldStudioCreateDisplayStage = 'IMPORT' | 'CURATE' | 'GENERATE' | 'REVIEW';
 export type WorldStudioImportSubview = 'PREPARE' | 'RUNNING' | 'RESULT';
 export type WorldStudioReviewSubview = 'EDIT' | 'PUBLISH_REVIEW';
-export type WorldStudioMaintainSection = 'WORLD' | 'WORLDVIEW' | 'EVENTS' | 'LOREBOOKS';
 export type WorldStudioCreateStageAccess = Record<WorldStudioCreateDisplayStage, {
   enabled: boolean;
   reason: string | null;
@@ -54,7 +61,9 @@ export type WorldStudioWorkflowSlice = {
   selectedDraftId: string;
   createDisplayStage: WorldStudioCreateDisplayStage;
   createStageAccess: WorldStudioCreateStageAccess;
-  maintainSection: WorldStudioMaintainSection;
+  activeDomain: WorldStudioMaintainDomain;
+  activeSection: WorldStudioMaintainSection;
+  selectedAgentId: string;
 };
 
 export type WorldStudioMainSlice = {
@@ -80,6 +89,9 @@ export type WorldStudioMainSlice = {
   importSubview: WorldStudioImportSubview;
   reviewSubview: WorldStudioReviewSubview;
   working: boolean;
+  creatorAgents: WorldStudioCreatorAgentSummary[];
+  selectedCreatorAgent: WorldStudioCreatorAgentSummary | null;
+  mediaBindings: WorldStudioMediaBindingSummary[];
 };
 
 export type WorldStudioRoutingSlice = {
@@ -155,7 +167,9 @@ export type WorldStudioActionsSlice = {
     openMaintenance: (worldId: string) => void;
     openCreate: (draftId: string | null) => void;
     selectCreateDisplayStage: (stage: WorldStudioCreateDisplayStage) => void;
+    selectMaintainDomain: (domain: WorldStudioMaintainDomain) => void;
     selectMaintainSection: (section: WorldStudioMaintainSection) => void;
+    selectMaintainAgent: (agentId: string) => void;
     refreshWorkspace: () => Promise<void>;
     openRuntimeSetup?: () => void;
   };
@@ -210,6 +224,12 @@ export type WorldStudioActionsSlice = {
     saveMaintenance: (payload?: { force?: boolean }) => Promise<void>;
     syncEvents: (payload?: { force?: boolean }) => Promise<void>;
     syncLorebooks: () => Promise<void>;
+    deleteFirstEvent: () => Promise<void>;
+    deleteFirstLorebook: () => Promise<void>;
+    createAgentsFromDrafts: (characterNames?: string[]) => Promise<void>;
+    updateCreatorAgentMetadata: (agentId: string, patch: Record<string, unknown>) => Promise<void>;
+    setSectionDirty: (section: keyof WorldStudioWorkspaceSnapshot['unsavedChangesByPanel'], dirty: boolean) => void;
+    syncMediaBindings: (scope: 'WORLD_ASSETS' | 'AGENT_ASSETS') => Promise<void>;
     refreshResources: () => Promise<void>;
     reloadRemote: () => Promise<void>;
     adoptRemoteSnapshot: () => void;

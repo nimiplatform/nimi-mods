@@ -28,8 +28,10 @@ export {
 
 export {
   listCreatorAgents,
+  getCreatorAgent,
   createCreatorAgent,
   batchCreateCreatorAgents,
+  updateCreatorAgent,
 } from './data/queries/creator-agents.js';
 
 export {

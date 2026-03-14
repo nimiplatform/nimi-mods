@@ -1,4 +1,11 @@
-import type { EventNodeDraft, WorldStudioCreateStep, WorldStudioSnapshotPatch, WorldStudioWorkspaceSnapshot } from '../contracts.js';
+import type {
+  EventNodeDraft,
+  WorldStudioCreateStep,
+  WorldStudioMaintainDomain,
+  WorldStudioMaintainSection,
+  WorldStudioSnapshotPatch,
+  WorldStudioWorkspaceSnapshot,
+} from '../contracts.js';
 import type { Phase1Result, Phase2Result } from '../generation/pipeline.js';
 import type { useWorldStudioControllerContext } from './world-studio-controller-context.js';
 import type { useWorldStudioPageUiState } from './use-world-studio-page-ui-state.js';
@@ -8,13 +15,19 @@ import type {
   WorldStudioCreateStageAccess,
   WorldStudioDirtySummary,
   WorldStudioImportSubview,
-  WorldStudioMaintainSection,
   WorldStudioReviewSubview,
   WorldStudioScreenModel,
 } from './world-studio-screen-model.js';
 import { worldStudioMessage } from '../i18n/messages.js';
 import type { WorldMutationSummary } from '../ui/types.js';
 import type { RetryScope } from '../services/event-graph-map.js';
+
+const MAINTAIN_DOMAIN_SECTIONS: Record<WorldStudioMaintainDomain, WorldStudioMaintainSection[]> = {
+  WORLD: ['BASE', 'WORLDVIEW', 'WORLD_EVENTS', 'LOREBOOKS'],
+  AGENTS: ['REGISTRY', 'EDITOR'],
+  ASSETS: ['WORLD_ASSETS', 'AGENT_ASSETS'],
+  RELEASES: ['DRAFTS', 'PUBLISH', 'HISTORY'],
+};
 
 type ControllerContext = ReturnType<typeof useWorldStudioControllerContext>;
 type PageUiState = ReturnType<typeof useWorldStudioPageUiState>;
@@ -50,6 +63,11 @@ type BuildWorldStudioScreenModelArgs = {
     onAdoptRemoteSnapshot: () => void;
     refreshResources: () => Promise<void>;
     onSaveMaintenance: (payload?: { force?: boolean }) => Promise<void>;
+    onDeleteFirstEvent: () => Promise<void>;
+    onDeleteFirstLorebook: () => Promise<void>;
+    onCreateAgentsFromDrafts: (characterNames?: string[]) => Promise<void>;
+    onUpdateCreatorAgentMetadata: (agentId: string, patch: Record<string, unknown>) => Promise<void>;
+    onSyncMediaBindings: (scope: 'WORLD_ASSETS' | 'AGENT_ASSETS') => Promise<void>;
   };
   snapshot: WorldStudioWorkspaceSnapshot;
   patchSnapshot: (patch: WorldStudioSnapshotPatch) => void;
@@ -116,20 +134,35 @@ function deriveReviewSubview(args: {
   return 'PUBLISH_REVIEW';
 }
 
-function deriveMaintainSection(snapshot: WorldStudioWorkspaceSnapshot): WorldStudioMaintainSection {
-  const current = String(snapshot.panel.activeMaintainTab || 'WORLD').toUpperCase();
-  if (current === 'WORLDVIEW' || current === 'EVENTS' || current === 'LOREBOOKS') {
-    return current;
-  }
-  return 'WORLD';
+function deriveMaintainNavigation(snapshot: WorldStudioWorkspaceSnapshot): {
+  activeDomain: WorldStudioMaintainDomain;
+  activeSection: WorldStudioMaintainSection;
+} {
+  const activeDomain = snapshot.panel.activeDomain || 'WORLD';
+  const sections = MAINTAIN_DOMAIN_SECTIONS[activeDomain] || MAINTAIN_DOMAIN_SECTIONS.WORLD;
+  const fallbackSection: WorldStudioMaintainSection = sections[0] || 'BASE';
+  const activeSection = sections.includes(snapshot.panel.activeSection)
+    ? snapshot.panel.activeSection
+    : fallbackSection;
+  return {
+    activeDomain,
+    activeSection,
+  };
 }
 
 function buildDirtySummary(snapshot: WorldStudioWorkspaceSnapshot): WorldStudioDirtySummary {
   const labelMap: Record<keyof WorldStudioWorkspaceSnapshot['unsavedChangesByPanel'], string> = {
-    world: worldStudioMessage('dirty.world', 'World'),
+    base: worldStudioMessage('dirty.world', 'World Base'),
     worldview: worldStudioMessage('dirty.worldview', 'Worldview'),
-    events: worldStudioMessage('dirty.events', 'Events'),
+    worldEvents: worldStudioMessage('dirty.events', 'World Events'),
     lorebooks: worldStudioMessage('dirty.lorebooks', 'Lorebooks'),
+    agentRegistry: worldStudioMessage('dirty.agentRegistry', 'Agent Registry'),
+    agentEditor: worldStudioMessage('dirty.agentEditor', 'Agent Editor'),
+    worldAssets: worldStudioMessage('dirty.worldAssets', 'World Assets'),
+    agentAssets: worldStudioMessage('dirty.agentAssets', 'Agent Assets'),
+    releaseDrafts: worldStudioMessage('dirty.releaseDrafts', 'Drafts'),
+    releasePublish: worldStudioMessage('dirty.releasePublish', 'Publish'),
+    releaseHistory: worldStudioMessage('dirty.releaseHistory', 'History'),
   };
   const labels = Object.entries(snapshot.unsavedChangesByPanel)
     .filter(([, value]) => Boolean(value))
@@ -249,7 +282,7 @@ function buildReviewActions(args: BuildWorldStudioScreenModelArgs): WorldStudioA
         worldPatch: value,
         unsavedChangesByPanel: {
           ...args.snapshot.unsavedChangesByPanel,
-          world: true,
+          base: true,
         },
       });
     },
@@ -271,7 +304,7 @@ function buildReviewActions(args: BuildWorldStudioScreenModelArgs): WorldStudioA
         },
         unsavedChangesByPanel: {
           ...args.snapshot.unsavedChangesByPanel,
-          events: true,
+          worldEvents: true,
         },
       });
     },
@@ -307,7 +340,7 @@ function buildCurateActions(args: BuildWorldStudioScreenModelArgs): WorldStudioA
         selectedStartTimeId: id,
         unsavedChangesByPanel: {
           ...args.snapshot.unsavedChangesByPanel,
-          events: true,
+          worldEvents: true,
         },
       });
     },
@@ -337,7 +370,7 @@ function buildCurateActions(args: BuildWorldStudioScreenModelArgs): WorldStudioA
         },
         unsavedChangesByPanel: {
           ...args.snapshot.unsavedChangesByPanel,
-          events: true,
+          worldEvents: true,
         },
       });
     },
@@ -396,7 +429,7 @@ export function buildWorldStudioScreenModel(args: BuildWorldStudioScreenModelArg
     hasDraft: Boolean(args.context.selectedDraftId),
     currentStep: args.snapshot.createStep,
   });
-  const maintainSection = deriveMaintainSection(args.snapshot);
+  const { activeDomain, activeSection } = deriveMaintainNavigation(args.snapshot);
   const dirtySummary = buildDirtySummary(args.snapshot);
   const currentObjectLabel = resolveCurrentObjectLabel({
     landingTarget,
@@ -411,7 +444,12 @@ export function buildWorldStudioScreenModel(args: BuildWorldStudioScreenModelArg
     workflow: {
       loadLanding: args.loadLanding,
       openMaintenance: (worldId) => {
-        args.patchPanel({ selectedWorldId: worldId });
+        args.patchPanel({
+          selectedWorldId: worldId,
+          activeDomain: 'WORLD',
+          activeSection: 'BASE',
+          selectedAgentId: '',
+        });
         args.ui.setLanding({ target: 'MAINTAIN', worldId, reason: null });
       },
       openCreate: (draftId) => {
@@ -443,8 +481,26 @@ export function buildWorldStudioScreenModel(args: BuildWorldStudioScreenModelArg
         }
         args.setCreateStep('DRAFT');
       },
+      selectMaintainDomain: (domain) => {
+        args.patchPanel({
+          activeDomain: domain,
+          activeSection: MAINTAIN_DOMAIN_SECTIONS[domain][0],
+        });
+      },
       selectMaintainSection: (section) => {
-        args.patchPanel({ activeMaintainTab: section });
+        const nextDomain = (Object.entries(MAINTAIN_DOMAIN_SECTIONS).find(([, sections]) => sections.includes(section))?.[0]
+          || activeDomain) as WorldStudioMaintainDomain;
+        args.patchPanel({
+          activeDomain: nextDomain,
+          activeSection: section,
+        });
+      },
+      selectMaintainAgent: (agentId) => {
+        args.patchPanel({
+          activeDomain: 'AGENTS',
+          activeSection: 'EDITOR',
+          selectedAgentId: agentId,
+        });
       },
       refreshWorkspace: () => args.actions.refreshResources(),
       openRuntimeSetup: args.onOpenRuntimeSetup,
@@ -491,7 +547,7 @@ export function buildWorldStudioScreenModel(args: BuildWorldStudioScreenModelArg
           worldPatch: value,
           unsavedChangesByPanel: {
             ...args.snapshot.unsavedChangesByPanel,
-            world: true,
+            base: true,
           },
         });
       },
@@ -513,7 +569,7 @@ export function buildWorldStudioScreenModel(args: BuildWorldStudioScreenModelArg
           },
           unsavedChangesByPanel: {
             ...args.snapshot.unsavedChangesByPanel,
-            events: true,
+            worldEvents: true,
           },
         });
       },
@@ -540,6 +596,22 @@ export function buildWorldStudioScreenModel(args: BuildWorldStudioScreenModelArg
       saveMaintenance: (payload) => args.actions.onSaveMaintenance(payload),
       syncEvents: (payload) => args.actions.onSyncEvents(payload),
       syncLorebooks: () => args.actions.onSyncLorebooks(),
+      deleteFirstEvent: () => args.actions.onDeleteFirstEvent(),
+      deleteFirstLorebook: () => args.actions.onDeleteFirstLorebook(),
+      createAgentsFromDrafts: (characterNames) => args.actions.onCreateAgentsFromDrafts(characterNames),
+      updateCreatorAgentMetadata: (agentId, patch) => args.actions.onUpdateCreatorAgentMetadata(agentId, patch),
+      setSectionDirty: (section, dirty) => {
+        if (args.snapshot.unsavedChangesByPanel[section] === dirty) {
+          return;
+        }
+        args.patchSnapshot({
+          unsavedChangesByPanel: {
+            ...args.snapshot.unsavedChangesByPanel,
+            [section]: dirty,
+          },
+        });
+      },
+      syncMediaBindings: (scope) => args.actions.onSyncMediaBindings(scope),
       refreshResources: () => args.actions.refreshResources(),
       reloadRemote: () => args.actions.onReloadRemoteForConflict(),
       adoptRemoteSnapshot: () => args.actions.onAdoptRemoteSnapshot(),
@@ -586,7 +658,9 @@ export function buildWorldStudioScreenModel(args: BuildWorldStudioScreenModelArg
       selectedDraftId: args.context.selectedDraftId,
       createDisplayStage,
       createStageAccess,
-      maintainSection,
+      activeDomain,
+      activeSection,
+      selectedAgentId: args.context.selectedAgentId,
     },
     main: {
       snapshot: args.snapshot,
@@ -608,6 +682,9 @@ export function buildWorldStudioScreenModel(args: BuildWorldStudioScreenModelArg
       importSubview,
       reviewSubview,
       working: args.context.working,
+      creatorAgents: args.context.worldCreatorAgents,
+      selectedCreatorAgent: args.context.selectedCreatorAgent,
+      mediaBindings: args.context.mediaBindings,
     },
     routing: {
       activeCoarseRouteSource: args.context.activeCoarseRouteSource,

@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
-import type { LandingState, WorldDraftSummary, WorldSummary } from '../ui/types.js';
+import type {
+  LandingState,
+  WorldDraftSummary,
+  WorldStudioCreatorAgentSummary,
+  WorldStudioMediaBindingSummary,
+  WorldSummary,
+} from '../ui/types.js';
 import type { Phase1Result } from '../generation/pipeline.js';
 import type { WorldStudioWorkspaceSnapshot } from '../contracts.js';
 import { useWorldStudioResourceQueries } from '../hooks/use-world-studio-queries.js';
@@ -54,15 +60,23 @@ export function useWorldStudioStoreBindings(userId: string) {
 export function useWorldStudioControllerContext(input: UseWorldStudioControllerContextInput) {
     const selectedWorldId = input.snapshot.panel.selectedWorldId || input.landing.worldId || '';
     const selectedDraftId = input.snapshot.panel.selectedDraftId;
+    const selectedAgentId = input.snapshot.panel.selectedAgentId;
     const eventsGraph = input.snapshot.eventsDraft;
     const queries = useWorldStudioResourceQueries(input.hookClient, {
         enabled: !input.landingLoading && input.landing.target !== 'NO_ACCESS',
         worldId: selectedWorldId,
+        selectedAgentId,
         enableCollections: true,
     });
     const mutations = useWorldStudioMutations(input.hookClient);
     const worlds = (queries.worldsQuery.data || []) as WorldSummary[];
     const drafts = (queries.draftsQuery.data || []) as WorldDraftSummary[];
+    const creatorAgents = (queries.creatorAgentsQuery.data || []) as WorldStudioCreatorAgentSummary[];
+    const selectedCreatorAgent = ((queries.selectedAgentQuery.data as WorldStudioCreatorAgentSummary | null | undefined)
+        || creatorAgents.find((agent) => agent.id === selectedAgentId)
+        || null);
+    const worldCreatorAgents = creatorAgents.filter((agent) => agent.worldId === selectedWorldId);
+    const mediaBindings = (queries.mediaBindingsQuery.data || []) as WorldStudioMediaBindingSummary[];
     const primaryWorld = worlds[0] || null;
     const latestDraft = drafts[0] || null;
     const activeTask = input.snapshot.taskState.activeTask;
@@ -110,11 +124,16 @@ export function useWorldStudioControllerContext(input: UseWorldStudioControllerC
     return {
         selectedWorldId,
         selectedDraftId,
+        selectedAgentId,
         eventsGraph,
         queries,
         mutations,
         worlds,
         drafts,
+        creatorAgents,
+        worldCreatorAgents,
+        selectedCreatorAgent,
+        mediaBindings,
         primaryWorld,
         latestDraft,
         activeTask,

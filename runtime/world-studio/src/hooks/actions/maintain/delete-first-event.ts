@@ -34,7 +34,7 @@ export async function deleteFirstEvent(context: WorldStudioMaintainActionContext
             editorSnapshotVersion: String(data.editorSnapshotVersion || context.snapshot.editorSnapshotVersion || ''),
             unsavedChangesByPanel: {
                 ...context.snapshot.unsavedChangesByPanel,
-                events: false,
+                worldEvents: false,
             },
         });
         context.setStatusBanner({

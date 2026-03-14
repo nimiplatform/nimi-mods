@@ -584,6 +584,13 @@
     "worldview": "Worldview",
     "events": "Events",
     "lorebooks": "Lorebooks",
+    "agentRegistry": "Agent Registry",
+    "agentEditor": "Agent Editor",
+    "worldAssets": "World Assets",
+    "agentAssets": "Agent Assets",
+    "releaseDrafts": "Drafts",
+    "releasePublish": "Publish",
+    "releaseHistory": "History",
     "clean": "Saved",
     "single": "1 unsaved change",
     "multiple": "{{count}} unsaved changes"
@@ -609,8 +616,41 @@
     "continueDraft": "Continue draft",
     "stageNavTitle": "Workflow",
     "stageNavDescription": "Jump between the major creation stages.",
+    "domainNavTitle": "Maintenance Domains",
+    "domainNavDescription": "Switch between world, agent, asset, and release maintenance views.",
     "sectionNavTitle": "Content",
     "sectionNavDescription": "Switch between world, worldview, events, and lorebooks."
+  },
+  "domainNav": {
+    "world": {
+      "label": "World",
+      "subtitle": "Base, worldview, world events, lorebooks"
+    },
+    "agents": {
+      "label": "Agents",
+      "subtitle": "Registry and metadata editor"
+    },
+    "assets": {
+      "label": "Assets",
+      "subtitle": "World and agent media bindings"
+    },
+    "releases": {
+      "label": "Releases",
+      "subtitle": "Drafts, publish, history"
+    }
+  },
+  "sectionNav": {
+    "base": "Base",
+    "worldview": "Worldview",
+    "worldEvents": "World Events",
+    "lorebooks": "Lorebooks",
+    "registry": "Registry",
+    "editor": "Editor",
+    "worldAssets": "World Assets",
+    "agentAssets": "Agent Assets",
+    "drafts": "Drafts",
+    "publish": "Publish",
+    "history": "History"
   },
   "maintainNav": {
     "world": "World",
@@ -620,9 +660,83 @@
   },
   "statusSummary": {
     "title": "Status",
+    "dirtySections": "Dirty sections",
+    "primarySecondary": "Primary / Secondary",
+    "storyProjections": "Story projections",
+    "mutations": "Mutations",
     "noActiveTask": "No active task",
     "events": "Primary {{primary}} · Secondary {{secondary}}",
     "evidence": "Missing evidence: {{count}}"
+  },
+  "agents": {
+    "registry": {
+      "title": "World-owned agents",
+      "currentWorld": "Current world",
+      "summary": "{{worldName}} currently exposes {{count}} agent records.",
+      "createMissing": "Create Missing Draft Agents",
+      "empty": "No world-owned agents are available yet.",
+      "draftCandidatesTitle": "Draft candidates",
+      "draftCandidatesDescription": "Characters extracted from the draft can be promoted into world-owned agents from here.",
+      "draftCandidatesEmpty": "No agent draft candidates are available."
+    },
+    "editor": {
+      "title": "Agent Editor",
+      "empty": "Select a world-owned agent from Registry to inspect and edit its metadata.",
+      "subtitle": "Metadata editing is available now; full persona editing remains a later realm API milestone.",
+      "readable": "Readable",
+      "handle": "Handle: @{{value}}",
+      "ownership": "Ownership: {{value}}",
+      "state": "State: {{value}}",
+      "world": "World: {{value}}",
+      "personaTitle": "Persona editing",
+      "personaDescription": "Complete persona fields such as concept, scenario, greeting, rules, lorebooks, and fine-grained DNA editing will be unlocked after realm exposes a fuller agent detail contract.",
+      "dnaSnapshot": "Readable DNA snapshot"
+    }
+  },
+  "assets": {
+    "synced": {
+      "empty": "No synced media bindings yet.",
+      "noStorageRef": "No asset storageRef"
+    },
+    "world": {
+      "generatedTitle": "Generated World Assets",
+      "cover": "World cover: {{value}}",
+      "noGeneratedCover": "No generated cover yet",
+      "locationImages": "Generated location images: {{count}}",
+      "syncedTitle": "Synced World Assets"
+    },
+    "agent": {
+      "generatedTitle": "Generated Agent Assets",
+      "emptyGenerated": "No generated character portraits yet.",
+      "remoteAgent": "Remote agent: {{value}}",
+      "notCreated": "not created",
+      "syncedTitle": "Synced Agent Assets"
+    }
+  },
+  "releases": {
+    "drafts": {
+      "title": "Drafts",
+      "description": "Detailed draft selection now lives here; the workspace drawer keeps only quick entry points.",
+      "newDraft": "New Draft",
+      "empty": "No drafts are available.",
+      "statusLine": "Status: {{status}} · Updated: {{updatedAt}}",
+      "continue": "Continue"
+    },
+    "publish": {
+      "title": "Publish",
+      "description": "Publishing still runs through the Create review flow. Use this section to jump back into the current draft with the right mental model.",
+      "currentWorld": "Current world: {{value}}",
+      "noWorldSelected": "No world selected",
+      "latestDraft": "Latest selected draft: {{value}}",
+      "noDraftSelected": "No draft selected",
+      "openFlow": "Open Publish Flow"
+    },
+    "history": {
+      "title": "History",
+      "description": "Mutation history is now a first-class release surface instead of a hidden background query.",
+      "empty": "No mutations recorded yet.",
+      "noTargetPath": "no target path"
+    }
   },
   "taskStrip": {
     "pause": "Pause",
@@ -691,10 +805,16 @@
     "reloadRemote": "Reload Remote",
     "reloadRemoteSnapshot": "Reload Remote Snapshot",
     "save": "Save",
+    "saveAgentMetadata": "Save Agent Metadata",
     "savedState": "Local edits are synced with the current snapshot.",
     "snapshotVersion": "Snapshot: {{value}}",
     "syncEvents": "Sync Events",
+    "deleteFirstEvent": "Delete First Event",
     "syncLorebooks": "Sync Lorebooks",
+    "deleteFirstLorebook": "Delete First Lorebook",
+    "createMissingDraftAgents": "Create Missing Draft Agents",
+    "syncWorldAssets": "Sync World Assets",
+    "syncAgentAssets": "Sync Agent Assets",
     "unsavedPanels": "Unsaved panels: {{value}}",
     "untitledWorld": "Untitled world",
     "worldId": "World ID: {{value}}"

@@ -13,7 +13,9 @@ export function useWorldStudioHydration(input: {
     patchPanel: (patch: {
         selectedWorldId?: string;
         selectedDraftId?: string;
-        activeMaintainTab?: WorldStudioPanelState['activeMaintainTab'];
+        activeDomain?: WorldStudioPanelState['activeDomain'];
+        activeSection?: WorldStudioPanelState['activeSection'];
+        selectedAgentId?: WorldStudioPanelState['selectedAgentId'];
     }) => void;
     setCreateStep: (step: 'SOURCE' | 'INGEST' | 'EXTRACT' | 'CHECKPOINTS' | 'SYNTHESIZE' | 'DRAFT' | 'PUBLISH') => void;
     patchSnapshot: (patch: WorldStudioSnapshotPatch) => void;
@@ -26,6 +28,12 @@ export function useWorldStudioHydration(input: {
             data: unknown;
         };
         lorebooksQuery: {
+            data: unknown;
+        };
+        creatorAgentsQuery: {
+            data: unknown;
+        };
+        mediaBindingsQuery: {
             data: unknown;
         };
     };

@@ -28,6 +28,8 @@ capabilities:
   - data.query.data-api.world.events.list
   - data.query.data-api.world.events.batch-upsert
   - data.query.data-api.world.events.delete
+  - data.query.data-api.world.scenes.list
+  - data.query.data-api.world.narrative-contexts.list
   - data.query.data-api.world.lorebooks.list
   - data.query.data-api.world.lorebooks.batch-upsert
   - data.query.data-api.world.lorebooks.delete
@@ -38,7 +40,9 @@ capabilities:
   - data.query.data-api.world.worlds.mine
   - data.query.data-api.world.mutations.list
   - data.query.data-api.creator.agents.list
+  - data.query.data-api.creator.agents.get
   - data.query.data-api.creator.agents.create
+  - data.query.data-api.creator.agents.update
   - data.query.data-api.creator.agents.batch-create
   - ui.register.ui-extension.app.sidebar.mods
   - ui.register.ui-extension.app.content.routes

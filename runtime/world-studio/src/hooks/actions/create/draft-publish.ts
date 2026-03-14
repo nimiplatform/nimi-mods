@@ -167,10 +167,17 @@ export async function saveWorldDraft(input: WorldStudioCreateActionsInput, _opti
         input.patchPanel({ selectedDraftId: draftId });
         input.patchSnapshot({
             unsavedChangesByPanel: {
-                world: false,
+                base: false,
                 worldview: false,
-                events: false,
+                worldEvents: false,
                 lorebooks: false,
+                agentRegistry: false,
+                agentEditor: false,
+                worldAssets: false,
+                agentAssets: false,
+                releaseDrafts: false,
+                releasePublish: false,
+                releaseHistory: false,
             },
         });
         input.setCreateStep('PUBLISH');
@@ -476,10 +483,24 @@ export async function publishWorldDraft(input: WorldStudioCreateActionsInput, _o
         else {
             diagLog('agent sync SKIPPED: syncCharacters is empty');
         }
-        const visualBindingUpserts: Array<Record<string, unknown>> = [];
+        const mediaBindingUpserts: Array<Record<string, unknown>> = [];
         const worldCoverUrl = toNullableTrimmedString(input.snapshot.assets.worldCover.imageUrl);
         if (worldCoverUrl) {
-            visualBindingUpserts.push({
+            mediaBindingUpserts.push({
+                targetType: 'WORLD',
+                targetId: worldId,
+                slot: 'WORLD_ICON',
+                priority: 0,
+                asset: {
+                    mediaType: 'IMAGE',
+                    storageRef: worldCoverUrl,
+                    provenance: 'GENERATED',
+                    sourceRef: 'world-studio:world-cover',
+                    label: 'world_icon',
+                    tags: ['world-studio', 'world-icon'],
+                },
+            });
+            mediaBindingUpserts.push({
                 targetType: 'WORLD',
                 targetId: worldId,
                 slot: 'WORLD_BANNER',
@@ -500,7 +521,7 @@ export async function publishWorldDraft(input: WorldStudioCreateActionsInput, _o
             const imageUrl = toNullableTrimmedString(asRecord(draft).imageUrl);
             if (!imageUrl)
                 continue;
-            visualBindingUpserts.push({
+            mediaBindingUpserts.push({
                 targetType: 'WORLD',
                 targetId: worldId,
                 slot: 'WORLD_GALLERY',
@@ -524,7 +545,7 @@ export async function publishWorldDraft(input: WorldStudioCreateActionsInput, _o
             const agentId = createdAgentIdByCharacter.get(characterName);
             if (!imageUrl || !agentId)
                 continue;
-            visualBindingUpserts.push({
+            mediaBindingUpserts.push({
                 targetType: 'AGENT',
                 targetId: agentId,
                 slot: 'AGENT_PORTRAIT',
@@ -541,10 +562,10 @@ export async function publishWorldDraft(input: WorldStudioCreateActionsInput, _o
                 },
             });
         }
-        if (visualBindingUpserts.length > 0) {
+        if (mediaBindingUpserts.length > 0) {
             await input.mutations.syncMediaBindingsMutation.mutateAsync({
                 worldId,
-                bindingUpserts: visualBindingUpserts,
+                bindingUpserts: mediaBindingUpserts,
                 reason: 'Publish world media assets from world-studio draft',
             });
         }
@@ -555,7 +576,12 @@ export async function publishWorldDraft(input: WorldStudioCreateActionsInput, _o
             },
         });
         input.setLanding({ target: 'MAINTAIN', worldId, reason: null });
-        input.patchPanel({ selectedWorldId: worldId });
+        input.patchPanel({
+            selectedWorldId: worldId,
+            activeDomain: 'WORLD',
+            activeSection: 'BASE',
+            selectedAgentId: '',
+        });
         input.setNotice(worldStudioMessage('notice.draftPublishedToWorld', 'Draft published to world {{worldId}}.{{syncNotice}}', { worldId, syncNotice }));
         input.setStatusBanner({
             kind: 'success',
