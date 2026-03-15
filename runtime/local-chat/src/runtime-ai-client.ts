@@ -302,7 +302,7 @@ async function resolveLocalImageExtensions(input: {
                 })),
             },
         });
-        throw new Error('Local image route requires installed companion artifacts (VAE and LLM). Verify z_image_ae and qwen3_4b_companion in Runtime and try again.');
+        throw new Error('Local image route requires installed companion artifacts (VAE and LLM). Verify local/z_image_ae and local/qwen3_4b_companion in Runtime and try again.');
     }
     const baseExtensions: Record<string, unknown> = {
         ...(input.extensions || {}),
