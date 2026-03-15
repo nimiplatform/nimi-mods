@@ -72,10 +72,14 @@ export const LocalChatCharacterRail = React.memo(function LocalChatCharacterRail
 
         <div className="flex min-h-0 flex-1 flex-col px-5 pb-5 pt-4">
           <div className="flex min-h-0 flex-1 items-center justify-center pb-8">
-            <button type="button" ref={avatarAnchorRef} onClick={onOpenSelectedTargetProfile} className="group relative rounded-full outline-none transition-transform duration-300 hover:scale-[1.02] focus-visible:ring-4 focus-visible:ring-white/85" aria-label={t('Header.openProfileDrawer')} title={t('Header.openProfileDrawer')}>
+            <button type="button" ref={(node) => {
+            if (avatarAnchorRef) {
+                avatarAnchorRef.current = node;
+            }
+        }} onClick={onOpenSelectedTargetProfile} className="group relative rounded-full outline-none transition-transform duration-300 hover:scale-[1.02] focus-visible:ring-4 focus-visible:ring-white/85" aria-label={t('Header.openProfileDrawer')} title={t('Header.openProfileDrawer')}>
               <span className="lc-stage-aura absolute inset-[-28px] rounded-full opacity-75 blur-3xl" style={{ background: theme.accentSoft }}/>
               <span className="absolute inset-[-12px] rounded-full border border-white/75" style={{ boxShadow: `0 22px 56px ${theme.accentSoft}` }}/>
-              <span className="lc-stage-avatar-frame relative flex h-40 w-40 items-center justify-center overflow-hidden rounded-full border border-white/90 bg-white/82 shadow-[0_24px_60px_rgba(15,23,42,0.12)] xl:h-48 xl:w-48">
+              <span className="lc-stage-avatar-frame lc-stage-avatar-frame-hero-rail relative flex items-center justify-center overflow-hidden rounded-full border border-white/90 bg-white/82 shadow-[0_24px_60px_rgba(15,23,42,0.12)]">
                 {selectedTargetAvatarUrl ? (<img src={selectedTargetAvatarUrl} alt={selectedTarget.displayName} className="h-full w-full object-cover"/>) : (<span className="text-6xl font-black xl:text-7xl" style={{ color: theme.text }}>
                     {selectedTargetInitial}
                   </span>)}

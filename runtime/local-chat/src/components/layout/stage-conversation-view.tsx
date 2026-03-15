@@ -101,7 +101,7 @@ export const StageConversationView = React.memo(function StageConversationView({
           <button type="button" onClick={onOpenSelectedTargetProfile} className="group relative rounded-full outline-none transition-transform duration-300 hover:scale-[1.02] focus-visible:ring-4 focus-visible:ring-white/85" aria-label={t('Header.openProfileDrawer')} title={t('Header.openProfileDrawer')}>
             <span className="lc-stage-aura absolute inset-[-22px] rounded-full opacity-70 blur-2xl" style={{ background: theme.accentSoft }}/>
             <span className="absolute inset-[-10px] rounded-full border border-white/70" style={{ boxShadow: `0 18px 48px ${theme.accentSoft}` }}/>
-            <span className="lc-stage-avatar-frame relative flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border border-white/85 bg-white/78 shadow-[0_20px_52px_rgba(15,23,42,0.12)]">
+            <span className="lc-stage-avatar-frame lc-stage-avatar-frame-hero-stage relative flex items-center justify-center overflow-hidden rounded-full border border-white/85 bg-white/78 shadow-[0_20px_52px_rgba(15,23,42,0.12)]">
               {selectedTargetAvatarUrl ? (<img src={selectedTargetAvatarUrl} alt={selectedTarget.displayName} className="h-full w-full object-cover"/>) : (<span className="text-5xl font-black" style={{ color: theme.text }}>
                   {selectedTargetInitial}
                 </span>)}

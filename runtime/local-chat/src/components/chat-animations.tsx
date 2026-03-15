@@ -301,8 +301,22 @@ const KEYFRAMES = `
 .local-chat-root .lc-stage-avatar-frame {
   animation: lc-stage-breathe 5.4s ease-in-out infinite;
 }
+.local-chat-root .lc-stage-avatar-frame-hero-rail {
+  width: 10rem;
+  height: 10rem;
+}
+.local-chat-root .lc-stage-avatar-frame-hero-stage {
+  width: 8rem;
+  height: 8rem;
+}
 .local-chat-root .lc-stage-aura {
   animation: lc-stage-aura-glow 6s ease-in-out infinite;
+}
+@media (min-width: 80rem) {
+  .local-chat-root .lc-stage-avatar-frame-hero-rail {
+    width: 12rem;
+    height: 12rem;
+  }
 }
 .local-chat-root .lc-btn-primary {
   border-color: rgba(20, 184, 166, 0.15);
