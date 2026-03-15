@@ -11,27 +11,6 @@ import { resetTextTurnStreamHealthForTests } from '../src/hooks/turn-send/text-t
 import { resolveStageConversationSlice } from '../src/components/layout/stage-dialogue-card.tsx';
 import { resetLocalChatConversationLedgerForTests } from '../src/state/index.ts';
 import { type ModRuntimeLocalProfileSnapshot } from "@nimiplatform/sdk/mod";
-class MemoryStorage implements Storage {
-    private store = new Map<string, string>();
-    get length(): number {
-        return this.store.size;
-    }
-    clear(): void {
-        this.store.clear();
-    }
-    getItem(key: string): string | null {
-        return this.store.has(key) ? this.store.get(key) || null : null;
-    }
-    key(index: number): string | null {
-        return Array.from(this.store.keys())[index] || null;
-    }
-    removeItem(key: string): void {
-        this.store.delete(key);
-    }
-    setItem(key: string, value: string): void {
-        this.store.set(key, value);
-    }
-}
 class TestCustomEvent<T = unknown> extends Event {
     detail: T;
     constructor(type: string, init?: CustomEventInit<T>) {
@@ -248,24 +227,15 @@ async function withSendFlowHarness(run: (harness: ReturnType<typeof createHarnes
     const previousWindow = (globalThis as {
         window?: unknown;
     }).window;
-    const previousLocalStorage = (globalThis as {
-        localStorage?: unknown;
-    }).localStorage;
     const previousCustomEvent = (globalThis as {
         CustomEvent?: unknown;
     }).CustomEvent;
-    const localStorage = new MemoryStorage();
     const windowShim = {
-        localStorage,
         dispatchEvent: () => true,
     };
     Object.defineProperty(globalThis, 'window', {
         configurable: true,
         value: windowShim,
-    });
-    Object.defineProperty(globalThis, 'localStorage', {
-        configurable: true,
-        value: localStorage,
     });
     Object.defineProperty(globalThis, 'CustomEvent', {
         configurable: true,
@@ -308,17 +278,6 @@ async function withSendFlowHarness(run: (harness: ReturnType<typeof createHarnes
             Object.defineProperty(globalThis, 'window', {
                 configurable: true,
                 value: previousWindow,
-            });
-        }
-        if (previousLocalStorage === undefined) {
-            delete (globalThis as {
-                localStorage?: unknown;
-            }).localStorage;
-        }
-        else {
-            Object.defineProperty(globalThis, 'localStorage', {
-                configurable: true,
-                value: previousLocalStorage,
             });
         }
         if (previousCustomEvent === undefined) {

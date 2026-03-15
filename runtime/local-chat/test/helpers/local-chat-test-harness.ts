@@ -9,27 +9,6 @@ import { buildLocalChatTurnContextKey } from '../../src/hooks/turn-send/context-
 import { runLocalChatTurnSend } from '../../src/hooks/turn-send/send-flow.ts';
 import { resetLocalChatConversationLedgerForTests, } from '../../src/state/index.ts';
 import { type ModRuntimeLocalProfileSnapshot } from "@nimiplatform/sdk/mod";
-class MemoryStorage implements Storage {
-    private store = new Map<string, string>();
-    get length(): number {
-        return this.store.size;
-    }
-    clear(): void {
-        this.store.clear();
-    }
-    getItem(key: string): string | null {
-        return this.store.has(key) ? this.store.get(key) || null : null;
-    }
-    key(index: number): string | null {
-        return Array.from(this.store.keys())[index] || null;
-    }
-    removeItem(key: string): void {
-        this.store.delete(key);
-    }
-    setItem(key: string, value: string): void {
-        this.store.set(key, value);
-    }
-}
 class TestCustomEvent<T = unknown> extends Event {
     detail: T;
     constructor(type: string, init?: CustomEventInit<T>) {
@@ -37,9 +16,8 @@ class TestCustomEvent<T = unknown> extends Event {
         this.detail = init?.detail as T;
     }
 }
-function createWindowShim(localStorage: Storage) {
+function createWindowShim() {
     return {
-        localStorage,
         addEventListener: () => undefined,
         removeEventListener: () => undefined,
         dispatchEvent: () => true,
@@ -325,21 +303,16 @@ export async function withLocalChatTestEnv(input: {
     worldsById?: Record<string, Record<string, unknown> | null>;
     worldviewsById?: Record<string, Record<string, unknown> | null>;
 }, run: (env: {
-    localStorage: Storage;
     readContext: LocalChatReadContext;
     targets: LocalChatTarget[];
 }) => Promise<void>): Promise<void> {
     const previousWindow = (globalThis as {
         window?: unknown;
     }).window;
-    const previousLocalStorage = (globalThis as {
-        localStorage?: unknown;
-    }).localStorage;
     const previousCustomEvent = (globalThis as {
         CustomEvent?: unknown;
     }).CustomEvent;
-    const localStorage = new MemoryStorage();
-    const windowShim = createWindowShim(localStorage);
+    const windowShim = createWindowShim();
     const targets = input.targets || [createTestTarget()];
     const worldsById = input.worldsById || Object.fromEntries(targets
         .filter((target) => Boolean(target.worldId))
@@ -350,10 +323,6 @@ export async function withLocalChatTestEnv(input: {
     Object.defineProperty(globalThis, 'window', {
         configurable: true,
         value: windowShim,
-    });
-    Object.defineProperty(globalThis, 'localStorage', {
-        configurable: true,
-        value: localStorage,
     });
     Object.defineProperty(globalThis, 'CustomEvent', {
         configurable: true,
@@ -398,7 +367,6 @@ export async function withLocalChatTestEnv(input: {
         await resetLocalChatConversationLedgerForTests();
         persistLocalChatSettings(input.settings || DEFAULT_LOCAL_CHAT_SETTINGS);
         await run({
-            localStorage,
             readContext: {
                 realmBaseUrl: 'http://localhost.test',
                 viewerId: 'user.test',
@@ -420,17 +388,6 @@ export async function withLocalChatTestEnv(input: {
             Object.defineProperty(globalThis, 'window', {
                 configurable: true,
                 value: previousWindow,
-            });
-        }
-        if (previousLocalStorage === undefined) {
-            delete (globalThis as {
-                localStorage?: unknown;
-            }).localStorage;
-        }
-        else {
-            Object.defineProperty(globalThis, 'localStorage', {
-                configurable: true,
-                value: previousLocalStorage,
             });
         }
         if (previousCustomEvent === undefined) {

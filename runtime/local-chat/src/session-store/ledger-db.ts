@@ -170,8 +170,7 @@ export async function openLedgerDatabase(): Promise<boolean> {
   return true;
 }
 
-// The exported name is preserved for compatibility; the backing store is the host storage snapshot, not browser IndexedDB.
-export async function loadAllFromIndexedDb(): Promise<void> {
+export async function loadAllFromHostStorageSnapshot(): Promise<void> {
   const snapshot = await getLedgerStateStore().getJson<PersistedLedgerSnapshot>(LEDGER_SNAPSHOT_KEY);
   applyPersistedSnapshot(snapshot);
 }
@@ -179,7 +178,7 @@ export async function loadAllFromIndexedDb(): Promise<void> {
 export async function ensureLedgerHydrated(): Promise<void> {
   if (ledgerCache.hydrated) return;
   if (hydratePromise) return hydratePromise;
-  hydratePromise = loadAllFromIndexedDb().finally(() => {
+  hydratePromise = loadAllFromHostStorageSnapshot().finally(() => {
     hydratePromise = null;
   });
   return hydratePromise;

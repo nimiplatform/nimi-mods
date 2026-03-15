@@ -20,10 +20,10 @@ function walkFiles(rootDir) {
 }
 
 function hasForbiddenBrowserStorage(sourceText) {
-  return /(?:localStorage|sessionStorage|window\.localStorage|window\.sessionStorage)/.test(sourceText);
+  return /(?:localStorage|sessionStorage|indexedDB|window\.localStorage|window\.sessionStorage|window\.indexedDB)/.test(sourceText);
 }
 
-test('textplay and narrative-engine keep browser storage out of source layer', () => {
+test('textplay and narrative-engine keep browser storage apis out of source layer', () => {
   const textplaySrc = path.resolve(import.meta.dirname, '../src');
   const narrativeEngineSrc = path.resolve(import.meta.dirname, '../../../modules/narrative-engine/src');
   const allFiles = [
