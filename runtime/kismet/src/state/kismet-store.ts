@@ -57,7 +57,7 @@ const initialBirthInput: Partial<KismetBirthInputV2> = {
     consent: {
         allowCityAffinityUse: true,
         allowLocalProfileMatchUse: false,
-        allowLocalProfilePersist: true,
+        allowLocalProfilePersist: false,
     },
 };
 const initialState = {
@@ -99,7 +99,7 @@ export const useKismetStore = create<KismetStore>((set) => ({
         const nextConsent = {
             allowCityAffinityUse: input.consent?.allowCityAffinityUse ?? state.birthInput.consent?.allowCityAffinityUse ?? true,
             allowLocalProfileMatchUse: input.consent?.allowLocalProfileMatchUse ?? state.birthInput.consent?.allowLocalProfileMatchUse ?? false,
-            allowLocalProfilePersist: input.consent?.allowLocalProfilePersist ?? state.birthInput.consent?.allowLocalProfilePersist ?? true,
+            allowLocalProfilePersist: input.consent?.allowLocalProfilePersist ?? state.birthInput.consent?.allowLocalProfilePersist ?? false,
         };
         return {
             birthInput: {

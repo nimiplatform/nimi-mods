@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Vector store — cosine similarity search with IndexedDB persistence (SSOT §4.2)
+// Vector store — cosine similarity search with host sqlite-backed persistence (SSOT §4.2)
 // ---------------------------------------------------------------------------
 
 import type { KBVector } from '../types.js';
@@ -42,7 +42,7 @@ export function cosineSimilarity(a: number[] | Float32Array, b: number[] | Float
 
 /**
  * In-memory vector store backed by a Map.
- * Vectors are loaded from IndexedDB on init and kept in memory for fast search.
+ * Vectors are loaded from host sqlite-backed mod storage on init and kept in memory for fast search.
  */
 export class VectorStore {
   private store = new Map<string, KBVector>();

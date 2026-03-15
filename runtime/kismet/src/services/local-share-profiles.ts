@@ -1,4 +1,4 @@
-import { createModKvStore, createModStorageClient } from '@nimiplatform/sdk/mod';
+import { createModKvStore, createModStorageClient } from '@nimiplatform/sdk/mod/storage';
 import { KISMET_MOD_ID } from '../contracts.js';
 import type { KismetBirthInputV2, KismetCanonicalProfile, KismetFortuneStickResult, KismetLocalShareProfile, KismetNatalAnalysisResult } from '../types.js';
 import { createUlid } from '../utils/ulid.js';

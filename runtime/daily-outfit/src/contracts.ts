@@ -25,6 +25,8 @@ export const DAILY_OUTFIT_CAPABILITIES = [
   'runtime.route.resolve',
   'storage.sqlite.query',
   'storage.sqlite.execute',
+  'storage.files.read',
+  'storage.files.write',
   `data.register.${DAILY_OUTFIT_DATA_API_WARDROBE_LIST}`,
   `data.register.${DAILY_OUTFIT_DATA_API_WARDROBE_GET}`,
   `data.register.${DAILY_OUTFIT_DATA_API_WARDROBE_CREATE}`,

@@ -9,6 +9,7 @@ import { ANALYSIS_DIMENSIONS } from '../contracts.js';
 import { KISMET_REASON } from '../contracts.js';
 import { BRANCH_TO_ZODIAC, EARTHLY_BRANCHES, HEAVENLY_STEMS } from '../services/bazi/constants.js';
 import type {
+  KismetAiKeyNode,
   KismetNatalAiOutput,
   KismetCompatibilityResult,
   KismetDailyFortuneResult,
@@ -33,6 +34,12 @@ const DEFAULT_DIMENSION_TAGS: Record<AnalysisDimensionKey, string> = {
   crypto: '虚财节奏',
 };
 
+const MIN_KEY_NODE_AGE = 1;
+const MAX_KEY_NODE_AGE = 100;
+const MIN_KEY_NODE_COUNT = 5;
+const MAX_KEY_NODE_COUNT = 15;
+const MIN_TERMINAL_KEY_NODE_AGE = 95;
+
 function asRecord(input: unknown): Record<string, unknown> {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     return {};
@@ -42,6 +49,27 @@ function asRecord(input: unknown): Record<string, unknown> {
 
 function asText(input: unknown, fallback = ''): string {
   return typeof input === 'string' ? input.trim() : fallback;
+}
+
+function asNumber(input: unknown, fallback: number): number {
+  if (typeof input === 'number' && Number.isFinite(input)) {
+    return input;
+  }
+  if (typeof input === 'string' && input.trim()) {
+    const parsed = Number(input);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return fallback;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function roundAndClamp(value: number, min: number, max: number): number {
+  return clamp(Math.round(value), min, max);
 }
 
 function deriveScoreFromText(text: string): number {
@@ -90,12 +118,158 @@ function buildCurrentYearContext() {
   };
 }
 
+function normalizeKeyNode(entry: unknown, fallbackAge: number, fallbackDaYun: string, fallbackTag: string): KismetAiKeyNode | null {
+  const record = asRecord(entry);
+  if (Object.keys(record).length === 0) {
+    return null;
+  }
+
+  const age = roundAndClamp(asNumber(record.age, fallbackAge), MIN_KEY_NODE_AGE, MAX_KEY_NODE_AGE);
+  const score = roundAndClamp(asNumber(record.score, 50), 0, 100);
+  const open = roundAndClamp(asNumber(record.open, score), 0, 100);
+  const close = roundAndClamp(asNumber(record.close, score), 0, 100);
+  const baseHigh = Math.max(open, close);
+  const baseLow = Math.min(open, close);
+  const high = roundAndClamp(asNumber(record.high, baseHigh), baseHigh, 100);
+  const low = roundAndClamp(asNumber(record.low, baseLow), 0, baseLow);
+
+  return {
+    age,
+    daYun: asText(record.daYun, fallbackDaYun || `第${Math.ceil(age / 10)}运`),
+    score,
+    open,
+    close,
+    high,
+    low,
+    tag: asText(record.tag, fallbackTag || '运势节点'),
+  };
+}
+
+function dedupeAndSortKeyNodes(nodes: KismetAiKeyNode[]): KismetAiKeyNode[] {
+  const sorted = [...nodes].sort((left, right) => left.age - right.age);
+  const deduped: KismetAiKeyNode[] = [];
+  for (const node of sorted) {
+    if (deduped.length === 0 || deduped[deduped.length - 1]!.age !== node.age) {
+      deduped.push(node);
+    }
+  }
+  return deduped;
+}
+
+function interpolateNumeric(left: number, right: number, amount: number): number {
+  return left + (right - left) * amount;
+}
+
+function synthesizeKeyNode(age: number, anchors: KismetAiKeyNode[]): KismetAiKeyNode {
+  const normalizedAge = roundAndClamp(age, MIN_KEY_NODE_AGE, MAX_KEY_NODE_AGE);
+  const exact = anchors.find((node) => node.age === normalizedAge);
+  if (exact) {
+    return exact;
+  }
+
+  const previous = [...anchors].reverse().find((node) => node.age < normalizedAge) ?? anchors[0]!;
+  const next = anchors.find((node) => node.age > normalizedAge) ?? anchors[anchors.length - 1]!;
+
+  if (previous.age === next.age) {
+    return {
+      ...previous,
+      age: normalizedAge,
+    };
+  }
+
+  const amount = (normalizedAge - previous.age) / Math.max(1, next.age - previous.age);
+  const score = roundAndClamp(interpolateNumeric(previous.score, next.score, amount), 0, 100);
+  const open = roundAndClamp(interpolateNumeric(previous.open, next.open, amount), 0, 100);
+  const close = roundAndClamp(interpolateNumeric(previous.close, next.close, amount), 0, 100);
+  const highBase = Math.max(open, close);
+  const lowBase = Math.min(open, close);
+
+  return {
+    age: normalizedAge,
+    daYun: amount < 0.5 ? previous.daYun : next.daYun,
+    score,
+    open,
+    close,
+    high: roundAndClamp(interpolateNumeric(previous.high, next.high, amount), highBase, 100),
+    low: roundAndClamp(interpolateNumeric(previous.low, next.low, amount), 0, lowBase),
+    tag: amount < 0.5 ? previous.tag : next.tag,
+  };
+}
+
+function buildEvenAges(startAge: number, endAge: number, count: number): number[] {
+  if (count <= 1) {
+    return [startAge];
+  }
+
+  const ages = new Set<number>();
+  for (let index = 0; index < count; index += 1) {
+    const amount = index / (count - 1);
+    ages.add(roundAndClamp(interpolateNumeric(startAge, endAge, amount), MIN_KEY_NODE_AGE, MAX_KEY_NODE_AGE));
+  }
+
+  ages.add(startAge);
+  ages.add(endAge);
+  return Array.from(ages).sort((left, right) => left - right);
+}
+
+function ensureBoundaryNodes(nodes: KismetAiKeyNode[]): KismetAiKeyNode[] {
+  if (nodes.length === 0) {
+    return [];
+  }
+
+  const bounded = [...nodes];
+  if (bounded[0]!.age !== MIN_KEY_NODE_AGE) {
+    bounded.unshift(synthesizeKeyNode(MIN_KEY_NODE_AGE, nodes));
+  }
+
+  const tailAge = bounded[bounded.length - 1]!.age >= MIN_TERMINAL_KEY_NODE_AGE
+    ? bounded[bounded.length - 1]!.age
+    : MIN_TERMINAL_KEY_NODE_AGE;
+  if (bounded[bounded.length - 1]!.age < MIN_TERMINAL_KEY_NODE_AGE) {
+    bounded.push(synthesizeKeyNode(tailAge, bounded));
+  }
+
+  return dedupeAndSortKeyNodes(bounded);
+}
+
+function trimKeyNodes(nodes: KismetAiKeyNode[], maxCount: number): KismetAiKeyNode[] {
+  if (nodes.length <= maxCount) {
+    return nodes;
+  }
+
+  const targetAges = buildEvenAges(nodes[0]!.age, nodes[nodes.length - 1]!.age, maxCount);
+  return targetAges.map((age) => synthesizeKeyNode(age, nodes));
+}
+
+function padKeyNodes(nodes: KismetAiKeyNode[], minCount: number): KismetAiKeyNode[] {
+  if (nodes.length >= minCount) {
+    return nodes;
+  }
+
+  const targetAges = buildEvenAges(nodes[0]!.age, nodes[nodes.length - 1]!.age, minCount);
+  return targetAges.map((age) => synthesizeKeyNode(age, nodes));
+}
+
+function normalizeNatalKeyNodes(raw: unknown): KismetAiKeyNode[] {
+  const source = Array.isArray(raw) ? raw : [];
+  const normalized = source
+    .map((entry, index) => normalizeKeyNode(entry, MIN_KEY_NODE_AGE + index * 10, `第${index + 1}运`, `节点${index + 1}`))
+    .filter((entry): entry is KismetAiKeyNode => entry !== null);
+
+  if (normalized.length === 0) {
+    return [];
+  }
+
+  const bounded = ensureBoundaryNodes(dedupeAndSortKeyNodes(normalized));
+  const padded = padKeyNodes(bounded, MIN_KEY_NODE_COUNT);
+  const trimmed = trimKeyNodes(padded, MAX_KEY_NODE_COUNT);
+  return dedupeAndSortKeyNodes(trimmed);
+}
+
 function normalizeNatalAiOutput(raw: unknown): unknown {
   const root = asRecord(raw);
   const analysis = asRecord(root.analysis);
-  if (Object.keys(analysis).length === 0) {
-    return raw;
-  }
+  const normalizedKeyNodes = normalizeNatalKeyNodes(root.keyNodes);
 
   const scores = asRecord(analysis.scores);
   const tags = asRecord(analysis.tags);
@@ -134,6 +308,15 @@ function normalizeNatalAiOutput(raw: unknown): unknown {
     ? root.recommendedCities
     : [];
 
+  if (Object.keys(analysis).length === 0) {
+    return {
+      ...root,
+      keyNodes: normalizedKeyNodes,
+      recommendedCities,
+      citySummary: asText(root.citySummary),
+    };
+  }
+
   return {
     ...root,
     analysis: {
@@ -142,6 +325,7 @@ function normalizeNatalAiOutput(raw: unknown): unknown {
       tags: normalizedTags,
       zodiacYearFortune: normalizedZodiacYearFortune,
     },
+    keyNodes: normalizedKeyNodes,
     recommendedCities,
     citySummary: asText(root.citySummary),
   };

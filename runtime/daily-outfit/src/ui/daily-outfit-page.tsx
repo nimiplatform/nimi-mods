@@ -26,7 +26,7 @@ import {
   suggestCutoutBinding,
 } from '../runtime-ai-client.js';
 import { DAILY_OUTFIT_AGE_GROUPS, DAILY_OUTFIT_CATEGORIES, DAILY_OUTFIT_GENDERS, DAILY_OUTFIT_SEASONS } from '../types.js';
-import { compressImageForStorage } from '../image-storage.js';
+import { compressImageForStorage, resolveImageUrlForDisplay, resolveImageUrlForRuntime } from '../image-storage.js';
 import { generateOutfitCollageImage } from './outfit-collage.js';
 
 function MetricCard(input: {
@@ -194,6 +194,25 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
+function collectImageRefs(values: Array<string | null | undefined>): string[] {
+  const refs = new Set<string>();
+  for (const value of values) {
+    const normalized = String(value || '').trim();
+    if (normalized) {
+      refs.add(normalized);
+    }
+  }
+  return [...refs];
+}
+
+function displayImageUrl(imageUrl: string | null | undefined, resolved: Record<string, string>): string {
+  const normalized = String(imageUrl || '').trim();
+  if (!normalized) {
+    return '';
+  }
+  return resolved[normalized] || normalized;
+}
+
 export function DailyOutfitPage() {
   const { t } = useModTranslation('daily-outfit');
   const snapshot = useSyncExternalStore(subscribeDailyOutfitStore, getDailyOutfitSnapshot, getDailyOutfitSnapshot);
@@ -241,6 +260,7 @@ export function DailyOutfitPage() {
   const [tryOnBusy, setTryOnBusy] = useState(false);
   const [tryOnError, setTryOnError] = useState('');
   const [tryOnTraceId, setTryOnTraceId] = useState('');
+  const [resolvedImageUrls, setResolvedImageUrls] = useState<Record<string, string>>({});
   const collageJobsRef = useRef(new Set<string>());
 
   const loadRouteOptions = async (capability: RuntimeCanonicalCapability) => {
@@ -309,8 +329,17 @@ export function DailyOutfitPage() {
           if (cancelled || !collageImageUrl) {
             continue;
           }
+          const persistedCollageUrl = await compressImageForStorage({
+            imageUrl: collageImageUrl,
+            maxDimension: 1440,
+            quality: 0.9,
+            bucket: 'outfits',
+          });
+          if (cancelled || !persistedCollageUrl) {
+            continue;
+          }
           startTransition(() => {
-            updateOutfitCollage(outfit.id, collageImageUrl);
+            updateOutfitCollage(outfit.id, persistedCollageUrl);
           });
         } catch {
           // Ignore collage generation failures; recommendations still render as text.
@@ -334,6 +363,43 @@ export function DailyOutfitPage() {
     }
   }, [selectedOutfitId, snapshot.outfits]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const cleanup: Array<() => void> = [];
+    const refs = collectImageRefs([
+      selfieUrl,
+      photoUrl,
+      cutoutUrl,
+      snapshot.profile?.selfieUrl,
+      ...snapshot.outfits.flatMap((outfit) => [outfit.collageImageUrl, outfit.tryOnImageUrl]),
+    ]);
+
+    void (async () => {
+      const next: Record<string, string> = {};
+      for (const ref of refs) {
+        const resolved = await resolveImageUrlForDisplay(ref);
+        next[ref] = resolved.url;
+        if (resolved.revoke) {
+          cleanup.push(resolved.revoke);
+        }
+      }
+      if (cancelled) {
+        for (const revoke of cleanup) {
+          revoke();
+        }
+        return;
+      }
+      setResolvedImageUrls(next);
+    })();
+
+    return () => {
+      cancelled = true;
+      for (const revoke of cleanup) {
+        revoke();
+      }
+    };
+  }, [cutoutUrl, photoUrl, selfieUrl, snapshot]);
+
   const handleSaveProfile = async () => {
     try {
       setUploadError('');
@@ -343,6 +409,7 @@ export function DailyOutfitPage() {
           imageUrl: selfieUrl.trim(),
           maxDimension: 1280,
           quality: 0.84,
+          bucket: 'selfies',
         })
         : undefined;
       if (persistedSelfieUrl) {
@@ -376,6 +443,7 @@ export function DailyOutfitPage() {
         imageUrl: cutoutUrl.trim(),
         maxDimension: 1600,
         quality: 0.9,
+        bucket: 'garments',
       });
       setCutoutUrl(persistedCutoutUrl);
       startTransition(() => {
@@ -555,6 +623,7 @@ export function DailyOutfitPage() {
         imageUrl: result.imageUrl,
         maxDimension: 1600,
         quality: 0.9,
+        bucket: 'garments',
       });
       setCutoutUrl(persistedCutoutUrl);
       setCutoutTraceId(result.traceId || '');
@@ -604,8 +673,8 @@ export function DailyOutfitPage() {
         setCutoutBinding(nextBinding);
       }
       const result = await generateOutfitTryOn({
-        selfieUrl: snapshot.profile.selfieUrl,
-        collageImageUrl: selectedOutfit.collageImageUrl,
+        selfieUrl: await resolveImageUrlForRuntime(snapshot.profile.selfieUrl),
+        collageImageUrl: await resolveImageUrlForRuntime(selectedOutfit.collageImageUrl),
         occasion: selectedOutfit.occasion,
         reasoning: selectedOutfit.aiReasoning,
         binding: nextBinding,
@@ -614,6 +683,7 @@ export function DailyOutfitPage() {
         imageUrl: result.imageUrl,
         maxDimension: 1440,
         quality: 0.9,
+        bucket: 'outfits',
       });
       setTryOnTraceId(result.traceId || '');
       startTransition(() => {
@@ -695,7 +765,7 @@ export function DailyOutfitPage() {
                 <div className="mt-6 grid gap-6 md:grid-cols-[160px_1fr]">
                   <label className="group relative flex h-[190px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[24px] border-2 border-dashed border-[#e5d7d1] bg-[#faf6f3] text-[#9c8d87] transition-colors hover:border-[#b0867d]">
                     {selfieUrl ? (
-                      <img src={selfieUrl} alt={t('fields.uploadSelfie')} className="absolute inset-0 h-full w-full object-cover" />
+                      <img src={displayImageUrl(selfieUrl, resolvedImageUrls)} alt={t('fields.uploadSelfie')} className="absolute inset-0 h-full w-full object-cover" />
                     ) : null}
                     <div className={`relative z-10 flex flex-col items-center gap-2 ${selfieUrl ? 'rounded-2xl bg-white/80 px-4 py-3 backdrop-blur' : ''}`}>
                       <div className="text-3xl">+</div>
@@ -761,7 +831,7 @@ export function DailyOutfitPage() {
                 <div className="grid gap-4 lg:grid-cols-2">
                   <label className="group relative flex min-h-[360px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[24px] border-2 border-dashed border-[#eadad3] bg-[#fbf7f4] text-center text-[#9a8d86] transition-colors hover:border-[#b0867d]">
                     {photoUrl ? (
-                      <img src={photoUrl} alt={t('fields.uploadGarment')} className="absolute inset-0 h-full w-full object-cover" />
+                      <img src={displayImageUrl(photoUrl, resolvedImageUrls)} alt={t('fields.uploadGarment')} className="absolute inset-0 h-full w-full object-cover" />
                     ) : null}
                     {!photoUrl ? (
                       <div className="relative z-10 flex max-w-[220px] flex-col items-center gap-2">
@@ -783,7 +853,7 @@ export function DailyOutfitPage() {
                           backgroundPosition: '0 0, 0 14px, 14px -14px, -14px 0px',
                         }}
                       >
-                        <img src={cutoutUrl} alt={t('fields.cutoutPreview')} className="max-h-[320px] w-full object-contain" />
+                        <img src={displayImageUrl(cutoutUrl, resolvedImageUrls)} alt={t('fields.cutoutPreview')} className="max-h-[320px] w-full object-contain" />
                       </div>
                     ) : (
                       <div className="flex min-h-[360px] flex-col items-center justify-center px-6 text-center text-[#9a8d86]">
@@ -1035,7 +1105,7 @@ export function DailyOutfitPage() {
                           <div className="relative w-full max-w-[420px] overflow-hidden rounded-[36px] border border-[#d8c7bd] bg-[#dbcbbf] shadow-[0_24px_56px_-32px_rgba(85,60,50,0.45)]">
                             {selectedOutfit.collageImageUrl ? (
                               <img
-                                src={selectedOutfit.collageImageUrl}
+                                src={displayImageUrl(selectedOutfit.collageImageUrl, resolvedImageUrls)}
                                 alt={selectedOutfit.occasion}
                                 className="aspect-[21/32] w-full object-cover"
                               />
@@ -1049,7 +1119,7 @@ export function DailyOutfitPage() {
                           {selectedOutfit.tryOnImageUrl ? (
                             <div className="mt-6 w-full max-w-[360px] overflow-hidden rounded-[32px] border border-[#e0d3cc] bg-white shadow-[0_18px_40px_-30px_rgba(74,53,44,0.2)] xl:mt-0">
                               <img
-                                src={selectedOutfit.tryOnImageUrl}
+                                src={displayImageUrl(selectedOutfit.tryOnImageUrl, resolvedImageUrls)}
                                 alt={`${selectedOutfit.occasion} try on`}
                                 className="aspect-square w-full object-cover"
                               />
@@ -1073,7 +1143,7 @@ export function DailyOutfitPage() {
                               >
                                 <div className="h-full w-full overflow-hidden rounded-lg bg-[#eadfd8]">
                                   {outfit.collageImageUrl ? (
-                                    <img src={outfit.collageImageUrl} alt={outfit.occasion} className="h-full w-full object-cover object-top" />
+                                    <img src={displayImageUrl(outfit.collageImageUrl, resolvedImageUrls)} alt={outfit.occasion} className="h-full w-full object-cover object-top" />
                                   ) : null}
                                 </div>
                                 {selectedOutfit.id === outfit.id ? (

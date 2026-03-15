@@ -17,6 +17,8 @@ capabilities:
   - runtime.route.resolve
   - storage.sqlite.query
   - storage.sqlite.execute
+  - storage.files.read
+  - storage.files.write
   - data.register.data-api.daily-outfit.wardrobe.list
   - data.register.data-api.daily-outfit.wardrobe.get
   - data.register.data-api.daily-outfit.wardrobe.create

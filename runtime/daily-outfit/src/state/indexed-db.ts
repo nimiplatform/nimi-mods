@@ -1,4 +1,4 @@
-import { createModKvStore, createModStorageClient } from '@nimiplatform/sdk/mod';
+import { createModKvStore, createModStorageClient, type ModKvStore } from '@nimiplatform/sdk/mod/storage';
 import { DAILY_OUTFIT_MOD_ID } from '../contracts.js';
 import type { DailyOutfitSnapshot } from '../types.js';
 
@@ -11,17 +11,24 @@ type PersistedSnapshotRow = {
 };
 
 let memoryRow: PersistedSnapshotRow | null = null;
-const outfitSnapshotStore = createModKvStore({
-  storage: createModStorageClient(DAILY_OUTFIT_MOD_ID),
-  namespace: 'daily-outfit.snapshot',
-});
+let outfitSnapshotStore: ModKvStore | null = null;
+
+function getOutfitSnapshotStore(): ModKvStore {
+  if (!outfitSnapshotStore) {
+    outfitSnapshotStore = createModKvStore({
+      storage: createModStorageClient(DAILY_OUTFIT_MOD_ID),
+      namespace: 'daily-outfit.snapshot',
+    });
+  }
+  return outfitSnapshotStore;
+}
 
 function cloneSnapshot(snapshot: DailyOutfitSnapshot): DailyOutfitSnapshot {
   return JSON.parse(JSON.stringify(snapshot)) as DailyOutfitSnapshot;
 }
 
 export async function loadDailyOutfitSnapshotFromIndexedDb(): Promise<DailyOutfitSnapshot | null> {
-  const row = await outfitSnapshotStore.getJson<PersistedSnapshotRow>(SNAPSHOT_KEY);
+  const row = await getOutfitSnapshotStore().getJson<PersistedSnapshotRow>(SNAPSHOT_KEY);
   if (!row) {
     return memoryRow ? cloneSnapshot(memoryRow.snapshot) : null;
   }
@@ -35,5 +42,5 @@ export async function persistDailyOutfitSnapshotToIndexedDb(snapshot: DailyOutfi
     updatedAt: new Date().toISOString(),
   };
   memoryRow = row;
-  await outfitSnapshotStore.setJson(SNAPSHOT_KEY, row);
+  await getOutfitSnapshotStore().setJson(SNAPSHOT_KEY, row);
 }

@@ -24,12 +24,15 @@ const settings: KBSettings = {
   queryRewritingEnabled: false,
 };
 
-function createLlmClient(
-  streamText: LlmClient['streamText'],
-): LlmClient {
+function createLlmClient(input?: {
+  generateText?: LlmClient['generateText'];
+  streamText?: LlmClient['streamText'];
+}): LlmClient {
   return {
-    generateText: vi.fn(async () => ({ text: 'unused' })),
-    streamText,
+    generateText: input?.generateText ?? vi.fn(async () => ({ text: 'unused' })),
+    streamText: input?.streamText ?? vi.fn(async function* () {
+      yield { type: 'done' as const };
+    }),
   };
 }
 
@@ -84,20 +87,19 @@ describe('rag-pipeline', () => {
       },
     ]);
 
-    const streamText = vi.fn<LlmClient['streamText']>(async function* (input) {
+    const generateText = vi.fn<LlmClient['generateText']>(async (input) => {
       expect(input.systemPrompt).toContain('Treat all content inside <REFERENCE_DOCUMENTS>');
       expect(input.userPrompt).toContain('<REFERENCE_DOCUMENTS>');
       expect(input.userPrompt).toContain('<USER_QUESTION>');
       expect(input.maxTokens).toBe(1024);
-      yield { type: 'text_delta', textDelta: 'Grounded answer [1]' };
-      yield { type: 'done' };
+      return { text: 'Grounded answer [1]' };
     });
 
     const events = await collectEvents(runRagPipeline({
       query: 'What does the note say?',
       recentTurns: [],
       settings,
-      llmClient: createLlmClient(streamText),
+      llmClient: createLlmClient({ generateText }),
       embeddingClient: createEmbeddingClient(async () => ({
         embeddings: [[1, 0]],
         model: 'openai/text-embedding-3-small',
@@ -111,6 +113,7 @@ describe('rag-pipeline', () => {
     expect(done.type).toBe('done');
     expect(done.fullText).toContain('Grounded answer');
     expect(done.citations[0]?.refIndex).toBe(1);
+    expect(generateText).toHaveBeenCalledTimes(1);
   });
 
   it('fails closed when stored vectors are incompatible with the active embedding model', async () => {
@@ -130,9 +133,7 @@ describe('rag-pipeline', () => {
       query: 'Will this fail?',
       recentTurns: [],
       settings,
-      llmClient: createLlmClient(async function* () {
-        yield { type: 'done' };
-      }),
+      llmClient: createLlmClient(),
       embeddingClient: createEmbeddingClient(async () => ({
         embeddings: [[1, 0]],
         model: 'openai/text-embedding-3-small',

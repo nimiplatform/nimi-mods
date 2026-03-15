@@ -14,10 +14,10 @@ export function CitationInline(props: CitationInlineProps) {
     <button
       type="button"
       onClick={props.onClick}
-      className="inline-flex h-[18px] min-w-[1.25rem] items-center justify-center rounded bg-indigo-50 px-1 text-[9px] font-bold text-indigo-600 hover:bg-indigo-100"
+      className="inline rounded-sm px-0.5 align-baseline text-[0.9em] font-medium text-indigo-600 underline decoration-indigo-200 underline-offset-2 hover:bg-indigo-50 hover:text-indigo-700"
       title={`Reference ${props.refIndex}`}
     >
-      {props.refIndex}
+      [{props.refIndex}]
     </button>
   );
 }

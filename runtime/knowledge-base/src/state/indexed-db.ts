@@ -1,4 +1,4 @@
-import { createModKvStore, createModStorageClient } from '@nimiplatform/sdk/mod';
+import { createModKvStore, createModStorageClient, type ModKvStore } from '@nimiplatform/sdk/mod/storage';
 import { KB_MOD_ID } from '../contracts.js';
 import type { KBDocument, KBChunk, KBVector, KBConversation, KBSettings } from '../types.js';
 
@@ -10,15 +10,21 @@ type KnowledgeBaseSnapshot = {
   settings?: KBSettings;
 };
 
-const kbStateStore = createModKvStore({
-  storage: createModStorageClient(KB_MOD_ID),
-  namespace: 'knowledge-base.state',
-});
-
 const SNAPSHOT_KEY = 'snapshot';
+let kbStateStore: ModKvStore | null = null;
+
+function getKbStateStore(): ModKvStore {
+  if (!kbStateStore) {
+    kbStateStore = createModKvStore({
+      storage: createModStorageClient(KB_MOD_ID),
+      namespace: 'knowledge-base.state',
+    });
+  }
+  return kbStateStore;
+}
 
 async function loadSnapshot(): Promise<KnowledgeBaseSnapshot> {
-  return await kbStateStore.getJson<KnowledgeBaseSnapshot>(SNAPSHOT_KEY) || {
+  return await getKbStateStore().getJson<KnowledgeBaseSnapshot>(SNAPSHOT_KEY) || {
     documents: [],
     chunks: [],
     vectors: [],
@@ -27,7 +33,7 @@ async function loadSnapshot(): Promise<KnowledgeBaseSnapshot> {
 }
 
 async function saveSnapshot(snapshot: KnowledgeBaseSnapshot): Promise<void> {
-  await kbStateStore.setJson(SNAPSHOT_KEY, snapshot);
+  await getKbStateStore().setJson(SNAPSHOT_KEY, snapshot);
 }
 
 export async function openDb(): Promise<null> {

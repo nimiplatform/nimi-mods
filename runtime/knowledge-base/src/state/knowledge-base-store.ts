@@ -170,7 +170,7 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
           : d,
       ),
     }));
-    // Persist to IndexedDB
+    // Persist to host sqlite-backed mod storage
     const doc = get().documents.find((d) => d.id === docId);
     if (doc) dbPutDocument(doc);
   },

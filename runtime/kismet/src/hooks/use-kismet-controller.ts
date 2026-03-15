@@ -26,6 +26,7 @@ import {
   validateNatalAiOutput,
 } from '../validation/validate-result.js';
 import {
+  clearPrimaryProfile,
   createLocalShareProfile,
   hydrateLocalShareProfilesState,
   loadCachedFortuneStick,
@@ -187,7 +188,11 @@ export function useKismetController() {
         natalResult,
         savedAt: new Date().toISOString(),
       };
-      void persistPrimaryProfile(primary);
+      if (derived.birthInput.consent.allowLocalProfilePersist) {
+        void persistPrimaryProfile(primary);
+      } else {
+        void clearPrimaryProfile();
+      }
       store.setPrimaryProfile(primary);
       emitKismetLog({ message: KISMET_AUDIT.NATAL_GENERATE_SUCCEEDED, source: 'useKismetController' });
       return;
@@ -492,7 +497,11 @@ export function useKismetController() {
       canonicalProfile: profileToSave,
       savedAt: new Date().toISOString(),
     };
-    void persistPrimaryProfile(primary);
+    if (validation.data.consent.allowLocalProfilePersist) {
+      void persistPrimaryProfile(primary);
+    } else {
+      void clearPrimaryProfile();
+    }
     store.setPrimaryProfile(primary);
     store.setConfirmedProfile(profileToSave);
     emitKismetLog({ message: KISMET_AUDIT.LOCAL_PROFILE_SAVED, source: 'useKismetController' });
@@ -506,7 +515,7 @@ export function useKismetController() {
     // Save as primary profile
     savePrimaryProfile();
     // Also save to compatibility profiles list
-    if (store.birthInput.consent?.allowLocalProfileMatchUse) {
+    if (store.birthInput.consent?.allowLocalProfilePersist && store.birthInput.consent?.allowLocalProfileMatchUse) {
       const profile = createLocalShareProfile(
         store.birthInput.name || store.birthInput.birthPlaceLabel || kismetMessage('Messages.savedProfileFallback', 'Kismet Profile'),
         profileToSave,

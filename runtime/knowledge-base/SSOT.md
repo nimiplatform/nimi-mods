@@ -6,7 +6,7 @@ updated_at: 2026-03-04
 rules:
   - KB 业务执行真相唯一归属本文件；`@nimiplatform/nimi/ssot/mod/governance.md` 仅定义 Mod 通用治理规则。
   - KB 执行主路径固定在 `nimi-mods/runtime/knowledge-base`，不得以独立网页壳替代 Nimi runtime mod 形态。
-  - 文档数据默认仅本地处理（IndexedDB），不隐式上传；导出/分享必须由用户显式触发。
+  - 文档数据默认仅本地处理（宿主 sqlite），不隐式上传；导出/分享必须由用户显式触发。
   - AI 调用入口统一为 `@nimiplatform/sdk/mod`（`runtime.ai.text.*` / `runtime.ai.embedding.generate`），不保留 legacy 场景调用兼容路径。
   - 搜索能力通过 `data.register` 暴露为 data-api capability，不使用 `inter-mod.provide`。
   - Embedding 路由默认 cloud-first（cloud），预留 local 接口；路由来源由 `RuntimeRouteBinding` 控制，不硬编码 provider。
@@ -65,7 +65,7 @@ rules:
 | Layer | Technology |
 |-------|-----------|
 | UI | React 19 + Tailwind 4 + Radix UI (Dialog, Progress, Tooltip) |
-| State | Zustand + IndexedDB (`knowledge-base-db` v1) |
+| State | Zustand + host sqlite-backed mod storage (`knowledge-base.state`) |
 | AI | `@nimiplatform/sdk/mod` (`runtime.ai.text.generate/stream`, `runtime.ai.embedding.generate`) |
 | Vector Search | In-memory cosine similarity (VectorStore) |
 | Cross-Mod | Data-API capability (search, documents, conversations) |

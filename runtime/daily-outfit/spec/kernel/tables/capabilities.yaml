@@ -26,6 +26,12 @@ required_capabilities:
   - key: storage.sqlite.execute
     purpose: 持久化本地衣橱状态到宿主 sqlite
     source_rule: DO-CAP-006
+  - key: storage.files.read
+    purpose: 读取本地自拍、衣物图与试穿图文件引用
+    source_rule: DO-CAP-006
+  - key: storage.files.write
+    purpose: 写入本地自拍、衣物图与试穿图文件引用
+    source_rule: DO-CAP-006
   - key: data.register.data-api.daily-outfit.wardrobe.list
     purpose: 查询衣橱列表
     source_rule: DO-CAP-006

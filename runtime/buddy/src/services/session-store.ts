@@ -1,6 +1,7 @@
 import { BUDDY_SESSION_VERSION, DEFAULT_BUDDY_MODEL_ID, BUDDY_MODELS, type BuddyModelId, } from '../contracts.js';
 import type { ChatMessage } from './dialogue-engine.js';
-import { createModKvStore, type HookClient, type RuntimeRouteBinding } from "@nimiplatform/sdk/mod";
+import { type HookClient, type RuntimeRouteBinding } from "@nimiplatform/sdk/mod";
+import { createModKvStore } from '@nimiplatform/sdk/mod/storage';
 const SESSION_KEY = 'buddy:session:default';
 export interface BuddySessionState {
     version: number;

@@ -28,7 +28,7 @@ export function InputForm({
       consent: {
         allowCityAffinityUse: value.consent?.allowCityAffinityUse ?? true,
         allowLocalProfileMatchUse: value.consent?.allowLocalProfileMatchUse ?? false,
-        allowLocalProfilePersist: value.consent?.allowLocalProfilePersist ?? true,
+        allowLocalProfilePersist: value.consent?.allowLocalProfilePersist ?? false,
         [key]: checked,
       },
     });
@@ -140,7 +140,7 @@ export function InputForm({
               <label className="flex cursor-pointer items-start gap-2.5">
                 <input
                   type="checkbox"
-                  checked={value.consent?.allowLocalProfilePersist ?? true}
+                  checked={value.consent?.allowLocalProfilePersist ?? false}
                   onChange={(e) => updateConsent('allowLocalProfilePersist', e.target.checked)}
                   disabled={disabled}
                   className="mt-0.5"

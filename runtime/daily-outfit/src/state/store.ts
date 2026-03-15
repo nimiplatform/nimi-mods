@@ -802,6 +802,8 @@ async function hydrateDailyOutfitStore(): Promise<void> {
       applyPersistedSnapshot(snapshot);
       notifyListeners();
     }
+  } catch {
+    // Tests and non-host contexts can import the store before the mod host exists.
   } finally {
     hasHydratedFromPersistence = true;
     if (pendingPersistBeforeHydration) {

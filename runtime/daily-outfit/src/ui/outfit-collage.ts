@@ -1,4 +1,5 @@
 import type { GarmentItem, OutfitCombo } from '../types.js';
+import { resolveImageUrlForDisplay } from '../image-storage.js';
 
 type OutfitCollageInput = {
   outfit: OutfitCombo;
@@ -214,8 +215,13 @@ export async function generateOutfitCollageImage(input: OutfitCollageInput): Pro
     if (!imageUrl) {
       continue;
     }
-    const image = await loadImage(imageUrl);
-    drawImageContain(context, image, slot.rect);
+    const resolved = await resolveImageUrlForDisplay(imageUrl);
+    try {
+      const image = await loadImage(resolved.url);
+      drawImageContain(context, image, slot.rect);
+    } finally {
+      resolved.revoke?.();
+    }
   }
 
   drawFooter(context, input.outfit);

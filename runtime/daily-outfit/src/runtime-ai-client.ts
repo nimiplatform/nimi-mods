@@ -11,6 +11,7 @@ import {
   type DailyOutfitCategory,
   type DailyOutfitSeason,
 } from './types.js';
+import { resolveImageUrlForRuntime } from './image-storage.js';
 
 export type DailyOutfitGarmentAnalysis = {
   category: DailyOutfitCategory;
@@ -622,6 +623,7 @@ export async function analyzeGarmentPhoto(input: {
   binding?: RuntimeRouteBinding | null;
 }): Promise<DailyOutfitGarmentAnalysis> {
   const runtimeClient = getDailyOutfitRuntimeClient();
+  const resolvedImageUrl = await resolveImageUrlForRuntime(input.imageUrl);
   const route = await runtimeClient.route.resolve({
     capability: 'text.generate',
     ...(input.binding ? { binding: input.binding } : {}),
@@ -631,7 +633,7 @@ export async function analyzeGarmentPhoto(input: {
       role: 'user',
       content: [
         { type: 'text', text: GARMENT_ANALYSIS_PROMPT },
-        { type: 'image_url', imageUrl: input.imageUrl, detail: 'high' },
+        { type: 'image_url', imageUrl: resolvedImageUrl, detail: 'high' },
       ],
     }],
     model: route.model || undefined,
@@ -652,13 +654,14 @@ export async function generateGarmentCutout(input: {
   binding?: RuntimeRouteBinding | null;
 }): Promise<{ imageUrl: string; traceId?: string }> {
   const runtimeClient = getDailyOutfitRuntimeClient();
+  const resolvedImageUrl = await resolveImageUrlForRuntime(input.imageUrl);
   const route = await runtimeClient.route.resolve({
     capability: 'image.generate',
     ...(input.binding ? { binding: input.binding } : {}),
   });
   const result = await runtimeClient.media.image.generate({
     prompt: buildCutoutPrompt(input),
-    referenceImages: [input.imageUrl],
+    referenceImages: [resolvedImageUrl],
     responseFormat: 'base64',
     size: '1024x1024',
     quality: 'high',
@@ -701,6 +704,8 @@ export async function generateOutfitTryOn(input: {
   binding?: RuntimeRouteBinding | null;
 }): Promise<{ imageUrl: string; traceId?: string }> {
   const runtimeClient = getDailyOutfitRuntimeClient();
+  const selfieUrl = await resolveImageUrlForRuntime(input.selfieUrl);
+  const collageImageUrl = await resolveImageUrlForRuntime(input.collageImageUrl);
   const route = await runtimeClient.route.resolve({
     capability: 'image.generate',
     ...(input.binding ? { binding: input.binding } : {}),
@@ -710,7 +715,7 @@ export async function generateOutfitTryOn(input: {
       occasion: input.occasion,
       reasoning: input.reasoning,
     }),
-    referenceImages: [input.selfieUrl, input.collageImageUrl],
+    referenceImages: [selfieUrl, collageImageUrl],
     responseFormat: 'base64',
     size: '1024x1024',
     quality: 'high',

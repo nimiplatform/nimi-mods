@@ -205,19 +205,17 @@ export async function* runRagPipeline(input: {
     hasSearchResults: searchResults.length > 0,
   });
 
-  // 5. Stream generation (SSOT §4.4)
-  let fullText = '';
-
-  for await (const event of llmClient.streamText({
+  // 5. Text generation. Prefer a single grounded response over partial/empty
+  // streaming fragments when provider stream adapters are inconsistent.
+  const completion = await llmClient.generateText({
     systemPrompt: RAG_SYSTEM_PROMPT,
     userPrompt,
     temperature: 0.3,
     maxTokens: MAX_RAG_OUTPUT_TOKENS,
-  })) {
-    if (event.type === 'text_delta') {
-      fullText += event.textDelta;
-      yield { type: 'text_delta', textDelta: event.textDelta };
-    }
+  });
+  const fullText = String(completion.text || '');
+  if (fullText) {
+    yield { type: 'text_delta', textDelta: fullText };
   }
 
   // 6. Parse citations (SSOT §4.5)
