@@ -7,6 +7,7 @@ import { emitMintYouLog, createMintYouFlowId } from '../logging.js';
 import { MINTYOU_AUDIT } from '../contracts.js';
 import type { MintYouError } from '../types.js';
 import { ErrorBanner } from './error-banner.js';
+import { normalizeInterviewLanguage } from '../utils/interview-language.js';
 import { useModTranslation } from "@nimiplatform/sdk/mod";
 const DNA_SYNTHESIS_MAX_ATTEMPTS = 3;
 function delay(ms: number): Promise<void> {
@@ -21,11 +22,12 @@ function shouldRetryDnaSynthesis(error: MintYouError): boolean {
         || text.includes('rate'));
 }
 export function StepProcessing() {
-    const { t } = useModTranslation('mint-you');
+    const { t, i18n } = useModTranslation('mint-you');
     const store = useMintYouStore();
-    const { currentStep, interviewSignals, interviewTurnCount, interviewValidTurnCount, basicInfo, selectedInterests, selfReportedMbti, currentFocus, loading, error, routeBinding, } = store;
+    const { currentStep, interviewSignals, interviewTurnCount, interviewValidTurnCount, interviewLanguage, basicInfo, selectedInterests, selfReportedMbti, currentFocus, loading, error, routeBinding, } = store;
     const isExtracting = currentStep === 'trait-extract';
     const isSynthesizing = currentStep === 'dna-synthesize';
+    const synthesisLanguage = interviewLanguage || normalizeInterviewLanguage(i18n.resolvedLanguage || i18n.language || 'en');
     const runPipeline = useCallback(async () => {
         if (!basicInfo)
             return;
@@ -66,6 +68,7 @@ export function StepProcessing() {
                     interests: selectedInterests,
                     selfReportedMbti,
                     currentFocus,
+                    language: synthesisLanguage,
                     binding: routeBinding,
                 });
                 if (result.ok) {
@@ -106,7 +109,7 @@ export function StepProcessing() {
                 store.setError(lastError);
             }
         }
-    }, [isExtracting, isSynthesizing, basicInfo, interviewSignals, interviewTurnCount, interviewValidTurnCount, selectedInterests, selfReportedMbti, currentFocus, routeBinding, store]);
+    }, [isExtracting, isSynthesizing, basicInfo, interviewSignals, interviewTurnCount, interviewValidTurnCount, selectedInterests, selfReportedMbti, currentFocus, synthesisLanguage, routeBinding, store]);
     useEffect(() => {
         runPipeline();
     }, [currentStep]);

@@ -93,6 +93,9 @@ export function useMintYouSession() {
                 if (existing.interviewValidTurnCount > 0) {
                     store.setInterviewValidTurnCount(existing.interviewValidTurnCount);
                 }
+                if (existing.interviewLanguage) {
+                    store.setInterviewLanguage(existing.interviewLanguage);
+                }
                 if (existing.memoryDigest) {
                     store.setMemoryDigest(existing.memoryDigest);
                 }
@@ -136,6 +139,7 @@ export function useMintYouSession() {
     const interviewSignals = useMintYouStore((s) => s.interviewSignals);
     const interviewTurnCount = useMintYouStore((s) => s.interviewTurnCount);
     const interviewValidTurnCount = useMintYouStore((s) => s.interviewValidTurnCount);
+    const interviewLanguage = useMintYouStore((s) => s.interviewLanguage);
     const memoryDigest = useMintYouStore((s) => s.memoryDigest);
     const traitResult = useMintYouStore((s) => s.traitResult);
     const dnaSynthesis = useMintYouStore((s) => s.dnaSynthesis);
@@ -164,6 +168,7 @@ export function useMintYouSession() {
                 interviewSignals: state.interviewSignals,
                 interviewTurnCount: state.interviewTurnCount,
                 interviewValidTurnCount: state.interviewValidTurnCount,
+                interviewLanguage: state.interviewLanguage,
                 memoryDigest: state.memoryDigest,
                 traitResult: state.traitResult,
                 dnaSynthesis: state.dnaSynthesis,
@@ -194,6 +199,7 @@ export function useMintYouSession() {
         interviewSignals,
         interviewTurnCount,
         interviewValidTurnCount,
+        interviewLanguage,
         memoryDigest,
         traitResult,
         dnaSynthesis,

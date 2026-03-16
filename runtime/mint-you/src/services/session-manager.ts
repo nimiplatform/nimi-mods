@@ -1,7 +1,8 @@
-import type { MintYouSession, BasicInfo, TraitExtractionResult, DnaSynthesisOutput, InterviewMessage, InterviewTurnSignal, SocialProfile, } from '../types.js';
+import type { MintYouSession, BasicInfo, TraitExtractionResult, DnaSynthesisOutput, InterviewMessage, InterviewTurnSignal, SocialProfile, MintYouInterviewLanguage, } from '../types.js';
 import type { MintYouPipelineStep, DnaPrimaryType, DnaSecondaryTrait, RelationshipMode, FormalityValue, SentimentValue, } from '../contracts.js';
 import { emitMintYouLog } from '../logging.js';
 import { readStoredState, removeStoredState, writeStoredState, } from './storage-state.js';
+import { parseInterviewLanguage } from '../utils/interview-language.js';
 import { type HookClient } from "@nimiplatform/sdk/mod";
 export const SESSION_VERSION = 4;
 const SESSION_KEY_PREFIX = 'mint-you:session:';
@@ -27,7 +28,10 @@ function parseSession(raw: string | null): MintYouSession | null {
         // Version check: reject sessions from older schema
         if ((parsed.sessionVersion ?? 0) !== SESSION_VERSION)
             return null;
-        return parsed;
+        return {
+            ...parsed,
+            interviewLanguage: parseInterviewLanguage(parsed.interviewLanguage),
+        };
     }
     catch {
         return null;
@@ -126,6 +130,7 @@ export function buildSessionSnapshot(input: {
     interviewSignals: InterviewTurnSignal[];
     interviewTurnCount: number;
     interviewValidTurnCount: number;
+    interviewLanguage: MintYouInterviewLanguage | null;
     memoryDigest: string;
     traitResult: TraitExtractionResult | null;
     dnaSynthesis: DnaSynthesisOutput | null;
@@ -155,6 +160,7 @@ export function buildSessionSnapshot(input: {
         interviewSignals: input.interviewSignals,
         interviewTurnCount: input.interviewTurnCount,
         interviewValidTurnCount: input.interviewValidTurnCount,
+        interviewLanguage: input.interviewLanguage,
         memoryDigest: input.memoryDigest,
         traitResult: input.traitResult,
         dnaSynthesis: input.dnaSynthesis,

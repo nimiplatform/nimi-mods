@@ -4,6 +4,7 @@ import { processInterviewTurn, shouldForceEnd, canUserEnd, isDegradedEnd, needsE
 import { getMintYouRuntimeClient } from '../runtime-mod.js';
 import { createUlid } from '../utils/ulid.js';
 import { emitMintYouLog } from '../logging.js';
+import { normalizeInterviewLanguage } from '../utils/interview-language.js';
 import { InterviewChatPane } from './interview-chat-pane.js';
 import { InterviewInput } from './interview-input.js';
 import type { InterviewMessage } from '../types.js';
@@ -12,8 +13,9 @@ export function StepInterview() {
     const { t, i18n } = useModTranslation('mint-you');
     const store = useMintYouStore();
     const [typingText, setTypingText] = useState<string | null>(null);
-    const language = String(i18n.resolvedLanguage || i18n.language || 'en');
-    const { interviewMessages, interviewSignals, interviewTurnCount, interviewValidTurnCount, interviewStatus, memoryDigest, selectedInterests, currentFocus, routeBinding, currentRequestId, sessionPersistWarning, error, } = store;
+    const localeLanguage = String(i18n.resolvedLanguage || i18n.language || 'en');
+    const { interviewMessages, interviewSignals, interviewTurnCount, interviewValidTurnCount, interviewLanguage, interviewStatus, memoryDigest, selectedInterests, currentFocus, routeBinding, currentRequestId, sessionPersistWarning, error, } = store;
+    const resolvedInterviewLanguage = interviewLanguage || normalizeInterviewLanguage(localeLanguage);
     const turnCountRef = useRef(interviewTurnCount);
     turnCountRef.current = interviewTurnCount;
     const lastFailedTurnRef = useRef<{
@@ -22,6 +24,11 @@ export function StepInterview() {
     } | null>(null);
     // Opening: AI sends first message when interview starts
     const hasInitRef = useRef(false);
+    useEffect(() => {
+        if (interviewLanguage)
+            return;
+        store.setInterviewLanguage(resolvedInterviewLanguage);
+    }, [interviewLanguage, resolvedInterviewLanguage, store]);
     useEffect(() => {
         if (hasInitRef.current)
             return;
@@ -73,7 +80,7 @@ export function StepInterview() {
                 validTurnCount: state.interviewValidTurnCount,
                 interests: state.selectedInterests,
                 currentFocus: state.currentFocus,
-                language,
+                language: state.interviewLanguage || resolvedInterviewLanguage,
                 binding: state.routeBinding || undefined,
             });
             // Concurrency guard: discard if a newer request superseded this one
@@ -135,7 +142,7 @@ export function StepInterview() {
                 };
             }
         }
-    }, [store, language, t, currentFocus]);
+    }, [store, resolvedInterviewLanguage, t, currentFocus]);
     const handleTypingDone = useCallback(() => {
         const state = useMintYouStore.getState();
         // Add the AI message to the chat

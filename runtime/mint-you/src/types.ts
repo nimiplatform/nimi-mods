@@ -74,6 +74,7 @@ export type InterviewTurnOutput = {
 };
 
 export type InterviewStatus = 'idle' | 'ai-thinking' | 'typing' | 'complete' | 'error';
+export type MintYouInterviewLanguage = 'en' | 'zh';
 
 // ── Trait Extraction Result ──
 
@@ -148,6 +149,7 @@ export type MintYouSession = {
   interviewSignals: InterviewTurnSignal[];
   interviewTurnCount: number;
   interviewValidTurnCount: number;
+  interviewLanguage: MintYouInterviewLanguage | null;
   memoryDigest: string;
   traitResult: TraitExtractionResult | null;
   dnaSynthesis: DnaSynthesisOutput | null;

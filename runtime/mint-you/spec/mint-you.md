@@ -39,6 +39,7 @@
 - `MY-DOM-018`: Agent creation payload assembles full `CreateAgentDto` including pre-built `dna` object to skip backend LLM generation.
 - `MY-DOM-019`: Appearance and non-behavioral biological fields use hard-coded defaults appropriate for the social-persona context (see `tables/field-provenance.yaml`). These fields exist to satisfy AgentDna schema requirements but do not influence agent behavior.
 - `MY-DOM-020`: Interview prompts are generated dynamically per turn. No static scenario data is required for the interview phase.
+- `MY-DOM-033`: Interview establishes a session-scoped main language. Persona synthesis and preview re-synthesis must generate all natural-language agent artifacts in that same language.
 
 ## 3. Domain Increments — Photo Trust
 

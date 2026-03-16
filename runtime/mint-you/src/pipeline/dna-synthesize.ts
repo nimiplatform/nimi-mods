@@ -1,10 +1,11 @@
 import { MINTYOU_REASON, type MbtiValue, } from '../contracts.js';
 import { DnaSynthesisOutputSchema } from '../schemas.js';
-import type { BasicInfo, TraitExtractionResult, DnaSynthesisOutput, MintYouResult, } from '../types.js';
+import type { BasicInfo, TraitExtractionResult, DnaSynthesisOutput, MintYouResult, MintYouInterviewLanguage, } from '../types.js';
 import { emitMintYouLog } from '../logging.js';
 import { mintYouMessage } from '../i18n/messages.js';
 import { type ModRuntimeClient, type RuntimeRouteBinding } from "@nimiplatform/sdk/mod";
-function buildSystemPrompt(): string {
+function buildSystemPrompt(language: MintYouInterviewLanguage): string {
+    const outputLanguage = language === 'zh' ? 'Chinese (中文)' : 'English';
     return `You are a persona synthesis engine for a social AI platform. Given a user's personality profile (primary archetype, secondary traits, relationship mode, formality, sentiment) along with their basic info and interests, generate a complete social persona.
 
 Output a single JSON object with exactly these fields:
@@ -34,10 +35,13 @@ Output a single JSON object with exactly these fields:
 
 Rules:
 - All text fields must be non-empty strings.
+- All natural-language fields in the JSON must be written in ${outputLanguage}.
 - The greeting must reflect the persona's communication style (formality + sentiment).
 - The MBTI must be a valid 4-letter code: [E|I][N|S][T|F][J|P].
 - When Self Reported MBTI is provided, you MUST set personality.mbti to that exact value.
 - The "rules" field must be an array of rule line strings.
+- Every string inside the "rules" array must also be written in ${outputLanguage}.
+- Keep enum-like values and codes in their contract format (for example MBTI and responseLength stay in English enum form).
 - Output ONLY the JSON object. No markdown, no explanation.`;
 }
 function buildUserPrompt(input: {
@@ -46,8 +50,10 @@ function buildUserPrompt(input: {
     interests: string[];
     selfReportedMbti?: MbtiValue | null;
     currentFocus?: string;
+    language: MintYouInterviewLanguage;
 }): string {
-    const { basicInfo, traitResult, interests, selfReportedMbti, currentFocus, } = input;
+    const { basicInfo, traitResult, interests, selfReportedMbti, currentFocus, language, } = input;
+    const outputLanguage = language === 'zh' ? 'Chinese (中文)' : 'English';
     return `Generate a social persona with the following profile:
 
 Display Name: ${basicInfo.displayName}
@@ -64,6 +70,7 @@ Sentiment: ${traitResult.sentiment}
 Interests: ${interests.join(', ')}
 Self Reported MBTI: ${selfReportedMbti || 'not provided'}
 Current Focus Topic: ${currentFocus?.trim() || 'not provided'}
+Target Output Language: ${outputLanguage}
 
 Generate the complete persona JSON now.`;
 }
@@ -87,16 +94,18 @@ export async function synthesizeDna(input: {
     interests: string[];
     selfReportedMbti?: MbtiValue | null;
     currentFocus?: string;
+    language: MintYouInterviewLanguage;
     binding?: RuntimeRouteBinding | null;
 }): Promise<MintYouResult<DnaSynthesisOutput>> {
-    const { runtimeClient, basicInfo, traitResult, interests, selfReportedMbti, currentFocus, binding, } = input;
-    const systemPrompt = buildSystemPrompt();
+    const { runtimeClient, basicInfo, traitResult, interests, selfReportedMbti, currentFocus, language, binding, } = input;
+    const systemPrompt = buildSystemPrompt(language);
     const prompt = buildUserPrompt({
         basicInfo,
         traitResult,
         interests,
         selfReportedMbti,
         currentFocus,
+        language,
     });
     const actionHint = mintYouMessage('Errors.dnaActionHint', 'Check LLM route availability and retry synthesis.');
     try {

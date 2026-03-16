@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { MintYouPipelineStep, DnaPrimaryType, DnaSecondaryTrait, RelationshipMode, FormalityValue, SentimentValue, MbtiValue, } from '../contracts.js';
-import type { BasicInfo, TraitExtractionResult, DnaSynthesisOutput, InterviewMessage, InterviewTurnSignal, InterviewStatus, MintYouError, SocialProfile, } from '../types.js';
+import type { BasicInfo, TraitExtractionResult, DnaSynthesisOutput, InterviewMessage, InterviewTurnSignal, InterviewStatus, MintYouError, SocialProfile, MintYouInterviewLanguage, } from '../types.js';
 import { type RuntimeRouteBinding } from "@nimiplatform/sdk/mod";
 type TraitOverrides = {
     dnaPrimary?: DnaPrimaryType;
@@ -23,6 +23,7 @@ type MintYouStore = {
     interviewSignals: InterviewTurnSignal[];
     interviewTurnCount: number;
     interviewValidTurnCount: number;
+    interviewLanguage: MintYouInterviewLanguage | null;
     interviewStatus: InterviewStatus;
     memoryDigest: string;
     currentRequestId: string | null;
@@ -53,6 +54,7 @@ type MintYouStore = {
     addInterviewSignals: (signals: InterviewTurnSignal[]) => void;
     setInterviewTurnCount: (count: number) => void;
     setInterviewValidTurnCount: (count: number) => void;
+    setInterviewLanguage: (language: MintYouInterviewLanguage | null) => void;
     setInterviewStatus: (status: InterviewStatus) => void;
     setMemoryDigest: (digest: string) => void;
     setCurrentRequestId: (id: string | null) => void;
@@ -94,6 +96,7 @@ const INITIAL_STATE = {
     interviewSignals: [] as InterviewTurnSignal[],
     interviewTurnCount: 0,
     interviewValidTurnCount: 0,
+    interviewLanguage: null as MintYouInterviewLanguage | null,
     interviewStatus: 'idle' as InterviewStatus,
     memoryDigest: '',
     currentRequestId: null as string | null,
@@ -142,6 +145,7 @@ export const useMintYouStore = create<MintYouStore>((set) => ({
     })),
     setInterviewTurnCount: (count) => set({ interviewTurnCount: count }),
     setInterviewValidTurnCount: (count) => set({ interviewValidTurnCount: count }),
+    setInterviewLanguage: (language) => set({ interviewLanguage: language }),
     setInterviewStatus: (status) => set({ interviewStatus: status }),
     setMemoryDigest: (digest) => set({ memoryDigest: digest }),
     setCurrentRequestId: (id) => set({ currentRequestId: id }),

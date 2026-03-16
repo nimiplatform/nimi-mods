@@ -4,16 +4,18 @@ import { PRIMARY_ARCHETYPES, SECONDARY_TRAITS, RELATIONSHIP_MODES, FORMALITY_VAL
 import { getMintYouRuntimeClient } from '../runtime-mod.js';
 import { synthesizeDna } from '../pipeline/dna-synthesize.js';
 import { emitMintYouLog, createMintYouFlowId } from '../logging.js';
+import { normalizeInterviewLanguage } from '../utils/interview-language.js';
 import { PersonaCard } from './persona-card.js';
 import { ErrorBanner } from './error-banner.js';
 import { useModTranslation } from "@nimiplatform/sdk/mod";
 export function StepPreviewCard() {
-    const { t } = useModTranslation('mint-you');
+    const { t, i18n } = useModTranslation('mint-you');
     const store = useMintYouStore();
-    const { traitResult, dnaSynthesis, basicInfo, selectedInterests, selfReportedMbti, currentFocus, traitOverrides, referenceImageUrl, error, routeBinding, } = store;
+    const { traitResult, dnaSynthesis, basicInfo, selectedInterests, selfReportedMbti, currentFocus, interviewLanguage, traitOverrides, referenceImageUrl, error, routeBinding, } = store;
     const [resynthesizing, setResynthesizing] = useState(false);
     const [editingPrimary, setEditingPrimary] = useState(false);
     const [editingSecondary, setEditingSecondary] = useState(false);
+    const synthesisLanguage = interviewLanguage || normalizeInterviewLanguage(i18n.resolvedLanguage || i18n.language || 'en');
     if (!traitResult || !dnaSynthesis || !basicInfo)
         return null;
     const effectivePrimary = traitOverrides?.dnaPrimary ?? traitResult.dnaPrimary;
@@ -93,6 +95,7 @@ export function StepPreviewCard() {
             interests: selectedInterests,
             selfReportedMbti,
             currentFocus,
+            language: synthesisLanguage,
             binding: routeBinding,
         });
         setResynthesizing(false);
@@ -102,7 +105,7 @@ export function StepPreviewCard() {
         else {
             store.setError(result.error);
         }
-    }, [basicInfo, traitResult, traitOverrides, selectedInterests, selfReportedMbti, currentFocus, routeBinding, store]);
+    }, [basicInfo, traitResult, traitOverrides, selectedInterests, selfReportedMbti, currentFocus, synthesisLanguage, routeBinding, store]);
     const hasOverrides = traitOverrides && (traitOverrides.dnaPrimary !== undefined
         || traitOverrides.dnaSecondary !== undefined
         || traitOverrides.relationshipMode !== undefined

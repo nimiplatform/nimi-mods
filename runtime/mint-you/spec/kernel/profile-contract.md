@@ -37,3 +37,7 @@ When a user modifies a trait in the preview phase, only dependent LLM-generated 
 ## MY-PROF-009 User MBTI Precedence
 
 When `selfReportedMbti` is provided in the social-profile intake phase, final `AgentDna.personality.mbti` must use that exact value. When `selfReportedMbti` is omitted, `personality.mbti` falls back to LLM synthesis from the resolved trait profile.
+
+## MY-PROF-010 LLM Output Language Lock
+
+All natural-language fields produced by `llm-synthesis` must be generated in the session-scoped `interviewLanguage`. This applies to CreateAgentDto-facing fields (`concept`, `description`, `greeting`, `exampleDialogue`, `systemPromptBase`, `rules`, `scenario`) and to the natural-language DNA summary fields (`identity.role`, `identity.worldview`, `identity.summary`, `personality.summary`, `communication.summary`). Enum literals, handles, and MBTI codes remain in their contract-defined formats.

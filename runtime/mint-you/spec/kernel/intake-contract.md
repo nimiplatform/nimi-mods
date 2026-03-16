@@ -41,3 +41,7 @@ The second intake phase may collect one lightweight opener field alongside inter
 ## MY-INT-008 Self-Reported MBTI
 
 Self-reported MBTI is optional and is collected in the second intake phase. When provided, the final persona must preserve that exact MBTI value. When omitted, MBTI falls back to synthesis from the interview-derived trait profile.
+
+## MY-INT-009 Interview Language Resolution
+
+The interview phase resolves a session-scoped `interviewLanguage` from the active prompt locale at interview start and keeps that value stable for the remainder of the intake session. Current supported values are `zh` and `en`. Recomputing the interview language from later UI locale changes during the same session is forbidden.

@@ -26,3 +26,7 @@ Intake progress is persisted per step to the mod's local state store (platform-p
 ## MY-PIPE-006 Photo Upload Step
 
 Photo upload is an optional action available on the `preview-card` step and also accessible post-creation from the agent management UI. Upload stores the image URL as `referenceImageUrl` on the CreateAgentDto (at creation) or via a profile update (post-creation). The photo is private-by-default per `MY-PHOTO-002`.
+
+## MY-PIPE-007 Interview Language Propagation
+
+`dna-synthesize` and any later preview-phase re-synthesis must consume the persisted `interviewLanguage` resolved during the interview phase. Falling back to the current UI locale after interview completion is forbidden when a session-scoped interview language is already present.
