@@ -298,7 +298,7 @@ function buildSynthesizePrompt(input: {
         'Schema:',
         '{',
         '  "world": {"name":"...","tagline":"...","motto":"...","overview":"...","description":"...","lore":"...","genre":"...","themes":["..."],"era":"...","status":"ACTIVE","contentRating":"TEEN","clockConfig":{"startRealTime":"...","startWorldTime":"...","anchorRealTime":"...","anchorWorldTime":"..."}},',
-        '  "worldview": {"lifecycle": {},"timeModel": {"timeFlowRatio":1,"calendarSystem":{}},"spaceTopology": {},"causality": {},"coreSystem": {"rules": {}},"languages":{"languages":[]},"existences": {},"resources": {},"structures": {},"visualGuide": {},"narrativeHooks": {}},',
+        '  "worldview": {"lifecycle": {},"timeModel": {"timeFlowRatio":1,"calendarSystem":{}},"spaceTopology": {},"causality": {},"coreSystem": {"rules": [{"key":"...","title":"...","value":"..."}]},"languages":{"languages":[]},"existences": {},"resources": {},"structures": {},"visualGuide": {},"narrativeHooks": {}},',
         '  "worldEvents":[{"id":"evt-p1","level":"PRIMARY","eventHorizon":"PAST","parentEventId":null,"title":"...","summary":"...","cause":"...","process":"...","result":"...","timeRef":"...","locationRefs":["..."],"characterRefs":["..."],"dependsOnEventIds":[],"evidenceRefs":[{"segmentId":"...","offsetStart":0,"offsetEnd":0,"excerpt":"...","confidence":0.0,"sourceType":"text"}],"confidence":0.0,"needsEvidence":false}],',
         '  "worldLorebooks":[{"key":"topic:subtopic:item_name","name":"...","content":"...","keywords":["..."],"value":{"details":{}},"provenance":{"source":"synthesize"}}],',
         '  "futureHistoricalEvents":[{"id":"future-1","title":"...","description":"...","timeNode":"...","impact":"..."}],',

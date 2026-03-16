@@ -116,22 +116,21 @@ test('world-studio phase2 can synthesize without full source text after refresh'
         }
         return {
           text: JSON.stringify({
-            world: {
-              name: 'World',
-              description: 'Description',
-              lore: '',
-              rules: {},
-            },
-            worldview: {
-              timeModel: { timeFlowRatio: 1, calendarSystem: {} },
-              spaceTopology: {},
-              causality: {},
-              coreSystem: {},
-              existences: {},
-              resources: {},
-              structures: {},
-              visualGuide: {},
-              narrativeHooks: {},
+          world: {
+            name: 'World',
+            description: 'Description',
+            lore: '',
+          },
+          worldview: {
+            timeModel: { timeFlowRatio: 1, calendarSystem: {} },
+            spaceTopology: {},
+            causality: {},
+            coreSystem: { rules: [] },
+            existences: {},
+            resources: {},
+            structures: {},
+            visualGuide: {},
+            narrativeHooks: {},
             },
             worldEvents: snapshotRef.current.knowledgeGraph.events.primary,
             futureHistoricalEvents: [],

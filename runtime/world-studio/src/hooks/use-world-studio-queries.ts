@@ -77,16 +77,24 @@ function toMutationSummaryList(payload: unknown): WorldMutationSummary[] {
   const items = Array.isArray(toRecord(payload).items) ? (toRecord(payload).items as unknown[]) : [];
   return items
     .map((item) => toRecord(item))
-    .map((item) => ({
-      id: String(item.id || ''),
-      worldId: String(item.worldId || ''),
-      mutationType: String(item.mutationType || 'SETTING_CHANGE') as WorldMutationSummary['mutationType'],
-      targetPath: String(item.targetPath || ''),
-      reason: toStringOrNull(item.reason),
-      creatorId: String(item.creatorId || ''),
-      createdAt: String(item.createdAt || ''),
-    }))
-    .filter((item) => Boolean(item.id));
+    .map((item) => {
+      const id = String(item.id || '');
+      const title = toStringOrNull(item.title);
+      const summary = toStringOrNull(item.summary);
+      if (!id || !title || !summary) return null;
+      return {
+        id,
+        worldId: String(item.worldId || ''),
+        mutationType: String(item.mutationType || 'SETTING_CHANGE') as WorldMutationSummary['mutationType'],
+        targetPath: String(item.targetPath || ''),
+        title,
+        summary,
+        reason: toStringOrNull(item.reason),
+        creatorId: String(item.creatorId || ''),
+        createdAt: String(item.createdAt || ''),
+      };
+    })
+    .filter((item): item is WorldMutationSummary => Boolean(item));
 }
 
 function toEventSummaryList(payload: unknown): WorldEventSummary[] {

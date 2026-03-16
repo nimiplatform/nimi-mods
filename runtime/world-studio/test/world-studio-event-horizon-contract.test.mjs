@@ -76,7 +76,7 @@ test('phase2 synthesize preserves eventHorizon and derives evidence requirements
             timeModel: { timeFlowRatio: 1, calendarSystem: {} },
             spaceTopology: {},
             causality: {},
-            coreSystem: {},
+            coreSystem: { rules: [] },
           },
           worldEvents: [
             makeEvent('future-1', 'FUTURE', []),

@@ -38,6 +38,7 @@
 - `WS-DOM-020`: World-Studio is the sole writer of canonical `WorldEvent.timelineSeq`; publish/sync must materialize temporal-order output into contiguous integer sequence values.
 - `WS-DOM-024`: Maintain information architecture is fixed to four domains (`World`, `Agents`, `Assets`, `Releases`); `World` sections are `Base`, `Worldview`, `WorldEvents`, `Lorebooks`.
 - `WS-DOM-025`: `world.rules` is not a world-base field; world rule editing belongs to `worldview.coreSystem.rules` in both synthesize output and maintenance editing.
+- `WS-DOM-025a`: `worldview.coreSystem.rules` uses ordered rule items with fixed fields `key / title / value`; World-Studio must not degrade it back into object-map editing.
 - `WS-DOM-026`: Agents V1 is metadata-first: creator-agent readable fields may be shown, metadata fields may be edited, and unsupported core persona editing must remain an explicit future capability.
 - `WS-DOM-027`: Assets V1 manages `World Assets` and `Agent Assets` through `media-bindings` hydration and batch-upsert, without redefining backend media contracts.
 - `WS-DOM-028`: Successful publish lands in `MAINTAIN` and defaults the editor context to `World > Base`.
@@ -48,6 +49,7 @@
 - `WS-DOM-033`: Maintain mode must present a consistent workbench rhythm (`section navigation -> object summary -> section context -> editor surface -> contextual action bar`) across `World`, `Agents`, `Assets`, and `Releases`.
 - `WS-DOM-034`: Assets maintenance must distinguish generated local assets, synced media bindings, and missing coverage so creators can tell whether the next action is generate, link, or sync.
 - `WS-DOM-035`: Releases maintenance must behave like a release surface, not a hidden transport panel; draft selection, publish entry, and mutation history must each have explicit reading context.
+- `WS-DOM-035a`: Mutation history in World-Studio keeps technical fields visible, but release-facing reading context must also expose realm-authored `title / summary`.
 - `WS-DOM-036`: `World.clockConfig` is a readable runtime truth surface in V2; until backend patch support exists, World-Studio must not present it as a writable Base editor field.
 
 ## 3. No Over-Design Guard

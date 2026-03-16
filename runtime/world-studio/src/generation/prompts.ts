@@ -46,7 +46,7 @@ export function buildPhase2Prompt(input: {
     '    "timeModel": {"timeFlowRatio":1,"calendarSystem":{}},',
     '    "spaceTopology": {},',
     '    "causality": {},',
-    '    "coreSystem": {"rules": {}},',
+    '    "coreSystem": {"rules": [{"key":"...","title":"...","value":"..."}]},',
     '    "languages": {"languages":[]},',
     '    "existences": {},',
     '    "resources": {},',

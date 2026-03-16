@@ -43,6 +43,8 @@ export type WorldMutationSummary = {
     | 'EVENT_DELETE'
     | 'EVENT_BATCH_UPSERT';
   targetPath: string;
+  title: string;
+  summary: string;
   reason: string | null;
   creatorId: string;
   createdAt: string;

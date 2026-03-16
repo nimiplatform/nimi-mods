@@ -98,7 +98,7 @@ cases:
     expected_ok: true
     source_rule: WS-ACC-002
   - id: WS-018-WORLD-RULES-MOVED-TO-WORLDVIEW
-    description: World base editor must not write world.rules; rule editing belongs to worldview.coreSystem.rules.
+    description: World base editor must not write world.rules; rule editing belongs to ordered worldview.coreSystem.rules items with fixed key/title/value fields.
     expected_ok: true
     source_rule: WS-ACC-002
   - id: WS-019-CHECKPOINTS-PHASE1-OVERVIEW
@@ -134,7 +134,7 @@ cases:
     expected_ok: true
     source_rule: WS-ACC-002
   - id: WS-027-RELEASES-READING-SURFACE
-    description: Releases maintenance presents draft selection, publish entry, and mutation history as explicit reading surfaces with current-world context.
+    description: Releases maintenance presents draft selection, publish entry, and mutation history as explicit reading surfaces with current-world context; mutation history exposes realm-authored title/summary while retaining technical fields.
     expected_ok: true
     source_rule: WS-ACC-002
   - id: WS-028-NO-LEGACY-TIME-FLOW-RATIO-COMPAT

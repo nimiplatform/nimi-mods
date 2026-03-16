@@ -122,7 +122,7 @@ export function ReleaseHistoryPanel(props: {
   const mutations = [...props.mutations].sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)));
   const summaryCards = [
     { label: t('releases.history.summary.total', 'Mutations'), value: String(mutations.length) },
-    { label: t('releases.history.summary.latest', 'Latest mutation'), value: mutations[0]?.mutationType || t('releases.shared.none', 'None') },
+    { label: t('releases.history.summary.latest', 'Latest mutation'), value: mutations[0]?.title || t('releases.shared.none', 'None') },
     { label: t('releases.history.summary.targets', 'Distinct targets'), value: String(new Set(mutations.map((mutation) => mutation.targetPath || '-')).size) },
   ];
   return (
@@ -141,16 +141,18 @@ export function ReleaseHistoryPanel(props: {
           <div key={mutation.id} className="rounded-[18px] border border-slate-200 bg-white p-3">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <p className="text-sm font-semibold text-slate-900">{mutation.mutationType}</p>
-                <p className="mt-1 text-xs text-slate-600">{mutation.targetPath || t('releases.history.noTargetPath', 'no target path')}</p>
+                <p className="text-sm font-semibold text-slate-900">{mutation.title}</p>
+                <p className="mt-1 text-xs text-slate-600">{mutation.summary}</p>
               </div>
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
                 {mutation.createdAt}
               </span>
             </div>
-            {mutation.reason ? (
-              <p className="mt-2 text-xs text-slate-500">{mutation.reason}</p>
-            ) : null}
+            <div className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
+              <div>{mutation.mutationType}</div>
+              <div>{mutation.targetPath || t('releases.history.noTargetPath', 'no target path')}</div>
+              {mutation.reason ? <div>{mutation.reason}</div> : null}
+            </div>
           </div>
         ))}
       </div>
