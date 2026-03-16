@@ -1,6 +1,6 @@
 import type { NarrativeEngineModule } from '../../../../modules/narrative-engine/src/index.js';
 import type { TextplayRenderRequest } from '../data/schemas.js';
-import type { TextplayNormalizedRenderInput, TextplayPresenceReport, TextplayRenderMeta, TextplayRunEvent, TextplayRunSnapshot, TextplayWarning, } from '../types.js';
+import type { TextplayLanguage, TextplayNormalizedRenderInput, TextplayPresenceReport, TextplayRenderMeta, TextplayRunEvent, TextplayRunSnapshot, TextplayWarning, } from '../types.js';
 import type { TextplayRuntimeAiClient } from '../runtime-ai-client.js';
 import { type HookClient, type ModRuntimeClient } from "@nimiplatform/sdk/mod";
 export type TextplayPipelineStep = 'received' | 'normalize' | 'filter-visibility' | 'build-prompt' | 'generate' | 'wrap-output' | 'fallback-render' | 'persist-best-effort';
@@ -14,6 +14,7 @@ export type TextplayPipelineDependencies = {
 export type TextplayRenderLocale = 'en' | 'zh';
 export type TextplayRenderExecutionInput = {
     renderLocale: TextplayRenderLocale;
+    storyLanguage: TextplayLanguage;
     request: TextplayRenderRequest;
     deps: TextplayPipelineDependencies;
     presenceReports: TextplayPresenceReport[];

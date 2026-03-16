@@ -29,6 +29,7 @@ import {
   loadTextplayDraft,
   saveTextplayDraft,
 } from '../draft-store.js';
+import { normalizeTextplayRenderLocale, resolveTextplayStoryLanguage } from '../language.js';
 import { createTextplayFlowId, emitTextplayLog } from '../logging.js';
 import { runTextplayRender } from '../pipeline/run-textplay-render.js';
 import { createTextplayPresenceMachine } from '../presence/state-machine.js';
@@ -105,16 +106,12 @@ function asBindingRecord(binding: RuntimeRouteBinding | null): Record<string, un
   return binding ? { ...binding } : undefined;
 }
 
-function normalizeTextplayRenderLocale(language: string | null | undefined): 'en' | 'zh' {
-  const normalized = String(language || '').trim().toLowerCase();
-  return normalized.startsWith('zh') ? 'zh' : 'en';
-}
-
 function buildPersistRecord(input: {
   request: {
     storyId: string;
     worldId: string;
     agentId: string;
+    storyLanguage: TextplayPersistRecord['storyLanguage'];
     userId: string;
     playerName: string;
     playerIdentity: string;
@@ -130,6 +127,7 @@ function buildPersistRecord(input: {
     storyId: input.result.meta.storyId,
     worldId: input.request.worldId,
     agentId: input.request.agentId,
+    storyLanguage: input.request.storyLanguage,
     turnId: input.result.meta.turnId,
     runId: input.result.meta.runId,
     traceId: input.result.meta.traceId,
@@ -505,6 +503,7 @@ export function useTextplayController(): TextplayShellProps {
       entryEventId: string;
       worldId: string;
       agentId: string;
+      storyLanguage: TextplayPersistRecord['storyLanguage'];
       userId: string;
       playerName: string;
       playerIdentity: string;
@@ -522,6 +521,7 @@ export function useTextplayController(): TextplayShellProps {
     try {
       const result = await runTextplayRender({
         renderLocale,
+        storyLanguage: input.request.storyLanguage,
         request: {
           storyId: input.request.storyId,
           entryEventId: input.request.entryEventId,
@@ -761,7 +761,14 @@ export function useTextplayController(): TextplayShellProps {
       id: selectedAgentId,
       name: selectedAgentId,
       avatarUrl: null,
+      agentLanguage: null,
     };
+    const selectedWorld = worlds.find((item) => item.id === selectedWorldId) || null;
+    const storyLanguage = resolveTextplayStoryLanguage({
+      worldPrimaryLanguage: selectedWorld?.primaryLanguage || null,
+      agentLanguage: selectedAgent.agentLanguage,
+      promptLanguage: renderLocale,
+    });
 
     try {
       const startupPackage = await loadEntryStartupPackage({
@@ -770,6 +777,7 @@ export function useTextplayController(): TextplayShellProps {
         storyId,
         agentId: selectedAgentId,
         userId,
+        storyLanguage,
       });
 
       await upsertStartupContext(startupPackage);
@@ -780,11 +788,13 @@ export function useTextplayController(): TextplayShellProps {
           entryEventId: selectedEntry.entryEventId,
           worldId: selectedWorldId,
           agentId: selectedAgentId,
+          storyLanguage,
           userId,
           playerName: playerName.trim(),
           playerIdentity: playerIdentity.trim(),
           triggerSource: 'SystemEvent',
           systemPayload: buildOpeningSystemPayload({
+            promptLanguage: renderLocale,
             entry: selectedEntry,
             startup: startupPackage,
             userId,
@@ -807,11 +817,13 @@ export function useTextplayController(): TextplayShellProps {
           storyId,
           worldId: selectedWorldId,
           agentId: selectedAgentId,
+          storyLanguage,
           userId,
           playerName: playerName.trim(),
           playerIdentity: playerIdentity.trim(),
           triggerSource: 'SystemEvent',
           systemPayload: buildOpeningSystemPayload({
+            promptLanguage: renderLocale,
             entry: selectedEntry,
             startup: startupPackage,
             userId,
@@ -838,6 +850,7 @@ export function useTextplayController(): TextplayShellProps {
         worldId: selectedWorldId,
         storyId,
         agentId: selectedAgentId,
+        storyLanguage,
         entryEventId: selectedEntry.entryEventId,
         sessionId,
         status: 'active',
@@ -876,6 +889,7 @@ export function useTextplayController(): TextplayShellProps {
     playerIdentity,
     playerName,
     pushNotice,
+    renderLocale,
     routeBinding,
     saveDraft,
     selectedAgentId,
@@ -885,6 +899,7 @@ export function useTextplayController(): TextplayShellProps {
     upsertStartupContext,
     userId,
     persistCurrentActiveAsPaused,
+    worlds,
   ]);
 
   const onPause = useCallback(async () => {
@@ -963,11 +978,13 @@ export function useTextplayController(): TextplayShellProps {
           entryEventId: draft.entryEventId,
           worldId: draft.worldId,
           agentId: draft.agentId,
+          storyLanguage: draft.storyLanguage,
           userId: draft.userId,
           playerName: draft.playerName,
           playerIdentity: draft.playerIdentity,
           triggerSource: 'SystemEvent',
           systemPayload: buildOpeningSystemPayload({
+            promptLanguage: renderLocale,
             entry: toEntryDetailFromStartup(draft.startupPackage),
             startup: draft.startupPackage,
             userId: draft.userId,
@@ -989,6 +1006,7 @@ export function useTextplayController(): TextplayShellProps {
 
       const snapshot = exportStoryState(draft.storyId);
       const openingPayload = buildOpeningSystemPayload({
+        promptLanguage: renderLocale,
         entry: toEntryDetailFromStartup(draft.startupPackage),
         startup: draft.startupPackage,
         userId: draft.userId,
@@ -1000,6 +1018,7 @@ export function useTextplayController(): TextplayShellProps {
           storyId: draft.storyId,
           worldId: draft.worldId,
           agentId: draft.agentId,
+          storyLanguage: draft.storyLanguage,
           userId: draft.userId,
           playerName: draft.playerName,
           playerIdentity: draft.playerIdentity,
@@ -1047,8 +1066,8 @@ export function useTextplayController(): TextplayShellProps {
     executeRender,
     persistCurrentActiveAsPaused,
     pushNotice,
+    renderLocale,
     resolveDraftByKey,
-    routeBinding,
     saveDraft,
     t,
     upsertStartupContext,
@@ -1061,6 +1080,7 @@ export function useTextplayController(): TextplayShellProps {
     }
     const rawInput = inputText.trim();
     const userMessage = buildContextualUserMessage({
+      promptLanguage: renderLocale,
       playerName: current.playerName,
       playerIdentity: current.playerIdentity,
       userMessage: rawInput,
@@ -1080,6 +1100,7 @@ export function useTextplayController(): TextplayShellProps {
           entryEventId: current.entryEventId,
           worldId: current.worldId,
           agentId: current.agentId,
+          storyLanguage: current.storyLanguage,
           userId: current.userId,
           playerName: current.playerName,
           playerIdentity: current.playerIdentity,
@@ -1100,6 +1121,7 @@ export function useTextplayController(): TextplayShellProps {
           storyId: current.storyId,
           worldId: current.worldId,
           agentId: current.agentId,
+          storyLanguage: current.storyLanguage,
           userId: current.userId,
           playerName: current.playerName,
           playerIdentity: current.playerIdentity,
@@ -1127,7 +1149,7 @@ export function useTextplayController(): TextplayShellProps {
         message: `${t('messages.renderCrashed')} ${toErrorMessage(error)}`,
       });
     }
-  }, [executeRender, inputText, pushNotice, routeBinding, saveDraft, t]);
+  }, [executeRender, inputText, pushNotice, renderLocale, routeBinding, saveDraft, t]);
 
   const onCancel = useCallback(() => {
     abortControllerRef.current?.abort();
@@ -1227,6 +1249,7 @@ export function useTextplayController(): TextplayShellProps {
       tickInFlight = true;
       try {
         const systemPayload = buildInitiativeSystemPayload({
+          promptLanguage: renderLocale,
           startup: current.startupPackage,
           records: current.records,
           playerName: current.playerName,
@@ -1240,6 +1263,7 @@ export function useTextplayController(): TextplayShellProps {
             entryEventId: current.entryEventId,
             worldId: current.worldId,
             agentId: current.agentId,
+            storyLanguage: current.storyLanguage,
             userId: current.userId,
             playerName: current.playerName,
             playerIdentity: current.playerIdentity,
@@ -1259,6 +1283,7 @@ export function useTextplayController(): TextplayShellProps {
             storyId: current.storyId,
             worldId: current.worldId,
             agentId: current.agentId,
+            storyLanguage: current.storyLanguage,
             userId: current.userId,
             playerName: current.playerName,
             playerIdentity: current.playerIdentity,
@@ -1308,7 +1333,7 @@ export function useTextplayController(): TextplayShellProps {
       disposed = true;
       clearInterval(intervalId);
     };
-  }, [activeDraft, dispatchPresenceEvent, executeRender, flowId, isRunning, saveDraft]);
+  }, [activeDraft, dispatchPresenceEvent, executeRender, flowId, isRunning, renderLocale, saveDraft]);
 
   const onRouteSourceChange = useCallback((source: 'local' | 'cloud') => {
     if (source === 'cloud') {

@@ -257,6 +257,8 @@ function assertContextComplete(input: {
 }
 
 export function normalizeTextplayRenderInput(input: {
+  promptLanguage: TextplayNormalizedRenderInput['promptLanguage'];
+  storyLanguage: TextplayNormalizedRenderInput['storyLanguage'];
   request: TextplayRenderRequest;
   upsertedTurn: NarrativeTurnResultUpsertResponse;
   turnById: NarrativeTurnByIdResponse;
@@ -281,6 +283,8 @@ export function normalizeTextplayRenderInput(input: {
     storyId: consistency.storyId,
     worldId: normalizeId(input.request.worldId),
     agentId: consistency.agentId,
+    promptLanguage: input.promptLanguage,
+    storyLanguage: input.storyLanguage,
     turnId: consistency.turnId,
     runId: normalizeId(input.request.runId),
     traceId: normalizeId(input.request.traceId),
@@ -306,6 +310,8 @@ export function normalizeTextplayRenderInput(input: {
     storyId: normalized.storyId,
     worldId: normalized.worldId,
     agentId: normalized.agentId,
+    promptLanguage: normalized.promptLanguage,
+    storyLanguage: normalized.storyLanguage,
     turnId: normalized.turnId,
     triggerSource: normalized.triggerSource,
     userId: normalized.userId,

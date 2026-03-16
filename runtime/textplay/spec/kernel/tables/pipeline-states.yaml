@@ -40,6 +40,8 @@ states:
   - state: BUILD_PROMPT
     preconditions:
       - visible_events_ready
+      - prompt_language_resolved
+      - story_language_resolved
     next: GENERATE
     source_rule: T-PIPE-002
   - state: GENERATE
@@ -57,3 +59,29 @@ persist:
   on_rendered_provided_required: true
   failure_behavior: warn-nonblocking
   source_rule: T-PIPE-004
+language_governance:
+  prompt_language:
+    source: active_ui_locale
+    supported_locales:
+      - en
+      - zh
+    fallback: en
+    source_rule: T-PIPE-005
+  story_language:
+    resolution_point: start_only
+    priority:
+      - world_primary_language
+      - agent_language
+      - prompt_language
+    supported_locales:
+      - en
+      - zh
+    reuse_on:
+      - resume
+      - restart
+      - draft-switch
+    source_rule: T-PIPE-005
+  output_lock:
+    prompt_shell_language_follows_prompt_language: true
+    player_facing_narrative_must_follow_story_language: true
+    source_rule: T-PIPE-006

@@ -7,6 +7,7 @@ function createStartup(overrides = {}) {
     storyId: 'story.world-1.evt-1',
     worldId: 'world-1',
     entryEventId: 'evt-1',
+    storyLanguage: 'zh',
     entry: {
       title: '诛杀真仙马良',
       summary: '大战将启',
@@ -90,6 +91,7 @@ test('initiative director avoids recently used hook and picks fresh open thread'
   ];
 
   const result = buildInitiativeDirectorMessage({
+    promptLanguage: 'zh',
     startup,
     records,
     playerName: '云澜',
@@ -118,6 +120,7 @@ test('initiative director falls back to entry process when no hooks are availabl
   });
 
   const result = buildInitiativeDirectorMessage({
+    promptLanguage: 'zh',
     startup,
     records: [],
     playerName: '',

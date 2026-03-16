@@ -11,6 +11,7 @@ function createDraft() {
     worldId: 'world-1',
     storyId: 'story_01KXTEXTPLAYPUBLISH1234567',
     agentId: 'agent-1',
+    storyLanguage: 'zh',
     entryEventId: 'evt-opening',
     sessionId: 'session_01KXTEXTPLAYPUBLISH12345',
     status: 'active',
@@ -23,6 +24,7 @@ function createDraft() {
       storyId: 'story_01KXTEXTPLAYPUBLISH1234567',
       worldId: 'world-1',
       entryEventId: 'evt-opening',
+      storyLanguage: 'zh',
       entry: {
         entryEventId: 'evt-opening',
         worldId: 'world-1',
@@ -141,6 +143,7 @@ function createDraft() {
         storyId: 'story_01KXTEXTPLAYPUBLISH1234567',
         worldId: 'world-1',
         agentId: 'agent-1',
+        storyLanguage: 'zh',
         turnId: 'turn-1',
         runId: 'run-1',
         traceId: 'trace-1',

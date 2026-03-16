@@ -1,4 +1,5 @@
 import type {
+    TextplayLanguage,
     TextplayPersistRecord,
     TextplayPresenceReport,
     TextplayRunEvent,
@@ -6,6 +7,7 @@ import type {
     TextplayWarning,
 } from '../types.js';
 import { createUlid } from '../utils/ulid.js';
+import { normalizeTextplayLanguage } from '../language.js';
 
 export function asRecord(value: unknown): Record<string, unknown> | null {
     if (!value || typeof value !== 'object') {
@@ -179,13 +181,14 @@ export function parsePersistRecord(value: unknown): TextplayPersistRecord | null
     const runId = toTrimmedString(record.runId);
     const traceId = toTrimmedString(record.traceId);
     const userId = toTrimmedString(record.userId);
+    const storyLanguage = normalizeTextplayLanguage(record.storyLanguage);
     const openingPayload = asRecord(asRecord(record.systemPayload)?.opening);
     const playerIdentity = firstNonEmptyText([
         record.playerIdentity,
         openingPayload?.playerIdentity,
         openingPayload?.playerRole,
     ]);
-    if (!storyId || !turnId || !runId || !traceId || !userId) {
+    if (!storyId || !turnId || !runId || !traceId || !userId || !storyLanguage) {
         return null;
     }
     const runSnapshot = parseRunSnapshot(record.runSnapshot);
@@ -197,6 +200,7 @@ export function parsePersistRecord(value: unknown): TextplayPersistRecord | null
         storyId,
         worldId,
         agentId,
+        storyLanguage: storyLanguage as TextplayLanguage,
         turnId,
         runId,
         traceId,

@@ -1,5 +1,6 @@
 export type TextplayTriggerSource = 'UserTurn' | 'AgentInitiative' | 'SystemEvent';
 export type TextplayVisibility = 'public' | 'internal' | 'sensory';
+export type TextplayLanguage = 'en' | 'zh';
 
 export type TextplayPresenceState = 'composing' | 'paused' | 'active' | 'idle' | 'away';
 
@@ -121,12 +122,15 @@ export type TextplayWorldSummary = {
   status: string;
   description: string | null;
   updatedAt: string;
+  primaryLanguage: TextplayLanguage | null;
+  commonLanguages: TextplayLanguage[];
 };
 
 export type TextplayAgentOption = {
   id: string;
   name: string;
   avatarUrl: string | null;
+  agentLanguage: TextplayLanguage | null;
 };
 
 export type TextplayEntrySummary = {
@@ -148,11 +152,12 @@ export type TextplayEntrySummary = {
 export type TextplayEntryDetail = TextplayEntrySummary & {
   cause: string;
   process: string;
-  result: string;
-  timeRef: string;
-  locationRefs: string[];
-  recommendedSceneId: string | null;
-};
+    result: string;
+    timeRef: string;
+    locationRefs: string[];
+    characterRefs: string[];
+    recommendedSceneId: string | null;
+  };
 
 export type TextplayDraftStatus = 'active' | 'paused';
 
@@ -170,6 +175,7 @@ export type TextplayDraftRecord = {
   worldId: string;
   storyId: string;
   agentId: string;
+  storyLanguage: TextplayLanguage;
   entryEventId: string;
   sessionId: string;
   status: TextplayDraftStatus;
@@ -256,6 +262,7 @@ export type TextplayStartupPackage = {
   storyId: string;
   worldId: string;
   entryEventId: string;
+  storyLanguage: TextplayLanguage;
   entry: {
     timelineSeq: number;
     title: string;
@@ -322,6 +329,7 @@ export type TextplayPersistRecord = {
   storyId: string;
   worldId: string;
   agentId: string;
+  storyLanguage: TextplayLanguage;
   turnId: string;
   runId: string;
   traceId: string;
@@ -358,6 +366,8 @@ export type TextplayNormalizedRenderInput = {
   storyId: string;
   worldId: string;
   agentId: string;
+  promptLanguage: TextplayLanguage;
+  storyLanguage: TextplayLanguage;
   turnId: string;
   runId: string;
   traceId: string;

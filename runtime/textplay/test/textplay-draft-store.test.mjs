@@ -83,6 +83,7 @@ function createDraft(overrides = {}) {
     worldId,
     storyId,
     agentId,
+    storyLanguage: String(overrides.storyLanguage || 'zh'),
     entryEventId: String(overrides.entryEventId || 'evt-opening'),
     sessionId: String(overrides.sessionId || 'session_01KXTEXTPLAYDRAFT1234567890'),
     status: overrides.status || 'active',
@@ -95,6 +96,7 @@ function createDraft(overrides = {}) {
       storyId,
       worldId,
       entryEventId: 'evt-opening',
+      storyLanguage: String(overrides.storyLanguage || 'zh'),
       entry: {
         entryEventId: 'evt-opening',
         worldId,

@@ -180,10 +180,12 @@ test('loadEntryStartupPackage builds story-scoped startup package from entry, co
     storyId: 'story_01KXTEXTPLAYENTRY1234567890',
     agentId: 'agent-1',
     userId: 'user-1',
+    storyLanguage: 'zh',
   });
 
   assert.equal(startup.storyId, 'story_01KXTEXTPLAYENTRY1234567890');
   assert.equal(startup.entryEventId, 'evt-opening');
+  assert.equal(startup.storyLanguage, 'zh');
   assert.equal(startup.cast.primaryAgentId, 'agent-1');
   assert.deepEqual(startup.cast.participants, ['agent-1', 'agent-2']);
   assert.equal(startup.entry.entryMode, 'PRE_EVENT');

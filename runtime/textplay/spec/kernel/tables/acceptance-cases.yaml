@@ -177,6 +177,45 @@ cases:
     focus_restore_required: true
     test_reference: textplay-route-config-drawer-focus.test.mjs
     source_rule: T-ACC-002
+  - id: TXT-023-PROMPT-LOCALE-UI
+    description: Prompt shell language follows active UI locale and normalizes supported locales to en or zh without adding new user-visible steps.
+    expected_ok: true
+    prompt_language_matches_ui: true
+    supported_prompt_languages:
+      - en
+      - zh
+    existing_flow_preserved: true
+    source_rule: T-ACC-002
+  - id: TXT-024-STORY-LANGUAGE-WORLD-FIRST
+    description: Story language resolves once at Start and prefers world primary language over agent language before falling back to prompt language.
+    expected_ok: true
+    story_language_priority:
+      - world_primary_language
+      - agent_language
+      - prompt_language
+    story_language_resolved_at_start: true
+    source_rule: T-ACC-002
+  - id: TXT-025-STORY-LANGUAGE-LOCK
+    description: Prompt shell locale may differ from player-facing output language, but narrative output remains locked to storyLanguage.
+    expected_ok: true
+    prompt_shell_may_differ_from_output_language: true
+    narrative_output_locked_to_story_language: true
+    source_rule: T-ACC-002
+  - id: TXT-026-STORY-LANGUAGE-RESUME-STABLE
+    description: Resume, Restart, and draft switching reuse the persisted storyLanguage instead of recomputing it from the current UI locale.
+    expected_ok: true
+    story_language_reused_on_resume: true
+    story_language_reused_on_restart: true
+    story_language_reused_on_draft_switch: true
+    source_rule: T-ACC-002
+  - id: TXT-027-LANGUAGE-GOVERNANCE-FLOW-PRESERVED
+    description: Language governance must not change existing Start, Resume, Restart, Stop, presence, optimistic submit, or fallback control flow.
+    expected_ok: true
+    existing_flow_preserved: true
+    start_resume_restart_stop_unchanged: true
+    presence_and_optimistic_submit_unchanged: true
+    fallback_locale_matches_ui: true
+    source_rule: T-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:textplay-kernel-docs
     source_rule: T-ACC-003

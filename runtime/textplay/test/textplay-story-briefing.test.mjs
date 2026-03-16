@@ -35,6 +35,7 @@ function createStartupPackage() {
     storyId: 'story_01KXTEXTPLAYBRIEFING1234567',
     worldId: 'world-1',
     entryEventId: 'evt-primary',
+    storyLanguage: 'zh',
     entry: {
       ...createEntry(),
     },
@@ -114,6 +115,7 @@ function createStartupPackage() {
 
 test('opening payload keeps PRE_EVENT semantics and injects user identity context', () => {
   const payload = buildOpeningSystemPayload({
+    promptLanguage: 'zh',
     entry: createEntry(),
     startup: createStartupPackage(),
     userId: 'user-1',
@@ -123,6 +125,7 @@ test('opening payload keeps PRE_EVENT semantics and injects user identity contex
 
   assert.equal(payload.opening.entryMode, 'PRE_EVENT');
   assert.equal(payload.opening.entryEventHorizon, 'PAST');
+  assert.equal(payload.opening.storyLanguage, 'zh');
   assert.equal(payload.opening.targetEventMaterialOnly, true);
   assert.equal(payload.opening.userId, 'user-1');
   assert.match(payload.opening.instruction, /发生前的临界阶段/);
@@ -132,6 +135,7 @@ test('opening payload keeps PRE_EVENT semantics and injects user identity contex
 
 test('contextual user message prepends player identity when provided', () => {
   const message = buildContextualUserMessage({
+    promptLanguage: 'zh',
     playerName: 'Han Yun',
     playerIdentity: 'Dock courier',
     userMessage: 'I step toward the signal mast.',
@@ -143,6 +147,7 @@ test('contextual user message prepends player identity when provided', () => {
 
 test('initiative payload frames autonomous progression around open pressure and presence', () => {
   const payload = buildInitiativeSystemPayload({
+    promptLanguage: 'zh',
     startup: createStartupPackage(),
     records: [],
     playerName: 'Han Yun',
@@ -152,5 +157,32 @@ test('initiative payload frames autonomous progression around open pressure and 
 
   assert.equal(payload.initiative.triggerSource, 'AgentInitiative');
   assert.equal(payload.initiative.presence, 'idle');
+  assert.equal(payload.initiative.storyLanguage, 'zh');
   assert.match(payload.initiative.directive, /世界推进|冲突压力|角色动机/);
+});
+
+test('briefing helpers follow English prompt language while preserving story language', () => {
+  const startup = createStartupPackage();
+  startup.storyLanguage = 'zh';
+
+  const payload = buildOpeningSystemPayload({
+    promptLanguage: 'en',
+    entry: createEntry(),
+    startup,
+    userId: 'user-1',
+    playerName: 'Han Yun',
+    playerIdentity: 'Dock courier',
+  });
+
+  const message = buildContextualUserMessage({
+    promptLanguage: 'en',
+    playerName: 'Han Yun',
+    playerIdentity: 'Dock courier',
+    userMessage: 'I step toward the signal mast.',
+  });
+
+  assert.match(payload.opening.instruction, /Start at the threshold before the target event actually happens/);
+  assert.match(payload.opening.background, /Player: Han Yun \(Dock courier\)/);
+  assert.equal(payload.opening.storyLanguage, 'zh');
+  assert.match(message, /^\[Han Yun \(Dock courier\)\]:/);
 });

@@ -61,6 +61,11 @@
 - `TXT-039`: Renderer fallback copy must follow the active UI locale. Current supported render locales are `en|zh`; any other locale degrades to `en`.
 - `TXT-040`: Projection render-input parsing may tolerate malformed non-critical branches by degrading them to empty values, but only if strict shadow validation emits diagnostics. Missing required story/turn identity fields remain fail-close.
 - `TXT-041`: Route Config drawer uses modal dialog semantics with focus containment and trigger-focus restore; dialog accessibility must not change workspace layout.
+- `TXT-042`: `promptLanguage` is resolved from the active UI locale, normalized to `en|zh`, and is used only for prompt shell/briefing copy. It does not change Start/Resume/Restart flow semantics.
+- `TXT-043`: `storyLanguage` is resolved once on explicit `Start` as `worldPrimaryLanguage ?? agentLanguage ?? promptLanguage`, is persisted in draft/startup/render records, and is reused unchanged by Resume, Restart, and draft switching.
+- `TXT-044`: World primary language outranks agent language for player-facing TextPlay narration. Agent language is only a fallback when the selected world has no recognized primary language.
+- `TXT-045`: Prompt shell language may differ from player-facing output language. Render prompts must explicitly lock final narrative output to `storyLanguage`.
+- `TXT-046`: Language governance must not introduce new user-visible language settings, new start-form fields, or any control-flow changes to Start, Resume, Restart, Stop, presence handling, initiative scheduling, optimistic submit, or locale-aware fallback.
 
 ## 3. No Over-Design Guard
 

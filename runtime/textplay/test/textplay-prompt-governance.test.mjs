@@ -7,6 +7,8 @@ test('textplay prompt includes explicit anti-cliche bans and replacement example
     normalized: {
       storyId: 'story-1',
       turnId: 'turn-1',
+      promptLanguage: 'zh',
+      storyLanguage: 'zh',
       triggerSource: 'UserTurn',
       userMessage: '我先靠近城门再观察。',
       userId: 'user-1',
@@ -29,9 +31,9 @@ test('textplay prompt includes explicit anti-cliche bans and replacement example
     ],
   });
 
-  assert.match(prompt, /Banned cliché phrases \(never use verbatim\)/i);
+  assert.match(prompt, /禁用陈词滥调/);
   assert.match(prompt, /双目微眯/);
-  assert.match(prompt, /Replacement style examples/i);
+  assert.match(prompt, /替换风格示例/);
   assert.match(prompt, /瞳孔骤然收缩成一线/);
 });
 
@@ -40,6 +42,8 @@ test('textplay opening prompt enforces future-threshold no-spoiler constraints',
     normalized: {
       storyId: 'story-1',
       turnId: 'turn-start',
+      promptLanguage: 'en',
+      storyLanguage: 'zh',
       triggerSource: 'SystemEvent',
       userMessage: '',
       userId: 'user-1',
@@ -71,7 +75,7 @@ test('textplay opening prompt enforces future-threshold no-spoiler constraints',
 
   assert.match(prompt, /Opening mode: this is the pre-event threshold/i);
   assert.match(prompt, /with no future spoilers/i);
-  assert.match(prompt, /Non-user trigger: focus on world\/NPC-driven development/i);
+  assert.match(prompt, /Non-user trigger: focus on world- or NPC-driven development/i);
 });
 
 test('textplay opening prompt adapts constraints for aftermath stories', () => {
@@ -79,6 +83,8 @@ test('textplay opening prompt adapts constraints for aftermath stories', () => {
     normalized: {
       storyId: 'story-1',
       turnId: 'turn-start',
+      promptLanguage: 'en',
+      storyLanguage: 'zh',
       triggerSource: 'SystemEvent',
       userMessage: '',
       userId: 'user-1',
@@ -121,6 +127,8 @@ test('textplay HIGH tension band prompt includes short-sentence pacing instructi
     normalized: {
       storyId: 'story-1',
       turnId: 'turn-tension',
+      promptLanguage: 'zh',
+      storyLanguage: 'zh',
       triggerSource: 'UserTurn',
       userMessage: '冲出去！',
       userId: 'user-1',
@@ -143,7 +151,7 @@ test('textplay HIGH tension band prompt includes short-sentence pacing instructi
     ],
   });
 
-  assert.match(prompt, /HIGH tension/);
+  assert.match(prompt, /高张力/);
   assert.match(prompt, /短促有力/);
 });
 
@@ -152,6 +160,8 @@ test('textplay thought event prompt includes consciousness-stream rendering hint
     normalized: {
       storyId: 'story-1',
       turnId: 'turn-thought',
+      promptLanguage: 'zh',
+      storyLanguage: 'zh',
       triggerSource: 'UserTurn',
       userMessage: '我在想什么？',
       userId: 'user-1',
@@ -188,6 +198,8 @@ test('textplay event without type field renders normally (backward compatible)',
     normalized: {
       storyId: 'story-1',
       turnId: 'turn-compat',
+      promptLanguage: 'zh',
+      storyLanguage: 'zh',
       triggerSource: 'UserTurn',
       userMessage: '看看周围。',
       userId: 'user-1',
@@ -213,4 +225,39 @@ test('textplay event without type field renders normally (backward compatible)',
   assert.match(prompt, /风吹过城墙/);
   // No rendering hint for empty type
   assert.equal(prompt.includes('Rendering hint'), false);
+  assert.equal(prompt.includes('渲染提示'), false);
+});
+
+test('textplay prompt locks final output language to storyLanguage while shell follows promptLanguage', () => {
+  const prompt = buildTextplayPrompt({
+    normalized: {
+      storyId: 'story-1',
+      turnId: 'turn-language-lock',
+      promptLanguage: 'en',
+      storyLanguage: 'zh',
+      triggerSource: 'UserTurn',
+      userMessage: 'Keep low and watch the gate.',
+      userId: 'user-1',
+      playerName: 'Han Yun',
+      playerIdentity: 'Dock courier',
+      sceneSummary: 'Rain lashes the docks while the cordon tightens.',
+      agentSummary: 'Han Li keeps one eye on the mast and one on the patrol line.',
+      worldStyleSummary: 'Grounded harbor tension with tactile sensory detail.',
+      systemPayload: {},
+      pacingContext: { currentTension: 0.55, tensionBand: 'MODERATE' },
+    },
+    visibleEvents: [
+      {
+        eventId: 'evt-1',
+        type: 'scene-beat',
+        visibility: 'public',
+        content: 'A warning bell shakes once and then cuts off.',
+        payload: {},
+      },
+    ],
+  });
+
+  assert.match(prompt, /You are TextPlay narrative renderer/);
+  assert.match(prompt, /All player-facing narrative output must be written in Chinese/);
+  assert.match(prompt, /Visible Narrative Events/);
 });

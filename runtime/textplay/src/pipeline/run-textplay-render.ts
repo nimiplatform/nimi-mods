@@ -500,6 +500,8 @@ export async function runTextplayRender(input: TextplayRenderExecutionInput): Pr
     });
 
     const normalizedResult = normalizeTextplayRenderInput({
+      promptLanguage: input.renderLocale,
+      storyLanguage: input.storyLanguage,
       request: input.request,
       upsertedTurn,
       turnById,

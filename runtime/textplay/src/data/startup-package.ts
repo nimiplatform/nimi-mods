@@ -20,7 +20,12 @@ import {
   type TextplayWorldNarrativeContextRow,
   type TextplayWorldSceneRow,
 } from './schemas.js';
-import type { TextplayEntryDetail, TextplayStartupPackage, TextplayStartupPolicy } from '../types.js';
+import type {
+  TextplayEntryDetail,
+  TextplayLanguage,
+  TextplayStartupPackage,
+  TextplayStartupPolicy,
+} from '../types.js';
 import { hashString } from '../utils/hash.js';
 import { type HookClient } from '@nimiplatform/sdk/mod';
 
@@ -318,6 +323,7 @@ export async function loadEntryStartupPackage(input: {
   storyId: string;
   agentId: string;
   userId: string;
+  storyLanguage: TextplayLanguage;
 }): Promise<TextplayStartupPackage> {
   const [lorebooks, scenes, contexts] = await Promise.all([
     queryWorldLorebooks(input.hookClient, input.detail.worldId),
@@ -435,6 +441,7 @@ export async function loadEntryStartupPackage(input: {
     storyId: input.storyId,
     worldId: input.detail.worldId,
     entryEventId: input.detail.entryEventId,
+    storyLanguage: input.storyLanguage,
     entry: {
       timelineSeq: input.detail.timelineSeq,
       title: input.detail.title,

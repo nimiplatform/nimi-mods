@@ -2,6 +2,7 @@ import { createModKvStore, createModStorageClient } from '@nimiplatform/sdk/mod'
 import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod';
 import type { NarrativeStorySnapshot } from '../../../modules/narrative-engine/src/index.js';
 import { TEXTPLAY_MOD_ID } from './contracts.js';
+import { normalizeTextplayLanguage } from './language.js';
 import type { TextplayDraftRecord, TextplayDraftStatus, TextplayStartupPackage } from './types.js';
 
 const DRAFTS_STATE_KEY = 'drafts';
@@ -51,6 +52,7 @@ function normalizeDraftRow(value: unknown): DraftRow | null {
   const worldId = toText(record.worldId);
   const storyId = toText(record.storyId);
   const agentId = toText(record.agentId);
+  const storyLanguage = normalizeTextplayLanguage(record.storyLanguage);
   const entryEventId = toText(record.entryEventId);
   const sessionId = toText(record.sessionId);
   const playerName = toText(record.playerName);
@@ -73,6 +75,7 @@ function normalizeDraftRow(value: unknown): DraftRow | null {
     || !worldId
     || !storyId
     || !agentId
+    || !storyLanguage
     || !entryEventId
     || !sessionId
     || !playerName
@@ -92,6 +95,7 @@ function normalizeDraftRow(value: unknown): DraftRow | null {
     worldId,
     storyId,
     agentId,
+    storyLanguage: storyLanguage as TextplayDraftRecord['storyLanguage'],
     entryEventId,
     sessionId,
     status,
