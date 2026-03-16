@@ -1,4 +1,5 @@
 import { Runtime, ExecutionMode, ScenarioType } from '@nimiplatform/sdk/runtime';
+import util from 'node:util';
 import { loadGoldFixture, loadGoldFixtureAudioInput } from '../../../../../scripts/ai-gold-path/fixtures.mjs';
 import { createLocalChatAiClient } from '../../src/runtime-ai-client.js';
 import { createModRuntimeClient, type ModRuntimeHost } from "@nimiplatform/sdk/mod";
@@ -27,6 +28,16 @@ function requireGoldSubjectUserId(): string {
         throw new Error('NIMI_LIVE_GOLD_SUBJECT_USER_ID_REQUIRED');
     }
     return value;
+}
+
+function redirectConsoleToStderr(): void {
+    const methods: Array<'log' | 'info' | 'debug' | 'warn' | 'error'> = ['log', 'info', 'debug', 'warn', 'error'];
+    for (const method of methods) {
+        console[method] = (...args: unknown[]) => {
+            const rendered = util.format(...args);
+            process.stderr.write(`${rendered}\n`);
+        };
+    }
 }
 function trimPreview(value: string): string {
     const normalized = String(value || '').trim();
@@ -340,6 +351,7 @@ function createRuntimeHost(runtime: Runtime, fixture: ReturnType<typeof loadGold
     };
 }
 async function main(): Promise<void> {
+    redirectConsoleToStderr();
     const endpoint = readArg('--endpoint');
     const fixturePath = readArg('--fixture');
     if (!endpoint) {
