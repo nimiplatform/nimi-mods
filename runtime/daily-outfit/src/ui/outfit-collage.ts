@@ -165,28 +165,10 @@ function groupGarments(garments: GarmentItem[]): {
 }
 
 function drawFooter(context: CanvasRenderingContext2D, outfit: OutfitCombo): void {
-  const chipY = 1228;
-  context.fillStyle = 'rgba(255,255,255,0.55)';
-  context.beginPath();
-  context.roundRect(72, chipY, 220, 78, 39);
-  context.fill();
-  context.beginPath();
-  context.roundRect(316, chipY, 190, 78, 39);
-  context.fill();
-  context.beginPath();
-  context.roundRect(764, 1216, 84, 84, 42);
-  context.fill();
-
-  context.fillStyle = INK_COLOR;
-  context.font = '600 34px "Helvetica Neue", "PingFang SC", sans-serif';
-  context.fillText('Try on', 124, 1278);
-  context.font = '500 26px "Helvetica Neue", "PingFang SC", sans-serif';
-  context.fillText('Edit', 384, 1276);
-
   context.font = '500 18px "Helvetica Neue", "PingFang SC", sans-serif';
   context.fillStyle = 'rgba(67, 48, 43, 0.72)';
   const tagLine = outfit.occasionTags.length > 0 ? titleCase(outfit.occasionTags.join(' · ')) : 'Daily Outfit';
-  context.fillText(tagLine, 74, 1346);
+  context.fillText(tagLine, 74, 1318);
 }
 
 export async function generateOutfitCollageImage(input: OutfitCollageInput): Promise<string> {

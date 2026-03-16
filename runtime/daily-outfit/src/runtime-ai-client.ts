@@ -448,8 +448,22 @@ export function suggestCutoutBinding(
     || current;
 }
 
+export function suggestTryOnBinding(
+  snapshot: RuntimeRouteOptionsSnapshot | null,
+  current: RuntimeRouteBinding | null,
+): RuntimeRouteBinding | null {
+  if (bindingSupportsCapabilityTokens(snapshot, current, IMAGE_REFERENCE_CAPABILITY_TOKENS)) {
+    return current;
+  }
+  return findPreferredCloudBinding(snapshot, IMAGE_REFERENCE_CAPABILITY_TOKENS)
+    || findPreferredLocalBinding(snapshot, IMAGE_REFERENCE_CAPABILITY_TOKENS)
+    || findPreferredCloudBinding(snapshot, IMAGE_GENERATE_CAPABILITY_TOKENS)
+    || findPreferredLocalBinding(snapshot, IMAGE_GENERATE_CAPABILITY_TOKENS)
+    || current;
+}
+
 export function explainModalityError(input: {
-  capability: 'analysis' | 'cutout';
+  capability: 'analysis' | 'cutout' | 'tryOn';
   snapshot: RuntimeRouteOptionsSnapshot | null;
   binding: RuntimeRouteBinding | null;
 }): string {
@@ -460,11 +474,41 @@ export function explainModalityError(input: {
     }
     return 'Current analysis model does not support image understanding.';
   }
-  const suggested = suggestCutoutBinding(input.snapshot, input.binding);
+  const suggested = input.capability === 'tryOn'
+    ? suggestTryOnBinding(input.snapshot, input.binding)
+    : suggestCutoutBinding(input.snapshot, input.binding);
   if (suggested && suggested !== input.binding) {
-    return 'Current cutout model does not support reference-image generation. Switch to a model with i2i or reference-image support.';
+    return input.capability === 'tryOn'
+      ? 'Current try-on model does not support selfie-plus-outfit generation. Switch to a model with strong reference-image support.'
+      : 'Current cutout model does not support reference-image generation. Switch to a model with i2i or reference-image support.';
   }
-  return 'Current cutout model does not support reference-image generation.';
+  return input.capability === 'tryOn'
+    ? 'Current try-on model does not support selfie-plus-outfit generation.'
+    : 'Current cutout model does not support reference-image generation.';
+}
+
+export function explainProviderUnavailableError(input: {
+  capability: 'analysis' | 'cutout' | 'tryOn';
+  snapshot: RuntimeRouteOptionsSnapshot | null;
+  binding: RuntimeRouteBinding | null;
+}): string {
+  const suggested = input.capability === 'analysis'
+    ? suggestAnalysisBinding(input.snapshot, input.binding)
+    : input.capability === 'tryOn'
+      ? suggestTryOnBinding(input.snapshot, input.binding)
+      : suggestCutoutBinding(input.snapshot, input.binding);
+  if (suggested && JSON.stringify(suggested) !== JSON.stringify(input.binding)) {
+    return input.capability === 'tryOn'
+      ? 'Current try-on provider is unavailable. Open 模型设置 and switch Try-on Image Route to another image model.'
+      : input.capability === 'cutout'
+        ? 'Current cutout provider is unavailable. Open 模型设置 and switch Image Generate Route to another image model.'
+        : 'Current analysis provider is unavailable. Open 模型设置 and switch Analysis Route to another vision model.';
+  }
+  return input.capability === 'tryOn'
+    ? 'Try-on provider is currently unavailable. Check 模型设置 or try another image model.'
+    : input.capability === 'cutout'
+      ? 'Cutout provider is currently unavailable. Check 模型设置 or try another image model.'
+      : 'Analysis provider is currently unavailable. Check 模型设置 or try another vision model.';
 }
 
 function extractJsonObject(text: string): string {
@@ -603,8 +647,11 @@ function buildCutoutPrompt(input: {
     'Remove the background, bed, body parts, shadows from other objects, and all clutter.',
     'Return a transparent background PNG with preserved alpha whenever the model supports transparency.',
     'If transparent output is unavailable, use a flat very light neutral background with no props or scene elements.',
-    'Show the full garment clearly in frame with generous margins so sleeves, hem, collar, and silhouette are not cropped.',
-    'Center the garment in a portrait-oriented product frame.',
+    'Do not add any checkerboard pattern, transparency preview grid, tiled matte, mockup board, studio backdrop texture, or placeholder background.',
+    'The output background must be either truly transparent alpha or a single clean flat light color.',
+    'Make the garment fill most of the frame, roughly 80 to 90 percent of the image height.',
+    'Minimize transparent padding and empty space around the garment while keeping sleeves, hem, collar, and silhouette fully visible.',
+    'Center the garment tightly in a portrait-oriented product frame with only a narrow safe margin.',
     'Do not redesign, restyle, or replace the garment.',
     descriptor ? `Garment descriptor: ${descriptor}.` : '',
   ].filter(Boolean).join(' ');
