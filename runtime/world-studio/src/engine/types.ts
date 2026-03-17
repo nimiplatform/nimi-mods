@@ -1,4 +1,9 @@
 import { type RuntimeCanonicalCapability, type RuntimeRouteBinding } from "@nimiplatform/sdk/mod";
+import type {
+  Phase2EnrichmentPatch as ContractsPhase2EnrichmentPatch,
+  Phase2WeakFieldIssue as ContractsPhase2WeakFieldIssue,
+  Phase2WeakFieldReason as ContractsPhase2WeakFieldReason,
+} from '../contracts/types/generation.js';
 export type DistillStage = 'INGEST' | 'COARSE' | 'FINE' | 'MERGE' | 'CHECKPOINTS' | 'SYNTHESIZE' | 'DRAFT' | 'PUBLISH';
 export type DistillRouteStage = 'coarse' | 'fine';
 export type WorldStudioRouteBinding = RuntimeRouteBinding;
@@ -127,6 +132,14 @@ export type QualityGateResult = {
     reasons: string[];
     metrics: ExtractionCoverageMetrics;
 };
+export type TemporalNormalizationSummary = {
+    reorderedEvents: number;
+    rewrittenTimelineSeq: number;
+    rebuiltTimelineCount: number;
+    droppedConflictingEdges: number;
+    dedupedPrimaryAnchors: number;
+    startTimeCandidateCount: number;
+};
 export type WorldStudioProgressState = {
     phase: 'ingest' | 'extract' | 'merge' | 'synthesize' | 'validate';
     chunkTotal: number;
@@ -143,6 +156,7 @@ export type Phase1Result = {
     knowledgeGraph: WorldStudioKnowledgeGraphDraft;
     finalDraftAccumulator: FinalDraftAccumulator;
     qualityGate: QualityGateResult;
+    temporalNormalization?: TemporalNormalizationSummary;
     chunkTasks: ChunkTaskResult[];
     rawText: string;
     interrupted?: {
@@ -288,6 +302,9 @@ export type FinalDraftAccumulator = {
     revisions: FinalDraftAccumulatorRevision[];
     lastUpdatedChunk: number;
 };
+export type Phase2WeakFieldReason = ContractsPhase2WeakFieldReason;
+export type Phase2WeakFieldIssue = ContractsPhase2WeakFieldIssue;
+export type Phase2EnrichmentPatch = ContractsPhase2EnrichmentPatch;
 export type Phase2Result = {
     world: Record<string, unknown>;
     worldview: Record<string, unknown>;
@@ -296,6 +313,9 @@ export type Phase2Result = {
     futureHistoricalEvents: Array<Record<string, unknown>>;
     agentDrafts: WorldStudioAgentDraft[];
     finalDraftAccumulator?: FinalDraftAccumulator;
+    enrichDegraded?: boolean;
+    enrichFailureReason?: string | null;
+    weakFieldIssues?: Phase2WeakFieldIssue[];
     rawText: string;
 };
 export type RouteCapabilityLlmInvoker = {

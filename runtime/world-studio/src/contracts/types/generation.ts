@@ -116,6 +116,14 @@ export type QualityGateResult = {
     reasons: string[];
     metrics: ExtractionCoverageMetrics;
 };
+export type TemporalNormalizationSummary = {
+    reorderedEvents: number;
+    rewrittenTimelineSeq: number;
+    rebuiltTimelineCount: number;
+    droppedConflictingEdges: number;
+    dedupedPrimaryAnchors: number;
+    startTimeCandidateCount: number;
+};
 export type WorldStudioChunkPolicyDiagnostics = {
     chunkSize: number;
     overlap: number;
@@ -308,6 +316,21 @@ export type FinalDraftAccumulator = {
     evidenceRefs: DraftPatchEvidenceRef[];
     revisions: FinalDraftAccumulatorRevision[];
     lastUpdatedChunk: number;
+};
+export type Phase2WeakFieldReason = 'empty' | 'low_information' | 'low_evidence' | 'incomplete_reference';
+export type Phase2WeakFieldIssue = {
+    path: string;
+    reason: Phase2WeakFieldReason;
+    detail: string;
+};
+export type Phase2EnrichmentPatch = {
+    world?: Record<string, unknown>;
+    worldview?: Record<string, unknown>;
+    worldLorebooks?: Array<Record<string, unknown>>;
+    futureHistoricalEvents?: Array<Record<string, unknown>>;
+    agentDrafts?: Array<Partial<WorldStudioAgentDraft> & {
+        characterName: string;
+    }>;
 };
 export type WorldStudioAgentSyncPlan = {
     selectedCharacterIds: string[];

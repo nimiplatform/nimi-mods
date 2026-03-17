@@ -11,6 +11,7 @@ import type {
   WorldStudioKnowledgeGraphDraft,
   WorldStudioNarrativeArc,
   WorldStudioParseJobState,
+  Phase2WeakFieldIssue,
 } from './generation.js';
 
 export type WorldStudioLandingMode = 'NO_ACCESS' | 'CREATE' | 'MAINTAIN';
@@ -132,6 +133,14 @@ export type WorldStudioPhase1Artifact = {
   updatedAt: string;
 };
 
+export type WorldStudioDraftQualityState = {
+  worldCutStatus: 'idle' | 'ready';
+  enrichStatus: 'idle' | 'complete' | 'incomplete';
+  enrichFailureReason: string | null;
+  weakFieldIssues: Phase2WeakFieldIssue[];
+  updatedAt: string | null;
+};
+
 export type WorldStudioPanelState = {
   searchText: string;
   selectedWorldId: string;
@@ -164,6 +173,7 @@ export type WorldStudioWorkspaceSnapshot = {
   knowledgeGraph: WorldStudioKnowledgeGraphDraft;
   finalDraftAccumulator: FinalDraftAccumulator;
   phase1Artifact: WorldStudioPhase1Artifact | null;
+  draftQuality: WorldStudioDraftQualityState;
   assets: WorldStudioAssetDraft;
   agentSync: WorldStudioAgentSyncPlan;
   eventGraphLayout: {

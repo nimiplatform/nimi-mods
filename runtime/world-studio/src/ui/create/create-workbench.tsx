@@ -393,6 +393,9 @@ export function CreateWorkbench(props: CreateWorkbenchProps) {
     || phase1?.startTimeOptions[phase1.startTimeOptions.length - 1]?.id
     || snapshot.phase1Artifact?.startTimeOptions[snapshot.phase1Artifact.startTimeOptions.length - 1]?.id
     || '';
+  const draftQuality = snapshot.draftQuality;
+  const draftQualityIncomplete = draftQuality.worldCutStatus === 'ready' && draftQuality.enrichStatus === 'incomplete';
+  const draftQualityReason = String(draftQuality.enrichFailureReason || '').trim();
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -424,6 +427,18 @@ export function CreateWorkbench(props: CreateWorkbenchProps) {
               tone="danger"
               title={t('create.qualityGateBlockTitle', 'Quality gate blocked')}
               body={(qualityGate.reasons || []).join(' · ') || t('create.qualityGateBlockBody', 'Resolve coverage and evidence issues before synthesis.')}
+            />
+          ) : null}
+
+          {(props.workflow.createDisplayStage === 'GENERATE' || props.workflow.createDisplayStage === 'REVIEW') && draftQualityIncomplete ? (
+            <Banner
+              tone="info"
+              title={t('create.draftQualityEnrichIncompleteTitle', 'Draft quality status: detail enrichment incomplete')}
+              body={draftQualityReason
+                ? t('create.draftQualityEnrichIncompleteBodyWithReason', 'The initial world cut succeeded, but detail enrichment did not complete successfully ({{reason}}). Review and adjust the draft before deciding whether to continue creating the world.', {
+                  reason: draftQualityReason,
+                })
+                : t('create.draftQualityEnrichIncompleteBody', 'The initial world cut succeeded, but detail enrichment is incomplete. Review and adjust the draft before deciding whether to continue creating the world.')}
             />
           ) : null}
 

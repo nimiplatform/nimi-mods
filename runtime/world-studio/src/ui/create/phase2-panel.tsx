@@ -35,6 +35,10 @@ export function Phase2Panel(props: Phase2PanelProps) {
     return (<section className="ui-sync-card ui-sync-card-inset p-4">
       <h3 className="text-sm font-semibold text-gray-900">{t('phase2Panel.title')}</h3>
       {!props.phase2 ? (<p className="mt-2 text-xs text-gray-500">{t('phase2Panel.empty')}</p>) : (<div className="mt-3 space-y-3">
+          {props.phase2.enrichDegraded ? (<div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800">
+              <p className="font-semibold">{t('phase2Panel.draftQualityTitle', 'Draft quality status: detail enrichment incomplete')}</p>
+              <p className="mt-1">{t('phase2Panel.draftQualityBody', 'The initial world cut succeeded, but some weak fields remain thin or empty. Continue into Review and adjust the draft before deciding whether to continue creating the world.')}</p>
+            </div>) : null}
           <div className="grid gap-2 lg:grid-cols-4">
             <div className="ui-sync-metric-card p-2">
               <div className="font-medium text-gray-800">{t('phase2Panel.world')}</div>

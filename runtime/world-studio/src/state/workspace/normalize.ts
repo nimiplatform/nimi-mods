@@ -1,6 +1,7 @@
-import type { ChunkTaskResult, EventNodeDraft, QualityGateResult, WorldStudioEmbeddingIndex, WorldStudioEmbeddingIndexEntry, WorldLorebookDraftRow, WorldStudioAgentDraft, WorldStudioAgentLorebookDraft, WorldStudioPhase1Artifact, WorldStudioTaskCheckpoint, WorldStudioTaskRecord, WorldStudioTaskState, WorldStudioWorkspaceSnapshot, } from '../../contracts.js';
+import type { ChunkTaskResult, EventNodeDraft, QualityGateResult, WorldStudioDraftQualityState, WorldStudioEmbeddingIndex, WorldStudioEmbeddingIndexEntry, WorldLorebookDraftRow, WorldStudioAgentDraft, WorldStudioAgentLorebookDraft, WorldStudioPhase1Artifact, WorldStudioTaskCheckpoint, WorldStudioTaskRecord, WorldStudioTaskState, WorldStudioWorkspaceSnapshot, } from '../../contracts.js';
 import { createEmptyFinalDraftAccumulator } from '../../engine/final-draft-accumulator.js';
 import { AGENT_PROSE_FIELDS, WORLD_PROSE_FIELDS } from '../../engine/realm-alignment.js';
+import { normalizePhase2WeakFieldIssues } from './draft-quality.js';
 import { asRecord, safeParseArray, safeParseObject } from "@nimiplatform/sdk/mod";
 function defaultQualityMetrics(): QualityGateResult['metrics'] {
     return {
@@ -147,6 +148,21 @@ function normalizePhase1Artifact(value: unknown): WorldStudioPhase1Artifact | nu
         narrativeArc: normalizeNarrativeArc(record.narrativeArc),
         sourceDigest: String(record.sourceDigest || ''),
         updatedAt: String(record.updatedAt || new Date().toISOString()),
+    };
+}
+
+function normalizeDraftQuality(value: unknown): WorldStudioDraftQualityState {
+    const record = asRecord(value);
+    const worldCutStatusRaw = String(record.worldCutStatus || '').trim().toLowerCase();
+    const enrichStatusRaw = String(record.enrichStatus || '').trim().toLowerCase();
+    return {
+        worldCutStatus: worldCutStatusRaw === 'ready' ? 'ready' : 'idle',
+        enrichStatus: enrichStatusRaw === 'complete' || enrichStatusRaw === 'incomplete'
+            ? enrichStatusRaw as WorldStudioDraftQualityState['enrichStatus']
+            : 'idle',
+        enrichFailureReason: record.enrichFailureReason == null ? null : String(record.enrichFailureReason),
+        weakFieldIssues: normalizePhase2WeakFieldIssues(record.weakFieldIssues),
+        updatedAt: record.updatedAt == null ? null : String(record.updatedAt),
     };
 }
 function normalizeAgentDraft(value: unknown): WorldStudioAgentDraft | null {
@@ -659,6 +675,7 @@ export function syncSnapshot(snapshot: WorldStudioWorkspaceSnapshot): WorldStudi
     const lorebooksDraft = normalizeLorebooksDraft(snapshot.lorebooksDraft || []);
     const taskState = normalizeTaskState(snapshot.taskState || {});
     const phase1Artifact = normalizePhase1Artifact(snapshot.phase1Artifact);
+    const draftQuality = normalizeDraftQuality(snapshot.draftQuality || {});
     const parseJob = {
         ...snapshot.parseJob,
         chunkTotal: Math.max(0, Number(snapshot.parseJob?.chunkTotal) || 0),
@@ -699,6 +716,7 @@ export function syncSnapshot(snapshot: WorldStudioWorkspaceSnapshot): WorldStudi
         eventsDraft,
         lorebooksDraft,
         phase1Artifact,
+        draftQuality,
         taskState,
         knowledgeGraph: {
             ...snapshot.knowledgeGraph,

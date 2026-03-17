@@ -52,6 +52,13 @@ const DEFAULT_SNAPSHOT: WorldStudioWorkspaceSnapshot = {
   },
   finalDraftAccumulator: createEmptyFinalDraftAccumulator(),
   phase1Artifact: null,
+  draftQuality: {
+    worldCutStatus: 'idle',
+    enrichStatus: 'idle',
+    enrichFailureReason: null,
+    weakFieldIssues: [],
+    updatedAt: null,
+  },
   assets: {
     worldCover: { status: 'idle', imageUrl: null },
     characterPortraits: {},
@@ -126,6 +133,10 @@ export function cloneDefaultSnapshot(): WorldStudioWorkspaceSnapshot {
     },
     finalDraftAccumulator: createEmptyFinalDraftAccumulator(),
     phase1Artifact: null,
+    draftQuality: {
+      ...DEFAULT_SNAPSHOT.draftQuality,
+      weakFieldIssues: [],
+    },
     assets: {
       worldCover: { ...DEFAULT_SNAPSHOT.assets.worldCover },
       characterPortraits: {},

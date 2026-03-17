@@ -6,8 +6,11 @@ import { upsertMergeExtraction, toChunkExtraction } from '../src/engine/accumula
 import { canonicalizeCharacterNames } from '../src/engine/character/normalize-zh.ts';
 import { createEmptyFinalDraftAccumulator } from '../src/engine/final-draft-accumulator.ts';
 import { runPhase1GlobalRefine } from '../src/generation/phase1/global-refine.ts';
+import { normalizeTemporalGraph } from '../src/generation/phase1/temporal-normalize.ts';
 import { runSynthesizeDraft } from '../src/engine/synthesize.ts';
 import { buildStartTimeOptionsFromEvents } from '../src/services/temporal-order.ts';
+import { cloneDefaultSnapshot } from '../src/state/workspace/defaults.ts';
+import { syncSnapshot } from '../src/state/workspace/normalize.ts';
 
 function makePrimaryEvent(input) {
   return {
@@ -209,6 +212,66 @@ test('runPhase1GlobalRefine keeps single-event narrative arc as single summary',
 
   const refined = runPhase1GlobalRefine(graph);
   assert.equal(refined.narrativeArc?.summary, '开端');
+});
+
+test('normalizeTemporalGraph rewrites canonical event order, timelineSeq, and timeline from temporal order', () => {
+  const graph = {
+    worldSetting: '修仙世界',
+    timeline: [{ id: 'legacy-1', label: '旧时间线' }],
+    locations: [],
+    characters: [{ id: 'char:韩立', name: '韩立', summary: '主角' }],
+    events: {
+      primary: [
+        {
+          ...makePrimaryEvent({ id: 'evt-late', title: '后段事件', timeRef: '三年后', characterRefs: ['韩立'] }),
+          temporalConfidence: 0.9,
+          dependsOnEventIds: ['evt-middle'],
+          temporalBeforeEventIds: ['evt-early'],
+        },
+        {
+          ...makePrimaryEvent({ id: 'evt-early', title: '前段事件', timeRef: '入门之初', characterRefs: ['韩立'] }),
+          temporalConfidence: 0.9,
+          temporalAfterEventIds: ['evt-late'],
+        },
+      ],
+      secondary: [
+        {
+          ...makePrimaryEvent({ id: 'evt-middle', title: '中段事件', timeRef: '半年后', characterRefs: ['韩立'] }),
+          level: 'SECONDARY',
+          temporalConfidence: 0.85,
+          temporalBeforeEventIds: ['evt-early'],
+          temporalAfterEventIds: ['evt-late'],
+        },
+      ],
+    },
+    characterRelations: [],
+    futureHistoricalEvents: [],
+  };
+
+  const normalized = normalizeTemporalGraph(graph);
+
+  assert.deepEqual(
+    normalized.graph.events.primary.map((item) => item.id),
+    ['evt-early', 'evt-late'],
+  );
+  assert.deepEqual(
+    normalized.graph.events.secondary.map((item) => item.id),
+    ['evt-middle'],
+  );
+  assert.deepEqual(
+    Object.fromEntries(
+      [...normalized.graph.events.primary, ...normalized.graph.events.secondary].map((item) => [item.id, item.timelineSeq]),
+    ),
+    {
+      'evt-early': 1,
+      'evt-middle': 2,
+      'evt-late': 3,
+    },
+  );
+  assert.equal(normalized.graph.timeline.length > 0, true);
+  assert.equal(String(normalized.graph.timeline[0]?.eventId || ''), 'evt-early');
+  assert.equal(normalized.summary.rewrittenTimelineSeq, 3);
+  assert.equal(normalized.summary.startTimeCandidateCount > 0, true);
 });
 
 test('canonicalizeCharacterNames keeps protagonist separate from kinship descriptors', () => {
@@ -550,6 +613,307 @@ test('runSynthesizeDraft prefers working prose over candidate pools and writes a
   assert.equal(calls[0].includes('candidate prose should only be secondary'), true);
   assert.equal(result.finalDraftAccumulator.worldWorkingProseByField.description.content, 'working prose should stay primary');
   assert.equal(result.finalDraftAccumulator.agentWorkingProseByCharacterAndField['韩立'].greeting.content.includes('看清局势'), true);
+});
+
+test('runSynthesizeDraft degrades enrich failure into audit and returns warning metadata', async () => {
+  const calls = [];
+  const event = makePrimaryEvent({
+    id: 'evt-p1',
+    title: '韩立入门',
+    summary: '韩立进入七玄门',
+    timeRef: '卷一',
+    characterRefs: ['韩立'],
+  });
+  const llm = {
+    async generateText(input) {
+      const prompt = String(input.prompt || '');
+      calls.push(prompt);
+      if (calls.length === 1) {
+        return {
+          text: JSON.stringify({
+            world: {
+              name: '凡人世界',
+              description: '一个已经可以切出的初始世界。',
+              genre: 'xianxia',
+              era: '古代',
+            },
+            worldview: {
+              timeModel: { timeFlowRatio: 1 },
+              spaceTopology: {},
+              causality: {},
+              coreSystem: { rules: [] },
+            },
+            worldEvents: [event],
+            worldLorebooks: [],
+            futureHistoricalEvents: [],
+            agentDrafts: [{
+              characterName: '韩立',
+              handle: '~hanli',
+              concept: '少年修士',
+              backstory: '出身凡俗',
+              coreValues: '谨慎',
+              relationshipStyle: '克制',
+            }],
+          }),
+          promptTraceId: 'trace-r1',
+        };
+      }
+      if (calls.length === 2 || calls.length === 3) {
+        return {
+          text: 'not-json-object',
+          promptTraceId: `trace-r2-${calls.length}`,
+        };
+      }
+      return {
+        text: JSON.stringify({
+          world: {
+            name: '凡人世界',
+            description: '一个已经可以切出的初始世界。',
+            genre: 'xianxia',
+            era: '古代',
+          },
+          worldview: {
+            timeModel: { timeFlowRatio: 1 },
+            spaceTopology: {},
+            causality: {},
+            coreSystem: { rules: [] },
+          },
+          worldEvents: [event],
+          worldLorebooks: [],
+          futureHistoricalEvents: [],
+          agentDrafts: [{
+            characterName: '韩立',
+            handle: '~hanli',
+            concept: '少年修士',
+            backstory: '出身凡俗',
+            coreValues: '谨慎',
+            relationshipStyle: '克制',
+          }],
+        }),
+        promptTraceId: 'trace-r3',
+      };
+    },
+  };
+
+  const result = await runSynthesizeDraft(llm, {
+    selectedStartTimeId: 'event:evt-p1',
+    selectedCharacters: ['韩立'],
+    knowledgeGraph: {
+      worldSetting: '修仙世界',
+      timeline: [{ id: 'timeline:1', label: '1. 卷一 · 韩立入门' }],
+      locations: [],
+      characters: [{ id: 'char:韩立', name: '韩立', summary: '主角' }],
+      events: {
+        primary: [event],
+        secondary: [],
+      },
+      characterRelations: [],
+      futureHistoricalEvents: [],
+      characterProfiles: [{
+        name: '韩立',
+        aliases: [],
+        summary: '主角',
+        background: '山村少年',
+        motivation: '求生修仙',
+        relationships: [],
+        keyEvents: ['韩立入门'],
+      }],
+      characterAliasMap: { 韩立: '韩立' },
+    },
+    finalDraftAccumulator: createEmptyFinalDraftAccumulator(),
+  });
+
+  assert.equal(result.enrichDegraded, true);
+  assert.equal(Boolean(result.enrichFailureReason), true);
+  assert.equal(Array.isArray(result.weakFieldIssues), true);
+  assert.equal(calls.length, 4);
+  assert.equal(calls[2].includes('Return a SPARSE PATCH'), true);
+  assert.equal(calls[3].includes('round2-enrich did not complete successfully'), true);
+  assert.equal(calls[3].includes('empty/thin fields as "not yet rich enough"'), true);
+});
+
+test('runSynthesizeDraft enrichment patch preserves stable array fields instead of replacing them wholesale', async () => {
+  const event = makePrimaryEvent({
+    id: 'evt-p1',
+    title: '韩立入门',
+    summary: '韩立进入七玄门',
+    timeRef: '卷一',
+    characterRefs: ['韩立'],
+  });
+  const llm = {
+    calls: 0,
+    async generateText() {
+      this.calls += 1;
+      if (this.calls === 1) {
+        return {
+          text: JSON.stringify({
+            world: {
+              name: '凡人世界',
+              description: '一个已经可以切出的初始世界。',
+              genre: 'xianxia',
+              era: '古代',
+              themes: ['修仙', '求生', '因果'],
+            },
+            worldview: {
+              timeModel: { timeFlowRatio: 1 },
+              spaceTopology: {},
+              causality: {},
+              coreSystem: {
+                rules: [
+                  { key: 'survival', title: '求生第一', value: '先活下来。' },
+                ],
+              },
+            },
+            worldEvents: [event],
+            worldLorebooks: [
+              { name: '七玄门', content: '基础宗门设定' },
+            ],
+            futureHistoricalEvents: [
+              { id: 'future-1', title: '韩立外出历练' },
+            ],
+            agentDrafts: [{
+              characterName: '韩立',
+              handle: '~hanli',
+              concept: '少年修士',
+              backstory: '出身凡俗',
+              coreValues: '谨慎',
+              relationshipStyle: '克制',
+              agentLorebooks: [
+                { name: '绿瓶', content: '关键机缘' },
+              ],
+            }],
+          }),
+          promptTraceId: 'trace-r1',
+        };
+      }
+      if (this.calls === 2) {
+        return {
+          text: JSON.stringify({
+            world: {
+              themes: ['成长'],
+            },
+            worldview: {
+              coreSystem: {
+                rules: [
+                  { key: 'causality', title: '因果代价', value: '每次机缘都有代价。' },
+                ],
+              },
+            },
+            worldLorebooks: [
+              { name: '墨大夫', content: '韩立早期重要人物' },
+            ],
+            futureHistoricalEvents: [
+              { id: 'future-2', title: '墨大夫图谋暴露' },
+            ],
+            agentDrafts: [{
+              characterName: '韩立',
+              agentLorebooks: [
+                { name: '神手谷', content: '早期修行地点' },
+              ],
+            }],
+          }),
+          promptTraceId: 'trace-r2',
+        };
+      }
+      return {
+        text: JSON.stringify({
+          world: {
+            name: '凡人世界',
+            description: '一个已经可以切出的初始世界。',
+          },
+          worldview: {
+            timeModel: { timeFlowRatio: 1 },
+            spaceTopology: {},
+            causality: {},
+            coreSystem: {},
+          },
+          worldEvents: [event],
+          worldLorebooks: [],
+          futureHistoricalEvents: [],
+          agentDrafts: [{
+            characterName: '韩立',
+            handle: '~hanli',
+            concept: '少年修士',
+            backstory: '出身凡俗',
+            coreValues: '谨慎',
+            relationshipStyle: '克制',
+          }],
+        }),
+        promptTraceId: 'trace-r3',
+      };
+    },
+  };
+
+  const result = await runSynthesizeDraft(llm, {
+    selectedStartTimeId: 'event:evt-p1',
+    selectedCharacters: ['韩立'],
+    knowledgeGraph: {
+      worldSetting: '修仙世界',
+      timeline: [{ id: 'timeline:1', label: '1. 卷一 · 韩立入门' }],
+      locations: [],
+      characters: [{ id: 'char:韩立', name: '韩立', summary: '主角' }],
+      events: {
+        primary: [event],
+        secondary: [],
+      },
+      characterRelations: [],
+      futureHistoricalEvents: [],
+      characterProfiles: [{
+        name: '韩立',
+        aliases: [],
+        summary: '主角',
+        background: '山村少年',
+        motivation: '求生修仙',
+        relationships: [],
+        keyEvents: ['韩立入门'],
+      }],
+      characterAliasMap: { 韩立: '韩立' },
+    },
+    finalDraftAccumulator: createEmptyFinalDraftAccumulator(),
+  });
+
+  assert.deepEqual(result.world.themes, ['修仙', '求生', '因果', '成长']);
+  assert.deepEqual(
+    result.worldview.coreSystem.rules.map((item) => item.key),
+    ['survival', 'causality'],
+  );
+  assert.deepEqual(
+    result.worldLorebooks.map((item) => item.name),
+    ['七玄门', '墨大夫'],
+  );
+  assert.deepEqual(
+    result.futureHistoricalEvents.map((item) => item.id),
+    ['future-1', 'future-2'],
+  );
+  assert.deepEqual(
+    result.agentDrafts[0].agentLorebooks.map((item) => item.name),
+    ['绿瓶', '神手谷'],
+  );
+});
+
+test('syncSnapshot preserves degraded draft quality state across reload normalization', () => {
+  const snapshot = cloneDefaultSnapshot();
+  snapshot.draftQuality = {
+    worldCutStatus: 'ready',
+    enrichStatus: 'incomplete',
+    enrichFailureReason: 'WORLD_STUDIO_JSON_OBJECT_REQUIRED',
+    weakFieldIssues: [
+      {
+        path: 'world.description',
+        reason: 'low_information',
+        detail: 'chars=24 threshold=50',
+      },
+    ],
+    updatedAt: '2026-03-18T10:00:00.000Z',
+  };
+
+  const synced = syncSnapshot(snapshot);
+
+  assert.equal(synced.draftQuality.worldCutStatus, 'ready');
+  assert.equal(synced.draftQuality.enrichStatus, 'incomplete');
+  assert.equal(synced.draftQuality.enrichFailureReason, 'WORLD_STUDIO_JSON_OBJECT_REQUIRED');
+  assert.equal(synced.draftQuality.weakFieldIssues.length, 1);
+  assert.equal(synced.draftQuality.weakFieldIssues[0].path, 'world.description');
 });
 
 test('buildStartTimeOptionsFromEvents orders by temporal hint before source order fallback', () => {

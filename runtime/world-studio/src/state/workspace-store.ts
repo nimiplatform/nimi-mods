@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { FinalDraftAccumulator, EventNodeDraft, WorldStudioCreateStep, WorldStudioSnapshotPatch, WorldStudioWorkspaceSnapshot, } from '../contracts.js';
 import { cloneDefaultSnapshot } from './workspace/defaults.js';
+import { normalizePhase2WeakFieldIssues } from './workspace/draft-quality.js';
 import { syncSnapshot } from './workspace/normalize.js';
 import { persistSnapshotToStorage, readSnapshotFromStorage } from './workspace/storage.js';
 import { emitWorldStudioDiag } from '../logging.js';
@@ -237,6 +238,13 @@ export const useWorldStudioWorkspaceStore = create<WorldStudioWorkspaceStore>((s
                         : state.snapshot.finalDraftAccumulator.lastUpdatedChunk,
                 };
             })(),
+            draftQuality: {
+                ...state.snapshot.draftQuality,
+                ...(patch.draftQuality || {}),
+                weakFieldIssues: Array.isArray(patch.draftQuality?.weakFieldIssues)
+                    ? normalizePhase2WeakFieldIssues(patch.draftQuality.weakFieldIssues)
+                    : state.snapshot.draftQuality.weakFieldIssues,
+            },
             taskState: {
                 ...state.snapshot.taskState,
                 ...(patch.taskState || {}),

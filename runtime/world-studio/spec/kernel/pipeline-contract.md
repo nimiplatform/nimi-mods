@@ -66,6 +66,7 @@ Candidate pools remain program-governed via `create | revise | replace | no-op`.
 World and agent outputs stay coupled inside the same round set to preserve shared style and setting coherence.
 Prose input priority is fixed: `working prose > candidate pool > model gap fill`.
 Round3 closure must write final audited prose back into `working prose`.
+Round2 patch merge is additive by default: sparse list/array fields must merge into stable existing state by identity when possible, not wholesale replace already-stable arrays just because an incoming list is non-empty.
 
 ## WS-PIPE-012 Weak-Field Report Contract
 
@@ -95,3 +96,41 @@ Phase2 final output is fail-close to realm truth:
 - `agentDrafts` must align to canonical creator-agent payload fields
 
 This refactor does not alter `narrativeArc` ownership or construction; it remains a phase1 global-refine product derived from `knowledgeGraph.events.primary`.
+
+## WS-PIPE-015 Phase1 Temporal Normalization Contract
+
+After phase1 global refine and before quality gate / start-time derivation, world-studio must run a formal temporal normalization pass.
+The pass reuses existing temporal-order logic and writes the resulting order back into graph truth:
+
+- reorder `events.primary + events.secondary`
+- rewrite contiguous integer `timelineSeq`
+- rebuild canonical `timeline` from normalized primary events
+- feed both quality gate and start-time option derivation from the normalized graph
+
+Temporal normalization is a graph-level truth rewrite, not a UI-only or start-time-only projection.
+
+## WS-PIPE-016 Generate Degraded-Enrich Contract
+
+Generate is world-cut-first.
+
+- `round1-produce` failure => generate fails
+- `round2-enrich` failure => mark `enrichDegraded = true`, continue to `round3-audit` with round1 output
+- `round3-audit` failure => generate fails
+
+When `enrichDegraded = true`, round3 must receive explicit degraded context:
+
+- empty or thin fields are treated as “not yet rich enough”, not as consistency failures
+- `weakFieldReport` becomes advisory only
+- audit scope stays limited to consistency, realm whitelist, and basic tone/style unification
+
+If round3 succeeds under degraded mode, creator must be routed to Review with explicit warning and allowed to manually edit before deciding whether to continue creating/publishing the world.
+
+The degraded result must also persist as draft-quality state in the draft snapshot:
+
+- `worldCutStatus = ready`
+- `enrichStatus = incomplete`
+- `enrichFailureReason`
+- advisory `weakFieldIssues`
+
+This state is informational, not blocking. It must survive reload/re-entry, remain visible during Review, and be cleared or superseded only by a later successful Generate result.
+Starting a new Generate attempt must not clear an existing degraded draft-quality state up front; if the new attempt fails, the prior persisted quality state remains the last known truth for that draft.

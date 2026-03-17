@@ -172,6 +172,26 @@ cases:
     expected_ok: true
     test_reference: world-studio-regressions.test.mjs
     source_rule: WS-PIPE-011
+  - id: WS-032A-PHASE1-TEMPORAL-NORMALIZATION
+    description: Phase1 rewrites event order, contiguous timelineSeq, canonical timeline, and start-time options from a normalized graph after global refine rather than relying on raw merge order.
+    expected_ok: true
+    test_reference: world-studio-regressions.test.mjs
+    source_rule: WS-PIPE-015
+  - id: WS-032B-PHASE2-DEGRADED-ENRICH-REVIEW-HANDOFF
+    description: If round1 succeeds and round2 enrich fails, phase2 continues to audit using round1 state, treats weak fields as advisory during degraded audit, and hands creator to Review with explicit draft-quality status instead of hard-failing Generate.
+    expected_ok: true
+    test_reference: world-studio-regressions.test.mjs
+    source_rule: WS-PIPE-016
+  - id: WS-032C-DEGRADED-DRAFT-QUALITY-PERSISTED
+    description: Degraded enrich state persists as draft quality metadata across reload/re-entry and across failed Generate retries; it remains informational rather than blocking until a later successful Generate supersedes it.
+    expected_ok: true
+    test_reference: world-studio-phase2-without-full-source.test.mjs
+    source_rule: WS-PIPE-016
+  - id: WS-032D-ROUND2-PATCH-ARRAYS-PRESERVE-STABLE-STATE
+    description: Round2 enrichment patches merge stable array/list fields additively by identity instead of replacing already-stable arrays wholesale when only sparse weak-field supplementation is intended.
+    expected_ok: true
+    test_reference: world-studio-regressions.test.mjs
+    source_rule: WS-PIPE-011
   - id: WS-033-PHASE2-REALM-ALIGNED-FINAL-DRAFT
     description: Phase2 final output remains aligned to canonical world/worldview/creator-agent payload shapes and preserves narrativeArc ownership in phase1 global-refine.
     expected_ok: true

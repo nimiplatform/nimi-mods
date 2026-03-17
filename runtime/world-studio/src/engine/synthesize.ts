@@ -4,7 +4,10 @@ import type {
   DraftPatchEvidenceRef,
   EventNodeDraft,
   FinalDraftAccumulator,
+  Phase2EnrichmentPatch,
   Phase2Result,
+  Phase2WeakFieldIssue,
+  Phase2WeakFieldReason,
   ProseCandidateRecord,
   RouteCapabilityLlmInvoker,
   WorldProseCandidateField,
@@ -59,14 +62,6 @@ type Phase2DraftState = {
   worldLorebooks: Array<Record<string, unknown>>;
   futureHistoricalEvents: Array<Record<string, unknown>>;
   agentDrafts: WorldStudioAgentDraft[];
-};
-
-type WeakFieldReason = 'empty' | 'low_information' | 'low_evidence' | 'incomplete_reference';
-
-type WeakFieldIssue = {
-  path: string;
-  reason: WeakFieldReason;
-  detail: string;
 };
 
 const DEFAULT_PROMPT_BUDGET: Phase2PromptBudget = {
@@ -452,16 +447,85 @@ function mergeMeaningful(base: unknown, incoming: unknown): unknown {
   return incoming;
 }
 
+function stablePatchArrayIdentity(value: unknown): string {
+  if (value == null) return '';
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    return `${typeof value}:${String(value)}`;
+  }
+  const record = asRecord(value);
+  for (const key of ['id', 'key', 'name', 'characterName', 'title']) {
+    const normalized = String(record[key] || '').trim();
+    if (normalized) {
+      return `${key}:${normalized}`;
+    }
+  }
+  const ordered = Object.keys(record)
+    .sort()
+    .reduce<Record<string, unknown>>((acc, key) => {
+      acc[key] = record[key];
+      return acc;
+    }, {});
+  return JSON.stringify(ordered);
+}
+
+function mergePatchArray(base: unknown, incoming: unknown): unknown {
+  if (!Array.isArray(incoming) || incoming.length === 0) return base;
+  if (!Array.isArray(base) || base.length === 0) {
+    return incoming;
+  }
+  const next = [...base];
+  const indexByIdentity = new Map<string, number>();
+  next.forEach((item, index) => {
+    const identity = stablePatchArrayIdentity(item);
+    if (identity) {
+      indexByIdentity.set(identity, index);
+    }
+  });
+  incoming.forEach((item) => {
+    const identity = stablePatchArrayIdentity(item);
+    const existingIndex = identity ? indexByIdentity.get(identity) : undefined;
+    if (existingIndex != null) {
+      next[existingIndex] = mergePatchMeaningful(next[existingIndex], item);
+      return;
+    }
+    next.push(item);
+    if (identity) {
+      indexByIdentity.set(identity, next.length - 1);
+    }
+  });
+  return next;
+}
+
+function mergePatchMeaningful(base: unknown, incoming: unknown): unknown {
+  if (typeof incoming === 'object' && incoming && !Array.isArray(incoming)) {
+    const baseRecord = (typeof base === 'object' && base && !Array.isArray(base)) ? asRecord(base) : {};
+    const next: Record<string, unknown> = { ...baseRecord };
+    Object.entries(asRecord(incoming)).forEach(([key, value]) => {
+      next[key] = mergePatchMeaningful(baseRecord[key], value);
+    });
+    return next;
+  }
+  if (!hasMeaningfulValue(incoming)) return base;
+  if (Array.isArray(incoming)) {
+    return mergePatchArray(base, incoming);
+  }
+  if (typeof incoming === 'string') {
+    return incoming.trim().length > 0 ? incoming.trim() : base;
+  }
+  return incoming;
+}
+
 function mergeAgentDrafts(
   selectedCharacters: string[],
   base: WorldStudioAgentDraft[],
   incoming: WorldStudioAgentDraft[],
+  mergeFn: (baseValue: unknown, incomingValue: unknown) => unknown = mergeMeaningful,
 ): WorldStudioAgentDraft[] {
   const baseByCharacter = new Map(base.map((draft) => [draft.characterName, draft] as const));
   incoming.forEach((draft, index) => {
     const characterName = String(draft.characterName || selectedCharacters[index] || '').trim();
     if (!characterName) return;
-    const mergedSource = mergeMeaningful(baseByCharacter.get(characterName) || {}, draft);
+    const mergedSource = mergeFn(baseByCharacter.get(characterName) || {}, draft);
     const normalized = normalizeAgentDraft({
       ...(baseByCharacter.get(characterName) || {}),
       ...(typeof mergedSource === 'object' && mergedSource && !Array.isArray(mergedSource)
@@ -476,7 +540,7 @@ function mergeAgentDrafts(
     .filter((draft) => Boolean(String(draft.characterName || '').trim()));
 }
 
-function materializeDraftState(input: {
+function materializeFullDraftState(input: {
   base: Phase2DraftState;
   selectedCharacters: string[];
   knowledgeGraph: WorldStudioKnowledgeGraphDraft;
@@ -516,7 +580,51 @@ function materializeDraftState(input: {
     worldEvents: incomingEvents.length > 0 ? incomingEvents : input.base.worldEvents,
     worldLorebooks: incomingLorebooks.length > 0 ? incomingLorebooks : input.base.worldLorebooks,
     futureHistoricalEvents: incomingFutureEvents.length > 0 ? incomingFutureEvents : input.base.futureHistoricalEvents,
-    agentDrafts: mergeAgentDrafts(input.selectedCharacters, input.base.agentDrafts, incomingAgentDrafts),
+    agentDrafts: mergeAgentDrafts(input.selectedCharacters, input.base.agentDrafts, incomingAgentDrafts, mergeMeaningful),
+  };
+}
+
+function applyEnrichmentPatch(input: {
+  base: Phase2DraftState;
+  selectedCharacters: string[];
+  patch: Phase2EnrichmentPatch;
+}): Phase2DraftState {
+  const patch = asRecord(input.patch);
+  const incomingWorld = alignWorldPatch(patch.world || {});
+  const incomingWorldview = alignWorldviewPatch(patch.worldview || {});
+  const incomingLorebooks = asObjectArray(patch.worldLorebooks);
+  const incomingFutureEvents = asObjectArray(patch.futureHistoricalEvents);
+  const incomingAgentDrafts = Array.isArray(patch.agentDrafts)
+    ? patch.agentDrafts
+      .filter((item) => item && typeof item === 'object')
+      .map((item, index) => {
+        const record = asRecord(item);
+        const characterName = String(record.characterName || input.selectedCharacters[index] || '').trim();
+        return {
+          ...normalizeAgentDraft(record, characterName, index),
+          ...alignAgentStructuralDraft(normalizeAgentDraft(record, characterName, index)),
+          ...(Object.prototype.hasOwnProperty.call(record, 'scenario')
+            ? { scenario: normalizeNullableString(record.scenario) }
+            : {}),
+          ...(Object.prototype.hasOwnProperty.call(record, 'greeting')
+            ? { greeting: normalizeNullableString(record.greeting) }
+            : {}),
+          ...(Object.prototype.hasOwnProperty.call(record, 'exampleDialogue')
+            ? { exampleDialogue: normalizeNullableString(record.exampleDialogue) }
+            : {}),
+          ...(Object.prototype.hasOwnProperty.call(record, 'systemPromptBase')
+            ? { systemPromptBase: normalizeNullableString(record.systemPromptBase) }
+            : {}),
+        };
+      })
+    : [];
+  return {
+    world: mergePatchMeaningful(input.base.world, incomingWorld) as Record<string, unknown>,
+    worldview: mergePatchMeaningful(input.base.worldview, incomingWorldview) as Record<string, unknown>,
+    worldEvents: input.base.worldEvents,
+    worldLorebooks: mergePatchArray(input.base.worldLorebooks, incomingLorebooks) as Array<Record<string, unknown>>,
+    futureHistoricalEvents: mergePatchArray(input.base.futureHistoricalEvents, incomingFutureEvents) as Array<Record<string, unknown>>,
+    agentDrafts: mergeAgentDrafts(input.selectedCharacters, input.base.agentDrafts, incomingAgentDrafts, mergePatchMeaningful),
   };
 }
 
@@ -555,9 +663,9 @@ function buildWeakFieldReport(input: {
   selectedCharacters: string[];
   knowledgeGraph: WorldStudioKnowledgeGraphDraft;
   finalDraftAccumulator: FinalDraftAccumulator;
-}): { issues: WeakFieldIssue[] } {
-  const issues: WeakFieldIssue[] = [];
-  const pushIssue = (path: string, reason: WeakFieldReason, detail: string) => {
+}): { issues: Phase2WeakFieldIssue[] } {
+  const issues: Phase2WeakFieldIssue[] = [];
+  const pushIssue = (path: string, reason: Phase2WeakFieldReason, detail: string) => {
     issues.push({ path, reason, detail });
   };
   const world = asRecord(input.draft.world);
@@ -729,7 +837,7 @@ function buildAgentProsePatchFromState(
   return Object.keys(patch).length > 0 ? patch : undefined;
 }
 
-function buildPhase2SchemaLines(): string[] {
+function buildPhase2FullSchemaLines(): string[] {
   return [
     '{',
     '  "world":{"name":"...","tagline":"...","motto":"...","overview":"...","description":"...","genre":"...","themes":["..."],"era":"...","status":"ACTIVE","contentRating":"TEEN"},',
@@ -742,6 +850,18 @@ function buildPhase2SchemaLines(): string[] {
   ];
 }
 
+function buildPhase2EnrichmentPatchSchemaLines(): string[] {
+  return [
+    '{',
+    '  "world":{"tagline":"...","motto":"...","overview":"...","description":"...","genre":"...","themes":["..."],"era":"...","contentRating":"TEEN"},',
+    '  "worldview":{"timeModel":{},"spaceTopology":{},"causality":{},"coreSystem":{"rules":[{"key":"...","title":"...","value":"..."}]},"languages":{},"existences":{},"resources":{},"structures":{},"visualGuide":{},"narrativeHooks":{}},',
+    '  "worldLorebooks":[{"key":"topic:subtopic:item_name","name":"...","content":"...","keywords":["..."],"value":{"details":{}},"provenance":{"source":"phase2.enrich"}}],',
+    '  "futureHistoricalEvents":[{"id":"future-1","title":"...","description":"...","timeNode":"...","impact":"..."}],',
+    '  "agentDrafts":[{"characterName":"...","description":"...","scenario":"...","greeting":"...","exampleDialogue":"...","systemPromptBase":"...","agentLorebooks":[{"name":"...","content":"...","keywords":["..."],"priority":10,"insertionOrder":100,"constant":false,"selective":false,"secondaryKeys":[],"enabled":true,"source":"world-studio.phase2.enrich"}]}]',
+    '}',
+  ];
+}
+
 function buildRoundPrompt(input: {
   round: Phase2RoundName;
   selectedStartTimeId: string;
@@ -749,8 +869,9 @@ function buildRoundPrompt(input: {
   knowledgeGraph: WorldStudioKnowledgeGraphDraft;
   finalDraftAccumulator: FinalDraftAccumulator;
   currentDraft: Phase2DraftState;
-  weakFieldReport?: { issues: WeakFieldIssue[] };
+  weakFieldReport?: { issues: Phase2WeakFieldIssue[] };
   compact?: boolean;
+  degradedMode?: boolean;
 }): string {
   const budget = input.compact ? COMPACT_PROMPT_BUDGET : DEFAULT_PROMPT_BUDGET;
   const structuredGraph = buildStructuredGraphForPrompt({
@@ -787,6 +908,17 @@ function buildRoundPrompt(input: {
       'Return a FULL final draft.',
       'Unify tone/style across world and agents, enforce realm field whitelist, and remove unsupported fields.',
       'Do not replace stable working prose without a concrete consistency or realm-alignment reason.',
+      ...(input.degradedMode
+        ? [
+          '',
+          '## Degraded Audit Context',
+          'round2-enrich did not complete successfully.',
+          'The current draft may still contain empty or thin fields.',
+          'Treat empty/thin fields as "not yet rich enough", NOT as consistency failures.',
+          'Only audit consistency, realm whitelist, and basic tone/style unification.',
+          'Do not fail or over-rewrite solely because fields remain empty after the degraded enrich path.',
+        ]
+        : []),
     ];
   })();
   return [
@@ -811,7 +943,9 @@ function buildRoundPrompt(input: {
     '- Keep handle ASCII-safe and concise when present.',
     '',
     'Schema:',
-    ...buildPhase2SchemaLines(),
+    ...(input.round === 'round2-enrich'
+      ? buildPhase2EnrichmentPatchSchemaLines()
+      : buildPhase2FullSchemaLines()),
     '',
     `CHECKPOINT_START_TIME_ID: ${input.selectedStartTimeId}`,
     `CHECKPOINT_CHARACTERS: ${input.selectedCharacters.join(', ')}`,
@@ -986,7 +1120,7 @@ export async function runSynthesizeDraft(
       compact,
     }),
   });
-  const round1State = materializeDraftState({
+  const round1State = materializeFullDraftState({
     base: seedState,
     selectedCharacters: input.selectedCharacters,
     knowledgeGraph: input.knowledgeGraph,
@@ -1002,26 +1136,43 @@ export async function runSynthesizeDraft(
     issueCount: weakFieldReport.issues.length,
     sample: weakFieldReport.issues.slice(0, 12),
   });
-  const round2 = await runRound(llm, {
-    round: 'round2-enrich',
-    abortSignal: input.abortSignal,
-    promptFactory: (compact) => buildRoundPrompt({
+  let enrichDegraded = false;
+  let enrichFailureReason: string | null = null;
+  let round2RawText = '';
+  let round2State = round1State;
+  try {
+    const round2 = await runRound(llm, {
       round: 'round2-enrich',
-      selectedStartTimeId: input.selectedStartTimeId,
+      abortSignal: input.abortSignal,
+      promptFactory: (compact) => buildRoundPrompt({
+        round: 'round2-enrich',
+        selectedStartTimeId: input.selectedStartTimeId,
+        selectedCharacters: input.selectedCharacters,
+        knowledgeGraph: input.knowledgeGraph,
+        finalDraftAccumulator,
+        currentDraft: round1State,
+        weakFieldReport,
+        compact,
+      }),
+    });
+    round2RawText = round2.rawText;
+    round2State = applyEnrichmentPatch({
+      base: round1State,
       selectedCharacters: input.selectedCharacters,
-      knowledgeGraph: input.knowledgeGraph,
-      finalDraftAccumulator,
-      currentDraft: round1State,
-      weakFieldReport,
-      compact,
-    }),
-  });
-  const round2State = materializeDraftState({
-    base: round1State,
-    selectedCharacters: input.selectedCharacters,
-    knowledgeGraph: input.knowledgeGraph,
-    payload: round2.payload,
-  });
+      patch: round2.payload as Phase2EnrichmentPatch,
+    });
+  } catch (error) {
+    if (input.abortSignal?.aborted) {
+      throw error;
+    }
+    enrichDegraded = true;
+    enrichFailureReason = error instanceof Error ? error.message : String(error);
+    round2State = round1State;
+    diag('round2-degraded-continue', {
+      reason: enrichFailureReason,
+      weakFieldIssueCount: weakFieldReport.issues.length,
+    });
+  }
   const round3 = await runRound(llm, {
     round: 'round3-audit',
     abortSignal: input.abortSignal,
@@ -1034,9 +1185,10 @@ export async function runSynthesizeDraft(
       currentDraft: round2State,
       weakFieldReport,
       compact,
+      degradedMode: enrichDegraded,
     }),
   });
-  const auditedState = materializeDraftState({
+  const auditedState = materializeFullDraftState({
     base: round2State,
     selectedCharacters: input.selectedCharacters,
     knowledgeGraph: input.knowledgeGraph,
@@ -1082,6 +1234,9 @@ export async function runSynthesizeDraft(
     futureHistoricalEvents,
     agentDrafts,
     finalDraftAccumulator: closureAccumulator,
-    rawText: round3.rawText,
+    enrichDegraded,
+    enrichFailureReason,
+    weakFieldIssues: weakFieldReport.issues,
+    rawText: [round1.rawText, round2RawText, round3.rawText].filter(Boolean).join('\n\n'),
   };
 }

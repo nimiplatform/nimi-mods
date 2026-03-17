@@ -215,3 +215,373 @@ test('world-studio phase2 can synthesize without full source text after refresh'
   assert.equal(lastStatusBanner?.kind, 'warning');
   assert.equal(String(lastStatusBanner?.message || '').includes('embedding'), true);
 });
+
+test('world-studio phase2 persists degraded draft quality state when enrich fails but audit succeeds', async () => {
+  const snapshotRef = { current: cloneDefaultSnapshot() };
+  snapshotRef.current.selectedStartTimeId = 'event:p-1';
+  snapshotRef.current.selectedCharacters = ['汪淼'];
+  snapshotRef.current.phase1Artifact = {
+    startTimeOptions: [{ id: 'event:p-1', label: '1. 2004 · 倒计时危机爆发', description: '', weight: 0.8 }],
+    characterCandidates: [{ name: '汪淼', summary: 'summary', significance: 0.8 }],
+    qualityGate: makeQualityGatePass(),
+    chunkTasks: [],
+    narrativeArc: {
+      summary: 'summary',
+      opening: 'opening',
+      development: 'development',
+      climax: 'climax',
+      resolution: 'resolution',
+    },
+    sourceDigest: 'digest-1',
+    updatedAt: new Date().toISOString(),
+  };
+  snapshotRef.current.knowledgeGraph = {
+    ...snapshotRef.current.knowledgeGraph,
+    worldSetting: 'world',
+    timeline: [{ id: 't-1', label: '2004' }],
+    characters: [{ id: 'char-1', name: '汪淼', summary: 'summary' }],
+    events: {
+      primary: [{
+        id: 'p-1',
+        level: 'PRIMARY',
+        parentEventId: null,
+        title: '倒计时危机爆发',
+        summary: 'summary',
+        cause: 'cause',
+        process: 'process',
+        result: 'result',
+        timeRef: '2004',
+        locationRefs: ['北京'],
+        characterRefs: ['汪淼'],
+        dependsOnEventIds: [],
+        evidenceRefs: [{ segmentId: 'seg-1', offsetStart: 0, offsetEnd: 12, excerpt: 'evidence', confidence: 0.8, sourceType: 'chunk' }],
+        confidence: 0.8,
+        needsEvidence: false,
+      }],
+      secondary: [],
+    },
+    narrativeArc: snapshotRef.current.phase1Artifact.narrativeArc,
+    characterProfiles: [{
+      name: '汪淼',
+      aliases: [],
+      summary: 'summary',
+      background: 'background',
+      motivation: 'motivation',
+      relationships: ['常伟思:合作'],
+      keyEvents: ['倒计时危机爆发'],
+    }],
+    characterAliasMap: { 汪淼: '汪淼' },
+  };
+
+  const taskController = createMockTaskController();
+  let phase2 = null;
+  let lastNotice = null;
+  let generateCalls = 0;
+
+  const binding = {
+    source: 'cloud',
+    connectorId: 'connector-1',
+    model: 'deepseek/deepseek-chat',
+  };
+
+  const input = {
+    aiClient: {
+      async generateText() {
+        generateCalls += 1;
+        if (generateCalls === 1) {
+          return {
+            text: JSON.stringify({
+              world: {
+                name: 'World',
+                description: 'Description',
+                themes: ['science'],
+              },
+              worldview: {
+                timeModel: { timeFlowRatio: 1, calendarSystem: {} },
+                spaceTopology: {},
+                causality: {},
+                coreSystem: { rules: [] },
+                existences: {},
+                resources: {},
+                structures: {},
+                visualGuide: {},
+                narrativeHooks: {},
+              },
+              worldEvents: snapshotRef.current.knowledgeGraph.events.primary,
+              futureHistoricalEvents: [],
+              agentDrafts: [{
+                characterName: '汪淼',
+                handle: '~wangmiao',
+                concept: 'concept',
+                backstory: 'background',
+                coreValues: 'motivation',
+                relationshipStyle: 'cooperative',
+              }],
+            }),
+            promptTraceId: 'trace-r1',
+          };
+        }
+        if (generateCalls === 2 || generateCalls === 3) {
+          return {
+            text: '{"world":',
+            promptTraceId: `trace-r2-${generateCalls}`,
+          };
+        }
+        return {
+          text: JSON.stringify({
+            world: {
+              name: 'World',
+              description: 'Description',
+            },
+            worldview: {
+              timeModel: { timeFlowRatio: 1, calendarSystem: {} },
+              spaceTopology: {},
+              causality: {},
+              coreSystem: { rules: [] },
+              existences: {},
+              resources: {},
+              structures: {},
+              visualGuide: {},
+              narrativeHooks: {},
+            },
+            worldEvents: snapshotRef.current.knowledgeGraph.events.primary,
+            futureHistoricalEvents: [],
+            agentDrafts: [{
+              characterName: '汪淼',
+              handle: '~wangmiao',
+              concept: 'concept',
+              backstory: 'background',
+              coreValues: 'motivation',
+              relationshipStyle: 'cooperative',
+            }],
+          }),
+          promptTraceId: 'trace-r3',
+        };
+      },
+    },
+    flowId: 'flow-phase2-degraded-quality',
+    sourceEncoding: 'utf-8',
+    setSourceEncoding: () => {},
+    sourceMode: 'FILE',
+    setSourceMode: () => {},
+    setFilePreviewText: () => {},
+    sourceChunksRef: { current: [] },
+    sourceRawTextRef: { current: '' },
+    routeOptions: null,
+    snapshot: snapshotRef.current,
+    patchSnapshot: (patch) => {
+      snapshotRef.current = {
+        ...snapshotRef.current,
+        ...patch,
+        parseJob: {
+          ...snapshotRef.current.parseJob,
+          ...(patch.parseJob || {}),
+        },
+        agentSync: {
+          ...snapshotRef.current.agentSync,
+          ...(patch.agentSync || {}),
+        },
+        draftQuality: {
+          ...snapshotRef.current.draftQuality,
+          ...(patch.draftQuality || {}),
+          weakFieldIssues: Array.isArray(patch.draftQuality?.weakFieldIssues)
+            ? patch.draftQuality.weakFieldIssues
+            : snapshotRef.current.draftQuality.weakFieldIssues,
+        },
+      };
+      input.snapshot = snapshotRef.current;
+    },
+    patchPanel: () => {},
+    setCreateStep: () => {},
+    setPhase1: () => {},
+    setPhase2: (value) => {
+      phase2 = value;
+    },
+    phase1: null,
+    retryConcurrency: 1,
+    retryErrorCode: null,
+    retryScope: 'all',
+    retryWithFineRoute: false,
+    resolveEffectiveRouteBindings: () => ({ coarse: binding, fine: binding }),
+    resolveRuntimeDefaultRouteBinding: async () => binding,
+    bindingMap: { coarse: binding, fine: binding },
+    runtimeDefaultRouteBinding: binding,
+    selectedDraftId: '',
+    selectedWorldId: '',
+    setLanding: () => {},
+    mutations: {},
+    queries: {},
+    setStatusBanner: () => {},
+    setError: () => {},
+    setNotice: (value) => {
+      lastNotice = value;
+    },
+    taskController,
+  };
+
+  await runCreatePhase2(input);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(Boolean(phase2), true);
+  assert.equal(phase2.enrichDegraded, true);
+  assert.equal(snapshotRef.current.draftQuality.worldCutStatus, 'ready');
+  assert.equal(snapshotRef.current.draftQuality.enrichStatus, 'incomplete');
+  assert.equal(snapshotRef.current.draftQuality.enrichFailureReason, 'WORLD_STUDIO_JSON_OBJECT_REQUIRED');
+  assert.equal(Array.isArray(snapshotRef.current.draftQuality.weakFieldIssues), true);
+  assert.equal(snapshotRef.current.createStep, 'DRAFT');
+  assert.equal(String(lastNotice || '').includes('Draft quality indicates detail enrichment is incomplete'), true);
+});
+
+test('world-studio phase2 keeps prior degraded draft quality state when a later generate attempt fails', async () => {
+  const snapshotRef = { current: cloneDefaultSnapshot() };
+  snapshotRef.current.selectedStartTimeId = 'event:p-1';
+  snapshotRef.current.selectedCharacters = ['汪淼'];
+  snapshotRef.current.draftQuality = {
+    worldCutStatus: 'ready',
+    enrichStatus: 'incomplete',
+    enrichFailureReason: 'WORLD_STUDIO_JSON_OBJECT_REQUIRED',
+    weakFieldIssues: [{
+      path: 'world.description',
+      reason: 'low_information',
+      detail: 'chars=24 threshold=50',
+    }],
+    updatedAt: '2026-03-18T10:00:00.000Z',
+  };
+  snapshotRef.current.phase1Artifact = {
+    startTimeOptions: [{ id: 'event:p-1', label: '1. 2004 · 倒计时危机爆发', description: '', weight: 0.8 }],
+    characterCandidates: [{ name: '汪淼', summary: 'summary', significance: 0.8 }],
+    qualityGate: makeQualityGatePass(),
+    chunkTasks: [],
+    narrativeArc: {
+      summary: 'summary',
+      opening: 'opening',
+      development: 'development',
+      climax: 'climax',
+      resolution: 'resolution',
+    },
+    sourceDigest: 'digest-1',
+    updatedAt: new Date().toISOString(),
+  };
+  snapshotRef.current.knowledgeGraph = {
+    ...snapshotRef.current.knowledgeGraph,
+    worldSetting: 'world',
+    timeline: [{ id: 't-1', label: '2004' }],
+    characters: [{ id: 'char-1', name: '汪淼', summary: 'summary' }],
+    events: {
+      primary: [{
+        id: 'p-1',
+        level: 'PRIMARY',
+        parentEventId: null,
+        title: '倒计时危机爆发',
+        summary: 'summary',
+        cause: 'cause',
+        process: 'process',
+        result: 'result',
+        timeRef: '2004',
+        locationRefs: ['北京'],
+        characterRefs: ['汪淼'],
+        dependsOnEventIds: [],
+        evidenceRefs: [{ segmentId: 'seg-1', offsetStart: 0, offsetEnd: 12, excerpt: 'evidence', confidence: 0.8, sourceType: 'chunk' }],
+        confidence: 0.8,
+        needsEvidence: false,
+      }],
+      secondary: [],
+    },
+    narrativeArc: snapshotRef.current.phase1Artifact.narrativeArc,
+    characterProfiles: [{
+      name: '汪淼',
+      aliases: [],
+      summary: 'summary',
+      background: 'background',
+      motivation: 'motivation',
+      relationships: ['常伟思:合作'],
+      keyEvents: ['倒计时危机爆发'],
+    }],
+    characterAliasMap: { 汪淼: '汪淼' },
+  };
+
+  const taskController = createMockTaskController();
+  let lastError = null;
+
+  const binding = {
+    source: 'cloud',
+    connectorId: 'connector-1',
+    model: 'deepseek/deepseek-chat',
+  };
+
+  const input = {
+    aiClient: {
+      async generateText() {
+        return {
+          text: '{"world":',
+          promptTraceId: 'trace-fail',
+        };
+      },
+    },
+    flowId: 'flow-phase2-preserve-quality-on-failure',
+    sourceEncoding: 'utf-8',
+    setSourceEncoding: () => {},
+    sourceMode: 'FILE',
+    setSourceMode: () => {},
+    setFilePreviewText: () => {},
+    sourceChunksRef: { current: [] },
+    sourceRawTextRef: { current: '' },
+    routeOptions: null,
+    snapshot: snapshotRef.current,
+    patchSnapshot: (patch) => {
+      snapshotRef.current = {
+        ...snapshotRef.current,
+        ...patch,
+        parseJob: {
+          ...snapshotRef.current.parseJob,
+          ...(patch.parseJob || {}),
+        },
+        agentSync: {
+          ...snapshotRef.current.agentSync,
+          ...(patch.agentSync || {}),
+        },
+        draftQuality: {
+          ...snapshotRef.current.draftQuality,
+          ...(patch.draftQuality || {}),
+          weakFieldIssues: Array.isArray(patch.draftQuality?.weakFieldIssues)
+            ? patch.draftQuality.weakFieldIssues
+            : snapshotRef.current.draftQuality.weakFieldIssues,
+        },
+      };
+      input.snapshot = snapshotRef.current;
+    },
+    patchPanel: () => {},
+    setCreateStep: () => {},
+    setPhase1: () => {},
+    setPhase2: () => {},
+    phase1: null,
+    retryConcurrency: 1,
+    retryErrorCode: null,
+    retryScope: 'all',
+    retryWithFineRoute: false,
+    resolveEffectiveRouteBindings: () => ({ coarse: binding, fine: binding }),
+    resolveRuntimeDefaultRouteBinding: async () => binding,
+    bindingMap: { coarse: binding, fine: binding },
+    runtimeDefaultRouteBinding: binding,
+    selectedDraftId: '',
+    selectedWorldId: '',
+    setLanding: () => {},
+    mutations: {},
+    queries: {},
+    setStatusBanner: () => {},
+    setError: (value) => {
+      lastError = value;
+    },
+    setNotice: () => {},
+    taskController,
+  };
+
+  await runCreatePhase2(input);
+
+  assert.equal(String(lastError || '').includes('WORLD_STUDIO_JSON_OBJECT_REQUIRED'), true);
+  assert.equal(snapshotRef.current.draftQuality.worldCutStatus, 'ready');
+  assert.equal(snapshotRef.current.draftQuality.enrichStatus, 'incomplete');
+  assert.equal(snapshotRef.current.draftQuality.enrichFailureReason, 'WORLD_STUDIO_JSON_OBJECT_REQUIRED');
+  assert.equal(snapshotRef.current.draftQuality.weakFieldIssues.length, 1);
+  assert.equal(snapshotRef.current.draftQuality.weakFieldIssues[0].path, 'world.description');
+});

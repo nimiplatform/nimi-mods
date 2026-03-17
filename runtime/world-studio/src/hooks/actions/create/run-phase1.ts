@@ -197,7 +197,15 @@ export async function runCreatePhase1(input: WorldStudioCreateActionsInput, mode
     };
     input.setError(null);
     input.setNotice(null);
+    input.setPhase2(null);
     input.patchSnapshot({
+        draftQuality: {
+            worldCutStatus: 'idle',
+            enrichStatus: 'idle',
+            enrichFailureReason: null,
+            weakFieldIssues: [],
+            updatedAt: new Date().toISOString(),
+        },
         parseJob: buildParseJobStartState(activeChunkPolicy),
     });
     input.setCreateStep('INGEST');

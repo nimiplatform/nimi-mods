@@ -334,6 +334,8 @@ export async function runCreatePhase2(input: WorldStudioCreateActionsInput, opti
         });
         diagLog('Phase2 generateText done', {
             taskId,
+            enrichDegraded: Boolean(result.enrichDegraded),
+            enrichFailureReason: result.enrichFailureReason || null,
             worldKeys: Object.keys(asRecord(result.world)),
             worldviewKeys: Object.keys(asRecord(result.worldview)),
             worldEvents: Array.isArray(result.worldEvents) ? result.worldEvents.length : 0,
@@ -453,6 +455,13 @@ export async function runCreatePhase2(input: WorldStudioCreateActionsInput, opti
                 futureHistoricalEvents: nextKnowledgeFutureEvents,
             },
             finalDraftAccumulator: result.finalDraftAccumulator || input.snapshot.finalDraftAccumulator,
+            draftQuality: {
+                worldCutStatus: 'ready',
+                enrichStatus: result.enrichDegraded ? 'incomplete' : 'complete',
+                enrichFailureReason: result.enrichFailureReason || null,
+                weakFieldIssues: Array.isArray(result.weakFieldIssues) ? result.weakFieldIssues : [],
+                updatedAt: new Date().toISOString(),
+            },
             unsavedChangesByPanel: {
                 base: true,
                 worldview: true,
@@ -486,24 +495,34 @@ export async function runCreatePhase2(input: WorldStudioCreateActionsInput, opti
             taskId,
             worldName: String(asRecord(result.world).name || ''),
             selectedCharacters,
+            enrichDegraded: Boolean(result.enrichDegraded),
             draftsByCharacterKeys: Object.keys(draftsByCharacter),
             missingDnaCharacters,
             lorebooksDraftCount: Array.isArray(result.worldLorebooks)
                 ? result.worldLorebooks.filter((item) => item && typeof item === 'object').length
                 : 0,
         });
-        const completionNotice = missingDnaCharacters.length > 0
-            ? worldStudioMessage('notice.synthesizeCompletedMissingDna', 'Synthesize completed, but missing DNA for: {{characters}}', { characters: missingDnaCharacters.join(', ') })
-            : worldStudioMessage('notice.synthesizeCompletedReady', 'Synthesize completed. Draft editor is ready.');
-        const completionBanner = missingDnaCharacters.length > 0
+        const completionNotice = result.enrichDegraded
+            ? worldStudioMessage('notice.synthesizeCompletedEnrichDegraded', 'Initial world cut completed. Draft quality indicates detail enrichment is incomplete; review and adjust the draft before continuing.', {
+                reason: result.enrichFailureReason || 'enrich_failed',
+            })
+            : missingDnaCharacters.length > 0
+                ? worldStudioMessage('notice.synthesizeCompletedMissingDna', 'Synthesize completed, but missing DNA for: {{characters}}', { characters: missingDnaCharacters.join(', ') })
+                : worldStudioMessage('notice.synthesizeCompletedReady', 'Synthesize completed. Draft editor is ready.');
+        const completionBanner = result.enrichDegraded
             ? {
-                kind: 'warning' as const,
-                message: worldStudioMessage('banner.synthesizeCompletedWithDnaGaps', 'Synthesize completed with DNA gaps'),
+                kind: 'info' as const,
+                message: worldStudioMessage('banner.synthesizeCompletedEnrichDegraded', 'Initial world cut completed with draft quality notes'),
             }
-            : {
-                kind: 'success' as const,
-                message: worldStudioMessage('banner.synthesizeCompleted', 'Synthesize completed'),
-            };
+            : missingDnaCharacters.length > 0
+                ? {
+                    kind: 'warning' as const,
+                    message: worldStudioMessage('banner.synthesizeCompletedWithDnaGaps', 'Synthesize completed with DNA gaps'),
+                }
+                : {
+                    kind: 'success' as const,
+                    message: worldStudioMessage('banner.synthesizeCompleted', 'Synthesize completed'),
+                };
         input.setNotice(completionNotice);
         input.setStatusBanner(completionBanner);
         input.taskController.completeTask(taskId, worldStudioMessage('task.synthesizeCompleted', 'Synthesize completed'));

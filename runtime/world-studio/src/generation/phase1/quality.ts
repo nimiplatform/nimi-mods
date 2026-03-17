@@ -7,6 +7,7 @@ import type {
 } from '../../engine/types.js';
 import { deriveCharacterCandidates, deriveStartTimeOptions } from './derived-options.js';
 import { runPhase1GlobalRefine } from './global-refine.js';
+import { normalizeTemporalGraph } from './temporal-normalize.js';
 
 type BuildPhase1ResultInput = {
   merged: ChunkExtraction;
@@ -24,7 +25,8 @@ export function buildPhase1Result(input: BuildPhase1ResultInput): Phase1Result {
     futureHistoricalEvents: [] as Array<Record<string, unknown>>,
   };
   const refined = runPhase1GlobalRefine(mergedGraph);
-  const knowledgeGraph = refined.graph;
+  const temporalNormalized = normalizeTemporalGraph(refined.graph);
+  const knowledgeGraph = temporalNormalized.graph;
   const qualityGate = evaluateQualityGate({
     graph: knowledgeGraph,
     totalChunks: input.totalChunks,
@@ -44,12 +46,14 @@ export function buildPhase1Result(input: BuildPhase1ResultInput): Phase1Result {
     knowledgeGraph,
     finalDraftAccumulator: input.finalDraftAccumulator,
     qualityGate,
+    temporalNormalization: temporalNormalized.summary,
     chunkTasks: input.chunkTasks,
     rawText: JSON.stringify({
       totalChunks: input.totalChunks,
       completedChunks: input.completedChunks,
       failedChunks: input.failedChunks,
       refined,
+      temporalNormalization: temporalNormalized.summary,
       qualityGate,
       chunkTasks: input.chunkTasks,
       knowledgeGraph,
