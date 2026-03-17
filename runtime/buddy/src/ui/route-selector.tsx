@@ -23,7 +23,9 @@ interface RouteSelectorProps {
 function getModelOptions(value: RouteSelectorValue): string[] {
   if (value.binding?.source === 'cloud') {
     const connectorId = String(value.binding.connectorId || '').trim();
-    const connector = value.options?.connectors.find((item) => item.id === connectorId) || null;
+    const connector = value.options?.connectors.find((item) => item.id === connectorId)
+      || value.options?.connectors[0]
+      || null;
     return connector?.models || [];
   }
   return (value.options?.local.models || []).map((item) => item.model);
@@ -37,9 +39,10 @@ export function RouteSelector({
 }: RouteSelectorProps) {
   const { t } = useModTranslation('buddy');
   const source = value.binding?.source || 'local';
-  const connectorId = value.binding?.connectorId || '';
+  const connectorId = value.binding?.connectorId || value.options?.connectors[0]?.id || '';
   const model = value.binding?.model || '';
   const modelOptions = getModelOptions(value);
+  const selectedModel = modelOptions.includes(model) ? model : (modelOptions[0] || '');
   const statusLabel = value.loading ? t('RouteSelector.loading') : t(`RouteSelector.${source}`);
 
   return (
@@ -83,15 +86,19 @@ export function RouteSelector({
       </div>
 
       <select
-        value={model}
+        value={selectedModel}
         onChange={(event) => onChangeModel(event.target.value)}
         className="mt-2 h-[38px] w-full rounded-[10px] border border-black/5 bg-white px-3 text-[14px] text-slate-700 outline-none transition focus:border-sky-300 focus:shadow-[0_0_0_3px_rgba(122,186,255,0.18)]"
       >
-        {modelOptions.map((item) => (
-          <option key={item} value={item}>
-            {item}
-          </option>
-        ))}
+        {modelOptions.length === 0 ? (
+          <option value="">{t('BuddyPage.voiceUnavailable')}</option>
+        ) : (
+          modelOptions.map((item) => (
+            <option key={item} value={item}>
+              {item}
+            </option>
+          ))
+        )}
       </select>
     </div>
   );

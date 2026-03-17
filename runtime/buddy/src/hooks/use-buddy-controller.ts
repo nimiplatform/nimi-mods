@@ -37,11 +37,34 @@ import {
 } from '../services/voice-engine.js';
 import { isBuddyDebugEnabled, logBuddyConsole } from '../services/debug-log.js';
 import { loadBuddySession, saveBuddySession } from '../services/session-store.js';
+import {
+  chooseBindingByConnector,
+  chooseBindingByModel,
+  chooseBindingBySource,
+  ensureRouteSnapshot,
+  reconcileRouteBinding,
+} from '../services/route-binding.js';
 
 const TEXT_ROUTE_CAPABILITY: RuntimeCanonicalCapability = 'text.generate';
 const TTS_ROUTE_CAPABILITY: RuntimeCanonicalCapability = 'audio.synthesize';
 const STT_ROUTE_CAPABILITY: RuntimeCanonicalCapability = 'audio.transcribe';
 const DEFAULT_TTS_AUDIO_FORMAT = 'mp3';
+
+function sameRouteBinding(
+  left: RuntimeRouteBinding | null,
+  right: RuntimeRouteBinding | null,
+): boolean {
+  if (!left && !right) return true;
+  if (!left || !right) return false;
+  return left.source === right.source
+    && String(left.connectorId || '') === String(right.connectorId || '')
+    && String(left.model || '') === String(right.model || '')
+    && String(left.modelId || '') === String(right.modelId || '')
+    && String(left.localModelId || '') === String(right.localModelId || '')
+    && String(left.engine || '') === String(right.engine || '')
+    && String(left.provider || '') === String(right.provider || '')
+    && String(left.endpoint || '') === String(right.endpoint || '');
+}
 
 function resolveRecordingStartErrorCode(error: unknown): 'unsupported' | 'permission' | 'device-missing' | 'device-unavailable' | 'unknown' {
   const name = String((error as { name?: unknown })?.name || '').trim();
@@ -49,81 +72,6 @@ function resolveRecordingStartErrorCode(error: unknown): 'unsupported' | 'permis
   if (name === 'NotFoundError' || name === 'OverconstrainedError') return 'device-missing';
   if (name === 'NotReadableError' || name === 'AbortError') return 'device-unavailable';
   return 'unknown';
-}
-
-function pickRouteBinding(snapshot: RuntimeRouteOptionsSnapshot | null): RuntimeRouteBinding | null {
-  if (!snapshot) return null;
-  const candidate = snapshot.resolvedDefault || snapshot.selected || null;
-  if (!candidate || !String(candidate.model || '').trim()) {
-    return null;
-  }
-  return candidate;
-}
-
-function ensureRouteSnapshot(snapshot: RuntimeRouteOptionsSnapshot | null): RuntimeRouteOptionsSnapshot | null {
-  if (!snapshot) return null;
-  return {
-    ...snapshot,
-    local: {
-      models: snapshot.local?.models || [],
-      defaultEndpoint: snapshot.local?.defaultEndpoint,
-    },
-    connectors: Array.isArray(snapshot.connectors) ? snapshot.connectors : [],
-  };
-}
-
-function chooseBindingBySource(
-  source: RuntimeRouteSource,
-  options: RuntimeRouteOptionsSnapshot | null,
-  previous: RuntimeRouteBinding | null,
-): RuntimeRouteBinding | null {
-  if (!options) return previous;
-  if (source === 'local') {
-    const local = options.local.models[0] || null;
-    return {
-      source: 'local',
-      connectorId: '',
-      model: local?.model || previous?.model || '',
-      ...(local?.localModelId ? { localModelId: local.localModelId } : {}),
-      ...(local?.engine ? { engine: local.engine } : {}),
-    };
-  }
-  const connector = options.connectors[0] || null;
-  return {
-    source: 'cloud',
-    connectorId: connector?.id || previous?.connectorId || '',
-    model: connector?.models[0] || previous?.model || '',
-  };
-}
-
-function chooseBindingByConnector(
-  connectorId: string,
-  options: RuntimeRouteOptionsSnapshot | null,
-  previous: RuntimeRouteBinding | null,
-): RuntimeRouteBinding | null {
-  if (!options) return previous;
-  const connector = options.connectors.find((item) => item.id === connectorId) || null;
-  if (!connector) return previous;
-  return {
-    source: 'cloud',
-    connectorId: connector.id,
-    model: connector.models[0] || previous?.model || '',
-  };
-}
-
-function chooseBindingByModel(
-  model: string,
-  previous: RuntimeRouteBinding | null,
-): RuntimeRouteBinding | null {
-  const normalized = model.trim();
-  if (!normalized) return previous;
-  return {
-    source: previous?.source || 'local',
-    connectorId: previous?.connectorId || '',
-    model: normalized,
-    ...(previous?.localModelId ? { localModelId: previous.localModelId } : {}),
-    ...(previous?.engine ? { engine: previous.engine } : {}),
-  };
 }
 
 type RouteKind = 'text' | 'tts' | 'stt';
@@ -277,9 +225,9 @@ export function useBuddyController(
       setTtsRouteOptions(normalizedTtsOptions);
       setSttRouteOptions(normalizedSttOptions);
 
-      textBindingRef.current = session?.textBinding || pickRouteBinding(normalizedTextOptions);
-      ttsBindingRef.current = session?.ttsBinding || pickRouteBinding(normalizedTtsOptions);
-      sttBindingRef.current = session?.sttBinding || pickRouteBinding(normalizedSttOptions);
+      textBindingRef.current = reconcileRouteBinding(session?.textBinding || null, normalizedTextOptions);
+      ttsBindingRef.current = reconcileRouteBinding(session?.ttsBinding || null, normalizedTtsOptions);
+      sttBindingRef.current = reconcileRouteBinding(session?.sttBinding || null, normalizedSttOptions);
       setTextRouteBinding(textBindingRef.current);
       setTtsRouteBinding(ttsBindingRef.current);
       setSttRouteBinding(sttBindingRef.current);
@@ -326,6 +274,28 @@ export function useBuddyController(
     ttsRouteBinding,
     sttRouteBinding,
   ]);
+
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+
+    const nextText = reconcileRouteBinding(textBindingRef.current, textRouteOptions);
+    if (!sameRouteBinding(nextText, textBindingRef.current)) {
+      textBindingRef.current = nextText;
+      setTextRouteBinding(nextText);
+    }
+
+    const nextTts = reconcileRouteBinding(ttsBindingRef.current, ttsRouteOptions);
+    if (!sameRouteBinding(nextTts, ttsBindingRef.current)) {
+      ttsBindingRef.current = nextTts;
+      setTtsRouteBinding(nextTts);
+    }
+
+    const nextStt = reconcileRouteBinding(sttBindingRef.current, sttRouteOptions);
+    if (!sameRouteBinding(nextStt, sttBindingRef.current)) {
+      sttBindingRef.current = nextStt;
+      setSttRouteBinding(nextStt);
+    }
+  }, [sttRouteOptions, textRouteOptions, ttsRouteOptions]);
 
   // Rest reminder timer (BD-SAFE-003)
   const resetRestTimer = useCallback(() => {
