@@ -3,7 +3,7 @@ import type { FinalDraftAccumulator, EventNodeDraft, WorldStudioCreateStep, Worl
 import { cloneDefaultSnapshot } from './workspace/defaults.js';
 import { syncSnapshot } from './workspace/normalize.js';
 import { persistSnapshotToStorage, readSnapshotFromStorage } from './workspace/storage.js';
-import { emitWorldStudioLog } from '../logging.js';
+import { emitWorldStudioDiag } from '../logging.js';
 import { asRecord } from "@nimiplatform/sdk/mod";
 type WorldStudioWorkspaceStore = {
     snapshot: WorldStudioWorkspaceSnapshot;
@@ -16,10 +16,11 @@ type WorldStudioWorkspaceStore = {
 };
 function diagLog(message: string, details?: Record<string, unknown>) {
     try {
-        emitWorldStudioLog({
-            level: 'error',
-            message: `[MODS-TEST-DIAG] ${message}`,
-            source: 'DIAG',
+        emitWorldStudioDiag({
+            stage: 'workspace-store',
+            event: message,
+            level: 'debug',
+            source: 'world-studio.workspace-store',
             details,
         });
     }
@@ -213,6 +214,21 @@ export const useWorldStudioWorkspaceStore = create<WorldStudioWorkspaceStore>((s
                     agentDraftsByCharacter: incoming.agentDraftsByCharacter && typeof incoming.agentDraftsByCharacter === 'object'
                         ? asRecord(incoming.agentDraftsByCharacter) as FinalDraftAccumulator['agentDraftsByCharacter']
                         : state.snapshot.finalDraftAccumulator.agentDraftsByCharacter,
+                    worldWorkingProseByField: incoming.worldWorkingProseByField && typeof incoming.worldWorkingProseByField === 'object'
+                        ? asRecord(incoming.worldWorkingProseByField) as FinalDraftAccumulator['worldWorkingProseByField']
+                        : state.snapshot.finalDraftAccumulator.worldWorkingProseByField,
+                    agentWorkingProseByCharacterAndField: incoming.agentWorkingProseByCharacterAndField && typeof incoming.agentWorkingProseByCharacterAndField === 'object'
+                        ? asRecord(incoming.agentWorkingProseByCharacterAndField) as FinalDraftAccumulator['agentWorkingProseByCharacterAndField']
+                        : state.snapshot.finalDraftAccumulator.agentWorkingProseByCharacterAndField,
+                    worldProseCandidatesByField: incoming.worldProseCandidatesByField && typeof incoming.worldProseCandidatesByField === 'object'
+                        ? asRecord(incoming.worldProseCandidatesByField) as FinalDraftAccumulator['worldProseCandidatesByField']
+                        : state.snapshot.finalDraftAccumulator.worldProseCandidatesByField,
+                    agentProseCandidatesByCharacterAndField: incoming.agentProseCandidatesByCharacterAndField && typeof incoming.agentProseCandidatesByCharacterAndField === 'object'
+                        ? asRecord(incoming.agentProseCandidatesByCharacterAndField) as FinalDraftAccumulator['agentProseCandidatesByCharacterAndField']
+                        : state.snapshot.finalDraftAccumulator.agentProseCandidatesByCharacterAndField,
+                    evidenceRefs: Array.isArray(incoming.evidenceRefs)
+                        ? incoming.evidenceRefs as FinalDraftAccumulator['evidenceRefs']
+                        : state.snapshot.finalDraftAccumulator.evidenceRefs,
                     revisions: Array.isArray(incoming.revisions)
                         ? incoming.revisions as FinalDraftAccumulator['revisions']
                         : state.snapshot.finalDraftAccumulator.revisions,

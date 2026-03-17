@@ -161,7 +161,7 @@ test('runCreatePhase1 emits terminal failure histogram in diagnostics', async ()
     await runCreatePhase1(input);
 
     const effectiveResultLog = rendererLogs.find(
-      (entry) => String(entry.message || '').includes('[MODS-TEST-DIAG] Phase1 effective result'),
+      (entry) => String(entry.message || '').includes('world-studio:diag:phase1:Phase1 effective result'),
     );
     assert.equal(Boolean(effectiveResultLog), true);
     const histogram = effectiveResultLog?.details?.terminalFailureHistogram;

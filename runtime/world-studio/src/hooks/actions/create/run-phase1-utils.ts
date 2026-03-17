@@ -1,7 +1,8 @@
 import type { EventNodeDraft, WorldStudioTaskRecord } from '../../../contracts.js';
 import { classifyChunkFailureKind, isContextOverflowText } from '../../../engine/errors.js';
 import type { ChunkTaskResult, DraftPatch, FinalDraftAccumulator } from '../../../engine/types.js';
-import { emitWorldStudioLog } from '../../../logging.js';
+import { emitWorldStudioDiag } from '../../../logging.js';
+import { AGENT_PROSE_FIELDS, WORLD_PROSE_FIELDS } from '../../../engine/realm-alignment.js';
 import { buildPhase1ArtifactFromResult } from '../../../services/phase1-artifact.js';
 import { projectEventsForSelectedStartTime } from '../../../services/start-time-projection.js';
 import type { WorldStudioCreateActionsInput } from './types.js';
@@ -14,10 +15,11 @@ export type RunCreatePhase1Options = {
 };
 export function diagLog(message: string, details?: Record<string, unknown>) {
     try {
-        emitWorldStudioLog({
-            level: 'error',
-            message: `[MODS-TEST-DIAG] ${message}`,
-            source: 'DIAG',
+        emitWorldStudioDiag({
+            stage: 'phase1',
+            event: message,
+            level: 'debug',
+            source: 'world-studio.create.run-phase1-utils',
             details,
         });
     }
@@ -63,6 +65,14 @@ export function summarizeFinalDraftAccumulator(accumulator: FinalDraftAccumulato
         worldLorebooks: Array.isArray(accumulator.worldLorebooks) ? accumulator.worldLorebooks.length : 0,
         futureHistoricalEvents: Array.isArray(accumulator.futureHistoricalEvents) ? accumulator.futureHistoricalEvents.length : 0,
         agentDraftKeys: Object.keys(accumulator.agentDraftsByCharacter || {}),
+        worldWorkingProseCount: WORLD_PROSE_FIELDS.reduce((count, field) => count + (accumulator.worldWorkingProseByField[field] ? 1 : 0), 0),
+        agentWorkingProseCount: Object.values(accumulator.agentWorkingProseByCharacterAndField || {}).reduce((count, fields) => (
+            count + AGENT_PROSE_FIELDS.reduce((fieldCount, field) => fieldCount + (fields[field] ? 1 : 0), 0)
+        ), 0),
+        worldProseCandidateCount: WORLD_PROSE_FIELDS.reduce((count, field) => count + (accumulator.worldProseCandidatesByField[field]?.length || 0), 0),
+        agentProseCandidateCount: Object.values(accumulator.agentProseCandidatesByCharacterAndField || {}).reduce((count, fields) => (
+            count + AGENT_PROSE_FIELDS.reduce((fieldCount, field) => fieldCount + (fields[field]?.length || 0), 0)
+        ), 0),
         revisionCount: Array.isArray(accumulator.revisions) ? accumulator.revisions.length : 0,
         lastUpdatedChunk: accumulator.lastUpdatedChunk,
     };
@@ -74,7 +84,11 @@ export function isFinalDraftAccumulatorPopulated(accumulator: FinalDraftAccumula
         || Object.keys(asRecord(accumulator.worldview || {})).length > 0
         || (Array.isArray(accumulator.worldLorebooks) && accumulator.worldLorebooks.length > 0)
         || (Array.isArray(accumulator.futureHistoricalEvents) && accumulator.futureHistoricalEvents.length > 0)
-        || Object.keys(accumulator.agentDraftsByCharacter || {}).length > 0);
+        || Object.keys(accumulator.agentDraftsByCharacter || {}).length > 0
+        || WORLD_PROSE_FIELDS.some((field) => Boolean(accumulator.worldWorkingProseByField[field]))
+        || Object.values(accumulator.agentWorkingProseByCharacterAndField || {}).some((fields) => AGENT_PROSE_FIELDS.some((field) => Boolean(fields[field])))
+        || WORLD_PROSE_FIELDS.some((field) => (accumulator.worldProseCandidatesByField[field] || []).length > 0)
+        || Object.values(accumulator.agentProseCandidatesByCharacterAndField || {}).some((fields) => AGENT_PROSE_FIELDS.some((field) => (fields[field] || []).length > 0)));
 }
 export function summarizeDraftPatch(patch: DraftPatch): Record<string, unknown> {
     return {
@@ -86,6 +100,10 @@ export function summarizeDraftPatch(patch: DraftPatch): Record<string, unknown> 
         agentDraftCharacters: Array.isArray(patch.agentDrafts)
             ? patch.agentDrafts.map((item) => String(item.characterName || '')).filter(Boolean)
             : [],
+        worldProseCount: WORLD_PROSE_FIELDS.reduce((count, field) => count + (patch.worldProse?.[field] ? 1 : 0), 0),
+        agentProseCount: Object.values(patch.agentProse || {}).reduce((count, fields) => (
+            count + AGENT_PROSE_FIELDS.reduce((fieldCount, field) => fieldCount + (fields[field] ? 1 : 0), 0)
+        ), 0),
         evidenceRefCount: Array.isArray(patch.evidenceRefs) ? patch.evidenceRefs.length : 0,
         noteCount: Array.isArray(patch.notes) ? patch.notes.length : 0,
     };
@@ -211,12 +229,12 @@ export function applyPhase1ResultSnapshot(input: WorldStudioCreateActionsInput, 
         result: params.result,
         sourceDigest: params.sourceDigest,
     });
-    // >>> DIAG: remove after debugging <<<
     try {
-        emitWorldStudioLog({
-            level: 'error',
-            message: '[MODS-TEST-DIAG] Phase1 applyResult: writing selectedCharacters + agentSync.selectedCharacterIds',
-            source: 'DIAG',
+        emitWorldStudioDiag({
+            stage: 'phase1',
+            event: 'apply-result-selection-sync',
+            level: 'debug',
+            source: 'world-studio.create.run-phase1-utils',
             details: {
                 selectedCharacters,
                 characterCandidateCount: params.result.characterCandidates.length,

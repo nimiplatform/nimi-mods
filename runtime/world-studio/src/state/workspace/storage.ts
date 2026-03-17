@@ -1,7 +1,7 @@
 import type { WorldStudioWorkspaceSnapshot } from '../../contracts.js';
 import { cloneDefaultSnapshot } from './defaults.js';
 import { normalizeEventsDraft, normalizeLorebooksDraft, parseEventsDraftFromText, parseLorebooksDraftFromText, recoverTaskStateAfterReload, syncSnapshot, normalizeTaskState, } from './normalize.js';
-import { emitWorldStudioLog } from '../../logging.js';
+import { emitWorldStudioDiag } from '../../logging.js';
 import {
     asRecord,
     createModKvStore,
@@ -27,10 +27,11 @@ function getWorkspaceSnapshotStore() {
 }
 function diagLog(message: string, details?: Record<string, unknown>) {
     try {
-        emitWorldStudioLog({
-            level: 'error',
-            message: `[MODS-TEST-DIAG] ${message}`,
-            source: 'DIAG',
+        emitWorldStudioDiag({
+            stage: 'storage',
+            event: message,
+            level: 'debug',
+            source: 'world-studio.workspace.storage',
             details,
         });
     }

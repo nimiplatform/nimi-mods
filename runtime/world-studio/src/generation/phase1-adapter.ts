@@ -32,6 +32,7 @@ type FinalDraftAccumulatorPatchUpdate = {
   chunkIndex: number;
   logicalChunkIndex: number;
   changedFields: string[];
+  candidateOps: string[];
   hasChanges: boolean;
   before: FinalDraftAccumulator;
   after: FinalDraftAccumulator;
@@ -42,10 +43,11 @@ function resolveMissingFinalDraftFields(accumulator: FinalDraftAccumulator): str
   const world = accumulator.world || {};
   const worldview = accumulator.worldview || {};
   const worldviewRecord = worldview as Record<string, unknown>;
+  const worldWorkingProse = accumulator.worldWorkingProseByField || {};
+  const agentWorkingProse = accumulator.agentWorkingProseByCharacterAndField || {};
   const draftValues = Object.values(accumulator.agentDraftsByCharacter || {});
   const fields: string[] = [];
   if (!String(world.name || '').trim()) fields.push('world.name');
-  if (!String(world.description || '').trim()) fields.push('world.description');
   if (!String(world.genre || '').trim()) fields.push('world.genre');
   if (!worldviewRecord.timeModel || typeof worldviewRecord.timeModel !== 'object') fields.push('worldview.timeModel');
   if (!worldviewRecord.spaceTopology || typeof worldviewRecord.spaceTopology !== 'object') fields.push('worldview.spaceTopology');
@@ -59,7 +61,15 @@ function resolveMissingFinalDraftFields(accumulator: FinalDraftAccumulator): str
     if (!String(draft.concept || '').trim()) fields.push(`agentDrafts.${name}.concept`);
     if (!String(draft.description || '').trim()) fields.push(`agentDrafts.${name}.description`);
     if (!draft.dna || typeof draft.dna !== 'object') fields.push(`agentDrafts.${name}.dna`);
+    if (!String(agentWorkingProse[name]?.scenario?.content || '').trim()) fields.push(`agentProse.${name}.scenario`);
+    if (!String(agentWorkingProse[name]?.greeting?.content || '').trim()) fields.push(`agentProse.${name}.greeting`);
+    if (!String(agentWorkingProse[name]?.exampleDialogue?.content || '').trim()) fields.push(`agentProse.${name}.exampleDialogue`);
+    if (!String(agentWorkingProse[name]?.systemPromptBase?.content || '').trim()) fields.push(`agentProse.${name}.systemPromptBase`);
   });
+  if (!String(worldWorkingProse.description?.content || '').trim()) fields.push('worldProse.description');
+  if (!String(worldWorkingProse.tagline?.content || '').trim()) fields.push('worldProse.tagline');
+  if (!String(worldWorkingProse.motto?.content || '').trim()) fields.push('worldProse.motto');
+  if (!String(worldWorkingProse.overview?.content || '').trim()) fields.push('worldProse.overview');
   return Array.from(new Set(fields)).slice(0, 24);
 }
 
@@ -209,7 +219,8 @@ export async function runPhase1ExtractionFromChunks(
             chunkIndex: i,
             logicalChunkIndex: logicalIndex,
             changedFields: patchResult.changedFields,
-            hasChanges: patchResult.changedFields.length > 0,
+            candidateOps: patchResult.candidateOps.map((item) => `${item.bucketKey}:${item.operation}`),
+            hasChanges: patchResult.changedFields.length > 0 || patchResult.candidateOps.length > 0,
             before: beforeAccumulator,
             after: finalDraftAccumulator,
             patch: fine.draftPatch,

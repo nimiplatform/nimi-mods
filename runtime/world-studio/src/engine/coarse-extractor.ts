@@ -1,7 +1,7 @@
 import type { ChunkExtraction, EventNodeDraft, EvidenceRefDraft, RouteCapabilityLlmInvoker, } from './types.js';
 import { buildRepairPrompt, parseJsonRecord, summarizeModelError } from './json-repair.js';
-import { isSyntheticEntityName } from './errors.js';
-import { emitWorldStudioLog } from '../logging.js';
+import { isRetryableChunkError, isSyntheticEntityName } from './errors.js';
+import { emitWorldStudioDiag } from '../logging.js';
 import { deriveNeedsEvidence, normalizeEventHorizon, } from '../services/event-horizon.js';
 import { asRecord, clamp01, toStringArray } from "@nimiplatform/sdk/mod";
 const CHUNK_TIMELINE_MAX = 8;
@@ -14,10 +14,11 @@ const STRICT_REPAIR_OUTPUT_LIMIT = 1400;
 const STRICT_REPAIR_SOURCE_LIMIT = 2200;
 function diagLog(message: string, details?: Record<string, unknown>) {
     try {
-        emitWorldStudioLog({
-            level: 'error',
-            message: `[MODS-TEST-DIAG] ${message}`,
-            source: 'DIAG',
+        emitWorldStudioDiag({
+            stage: 'coarse',
+            event: message,
+            level: 'debug',
+            source: 'world-studio.engine.coarse-extractor',
             details,
         });
     }
@@ -288,6 +289,53 @@ function buildStrictCoarseRepairPrompt(input: {
         truncateForStrictRepair(input.chunk, STRICT_REPAIR_SOURCE_LIMIT),
     ].join('\n');
 }
+async function generateWithTransientRetry(llm: RouteCapabilityLlmInvoker, input: {
+    prompt: string;
+    attempt: number;
+    chunkIndex: number;
+    chunkTotal: number;
+    abortSignal?: AbortSignal;
+}): Promise<{
+    response: {
+        text: string;
+        promptTraceId: string;
+    };
+    transientRetries: number;
+}> {
+    let transientRetries = 0;
+    while (true) {
+        try {
+            const response = await llm.generateText({
+                capability: 'text.generate',
+                prompt: input.prompt,
+                mode: 'STORY',
+                abortSignal: input.abortSignal,
+            });
+            diagLog('llm-response', {
+                chunkIndex: input.chunkIndex,
+                chunkTotal: input.chunkTotal,
+                attempt: input.attempt,
+                transientRetries,
+                promptTraceId: response.promptTraceId,
+                textLength: String(response.text || '').length,
+            });
+            return { response, transientRetries };
+        }
+        catch (error) {
+            if (!isRetryableChunkError(error) || transientRetries >= 1 || input.abortSignal?.aborted) {
+                throw error;
+            }
+            transientRetries += 1;
+            diagLog('transient-retry', {
+                chunkIndex: input.chunkIndex,
+                chunkTotal: input.chunkTotal,
+                attempt: input.attempt,
+                transientRetries,
+                error: error instanceof Error ? error.message : String(error),
+            });
+        }
+    }
+}
 export async function extractChunkCoarse(llm: RouteCapabilityLlmInvoker, input: {
     chunk: string;
     index: number;
@@ -299,40 +347,33 @@ export async function extractChunkCoarse(llm: RouteCapabilityLlmInvoker, input: 
     retryCount: number;
 }> {
     const prompt = buildCoarsePrompt(input);
-    const first = await llm.generateText({
-        capability: 'text.generate',
+    const first = await generateWithTransientRetry(llm, {
         prompt,
-        mode: 'STORY',
-        abortSignal: input.abortSignal,
-    });
-    diagLog('Phase1 coarse llm response', {
+        attempt: 1,
         chunkIndex: input.index,
         chunkTotal: input.total,
-        attempt: 1,
-        capability: 'text.generate',
-        promptTraceId: first.promptTraceId,
-        textLength: String(first.text || '').length,
+        abortSignal: input.abortSignal,
     });
     try {
-        const parsed = normalizeChunkExtraction(parseJsonRecord(first.text));
-        diagLog('Phase1 coarse parse success', {
+        const parsed = normalizeChunkExtraction(parseJsonRecord(first.response.text));
+        diagLog('parse-success', {
             chunkIndex: input.index,
             chunkTotal: input.total,
             attempt: 1,
-            promptTraceId: first.promptTraceId,
+            promptTraceId: first.response.promptTraceId,
             extraction: summarizeExtractionCounts(parsed),
         });
         return {
             extraction: parsed,
-            retryCount: 0,
+            retryCount: first.transientRetries,
         };
     }
     catch (firstError) {
-        diagLog('Phase1 coarse parse failed', {
+        diagLog('parse-failed', {
             chunkIndex: input.index,
             chunkTotal: input.total,
             attempt: 1,
-            promptTraceId: first.promptTraceId,
+            promptTraceId: first.response.promptTraceId,
             error: summarizeModelError(firstError),
         });
         const repairPrompt = buildRepairPrompt({
@@ -340,43 +381,36 @@ export async function extractChunkCoarse(llm: RouteCapabilityLlmInvoker, input: 
             chunk: input.chunk,
             chunkIndex: input.index,
             chunkTotal: input.total,
-            invalidOutput: String(first.text || ''),
+            invalidOutput: String(first.response.text || ''),
             parseError: summarizeModelError(firstError),
         });
-        const second = await llm.generateText({
-            capability: 'text.generate',
+        const second = await generateWithTransientRetry(llm, {
             prompt: repairPrompt,
-            mode: 'STORY',
-            abortSignal: input.abortSignal,
-        });
-        diagLog('Phase1 coarse llm response', {
+            attempt: 2,
             chunkIndex: input.index,
             chunkTotal: input.total,
-            attempt: 2,
-            capability: 'text.generate',
-            promptTraceId: second.promptTraceId,
-            textLength: String(second.text || '').length,
+            abortSignal: input.abortSignal,
         });
         try {
-            const parsed = normalizeChunkExtraction(parseJsonRecord(second.text));
-            diagLog('Phase1 coarse parse success', {
+            const parsed = normalizeChunkExtraction(parseJsonRecord(second.response.text));
+            diagLog('parse-success', {
                 chunkIndex: input.index,
                 chunkTotal: input.total,
                 attempt: 2,
-                promptTraceId: second.promptTraceId,
+                promptTraceId: second.response.promptTraceId,
                 extraction: summarizeExtractionCounts(parsed),
             });
             return {
                 extraction: parsed,
-                retryCount: 1,
+                retryCount: 1 + first.transientRetries + second.transientRetries,
             };
         }
         catch (secondError) {
-            diagLog('Phase1 coarse parse failed', {
+            diagLog('parse-failed', {
                 chunkIndex: input.index,
                 chunkTotal: input.total,
                 attempt: 2,
-                promptTraceId: second.promptTraceId,
+                promptTraceId: second.response.promptTraceId,
                 error: summarizeModelError(secondError),
             });
             const strictRepairPrompt = buildStrictCoarseRepairPrompt({
@@ -384,45 +418,38 @@ export async function extractChunkCoarse(llm: RouteCapabilityLlmInvoker, input: 
                 chunk: input.chunk,
                 chunkIndex: input.index,
                 chunkTotal: input.total,
-                firstOutput: String(first.text || ''),
-                secondOutput: String(second.text || ''),
+                firstOutput: String(first.response.text || ''),
+                secondOutput: String(second.response.text || ''),
                 firstError: summarizeModelError(firstError),
                 secondError: summarizeModelError(secondError),
             });
-            const third = await llm.generateText({
-                capability: 'text.generate',
+            const third = await generateWithTransientRetry(llm, {
                 prompt: strictRepairPrompt,
-                mode: 'STORY',
-                abortSignal: input.abortSignal,
-            });
-            diagLog('Phase1 coarse llm response', {
+                attempt: 3,
                 chunkIndex: input.index,
                 chunkTotal: input.total,
-                attempt: 3,
-                capability: 'text.generate',
-                promptTraceId: third.promptTraceId,
-                textLength: String(third.text || '').length,
+                abortSignal: input.abortSignal,
             });
             try {
-                const parsed = normalizeChunkExtraction(parseJsonRecord(third.text));
-                diagLog('Phase1 coarse parse success', {
+                const parsed = normalizeChunkExtraction(parseJsonRecord(third.response.text));
+                diagLog('parse-success', {
                     chunkIndex: input.index,
                     chunkTotal: input.total,
                     attempt: 3,
-                    promptTraceId: third.promptTraceId,
+                    promptTraceId: third.response.promptTraceId,
                     extraction: summarizeExtractionCounts(parsed),
                 });
                 return {
                     extraction: parsed,
-                    retryCount: 2,
+                    retryCount: 2 + first.transientRetries + second.transientRetries + third.transientRetries,
                 };
             }
             catch (thirdError) {
-                diagLog('Phase1 coarse parse failed', {
+                diagLog('parse-failed', {
                     chunkIndex: input.index,
                     chunkTotal: input.total,
                     attempt: 3,
-                    promptTraceId: third.promptTraceId,
+                    promptTraceId: third.response.promptTraceId,
                     error: summarizeModelError(thirdError),
                 });
                 throw new Error(`WORLD_STUDIO_COARSE_JSON_PARSE_FAILED: ${summarizeModelError(firstError)} -> ${summarizeModelError(secondError)} -> ${summarizeModelError(thirdError)}`);

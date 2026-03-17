@@ -2,7 +2,7 @@ import type { WorldLorebookDraftRow } from '../../../contracts.js';
 import { PRIMARY_EVIDENCE_COVERAGE_BLOCK_THRESHOLD, summarizePrimaryEvidenceCoverage, } from '../../../engine/primary-evidence.js';
 import { deriveCharacterCandidates, deriveStartTimeOptions } from '../../../generation/phase1/derived-options.js';
 import { worldStudioMessage } from '../../../i18n/messages.js';
-import { emitWorldStudioLog } from '../../../logging.js';
+import { emitWorldStudioDiag } from '../../../logging.js';
 import { runPhase2DraftGeneration } from '../../../generation/pipeline.js';
 import { buildWorldStudioEmbeddingIndex } from '../../../services/embedding-index.js';
 import { toUniqueStringArray } from '../../../services/snapshot-normalize.js';
@@ -19,10 +19,11 @@ function normalizeStringArray(value: string[]): string[] {
 }
 function diagLog(message: string, details?: Record<string, unknown>) {
     try {
-        emitWorldStudioLog({
-            level: 'error',
-            message: `[MODS-TEST-DIAG] ${message}`,
-            source: 'DIAG',
+        emitWorldStudioDiag({
+            stage: 'phase2',
+            event: message,
+            level: 'debug',
+            source: 'world-studio.create.run-phase2',
             details,
         });
     }
@@ -415,41 +416,29 @@ export async function runCreatePhase2(input: WorldStudioCreateActionsInput, opti
             ...preservedProjectedFutureEvents,
             ...synthesizedFutureHistoricalEvents,
         ];
-        // >>> DIAG: remove after debugging <<<
-        try {
-            emitWorldStudioLog({
-                level: 'error',
-                message: '[MODS-TEST-DIAG] Phase2 complete: writing agentSync.draftsByCharacter',
-                source: 'DIAG',
-                details: {
-                    agentDraftCount: (result.agentDrafts || []).length,
-                    agentDraftNames: (result.agentDrafts || []).map((d) => d.characterName),
-                    agentDraftHasDna: (result.agentDrafts || []).map((d) => ({ name: d.characterName, hasDna: Boolean(d.dna), dnaKeys: d.dna && typeof d.dna === 'object' ? Object.keys(d.dna) : [] })),
-                    agentDraftFieldCoverage: (result.agentDrafts || []).map((d) => ({
-                        // Keep diagnostics stable across canonical rules object shape.
-                        ruleCount: (() => {
-                            const ruleLines = asRecord(d.rules).lines;
-                            return Array.isArray(ruleLines) ? ruleLines.length : 0;
-                        })(),
-                        name: d.characterName,
-                        fields: Object.keys(asRecord(d)).sort(),
-                        hasDescription: typeof d.description === 'string' && d.description.trim().length > 0,
-                        hasScenario: typeof d.scenario === 'string' && d.scenario.trim().length > 0,
-                        hasGreeting: typeof d.greeting === 'string' && d.greeting.trim().length > 0,
-                        alternateGreetingCount: Array.isArray(d.alternateGreetings) ? d.alternateGreetings.length : 0,
-                        agentLorebookCount: Array.isArray(d.agentLorebooks) ? d.agentLorebooks.length : 0,
-                    })),
-                    draftsByCharacterKeys: Object.keys(draftsByCharacter),
-                    existingAgentSyncSelectedCharacterIds: input.snapshot.agentSync.selectedCharacterIds,
-                    existingAgentSyncDraftKeys: Object.keys(input.snapshot.agentSync.draftsByCharacter || {}),
-                    mergedDraftKeys: [...new Set([...Object.keys(input.snapshot.agentSync.draftsByCharacter || {}), ...Object.keys(draftsByCharacter)])],
-                    missingDnaCharacters,
-                },
-            });
-        }
-        catch {
-            // Ignore diagnostics sink failures in non-runtime environments (tests, headless execution).
-        }
+        diagLog('agent-sync-draft-write', {
+            agentDraftCount: (result.agentDrafts || []).length,
+            agentDraftNames: (result.agentDrafts || []).map((d) => d.characterName),
+            agentDraftHasDna: (result.agentDrafts || []).map((d) => ({ name: d.characterName, hasDna: Boolean(d.dna), dnaKeys: d.dna && typeof d.dna === 'object' ? Object.keys(d.dna) : [] })),
+            agentDraftFieldCoverage: (result.agentDrafts || []).map((d) => ({
+                ruleCount: (() => {
+                    const ruleLines = asRecord(d.rules).lines;
+                    return Array.isArray(ruleLines) ? ruleLines.length : 0;
+                })(),
+                name: d.characterName,
+                fields: Object.keys(asRecord(d)).sort(),
+                hasDescription: typeof d.description === 'string' && d.description.trim().length > 0,
+                hasScenario: typeof d.scenario === 'string' && d.scenario.trim().length > 0,
+                hasGreeting: typeof d.greeting === 'string' && d.greeting.trim().length > 0,
+                alternateGreetingCount: Array.isArray(d.alternateGreetings) ? d.alternateGreetings.length : 0,
+                agentLorebookCount: Array.isArray(d.agentLorebooks) ? d.agentLorebooks.length : 0,
+            })),
+            draftsByCharacterKeys: Object.keys(draftsByCharacter),
+            existingAgentSyncSelectedCharacterIds: input.snapshot.agentSync.selectedCharacterIds,
+            existingAgentSyncDraftKeys: Object.keys(input.snapshot.agentSync.draftsByCharacter || {}),
+            mergedDraftKeys: [...new Set([...Object.keys(input.snapshot.agentSync.draftsByCharacter || {}), ...Object.keys(draftsByCharacter)])],
+            missingDnaCharacters,
+        });
         input.patchSnapshot({
             worldPatch: normalizedWorld,
             worldviewPatch: normalizedWorldview,

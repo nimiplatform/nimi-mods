@@ -32,10 +32,17 @@
 - `WS-DOM-014`: Publish path keeps agent sync world-owned and normalizes invalid handles.
 - `WS-DOM-015`: Maintenance diagnostics expose story projection summary (`count/missingContext/latestProjectedAt`) for narrative handoff audit.
 - `WS-DOM-016`: Start-time options must prioritize temporal semantics (`timeRef`, dependency edges) over raw merge order when both are available.
-- `WS-DOM-017`: Phase2 synthesize must auto-retry once with compact budget on timeout or JSON-object parse failure before surfacing an error.
+- `WS-DOM-017`: Phase2 synthesize is a three-round closure (`produce -> enrich -> audit`); timeout-like or JSON-object parse failures may fall through the existing compact retry path, while transient provider failures are retried only inside the current stage.
 - `WS-DOM-018`: Publish agent sync must normalize `dnaPrimary/dnaSecondary` into backend enum domain and omit non-enum values.
 - `WS-DOM-019`: Event graph, synthesize output, and event upsert payloads must preserve explicit `eventHorizon`; non-`FUTURE` `PRIMARY` events alone participate in evidence gating.
 - `WS-DOM-020`: World-Studio is the sole writer of canonical `WorldEvent.timelineSeq`; publish/sync must materialize temporal-order output into contiguous integer sequence values.
+- `WS-DOM-020a`: Phase1 `fine` is an incremental editor: chunk output may be partial or no-op, structural patches remain realm-aligned, and prose edits stay inside `draftPatch.worldProse / agentProse` instead of becoming a third top-level LLM channel.
+- `WS-DOM-020b`: Program logic, not the model, routes prose edits into either `working prose` or bounded candidate pools; candidate operations (`create/revise/replace/no-op`) are decided programmatically.
+- `WS-DOM-020c`: `buildFinalDraftAccumulatorSlice()` includes current `working prose` but excludes prose candidate pools so `fine` edits against the live prose draft without carrying candidate-pool noise.
+- `WS-DOM-020ca`: `working prose` is the primary prose accumulator; candidate pools are only supplementary backfill/correction material.
+- `WS-DOM-020d`: Phase2 enrich uses a program-generated weak-field report with fixed thresholds (`prose<50 chars`, `summary<30 chars`, `list<2`, plus evidence/reference gaps) and must not delegate that classification to the model.
+- `WS-DOM-020da`: Phase2 `produce` must prioritize `working prose`, then candidate pools, then model gap-fill; phase2 closure writes audited prose back into `working prose`.
+- `WS-DOM-020e`: Phase2 final outputs must stay inside canonical `WorldPatchDto`, `WorldviewPatchDto`, and creator-agent payload fields; any world-studio drift from realm truth is corrected in prompt, normalize, and publish shaping layers.
 - `WS-DOM-024`: Maintain information architecture is fixed to four domains (`World`, `Agents`, `Assets`, `Releases`); `World` sections are `Base`, `Worldview`, `WorldEvents`, `Lorebooks`.
 - `WS-DOM-025`: `world.rules` is not a world-base field; world rule editing belongs to `worldview.coreSystem.rules` in both synthesize output and maintenance editing.
 - `WS-DOM-025a`: `worldview.coreSystem.rules` uses ordered rule items with fixed fields `key / title / value`; World-Studio must not degrade it back into object-map editing.
@@ -51,6 +58,7 @@
 - `WS-DOM-035`: Releases maintenance must behave like a release surface, not a hidden transport panel; draft selection, publish entry, and mutation history must each have explicit reading context.
 - `WS-DOM-035a`: Mutation history in World-Studio keeps technical fields visible, but release-facing reading context must also expose realm-authored `title / summary`.
 - `WS-DOM-036`: `World.clockConfig` is a readable runtime truth surface in V2; until backend patch support exists, World-Studio must not present it as a writable Base editor field.
+- `WS-DOM-037`: `narrativeArc` remains a phase1 global-refine product derived from `knowledgeGraph.events.primary`; phase2 refactor must not move or reinterpret that ownership.
 
 ## 3. No Over-Design Guard
 

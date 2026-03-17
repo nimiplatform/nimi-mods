@@ -78,6 +78,49 @@ phase1_retry_policy:
   failed_retry_supports_error_code_filter: true
   auto_shrink_retry_on_context_overflow: true
   source_rule: WS-PIPE-004
+phase1_fine_patch_contract:
+  partial_patch_allowed: true
+  noop_patch_allowed: true
+  missing_fields_semantic: omit_means_noop
+  top_level_outputs:
+    - extraction
+    - draftPatch
+  draft_patch_prose_fields:
+    world:
+      - description
+      - tagline
+      - motto
+      - overview
+    agents:
+      - scenario
+      - greeting
+      - exampleDialogue
+      - systemPromptBase
+  draft_patch_prose_value_shape:
+    required:
+      - content
+      - confidence
+    optional:
+      - evidenceRefs
+  program_routes_prose_patch_to:
+    - working_prose
+    - candidate_pool
+  working_prose_admission:
+    confidence_min: 0.75
+    evidence_refs_min: 1
+    short_fields_min_chars: 8
+    long_fields_min_chars: 30
+  prose_candidates:
+    program_decides_operations: true
+    operation_enum:
+      - create
+      - revise
+      - replace
+      - no-op
+    per_field_active_limit: 3
+  accumulator_slice_includes_working_prose: true
+  accumulator_slice_excludes_prose_candidates: true
+  source_rule: WS-PIPE-010
 phase2_preconditions:
   required:
     - quality_gate_status_not_block
@@ -93,6 +136,50 @@ phase2_preconditions:
     - WORLD_STUDIO_EVENT_GRAPH_INVALID
     - WORLD_STUDIO_EVENT_EVIDENCE_REQUIRED
   source_rule: WS-PIPE-005
+phase2_round_policy:
+  rounds:
+    - round: produce
+      output_mode: full_draft
+    - round: enrich
+      output_mode: sparse_patch
+    - round: audit
+      output_mode: full_draft
+  round_partition_rule: purpose_not_content
+  prose_input_priority:
+    - working_prose
+    - candidate_pool
+    - model_gap_fill
+  round1_must_start_from_working_prose: true
+  round3_must_write_final_prose_back_to_working_prose: true
+  source_rule: WS-PIPE-011
+phase2_weak_field_report:
+  generated_by: program
+  thresholds:
+    prose_min_chars: 50
+    structural_summary_min_chars: 30
+    list_min_items: 2
+  reason_enum:
+    - empty
+    - low_information
+    - low_evidence
+    - incomplete_reference
+  source_rule: WS-PIPE-012
+phase2_retry_policy:
+  compact_retry_on:
+    - timeout_like_error
+    - json_object_parse_failure
+  stage_local_transient_retry:
+    coarse: 1
+    fine: 1
+    phase2_each_round_stage: 1
+  no_outer_retry_wrapper: true
+  source_rule: WS-PIPE-013
+phase2_realm_alignment:
+  world_patch_contract: WorldPatchDto
+  worldview_patch_contract: WorldviewPatchDto
+  agent_payload_contract: creator-agent-canonical
+  narrative_arc_build_logic_unchanged: true
+  source_rule: WS-PIPE-014
 maintain_operations:
   - operation: save-maintenance
     optimistic_concurrency: true

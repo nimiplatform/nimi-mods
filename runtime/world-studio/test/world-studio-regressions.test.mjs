@@ -4,6 +4,7 @@ import { mergeExtractions } from '../src/engine/merge.ts';
 import { createEmptyAccumulatedState } from '../src/engine/accumulated-context.ts';
 import { upsertMergeExtraction, toChunkExtraction } from '../src/engine/accumulated-merge.ts';
 import { canonicalizeCharacterNames } from '../src/engine/character/normalize-zh.ts';
+import { createEmptyFinalDraftAccumulator } from '../src/engine/final-draft-accumulator.ts';
 import { runPhase1GlobalRefine } from '../src/generation/phase1/global-refine.ts';
 import { runSynthesizeDraft } from '../src/engine/synthesize.ts';
 import { buildStartTimeOptionsFromEvents } from '../src/services/temporal-order.ts';
@@ -239,6 +240,7 @@ test('runSynthesizeDraft retries with compact prompt on timeout', async () => {
       calls.push({
         maxTokens: input.maxTokens,
         promptLength: String(input.prompt || '').length,
+        prompt: String(input.prompt || ''),
       });
 
       if (calls.length === 1) {
@@ -310,10 +312,16 @@ test('runSynthesizeDraft retries with compact prompt on timeout', async () => {
     },
   });
 
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 4);
   assert.equal(calls[0].maxTokens, 2200);
-  assert.equal(calls[1].maxTokens, 1400);
-  assert.equal(calls[1].promptLength < calls[0].promptLength, true);
+  assert.equal(calls[1].maxTokens, 2200);
+  assert.equal(calls[2].maxTokens, 2200);
+  assert.equal(calls[3].maxTokens, 2200);
+  assert.equal(calls[0].prompt.includes('Produce the first complete world/worldview/agent draft'), true);
+  assert.equal(calls[1].prompt.includes('Produce the first complete world/worldview/agent draft'), true);
+  assert.equal(calls[2].prompt.includes('Enrich only weak or missing fields identified in weak_field_report'), true);
+  assert.equal(calls[2].prompt.includes('<weak_field_report>'), true);
+  assert.equal(calls[3].prompt.includes('Audit and finalize the entire publish-ready draft'), true);
   assert.equal(String(result.world.name), '凡人世界');
 });
 
@@ -331,6 +339,7 @@ test('runSynthesizeDraft retries with compact prompt on parse failure', async ()
       calls.push({
         maxTokens: input.maxTokens,
         promptLength: String(input.prompt || '').length,
+        prompt: String(input.prompt || ''),
       });
       if (calls.length === 1) {
         return {
@@ -403,10 +412,144 @@ test('runSynthesizeDraft retries with compact prompt on parse failure', async ()
     },
   });
 
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 4);
   assert.equal(calls[0].maxTokens, 2200);
   assert.equal(calls[1].maxTokens, 1400);
+  assert.equal(calls[2].maxTokens, 2200);
+  assert.equal(calls[3].maxTokens, 2200);
+  assert.equal(calls[0].prompt.includes('Produce the first complete world/worldview/agent draft'), true);
+  assert.equal(calls[1].prompt.includes('Produce the first complete world/worldview/agent draft'), true);
+  assert.equal(calls[2].prompt.includes('Enrich only weak or missing fields identified in weak_field_report'), true);
+  assert.equal(calls[2].prompt.includes('<weak_field_report>'), true);
+  assert.equal(calls[3].prompt.includes('Audit and finalize the entire publish-ready draft'), true);
   assert.equal(String(result.world.name), '凡人世界');
+});
+
+test('runSynthesizeDraft prefers working prose over candidate pools and writes audited prose back', async () => {
+  const calls = [];
+  const event = makePrimaryEvent({
+    id: 'evt-p1',
+    title: '韩立入门',
+    summary: '韩立进入七玄门',
+    timeRef: '卷一',
+    characterRefs: ['韩立'],
+  });
+  const llm = {
+    async generateText(input) {
+      calls.push(String(input.prompt || ''));
+      return {
+        text: JSON.stringify({
+          world: {
+            name: '凡人世界',
+            description: 'working prose should stay primary',
+            tagline: '凡人亦可问长生',
+            genre: 'xianxia',
+            themes: ['修仙'],
+            era: '古代',
+          },
+          worldview: {
+            timeModel: { timeFlowRatio: 1, calendarSystem: {} },
+            spaceTopology: {},
+            causality: {},
+            coreSystem: { rules: [] },
+            existences: {},
+            resources: {},
+            structures: {},
+            visualGuide: {},
+            narrativeHooks: {},
+          },
+          worldEvents: [event],
+          worldLorebooks: [],
+          futureHistoricalEvents: [],
+          agentDrafts: [{
+            characterName: '韩立',
+            handle: 'hanli_1',
+            concept: '主角',
+            backstory: '山村少年',
+            coreValues: '谨慎求生',
+            relationshipStyle: '克制',
+            greeting: '先看清局势，再决定要不要出手。',
+          }],
+        }),
+        promptTraceId: `trace-${calls.length}`,
+      };
+    },
+  };
+
+  const result = await runSynthesizeDraft(llm, {
+    selectedStartTimeId: 't-1',
+    selectedCharacters: ['韩立'],
+    knowledgeGraph: {
+      worldSetting: '修仙世界',
+      timeline: [{ id: 't-1', label: '卷一' }],
+      locations: [{ id: 'loc:七玄门', name: '七玄门', description: '宗门', importance: 0.8 }],
+      characters: [{ id: 'char:韩立', name: '韩立', summary: '主角' }],
+      events: {
+        primary: [event],
+        secondary: [],
+      },
+      characterRelations: [],
+      futureHistoricalEvents: [],
+      characterProfiles: [{
+        name: '韩立',
+        aliases: [],
+        summary: '主角',
+        background: '山村少年',
+        motivation: '求生修仙',
+        relationships: [],
+        keyEvents: ['韩立入门'],
+      }],
+      characterAliasMap: { 韩立: '韩立' },
+    },
+    finalDraftAccumulator: {
+      ...createEmptyFinalDraftAccumulator(),
+      worldWorkingProseByField: {
+        description: {
+          content: 'working prose should stay primary',
+          confidence: 0.92,
+          evidenceRefs: [{ fieldPath: 'world.description', segmentId: 'seg-1', confidence: 0.92 }],
+          chunkIndex: 4,
+          updatedAt: '2026-03-17T00:00:00.000Z',
+        },
+      },
+      worldProseCandidatesByField: {
+        description: [{
+          content: 'candidate prose should only be secondary',
+          confidence: 0.71,
+          evidenceRefs: [{ fieldPath: 'world.description', segmentId: 'seg-2', confidence: 0.71 }],
+          chunkIndex: 3,
+          updatedAt: '2026-03-17T00:00:00.000Z',
+        }],
+      },
+      agentWorkingProseByCharacterAndField: {
+        韩立: {
+          greeting: {
+            content: '先看清局势，再决定要不要出手。',
+            confidence: 0.9,
+            evidenceRefs: [{ fieldPath: 'agent:韩立.greeting', segmentId: 'seg-3', confidence: 0.9 }],
+            chunkIndex: 4,
+            updatedAt: '2026-03-17T00:00:00.000Z',
+          },
+        },
+      },
+      agentProseCandidatesByCharacterAndField: {
+        韩立: {
+          greeting: [{
+            content: '候选问候语',
+            confidence: 0.6,
+            evidenceRefs: [{ fieldPath: 'agent:韩立.greeting', segmentId: 'seg-4', confidence: 0.6 }],
+            chunkIndex: 2,
+            updatedAt: '2026-03-17T00:00:00.000Z',
+          }],
+        },
+      },
+    },
+  });
+
+  assert.equal(calls[0].includes('working prose should stay primary'), true);
+  assert.equal(calls[0].includes('candidate prose should only be secondary'), true);
+  assert.equal(result.finalDraftAccumulator.worldWorkingProseByField.description.content, 'working prose should stay primary');
+  assert.equal(result.finalDraftAccumulator.agentWorkingProseByCharacterAndField['韩立'].greeting.content.includes('看清局势'), true);
 });
 
 test('buildStartTimeOptionsFromEvents orders by temporal hint before source order fallback', () => {

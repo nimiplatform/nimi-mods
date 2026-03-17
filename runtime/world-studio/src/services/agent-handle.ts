@@ -1,13 +1,14 @@
-import { emitWorldStudioLog } from '../logging.js';
+import { emitWorldStudioDiag } from '../logging.js';
 
 const HANDLE_BASE_REGEX = /^[a-z0-9_]{4,16}$/;
 
 function diagLog(message: string, details?: Record<string, unknown>) {
   try {
-    emitWorldStudioLog({
-      level: 'error',
-      message: `[MODS-TEST-DIAG] ${message}`,
-      source: 'DIAG',
+    emitWorldStudioDiag({
+      stage: 'agent-handle',
+      event: message,
+      level: 'debug',
+      source: 'world-studio.services.agent-handle',
       details,
     });
   } catch {

@@ -42,3 +42,56 @@ Published world projection must include a narrative-consumable handoff bundle (e
 ## WS-PIPE-009 Story Projection Summary
 
 Publish must upsert story projection contexts derived from `PRIMARY` events and expose summary metrics in maintenance diagnostics.
+
+## WS-PIPE-010 Fine Delta-Editor Contract
+
+`fine` is a delta editor, not a chunk-level full-draft writer.
+Partial patch and no-op patch are both valid outcomes.
+Omitted fields mean `no-op`, not blanking or deletion.
+`fine` top-level output remains only `extraction + draftPatch`.
+Natural-language deltas live inside `draftPatch.worldProse` and `draftPatch.agentProse`, each field using `{ content, confidence, evidenceRefs? }`.
+The model does not decide `working prose` vs `candidate pool`; program logic routes each prose patch by fixed admission rules.
+`working prose` admits only high-confidence, evidenced edits; weaker but still meaningful edits fall back to bounded candidate pools.
+Candidate pools remain program-governed via `create | revise | replace | no-op`.
+`accumulatorSlice` injected into `fine` includes current `working prose` but excludes prose candidate pools.
+
+## WS-PIPE-011 Phase2 Three-Round Closure
+
+`phase2` is purpose-split, not content-split:
+
+- `produce`: emit a complete initial draft from graph + accumulator, using `working prose` as the primary prose seed and candidate pools only as secondary backfill/correction input
+- `enrich`: emit a sparse patch for weak or missing fields only
+- `audit`: emit the publish-ready final draft after consistency and contract review
+
+World and agent outputs stay coupled inside the same round set to preserve shared style and setting coherence.
+Prose input priority is fixed: `working prose > candidate pool > model gap fill`.
+Round3 closure must write final audited prose back into `working prose`.
+
+## WS-PIPE-012 Weak-Field Report Contract
+
+The weak-field report is generated programmatically before phase2 enrich round.
+It does not rely on model self-judgment.
+Current fixed thresholds are:
+
+- prose fields: `< 50` chars => `low_information`
+- structural summary fields: `< 30` chars => `low_information`
+- list fields: `< 2` items => `low_information`
+- missing/null/empty => `empty`
+- missing evidence coverage => `low_evidence`
+- unresolved world/agent/event references => `incomplete_reference`
+
+## WS-PIPE-013 Stage-Local Retry Contract
+
+Coarse, fine, and each phase2 round may perform one stage-local transient retry for timeout/internal provider failures.
+Timeout-like or JSON-object parse failure may trigger compact retry within the existing phase ladder.
+No outer duplicate retry wrapper is introduced around those ladders.
+
+## WS-PIPE-014 Realm-Aligned Final Draft Contract
+
+Phase2 final output is fail-close to realm truth:
+
+- `world` must align to `WorldPatchDto`
+- `worldview` must align to `WorldviewPatchDto`
+- `agentDrafts` must align to canonical creator-agent payload fields
+
+This refactor does not alter `narrativeArc` ownership or construction; it remains a phase1 global-refine product derived from `knowledgeGraph.events.primary`.

@@ -7,7 +7,7 @@ import { buildPhase1ArtifactFromResult } from '../../services/phase1-artifact.js
 import type { WorldStudioSnapshotPatch, WorldStudioWorkspaceSnapshot } from '../../contracts.js';
 import type { Phase1Result, Phase2Result } from '../../generation/pipeline.js';
 import { worldStudioMessage } from '../../i18n/messages.js';
-import { emitWorldStudioLog } from '../../logging.js';
+import { emitWorldStudioDiag } from '../../logging.js';
 type UseWorldStudioWorkspaceControllerActionsInput = {
     snapshot: WorldStudioWorkspaceSnapshot;
     patchSnapshot: (patch: WorldStudioSnapshotPatch) => void;
@@ -29,10 +29,11 @@ type UseWorldStudioWorkspaceControllerActionsInput = {
 };
 function diagLog(message: string, details?: Record<string, unknown>) {
     try {
-        emitWorldStudioLog({
-            level: 'error',
-            message: `[MODS-TEST-DIAG] ${message}`,
-            source: 'DIAG',
+        emitWorldStudioDiag({
+            stage: 'workspace-action',
+            event: message,
+            level: 'debug',
+            source: 'world-studio.controllers.actions.workspace',
             details,
         });
     }

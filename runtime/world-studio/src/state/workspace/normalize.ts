@@ -1,5 +1,6 @@
 import type { ChunkTaskResult, EventNodeDraft, QualityGateResult, WorldStudioEmbeddingIndex, WorldStudioEmbeddingIndexEntry, WorldLorebookDraftRow, WorldStudioAgentDraft, WorldStudioAgentLorebookDraft, WorldStudioPhase1Artifact, WorldStudioTaskCheckpoint, WorldStudioTaskRecord, WorldStudioTaskState, WorldStudioWorkspaceSnapshot, } from '../../contracts.js';
 import { createEmptyFinalDraftAccumulator } from '../../engine/final-draft-accumulator.js';
+import { AGENT_PROSE_FIELDS, WORLD_PROSE_FIELDS } from '../../engine/realm-alignment.js';
 import { asRecord, safeParseArray, safeParseObject } from "@nimiplatform/sdk/mod";
 function defaultQualityMetrics(): QualityGateResult['metrics'] {
     return {
@@ -280,6 +281,106 @@ function normalizeFinalDraftAccumulator(value: unknown): WorldStudioWorkspaceSna
         acc[String(key)] = normalized;
         return acc;
     }, {} as Record<string, WorldStudioAgentDraft>);
+    const normalizeEvidenceRefs = (input: unknown) => Array.isArray(input)
+        ? input
+            .filter((item) => item && typeof item === 'object')
+            .map((item) => {
+                const entry = asRecord(item);
+                return {
+                    fieldPath: String(entry.fieldPath || '').trim(),
+                    ...(typeof entry.segmentId === 'string' ? { segmentId: entry.segmentId } : {}),
+                    ...(typeof entry.eventId === 'string' ? { eventId: entry.eventId } : {}),
+                    ...(Number.isFinite(Number(entry.confidence)) ? { confidence: Number(entry.confidence) } : {}),
+                };
+            })
+            .filter((item) => item.fieldPath.length > 0)
+        : [];
+    const normalizeCandidateBucket = (input: unknown) => Array.isArray(input)
+        ? input
+            .filter((item) => item && typeof item === 'object')
+            .map((item) => {
+                const candidate = asRecord(item);
+                const content = String(candidate.content || '').trim();
+                if (!content) {
+                    return null;
+                }
+                return {
+                    content,
+                    confidence: Number.isFinite(Number(candidate.confidence)) ? Math.max(0, Math.min(1, Number(candidate.confidence))) : 0.5,
+                    evidenceRefs: normalizeEvidenceRefs(candidate.evidenceRefs),
+                    chunkIndex: Number.isInteger(Number(candidate.chunkIndex)) ? Number(candidate.chunkIndex) : -1,
+                    updatedAt: String(candidate.updatedAt || new Date().toISOString()),
+                };
+            })
+            .filter((item): item is NonNullable<typeof item> => Boolean(item))
+        : [];
+    const normalizeWorkingRecord = (input: unknown) => {
+        if (!input || typeof input !== 'object' || Array.isArray(input)) {
+            return null;
+        }
+        const record = asRecord(input);
+        const content = String(record.content || '').trim();
+        if (!content) {
+            return null;
+        }
+        return {
+            content,
+            confidence: Number.isFinite(Number(record.confidence)) ? Math.max(0, Math.min(1, Number(record.confidence))) : 0.5,
+            evidenceRefs: normalizeEvidenceRefs(record.evidenceRefs),
+            chunkIndex: Number.isInteger(Number(record.chunkIndex)) ? Number(record.chunkIndex) : -1,
+            updatedAt: String(record.updatedAt || new Date().toISOString()),
+        };
+    };
+    const worldWorkingProseByField = WORLD_PROSE_FIELDS.reduce<WorldStudioWorkspaceSnapshot['finalDraftAccumulator']['worldWorkingProseByField']>((acc, field) => {
+        const value = normalizeWorkingRecord(asRecord(record.worldWorkingProseByField)[field]);
+        if (value) {
+            acc[field] = value;
+        }
+        return acc;
+    }, {});
+    const agentWorkingProseByCharacterAndField = Object.entries(asRecord(record.agentWorkingProseByCharacterAndField)).reduce<WorldStudioWorkspaceSnapshot['finalDraftAccumulator']['agentWorkingProseByCharacterAndField']>((acc, [characterName, rawFields]) => {
+        const normalizedName = String(characterName || '').trim();
+        if (!normalizedName) {
+            return acc;
+        }
+        const fieldsRecord = asRecord(rawFields);
+        const nextFields = AGENT_PROSE_FIELDS.reduce<Record<string, unknown>>((fieldAcc, field) => {
+            const value = normalizeWorkingRecord(fieldsRecord[field]);
+            if (value) {
+                fieldAcc[field] = value;
+            }
+            return fieldAcc;
+        }, {});
+        if (Object.keys(nextFields).length > 0) {
+            acc[normalizedName] = nextFields as WorldStudioWorkspaceSnapshot['finalDraftAccumulator']['agentWorkingProseByCharacterAndField'][string];
+        }
+        return acc;
+    }, {});
+    const worldProseCandidatesByField = WORLD_PROSE_FIELDS.reduce<WorldStudioWorkspaceSnapshot['finalDraftAccumulator']['worldProseCandidatesByField']>((acc, field) => {
+        const bucket = normalizeCandidateBucket(asRecord(record.worldProseCandidatesByField)[field]);
+        if (bucket.length > 0) {
+            acc[field] = bucket;
+        }
+        return acc;
+    }, {});
+    const agentProseCandidatesByCharacterAndField = Object.entries(asRecord(record.agentProseCandidatesByCharacterAndField)).reduce<WorldStudioWorkspaceSnapshot['finalDraftAccumulator']['agentProseCandidatesByCharacterAndField']>((acc, [characterName, rawFields]) => {
+        const normalizedName = String(characterName || '').trim();
+        if (!normalizedName) {
+            return acc;
+        }
+        const fieldsRecord = asRecord(rawFields);
+        const nextFields = AGENT_PROSE_FIELDS.reduce<Record<string, unknown>>((fieldAcc, field) => {
+            const bucket = normalizeCandidateBucket(fieldsRecord[field]);
+            if (bucket.length > 0) {
+                fieldAcc[field] = bucket;
+            }
+            return fieldAcc;
+        }, {});
+        if (Object.keys(nextFields).length > 0) {
+            acc[normalizedName] = nextFields as WorldStudioWorkspaceSnapshot['finalDraftAccumulator']['agentProseCandidatesByCharacterAndField'][string];
+        }
+        return acc;
+    }, {});
     return {
         ...base,
         world: asRecord(record.world),
@@ -291,6 +392,11 @@ function normalizeFinalDraftAccumulator(value: unknown): WorldStudioWorkspaceSna
             ? record.futureHistoricalEvents.filter((item) => item && typeof item === 'object').map((item) => asRecord(item))
             : [],
         agentDraftsByCharacter,
+        worldWorkingProseByField,
+        agentWorkingProseByCharacterAndField,
+        worldProseCandidatesByField,
+        agentProseCandidatesByCharacterAndField,
+        evidenceRefs: normalizeEvidenceRefs(record.evidenceRefs),
         revisions: Array.isArray(record.revisions)
             ? record.revisions
                 .filter((item) => item && typeof item === 'object')
@@ -302,6 +408,11 @@ function normalizeFinalDraftAccumulator(value: unknown): WorldStudioWorkspaceSna
                     changedFields: Array.isArray(revision.changedFields)
                         ? revision.changedFields.map((field) => String(field || '').trim()).filter(Boolean)
                         : [],
+                    ...(Array.isArray(revision.candidateOps)
+                        ? {
+                            candidateOps: revision.candidateOps.map((field) => String(field || '').trim()).filter(Boolean),
+                        }
+                        : {}),
                     ...(typeof revision.note === 'string' && revision.note.trim().length > 0
                         ? { note: revision.note.trim() }
                         : {}),

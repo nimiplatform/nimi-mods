@@ -160,6 +160,8 @@ export async function executePhase1ExtractionLoop(ctx: ExtractionLoopContext, lo
                     hasChanges: update.hasChanges,
                     changedFieldCount: update.changedFields.length,
                     changedFields: update.changedFields,
+                    candidateOpCount: update.candidateOps.length,
+                    candidateOps: update.candidateOps,
                     becameNonEmpty,
                     firstNonEmptyLogicalChunk,
                     before: summarizeFinalDraftAccumulator(update.before),

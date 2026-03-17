@@ -238,6 +238,23 @@ export type DraftPatchEvidenceRef = {
     eventId?: string;
     confidence?: number;
 };
+export type WorldProseCandidateField = 'description' | 'tagline' | 'motto' | 'overview';
+export type AgentProseCandidateField = 'scenario' | 'greeting' | 'exampleDialogue' | 'systemPromptBase';
+export type ProseCandidateOperation = 'create' | 'revise' | 'replace' | 'no-op';
+export type ProsePatchDraft = {
+    content: string;
+    confidence: number;
+    evidenceRefs?: DraftPatchEvidenceRef[];
+};
+export type WorkingProseRecord = {
+    content: string;
+    confidence: number;
+    evidenceRefs: DraftPatchEvidenceRef[];
+    chunkIndex: number;
+    updatedAt: string;
+};
+export type ProseCandidateDraft = ProsePatchDraft;
+export type ProseCandidateRecord = WorkingProseRecord;
 export type DraftPatch = {
     chunkIndex: number;
     world?: Record<string, unknown>;
@@ -245,6 +262,8 @@ export type DraftPatch = {
     worldLorebooks?: Array<Record<string, unknown>>;
     futureHistoricalEvents?: Array<Record<string, unknown>>;
     agentDrafts?: WorldStudioAgentDraft[];
+    worldProse?: Partial<Record<WorldProseCandidateField, ProsePatchDraft>>;
+    agentProse?: Record<string, Partial<Record<AgentProseCandidateField, ProsePatchDraft>>>;
     evidenceRefs?: DraftPatchEvidenceRef[];
     notes?: string[];
 };
@@ -252,6 +271,7 @@ export type FinalDraftAccumulatorRevision = {
     chunkIndex: number;
     appliedAt: string;
     changedFields: string[];
+    candidateOps?: string[];
     note?: string;
 };
 export type FinalDraftAccumulator = {
@@ -260,6 +280,11 @@ export type FinalDraftAccumulator = {
     worldLorebooks: Array<Record<string, unknown>>;
     futureHistoricalEvents: Array<Record<string, unknown>>;
     agentDraftsByCharacter: Record<string, WorldStudioAgentDraft>;
+    worldWorkingProseByField: Partial<Record<WorldProseCandidateField, WorkingProseRecord>>;
+    agentWorkingProseByCharacterAndField: Record<string, Partial<Record<AgentProseCandidateField, WorkingProseRecord>>>;
+    worldProseCandidatesByField: Partial<Record<WorldProseCandidateField, ProseCandidateRecord[]>>;
+    agentProseCandidatesByCharacterAndField: Record<string, Partial<Record<AgentProseCandidateField, ProseCandidateRecord[]>>>;
+    evidenceRefs: DraftPatchEvidenceRef[];
     revisions: FinalDraftAccumulatorRevision[];
     lastUpdatedChunk: number;
 };

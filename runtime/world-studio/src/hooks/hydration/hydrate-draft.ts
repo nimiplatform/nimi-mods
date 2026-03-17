@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import type { EventNodeDraft, WorldLorebookDraftRow, WorldStudioSnapshotPatch, WorldStudioWorkspaceSnapshot, } from '../../contracts.js';
 import { getWorldDraft } from '../../data.js';
-import { emitWorldStudioLog } from '../../logging.js';
+import { emitWorldStudioDiag } from '../../logging.js';
 import { asRecord, type HookClient } from "@nimiplatform/sdk/mod";
 export type WorldStudioDraftHydrationInput = {
     hookClient: HookClient;
@@ -23,10 +23,11 @@ export type WorldStudioDraftHydrationInput = {
 };
 function diagLog(message: string, details?: Record<string, unknown>) {
     try {
-        emitWorldStudioLog({
-            level: 'error',
-            message: `[MODS-TEST-DIAG] ${message}`,
-            source: 'DIAG',
+        emitWorldStudioDiag({
+            stage: 'hydrate',
+            event: message,
+            level: 'debug',
+            source: 'world-studio.hydration.hydrate-draft',
             details,
         });
     }

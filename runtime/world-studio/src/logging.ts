@@ -20,3 +20,22 @@ export function emitWorldStudioLog(input: {
         details: input.details,
     });
 }
+
+export function emitWorldStudioDiag(input: {
+    stage: string;
+    event: string;
+    level?: 'debug' | 'info' | 'warn' | 'error';
+    flowId?: string;
+    source?: string;
+    costMs?: number;
+    details?: Record<string, unknown>;
+}) {
+    emitWorldStudioLog({
+        level: input.level || 'debug',
+        message: `world-studio:diag:${input.stage}:${input.event}`,
+        flowId: input.flowId,
+        source: input.source,
+        costMs: input.costMs,
+        details: input.details,
+    });
+}

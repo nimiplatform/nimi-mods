@@ -10,7 +10,7 @@ import { worldStudioMessage } from '../../../i18n/messages.js';
 import type { DistillRouteBindingMap, FinalDraftAccumulator, Phase1Result, } from '../../../generation/pipeline.js';
 import type { WorldStudioCreateActionsInput } from './types.js';
 import type { AdaptiveChunkPolicy } from './chunk-policy.js';
-import { type RuntimeRouteBinding } from "@nimiplatform/sdk/mod";
+import { asRecord, type RuntimeRouteBinding } from "@nimiplatform/sdk/mod";
 export function resolvePhase1Chunks(input: WorldStudioCreateActionsInput, chunkPolicy: AdaptiveChunkPolicy): {
     allChunks: string[];
     usedLegacyFileChunks: boolean;
@@ -80,6 +80,45 @@ export function mergeRetryPhase1Result(input: WorldStudioCreateActionsInput, all
     if (mode !== 'failed')
         return result;
     const mergeFinalDraftAccumulator = (base: FinalDraftAccumulator, incoming: FinalDraftAccumulator): FinalDraftAccumulator => {
+        const worldProse = Object.entries(incoming.worldWorkingProseByField || {}).reduce<Record<string, {
+            content: string;
+            confidence: number;
+            evidenceRefs?: unknown[];
+        }>>((acc, [field, value]) => {
+            if (!value || typeof value !== 'object')
+                return acc;
+            acc[field] = {
+                content: String(value.content || ''),
+                confidence: Number(value.confidence || 0),
+                ...(Array.isArray(value.evidenceRefs) ? { evidenceRefs: value.evidenceRefs } : {}),
+            };
+            return acc;
+        }, {});
+        const agentProse = Object.entries(incoming.agentWorkingProseByCharacterAndField || {}).reduce<Record<string, Record<string, {
+            content: string;
+            confidence: number;
+            evidenceRefs?: unknown[];
+        }>>>((acc, [characterName, fields]) => {
+            const nextFields = Object.entries(fields || {}).reduce<Record<string, {
+                content: string;
+                confidence: number;
+                evidenceRefs?: unknown[];
+            }>>((fieldAcc, [field, value]) => {
+                if (!value || typeof value !== 'object')
+                    return fieldAcc;
+                const valueRecord = asRecord(value);
+                fieldAcc[field] = {
+                    content: String(valueRecord.content || ''),
+                    confidence: Number(valueRecord.confidence || 0),
+                    ...(Array.isArray(valueRecord.evidenceRefs) ? { evidenceRefs: valueRecord.evidenceRefs } : {}),
+                };
+                return fieldAcc;
+            }, {});
+            if (Object.keys(nextFields).length > 0) {
+                acc[characterName] = nextFields;
+            }
+            return acc;
+        }, {});
         const patched = applyDraftPatch(base, {
             chunkIndex: Math.max(base.lastUpdatedChunk, incoming.lastUpdatedChunk),
             world: incoming.world,
@@ -87,10 +126,31 @@ export function mergeRetryPhase1Result(input: WorldStudioCreateActionsInput, all
             worldLorebooks: incoming.worldLorebooks,
             futureHistoricalEvents: incoming.futureHistoricalEvents,
             agentDrafts: Object.values(incoming.agentDraftsByCharacter || {}),
+            ...(Object.keys(worldProse).length > 0 ? { worldProse } : {}),
+            ...(Object.keys(agentProse).length > 0 ? { agentProse } : {}),
+            ...(Array.isArray(incoming.evidenceRefs) && incoming.evidenceRefs.length > 0
+                ? { evidenceRefs: incoming.evidenceRefs }
+                : {}),
             notes: ['mergeRetryPhase1Result'],
         }).next;
         return {
             ...patched,
+            worldWorkingProseByField: {
+                ...patched.worldWorkingProseByField,
+                ...(incoming.worldWorkingProseByField || {}),
+            },
+            agentWorkingProseByCharacterAndField: {
+                ...patched.agentWorkingProseByCharacterAndField,
+                ...(incoming.agentWorkingProseByCharacterAndField || {}),
+            },
+            worldProseCandidatesByField: {
+                ...patched.worldProseCandidatesByField,
+                ...(incoming.worldProseCandidatesByField || {}),
+            },
+            agentProseCandidatesByCharacterAndField: {
+                ...patched.agentProseCandidatesByCharacterAndField,
+                ...(incoming.agentProseCandidatesByCharacterAndField || {}),
+            },
             revisions: [...(base.revisions || []), ...(incoming.revisions || []), ...(patched.revisions || [])].slice(-120),
             lastUpdatedChunk: Math.max(base.lastUpdatedChunk, incoming.lastUpdatedChunk, patched.lastUpdatedChunk),
         };

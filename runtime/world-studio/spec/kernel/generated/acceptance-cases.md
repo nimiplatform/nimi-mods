@@ -147,6 +147,41 @@ cases:
     description: World-Studio no longer migrates legacy top-level `world.timeFlowRatio`; only `worldview.timeModel.timeFlowRatio` is recognized as canonical.
     expected_ok: true
     source_rule: WS-ACC-002
+  - id: WS-029-FINE-DELTA-EDITOR-PARTIAL-NOOP
+    description: Fine extraction accepts partial/no-op draft patches; top-level output remains `extraction + draftPatch`, and omitted fields mean no-op rather than blanking existing accumulator values.
+    expected_ok: true
+    test_reference: world-studio-final-draft-accumulator.test.mjs
+    source_rule: WS-PIPE-010
+  - id: WS-030-PROSE-CANDIDATE-POOL-BOUNDED
+    description: Prose candidate pools are bounded to three active candidates per field and programmatically apply create/revise/replace/no-op operations after prose patch routing.
+    expected_ok: true
+    test_reference: world-studio-final-draft-accumulator.test.mjs
+    source_rule: WS-PIPE-010
+  - id: WS-031-ACCUMULATOR-SLICE-EXCLUDES-PROSE-CANDIDATES
+    description: Fine prompt accumulatorSlice includes working prose but excludes prose candidate pools so phase1 editing sees live prose drafts without candidate-pool noise.
+    expected_ok: true
+    test_reference: world-studio-final-draft-accumulator.test.mjs
+    source_rule: WS-PIPE-010
+  - id: WS-031A-PROSE-ROUTING-PREFERS-WORKING-THEN-CANDIDATES
+    description: Strong prose edits promote into working prose, weaker but meaningful edits degrade into candidate pools, and meaningless edits become no-op.
+    expected_ok: true
+    test_reference: world-studio-final-draft-accumulator.test.mjs
+    source_rule: WS-PIPE-010
+  - id: WS-032-PHASE2-THREE-ROUND-CLOSURE
+    description: Phase2 runs produce/enrich/audit rounds in sequence; produce prefers working prose over candidate pools, and weak-field enrichment is driven by program-generated thresholds rather than model-side heuristics.
+    expected_ok: true
+    test_reference: world-studio-regressions.test.mjs
+    source_rule: WS-PIPE-011
+  - id: WS-033-PHASE2-REALM-ALIGNED-FINAL-DRAFT
+    description: Phase2 final output remains aligned to canonical world/worldview/creator-agent payload shapes and preserves narrativeArc ownership in phase1 global-refine.
+    expected_ok: true
+    test_reference: world-studio-agent-drafts-flow.test.mjs
+    source_rule: WS-PIPE-014
+  - id: WS-034-TRANSIENT-RETRY-STAYS-IN-STAGE
+    description: Coarse, fine, and each phase2 round may perform one stage-local transient retry without introducing an outer duplicate retry loop.
+    expected_ok: true
+    test_reference: world-studio-regressions.test.mjs
+    source_rule: WS-PIPE-013
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:world-studio-kernel-docs
     source_rule: WS-ACC-003

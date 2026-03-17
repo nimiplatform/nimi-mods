@@ -1,7 +1,7 @@
 import { parseLorebooksArrayInput, toUniqueStringArray, } from '../../../services/snapshot-normalize.js';
 import { resolveWorldOwnedAgentHandle } from '../../../services/agent-handle.js';
 import { normalizeDnaPrimaryTrait, normalizeDnaSecondaryTraits, } from '../../../services/agent-dna-traits.js';
-import { emitWorldStudioLog } from '../../../logging.js';
+import { emitWorldStudioDiag, emitWorldStudioLog } from '../../../logging.js';
 import { worldStudioMessage } from '../../../i18n/messages.js';
 import type { WorldStudioCreateActionsInput } from './types.js';
 import { asRecord } from "@nimiplatform/sdk/mod";
@@ -11,10 +11,11 @@ type DraftTaskOptions = {
 // >>> DIAG helper: remove after debugging <<<
 function diagLog(message: string, details?: Record<string, unknown>) {
     try {
-        emitWorldStudioLog({
-            level: 'error',
-            message: `[MODS-TEST-DIAG] ${message}`,
-            source: 'DIAG',
+        emitWorldStudioDiag({
+            stage: 'publish',
+            event: message,
+            level: 'debug',
+            source: 'world-studio.create.draft-publish',
             details,
         });
     }

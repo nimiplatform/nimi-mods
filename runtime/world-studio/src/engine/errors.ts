@@ -76,6 +76,14 @@ export function classifyChunkFailureKind(value: unknown): WorldStudioChunkFailur
   return 'other';
 }
 
+export function isTransientChunkFailureKind(kind: WorldStudioChunkFailureKind): boolean {
+  return kind === 'provider_timeout' || kind === 'provider_internal';
+}
+
+export function isRetryableChunkError(value: unknown): boolean {
+  return isTransientChunkFailureKind(classifyChunkFailureKind(value));
+}
+
 export function resolveChunkFailureCode(stage: 'coarse' | 'fine', error: unknown): string {
   const kind = classifyChunkFailureKind(error);
   if (kind === 'context_overflow') return 'WORLD_STUDIO_CONTEXT_OVERFLOW';
