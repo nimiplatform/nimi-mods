@@ -412,9 +412,9 @@ test('local-chat runtime ai client: local z-image route injects companions and f
         route: {
             resolve: async () => ({
                 source: 'local' as const,
-                provider: 'localai',
-                engine: 'localai',
-                model: 'localai/z_image_turbo',
+                provider: 'media',
+                engine: 'media',
+                model: 'media/z_image_turbo',
                 localModelId: '01-model',
                 connectorId: '',
             }),
@@ -427,7 +427,7 @@ test('local-chat runtime ai client: local z-image route injects companions and f
                         localArtifactId: 'vae-1',
                         artifactId: 'z_image_ae',
                         kind: 'vae',
-                        engine: 'localai',
+                        engine: 'media',
                         entry: 'vae/diffusion_pytorch_model.safetensors',
                         files: ['vae/diffusion_pytorch_model.safetensors'],
                         license: 'apache-2.0',
@@ -442,7 +442,7 @@ test('local-chat runtime ai client: local z-image route injects companions and f
                         localArtifactId: 'llm-1',
                         artifactId: 'qwen3_4b_companion',
                         kind: 'llm',
-                        engine: 'localai',
+                        engine: 'media',
                         entry: 'Qwen3-4B-Q4_K_M.gguf',
                         files: ['Qwen3-4B-Q4_K_M.gguf'],
                         license: 'apache-2.0',
@@ -494,7 +494,7 @@ test('local-chat runtime ai client: local z-image route injects companions and f
         },
     });
     assert.equal(listedArtifactsCount, 1);
-    assert.equal(captured.model, 'localai/z_image_turbo');
+    assert.equal(captured.model, 'media/z_image_turbo');
     assert.equal(captured.extensions?.size, '512x512');
     assert.equal('aspectRatio' in (captured.extensions || {}), false);
     assert.equal(captured.extensions?.style, 'photorealistic');

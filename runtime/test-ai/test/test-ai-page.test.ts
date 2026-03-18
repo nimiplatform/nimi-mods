@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-  LOCALAI_IMAGE_COMPONENTS_REQUIRED_ERROR,
+  MEDIA_IMAGE_COMPONENTS_REQUIRED_ERROR,
   bindingForModel,
   buildAsyncImageJobOutcome,
-  buildLocalAIImageWorkflowExtensionsForRequest,
+  buildMediaImageWorkflowExtensionsForRequest,
   buildImageWorkflowProfileOverrides,
   buildImageWorkflowComponentSelections,
   buildImageGenerateRequestParams,
@@ -116,8 +116,8 @@ test('image workflow component selections include layered extended companions in
   ]);
 });
 
-test('localai image workflow extensions require explicit companion selections', () => {
-  const result = buildLocalAIImageWorkflowExtensionsForRequest({
+test('media image workflow extensions require explicit companion selections', () => {
+  const result = buildMediaImageWorkflowExtensionsForRequest({
     vaeModel: '',
     llmModel: '',
     clipLModel: '',
@@ -130,11 +130,11 @@ test('localai image workflow extensions require explicit companion selections', 
   });
 
   assert.equal(result.extensions, undefined);
-  assert.equal(result.error, LOCALAI_IMAGE_COMPONENTS_REQUIRED_ERROR);
+  assert.equal(result.error, MEDIA_IMAGE_COMPONENTS_REQUIRED_ERROR);
 });
 
-test('localai image workflow extensions keep explicit components and profile overrides', () => {
-  const result = buildLocalAIImageWorkflowExtensionsForRequest({
+test('media image workflow extensions keep explicit components and profile overrides', () => {
+  const result = buildMediaImageWorkflowExtensionsForRequest({
     vaeModel: 'artifact-vae',
     llmModel: 'artifact-llm',
     clipLModel: '',
@@ -260,11 +260,11 @@ test('local model selection preserves adapter and go runtime metadata', () => {
     selected: {
       source: 'local' as const,
       connectorId: '',
-      provider: 'localai',
+      provider: 'media',
       model: 'z-image-turbo-Q8_0',
       modelId: 'z-image-turbo-Q8_0',
       localModelId: 'file:local-import-z-image-turbo-q8-0',
-      engine: 'localai',
+      engine: 'media',
       adapter: 'localai_native_adapter',
       goRuntimeLocalModelId: '01JTESTLOCALAIMODEL',
       goRuntimeStatus: 'active',
@@ -273,10 +273,10 @@ test('local model selection preserves adapter and go runtime metadata', () => {
       models: [{
         localModelId: 'file:local-import-z-image-turbo-q8-0',
         label: 'z-image-turbo-Q8_0',
-        engine: 'localai',
+        engine: 'media',
         model: 'z-image-turbo-Q8_0',
         modelId: 'z-image-turbo-Q8_0',
-        provider: 'localai',
+        provider: 'media',
         adapter: 'localai_native_adapter',
         endpoint: 'http://127.0.0.1:1234/v1',
         status: 'active',
@@ -295,9 +295,9 @@ test('local model selection preserves adapter and go runtime metadata', () => {
     connectorId: '',
     model: 'z-image-turbo-Q8_0',
     modelId: 'z-image-turbo-Q8_0',
-    provider: 'localai',
+    provider: 'media',
     localModelId: 'file:local-import-z-image-turbo-q8-0',
-    engine: 'localai',
+    engine: 'media',
     adapter: 'localai_native_adapter',
     endpoint: 'http://127.0.0.1:1234/v1',
     goRuntimeLocalModelId: '01JTESTLOCALAIMODEL',
@@ -311,21 +311,21 @@ test('route model picker normalizes local selector model ids', () => {
     selected: {
       source: 'local' as const,
       connectorId: '',
-      provider: 'localai',
+      provider: 'media',
       model: 'z-image-turbo-Q8_0',
       modelId: 'z-image-turbo-Q8_0',
       localModelId: 'file:local-import-z-image-turbo-q8-0',
-      engine: 'localai',
+      engine: 'media',
       adapter: 'localai_native_adapter',
     },
     local: {
       models: [{
         localModelId: 'file:local-import-z-image-turbo-q8-0',
         label: 'z-image-turbo-Q8_0',
-        engine: 'localai',
+        engine: 'media',
         model: 'z-image-turbo-Q8_0',
         modelId: 'z-image-turbo-Q8_0',
-        provider: 'localai',
+        provider: 'media',
         adapter: 'localai_native_adapter',
         status: 'active',
         capabilities: ['image.generate' as const],
@@ -337,11 +337,11 @@ test('route model picker normalizes local selector model ids', () => {
   const state = resolveRouteModelPickerState(snapshot, {
     source: 'local',
     connectorId: '',
-    provider: 'localai',
+    provider: 'media',
     model: 'localai/z-image-turbo-Q8_0',
     modelId: 'z-image-turbo-Q8_0',
     localModelId: 'file:local-import-z-image-turbo-q8-0',
-    engine: 'localai',
+    engine: 'media',
   });
 
   assert.equal(state.activeModel, 'z-image-turbo-Q8_0');

@@ -510,7 +510,7 @@ test('media decision policy resolves auto image route via preflight for explicit
       },
       resolveRoute: async () => ({
         source: 'local',
-        provider: 'localai',
+        provider: 'media',
         model: 'flux-local',
       }),
     },

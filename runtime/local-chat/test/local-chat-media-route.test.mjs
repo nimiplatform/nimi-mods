@@ -76,11 +76,11 @@ test('toPinnedRouteBinding keeps local model and localModelId', () => {
   const binding = toPinnedRouteBinding({
     source: 'local',
     runtimeModelType: 'image',
-    provider: 'localai',
+    provider: 'media',
     connectorId: '',
     localModelId: 'z-image-turbo',
     model: 'z-image-turbo',
-    engine: 'localai',
+    engine: 'media',
     endpoint: 'http://127.0.0.1:8080',
     localProviderEndpoint: 'http://127.0.0.1:8080',
     localProviderModel: 'z-image-turbo',

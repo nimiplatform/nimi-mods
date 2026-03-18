@@ -16,7 +16,7 @@ function createResolvedRoute(input = {}) {
     source: routeSource,
     ...(routeSource === 'cloud' ? { connectorId: String(input.connectorId || 'connector.media').trim() } : {}),
     model: String(input.model || (routeSource === 'cloud' ? 'media-cloud-model' : 'media-local-model')).trim(),
-    provider: String(input.provider || (routeSource === 'cloud' ? 'openai-compatible' : 'localai')).trim(),
+    provider: String(input.provider || (routeSource === 'cloud' ? 'openai-compatible' : 'media')).trim(),
     resolvedBy: 'preflight',
     resolvedAt: new Date().toISOString(),
     settingsRevision: 'regression-test',
