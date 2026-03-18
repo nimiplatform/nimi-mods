@@ -41,9 +41,9 @@ ai:
     - chat
     - embedding
   profiles:
-    - id: knowledge-base-localai
+    - id: knowledge-base-llama
       title: Default RAG stack
-      description: Qwen2.5 chat with LocalAI embeddings.
+      description: Qwen2.5 chat with llama embeddings.
       recommended: true
       consumeCapabilities:
         - chat
@@ -58,34 +58,11 @@ ai:
           title: Qwen2.5 7B Instruct (default)
           required: true
           preferred: true
-        - entryId: knowledge-base/embedding-localai
+        - entryId: knowledge-base/embedding-llama
           kind: node
           capability: embedding
-          nodeId: embedding.generate.localai
-          title: Local embedding node (LocalAI)
-          required: true
-          preferred: true
-    - id: knowledge-base-nexa
-      title: Nexa embedding stack
-      description: Qwen2.5 chat with Nexa embeddings.
-      recommended: false
-      consumeCapabilities:
-        - chat
-        - embedding
-      entries:
-        - entryId: knowledge-base/chat-qwen2.5-7b
-          kind: model
-          capability: chat
-          modelId: qwen2.5-7b-instruct
-          repo: Qwen/Qwen2.5-7B-Instruct-GGUF
-          engine: openai-compatible
-          title: Qwen2.5 7B Instruct (default)
-          required: true
-          preferred: true
-        - entryId: knowledge-base/embedding-nexa
-          kind: node
-          capability: embedding
-          nodeId: embedding.generate.nexa
-          title: Local embedding node (Nexa)
+          nodeId: embedding.generate.llama
+          title: Local embedding node (llama)
+          engine: llama
           required: true
           preferred: true

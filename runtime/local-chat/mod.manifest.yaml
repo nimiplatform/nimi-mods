@@ -81,7 +81,7 @@ ai:
           capability: image
           modelId: local/z_image_turbo
           repo: jayn7/Z-Image-Turbo-GGUF
-          engine: localai
+          engine: media
           title: Z-Image Turbo (GGUF)
           required: true
           preferred: true
@@ -91,7 +91,7 @@ ai:
           artifactId: local/z_image_ae
           artifactKind: vae
           templateId: verified.artifact.z_image.vae
-          engine: localai
+          engine: media
           title: Z-Image AE VAE
           required: true
           preferred: true
@@ -101,7 +101,7 @@ ai:
           artifactId: local/qwen3_4b_companion
           artifactKind: llm
           templateId: verified.artifact.z_image.qwen3_4b
-          engine: localai
+          engine: media
           title: Qwen3 4B Companion LLM
           required: true
           preferred: true
@@ -152,7 +152,7 @@ ai:
           capability: image
           modelId: local/z_image_turbo
           repo: jayn7/Z-Image-Turbo-GGUF
-          engine: localai
+          engine: media
           title: Z-Image Turbo (GGUF)
           required: true
           preferred: true
@@ -162,7 +162,7 @@ ai:
           artifactId: local/z_image_ae
           artifactKind: vae
           templateId: verified.artifact.z_image.vae
-          engine: localai
+          engine: media
           title: Z-Image AE VAE
           required: true
           preferred: true
@@ -172,7 +172,7 @@ ai:
           artifactId: local/qwen3_4b_companion
           artifactKind: llm
           templateId: verified.artifact.z_image.qwen3_4b
-          engine: localai
+          engine: media
           title: Qwen3 4B Companion LLM
           required: true
           preferred: true
