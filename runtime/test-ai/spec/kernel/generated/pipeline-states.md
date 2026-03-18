@@ -29,7 +29,7 @@ image_generate_chain:
   - step: image-input-normalize
     order: 1
     source_rule: TAI-PIPE-003
-  - step: localai-companion-validate
+  - step: media-companion-validate
     order: 2
     source_rule: TAI-PIPE-003
   - step: image-generate
@@ -42,7 +42,7 @@ image_create_job_chain:
   - step: image-input-normalize
     order: 1
     source_rule: TAI-PIPE-003
-  - step: localai-companion-validate
+  - step: media-companion-validate
     order: 2
     source_rule: TAI-PIPE-003
   - step: image-job-submit

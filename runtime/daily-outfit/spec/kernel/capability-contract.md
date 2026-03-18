@@ -60,6 +60,6 @@ Daily Outfit 通过 hook 数据 API 注册衣橱和方案的数据访问。
 
 AI 能力同时支持本地推理和云端 API，运行时路由决定实际后端。
 
-- 本地模式: 使用 localai 兼容引擎运行视觉/文本/图像模型。
+- 本地模式: 使用 llama/media 引擎运行视觉/文本/图像模型。
 - 云端模式: 通过 runtime route 路由到云端 API。
 - mod 代码不感知底层是本地还是云端，统一通过 SDK runtime facade 调用。

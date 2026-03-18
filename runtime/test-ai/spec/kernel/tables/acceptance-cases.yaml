@@ -20,13 +20,13 @@ cases:
     expected_ok: true
     reason_code: null
     source_rule: TAI-ACC-002
-  - id: TAI-011-LOCALAI-IMAGE-COMPONENTS-REQUIRED
-    description: LocalAI image diagnostics block submit when no explicit companion artifacts are selected.
+  - id: TAI-011-MEDIA-IMAGE-COMPONENTS-REQUIRED
+    description: media engine image diagnostics block submit when no explicit companion artifacts are selected.
     expected_ok: false
     reason_code: TEST_AI_LOCAL_IMAGE_COMPONENTS_REQUIRED
     source_rule: TAI-ACC-002
-  - id: TAI-012-LOCALAI-LAYERED-COMPANIONS-PASS
-    description: LocalAI image diagnostics expose layered preset companion selectors plus custom slots, and serialize all selected companions into the workflow request.
+  - id: TAI-012-MEDIA-LAYERED-COMPANIONS-PASS
+    description: media engine image diagnostics expose layered preset companion selectors plus custom slots, and serialize all selected companions into the workflow request.
     expected_ok: true
     reason_code: null
     source_rule: TAI-ACC-002

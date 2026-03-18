@@ -17,8 +17,8 @@ Image diagnostics flow must support both:
 - sync text-to-image request: normalize inputs, execute `runtime.media.image.generate`, render generated image preview and structured raw response.
 - async image job request: normalize inputs, execute `runtime.media.jobs.submit`, subscribe/watch the job lifecycle, fetch artifacts on terminal completion, and render generated image preview plus structured diagnostics.
 
-For LocalAI dynamic image workflows, the UI must fail-close before submit when no explicit companion artifact selections are present.
-Test-AI must expose the full LocalAI companion test surface in layers: preset selectors for `vae` / `llm` / `clip` / `controlnet` / `lora` / `auxiliary`, plus custom slot rows for non-standard workflow shapes.
+For media engine dynamic image workflows, the UI must fail-close before submit when no explicit companion artifact selections are present.
+Test-AI must expose the full media engine companion test surface in layers: preset selectors for `vae` / `llm` / `clip` / `controlnet` / `lora` / `auxiliary`, plus custom slot rows for non-standard workflow shapes.
 Companion artifact selections and `profile_overrides` must flow through the sync and async image paths unchanged once the user has selected them.
 If a terminal image job completes but artifact fetch fails, the UI must surface an explicit artifact-fetch error instead of silently rendering an empty success state.
 

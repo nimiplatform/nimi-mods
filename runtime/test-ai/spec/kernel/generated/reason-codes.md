@@ -29,7 +29,7 @@ codes:
   - code: TEST_AI_LOCAL_IMAGE_COMPONENTS_REQUIRED
     stage: image-input-normalize
     blocking: true
-    action_hint: Select explicit LocalAI companion artifacts before submit.
+    action_hint: Select explicit media engine companion artifacts before submit.
     source_rule: TAI-ERR-001
   - code: TEST_AI_VIDEO_GENERATE_FAILED
     stage: video-generate
