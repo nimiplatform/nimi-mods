@@ -42,10 +42,8 @@ export function ensureRouteOptionsSnapshotShape(snapshot: RuntimeRouteOptionsSna
 export function normalizeLocalRuntimeModelRoot(value: unknown): string {
     const trimmed = asString(value);
     const lower = trimmed.toLowerCase();
-    if (lower.startsWith('localai/'))
-        return trimmed.slice('localai/'.length).trim();
-    if (lower.startsWith('nexa/'))
-        return trimmed.slice('nexa/'.length).trim();
+    if (lower.startsWith('media/'))
+        return trimmed.slice('media/'.length).trim();
     if (lower.startsWith('local/'))
         return trimmed.slice('local/'.length).trim();
     return trimmed;

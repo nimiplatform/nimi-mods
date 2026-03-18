@@ -1,4 +1,4 @@
-import { IMAGE_WORKFLOW_PRESET_SELECTIONS, LOCALAI_IMAGE_COMPONENTS_REQUIRED_ERROR, type CompanionArtifactSelectionsInput, type ImageResponseFormatMode, type ImageWorkflowComponentDraft, type ImageWorkflowProfileOverridesInput, } from './types.js';
+import { IMAGE_WORKFLOW_PRESET_SELECTIONS, MEDIA_IMAGE_COMPONENTS_REQUIRED_ERROR, type CompanionArtifactSelectionsInput, type ImageResponseFormatMode, type ImageWorkflowComponentDraft, type ImageWorkflowProfileOverridesInput, } from './types.js';
 import { asString } from './utils.js';
 import { resolveImageResponseFormat } from './route.js';
 import { buildLocalImageWorkflowExtensions, type LocalImageWorkflowComponentSelection, type ModRuntimeLocalArtifactKind, type ModRuntimeLocalArtifactRecord, type RuntimeRouteBinding } from "@nimiplatform/sdk/mod";
@@ -68,7 +68,7 @@ export function buildImageWorkflowComponentSelections(input: CompanionArtifactSe
         localArtifactId,
     }));
 }
-export function buildLocalAIImageWorkflowExtensionsForRequest(input: CompanionArtifactSelectionsInput & {
+export function buildMediaImageWorkflowExtensionsForRequest(input: CompanionArtifactSelectionsInput & {
     profileOverrides: Record<string, unknown>;
 }): {
     extensions?: Record<string, unknown>;
@@ -78,7 +78,7 @@ export function buildLocalAIImageWorkflowExtensionsForRequest(input: CompanionAr
     if (components.length === 0) {
         return {
             extensions: undefined,
-            error: LOCALAI_IMAGE_COMPONENTS_REQUIRED_ERROR,
+            error: MEDIA_IMAGE_COMPONENTS_REQUIRED_ERROR,
         };
     }
     return {

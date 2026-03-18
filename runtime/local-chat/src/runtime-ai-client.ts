@@ -176,8 +176,8 @@ const LOCAL_CHAT_LOCAL_IMAGE_STEP = 8;
 const LOCAL_CHAT_LOCAL_IMAGE_TIMEOUT_MS = 600000;
 function normalizeLocalImageModelId(value: unknown): string {
     let normalized = String(value ?? '').trim().toLowerCase();
-    if (normalized.startsWith('localai/'))
-        normalized = normalized.slice('localai/'.length).trim();
+    if (normalized.startsWith('media/'))
+        normalized = normalized.slice('media/'.length).trim();
     if (normalized.startsWith('local/'))
         normalized = normalized.slice('local/'.length).trim();
     return normalized;
@@ -228,7 +228,7 @@ function localArtifactSortValue(artifact: ModRuntimeLocalArtifactRecord): [
 }
 function pickLocalImageCompanionArtifact(artifacts: ModRuntimeLocalArtifactRecord[], kind: 'vae' | 'llm'): ModRuntimeLocalArtifactRecord | null {
     const matches = artifacts
-        .filter((artifact) => artifact.engine.toLowerCase() === 'localai')
+        .filter((artifact) => artifact.engine.toLowerCase() === 'media')
         .filter(isSelectableLocalArtifact)
         .filter((artifact) => artifact.kind === kind)
         .sort((left, right) => {
@@ -256,7 +256,7 @@ function shouldInjectLocalImageWorkflow(input: {
         return false;
     }
     const engine = String(input.route.engine || input.route.provider || '').trim().toLowerCase();
-    return !engine || engine === 'localai' || engine === 'local';
+    return !engine || engine === 'media' || engine === 'local';
 }
 async function resolveLocalImageExtensions(input: {
     runtimeClient: ModRuntimeClient;
@@ -272,7 +272,7 @@ async function resolveLocalImageExtensions(input: {
     }
     emitLocalChatLog({
         level: 'debug',
-        message: 'local-chat:image-localai-workflow:inject:start',
+        message: 'local-chat:image-media-workflow:inject:start',
         details: {
             routeSource: input.route.source,
             provider: input.route.provider,
@@ -281,13 +281,13 @@ async function resolveLocalImageExtensions(input: {
             requestedModel: input.requestedModel || '',
         },
     });
-    const artifacts = await input.runtimeClient.local.listArtifacts({ engine: 'localai' });
+    const artifacts = await input.runtimeClient.local.listArtifacts({ engine: 'media' });
     const vaeArtifact = pickLocalImageCompanionArtifact(artifacts, 'vae');
     const llmArtifact = pickLocalImageCompanionArtifact(artifacts, 'llm');
     if (!vaeArtifact || !llmArtifact) {
         emitLocalChatLog({
             level: 'error',
-            message: 'local-chat:image-localai-workflow:inject:companions-missing',
+            message: 'local-chat:image-media-workflow:inject:companions-missing',
             details: {
                 routeModel: input.route.model,
                 requestedModel: input.requestedModel || '',
@@ -320,7 +320,7 @@ async function resolveLocalImageExtensions(input: {
     }, baseExtensions);
     emitLocalChatLog({
         level: 'info',
-        message: 'local-chat:image-localai-workflow:inject:ready',
+        message: 'local-chat:image-media-workflow:inject:ready',
         details: {
             routeModel: input.route.model,
             requestedModel: input.requestedModel || '',

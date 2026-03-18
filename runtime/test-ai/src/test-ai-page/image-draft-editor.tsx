@@ -5,7 +5,7 @@ import { type ModRuntimeLocalArtifactRecord } from "@nimiplatform/sdk/mod";
 type ImageDraftEditorProps = {
     draft: ImageWorkflowDraftState;
     updateDraft: (updater: Partial<ImageWorkflowDraftState> | ((prev: ImageWorkflowDraftState) => ImageWorkflowDraftState)) => void;
-    isLocalAIImageWorkflow: boolean;
+    isMediaImageWorkflow: boolean;
     artifacts: ModRuntimeLocalArtifactRecord[];
     artifactLoading: boolean;
     artifactError: string;
@@ -38,7 +38,7 @@ function CompanionPresetSelect(props: {
 }
 export function ImageDraftEditor(props: ImageDraftEditorProps) {
     const locale = useTestAiLocale();
-    const { draft, updateDraft, isLocalAIImageWorkflow, artifacts, artifactLoading, artifactError, hasKnownCompanionArtifacts, coreCompanionPresets, extendedCompanionPresets, companionPresetArtifacts, onAddComponent, onRemoveComponent, onComponentChange, } = props;
+    const { draft, updateDraft, isMediaImageWorkflow, artifacts, artifactLoading, artifactError, hasKnownCompanionArtifacts, coreCompanionPresets, extendedCompanionPresets, companionPresetArtifacts, onAddComponent, onRemoveComponent, onComponentChange, } = props;
     return (<>
       <textarea className="h-20 w-full resize-y rounded-lg border border-gray-300 bg-white p-2 font-mono text-xs" value={draft.prompt} onChange={(event) => updateDraft({ prompt: event.target.value })} placeholder={locale.image.promptPlaceholder}/>
       <textarea className="h-14 w-full resize-y rounded-lg border border-gray-300 bg-white p-2 font-mono text-xs" value={draft.negativePrompt} onChange={(event) => updateDraft({ negativePrompt: event.target.value })} placeholder={locale.image.negativePromptPlaceholder}/>
@@ -55,7 +55,7 @@ export function ImageDraftEditor(props: ImageDraftEditorProps) {
           <input type="number" min="1" max="4" className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs" value={draft.n} onChange={(event) => updateDraft({ n: event.target.value })}/>
         </label>
       </div>
-      {isLocalAIImageWorkflow ? (<div className="rounded-xl border border-gray-200 bg-white p-3">
+      {isMediaImageWorkflow ? (<div className="rounded-xl border border-gray-200 bg-white p-3">
           <div className="mb-2">
             <div className="text-xs font-semibold text-gray-700">{locale.image.companionModels}</div>
             <div className="text-[11px] text-gray-500">
@@ -121,7 +121,7 @@ export function ImageDraftEditor(props: ImageDraftEditorProps) {
             </span>
           </label>
         </div>
-        {isLocalAIImageWorkflow ? (<div className="mt-3 rounded-lg border border-gray-200 bg-white p-3">
+        {isMediaImageWorkflow ? (<div className="mt-3 rounded-lg border border-gray-200 bg-white p-3">
             <div className="flex items-center justify-between gap-2">
               <div>
                 <div className="font-semibold text-gray-700">{locale.image.localWorkflow}</div>

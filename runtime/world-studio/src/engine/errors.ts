@@ -30,7 +30,6 @@ export function isProviderTimeoutText(value: unknown): boolean {
   if (!message) return false;
   return (
     message.includes('world_studio_provider_timeout')
-    || message.includes('local_ai_provider_timeout')
     || message.includes('play_provider_timeout')
     || message.includes('ai_provider_timeout')
     || message.includes('timeout expired')
@@ -45,7 +44,6 @@ export function isProviderInternalText(value: unknown): boolean {
   if (!message) return false;
   return (
     message.includes('world_studio_provider_internal')
-    || message.includes('local_ai_provider_internal_error')
     || message.includes('ai_output_invalid')
     || message.includes('sdk_runtime_tauri_unary_failed')
     || message.includes('runtime_bridge_unary')

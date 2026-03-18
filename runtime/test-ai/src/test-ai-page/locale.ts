@@ -1,6 +1,6 @@
 import enLocale from '../locales/en.js';
 import zhLocale from '../locales/zh.js';
-import { LOCALAI_IMAGE_COMPONENTS_REQUIRED_ERROR, type CapabilityId, type ImageWorkflowDraftState, type ImageWorkflowPresetSelectionKey, } from './types.js';
+import { MEDIA_IMAGE_COMPONENTS_REQUIRED_ERROR, type CapabilityId, type ImageWorkflowDraftState, type ImageWorkflowPresetSelectionKey, } from './types.js';
 import { scenarioJobEventLabel, scenarioJobStatusLabel, } from './utils.js';
 import { useModTranslation } from "@nimiplatform/sdk/mod";
 export type TestAiLocale = typeof enLocale | typeof zhLocale;
@@ -42,7 +42,7 @@ export function presetLabel(locale: TestAiLocale, key: ImageWorkflowPresetSelect
 }
 export function localizeKnownMessage(message: string, locale: TestAiLocale): string {
     switch (message) {
-        case LOCALAI_IMAGE_COMPONENTS_REQUIRED_ERROR:
+        case MEDIA_IMAGE_COMPONENTS_REQUIRED_ERROR:
             return locale.image.companionRequired;
         case 'Raw profile_overrides JSON must be an object.':
             return locale.image.rawProfileMustBeObject;

@@ -119,4 +119,4 @@ export const IMAGE_WORKFLOW_PRESET_SELECTIONS: ImageWorkflowPresetSelection[] = 
 export type CompanionArtifactSelectionsInput = Record<ImageWorkflowPresetSelectionKey, string> & {
     components: Array<Pick<ImageWorkflowComponentDraft, 'slot' | 'localArtifactId'>>;
 };
-export const LOCALAI_IMAGE_COMPONENTS_REQUIRED_ERROR = 'LocalAI image workflow requires explicit companion artifacts. Select one or more layered companion presets, or add workflow components first. If you are not sure what to pick, install or verify the companion artifacts in desktop first.';
+export const MEDIA_IMAGE_COMPONENTS_REQUIRED_ERROR = 'LocalAI image workflow requires explicit companion artifacts. Select one or more layered companion presets, or add workflow components first. If you are not sure what to pick, install or verify the companion artifacts in desktop first.';

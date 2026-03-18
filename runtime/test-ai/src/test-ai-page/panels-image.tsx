@@ -1,5 +1,5 @@
 import React from 'react';
-import { IMAGE_WORKFLOW_PRESET_SELECTIONS, artifactsForPresetKind, asString, buildAsyncImageJobOutcome, buildImageGenerateRequestParams, buildImageWorkflowProfileOverrides, buildLocalAIImageWorkflowExtensionsForRequest, isSelectableLocalArtifact, isTerminalScenarioJobStatus, localizeKnownMessage, localizedJobEvent, localizedJobStatus, makeEmptyDiagnostics, resolveEffectiveBinding, scenarioJobEventLabel, scenarioJobStatusLabel, stripArtifacts, toArtifactPreviewUri, toPrettyJson, useTestAiLocale, } from './core.js';
+import { IMAGE_WORKFLOW_PRESET_SELECTIONS, artifactsForPresetKind, asString, buildAsyncImageJobOutcome, buildImageGenerateRequestParams, buildImageWorkflowProfileOverrides, buildMediaImageWorkflowExtensionsForRequest, isSelectableLocalArtifact, isTerminalScenarioJobStatus, localizeKnownMessage, localizedJobEvent, localizedJobStatus, makeEmptyDiagnostics, resolveEffectiveBinding, scenarioJobEventLabel, scenarioJobStatusLabel, stripArtifacts, toArtifactPreviewUri, toPrettyJson, useTestAiLocale, } from './core.js';
 import type { CapabilityState, ImageWorkflowDraftState, ImageWorkflowPresetSelectionKey, } from './core.js';
 import { DiagnosticsPanel, ErrorBox, InfoBox, RawJsonSection, RouteBindingEditor, RunButton, } from './components.js';
 import { ImageDraftEditor } from './image-draft-editor.js';
@@ -30,7 +30,7 @@ export function ImageGeneratePanel(props: ImageGeneratePanelProps) {
     const localEngine = asString(isLocalRuntimeWorkflow
         ? (effectiveBinding?.engine || effectiveBinding?.provider)
         : '');
-    const isLocalAIImageWorkflow = isLocalRuntimeWorkflow && localEngine.toLowerCase() === 'localai';
+    const isMediaImageWorkflow = isLocalRuntimeWorkflow && localEngine.toLowerCase() === 'media';
     const updateDraft = React.useCallback((updater: Partial<ImageWorkflowDraftState> | ((prev: ImageWorkflowDraftState) => ImageWorkflowDraftState)) => {
         onDraftChange((prev) => {
             if (typeof updater === 'function') {
@@ -40,7 +40,7 @@ export function ImageGeneratePanel(props: ImageGeneratePanelProps) {
         });
     }, [onDraftChange]);
     React.useEffect(() => {
-        if (!isLocalAIImageWorkflow) {
+        if (!isMediaImageWorkflow) {
             setArtifacts([]);
             setArtifactLoading(false);
             setArtifactError('');
@@ -64,9 +64,9 @@ export function ImageGeneratePanel(props: ImageGeneratePanelProps) {
         return () => {
             cancelled = true;
         };
-    }, [runtimeClient, isLocalAIImageWorkflow, localEngine]);
+    }, [runtimeClient, isMediaImageWorkflow, localEngine]);
     React.useEffect(() => {
-        if (!isLocalAIImageWorkflow) {
+        if (!isMediaImageWorkflow) {
             return;
         }
         const selectableArtifactIds = new Set(artifacts
@@ -91,7 +91,7 @@ export function ImageGeneratePanel(props: ImageGeneratePanelProps) {
                 componentDrafts: nextComponentDrafts,
             }));
         }
-    }, [artifacts, draft, isLocalAIImageWorkflow, updateDraft]);
+    }, [artifacts, draft, isMediaImageWorkflow, updateDraft]);
     const handleComponentChange = React.useCallback((componentId: string, key: 'slot' | 'localArtifactId', value: string) => {
         updateDraft((prev) => ({
             ...prev,
@@ -137,8 +137,8 @@ export function ImageGeneratePanel(props: ImageGeneratePanelProps) {
         const binding = effectiveBinding || undefined;
         const nNum = Math.max(1, Number(draft.n) || 1);
         let extensions: Record<string, unknown> | undefined;
-        if (isLocalAIImageWorkflow) {
-            const localWorkflow = buildLocalAIImageWorkflowExtensionsForRequest({
+        if (isMediaImageWorkflow) {
+            const localWorkflow = buildMediaImageWorkflowExtensionsForRequest({
                 vaeModel: draft.vaeModel,
                 llmModel: draft.llmModel,
                 clipLModel: draft.clipLModel,
@@ -169,7 +169,7 @@ export function ImageGeneratePanel(props: ImageGeneratePanelProps) {
                 binding,
             }),
         };
-    }, [draft, effectiveBinding, isLocalAIImageWorkflow, locale]);
+    }, [draft, effectiveBinding, isMediaImageWorkflow, locale]);
     const finalizeAsyncImageJob = React.useCallback(async (input: {
         jobId: string;
         requestParams: Record<string, unknown> | null;
@@ -469,7 +469,7 @@ export function ImageGeneratePanel(props: ImageGeneratePanelProps) {
     const extendedCompanionPresets = React.useMemo(() => IMAGE_WORKFLOW_PRESET_SELECTIONS.filter((preset) => preset.tier === 'extended'), []);
     return (<div className="flex flex-col gap-3">
       <RouteBindingEditor capabilityId="image.generate" snapshot={state.snapshot} binding={state.binding} loading={state.routeLoading} error={state.routeError} onReload={onRouteReload} onBindingChange={onBindingChange}/>
-      <ImageDraftEditor draft={draft} updateDraft={updateDraft} isLocalAIImageWorkflow={isLocalAIImageWorkflow} artifacts={artifacts} artifactLoading={artifactLoading} artifactError={artifactError} hasKnownCompanionArtifacts={hasKnownCompanionArtifacts} coreCompanionPresets={coreCompanionPresets} extendedCompanionPresets={extendedCompanionPresets} companionPresetArtifacts={companionPresetArtifacts} onAddComponent={handleAddComponent} onRemoveComponent={handleRemoveComponent} onComponentChange={handleComponentChange}/>
+      <ImageDraftEditor draft={draft} updateDraft={updateDraft} isMediaImageWorkflow={isMediaImageWorkflow} artifacts={artifacts} artifactLoading={artifactLoading} artifactError={artifactError} hasKnownCompanionArtifacts={hasKnownCompanionArtifacts} coreCompanionPresets={coreCompanionPresets} extendedCompanionPresets={extendedCompanionPresets} companionPresetArtifacts={companionPresetArtifacts} onAddComponent={handleAddComponent} onRemoveComponent={handleRemoveComponent} onComponentChange={handleComponentChange}/>
       {mode === 'job' ? (<ImageJobPanel busy={state.busy} busyLabel={state.busyLabel} watchJobId={watchJobId} onWatchJobIdChange={setWatchJobId} onWatchExistingJob={() => { void handleWatchExistingJob(); }} onCancelJob={() => { void handleCancelJob(); }} onSubmitJob={() => { void handleRun(); }} jobTimeline={jobTimeline}/>) : (<RunButton busy={state.busy} busyLabel={state.busyLabel} label={locale.image.runGenerate} onClick={() => { void handleRun(); }}/>)}
       {state.error ? <ErrorBox message={state.error}/> : null}
       {imageUris.length > 0 ? (<div className="grid grid-cols-2 gap-2">
