@@ -294,6 +294,16 @@ function buildReviewActions(args: BuildWorldStudioScreenModelArgs): WorldStudioA
         },
       });
     },
+    onRuleTruthDraftChange: (value) => {
+      patchSnapshotWithReviewFallback(args, {
+        ruleTruthDraft: value,
+        unsavedChangesByPanel: {
+          ...args.snapshot.unsavedChangesByPanel,
+          worldview: true,
+          lorebooks: true,
+        },
+      });
+    },
     onEventsChange: (value) => {
       patchSnapshotWithReviewFallback(args, {
         eventsDraft: value,
@@ -674,6 +684,7 @@ export function buildWorldStudioScreenModel(args: BuildWorldStudioScreenModelArg
       routeOptions: args.ui.routeOptions,
       eventSyncMode: args.ui.eventSyncMode,
       selectedAgentSyncCharacters: args.context.selectedAgentSyncCharacters,
+      truthDerivedAgentDraftsByCharacter: args.snapshot.agentSync.draftsByCharacter,
       eventsGraph: args.context.eventsGraph,
       timeFlowRatio: args.context.timeFlowRatio,
       importSubview,

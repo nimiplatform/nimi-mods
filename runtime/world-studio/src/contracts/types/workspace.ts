@@ -150,6 +150,16 @@ export type WorldStudioPanelState = {
   selectedAgentId: string;
 };
 
+export type WorldStudioAgentRuleDraft = {
+  characterName: string;
+  payload: Record<string, unknown>;
+};
+
+export type WorldStudioRuleTruthDraft = {
+  worldRules: Record<string, unknown>[];
+  agentRules: WorldStudioAgentRuleDraft[];
+};
+
 export type WorldStudioWorkspaceSnapshot = {
   panel: WorldStudioPanelState;
   createStep: WorldStudioCreateStep;
@@ -157,6 +167,7 @@ export type WorldStudioWorkspaceSnapshot = {
   sourceRef: string;
   worldPatch: Record<string, unknown>;
   worldviewPatch: Record<string, unknown>;
+  ruleTruthDraft: WorldStudioRuleTruthDraft;
   eventsDraft: {
     primary: EventNodeDraft[];
     secondary: EventNodeDraft[];

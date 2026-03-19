@@ -483,7 +483,7 @@ export function CreateWorkbench(props: CreateWorkbenchProps) {
               assets={snapshot.assets}
               selectedCharacters={snapshot.selectedCharacters}
               selectedAgentSyncCharacters={props.main.selectedAgentSyncCharacters}
-              agentDraftsByCharacter={snapshot.agentSync.draftsByCharacter}
+              agentDraftsByCharacter={props.main.truthDerivedAgentDraftsByCharacter}
               timeFlowRatio={props.main.timeFlowRatio}
               futureEventsText={snapshot.futureEventsText}
               onTimeFlowRatioChange={props.actions.generate.onTimeFlowRatioChange}
@@ -505,13 +505,11 @@ export function CreateWorkbench(props: CreateWorkbenchProps) {
               <DraftEditorPanel
                 sourceText={snapshot.sourceText}
                 worldPatch={snapshot.worldPatch}
-                worldviewPatch={snapshot.worldviewPatch}
+                ruleTruthDraft={snapshot.ruleTruthDraft}
                 events={props.main.eventsGraph}
-                lorebooksDraft={snapshot.lorebooksDraft}
                 onWorldPatchChange={props.actions.review.onWorldPatchChange}
-                onWorldviewPatchChange={props.actions.review.onWorldviewPatchChange}
+                onRuleTruthDraftChange={props.actions.review.onRuleTruthDraftChange}
                 onEventsChange={props.actions.review.onEventsChange}
-                onLorebooksChange={props.actions.review.onLorebooksChange}
                 eventGraphLayout={snapshot.eventGraphLayout}
                 onEventGraphLayoutChange={props.actions.review.onEventGraphLayoutChange}
               />

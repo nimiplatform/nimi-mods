@@ -537,6 +537,30 @@ export function normalizeLorebooksDraft(value: unknown): WorldLorebookDraftRow[]
 export function parseLorebooksDraftFromText(text: string): WorldLorebookDraftRow[] {
     return normalizeLorebooksDraft(safeParseArray(text));
 }
+function normalizeRuleTruthDraft(value: unknown): WorldStudioWorkspaceSnapshot['ruleTruthDraft'] {
+    const record = asRecord(value);
+    const worldRules = Array.isArray(record.worldRules)
+        ? record.worldRules
+            .filter((item) => item && typeof item === 'object' && !Array.isArray(item))
+            .map((item) => asRecord(item))
+        : [];
+    const agentRules = Array.isArray(record.agentRules)
+        ? record.agentRules
+            .filter((item) => item && typeof item === 'object' && !Array.isArray(item))
+            .map((item) => {
+            const entry = asRecord(item);
+            return {
+                characterName: String(entry.characterName || '').trim(),
+                payload: asRecord(entry.payload),
+            };
+        })
+            .filter((item) => Boolean(item.characterName))
+        : [];
+    return {
+        worldRules,
+        agentRules,
+    };
+}
 const TERMINAL_TASK_STATUSES = new Set([
     'CANCELED',
     'FAILED',
@@ -676,6 +700,7 @@ export function syncSnapshot(snapshot: WorldStudioWorkspaceSnapshot): WorldStudi
     const taskState = normalizeTaskState(snapshot.taskState || {});
     const phase1Artifact = normalizePhase1Artifact(snapshot.phase1Artifact);
     const draftQuality = normalizeDraftQuality(snapshot.draftQuality || {});
+    const ruleTruthDraft = normalizeRuleTruthDraft(snapshot.ruleTruthDraft || {});
     const parseJob = {
         ...snapshot.parseJob,
         chunkTotal: Math.max(0, Number(snapshot.parseJob?.chunkTotal) || 0),
@@ -713,6 +738,7 @@ export function syncSnapshot(snapshot: WorldStudioWorkspaceSnapshot): WorldStudi
         parseJob,
         worldPatch,
         worldviewPatch,
+        ruleTruthDraft,
         eventsDraft,
         lorebooksDraft,
         phase1Artifact,

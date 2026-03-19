@@ -16,6 +16,10 @@ const DEFAULT_SNAPSHOT: WorldStudioWorkspaceSnapshot = {
   sourceRef: '',
   worldPatch: {},
   worldviewPatch: {},
+  ruleTruthDraft: {
+    worldRules: [],
+    agentRules: [],
+  },
   eventsDraft: {
     primary: [],
     secondary: [],
@@ -109,6 +113,10 @@ export function cloneDefaultSnapshot(): WorldStudioWorkspaceSnapshot {
     panel: { ...DEFAULT_SNAPSHOT.panel },
     worldPatch: {},
     worldviewPatch: {},
+    ruleTruthDraft: {
+      worldRules: [],
+      agentRules: [],
+    },
     eventsDraft: {
       primary: [],
       secondary: [],

@@ -3,9 +3,7 @@ import { useModTranslation } from "@nimiplatform/sdk/mod";
 
 type WorldBasePanelProps = {
   worldPatch: Record<string, unknown>;
-  worldviewPatch: Record<string, unknown>;
   onWorldPatchChange: (value: Record<string, unknown>) => void;
-  onWorldviewPatchChange: (value: Record<string, unknown>) => void;
 };
 
 function updateWorld(raw: Record<string, unknown>, patch: (next: Record<string, unknown>) => void): Record<string, unknown> {

@@ -1,5 +1,6 @@
 import type {
   EventNodeDraft,
+  WorldStudioAgentDraft,
   WorldStudioMaintainDomain,
   WorldStudioMaintainSection,
   WorldStudioCreateStep,
@@ -80,6 +81,7 @@ export type WorldStudioMainSlice = {
   routeOptions: RuntimeRouteOptionsSnapshot | null;
   eventSyncMode: 'merge' | 'replace';
   selectedAgentSyncCharacters: string[];
+  truthDerivedAgentDraftsByCharacter: Record<string, WorldStudioAgentDraft>;
   eventsGraph: {
     primary: EventNodeDraft[];
     secondary: EventNodeDraft[];
@@ -205,6 +207,7 @@ export type WorldStudioActionsSlice = {
   review: {
     onWorldPatchChange: (value: Record<string, unknown>) => void;
     onWorldviewPatchChange: (value: Record<string, unknown>) => void;
+    onRuleTruthDraftChange: (value: WorldStudioWorkspaceSnapshot['ruleTruthDraft']) => void;
     onEventsChange: (value: { primary: EventNodeDraft[]; secondary: EventNodeDraft[] }) => void;
     onLorebooksChange: (value: WorldStudioWorkspaceSnapshot['lorebooksDraft']) => void;
     onEventGraphLayoutChange: (next: { selectedEventId: string; expandedPrimaryIds: string[] }) => void;

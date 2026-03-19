@@ -69,7 +69,7 @@ export function Phase2Panel(props: Phase2PanelProps) {
           <div className="ui-sync-toolbar p-3">
             <div className="grid gap-3 lg:grid-cols-1">
               <label className="text-xs text-gray-700">
-                {t('phase2Panel.timeFlowRatio')}
+                {t('phase2Panel.timeFlowRatio')} · {t('phase2Panel.truthDraftHint', 'updates the WorldRule truth draft')}
                 <input className="mt-1 h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-xs" value={props.timeFlowRatio} onChange={(event) => props.onTimeFlowRatioChange(event.target.value)} placeholder="1"/>
               </label>
             </div>
@@ -93,6 +93,9 @@ export function Phase2Panel(props: Phase2PanelProps) {
 
           <div className="ui-sync-card p-3">
             <div className="text-xs font-semibold text-gray-800">{t('phase2Panel.characterPortraitAgentSync')}</div>
+            <p className="mt-1 text-[11px] text-gray-500">
+              {t('phase2Panel.agentTruthHint', 'Character sync and profile fields now feed the AgentRule truth draft directly.')}
+            </p>
             <div className="mt-2 max-h-44 space-y-2 overflow-auto">
               {props.selectedCharacters.length === 0 ? (<p className="text-xs text-gray-500">{t('phase2Panel.noCharacterSelected')}</p>) : props.selectedCharacters.map((name) => {
                 const portrait = props.assets.characterPortraits[name]

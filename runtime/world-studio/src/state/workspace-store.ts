@@ -113,6 +113,25 @@ export const useWorldStudioWorkspaceStore = create<WorldStudioWorkspaceStore>((s
             lorebooksDraft: Array.isArray(patch.lorebooksDraft)
                 ? patch.lorebooksDraft as WorldStudioWorkspaceSnapshot['lorebooksDraft']
                 : state.snapshot.lorebooksDraft,
+            ruleTruthDraft: {
+                worldRules: Array.isArray(patch.ruleTruthDraft?.worldRules)
+                    ? patch.ruleTruthDraft.worldRules
+                        .filter((item) => item && typeof item === 'object' && !Array.isArray(item))
+                        .map((item) => asRecord(item))
+                    : state.snapshot.ruleTruthDraft.worldRules,
+                agentRules: Array.isArray(patch.ruleTruthDraft?.agentRules)
+                    ? patch.ruleTruthDraft.agentRules
+                        .filter((item) => item && typeof item === 'object' && !Array.isArray(item))
+                        .map((item) => {
+                        const record = asRecord(item);
+                        return {
+                            characterName: String(record.characterName || '').trim(),
+                            payload: asRecord(record.payload),
+                        };
+                    })
+                        .filter((item) => Boolean(item.characterName))
+                    : state.snapshot.ruleTruthDraft.agentRules,
+            },
             assets: {
                 worldCover: {
                     ...state.snapshot.assets.worldCover,
