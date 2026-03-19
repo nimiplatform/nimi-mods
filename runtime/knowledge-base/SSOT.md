@@ -4,7 +4,7 @@ status: ACTIVE
 version: v1.0
 updated_at: 2026-03-04
 rules:
-  - KB 业务执行真相唯一归属本文件；`@nimiplatform/nimi/ssot/mod/governance.md` 仅定义 Mod 通用治理规则。
+  - KB 业务执行真相唯一归属本文件；`spec/platform/kernel/governance-contract.md` 仅定义 Mod 通用治理规则。
   - KB 执行主路径固定在 `nimi-mods/runtime/knowledge-base`，不得以独立网页壳替代 Nimi runtime mod 形态。
   - 文档数据默认仅本地处理（宿主 sqlite），不隐式上传；导出/分享必须由用户显式触发。
   - AI 调用入口统一为 `@nimiplatform/sdk/mod`（`runtime.ai.text.*` / `runtime.ai.embedding.generate`），不保留 legacy 场景调用兼容路径。
@@ -97,8 +97,8 @@ rules:
 
 ## 与其他 SSOT 对齐
 
-1. `@nimiplatform/nimi/ssot/mod/governance.md` — 通用 Mod 治理规则；KB 业务由本文件定义。
+1. `spec/platform/kernel/governance-contract.md` — 通用 Mod 治理规则；KB 业务由本文件定义。
 2. `spec/runtime/kernel/knowledge-contract.md`（K-KNOW-*）— RuntimeKnowledgeService 接口；KB mod 独立实现（Phase 1）。
 3. `spec/desktop/kernel/hook-capability-contract.md`（D-HOOK-*）— Hook 能力模型；KB 遵循但不重定义。
-4. `@nimiplatform/nimi-mods/runtime/local-chat/SSOT.md` — local-chat 集成协议见 `spec/kernel/capability-contract.md` § KB-CAP-007。
-5. `@nimiplatform/nimi/ssot/runtime/local.md` — 路由语义；KB 消费但不定义。
+4. `spec/kernel/capability-contract.md` § KB-CAP-007 — local-chat 集成协议。
+5. `spec/runtime/kernel/local-engine-contract.md` — 路由语义；KB 消费但不定义。
