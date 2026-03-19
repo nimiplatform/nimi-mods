@@ -37,6 +37,9 @@ export interface ModelManager {
     feedAudio(analyser: AnalyserNode, lipSyncStream?: LipSyncStream | null): void;
     stopAudio(): void;
     handleTap(clientX: number, clientY: number): void;
+    setViewportScale(multiplier: number): void;
+    setViewportOffsetX(offsetPx: number): void;
+    setViewportOffsetY(offsetPx: number): void;
     resize(width: number, height: number): void;
     pauseBackgroundWork(): void;
     resumeBackgroundWork(): void;
@@ -56,6 +59,9 @@ export function createModelManager(onStateChange: (state: ModelState, error?: st
     let currentMotionProfile = getBuddyMotionProfile(DEFAULT_BUDDY_MODEL_ID);
     let currentEmotion: EmotionType = 'happy';
     let speaking = false;
+    let viewportScale = 1.9;
+    let viewportOffsetX = 0;
+    let viewportOffsetY = 0;
     const debugEnabled = isBuddyDebugEnabled();
     function getViewportSize() {
         const parent = canvasEl?.parentElement;
@@ -107,19 +113,50 @@ export function createModelManager(onStateChange: (state: ModelState, error?: st
         }
         return false;
     }
+    function computeViewportScale(viewWidth: number, viewHeight: number, naturalWidth: number, naturalHeight: number): number {
+        const widthScale = (viewWidth * 0.48) / naturalWidth;
+        const heightScale = (viewHeight * 0.78) / naturalHeight;
+        return Math.min(widthScale, heightScale) * viewportScale;
+    }
+    function clampViewportOffsetX(offset: number, viewWidth: number, viewHeight: number): number {
+        if (!model) {
+            const fallbackLimit = Math.max(viewWidth * 0.18, 60);
+            return Math.min(fallbackLimit, Math.max(-fallbackLimit, offset));
+        }
+        const bounds = model.getLocalBounds();
+        const naturalWidth = Math.max(bounds.width || 0, 1);
+        const naturalHeight = Math.max(bounds.height || 0, 1);
+        const scale = computeViewportScale(viewWidth, viewHeight, naturalWidth, naturalHeight);
+        const scaledWidth = naturalWidth * scale;
+        const overflowAllowance = Math.max((scaledWidth - viewWidth * 0.58) * 0.5, 0);
+        const limit = Math.max(viewWidth * 0.1, overflowAllowance, 60);
+        return Math.min(limit, Math.max(-limit, offset));
+    }
+    function clampViewportOffset(offset: number, viewWidth: number, viewHeight: number): number {
+        if (!model) {
+            const fallbackLimit = Math.max(viewHeight * 0.28, 80);
+            return Math.min(fallbackLimit, Math.max(-fallbackLimit, offset));
+        }
+        const bounds = model.getLocalBounds();
+        const naturalWidth = Math.max(bounds.width || 0, 1);
+        const naturalHeight = Math.max(bounds.height || 0, 1);
+        const scale = computeViewportScale(viewWidth, viewHeight, naturalWidth, naturalHeight);
+        const scaledHeight = naturalHeight * scale;
+        const overflowAllowance = Math.max((scaledHeight - viewHeight * 0.7) * 0.5, 0);
+        const limit = Math.max(viewHeight * 0.18, overflowAllowance, 80);
+        return Math.min(limit, Math.max(-limit, offset));
+    }
     function applyModelLayout(viewWidth: number, viewHeight: number) {
         if (!model)
             return;
         const bounds = model.getLocalBounds();
         const naturalWidth = Math.max(bounds.width || 0, 1);
         const naturalHeight = Math.max(bounds.height || 0, 1);
-        model.anchor.set(0.5, 1);
-        const widthScale = (viewWidth * 0.5) / naturalWidth;
-        const heightScale = (viewHeight * 0.86) / naturalHeight;
-        const scale = Math.min(widthScale, heightScale);
+        model.anchor.set(0.5, 0.5);
+        const scale = computeViewportScale(viewWidth, viewHeight, naturalWidth, naturalHeight);
         model.scale.set(scale);
-        model.x = viewWidth * 0.43;
-        model.y = viewHeight * 1.0;
+        model.x = (viewWidth * 0.5) + clampViewportOffsetX(viewportOffsetX, viewWidth, viewHeight);
+        model.y = (viewHeight * 0.56) + clampViewportOffset(viewportOffsetY, viewWidth, viewHeight);
     }
     function clearIdleMotionLoop() {
         if (idleMotionTimer) {
@@ -316,6 +353,31 @@ export function createModelManager(onStateChange: (state: ModelState, error?: st
         activeModel.tap(x, y);
         void playFirstAvailableMotion(buildEmotionMotionQueue(currentEmotion, 'tap'));
     }
+    function setViewportScale(multiplier: number) {
+        viewportScale = Math.min(2.8, Math.max(0.8, multiplier));
+        const viewport = getViewportSize();
+        if ((viewport.width || 0) > 0 && (viewport.height || 0) > 0) {
+            applyModelLayout(viewport.width, viewport.height);
+        }
+    }
+    function setViewportOffsetX(offsetPx: number) {
+        const viewport = getViewportSize();
+        const width = viewport.width || app?.screen.width || 0;
+        const height = viewport.height || app?.screen.height || 0;
+        viewportOffsetX = clampViewportOffsetX(offsetPx, width, height);
+        if ((viewport.width || 0) > 0 && (viewport.height || 0) > 0) {
+            applyModelLayout(viewport.width, viewport.height);
+        }
+    }
+    function setViewportOffsetY(offsetPx: number) {
+        const viewport = getViewportSize();
+        const width = viewport.width || app?.screen.width || 0;
+        const height = viewport.height || app?.screen.height || 0;
+        viewportOffsetY = clampViewportOffset(offsetPx, width, height);
+        if ((viewport.width || 0) > 0 && (viewport.height || 0) > 0) {
+            applyModelLayout(viewport.width, viewport.height);
+        }
+    }
     function resize(width: number, height: number) {
         if (!app || !model)
             return;
@@ -370,6 +432,9 @@ export function createModelManager(onStateChange: (state: ModelState, error?: st
         feedAudio,
         stopAudio,
         handleTap,
+        setViewportScale,
+        setViewportOffsetX,
+        setViewportOffsetY,
         resize,
         pauseBackgroundWork,
         resumeBackgroundWork,

@@ -84,6 +84,12 @@ interface TtsVoiceOption {
   lang: string;
 }
 
+const MIN_MODEL_ZOOM = 0.8;
+const MAX_MODEL_ZOOM = 2.8;
+const DEFAULT_MODEL_ZOOM = 1.9;
+const DEFAULT_MODEL_PAN_X = 0;
+const DEFAULT_MODEL_PAN_Y = 0;
+
 interface AssistantAudioCacheEntry {
   audioBytes?: Uint8Array;
   audioUri?: string;
@@ -109,6 +115,9 @@ export interface BuddyControllerState {
   isRecording: boolean;
   streamingText: string;
   currentEmotion: EmotionType;
+  modelZoom: number;
+  modelPanX: number;
+  modelPanY: number;
   showRestReminder: boolean;
   selectedModelId: BuddyModelId;
   textRouteOptions: RuntimeRouteOptionsSnapshot | null;
@@ -131,6 +140,9 @@ export interface BuddyControllerActions {
   mountCanvas: (canvas: HTMLCanvasElement) => void;
   loadModel: (url: string) => Promise<void>;
   tapModel: (clientX: number, clientY: number) => void;
+  setModelZoom: (zoom: number) => void;
+  setModelPanX: (offsetX: number) => void;
+  setModelPanY: (offsetY: number) => void;
   selectModel: (modelId: string) => void;
   setVoiceModeEnabled: (enabled: boolean) => void;
   setRouteSource: (kind: RouteKind, source: RuntimeRouteSource) => void;
@@ -156,6 +168,9 @@ export function useBuddyController(
   const [isRecording, setIsRecording] = useState(false);
   const [streamingText, setStreamingText] = useState('');
   const [currentEmotion, setCurrentEmotion] = useState<EmotionType>('happy');
+  const [modelZoom, setModelZoomState] = useState(DEFAULT_MODEL_ZOOM);
+  const [modelPanX, setModelPanXState] = useState(DEFAULT_MODEL_PAN_X);
+  const [modelPanY, setModelPanYState] = useState(DEFAULT_MODEL_PAN_Y);
   const [showRestReminder, setShowRestReminder] = useState(false);
   const [selectedModelId, setSelectedModelId] = useState<BuddyModelId>(DEFAULT_BUDDY_MODEL_ID);
   const [routeOptionsLoading, setRouteOptionsLoading] = useState(false);
@@ -191,6 +206,9 @@ export function useBuddyController(
   const sttBindingRef = useRef<RuntimeRouteBinding | null>(null);
   const audioCacheRef = useRef<Map<string, AssistantAudioCacheEntry>>(new Map());
   const playbackTokenRef = useRef(0);
+  const modelZoomRef = useRef(DEFAULT_MODEL_ZOOM);
+  const modelPanXRef = useRef(DEFAULT_MODEL_PAN_X);
+  const modelPanYRef = useRef(DEFAULT_MODEL_PAN_Y);
 
   // Initialize runtime client
   useEffect(() => {
@@ -341,6 +359,9 @@ export function useBuddyController(
       setModelError(error ?? null);
     });
     mgr.mount(canvas);
+    mgr.setViewportScale(modelZoomRef.current);
+    mgr.setViewportOffsetX(modelPanXRef.current);
+    mgr.setViewportOffsetY(modelPanYRef.current);
     managerRef.current = mgr;
   }, []);
 
@@ -388,6 +409,25 @@ export function useBuddyController(
     managerRef.current?.handleTap(clientX, clientY);
   }, []);
 
+  const setModelZoom = useCallback((zoom: number) => {
+    const nextZoom = Math.min(MAX_MODEL_ZOOM, Math.max(MIN_MODEL_ZOOM, zoom));
+    modelZoomRef.current = nextZoom;
+    setModelZoomState(nextZoom);
+    managerRef.current?.setViewportScale(nextZoom);
+  }, []);
+
+  const setModelPanX = useCallback((offsetX: number) => {
+    modelPanXRef.current = offsetX;
+    setModelPanXState(offsetX);
+    managerRef.current?.setViewportOffsetX(offsetX);
+  }, []);
+
+  const setModelPanY = useCallback((offsetY: number) => {
+    modelPanYRef.current = offsetY;
+    setModelPanYState(offsetY);
+    managerRef.current?.setViewportOffsetY(offsetY);
+  }, []);
+
   const selectModel = useCallback((modelId: string) => {
     const matched = BUDDY_MODELS.find((item) => item.id === modelId);
     if (matched) {
@@ -399,6 +439,18 @@ export function useBuddyController(
   useEffect(() => {
     managerRef.current?.setModelProfile(selectedModelId);
   }, [selectedModelId]);
+
+  useEffect(() => {
+    managerRef.current?.setViewportScale(modelZoom);
+  }, [modelZoom]);
+
+  useEffect(() => {
+    managerRef.current?.setViewportOffsetX(modelPanX);
+  }, [modelPanX]);
+
+  useEffect(() => {
+    managerRef.current?.setViewportOffsetY(modelPanY);
+  }, [modelPanY]);
 
   const setRouteSource = useCallback((kind: RouteKind, source: RuntimeRouteSource) => {
     if (kind === 'text') {
@@ -990,6 +1042,9 @@ export function useBuddyController(
     isRecording,
     streamingText,
     currentEmotion,
+    modelZoom,
+    modelPanX,
+    modelPanY,
     showRestReminder,
     selectedModelId,
     textRouteOptions,
@@ -1009,6 +1064,9 @@ export function useBuddyController(
     mountCanvas,
     loadModel,
     tapModel,
+    setModelZoom,
+    setModelPanX,
+    setModelPanY,
     selectModel,
     setVoiceModeEnabled,
     setRouteSource,

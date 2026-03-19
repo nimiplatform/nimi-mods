@@ -21,10 +21,11 @@ export function VoiceButton({ isRecording, onStart, onStop }: VoiceButtonProps) 
   return (
     <button
       type="button"
-      className={`select-none touch-none flex items-center gap-1.5 rounded-full px-4 py-2 text-sm transition-all ${
+      title={isRecording ? t('BuddyPage.voiceRelease') : t('BuddyPage.voiceHold')}
+      className={`select-none touch-none flex h-10 w-10 items-center justify-center rounded-full transition-all ${
         isRecording
-          ? 'bg-red-500 text-white shadow-lg shadow-red-200'
-          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          ? 'bg-rose-500 text-white shadow-lg shadow-rose-200'
+          : 'bg-white text-slate-500 shadow-sm hover:bg-slate-100'
       }`}
       onPointerDown={(e) => {
         e.preventDefault();
@@ -51,7 +52,9 @@ export function VoiceButton({ isRecording, onStart, onStop }: VoiceButtonProps) 
         <line x1="12" y1="19" x2="12" y2="23" />
         <line x1="8" y1="23" x2="16" y2="23" />
       </svg>
-      {isRecording ? t('BuddyPage.voiceRelease') : t('BuddyPage.voiceHold')}
+      <span className="sr-only">
+        {isRecording ? t('BuddyPage.voiceRelease') : t('BuddyPage.voiceHold')}
+      </span>
     </button>
   );
 }
