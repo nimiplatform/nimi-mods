@@ -1,0 +1,118 @@
+version: 1
+pipelines:
+  - pipeline: setup
+    label: 项目设置流水线
+    source_rule: PS-PIPE-001
+    steps:
+      - step: project-create
+        order: 1
+        description: 创建项目，输入名称和描述
+        required: true
+      - step: project-upload-reference
+        order: 2
+        description: 上传 1+ 张产品参考照片，设定默认参考图
+        required: true
+        note: 可任意顺序完成 2-4 步
+      - step: project-import-scenes
+        order: 3
+        description: 批量导入竞品/模板场景图（multimodal 模式需要）
+        required: false
+        note: 文生图模式可跳过
+      - step: project-setup-selling-points
+        order: 4
+        description: 录入产品卖点和店铺卖点（支持 JSON 导入或逐条手动添加）
+        required: false
+        note: 卖点为可选，不配置时 AI 优化 prompt 不融入卖点
+
+  - pipeline: prompt-workshop
+    label: Prompt 工坊流水线
+    source_rule: PS-PIPE-002
+    description: 核心两步流程的第一步。从自然语言意图到生图模型可消费的 prompt。
+    steps:
+      - step: prompt-compose
+        order: 1
+        description: 用户选择生图模式、贴入图片（自动编号）、输入自然语言意图、可选勾选卖点
+      - step: prompt-ai-refine
+        order: 2
+        description: AI 分析所有附带图片视觉特征 + 用户意图 + 勾选卖点，生成优化 prompt
+        skippable: true
+        skip_note: 用户可跳过 AI 优化，直接手写 prompt
+      - step: prompt-save
+        order: 3
+        description: 展示最终 prompt 全文，用户确认后保存为 PromptConfig，可收藏复用
+    iteration_allowed: true
+    iteration_note: 用户可在步骤 2-3 之间多次迭代（修改意图 → 重新优化）
+
+  - pipeline: single-preview
+    label: 单图生成预览流水线
+    source_rule: PS-PIPE-003
+    description: 核心两步流程的第二步。验证 prompt 效果，满意后进入批量生成。
+    steps:
+      - step: gen-confirm-params
+        order: 1
+        description: 确认 PromptConfig（含 prompt + 附带图片），选择生图目标
+      - step: gen-execute
+        order: 2
+        description: |
+          执行生图调用。
+          multimodal 模式：发送附带图片 + refinedPrompt 给多模态模型。
+          text-to-image 模式：仅发送 refinedPrompt 给文生图模型。
+      - step: gen-preview-evaluate
+        order: 3
+        description: 展示生成结果，用户评估满意度
+    post_evaluate_actions:
+      - action: proceed_to_batch
+        label: 满意 → 批量生成
+        trigger: 用户点击"满意 → 批量生成"
+      - action: adjust_prompt
+        label: 调整 Prompt
+        trigger: 用户点击"调整 Prompt"，返回 Prompt 工坊
+      - action: regenerate
+        label: 重新生成
+        trigger: 用户点击"重新生成"，使用相同参数重新执行
+    history: 生成历史自动保留，可横向滚动对比多次结果
+
+  - pipeline: batch-generation
+    label: 批量生成流水线
+    source_rule: PS-PIPE-004
+    description: 批量应用同一 PromptConfig，多模态替换模式或文生图变体模式。
+    steps:
+      - step: batch-select-scope
+        order: 1
+        description: |
+          multimodal 模式：选择目标场景图（全部未处理 / 手动勾选 / 按状态筛选）。
+          text-to-image 模式：设置生成数量（如 20 张变体）。
+      - step: batch-configure
+        order: 2
+        description: 设置并发数（默认 5），multimodal 模式配置是否跳过已生成的
+      - step: batch-submit
+        order: 3
+        description: 创建 BatchJob，状态变为 QUEUED
+      - step: batch-monitor
+        order: 4
+        description: 实时进度展示，支持暂停/恢复/取消
+      - step: batch-summary
+        order: 5
+        description: 展示成功率、平均耗时、失败列表（可重试失败项）
+    resume_semantics:
+      - 已有成功输出的场景图默认跳过（仅 multimodal 模式）
+      - 单个失败不阻塞其他任务
+      - PAUSED 后可恢复
+
+  - pipeline: gallery-export
+    label: 图库与导出流水线
+    source_rule: PS-PIPE-005
+    steps:
+      - step: gallery-browse
+        order: 1
+        description: 网格视图浏览所有生成图，支持多维度筛选
+      - step: gallery-compare
+        order: 2
+        description: 原始场景图和生成图并排对比（仅 multimodal 模式）
+        mode_restricted: multimodal
+      - step: gallery-rate
+        order: 3
+        description: 用户评分 1-5，丢弃不满意的（标记 discarded，不删除文件）
+      - step: gallery-export
+        order: 4
+        description: 选中图片批量导出到指定目录

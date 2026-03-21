@@ -1,0 +1,281 @@
+version: 1
+entities:
+  - entity: Project
+    source_rule: PS-DOM-001
+    description: 电商产品工作空间，每个产品（如"水过滤器"）对应一个 Project。
+    fields:
+      - name: id
+        type: ULID
+        required: true
+        description: 唯一标识
+      - name: name
+        type: string
+        required: true
+        description: 项目名称
+      - name: description
+        type: string
+        required: false
+        description: 项目描述
+      - name: status
+        type: enum
+        required: true
+        values: [active, archived]
+        description: 项目状态
+      - name: createdAt
+        type: datetime
+        required: true
+      - name: updatedAt
+        type: datetime
+        required: true
+
+  - entity: ReferenceImage
+    source_rule: PS-DOM-002
+    description: 用户自己产品的参考照片，一个 Project 可有多张。
+    fields:
+      - name: id
+        type: ULID
+        required: true
+        description: 唯一标识
+      - name: projectId
+        type: ULID
+        required: true
+        description: 所属 Project
+      - name: fileUrl
+        type: string
+        required: true
+        description: 本地文件路径
+      - name: label
+        type: string
+        required: false
+        description: 标签（如"正面"、"侧面"、"变体A"）
+      - name: isDefault
+        type: boolean
+        required: true
+        description: 是否为默认参考图
+      - name: createdAt
+        type: datetime
+        required: true
+
+  - entity: SellingPoint
+    source_rule: PS-DOM-003
+    description: 产品和店铺的营销卖点。
+    fields:
+      - name: id
+        type: ULID
+        required: true
+        description: 唯一标识
+      - name: projectId
+        type: ULID
+        required: true
+        description: 所属 Project
+      - name: category
+        type: enum
+        required: true
+        values: [product, store]
+        description: 卖点类别（产品特性 / 店铺服务）
+      - name: text
+        type: string
+        required: true
+        description: 卖点文案内容
+      - name: sortOrder
+        type: integer
+        required: true
+        description: 排序权重
+      - name: isActive
+        type: boolean
+        required: true
+        description: 是否启用
+      - name: createdAt
+        type: datetime
+        required: true
+
+  - entity: SceneImage
+    source_rule: PS-DOM-004
+    description: 竞品或模板场景图。用户希望将自己的产品替换进这些场景。仅 multimodal 模式使用。
+    fields:
+      - name: id
+        type: ULID
+        required: true
+        description: 唯一标识
+      - name: projectId
+        type: ULID
+        required: true
+        description: 所属 Project
+      - name: fileUrl
+        type: string
+        required: true
+        description: 本地文件路径
+      - name: sourceLabel
+        type: string
+        required: false
+        description: 来源标签（如"竞品A"、"模板"）
+      - name: status
+        type: enum
+        required: true
+        values: [pending, used, skipped]
+        description: 场景图处理状态
+      - name: createdAt
+        type: datetime
+        required: true
+
+  - entity: PromptConfig
+    source_rule: PS-DOM-005
+    description: 一次 prompt 构建的完整配置。包含用户自然语言意图、附带图片和 AI 优化后的 prompt。
+    fields:
+      - name: id
+        type: ULID
+        required: true
+        description: 唯一标识
+      - name: projectId
+        type: ULID
+        required: true
+        description: 所属 Project
+      - name: name
+        type: string
+        required: false
+        description: 配置名称（方便复用）
+      - name: generationMode
+        type: enum
+        required: true
+        values: [multimodal, text-to-image]
+        description: 生图模式（详见 generation-modes.yaml）
+      - name: userIntent
+        type: string
+        required: true
+        description: 用户自然语言描述，可引用"图1"、"图2"等编号
+      - name: attachedImageIds
+        type: "ULID[]"
+        required: false
+        description: 附带图片 ID 列表（按顺序对应图1、图2...，来源可为 ReferenceImage 或 SceneImage）
+      - name: refinedPrompt
+        type: string
+        required: false
+        description: AI 优化后的最终 prompt（可手动微调）
+      - name: isFavorite
+        type: boolean
+        required: true
+        default: false
+        description: 是否收藏此配置
+      - name: createdAt
+        type: datetime
+        required: true
+      - name: updatedAt
+        type: datetime
+        required: true
+    notes:
+      - multimodal 模式：attachedImageIds 对应图片在生图调用时一同发给多模态模型
+      - text-to-image 模式：attachedImageIds 仅用于 AI 优化 prompt 阶段的视觉分析，不参与最终生图调用
+
+  - entity: BatchJob
+    source_rule: PS-DOM-006
+    description: 一次批量生图任务，关联一个 PromptConfig。
+    fields:
+      - name: id
+        type: ULID
+        required: true
+        description: 唯一标识
+      - name: projectId
+        type: ULID
+        required: true
+        description: 所属 Project
+      - name: promptConfigId
+        type: ULID
+        required: true
+        description: 使用的 Prompt 配置
+      - name: status
+        type: enum
+        required: true
+        values: [DRAFT, QUEUED, RUNNING, PAUSED, CANCELLED, COMPLETED, PARTIAL_COMPLETED]
+        description: 状态机详见 batch-states.yaml
+      - name: totalCount
+        type: integer
+        required: true
+        description: 总任务数
+      - name: completedCount
+        type: integer
+        required: true
+        description: 已完成数
+      - name: failedCount
+        type: integer
+        required: true
+        description: 失败数
+      - name: concurrency
+        type: integer
+        required: true
+        default: 5
+        description: 并发数
+      - name: sceneImageIds
+        type: "ULID[]"
+        required: false
+        description: 目标场景图 ID 列表（multimodal 模式必填）
+      - name: batchSize
+        type: integer
+        required: false
+        description: 批量生成数量（text-to-image 模式：生成多少张变体）
+      - name: startedAt
+        type: datetime
+        required: false
+      - name: completedAt
+        type: datetime
+        required: false
+      - name: createdAt
+        type: datetime
+        required: true
+
+  - entity: GeneratedImage
+    source_rule: PS-DOM-007
+    description: 单张生成的结果图片。
+    fields:
+      - name: id
+        type: ULID
+        required: true
+        description: 唯一标识
+      - name: projectId
+        type: ULID
+        required: true
+        description: 所属 Project
+      - name: batchJobId
+        type: ULID
+        required: false
+        description: 所属批量任务（单张预览时为空）
+      - name: promptConfigId
+        type: ULID
+        required: true
+        description: 使用的 Prompt 配置（通过 PromptConfig 可追溯输入图片和 prompt）
+      - name: generationMode
+        type: enum
+        required: true
+        values: [multimodal, text-to-image]
+        description: 生图模式
+      - name: fileUrl
+        type: string
+        required: true
+        description: 生成图片本地路径
+      - name: actualPrompt
+        type: string
+        required: true
+        description: 实际使用的 prompt（用户可能在生成前微调过）
+      - name: appliedSellingPoints
+        type: "string[]"
+        required: false
+        description: 实际融入 prompt 的卖点文案
+      - name: status
+        type: enum
+        required: true
+        values: [generating, success, failed, discarded]
+        description: 生成状态
+      - name: errorMessage
+        type: string
+        required: false
+        description: 失败时的错误信息
+      - name: generationTimeMs
+        type: integer
+        required: false
+        description: 生成耗时（毫秒）
+      - name: rating
+        type: integer
+        required: false
+        description: 用户评分 1-5
+      - name: createdAt
+        type: datetime
+        required: true

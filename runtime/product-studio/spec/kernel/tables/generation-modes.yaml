@@ -1,0 +1,36 @@
+version: 1
+source_rule: PS-DOM-005
+modes:
+  - mode: multimodal
+    label: 多模态生图
+    description: 将图片输入（参考图和/或场景图）+ prompt 一起发给多模态模型（如 Gemini）。
+    input_required:
+      - prompt
+      - at_least_one_image
+    image_role_in_generation: direct_input
+    suitable_for:
+      - 产品替换（将产品图替换到场景图中）
+      - 场景融合
+      - 图片编辑类需求
+    sdk_call: runtime.media.image.generate
+    sdk_call_note: 请求携带 referenceImages + prompt
+
+  - mode: text-to-image
+    label: 纯文生图
+    description: 仅发送 prompt 给文生图模型（如 FLUX、SD），从零生成图像。
+    input_required:
+      - prompt
+    image_role_in_generation: none
+    image_role_in_prompt_refinement: optional_visual_reference
+    suitable_for:
+      - 从零生成产品营销图
+      - 不依赖现有场景图的创意生图
+    sdk_call: runtime.media.image.generate
+    sdk_call_note: 请求仅携带 prompt（attachedImageIds 仅用于 AI 优化 prompt 阶段的视觉分析）
+
+shared_behavior:
+  - PromptConfig.generationMode 决定生图调用方式
+  - 两种模式共享 PromptConfig 和 BatchJob 体系
+  - 两种模式均支持卖点融入 prompt
+  - text-to-image 模式下，BatchJob.batchSize 控制变体数量
+  - multimodal 模式下，BatchJob.sceneImageIds 为必填字段

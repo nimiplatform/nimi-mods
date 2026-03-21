@@ -1,0 +1,90 @@
+version: 1
+manifest_identity:
+  mod_id: world.nimi.product-studio
+  entry: ./dist/mods/product-studio/index.js
+  styles:
+    - ./dist/mods/product-studio/index.css
+  version: 0.1.0
+  kind: capability-mod
+  nav_slot: ui-extension.app.sidebar.mods
+  route_slot: ui-extension.app.content.routes
+  source_rule: PS-CAP-001
+
+ai_profile:
+  consume:
+    - chat
+    - image
+  source_rule: PS-CAP-003
+
+capabilities:
+  llm:
+    - runtime.ai.text.generate
+    - runtime.ai.text.stream
+    - runtime.media.image.generate
+    - runtime.media.jobs.submit
+    - runtime.media.jobs.get
+    - runtime.media.jobs.cancel
+    - runtime.media.jobs.subscribe
+    - runtime.media.jobs.get.artifacts
+    - runtime.route.list.options
+    - runtime.route.resolve
+    - runtime.route.check.health
+  storage:
+    - storage.sqlite.query
+    - storage.sqlite.execute
+    - storage.files.read
+    - storage.files.write
+  ui_register:
+    - ui.register.ui-extension.app.sidebar.mods
+    - ui.register.ui-extension.app.content.routes
+  data_register:
+    - data.register.data-api.product-studio.projects.*
+    - data.register.data-api.product-studio.references.*
+    - data.register.data-api.product-studio.scenes.*
+    - data.register.data-api.product-studio.selling-points.*
+    - data.register.data-api.product-studio.prompts.*
+    - data.register.data-api.product-studio.batches.*
+    - data.register.data-api.product-studio.gallery.*
+  source_rule: PS-CAP-002
+
+sdk_boundary:
+  allowed:
+    - "@nimiplatform/sdk/mod"
+    - "@nimiplatform/sdk/mod/shell"
+    - "@nimiplatform/sdk/mod/lifecycle"
+  forbidden:
+    - "@nimiplatform/sdk"
+    - "@nimiplatform/sdk/runtime"
+    - "@tauri-apps/*"
+    - "node:*"
+  source_rule: PS-CAP-002
+
+ai_capability_governance:
+  prompt_refinement:
+    allowed_capabilities:
+      - runtime.ai.text.generate
+      - runtime.ai.text.stream
+    forbidden: direct_http_endpoint_calls
+    source_rule: PS-CAP-003
+  image_generation:
+    multimodal_mode:
+      capability: runtime.media.image.generate
+      requires_reference_images: true
+    text_to_image_mode:
+      capability: runtime.media.image.generate
+      requires_reference_images: false
+    batch_management:
+      - runtime.media.jobs.submit
+      - runtime.media.jobs.get
+      - runtime.media.jobs.cancel
+      - runtime.media.jobs.subscribe
+    forbidden: direct_http_endpoint_calls
+    source_rule: PS-CAP-004
+
+manifest_validation:
+  required_fields:
+    - id
+    - entry
+    - styles
+    - capabilities
+  source_rule: PS-CAP-001
