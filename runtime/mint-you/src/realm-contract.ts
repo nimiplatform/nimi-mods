@@ -1,9 +1,15 @@
-import type {
-  WorldAccessSummaryDto,
-  WorldDetailDto,
-} from '@nimiplatform/sdk/realm';
+export type WorldAccessSummaryDto = {
+  userId: string;
+  hasActiveAccess: boolean;
+  canCreateWorld: boolean;
+  canMaintainWorld: boolean;
+  records: unknown[];
+};
 
-export type OasisWorld = Pick<WorldDetailDto, 'id' | 'name'>;
+export type OasisWorld = {
+  id: string;
+  name: string;
+};
 
 function toRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
