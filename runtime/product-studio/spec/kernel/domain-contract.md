@@ -25,7 +25,7 @@
 **字段**: 见 `entities.yaml` → `entity: ReferenceImage`
 
 **不变量**:
-- 同一 Project 内，有且仅有一张 `isDefault: true` 的 ReferenceImage。
+- 同一 Project 内，`ReferenceImage` 可为空；一旦存在默认图，则同一时刻最多一张 `isDefault: true`。
 - 上传新参考图时，若设为默认，则旧的默认图自动取消默认标记。
 - `fileUrl` 必须为本地文件路径，不支持远程 URL。
 
@@ -72,12 +72,14 @@
 - 用户可粘贴/拖入/选择多张图片，系统自动编号为"图1"、"图2"...
 - 用户在自然语言描述中引用图片编号（如"参考图1的产品，替换到图2的场景中"）
 - 图片来源不限：可以是项目的 ReferenceImage（PS-DOM-002）、SceneImage（PS-DOM-004），也可以是临时上传的图片
-- `attachedImageIds` 按顺序对应图1、图2...
+- `attachedImages` 按顺序对应图1、图2...；每项为 `PromptInputImageRef`
+- `PromptInputImageRef` 最少包含 `sourceType`（`reference | scene | ephemeral`）、`sourceId?`、`fileUrl`
+- 保存 PromptConfig 时，`attachedImages` 可为空；图片绑定属于模板可选信息，不是保存模板的硬前置
 - AI 优化 prompt 时会分析所有附带图片的视觉特征
 
 **`generationMode` 决定生图调用方式**:
-- `multimodal`: 将 `attachedImageIds` 对应的图片 + `refinedPrompt` 一起发给多模态模型（如 Gemini）
-- `text-to-image`: 仅发送 `refinedPrompt` 给文生图模型；`attachedImageIds` 仅用于 AI 优化 prompt 阶段的视觉分析，不参与最终生图调用
+- `multimodal`: 将 `attachedImages` 对应的图片 + `refinedPrompt` 一起发给多模态模型
+- `text-to-image`: 仅发送 `refinedPrompt` 给文生图模型；`attachedImages` 仅用于 AI 优化 prompt 阶段的视觉分析，不参与最终生图调用
 
 **AI Prompt 优化设计**:
 ```
@@ -91,9 +93,11 @@
 ```
 
 **不变量**:
-- `refinedPrompt` 可为空（用户跳过 AI 优化，直接手写 prompt 时）。
+- `attachedImages` 必须为稳定顺序数组；允许为空数组。即使存在临时粘贴图片，也必须在保存 PromptConfig 前持久化并记录 `fileUrl`。
+- `refinedPrompt` 为最终生图文本；跳过 AI 优化时，由用户手写后保存。
 - `userIntent` 为必填，是 AI 优化的核心输入。
 - 同一 PromptConfig 可被多个 BatchJob（PS-DOM-006）复用。
+- 一次实际生成调用使用的图片集合以执行时解析出的输入为准，可与 `PromptConfig.attachedImages` 不同；历史结果以 `GeneratedImage.inputImageSnapshot` 为准。
 
 ---
 
@@ -113,6 +117,7 @@
 - 单个子任务失败不改变 BatchJob 整体为 `CANCELLED`；全部完成后，有失败项则变为 `PARTIAL_COMPLETED`。
 - `concurrency` 默认值为 5，取值范围 1-10。
 - multimodal 模式下，`sceneImageIds` 不可为空。
+- “跳过已生成” 的判定以 `GeneratedImage.sourceSceneImageId + status=success` 为准，不依赖场景图展示顺序。
 
 ---
 
@@ -123,15 +128,18 @@
 **字段**: 见 `entities.yaml` → `entity: GeneratedImage`
 
 **追溯链**:
-`GeneratedImage.promptConfigId → PromptConfig → (userIntent + attachedImageIds + refinedPrompt)`
+`GeneratedImage.promptConfigId → PromptConfig` 提供配置级上下文；
+`GeneratedImage.inputImageSnapshot + actualPrompt` 提供本次调用的稳定快照。
 
 通过上述追溯链，每张生成图都可回溯到：
 - 使用的 prompt（`actualPrompt`，因为用户可能在生成前微调过）
-- 输入图片（`attachedImageIds`）
+- 输入图片（`inputImageSnapshot`；不受后续 PromptConfig 编辑影响）
 - 应用的卖点（`appliedSellingPoints`）
 
 **不变量**:
 - 单张预览生成时（非批量），`batchJobId` 为空。
 - `actualPrompt` 记录实际发送给模型的 prompt，可能与 `PromptConfig.refinedPrompt` 不同（用户微调）。
+- multimodal 结果若对应具体场景图，则必须填写 `sourceSceneImageId`。
+- `inputImageSnapshot` 必须完整记录实际发送给本次生成调用的图片集合；无图输入时为空数组。
 - `status: discarded` 仅标记，不删除本地文件（物理删除由用户手动操作或垃圾清理流程处理）。
 - `rating` 为 1-5 整数，未评分时为空。

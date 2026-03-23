@@ -1,0 +1,53 @@
+id: world.nimi.product-studio
+name: Product Studio
+version: 0.1.0
+kind: capability-mod
+iconAsset: ./assets/icon.svg
+entry: ./dist/mods/product-studio/index.js
+styles:
+  - ./dist/mods/product-studio/index.css
+description: >
+  Editorial AI workspace for product marketing visuals, prompt development,
+  batch generation planning, and gallery review inside Desktop mod surfaces.
+capabilities:
+  - runtime.ai.text.generate
+  - runtime.ai.text.stream
+  - runtime.media.image.generate
+  - runtime.media.jobs.submit
+  - runtime.media.jobs.get
+  - runtime.media.jobs.cancel
+  - runtime.media.jobs.subscribe
+  - runtime.media.jobs.get.artifacts
+  - runtime.route.list.options
+  - runtime.route.resolve
+  - runtime.route.check.health
+  - storage.sqlite.query
+  - storage.sqlite.execute
+  - storage.files.read
+  - storage.files.write
+  - data.register.data-api.product-studio.projects.list
+  - data.register.data-api.product-studio.projects.get
+  - data.register.data-api.product-studio.projects.create
+  - data.register.data-api.product-studio.projects.update
+  - data.register.data-api.product-studio.references.list
+  - data.register.data-api.product-studio.references.upsert
+  - data.register.data-api.product-studio.scenes.list
+  - data.register.data-api.product-studio.scenes.upsert
+  - data.register.data-api.product-studio.selling-points.list
+  - data.register.data-api.product-studio.selling-points.upsert
+  - data.register.data-api.product-studio.prompts.list
+  - data.register.data-api.product-studio.prompts.get
+  - data.register.data-api.product-studio.prompts.upsert
+  - data.register.data-api.product-studio.batches.list
+  - data.register.data-api.product-studio.batches.get
+  - data.register.data-api.product-studio.batches.upsert
+  - data.register.data-api.product-studio.gallery.list
+  - data.register.data-api.product-studio.gallery.get
+  - data.register.data-api.product-studio.gallery.upsert
+  - data.register.data-api.product-studio.gallery.rate
+  - ui.register.ui-extension.app.sidebar.mods
+  - ui.register.ui-extension.app.content.routes
+ai:
+  consume:
+    - chat
+    - image

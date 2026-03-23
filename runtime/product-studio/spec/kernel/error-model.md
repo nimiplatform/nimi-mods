@@ -18,13 +18,12 @@
 
 | 错误码 | 阶段 | 阻塞 | 用户提示 |
 |--------|------|:----:|---------|
-| `PS_REFERENCE_IMAGE_MISSING` | gen-confirm-params | Y | 项目未上传参考图，请先上传产品照片 |
-| `PS_SCENE_IMAGE_LOAD_FAILED` | gen-select-scene | Y | 场景图加载失败，请检查文件是否存在 |
+| `PS_SCENE_IMAGE_LOAD_FAILED` | gen-confirm-params | Y | 输入图片加载失败，请检查文件是否存在 |
 | `PS_PROMPT_REFINE_FAILED` | prompt-ai-refine | N | AI 优化 prompt 失败，可手动编辑 prompt |
 | `PS_IMAGE_GENERATE_FAILED` | gen-execute | N | 图片生成失败，请稍后重试或更换模型 |
 | `PS_IMAGE_GENERATE_TIMEOUT` | gen-execute | N | 图片生成超时，可尝试使用更快的模型 |
 | `PS_BATCH_ALL_FAILED` | batch-summary | Y | 批量任务全部失败，请检查模型连接和 prompt |
-| `PS_SELLING_POINTS_EMPTY` | prompt-mode-select | N | 未配置卖点，将自动切换到适用模式 |
+| `PS_SELLING_POINTS_EMPTY` | prompt-compose | N | 未配置卖点，本次优化将不融入卖点文案 |
 | `PS_STORAGE_WRITE_FAILED` | * | Y | 本地存储写入失败，请检查磁盘空间 |
 | `PS_ROUTE_NO_IMAGE_PROVIDER` | gen-execute | Y | 未找到可用的图像生成服务，请在设置中配置 |
 | `PS_NO_IMAGES_FOR_MULTIMODAL` | gen-confirm-params | Y | 多模态模式需要至少附带一张图片 |

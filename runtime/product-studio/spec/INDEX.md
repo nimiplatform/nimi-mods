@@ -24,6 +24,7 @@ spec/
 ├── INDEX.md                         # 本文件
 ├── product-studio.md                # 领域文档
 └── kernel/
+    ├── index.md                     # kernel 契约索引
     ├── domain-contract.md           # PS-DOM-001 ~ 007
     ├── pipeline-contract.md         # PS-PIPE-001 ~ 005
     ├── capability-contract.md       # PS-CAP-001 ~ 006

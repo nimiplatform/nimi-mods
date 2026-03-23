@@ -18,6 +18,7 @@
 
 **验证要点**:
 - multimodal 和 text-to-image 的前置检查逻辑必须通过模式分支独立验证。
+- PromptConfig 保存不要求必须附带图片；multimodal 的无图阻塞仅发生在实际执行生成时。
 - AI 优化失败路径下，prompt 输出区仍可编辑。
 
 ---
@@ -53,6 +54,7 @@
 **验证要点**:
 - 状态机转换必须严格遵循 `batch-states.yaml` 中定义的合法转换路径。
 - `completedCount + failedCount = totalCount` 在任务终态时成立。
+- “重试失败项” 必须创建新的 BatchJob；原 `PARTIAL_COMPLETED` 任务保持终态不回跳。
 
 ---
 
@@ -62,11 +64,12 @@
 
 | 用例 ID | 验收条件 |
 |---------|---------|
-| PS-010 | 每张 GeneratedImage 可通过 promptConfigId 追溯到使用的 prompt 和附带图片 |
+| PS-010 | 每张 GeneratedImage 可通过 `promptConfigId + inputImageSnapshot + actualPrompt` 追溯到实际调用上下文；multimodal 结果还需关联 `sourceSceneImageId` |
 | PS-012 | 卖点 JSON 导入 → 可视化编辑正确展示 → 再导出 JSON 与原始内容等价（roundtrip） |
 
 **验证要点**:
 - `GeneratedImage.actualPrompt` 必须是实际发送给模型的 prompt（允许与 `PromptConfig.refinedPrompt` 不同）。
+- `GeneratedImage.inputImageSnapshot` 必须保留本次调用实际使用的图片集合；PromptConfig 后续编辑不得影响历史结果追溯。
 - 卖点 JSON 格式为 `{ "product": string[], "store": string[] }`，roundtrip 必须保持字段顺序和值不变。
 
 ---
