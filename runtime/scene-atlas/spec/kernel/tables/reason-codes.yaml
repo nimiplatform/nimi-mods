@@ -1,0 +1,33 @@
+version: 1
+source_rule: SA-ERR-001
+codes:
+  - code: SA_IMAGE_IMPORT_FAILED
+    stage: image-import
+    blocking: true
+    user_hint: 导入图片失败，请检查文件是否存在或格式是否可读
+    source_rule: SA-ERR-001
+  - code: SA_ROUTE_NO_IMAGE_PROVIDER
+    stage: scene-generate
+    blocking: true
+    user_hint: 未找到可用的图像生成服务，请先配置可用路由
+    source_rule: SA-ERR-001
+  - code: SA_SCENE_GENERATE_FAILED
+    stage: scene-generate
+    blocking: false
+    user_hint: 场景生成失败，可直接重试或更换风格后再试
+    source_rule: SA-ERR-001
+  - code: SA_STYLE_LOCKED
+    stage: style-adjust
+    blocking: true
+    user_hint: 当前素材包已有场景卡，需先移除全部场景卡后才能切换默认风格
+    source_rule: SA-ERR-001
+  - code: SA_PUBLISH_NOT_READY
+    stage: publish
+    blocking: true
+    user_hint: 素材包尚未满足发布条件，请先补齐缺失项
+    source_rule: SA-ERR-001
+  - code: SA_STORAGE_WRITE_FAILED
+    stage: "*"
+    blocking: true
+    user_hint: 本地存储写入失败，请检查磁盘空间或文件权限
+    source_rule: SA-ERR-001

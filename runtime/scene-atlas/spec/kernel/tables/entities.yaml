@@ -1,0 +1,133 @@
+version: 1
+entities:
+  - entity: SceneCard
+    source_rule: SA-DOM-001
+    description: 单张主体图为核心的场景素材卡。
+    fields:
+      - name: id
+        type: ULID
+        required: true
+        description: 唯一标识
+      - name: originImage
+        type: ImageRef
+        required: true
+        description: 来源图引用，必须长期保留
+      - name: coverImage
+        type: ImageRef
+        required: true
+        description: 主体场景图，用于默认展示
+      - name: title
+        type: string
+        required: true
+        description: 场景标题
+      - name: summary
+        type: string
+        required: true
+        description: 1-2 句场景描述
+      - name: placeCue
+        type: string
+        required: true
+        description: 场景地点线索，自由文本
+      - name: atmosphere
+        type: string
+        required: true
+        description: 场景气氛，自由文本
+      - name: tags
+        type: string[]
+        required: true
+        description: 标准化检索标签
+      - name: sceneElements
+        type: string[]
+        required: false
+        description: 关键视觉元素集合
+      - name: storyHook
+        type: string
+        required: false
+        description: 可选故事钩子
+      - name: createdAt
+        type: datetime
+        required: true
+      - name: updatedAt
+        type: datetime
+        required: true
+    notes:
+      - SceneCard 不定义正式 status 字段
+      - 生成后的文本字段允许用户编辑
+      - 图像结果修改通过重新生成完成，不通过手工替换图像完成
+
+  - entity: MaterialPack
+    source_rule: SA-DOM-002
+    description: 一组可被整理、发布、流通的 material items 集合。
+    fields:
+      - name: id
+        type: ULID
+        required: true
+        description: 唯一标识
+      - name: ownerId
+        type: ULID
+        required: true
+        description: 所属用户或拥有者标识
+      - name: title
+        type: string
+        required: false
+        description: 素材包标题；readiness 必需
+      - name: description
+        type: string
+        required: false
+        description: 素材包描述；readiness 必需
+      - name: defaultStyle
+        type: string
+        required: false
+        description: pack 级默认风格，在首次成功生成后确定
+      - name: coverImage
+        type: ImageRef
+        required: false
+        description: 默认取第一张 SceneCard.coverImage；发布前必须确认
+      - name: packType
+        type: string
+        required: true
+        description: 容器类型标识，保持机制层通用
+      - name: itemKind
+        type: string
+        required: true
+        description: 容器 item 类型标识，保持机制层通用
+      - name: orderedItemIds
+        type: ULID[]
+        required: true
+        description: 有序 item 序列，顺序具有展示和叙事语义
+      - name: tags
+        type: string[]
+        required: true
+        description: 素材包标签；readiness 至少需要 1 个
+      - name: status
+        type: enum
+        required: true
+        values: [draft, published, archived]
+        description: 素材包生命周期状态
+      - name: isReady
+        type: boolean
+        required: true
+        derived: true
+        description: 系统自动计算的可发布性信号
+      - name: readinessIssues
+        type: string[]
+        required: true
+        derived: true
+        description: 当前不可发布的缺失项清单
+      - name: createdAt
+        type: datetime
+        required: true
+      - name: updatedAt
+        type: datetime
+        required: true
+      - name: publishedAt
+        type: datetime
+        required: false
+      - name: archivedAt
+        type: datetime
+        required: false
+    notes:
+      - MaterialPack 不定义 visibility 字段
+      - 只有 MaterialPack 可进入发布交接
+      - 已发布后继续编辑的是 MaterialPack，而不是上层 asset
+      - 一个 MaterialPack 只对应一个 asset

@@ -9,6 +9,7 @@
 - Per-mod specs:
   - `runtime/kismet/spec/**`
   - `runtime/local-chat/spec/**`
+  - `runtime/scene-atlas/spec/**`
   - `audit/re-life/spec/**`
   - `runtime/mint-you/spec/**`
   - `runtime/test-ai/spec/**`
