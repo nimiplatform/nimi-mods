@@ -254,7 +254,8 @@ export function ProductStudioPage() {
   const [galleryModeFilter, setGalleryModeFilter] = useState<'all' | ProductStudioGenerationMode>('all');
   const [selectedExportIds, setSelectedExportIds] = useState<string[]>([]);
   const [batchCount, setBatchCount] = useState(6);
-  const [selectedSceneIds, setSelectedSceneIds] = useState<string[]>([]);
+  const [batchFixedInputIds, setBatchFixedInputIds] = useState<string[]>([]);
+  const [selectedBatchSourceIds, setSelectedBatchSourceIds] = useState<string[]>([]);
   const [sellingPointsOpen, setSellingPointsOpen] = useState(false);
   const [editorTab, setEditorTab] = useState<EditorTab>('visual');
   const [editorDraft, setEditorDraft] = useState<ProductStudioSellingPoint[]>([]);
@@ -268,6 +269,8 @@ export function ProductStudioPage() {
   const [batchPaused, setBatchPaused] = useState(false);
   const referenceInputRef = useRef<HTMLInputElement | null>(null);
   const sceneInputRef = useRef<HTMLInputElement | null>(null);
+  const batchFixedInputRef = useRef<HTMLInputElement | null>(null);
+  const batchSourceInputRef = useRef<HTMLInputElement | null>(null);
   const batchPausedRef = useRef(false);
   const batchCancelledRef = useRef(false);
   const batchResumeResolversRef = useRef<Array<() => void>>([]);
@@ -356,7 +359,8 @@ export function ProductStudioPage() {
     setRefinedPrompt(promptConfig?.refinedPrompt || '');
     setAttachedImageIds(persistedAttachedIds);
     setSelectedSellingPointIds(activeBundle.sellingPoints.filter((item) => item.isActive).map((item) => item.id));
-    setSelectedSceneIds(activeBundle.sceneImages.filter((scene) => scene.status !== 'used').map((scene) => scene.id));
+    setBatchFixedInputIds([]);
+    setSelectedBatchSourceIds(activeBundle.sceneImages.map((image) => image.id));
     setPreviewAssetId(activeBundle.generatedImages[0]?.id || '');
     setSelectedExportIds([]);
   }, [activeProjectId, activeBundle?.project.id]);
@@ -412,12 +416,29 @@ export function ProductStudioPage() {
   }, [pageView, projectBundles, activeBundle]);
   const displayImageMap = useResolvedImageMap(displayImageUrls);
   const promptInputAssets = useMemo(() => {
-    const selected = attachedImageIds
+    return attachedImageIds
       .map((imageId) => allAssetIds.get(imageId))
       .filter(Boolean) as StudioAssetSelection[];
-    const remaining = Array.from(allAssetIds.values()).filter((asset) => !attachedImageIds.includes(asset.id));
-    return [...selected, ...remaining];
   }, [attachedImageIds, allAssetIds]);
+  const batchFixedAssets = useMemo(() => (
+    (activeBundle?.referenceImages || []).filter((asset) => batchFixedInputIds.includes(asset.id)).map((asset) => ({
+      id: asset.id,
+      fileUrl: asset.fileUrl,
+      label: asset.label,
+      note: asset.note,
+      sourceType: 'reference' as const,
+    }))
+  ), [activeBundle, batchFixedInputIds]);
+  const batchSourceAssets = useMemo(() => (
+    (activeBundle?.sceneImages || []).map((asset) => ({
+      id: asset.id,
+      fileUrl: asset.fileUrl,
+      label: asset.sourceLabel,
+      note: asset.note,
+      sourceType: 'scene' as const,
+      status: asset.status,
+    }))
+  ), [activeBundle]);
 
   function enterWorkspace(projectId: string) {
     setShellSection('projects');
@@ -450,26 +471,6 @@ export function ProductStudioPage() {
     setAttachedImageIds((current) => (
       current.includes(imageId) ? current.filter((item) => item !== imageId) : [...current, imageId]
     ));
-  }
-
-  function moveAttachedImage(imageId: string, direction: -1 | 1) {
-    setAttachedImageIds((current) => {
-      const index = current.indexOf(imageId);
-      if (index < 0) {
-        return current;
-      }
-      const nextIndex = index + direction;
-      if (nextIndex < 0 || nextIndex >= current.length) {
-        return current;
-      }
-      const next = [...current];
-      const [item] = next.splice(index, 1);
-      if (!item) {
-        return current;
-      }
-      next.splice(nextIndex, 0, item);
-      return next;
-    });
   }
 
   function toggleSellingPoint(pointId: string) {
@@ -592,6 +593,86 @@ export function ProductStudioPage() {
       setStatusBanner({
         tone: 'error',
         text: error instanceof Error ? error.message : String(error || 'Scene import failed'),
+      });
+    } finally {
+      setBusyLabel('');
+      event.target.value = '';
+    }
+  }
+
+  async function handleBatchFixedFilesSelected(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!activeBundle) {
+      return;
+    }
+    const files = Array.from(event.target.files || []).filter((file) => file.type.startsWith('image/'));
+    if (files.length === 0) {
+      return;
+    }
+    setBusyLabel('Importing batch fixed inputs');
+    try {
+      const nextImages = [...activeBundle.referenceImages];
+      const nextIds = [...batchFixedInputIds];
+      for (const file of files) {
+        const fileUrl = await persistBrowserFileImage({ file, bucket: 'references' });
+        const id = createProductStudioId('ref');
+        nextImages.push({
+          id,
+          projectId: activeBundle.project.id,
+          fileUrl,
+          label: file.name.replace(/\.[^.]+$/u, '') || 'Batch Fixed Input',
+          note: 'Uploaded from batch fixed inputs',
+          isDefault: nextImages.length === 0,
+          createdAt: new Date().toISOString(),
+        });
+        nextIds.push(id);
+      }
+      replaceProductStudioReferenceImages(activeBundle.project.id, nextImages);
+      setBatchFixedInputIds(nextIds);
+      setStatusBanner({ tone: 'info', text: `${files.length} batch fixed input${files.length > 1 ? 's' : ''} imported.` });
+    } catch (error) {
+      setStatusBanner({
+        tone: 'error',
+        text: error instanceof Error ? error.message : String(error || 'Batch fixed input import failed'),
+      });
+    } finally {
+      setBusyLabel('');
+      event.target.value = '';
+    }
+  }
+
+  async function handleBatchSourceFilesSelected(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!activeBundle) {
+      return;
+    }
+    const files = Array.from(event.target.files || []).filter((file) => file.type.startsWith('image/'));
+    if (files.length === 0) {
+      return;
+    }
+    setBusyLabel('Importing batch source images');
+    try {
+      const nextImages = [...activeBundle.sceneImages];
+      const nextIds = [...selectedBatchSourceIds];
+      for (const file of files) {
+        const fileUrl = await persistBrowserFileImage({ file, bucket: 'scenes' });
+        const id = createProductStudioId('scene');
+        nextImages.push({
+          id,
+          projectId: activeBundle.project.id,
+          fileUrl,
+          sourceLabel: file.name.replace(/\.[^.]+$/u, '') || 'Batch Source Image',
+          note: 'Uploaded from batch source inputs',
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+        });
+        nextIds.push(id);
+      }
+      replaceProductStudioSceneImages(activeBundle.project.id, nextImages);
+      setSelectedBatchSourceIds(nextIds);
+      setStatusBanner({ tone: 'info', text: `${files.length} batch source image${files.length > 1 ? 's' : ''} imported.` });
+    } catch (error) {
+      setStatusBanner({
+        tone: 'error',
+        text: error instanceof Error ? error.message : String(error || 'Batch source import failed'),
       });
     } finally {
       setBusyLabel('');
@@ -747,27 +828,40 @@ export function ProductStudioPage() {
     setBatchPaused(false);
     setBusyLabel('Running batch');
     try {
-      const sceneRuns = activeBundle.sceneImages
-        .filter((scene) => selectedSceneIds.includes(scene.id))
-        .map((scene) => ({
-          sceneId: scene.id,
-          title: scene.sourceLabel,
-          sceneRef: {
-            sourceType: 'scene' as const,
-            sourceId: scene.id,
-            fileUrl: scene.fileUrl,
-            label: scene.sourceLabel,
+      const fixedInputImages = batchFixedInputIds
+        .map((imageId) => allAssetIds.get(imageId))
+        .filter((asset): asset is StudioAssetSelection => Boolean(asset))
+        .map((asset) => ({
+          sourceType: asset.sourceType,
+          sourceId: asset.id,
+          fileUrl: asset.fileUrl,
+          label: asset.label,
+        }));
+      const sourceRuns = batchSourceAssets
+        .filter((asset) => selectedBatchSourceIds.includes(asset.id))
+        .map((asset) => ({
+          sourceId: asset.id,
+          title: asset.label,
+          sourceRef: {
+            sourceType: asset.sourceType,
+            sourceId: asset.id,
+            fileUrl: asset.fileUrl,
+            label: asset.label,
           },
         }));
+      const executionPromptConfig = {
+        ...promptConfig,
+        generationMode: fixedInputImages.length > 0 || sourceRuns.length > 0 ? 'multimodal' as const : 'text-to-image' as const,
+      };
 
       const { batchJob, generatedImages, blockingError } = await runProductStudioBatchGeneration({
         batchJobId,
         projectId: activeBundle.project.id,
-        promptConfig,
+        promptConfig: executionPromptConfig,
         promptText: promptConfig.refinedPrompt || promptConfig.userIntent,
         appliedSellingPoints: selectedSellingPoints(),
-        baseInputImages: promptConfig.attachedImages.filter((item) => item.sourceType !== 'scene'),
-        sceneRuns,
+        baseInputImages: fixedInputImages,
+        sourceRuns,
         variantCount: batchCount,
         controller: {
           isPaused: () => batchPausedRef.current,
@@ -803,8 +897,7 @@ export function ProductStudioPage() {
           : `Batch run finished with ${batchJob.completedCount} completed and ${batchJob.failedCount} failed.`,
       });
     } catch (error) {
-      const envelope = error as ProductStudioErrorEnvelope;
-      setStatusBanner('reasonCode' in envelope ? toBannerFromEnvelope(envelope) : {
+      setStatusBanner(isProductStudioErrorEnvelope(error) ? toBannerFromEnvelope(error) : {
         tone: 'error',
         text: error instanceof Error ? error.message : String(error || 'Batch generation failed'),
       });
@@ -1356,57 +1449,16 @@ export function ProductStudioPage() {
         <aside className="w-72 shrink-0 overflow-y-auto border-r border-[#c6c6cd]/15 bg-[#f2f3ff] p-5">
           <div className="mb-6">
             <div className="mb-3 flex items-center justify-between">
-              <div>
-                <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#45464d]">Image Inputs</div>
-                <div className="mt-1 text-[11px] text-[#6a7186]">Upload any images you want the model to read. The selected order is the actual input order.</div>
-              </div>
+              <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#45464d]">Image Inputs</div>
               <button type="button" onClick={() => referenceInputRef.current?.click()} className="text-[11px] font-bold text-[#497cff] hover:underline">+ Add</button>
             </div>
 
-            {attachedImageIds.length > 0 ? (
-              <div className="mb-4 space-y-2">
-                <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#45464d]">Selected Order</div>
-                {attachedImageIds.map((imageId, index) => {
-                  const asset = allAssetIds.get(imageId);
-                  if (!asset) {
-                    return null;
-                  }
-                  return (
-                    <div key={`selected-${asset.id}`} className="flex items-center gap-3 rounded-xl bg-white px-3 py-2.5">
-                      <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#131b2e] text-[11px] font-bold text-white">{index + 1}</div>
-                      <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-[#eaedff]">
-                        {resolveDisplayUrl(displayImageMap, asset.fileUrl) ? (
-                          <img src={resolveDisplayUrl(displayImageMap, asset.fileUrl)} alt={asset.label} className="h-full w-full object-cover" />
-                        ) : (
-                          <div className="flex h-full items-center justify-center"><Icon name="image" className="text-lg text-[#c6c6cd]" /></div>
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-xs font-semibold text-[#131b2e]">{asset.label}</div>
-                        <div className="mt-0.5 text-[10px] uppercase tracking-[0.14em] text-[#6a7186]">{asset.sourceType === 'scene' ? 'Scene' : 'Image'}</div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button type="button" onClick={() => moveAttachedImage(asset.id, -1)} className="grid h-7 w-7 place-items-center rounded-full bg-[#edf1ff] text-[#45464d] disabled:opacity-30" disabled={index === 0}>
-                          <Icon name="arrow_upward" className="text-sm" />
-                        </button>
-                        <button type="button" onClick={() => moveAttachedImage(asset.id, 1)} className="grid h-7 w-7 place-items-center rounded-full bg-[#edf1ff] text-[#45464d] disabled:opacity-30" disabled={index === attachedImageIds.length - 1}>
-                          <Icon name="arrow_downward" className="text-sm" />
-                        </button>
-                        <button type="button" onClick={() => toggleAttachedImage(asset.id)} className="grid h-7 w-7 place-items-center rounded-full bg-[#131b2e] text-white">
-                          <Icon name="close" className="text-sm" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="mb-4 rounded-xl border border-dashed border-[#c6c6cd] bg-white/70 px-4 py-3 text-xs text-[#6a7186]">
-                No images selected. If you leave it like this, generation will run as text-only.
-              </div>
-            )}
-
             <div className="grid grid-cols-2 gap-2">
+              {promptInputAssets.length === 0 ? (
+                <div className="col-span-2 rounded-2xl border border-dashed border-[#c6c6cd] bg-white/60 px-4 py-6 text-center text-xs text-[#6a7186]">
+                  No images yet
+                </div>
+              ) : null}
               {promptInputAssets.map((asset) => (
                 <button
                   key={asset.id}
@@ -1424,9 +1476,22 @@ export function ProductStudioPage() {
                     <div className="text-[10px] text-white/80">{asset.sourceType === 'scene' ? 'Scene asset' : 'Uploaded image'}</div>
                   </div>
                   {attachedImageIds.includes(asset.id) ? (
-                    <div className="absolute right-2 top-2 grid min-h-[22px] min-w-[22px] place-items-center rounded-full bg-[#497cff] px-1 text-[10px] font-bold text-white">
-                      {attachedImageIds.indexOf(asset.id) + 1}
-                    </div>
+                    <>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          toggleAttachedImage(asset.id);
+                        }}
+                        className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-[#131b2e]/85 text-white"
+                        title="Remove from input"
+                      >
+                        <Icon name="close" className="text-sm" />
+                      </button>
+                      <div className="absolute right-10 top-2 grid min-h-[22px] min-w-[22px] place-items-center rounded-full bg-[#497cff] px-1 text-[10px] font-bold text-white">
+                        {attachedImageIds.indexOf(asset.id) + 1}
+                      </div>
+                    </>
                   ) : null}
                 </button>
               ))}
@@ -1442,27 +1507,44 @@ export function ProductStudioPage() {
 
           {/* Selling Points */}
           <div>
-            <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-[#45464d]">Selling Points</div>
-            <div className="flex flex-wrap gap-1.5">
-              {activeBundle.sellingPoints.map((point) => (
-                <button
-                  key={point.id}
-                  type="button"
-                  onClick={() => toggleSellingPoint(point.id)}
-                  className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${selectedSellingPointIds.includes(point.id) ? 'bg-[#131b2e] text-white' : 'bg-white text-[#45464d]'}`}
-                >
-                  {point.text.length > 18 ? `${point.text.slice(0, 18)}…` : point.text}
-                  {selectedSellingPointIds.includes(point.id) ? <Icon name="close" className="text-xs" /> : null}
-                </button>
-              ))}
+            <div className="mb-3 flex items-center justify-between">
+              <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#45464d]">Selling Points</div>
               <button
                 type="button"
                 onClick={openSellingPointsEditor}
-                className="flex items-center gap-1 rounded-full border border-dashed border-[#c6c6cd] px-3 py-1.5 text-[11px] font-semibold text-[#45464d] hover:border-[#497cff] hover:text-[#497cff]"
+                className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#45464d] hover:text-[#497cff]"
               >
-                <Icon name="add" className="text-xs" />
-                Add Key Point
+                Edit
               </button>
+            </div>
+            <div className="rounded-2xl bg-white/80 p-3 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-[11px] font-semibold text-[#131b2e]">{selectedSellingPointIds.length} selected</div>
+                {activeBundle.sellingPoints.length > 0 ? (
+                  <div className="text-[10px] text-[#6a7186]">{activeBundle.sellingPoints.length} total</div>
+                ) : null}
+              </div>
+              <div className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto pr-1">
+                {activeBundle.sellingPoints.filter((point) => selectedSellingPointIds.includes(point.id)).slice(0, 8).map((point) => (
+                  <button
+                    key={point.id}
+                    type="button"
+                    onClick={() => toggleSellingPoint(point.id)}
+                    className="inline-flex max-w-full items-center gap-1 rounded-full bg-[#131b2e] px-2.5 py-1 text-[10px] font-semibold text-white"
+                  >
+                    <span className="truncate">{point.text}</span>
+                    <Icon name="close" className="text-[10px]" />
+                  </button>
+                ))}
+                {selectedSellingPointIds.length === 0 ? (
+                  <div className="text-[11px] text-[#6a7186]">No selling points selected.</div>
+                ) : null}
+                {selectedSellingPointIds.length > 8 ? (
+                  <div className="inline-flex items-center rounded-full bg-[#edf1ff] px-2.5 py-1 text-[10px] font-semibold text-[#45464d]">
+                    +{selectedSellingPointIds.length - 8} more
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
         </aside>
@@ -1639,6 +1721,8 @@ export function ProductStudioPage() {
       ? Math.min(100, Math.round((activeBatchJob.completedCount / Math.max(1, activeBatchJob.totalCount)) * 100))
       : 0;
     const totalFailures = activeBundle.batchJobs.reduce((sum, b) => sum + b.failedCount, 0);
+    const fixedInputAssets = batchFixedAssets;
+    const hasBatchSource = selectedBatchSourceIds.length > 0;
     return (
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Row 1: Pipeline hero + Config panel */}
@@ -1678,7 +1762,7 @@ export function ProductStudioPage() {
             </div>
             <div className="mt-5 grid grid-cols-4 gap-3">
               {[
-                { label: 'Queue Density', value: promptMode === 'multimodal' ? `${selectedSceneIds.length}` : `${batchCount}` },
+                { label: 'Run Count', value: hasBatchSource ? `${selectedBatchSourceIds.length}` : `${batchCount}` },
                 { label: 'Throughput', value: `${activeBundle.generatedImages.length} img` },
                 { label: 'Latency', value: 'Runtime' },
                 { label: 'Emergency Stop', value: null, isStop: true },
@@ -1720,7 +1804,6 @@ export function ProductStudioPage() {
                     setImageGenerateModel(promptConfig.imageGenerateModel || '');
                     setIntent(promptConfig.userIntent);
                     setRefinedPrompt(promptConfig.refinedPrompt);
-                    setAttachedImageIds(promptConfig.attachedImages.map((image) => image.sourceId).filter(Boolean) as string[]);
                     setWorkspaceTab('batch');
                   }}
                 >
@@ -1743,30 +1826,107 @@ export function ProductStudioPage() {
                   </div>
                 </div>
               </div>
-              {promptMode === 'multimodal' ? (
-                <div className="space-y-2">
-                  <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#45464d]">Scene Range</div>
-                  {activeBundle.sceneImages.map((scene) => (
-                    <label key={scene.id} className="flex items-center gap-3 rounded-xl bg-white px-3 py-2.5 text-xs text-[#45464d]">
-                      <input
-                        type="checkbox"
-                        checked={selectedSceneIds.includes(scene.id)}
-                        onChange={() => setSelectedSceneIds((current) =>
-                          current.includes(scene.id) ? current.filter((item) => item !== scene.id) : [...current, scene.id],
-                        )}
-                      />
-                      <span className="font-medium">{scene.sourceLabel}</span>
-                      <span className="ml-auto text-[10px] font-bold uppercase tracking-[0.16em] text-[#45464d]">{scene.status}</span>
-                    </label>
-                  ))}
+              <div className="space-y-3">
+                <div>
+                  <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#45464d]">Fixed Inputs</div>
+                  <div className="space-y-2 rounded-xl bg-white p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-[11px] text-[#6a7186]">Upload batch-only fixed images here. They do not come from Prompt Studio.</div>
+                      <button
+                        type="button"
+                        onClick={() => batchFixedInputRef.current?.click()}
+                        className="rounded-full bg-[#edf1ff] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#497cff]"
+                      >
+                        + Add
+                      </button>
+                    </div>
+                    {fixedInputAssets.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-[#d5daf3] px-3 py-4 text-xs text-[#6a7186]">
+                        No fixed batch images yet. If you leave this empty, batch will run from prompt text or from the batch source only.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2">
+                        {fixedInputAssets.map((asset, index) => (
+                          <div key={`fixed-${asset.id}`} className="relative overflow-hidden rounded-xl bg-[#f2f3ff]">
+                            <button
+                              type="button"
+                              onClick={() => setBatchFixedInputIds((current) => current.filter((item) => item !== asset.id))}
+                              className="absolute right-2 top-2 z-10 grid h-6 w-6 place-items-center rounded-full bg-[#131b2e]/80 text-white"
+                              title="Remove fixed input"
+                            >
+                              <Icon name="close" className="text-sm" />
+                            </button>
+                            <div className="aspect-square overflow-hidden bg-[#eaedff]">
+                              {resolveDisplayUrl(displayImageMap, asset.fileUrl) ? (
+                                <img src={resolveDisplayUrl(displayImageMap, asset.fileUrl)} alt={asset.label} className="h-full w-full object-cover" />
+                              ) : (
+                                <div className="flex h-full items-center justify-center"><Icon name="image" className="text-3xl text-[#c6c6cd]" /></div>
+                              )}
+                            </div>
+                            <div className="space-y-1 p-2">
+                              <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#497cff]">Fixed {index + 1}</div>
+                              <div className="truncate text-[11px] font-semibold text-[#131b2e]">{asset.label}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              ) : (
+                <div>
+                  <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#45464d]">Batch Source</div>
+                  <div className="space-y-2 rounded-xl bg-white p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-[11px] text-[#6a7186]">These are the images batch will rotate through. Pick any number of uploaded source images.</div>
+                      <button
+                        type="button"
+                        onClick={() => batchSourceInputRef.current?.click()}
+                        className="rounded-full bg-[#edf1ff] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#497cff]"
+                      >
+                        + Add
+                      </button>
+                    </div>
+                    {batchSourceAssets.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-[#d5daf3] px-3 py-4 text-xs text-[#6a7186]">
+                        No batch source images yet. If you leave this empty, batch will generate multiple variants from the same prompt.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {batchSourceAssets.map((asset) => (
+                          <label key={asset.id} className="flex items-center gap-3 rounded-xl bg-[#f7f8ff] px-3 py-2.5 text-xs text-[#45464d]">
+                            <input
+                              type="checkbox"
+                              checked={selectedBatchSourceIds.includes(asset.id)}
+                              onChange={() => setSelectedBatchSourceIds((current) =>
+                                current.includes(asset.id) ? current.filter((item) => item !== asset.id) : [...current, asset.id],
+                              )}
+                            />
+                            <div className="h-10 w-10 overflow-hidden rounded-lg bg-[#eaedff]">
+                              {resolveDisplayUrl(displayImageMap, asset.fileUrl) ? (
+                                <img src={resolveDisplayUrl(displayImageMap, asset.fileUrl)} alt={asset.label} className="h-full w-full object-cover" />
+                              ) : (
+                                <div className="flex h-full items-center justify-center"><Icon name="image" className="text-lg text-[#c6c6cd]" /></div>
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-[11px] font-semibold text-[#131b2e]">{asset.label}</div>
+                              <div className="text-[10px] text-[#6a7186]">Uploaded batch source</div>
+                            </div>
+                            <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#45464d]">
+                              {asset.status}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
                 <label className="block">
-                  <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#45464d]">Variant Count</div>
+                  <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#45464d]">Fallback Variant Count</div>
                   <input type="range" min={2} max={12} value={batchCount} onChange={(event) => setBatchCount(Number(event.target.value))} className="w-full" />
-                  <div className="mt-1 text-xs text-[#45464d]">{batchCount} text-to-image variants</div>
+                  <div className="mt-1 text-xs text-[#45464d]">{batchCount} prompt-only variants when no batch source is selected</div>
                 </label>
-              )}
+              </div>
               <div className="flex flex-wrap gap-2">
                 <ActionButton label="Start Batch" tone="primary" onClick={startBatch} disabled={Boolean(busyLabel)} />
                 <ActionButton label="Pause" onClick={pauseBatch} disabled={!runningBatchJobId || batchPaused} />
@@ -2015,6 +2175,8 @@ export function ProductStudioPage() {
     >
       <input ref={referenceInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(event) => { void handleReferenceFilesSelected(event); }} />
       <input ref={sceneInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(event) => { void handleSceneFilesSelected(event); }} />
+      <input ref={batchFixedInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(event) => { void handleBatchFixedFilesSelected(event); }} />
+      <input ref={batchSourceInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(event) => { void handleBatchSourceFilesSelected(event); }} />
 
       {/* Sidebar */}
       <aside className="flex h-full w-64 shrink-0 flex-col bg-white border-r border-[#c6c6cd]/20">

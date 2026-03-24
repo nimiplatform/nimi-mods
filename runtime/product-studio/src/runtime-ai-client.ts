@@ -288,22 +288,14 @@ export async function generateProductStudioPreview(input: ProductStudioPreviewGe
   };
 }
 
-function replaceSceneInputImages(
+function appendBatchSourceInputImage(
   inputImages: ProductStudioPromptInputImageRef[],
-  sceneImage: ProductStudioPromptInputImageRef,
+  batchSourceImage: ProductStudioPromptInputImageRef,
 ): ProductStudioPromptInputImageRef[] {
-  let replaced = false;
-  const next = inputImages.map((image) => {
-    if (image.sourceType !== 'scene') {
-      return image;
-    }
-    replaced = true;
-    return sceneImage;
-  });
-  if (!replaced) {
-    next.push(sceneImage);
-  }
-  return next;
+  return [
+    ...inputImages.filter((image) => !(image.sourceType === batchSourceImage.sourceType && image.sourceId === batchSourceImage.sourceId)),
+    batchSourceImage,
+  ];
 }
 
 type ProductStudioBatchRunController = {
@@ -355,7 +347,7 @@ export async function runProductStudioBatchGeneration(input: {
   promptText: string;
   appliedSellingPoints: ProductStudioSellingPoint[];
   baseInputImages: ProductStudioPromptInputImageRef[];
-  sceneRuns: Array<{ sceneId: string; sceneRef: ProductStudioPromptInputImageRef; title: string }>;
+  sourceRuns: Array<{ sourceId: string; sourceRef: ProductStudioPromptInputImageRef; title: string }>;
   variantCount: number;
   controller?: ProductStudioBatchRunController;
   onProgress?: (payload: {
@@ -371,7 +363,10 @@ export async function runProductStudioBatchGeneration(input: {
   const createdAt = new Date().toISOString();
   const batchJobId = input.batchJobId || createProductStudioId('batch');
   const batchMode = input.promptConfig.generationMode;
-  const runCount = batchMode === 'multimodal' ? input.sceneRuns.length : input.variantCount;
+  const hasSourceRuns = input.sourceRuns.length > 0;
+  const runCount = batchMode === 'multimodal'
+    ? (hasSourceRuns ? input.sourceRuns.length : input.variantCount)
+    : input.variantCount;
   const generatedImages: ProductStudioGeneratedImage[] = [];
   const logs: string[] = [];
   let completedCount = 0;
@@ -381,7 +376,9 @@ export async function runProductStudioBatchGeneration(input: {
     id: batchJobId,
     projectId: input.projectId,
     promptConfigId: input.promptConfig.id,
-    title: batchMode === 'multimodal' ? 'Scene Replacement Run' : 'Prompt Variant Run',
+    title: batchMode === 'multimodal'
+      ? (hasSourceRuns ? 'Batch Source Run' : 'Fixed Input Variant Run')
+      : 'Prompt Variant Run',
     status: input.controller?.isCancelled()
       ? 'CANCELLED'
       : completedCount + failedCount < runCount
@@ -393,8 +390,8 @@ export async function runProductStudioBatchGeneration(input: {
     completedCount,
     failedCount,
     concurrency: 1,
-    sceneImageIds: input.sceneRuns.map((item) => item.sceneId),
-    batchSize: batchMode === 'text-to-image' ? input.variantCount : undefined,
+    sceneImageIds: input.sourceRuns.map((item) => item.sourceId),
+    batchSize: !hasSourceRuns ? input.variantCount : undefined,
     createdAt,
     startedAt: createdAt,
     completedAt: completedCount + failedCount >= runCount || input.controller?.isCancelled() ? new Date().toISOString() : undefined,
@@ -414,15 +411,12 @@ export async function runProductStudioBatchGeneration(input: {
       logs.push('Batch cancelled by user.');
       break;
     }
-    const sceneRun = batchMode === 'multimodal' ? input.sceneRuns[index] : null;
-    const inputImages = batchMode === 'multimodal' && sceneRun
-      ? replaceSceneInputImages(input.baseInputImages, sceneRun.sceneRef)
+    const sourceRun = batchMode === 'multimodal' && hasSourceRuns ? input.sourceRuns[index] : null;
+    const inputImages = batchMode === 'multimodal'
+      ? (sourceRun ? appendBatchSourceInputImage(input.baseInputImages, sourceRun.sourceRef) : input.baseInputImages)
       : [];
-    const orderedInputImages = batchMode === 'multimodal'
-      ? orderMultimodalInputImages(inputImages)
-      : inputImages;
     try {
-      const resolvedInputImages = await resolveRuntimeInputImages(orderedInputImages);
+      const resolvedInputImages = await resolveRuntimeInputImages(inputImages);
       const route = await runtimeClient.route.resolve({ capability: 'image.generate' });
       const job = await runtimeClient.media.jobs.submit({
         modal: 'image',
@@ -451,19 +445,19 @@ export async function runProductStudioBatchGeneration(input: {
         projectId: input.projectId,
         batchJobId,
         promptConfigId: input.promptConfig.id,
-        sourceSceneImageId: sceneRun?.sceneId,
+        sourceSceneImageId: sourceRun?.sourceRef.sourceType === 'scene' ? sourceRun.sourceId : undefined,
         generationMode: batchMode,
         fileUrl,
-        title: sceneRun?.title || `Variant ${index + 1}`,
+        title: sourceRun?.title || `Variant ${index + 1}`,
         actualPrompt: input.promptText,
-        inputImageSnapshot: orderedInputImages,
+        inputImageSnapshot: inputImages,
         appliedSellingPoints: input.appliedSellingPoints.filter((item) => item.isActive).map((item) => item.text),
         status: 'success',
         traceId: lastTraceId || undefined,
         createdAt: new Date().toISOString(),
       });
       logs.push(batchMode === 'multimodal'
-        ? `${sceneRun?.title || `Scene ${index + 1}`} completed`
+        ? `${sourceRun?.title || `Source ${index + 1}`} completed`
         : `Variant ${index + 1} completed`);
       input.onProgress?.({
         batchJob: buildBatchJob(),
@@ -481,7 +475,7 @@ export async function runProductStudioBatchGeneration(input: {
         stage: 'gen-execute',
       });
       logs.push(batchMode === 'multimodal'
-        ? `${sceneRun?.title || `Scene ${index + 1}`} failed: ${envelope.reasonCode}`
+        ? `${sourceRun?.title || `Source ${index + 1}`} failed: ${envelope.reasonCode}`
         : `Variant ${index + 1} failed: ${envelope.reasonCode}`);
       input.onProgress?.({ batchJob: buildBatchJob() });
     }
