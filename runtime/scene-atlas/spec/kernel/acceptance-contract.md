@@ -10,7 +10,7 @@
 **覆盖用例**: SA-001 ~ SA-003
 
 **验收条件**:
-- 导入第一张图片时隐式创建 `MaterialPack draft`
+- 导入第一张图片时隐式创建 `ScenePack draft`
 - 导图本身不自动触发 `Generate Scene`
 - 一次 `Generate Scene` 只产出一个 `SceneCard`
 
@@ -37,7 +37,7 @@
 **验收条件**:
 - `isReady` 与 `readinessIssues[]` 根据硬条件自动派生
 - 非 ready pack 不得发布
-- `MaterialPack` 发布后继续编辑的是 pack，不是 asset
+- `ScenePack` 发布后继续编辑的是 pack，不是 asset
 
 ## SA-ACC-005 — pack 顺序与清理验收门
 

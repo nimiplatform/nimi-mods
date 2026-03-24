@@ -59,7 +59,7 @@ Scene-Atlas 通过 Desktop mod UI 槽位接入宿主。
 
 ## SA-CAP-008 — 发布交接边界
 
-Scene-Atlas 只负责 material 侧发布交接，不负责上层 market 侧编辑与流通治理。
+Scene-Atlas 只负责 ScenePack 的发布交接，不负责上层 market 侧编辑与流通治理。
 
 **规则**:
 - Scene-Atlas 可发起 publish handoff

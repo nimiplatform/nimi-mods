@@ -14,7 +14,7 @@ Scene-Atlas 的默认流程是 pack-first，而不是 card-first。
 **规则**:
 - 每次只处理一张导入图片。
 - 导入图片不会自动触发生成；用户必须显式执行一次 `Generate Scene`。
-- 首次导图时隐式创建 `MaterialPack draft`。
+- 首次导图时隐式创建 `ScenePack draft`。
 - 一次 `Generate Scene` 只生成一个 `SceneCard`，并自动加入当前 pack。
 - 生成后的文本语义字段允许编辑；文本编辑不触发重新生成。
 
@@ -27,7 +27,7 @@ Scene-Atlas 的风格控制是 pack-level，不是 card-level 自由漂移。
 **规则**:
 - 导入图片后，系统先提供一个 recommended style。
 - 用户可在首次生成前接受推荐 style、切换推荐 style 或补充自定义风格描述。
-- 首次成功生成后，当前 style 被写入 `MaterialPack.defaultStyle`。
+- 首次成功生成后，当前 style 被写入 `ScenePack.defaultStyle`。
 - 一旦 pack 内存在任意 `SceneCard`，`defaultStyle` 锁定。
 
 ## SA-PIPE-003 — SceneCard 结果替换策略
@@ -41,14 +41,14 @@ Scene-Atlas 不保留生成历史版本。
 
 ## SA-PIPE-004 — readiness 与发布交接
 
-`MaterialPack` readiness 是自动派生结果，不是手动阶段。
+`ScenePack` readiness 是自动派生结果，不是手动阶段。
 
 **步骤**: 见 `pipeline-states.yaml` -> `publish_readiness`
 
 **规则**:
 - 只有当 readiness 硬条件满足时，pack 才可发布。
 - `isReady` 与 `readinessIssues[]` 由系统自动计算。
-- 发布动作的主体是 `MaterialPack`，不是 `SceneCard`。
+- 发布动作的主体是 `ScenePack`，不是 `SceneCard`。
 
 ## SA-PIPE-005 — 空 draft pack 清理
 
@@ -62,7 +62,7 @@ Scene-Atlas 不保留生成历史版本。
 
 ## SA-PIPE-006 — 发布后编辑与再发布
 
-发布后继续编辑的是 material，不是 asset。
+发布后继续编辑的是 `ScenePack` 工作态，不是 asset。
 
 **步骤**: 见 `pipeline-states.yaml` -> `published_edit_policy`
 

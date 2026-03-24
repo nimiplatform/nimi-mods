@@ -22,8 +22,8 @@
 
 - 先修改 `kernel/tables/*.yaml`，再对齐 kernel/domain 文档，保持同一次变更。
 - 不允许在 `.md` 中重复定义已在 YAML 中定义的字段或枚举值，引用即可。
-- 不允许把 `material`、`asset`、`listing` 混成一个对象；`Scene-Atlas` 只定义 `material` 侧业务，不定义 `Asset-Market` 市场对象。
-- 不允许把 Realm `asset` 语义提前下沉到 `SceneCard` 或 `MaterialPack`；Scene-Atlas 必须停留在 mod 私有工作态与显式发布交接边界。
+- 不允许把 `SceneCard` / `ScenePack`、`asset`、`listing` 混成一个对象；`Scene-Atlas` 只定义私有场景工作态，不定义 `Asset-Market` 市场对象。
+- 不允许把 Realm `asset` 语义提前下沉到 `SceneCard` 或 `ScenePack`；Scene-Atlas 必须停留在 mod 私有工作态与显式发布交接边界。
 
 ## 建议验证
 

@@ -16,7 +16,7 @@ pipeline:
     - step: pack-draft-ensure
       order: 2
       type: deterministic
-      description: implicitly create or reuse the current MaterialPack draft after image import
+      description: implicitly create or reuse the current ScenePack draft after image import
       source_rule: SA-PIPE-001
     - step: style-preselect
       order: 3
@@ -31,7 +31,7 @@ pipeline:
     - step: scene-generate
       order: 5
       type: generation
-      description: explicit Generate Scene action creates one SceneCard and inserts it into the current MaterialPack
+      description: explicit Generate Scene action creates one SceneCard and inserts it into the current ScenePack
       source_rule: SA-PIPE-001
     - step: card-curate
       order: 6
@@ -66,15 +66,14 @@ publish_readiness:
   readiness_outputs:
     - isReady
     - readinessIssues
-  publish_unit: material-pack
+  publish_unit: scene-pack
   source_rule: SA-PIPE-004
 empty_draft_cleanup:
   retain_while_context_open: true
   delete_on_context_exit: true
   source_rule: SA-PIPE-005
 published_edit_policy:
-  material_pack_editable_after_publish: true
+  scene_pack_editable_after_publish: true
   asset_editable_in_scene_atlas: false
-  mapping_cardinality: one-pack-to-one-asset
   source_rule: SA-PIPE-006
 ```

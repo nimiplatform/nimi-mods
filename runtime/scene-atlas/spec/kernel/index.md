@@ -7,7 +7,7 @@
 
 Kernel 是 Scene-Atlas 唯一权威层，定义：
 
-- Scene-Atlas material object model
+- Scene-Atlas scene object model
 - 导入图片到场景素材的稳定流水线
 - mod 能力边界
 - readiness / publish handoff 约束

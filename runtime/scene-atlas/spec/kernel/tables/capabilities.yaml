@@ -18,11 +18,11 @@ capabilities:
     source_rule: SA-CAP-005
   - key: storage.sqlite.query
     direction: consume
-    purpose: query persisted MaterialPack and SceneCard working state
+    purpose: query persisted ScenePack and SceneCard working state
     source_rule: SA-CAP-006
   - key: storage.sqlite.execute
     direction: consume
-    purpose: persist MaterialPack, SceneCard, readiness, and ordering state
+    purpose: persist ScenePack, SceneCard, readiness, and ordering state
     source_rule: SA-CAP-006
   - key: storage.files.read
     direction: consume

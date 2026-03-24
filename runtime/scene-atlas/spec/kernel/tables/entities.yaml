@@ -55,9 +55,9 @@ entities:
       - 生成后的文本字段允许用户编辑
       - 图像结果修改通过重新生成完成，不通过手工替换图像完成
 
-  - entity: MaterialPack
+  - entity: ScenePack
     source_rule: SA-DOM-002
-    description: 一组可被整理、发布、流通的 material items 集合。
+    description: 一组按顺序组织的 SceneCard 集合。
     fields:
       - name: id
         type: ULID
@@ -127,7 +127,6 @@ entities:
         type: datetime
         required: false
     notes:
-      - MaterialPack 不定义 visibility 字段
-      - 只有 MaterialPack 可进入发布交接
-      - 已发布后继续编辑的是 MaterialPack，而不是上层 asset
-      - 一个 MaterialPack 只对应一个 asset
+      - ScenePack 不定义 visibility 字段
+      - 只有 ScenePack 可进入发布交接
+      - 已发布后继续编辑的是 ScenePack，而不是上层 asset

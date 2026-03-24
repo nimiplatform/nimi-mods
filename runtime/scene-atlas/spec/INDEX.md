@@ -11,7 +11,7 @@
 
 ## Task-Oriented Read Path
 
-### Change material object model or publish boundary
+### Change scene object model or publish boundary
 
 1. `spec/kernel/domain-contract.md`
 2. `spec/kernel/tables/entities.yaml`

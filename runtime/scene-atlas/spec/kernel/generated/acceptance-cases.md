@@ -7,7 +7,7 @@
 version: 1
 cases:
   - id: SA-001-IMPLICIT-DRAFT-PACK
-    description: 导入第一张图片时，系统隐式创建一个 MaterialPack draft。
+    description: 导入第一张图片时，系统隐式创建一个 ScenePack draft。
     expected_ok: true
     source_rule: SA-ACC-001
   - id: SA-002-NO-AUTO-GENERATE-ON-IMPORT
@@ -15,11 +15,11 @@ cases:
     expected_ok: true
     source_rule: SA-ACC-001
   - id: SA-003-ONE-GENERATE-ONE-SCENE-CARD
-    description: 一次 Generate Scene 只生成一个 SceneCard，并自动加入当前 MaterialPack。
+    description: 一次 Generate Scene 只生成一个 SceneCard，并自动加入当前 ScenePack。
     expected_ok: true
     source_rule: SA-ACC-001
   - id: SA-004-FIRST-SUCCESS-LOCKS-DEFAULT-STYLE
-    description: 首次成功生成后，MaterialPack.defaultStyle 被确定并锁定。
+    description: 首次成功生成后，ScenePack.defaultStyle 被确定并锁定。
     expected_ok: true
     source_rule: SA-ACC-002
   - id: SA-005-STYLE-CHANGE-REQUIRES-EMPTY-PACK
@@ -36,25 +36,25 @@ cases:
     expected_ok: true
     source_rule: SA-ACC-003
   - id: SA-008-READINESS-DERIVED-AUTOMATICALLY
-    description: MaterialPack 的 isReady 和 readinessIssues 由系统自动计算，不依赖用户手动标记 ready。
+    description: ScenePack 的 isReady 和 readinessIssues 由系统自动计算，不依赖用户手动标记 ready。
     expected_ok: true
     required_fields:
       - isReady
       - readinessIssues
     source_rule: SA-ACC-004
   - id: SA-009-PUBLISH-BLOCKED-WHEN-NOT-READY
-    description: 非 ready 的 MaterialPack 不得发布，并返回 SA_PUBLISH_NOT_READY 与 readinessIssues。
+    description: 非 ready 的 ScenePack 不得发布，并返回 SA_PUBLISH_NOT_READY 与 readinessIssues。
     expected_ok: false
     reason_code: SA_PUBLISH_NOT_READY
     required_fields:
       - readinessIssues
     source_rule: SA-ACC-004
   - id: SA-010-PUBLISHED-PACK-EDITS-MATERIAL-NOT-ASSET
-    description: 已发布 pack 的后续编辑发生在 MaterialPack 工作态中，而不是直接修改 asset。
+    description: 已发布 pack 的后续编辑发生在 ScenePack 工作态中，而不是直接修改 asset。
     expected_ok: true
     source_rule: SA-ACC-004
   - id: SA-011-ORDER-PRESERVED-FOR-NARRATIVE-CONSUMPTION
-    description: MaterialPack 中 SceneCard 的顺序必须被保留，供展示和叙事下游消费使用。
+    description: ScenePack 中 SceneCard 的顺序必须被保留，供展示和叙事下游消费使用。
     expected_ok: true
     source_rule: SA-ACC-005
   - id: SA-012-EMPTY-DRAFT-DELETES-ON-EXIT
