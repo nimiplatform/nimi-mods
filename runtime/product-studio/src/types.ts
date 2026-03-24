@@ -94,6 +94,8 @@ export type ProductStudioBatchJob = {
   createdAt: string;
   logs: string[];
   traceId?: string;
+  outputDirectoryKey?: string;
+  outputDirectoryLabel?: string;
 };
 
 export type ProductStudioGeneratedImage = {
@@ -114,6 +116,13 @@ export type ProductStudioGeneratedImage = {
   rating?: number;
   traceId?: string;
   createdAt: string;
+  outputDirectoryKey?: string;
+  outputDirectoryLabel?: string;
+  outputFileName?: string;
+};
+
+export type ProductStudioStorageSettings = {
+  generatedOutputSubfolder?: string;
 };
 
 export type ProductStudioSnapshot = {
@@ -125,6 +134,7 @@ export type ProductStudioSnapshot = {
   promptConfigs: ProductStudioPromptConfig[];
   batchJobs: ProductStudioBatchJob[];
   generatedImages: ProductStudioGeneratedImage[];
+  settings?: ProductStudioStorageSettings;
 };
 
 export type ProductStudioProjectBundle = {
@@ -155,4 +165,5 @@ export type ProductStudioPreviewGenerationInput = {
   appliedSellingPoints: string[];
   title: string;
   sourceSceneImageId?: string;
+  outputSubfolder?: string;
 };

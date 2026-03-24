@@ -48,10 +48,20 @@ function extensionFromMimeType(mimeType: string): string {
   return 'webp';
 }
 
-function createStoragePath(bucket: PersistBucket, mimeType: string): string {
+function normalizeSubfolder(value?: string): string {
+  return String(value || '')
+    .trim()
+    .replace(/^[./\\\s]+|[./\\\s]+$/g, '')
+    .replace(/[^a-zA-Z0-9/_-]+/g, '-')
+    .replace(/\/+/g, '/');
+}
+
+function createStoragePath(bucket: PersistBucket, mimeType: string, subfolder?: string): string {
   const extension = extensionFromMimeType(mimeType);
   const nonce = Math.random().toString(36).slice(2, 10);
-  return `images/${bucket}/${Date.now().toString(36)}-${nonce}.${extension}`;
+  const normalizedSubfolder = bucket === 'generated' ? normalizeSubfolder(subfolder) : '';
+  const prefix = normalizedSubfolder ? `images/${bucket}/${normalizedSubfolder}` : `images/${bucket}`;
+  return `${prefix}/${Date.now().toString(36)}-${nonce}.${extension}`;
 }
 
 async function readStoredBlob(path: string): Promise<Blob> {
@@ -104,9 +114,10 @@ export async function persistBrowserFileImage(input: {
 export async function persistArtifactImage(input: {
   artifact: ProductStudioArtifact;
   bucket: PersistBucket;
+  subfolder?: string;
 }): Promise<string> {
   const mimeType = String(input.artifact.mimeType || '').trim() || 'image/png';
-  const path = createStoragePath(input.bucket, mimeType);
+  const path = createStoragePath(input.bucket, mimeType, input.subfolder);
   if (input.artifact.bytes && input.artifact.bytes.length > 0) {
     await getFileStorage().writeBytes(path, input.artifact.bytes);
     return path;
@@ -146,4 +157,12 @@ export async function resolveImageUrlForRuntime(imageUrl: string): Promise<strin
     return normalized;
   }
   return await blobToDataUrl(await readStoredBlob(normalized));
+}
+
+export async function deleteStoredImage(imageUrl: string): Promise<void> {
+  const normalized = String(imageUrl || '').trim();
+  if (!normalized || isDirectImageUrl(normalized)) {
+    return;
+  }
+  await getFileStorage().delete(normalized);
 }

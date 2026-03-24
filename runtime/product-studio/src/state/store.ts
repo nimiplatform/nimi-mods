@@ -8,6 +8,7 @@ import type {
   ProductStudioReferenceImage,
   ProductStudioSceneImage,
   ProductStudioSellingPoint,
+  ProductStudioStorageSettings,
   ProductStudioSnapshot,
 } from '../types.js';
 import { loadProductStudioSnapshot, persistProductStudioSnapshot } from './indexed-db.js';
@@ -20,6 +21,9 @@ const listeners = new Set<() => void>();
 const state: ProductStudioStoreState = {
   snapshot: null,
 };
+const DEFAULT_STORAGE_SETTINGS: ProductStudioStorageSettings = {
+  generatedOutputSubfolder: '',
+};
 const EMPTY_PRODUCT_STUDIO_SNAPSHOT: ProductStudioSnapshot = {
   version: 1,
   projects: [],
@@ -29,6 +33,7 @@ const EMPTY_PRODUCT_STUDIO_SNAPSHOT: ProductStudioSnapshot = {
   promptConfigs: [],
   batchJobs: [],
   generatedImages: [],
+  settings: DEFAULT_STORAGE_SETTINGS,
 };
 
 let hydrationPromise: Promise<ProductStudioSnapshot> | null = null;
@@ -44,6 +49,13 @@ export function createProductStudioId(prefix: string): string {
 
 function cloneSnapshot(snapshot: ProductStudioSnapshot): ProductStudioSnapshot {
   return JSON.parse(JSON.stringify(snapshot)) as ProductStudioSnapshot;
+}
+
+function normalizeStorageSettings(settings?: ProductStudioStorageSettings): ProductStudioStorageSettings {
+  return {
+    ...DEFAULT_STORAGE_SETTINGS,
+    ...(settings || {}),
+  };
 }
 
 function demoArtwork(key: string): string {
@@ -121,6 +133,7 @@ export function getProductStudioSnapshot(): ProductStudioSnapshot {
 
 function normalizeLegacySnapshot(snapshot: ProductStudioSnapshot): ProductStudioSnapshot {
   const next = cloneSnapshot(snapshot);
+  next.settings = normalizeStorageSettings(next.settings);
 
   const projectHeroMap: Record<string, string> = {
     'project-aurora': demoArtwork('aurora-hero'),
@@ -393,6 +406,7 @@ async function createSeedSnapshot(): Promise<ProductStudioSnapshot> {
     promptConfigs,
     batchJobs,
     generatedImages,
+    settings: normalizeStorageSettings(),
   };
 }
 
@@ -666,4 +680,49 @@ export function upsertManyProductStudioGeneratedImages(images: ProductStudioGene
   for (const image of images) {
     addProductStudioGeneratedImage(image);
   }
+}
+
+export function updateProductStudioStorageSettings(settingsPatch: Partial<ProductStudioStorageSettings>): ProductStudioStorageSettings {
+  const snapshot = requireSnapshot();
+  const nextSettings = normalizeStorageSettings({
+    ...normalizeStorageSettings(snapshot.settings),
+    ...settingsPatch,
+  });
+  const nextSnapshot: ProductStudioSnapshot = {
+    ...snapshot,
+    settings: nextSettings,
+  };
+  setSnapshot(nextSnapshot);
+  return nextSettings;
+}
+
+export function removeProductStudioGeneratedImage(imageId: string): void {
+  const snapshot = requireSnapshot();
+  const target = snapshot.generatedImages.find((item) => item.id === imageId);
+  if (!target) {
+    return;
+  }
+  const nextGeneratedImages = snapshot.generatedImages.filter((item) => item.id !== imageId);
+  const remainingProjectGenerated = nextGeneratedImages.filter((item) => item.projectId === target.projectId && item.status === 'success');
+  const fallbackReference = snapshot.referenceImages.find((item) => item.projectId === target.projectId)?.fileUrl || '';
+  const fallbackScene = snapshot.sceneImages.find((item) => item.projectId === target.projectId)?.fileUrl || '';
+  const updatedAt = nowIso();
+  const nextSnapshot: ProductStudioSnapshot = {
+    ...snapshot,
+    projects: snapshot.projects.map((project) => {
+      if (project.id !== target.projectId) {
+        return project;
+      }
+      const nextHeroImageUrl = project.heroImageUrl === target.fileUrl
+        ? (remainingProjectGenerated[0]?.fileUrl || fallbackReference || fallbackScene || project.heroImageUrl)
+        : project.heroImageUrl;
+      return {
+        ...project,
+        heroImageUrl: nextHeroImageUrl,
+        updatedAt,
+      };
+    }),
+    generatedImages: nextGeneratedImages,
+  };
+  setSnapshot(nextSnapshot);
 }

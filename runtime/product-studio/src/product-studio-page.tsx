@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { parseRuntimeRouteOptions, type RuntimeRouteOptionsSnapshot } from '@nimiplatform/sdk/mod';
-import { persistBrowserFileImage, resolveImageUrlForDisplay } from './image-storage.js';
+import { PRODUCT_STUDIO_MOD_ID } from './contracts.js';
+import { deleteStoredImage, persistBrowserFileImage, resolveImageUrlForDisplay } from './image-storage.js';
 import { getProductStudioRuntimeClient } from './runtime-mod.js';
 import {
   addProductStudioGeneratedImage,
@@ -12,7 +13,9 @@ import {
   replaceProductStudioReferenceImages,
   replaceProductStudioSceneImages,
   replaceProductStudioSellingPoints,
+  removeProductStudioGeneratedImage,
   subscribeProductStudioStore,
+  updateProductStudioStorageSettings,
   upsertManyProductStudioGeneratedImages,
   upsertProductStudioBatchJob,
   upsertProductStudioPromptConfig,
@@ -21,7 +24,6 @@ import { generateProductStudioPreview, refineProductStudioPrompt, runProductStud
 import type {
   ProductStudioErrorEnvelope,
   ProductStudioGenerationMode,
-  ProductStudioProjectBundle,
   ProductStudioPromptConfig,
   ProductStudioPromptInputImageRef,
   ProductStudioSellingPoint,
@@ -29,7 +31,6 @@ import type {
 } from './types.js';
 
 type WorkspaceTab = 'prompt' | 'batch' | 'gallery';
-type GalleryView = 'grid' | 'compare';
 type EditorTab = 'visual' | 'json';
 type ShellSection = 'projects' | 'templates' | 'assets' | 'settings';
 type StudioAssetSelection = {
@@ -42,6 +43,23 @@ type StudioAssetSelection = {
 
 const headlineFont = '"Manrope", "Avenir Next", "Segoe UI", sans-serif';
 const bodyFont = '"Inter", "SF Pro Text", "Segoe UI", sans-serif';
+const BATCH_FIXED_NOTE = 'Uploaded from batch fixed inputs';
+const BATCH_SOURCE_NOTE = 'Uploaded from batch source inputs';
+const DEFAULT_OUTPUT_SUBFOLDER = '';
+
+function normalizeOutputSubfolder(value: string): string {
+  return String(value || '')
+    .trim()
+    .replace(/^[./\\\s]+|[./\\\s]+$/g, '')
+    .replace(/[^a-zA-Z0-9/_-]+/g, '-')
+    .replace(/\/+/g, '/');
+}
+
+function buildGeneratedOutputPath(subfolder?: string): string {
+  const normalized = normalizeOutputSubfolder(subfolder || '');
+  const base = `~/.nimi/data/mod-data/${PRODUCT_STUDIO_MOD_ID}/files/images/generated`;
+  return normalized ? `${base}/${normalized}/` : `${base}/`;
+}
 
 function ensureRouteOptionsSnapshotShape(snapshot: RuntimeRouteOptionsSnapshot | null): RuntimeRouteOptionsSnapshot | null {
   if (!snapshot) {
@@ -215,6 +233,36 @@ function sanitizeFileName(value: string): string {
   return normalized || 'product-studio-image';
 }
 
+function isBatchFixedAssetNote(value: string): boolean {
+  return String(value || '').trim() === BATCH_FIXED_NOTE;
+}
+
+function isBatchSourceAssetNote(value: string): boolean {
+  return String(value || '').trim() === BATCH_SOURCE_NOTE;
+}
+
+function isBatchOwnedAssetNote(value: string): boolean {
+  return isBatchFixedAssetNote(value) || isBatchSourceAssetNote(value);
+}
+
+function extractReferencedImageIndexes(value: string): number[] {
+  const indexes = new Set<number>();
+  const text = String(value || '');
+  for (const match of text.matchAll(/图\s*(\d+)/gu)) {
+    const numeric = Number(match[1]);
+    if (Number.isInteger(numeric) && numeric > 0) {
+      indexes.add(numeric);
+    }
+  }
+  for (const match of text.matchAll(/\bimage\s*(\d+)\b/giu)) {
+    const numeric = Number(match[1]);
+    if (Number.isInteger(numeric) && numeric > 0) {
+      indexes.add(numeric);
+    }
+  }
+  return [...indexes].sort((left, right) => left - right);
+}
+
 function extensionFromMimeType(mimeType: string): string {
   const normalized = String(mimeType || '').trim().toLowerCase();
   if (normalized === 'image/png') return 'png';
@@ -241,8 +289,8 @@ export function ProductStudioPage() {
   const [activeProjectId, setActiveProjectId] = useState('');
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>('prompt');
   const [searchQuery, setSearchQuery] = useState('');
-  const [galleryView, setGalleryView] = useState<GalleryView>('grid');
   const [templateName, setTemplateName] = useState('');
+  const [generatedOutputSubfolderDraft, setGeneratedOutputSubfolderDraft] = useState(DEFAULT_OUTPUT_SUBFOLDER);
   const [promptMode, setPromptMode] = useState<ProductStudioGenerationMode>('multimodal');
   const [promptOptimizeModel, setPromptOptimizeModel] = useState('');
   const [imageGenerateModel, setImageGenerateModel] = useState('');
@@ -335,6 +383,8 @@ export function ProductStudioPage() {
 
   const activeBundle = projectBundles.find((bundle) => bundle.project.id === activeProjectId) || projectBundles[0] || null;
   const activePromptConfig = activeBundle?.promptConfigs[0] || null;
+  const generatedOutputSubfolder = normalizeOutputSubfolder(snapshot.settings?.generatedOutputSubfolder || DEFAULT_OUTPUT_SUBFOLDER);
+  const generatedOutputPath = buildGeneratedOutputPath(generatedOutputSubfolder);
   const promptOptimizeModelMenu = useMemo(
     () => dedupeModels([promptOptimizeModel, defaultPromptOptimizeModel, ...promptOptimizeModelOptions]),
     [promptOptimizeModel, defaultPromptOptimizeModel, promptOptimizeModelOptions],
@@ -346,11 +396,23 @@ export function ProductStudioPage() {
   const effectivePromptMode: ProductStudioGenerationMode = attachedImageIds.length > 0 ? 'multimodal' : 'text-to-image';
 
   useEffect(() => {
+    setGeneratedOutputSubfolderDraft(generatedOutputSubfolder);
+  }, [generatedOutputSubfolder]);
+
+  useEffect(() => {
     if (!activeBundle) {
       return;
     }
     const promptConfig = activeBundle.promptConfigs[0];
-    const persistedAttachedIds = promptConfig?.attachedImages.map((image) => image.sourceId).filter(Boolean) as string[] || [];
+    const promptReferenceIds = activeBundle.referenceImages
+      .filter((image) => !isBatchOwnedAssetNote(image.note))
+      .map((image) => image.id);
+    const promptSceneIds = activeBundle.sceneImages
+      .filter((image) => !isBatchOwnedAssetNote(image.note))
+      .map((image) => image.id);
+    const promptAssetIdSet = new Set<string>([...promptReferenceIds, ...promptSceneIds]);
+    const persistedAttachedIds = (promptConfig?.attachedImages.map((image) => image.sourceId).filter(Boolean) as string[] || [])
+      .filter((imageId) => promptAssetIdSet.has(imageId));
     setTemplateName(promptConfig?.name || `${activeBundle.project.name} Template`);
     setPromptMode(promptConfig?.generationMode || 'multimodal');
     setPromptOptimizeModel(promptConfig?.promptOptimizeModel || '');
@@ -360,7 +422,7 @@ export function ProductStudioPage() {
     setAttachedImageIds(persistedAttachedIds);
     setSelectedSellingPointIds(activeBundle.sellingPoints.filter((item) => item.isActive).map((item) => item.id));
     setBatchFixedInputIds([]);
-    setSelectedBatchSourceIds(activeBundle.sceneImages.map((image) => image.id));
+    setSelectedBatchSourceIds(activeBundle.sceneImages.filter((image) => isBatchSourceAssetNote(image.note)).map((image) => image.id));
     setPreviewAssetId(activeBundle.generatedImages[0]?.id || '');
     setSelectedExportIds([]);
   }, [activeProjectId, activeBundle?.project.id]);
@@ -376,16 +438,16 @@ export function ProductStudioPage() {
     }
   }, []);
 
-  const allAssetIds = useMemo<Map<string, StudioAssetSelection>>(() => (
+  const promptAssetIds = useMemo<Map<string, StudioAssetSelection>>(() => (
     new Map<string, StudioAssetSelection>([
-      ...((activeBundle?.referenceImages || []).map((image) => [image.id, {
+      ...((activeBundle?.referenceImages || []).filter((image) => !isBatchOwnedAssetNote(image.note)).map((image) => [image.id, {
         id: image.id,
         fileUrl: image.fileUrl,
         label: image.label,
         note: image.note,
         sourceType: 'reference' as const,
       }] as const)),
-      ...((activeBundle?.sceneImages || []).map((image) => [image.id, {
+      ...((activeBundle?.sceneImages || []).filter((image) => !isBatchOwnedAssetNote(image.note)).map((image) => [image.id, {
         id: image.id,
         fileUrl: image.fileUrl,
         label: image.sourceLabel,
@@ -416,12 +478,14 @@ export function ProductStudioPage() {
   }, [pageView, projectBundles, activeBundle]);
   const displayImageMap = useResolvedImageMap(displayImageUrls);
   const promptInputAssets = useMemo(() => {
-    return attachedImageIds
-      .map((imageId) => allAssetIds.get(imageId))
+    const selected = attachedImageIds
+      .map((imageId) => promptAssetIds.get(imageId))
       .filter(Boolean) as StudioAssetSelection[];
-  }, [attachedImageIds, allAssetIds]);
+    const remaining = Array.from(promptAssetIds.values()).filter((asset) => !attachedImageIds.includes(asset.id));
+    return [...selected, ...remaining];
+  }, [attachedImageIds, promptAssetIds]);
   const batchFixedAssets = useMemo(() => (
-    (activeBundle?.referenceImages || []).filter((asset) => batchFixedInputIds.includes(asset.id)).map((asset) => ({
+    (activeBundle?.referenceImages || []).filter((asset) => isBatchFixedAssetNote(asset.note) && batchFixedInputIds.includes(asset.id)).map((asset) => ({
       id: asset.id,
       fileUrl: asset.fileUrl,
       label: asset.label,
@@ -430,7 +494,7 @@ export function ProductStudioPage() {
     }))
   ), [activeBundle, batchFixedInputIds]);
   const batchSourceAssets = useMemo(() => (
-    (activeBundle?.sceneImages || []).map((asset) => ({
+    (activeBundle?.sceneImages || []).filter((asset) => isBatchSourceAssetNote(asset.note)).map((asset) => ({
       id: asset.id,
       fileUrl: asset.fileUrl,
       label: asset.sourceLabel,
@@ -485,7 +549,7 @@ export function ProductStudioPage() {
 
   function buildAttachedImagesFromSelection(): ProductStudioPromptInputImageRef[] {
     return attachedImageIds.map((imageId) => {
-      const asset = allAssetIds.get(imageId);
+      const asset = promptAssetIds.get(imageId);
       if (!asset) {
         return null;
       }
@@ -528,6 +592,18 @@ export function ProductStudioPage() {
     return upsertProductStudioPromptConfig(draft);
   }
 
+  function validatePromptIntentInputs(input: { userIntent: string; selectedImageCount: number }): string | null {
+    const referencedIndexes = extractReferencedImageIndexes(input.userIntent);
+    if (referencedIndexes.length === 0) {
+      return null;
+    }
+    const highestReferencedIndex = referencedIndexes[referencedIndexes.length - 1] || 0;
+    if (highestReferencedIndex <= input.selectedImageCount) {
+      return null;
+    }
+    return `你的描述里提到了图${highestReferencedIndex}，但当前只选中了 ${input.selectedImageCount} 张图。先把需要的图都加进当前输入，再继续。`;
+  }
+
   async function handleReferenceFilesSelected(event: React.ChangeEvent<HTMLInputElement>) {
     if (!activeBundle) {
       return;
@@ -539,10 +615,12 @@ export function ProductStudioPage() {
     setBusyLabel('Importing reference images');
     try {
       const nextImages = [...activeBundle.referenceImages];
+      const nextSelectedIds: string[] = [];
       for (const file of files) {
         const fileUrl = await persistBrowserFileImage({ file, bucket: 'references' });
+        const id = createProductStudioId('ref');
         nextImages.push({
-          id: createProductStudioId('ref'),
+          id,
           projectId: activeBundle.project.id,
           fileUrl,
           label: file.name.replace(/\.[^.]+$/u, '') || 'Reference Image',
@@ -550,9 +628,11 @@ export function ProductStudioPage() {
           isDefault: nextImages.length === 0,
           createdAt: new Date().toISOString(),
         });
+        nextSelectedIds.push(id);
       }
       replaceProductStudioReferenceImages(activeBundle.project.id, nextImages);
-      setStatusBanner({ tone: 'info', text: `${files.length} image${files.length > 1 ? 's' : ''} added to the input library.` });
+      setAttachedImageIds((current) => [...current, ...nextSelectedIds]);
+      setStatusBanner({ tone: 'info', text: `${files.length} 张图已加入当前输入。` });
     } catch (error) {
       setStatusBanner({
         tone: 'error',
@@ -680,6 +760,75 @@ export function ProductStudioPage() {
     }
   }
 
+  function deleteBatchFixedImage(imageId: string) {
+    if (!activeBundle) {
+      return;
+    }
+    replaceProductStudioReferenceImages(
+      activeBundle.project.id,
+      activeBundle.referenceImages.filter((image) => image.id !== imageId),
+    );
+    setBatchFixedInputIds((current) => current.filter((item) => item !== imageId));
+    setAttachedImageIds((current) => current.filter((item) => item !== imageId));
+    setStatusBanner({ tone: 'info', text: 'Fixed batch image deleted.' });
+  }
+
+  function deleteBatchSourceImage(imageId: string) {
+    if (!activeBundle) {
+      return;
+    }
+    replaceProductStudioSceneImages(
+      activeBundle.project.id,
+      activeBundle.sceneImages.filter((image) => image.id !== imageId),
+    );
+    setSelectedBatchSourceIds((current) => current.filter((item) => item !== imageId));
+    setAttachedImageIds((current) => current.filter((item) => item !== imageId));
+    setStatusBanner({ tone: 'info', text: 'Batch source image deleted.' });
+  }
+
+  function deletePromptImage(asset: StudioAssetSelection) {
+    if (!activeBundle) {
+      return;
+    }
+    if (asset.sourceType === 'reference') {
+      replaceProductStudioReferenceImages(
+        activeBundle.project.id,
+        activeBundle.referenceImages.filter((image) => image.id !== asset.id),
+      );
+    } else {
+      replaceProductStudioSceneImages(
+        activeBundle.project.id,
+        activeBundle.sceneImages.filter((image) => image.id !== asset.id),
+      );
+    }
+    setAttachedImageIds((current) => current.filter((item) => item !== asset.id));
+    setStatusBanner({ tone: 'info', text: 'Prompt image deleted.' });
+  }
+
+  async function deleteGeneratedImage(imageId: string) {
+    if (!activeBundle) {
+      return;
+    }
+    const target = activeBundle.generatedImages.find((item) => item.id === imageId);
+    if (!target) {
+      return;
+    }
+    setBusyLabel('Deleting image');
+    try {
+      await deleteStoredImage(target.fileUrl);
+      removeProductStudioGeneratedImage(imageId);
+      setPreviewAssetId((current) => current === imageId ? '' : current);
+      setStatusBanner({ tone: 'info', text: 'Generated image deleted.' });
+    } catch (error) {
+      setStatusBanner({
+        tone: 'error',
+        text: error instanceof Error ? error.message : String(error || 'Failed to delete image'),
+      });
+    } finally {
+      setBusyLabel('');
+    }
+  }
+
   async function exportGallerySelection() {
     if (!activeBundle) {
       return;
@@ -749,6 +898,14 @@ export function ProductStudioPage() {
       setStatusBanner({ tone: 'error', text: 'User intent is required before AI prompt refinement.' });
       return;
     }
+    const inputValidationError = validatePromptIntentInputs({
+      userIntent: draft.userIntent,
+      selectedImageCount: draft.attachedImages.length,
+    });
+    if (inputValidationError) {
+      setStatusBanner({ tone: 'error', text: inputValidationError });
+      return;
+    }
     setBusyLabel('Optimizing prompt');
     try {
       const result = await refineProductStudioPrompt({
@@ -780,9 +937,29 @@ export function ProductStudioPage() {
     setStatusBanner({ tone: 'info', text: 'Prompt template saved to this project.' });
   }
 
+  function saveGeneratedOutputSubfolder() {
+    const normalized = normalizeOutputSubfolder(generatedOutputSubfolderDraft);
+    updateProductStudioStorageSettings({
+      generatedOutputSubfolder: normalized,
+    });
+    setGeneratedOutputSubfolderDraft(normalized);
+    setStatusBanner({
+      tone: 'info',
+      text: `Generated images will now be saved to ${buildGeneratedOutputPath(normalized)}`,
+    });
+  }
+
   async function previewGenerate() {
     const promptConfig = saveCurrentPromptConfig();
     if (!promptConfig || !activeBundle) {
+      return;
+    }
+    const inputValidationError = validatePromptIntentInputs({
+      userIntent: promptConfig.userIntent,
+      selectedImageCount: promptConfig.attachedImages.length,
+    });
+    if (inputValidationError) {
+      setStatusBanner({ tone: 'error', text: inputValidationError });
       return;
     }
     setBusyLabel('Generating preview');
@@ -798,6 +975,7 @@ export function ProductStudioPage() {
         appliedSellingPoints: selectedSellingPoints().map((item) => item.text),
         title: `${activeBundle.project.name} Preview`,
         sourceSceneImageId: sceneInput?.sourceId,
+        outputSubfolder: generatedOutputSubfolder,
       });
       addProductStudioGeneratedImage(generatedImage);
       setPreviewAssetId(generatedImage.id);
@@ -821,6 +999,7 @@ export function ProductStudioPage() {
       return;
     }
     const batchJobId = createProductStudioId('batch');
+    const batchOutputSubfolder = [generatedOutputSubfolder, 'batches', batchJobId].filter(Boolean).join('/');
     batchPausedRef.current = false;
     batchCancelledRef.current = false;
     currentProviderJobIdRef.current = '';
@@ -829,8 +1008,8 @@ export function ProductStudioPage() {
     setBusyLabel('Running batch');
     try {
       const fixedInputImages = batchFixedInputIds
-        .map((imageId) => allAssetIds.get(imageId))
-        .filter((asset): asset is StudioAssetSelection => Boolean(asset))
+        .map((imageId) => batchFixedAssets.find((asset) => asset.id === imageId))
+        .filter((asset): asset is (typeof batchFixedAssets)[number] => Boolean(asset))
         .map((asset) => ({
           sourceType: asset.sourceType,
           sourceId: asset.id,
@@ -863,6 +1042,7 @@ export function ProductStudioPage() {
         baseInputImages: fixedInputImages,
         sourceRuns,
         variantCount: batchCount,
+        outputSubfolder: batchOutputSubfolder,
         controller: {
           isPaused: () => batchPausedRef.current,
           isCancelled: () => batchCancelledRef.current,
@@ -1048,14 +1228,6 @@ export function ProductStudioPage() {
 
   function removeEditorPoint(id: string) {
     setEditorDraft((current) => current.filter((item) => item.id !== id));
-  }
-
-  function updateGeneratedImage(id: string, patch: Partial<ProductStudioProjectBundle['generatedImages'][number]>) {
-    const target = activeBundle?.generatedImages.find((item) => item.id === id);
-    if (!target) {
-      return;
-    }
-    addProductStudioGeneratedImage({ ...target, ...patch });
   }
 
   function renderDashboard() {
@@ -1436,6 +1608,67 @@ export function ProductStudioPage() {
             ))}
           </div>
         </div>
+
+        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="rounded-2xl bg-white p-6 shadow-[0_4px_12px_rgba(15,23,42,0.05)]">
+            <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#45464d]">Generated Output</div>
+            <h3 className="mt-2 text-lg font-bold text-[#131b2e]" style={{ fontFamily: headlineFont }}>Where new images are saved</h3>
+            <p className="mt-2 text-sm leading-7 text-[#45464d]">
+              Product Studio saves generated images into its local workspace folder first. You can organize them under a custom subfolder below.
+            </p>
+            <div className="mt-5 rounded-2xl bg-[#f7f8ff] px-4 py-3 text-sm text-[#131b2e]">
+              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#6a7186]">Current save path</div>
+              <div className="mt-2 break-all font-semibold">{generatedOutputPath}</div>
+            </div>
+            <div className="mt-5">
+              <label className="block">
+                <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[#45464d]">Custom output subfolder</div>
+                <input
+                  value={generatedOutputSubfolderDraft}
+                  onChange={(event) => setGeneratedOutputSubfolderDraft(event.target.value)}
+                  placeholder="Leave empty to save directly into generated/"
+                  className="w-full rounded-xl border border-[#d9ddf5] bg-white px-4 py-3 text-sm text-[#131b2e] outline-none"
+                />
+              </label>
+              <div className="mt-2 text-xs text-[#6a7186]">
+                Example: <span className="font-semibold">campaigns/march-launch</span>
+              </div>
+            </div>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={saveGeneratedOutputSubfolder}
+                className="rounded-xl px-4 py-2.5 text-sm font-bold text-white"
+                style={{ backgroundImage: signatureGradient }}
+              >
+                Save Output Folder
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setGeneratedOutputSubfolderDraft(DEFAULT_OUTPUT_SUBFOLDER);
+                  updateProductStudioStorageSettings({ generatedOutputSubfolder: DEFAULT_OUTPUT_SUBFOLDER });
+                  setStatusBanner({
+                    tone: 'info',
+                    text: `Generated images will now be saved to ${buildGeneratedOutputPath(DEFAULT_OUTPUT_SUBFOLDER)}`,
+                  });
+                }}
+                className="rounded-xl bg-[#edf1ff] px-4 py-2.5 text-sm font-semibold text-[#45464d]"
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-white p-6 shadow-[0_4px_12px_rgba(15,23,42,0.05)]">
+            <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#45464d]">Notes</div>
+            <div className="mt-4 space-y-3 text-sm leading-7 text-[#45464d]">
+              <p>Old images stay where they were originally saved. New images use the latest folder setting.</p>
+              <p>Deleting from Gallery removes both the Gallery record and the actual saved file.</p>
+              <p>If you want files in another place outside Product Studio, use export after generation.</p>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -1460,18 +1693,22 @@ export function ProductStudioPage() {
                 </div>
               ) : null}
               {promptInputAssets.map((asset) => (
-                <button
+                <div
                   key={asset.id}
-                  type="button"
-                  onClick={() => toggleAttachedImage(asset.id)}
                   className={`group relative aspect-square overflow-hidden rounded-xl bg-[#eaedff] text-left transition-all ${attachedImageIds.includes(asset.id) ? 'ring-2 ring-[#497cff]' : 'hover:ring-2 hover:ring-[#d5dfff]'}`}
                 >
+                  <button
+                    type="button"
+                    onClick={() => toggleAttachedImage(asset.id)}
+                    className="absolute inset-0 z-0"
+                    aria-label={attachedImageIds.includes(asset.id) ? `Remove ${asset.label} from prompt inputs` : `Add ${asset.label} to prompt inputs`}
+                  />
                   {resolveDisplayUrl(displayImageMap, asset.fileUrl) ? (
                     <img src={resolveDisplayUrl(displayImageMap, asset.fileUrl)} alt={asset.label} className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full items-center justify-center"><Icon name="image" className="text-2xl text-[#c6c6cd]" /></div>
                   )}
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#0f172a]/75 to-transparent px-2 pb-2 pt-6">
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#0f172a]/75 to-transparent px-2 pb-2 pt-6">
                     <div className="truncate text-[11px] font-bold text-white">{asset.label}</div>
                     <div className="text-[10px] text-white/80">{asset.sourceType === 'scene' ? 'Scene asset' : 'Uploaded image'}</div>
                   </div>
@@ -1481,19 +1718,19 @@ export function ProductStudioPage() {
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation();
-                          toggleAttachedImage(asset.id);
+                          deletePromptImage(asset);
                         }}
-                        className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-[#131b2e]/85 text-white"
-                        title="Remove from input"
+                        className="absolute right-2 top-2 z-10 grid h-6 w-6 place-items-center rounded-full bg-[#131b2e]/85 text-white"
+                        title="Delete image"
                       >
                         <Icon name="close" className="text-sm" />
                       </button>
-                      <div className="absolute right-10 top-2 grid min-h-[22px] min-w-[22px] place-items-center rounded-full bg-[#497cff] px-1 text-[10px] font-bold text-white">
+                      <div className="pointer-events-none absolute right-10 top-2 z-10 grid min-h-[22px] min-w-[22px] place-items-center rounded-full bg-[#497cff] px-1 text-[10px] font-bold text-white">
                         {attachedImageIds.indexOf(asset.id) + 1}
                       </div>
                     </>
                   ) : null}
-                </button>
+                </div>
               ))}
               <button
                 type="button"
@@ -1628,12 +1865,36 @@ export function ProductStudioPage() {
                   <Icon name="auto_fix_high" className="text-base text-[#d0bcff]" fill />
                   <div className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#d0bcff]">AI Optimized Prompt</div>
                 </div>
+                <div className="mb-3 text-[11px] text-[#d9dcff]">
+                  You can edit this prompt before generating. Selected selling points below will also be applied during generation.
+                </div>
                 <textarea
                   value={refinedPrompt}
                   onChange={(event) => setRefinedPrompt(event.target.value)}
                   className="min-h-[120px] w-full resize-none bg-transparent text-sm leading-7 text-[#eef0ff] outline-none"
                   placeholder="AI-optimized prompt will appear here..."
                 />
+                <div className="mt-4 rounded-2xl bg-white/8 p-4">
+                  <div className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#d0bcff]">
+                    Selling Points Added During Generation
+                  </div>
+                  {selectedSellingPoints().length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {selectedSellingPoints().map((point) => (
+                        <div
+                          key={`prompt-selling-point-${point.id}`}
+                          className="max-w-full rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[11px] leading-5 text-[#eef0ff]"
+                        >
+                          {point.text}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-[11px] text-[#d9dcff]">
+                      No selling points selected. Generation will use only the prompt text.
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* 2-col preview */}
@@ -1641,9 +1902,9 @@ export function ProductStudioPage() {
                 <div>
                   <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[#45464d]">Primary Input</div>
                   <div className="aspect-[4/3] overflow-hidden rounded-2xl bg-[#eaedff]">
-                    {resolveDisplayUrl(displayImageMap, allAssetIds.get(attachedImageIds[0] || '')?.fileUrl || activeBundle.project.heroImageUrl) ? (
+                    {resolveDisplayUrl(displayImageMap, promptAssetIds.get(attachedImageIds[0] || '')?.fileUrl || activeBundle.project.heroImageUrl) ? (
                       <img
-                        src={resolveDisplayUrl(displayImageMap, allAssetIds.get(attachedImageIds[0] || '')?.fileUrl || activeBundle.project.heroImageUrl)}
+                        src={resolveDisplayUrl(displayImageMap, promptAssetIds.get(attachedImageIds[0] || '')?.fileUrl || activeBundle.project.heroImageUrl)}
                         alt="Source"
                         className="h-full w-full object-cover"
                       />
@@ -1717,6 +1978,9 @@ export function ProductStudioPage() {
   function renderBatchWorkspace() {
     if (!activeBundle) return null;
     const activeBatchJob = activeBundle.batchJobs.find((item) => item.id === runningBatchJobId);
+    const nextBatchOutputPath = buildGeneratedOutputPath([generatedOutputSubfolder, 'batches', 'next-batch-id'].filter(Boolean).join('/'))
+      .replace('/next-batch-id/', '/<batch-id>/');
+    const currentBatchOutputLabel = activeBatchJob?.outputDirectoryLabel || activeBundle.batchJobs[0]?.outputDirectoryLabel || nextBatchOutputPath;
     const progressPct = activeBatchJob
       ? Math.min(100, Math.round((activeBatchJob.completedCount / Math.max(1, activeBatchJob.totalCount)) * 100))
       : 0;
@@ -1826,6 +2090,17 @@ export function ProductStudioPage() {
                   </div>
                 </div>
               </div>
+              <div>
+                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#45464d]">Batch Output Folder</div>
+                <div className="rounded-xl bg-white p-3">
+                  <div className="text-[11px] text-[#6a7186]">
+                    Each batch writes into its own dedicated output folder automatically so Gallery always points to the real files for that run.
+                  </div>
+                  <div className="mt-3 rounded-xl bg-[#f7f8ff] px-3 py-3 text-sm font-semibold text-[#131b2e]">
+                    {currentBatchOutputLabel}
+                  </div>
+                </div>
+              </div>
               <div className="space-y-3">
                 <div>
                   <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#45464d]">Fixed Inputs</div>
@@ -1850,9 +2125,9 @@ export function ProductStudioPage() {
                           <div key={`fixed-${asset.id}`} className="relative overflow-hidden rounded-xl bg-[#f2f3ff]">
                             <button
                               type="button"
-                              onClick={() => setBatchFixedInputIds((current) => current.filter((item) => item !== asset.id))}
+                              onClick={() => deleteBatchFixedImage(asset.id)}
                               className="absolute right-2 top-2 z-10 grid h-6 w-6 place-items-center rounded-full bg-[#131b2e]/80 text-white"
-                              title="Remove fixed input"
+                              title="Delete image"
                             >
                               <Icon name="close" className="text-sm" />
                             </button>
@@ -1915,6 +2190,18 @@ export function ProductStudioPage() {
                             <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#45464d]">
                               {asset.status}
                             </span>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                deleteBatchSourceImage(asset.id);
+                              }}
+                              className="grid h-7 w-7 place-items-center rounded-full text-[#8d91a0] hover:bg-[#e7ebff] hover:text-[#131b2e]"
+                              title="Delete image"
+                            >
+                              <Icon name="close" className="text-base" />
+                            </button>
                           </label>
                         ))}
                       </div>
@@ -1998,8 +2285,15 @@ export function ProductStudioPage() {
     if (!activeBundle) return null;
     return (
       <div className="mx-auto max-w-7xl space-y-6">
-        {/* Filters row */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#45464d]">Gallery</div>
+            <div className="mt-2 text-sm text-[#45464d]">
+              Generated images are saved in the local output area:
+              {' '}
+              <span className="font-semibold text-[#131b2e]">{generatedOutputPath}</span>
+            </div>
+          </div>
           <div className="flex flex-wrap gap-2">
             {[
               { label: 'All', value: 'all' as const },
@@ -2016,25 +2310,6 @@ export function ProductStudioPage() {
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-3">
-            <div className="inline-flex rounded-full bg-[#f2f3ff] p-1">
-              {(['grid', 'compare'] as GalleryView[]).map((view) => (
-                <button
-                  key={view}
-                  type="button"
-                  onClick={() => setGalleryView(view)}
-                  className={`rounded-full px-4 py-1.5 text-sm font-semibold transition-all ${galleryView === view ? 'bg-white text-[#131b2e] shadow-sm' : 'text-[#45464d]'}`}
-                >
-                  {view === 'grid' ? 'Grid' : 'Compare'}
-                </button>
-              ))}
-            </div>
-            <ActionButton
-              label={selectedExportIds.length > 0 ? `Export (${selectedExportIds.length})` : 'Export All'}
-              onClick={() => { void exportGallerySelection(); }}
-              disabled={Boolean(busyLabel) || activeGallery.length === 0}
-            />
-          </div>
         </div>
 
         {activeGallery.length === 0 ? (
@@ -2045,108 +2320,41 @@ export function ProductStudioPage() {
             <div className="text-sm font-semibold text-[#45464d]">No images yet</div>
             <div className="text-xs text-[#c6c6cd]">Generate from Prompt Studio to populate the gallery</div>
           </div>
-        ) : galleryView === 'grid' ? (
+        ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {activeGallery.map((item) => (
-              <button
+              <div
                 key={item.id}
-                type="button"
-                onClick={() => setPreviewAssetId(item.id)}
-                className="overflow-hidden rounded-2xl bg-white text-left shadow-[0_4px_16px_rgba(15,23,42,0.06)] transition-shadow hover:shadow-[0_12px_32px_rgba(15,23,42,0.12)]"
+                className="overflow-hidden rounded-2xl bg-white shadow-[0_4px_16px_rgba(15,23,42,0.06)]"
               >
                 <div className="relative">
                   {resolveDisplayUrl(displayImageMap, item.fileUrl) ? (
-                    <img src={resolveDisplayUrl(displayImageMap, item.fileUrl)} alt={item.title} className="h-52 w-full object-cover" />
+                    <img src={resolveDisplayUrl(displayImageMap, item.fileUrl)} alt={item.title} className="h-64 w-full object-cover" />
                   ) : (
-                    <div className="flex h-52 items-center justify-center bg-[#eaedff]">
+                    <div className="flex h-64 items-center justify-center bg-[#eaedff]">
                       <Icon name="image" className="text-4xl text-[#c6c6cd]" />
                     </div>
                   )}
-                  <div
-                    className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full border-2 border-white bg-white"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setSelectedExportIds((current) =>
-                        current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id],
-                      );
-                    }}
+                  <button
+                    type="button"
+                    onClick={() => { void deleteGeneratedImage(item.id); }}
+                    className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-[#131b2e]/85 text-white"
+                    title="Delete image"
                   >
-                    {selectedExportIds.includes(item.id) ? (
-                      <div className="h-4 w-4 rounded-full bg-[#497cff]" />
-                    ) : (
-                      <div className="h-4 w-4 rounded-full border-2 border-[#c6c6cd]" />
-                    )}
+                    <Icon name="close" className="text-sm" />
+                  </button>
+                </div>
+                <div className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-[#131b2e]">{item.title}</div>
+                    <div className="mt-1 text-xs text-[#6a7186]">{formatRelativeUpdate(item.createdAt)}</div>
+                  </div>
+                  <div className="rounded-full bg-[#eaedff] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#45464d]">
+                    {item.generationMode}
                   </div>
                 </div>
-                <div className="space-y-2 p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-sm font-semibold text-[#131b2e]">{item.title}</div>
-                    <div className="rounded-full bg-[#eaedff] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#45464d]">{item.generationMode}</div>
-                  </div>
-                  <div className="text-xs text-[#45464d]">{formatRelativeUpdate(item.createdAt)}</div>
-                  <div className="flex items-center justify-between gap-2 pt-1">
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 4, 5].map((rating) => (
-                        <button
-                          key={rating}
-                          type="button"
-                          onClick={(event) => { event.stopPropagation(); updateGeneratedImage(item.id, { rating }); }}
-                          className={`grid h-6 w-6 place-items-center rounded-full text-[10px] font-bold ${item.rating === rating ? 'bg-[#131b2e] text-white' : 'bg-[#eaedff] text-[#45464d]'}`}
-                        >
-                          {rating}
-                        </button>
-                      ))}
-                    </div>
-                    <ActionButton
-                      label={item.status === 'discarded' ? 'Discarded' : 'Discard'}
-                      tone="ghost"
-                      small
-                      onClick={() => updateGeneratedImage(item.id, { status: item.status === 'discarded' ? 'success' : 'discarded' })}
-                    />
-                  </div>
-                </div>
-              </button>
+              </div>
             ))}
-          </div>
-        ) : (
-          <div className="grid gap-5 xl:grid-cols-2">
-            <div className="overflow-hidden rounded-2xl bg-white shadow-[0_4px_16px_rgba(15,23,42,0.06)]">
-              {resolveDisplayUrl(displayImageMap, activeBundle.sceneImages.find((item) => item.id === previewAsset?.sourceSceneImageId)?.fileUrl || activeBundle.project.heroImageUrl) ? (
-                <img
-                  src={resolveDisplayUrl(displayImageMap, activeBundle.sceneImages.find((item) => item.id === previewAsset?.sourceSceneImageId)?.fileUrl || activeBundle.project.heroImageUrl)}
-                  alt="Source Scene"
-                  className="h-80 w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-80 items-center justify-center bg-[#eaedff]"><Icon name="image" className="text-5xl text-[#c6c6cd]" /></div>
-              )}
-              <div className="p-4">
-                <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#45464d]">Source Scene</div>
-                <div className="mt-1 text-sm text-[#131b2e]">
-                  {activeBundle.sceneImages.find((item) => item.id === previewAsset?.sourceSceneImageId)?.sourceLabel || 'No scene attached to this result.'}
-                </div>
-              </div>
-            </div>
-            <div className="overflow-hidden rounded-2xl bg-white shadow-[0_4px_16px_rgba(15,23,42,0.06)]">
-              {resolveDisplayUrl(displayImageMap, previewAsset?.fileUrl || '') ? (
-                <img
-                  src={resolveDisplayUrl(displayImageMap, previewAsset?.fileUrl || '')}
-                  alt={previewAsset?.title || 'Generated'}
-                  className="h-80 w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-80 items-center justify-center bg-[#eaedff]"><Icon name="image" className="text-5xl text-[#c6c6cd]" /></div>
-              )}
-              <div className="space-y-2 p-4">
-                <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#45464d]">Generated Result</div>
-                <div className="text-lg font-bold text-[#131b2e]" style={{ fontFamily: headlineFont }}>
-                  {previewAsset?.title || 'No result selected'}
-                </div>
-                <div className="text-sm leading-6 text-[#45464d]">
-                  {previewAsset?.actualPrompt || 'Select a gallery item to inspect the generated prompt context.'}
-                </div>
-              </div>
-            </div>
           </div>
         )}
       </div>
@@ -2233,24 +2441,12 @@ export function ProductStudioPage() {
           </button>
         </div>
 
-        {/* Footer */}
-        <div className="border-t border-[#c6c6cd]/20 px-3 py-4 space-y-0.5">
-          {[
-            { label: 'Support', icon: 'help_outline' },
-            { label: 'Account', icon: 'person' },
-          ].map(({ label, icon }) => (
-            <div key={label} className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-[#45464d]">
-              <Icon name={icon} className="text-xl text-[#c6c6cd]" />
-              <span>{label}</span>
-            </div>
-          ))}
-        </div>
       </aside>
 
       {/* Main */}
       <main className="flex min-h-0 flex-1 flex-col">
         {/* Header */}
-        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between border-b border-[#c6c6cd]/15 bg-white/90 px-6 backdrop-blur-md">
+        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center border-b border-[#c6c6cd]/15 bg-white/90 px-6 backdrop-blur-md">
           <div className="flex items-center gap-2 text-sm">
             {isWorkspace ? (
               <>
@@ -2263,31 +2459,6 @@ export function ProductStudioPage() {
                 {shellSection === 'templates' ? 'Template Library' : shellSection === 'assets' ? 'Asset Library' : shellSection === 'settings' ? 'Settings' : 'Project Dashboard'}
               </span>
             )}
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <input
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search…"
-                className="w-48 rounded-full bg-[#f2f3ff] px-3 py-1.5 text-sm text-[#131b2e] outline-none"
-              />
-            </div>
-            <button type="button" className="grid h-8 w-8 place-items-center rounded-full text-[#45464d] hover:bg-[#f2f3ff]">
-              <Icon name="notifications" className="text-xl" />
-            </button>
-            <button type="button" className="rounded-xl bg-[#f2f3ff] px-3 py-1.5 text-xs font-semibold text-[#45464d] hover:bg-[#eaedff]">Share</button>
-            <button
-              type="button"
-              onClick={() => { if (isWorkspace) { void previewGenerate(); } else { void handleCreateProject(); } }}
-              disabled={Boolean(busyLabel)}
-              className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold text-white disabled:opacity-40"
-              style={{ backgroundImage: signatureGradient }}
-            >
-              <Icon name="add" className="text-sm" />
-              New Generation
-            </button>
-            <div className="grid h-8 w-8 place-items-center rounded-full bg-[#dae2fd] text-xs font-bold text-[#497cff]">PS</div>
           </div>
         </header>
 

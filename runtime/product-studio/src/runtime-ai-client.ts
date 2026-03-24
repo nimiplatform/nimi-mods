@@ -1,6 +1,7 @@
 import { createProductStudioId } from './state/store.js';
 import { persistArtifactImage, resolveImageUrlForRuntime } from './image-storage.js';
 import { getProductStudioRuntimeClient } from './runtime-mod.js';
+import { PRODUCT_STUDIO_MOD_ID } from './contracts.js';
 import type {
   ProductStudioBatchJob,
   ProductStudioErrorEnvelope,
@@ -11,17 +12,31 @@ import type {
   ProductStudioSellingPoint,
 } from './types.js';
 
-type ProductStudioTextMessageContentPart =
-  | { type: 'text'; text: string }
-  | { type: 'image_url'; imageUrl: string; detail?: 'auto' | 'low' | 'high' };
-
-type ProductStudioTextMessage = {
-  role: 'user';
-  content: ProductStudioTextMessageContentPart[];
-};
-
 function asString(value: unknown): string {
   return String(value || '').trim();
+}
+
+function sanitizeFileName(value: string): string {
+  const normalized = asString(value)
+    .replace(/[\\/:*?"<>|]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return normalized || 'generated-image';
+}
+
+function extensionFromMimeType(mimeType: string): string {
+  const lower = asString(mimeType).toLowerCase();
+  if (lower.startsWith('image/jpeg')) return 'jpg';
+  if (lower.startsWith('image/webp')) return 'webp';
+  if (lower.startsWith('image/gif')) return 'gif';
+  if (lower.startsWith('image/svg+xml')) return 'svg';
+  return 'png';
+}
+
+function buildGeneratedOutputPathLabel(subfolder?: string): string {
+  const normalized = asString(subfolder).replace(/^\/+|\/+$/g, '');
+  const base = `~/.nimi/data/mod-data/${PRODUCT_STUDIO_MOD_ID}/files/images/generated`;
+  return normalized ? `${base}/${normalized}/` : `${base}/`;
 }
 
 function isTimeoutMessage(value: string): boolean {
@@ -82,61 +97,51 @@ function buildRefinementRequest(input: {
   promptConfig: ProductStudioPromptConfig;
   sellingPoints: ProductStudioSellingPoint[];
   inputImages: ProductStudioPromptInputImageRef[];
-}): ProductStudioTextMessage[] {
-  const sellingPointText = input.sellingPoints
+}): { system: string; input: string } {
+  const selectedSellingPoints = input.sellingPoints
     .filter((item) => item.isActive)
-    .map((item, index) => `${index + 1}. [${item.category}] ${item.text}`)
-    .join('\n');
-  const imageNotes = input.inputImages
-    .map((image, index) => {
-      const role = image.sourceType === 'reference'
-        ? '参考产品图'
-        : image.sourceType === 'scene'
-          ? '场景图'
-          : '附加图片';
-      return `图${index + 1} (${role}): ${image.label || image.sourceType}`;
-    })
-    .join('\n');
+    .map((item) => item.text.trim())
+    .filter(Boolean);
+  return {
+    system: [
+      '把用户原话改写成一段更清楚、更完整、可直接用于生图的中文 prompt。',
+      '只优化语言结构和任务表达，不要分析图片，不要补充用户没有明确提出的细节。',
+      '如果用户提到图1、图2、图3或卖点数量，原样保留这些关系和数量要求。',
+      '如果当前选中了卖点，只需要让最终 prompt 明确保留“需要把这些卖点自然加入画面”的要求，不要逐条扩写卖点正文。',
+      '只输出 prompt 本身，必须是一段完整的话，不要解释，不要标题，不要 JSON。',
+    ].join('\n'),
+    input: [
+      input.promptConfig.userIntent,
+      selectedSellingPoints.length > 0 ? `当前已选卖点：${selectedSellingPoints.join('；')}` : '',
+    ].filter(Boolean).join('\n'),
+  };
+}
 
-  const content: ProductStudioTextMessageContentPart[] = [
-    {
-      type: 'text',
-      text: [
-        '你是资深电商产品图 prompt 工程师，目标是把用户意图整理成一段可以直接用于图像生成的最终 prompt。',
-        `当前模式: ${input.promptConfig.generationMode}.`,
-        `用户原始意图: ${input.promptConfig.userIntent}`,
-        imageNotes ? `输入图片说明:\n${imageNotes}` : '输入图片说明: 无',
-        sellingPointText ? `可用卖点:\n${sellingPointText}` : '可用卖点: 无',
-        '核心要求:',
-        '1. 优先理解并执行“用户意图”，不要把任务退化成对输入图片内容的客观描述。',
-        '2. 输入图片是约束和素材来源，不是让你逐张反向描述图片。',
-        '3. 如果用户在描述里提到“替换”“保留原场景/构图”“把图1产品放到图2”等操作，必须把这些操作关系明确写进最终 prompt。',
-        '4. 如果存在参考产品图和场景图，要把 prompt 写成“将参考产品自然整合/替换到目标场景”的执行型指令，而不是分别描述两张图长什么样。',
-        '5. 如果用户提到卖点、文案、copy、文字布局等要求，要从可用卖点中挑选最合适的内容，并明确这些文案如何进入画面版式；如果用户没要求文案上画面，就只把卖点作为视觉语义参考，不强行做成大段文字。',
-        '6. 最终 prompt 必须保留高级电商视觉、清晰产品层级、合理留白、真实材质与光影，并避免竞品品牌残留。',
-        '输出规则:',
-        '1. 只输出最终 prompt 本体，不要解释，不要加标题，不要返回 JSON。',
-        '2. 使用完整、明确、可执行的描述，避免空泛形容词堆砌。',
-        '3. 输出语言默认跟随用户原始意图的语言；用户用中文，就输出中文 prompt；用户用英文，就输出英文 prompt。',
-        '4. 不要逐条罗列图片里看到了什么，不要写成图片理解报告。',
-        '5. 如果用户意图是“替换产品”“保留构图”“加入卖点”，这些动作必须在最终 prompt 中明确体现。',
-      ].join('\n\n'),
-    },
-  ];
-  for (const image of input.inputImages) {
-    content.push({
-      type: 'image_url',
-      imageUrl: image.fileUrl,
-      detail: 'high',
-    });
+function normalizeRefinedPrompt(raw: string): string {
+  const normalized = asString(raw)
+    .replace(/^```(?:text|markdown)?/iu, '')
+    .replace(/```$/u, '')
+    .replace(/^<final_prompt>/iu, '')
+    .replace(/<\/final_prompt>$/iu, '')
+    .trim();
+  return normalized;
+}
+
+function isLikelyIncompleteRefinedPrompt(value: string): boolean {
+  const normalized = normalizeRefinedPrompt(value);
+  if (!normalized) {
+    return true;
   }
-
-  return [
-    {
-      role: 'user',
-      content,
-    },
-  ] as ProductStudioTextMessage[];
+  if (/[，,、:：;；\-]\s*$/u.test(normalized)) {
+    return true;
+  }
+  if (!/[。！？.!?）)]$/u.test(normalized)) {
+    return true;
+  }
+  if (/保持图$/u.test(normalized) || /替换到图\d+的?$/u.test(normalized) || /加入\d+个?$/u.test(normalized)) {
+    return true;
+  }
+  return false;
 }
 
 async function resolveRuntimeInputImages(inputImages: ProductStudioPromptInputImageRef[]): Promise<ProductStudioPromptInputImageRef[]> {
@@ -146,18 +151,20 @@ async function resolveRuntimeInputImages(inputImages: ProductStudioPromptInputIm
   })));
 }
 
-function orderMultimodalInputImages(inputImages: ProductStudioPromptInputImageRef[]): ProductStudioPromptInputImageRef[] {
-  const priority = (sourceType: ProductStudioPromptInputImageRef['sourceType']) => {
-    switch (sourceType) {
-      case 'scene':
-        return 0;
-      case 'reference':
-        return 1;
-      default:
-        return 2;
-    }
-  };
-  return [...inputImages].sort((left, right) => priority(left.sourceType) - priority(right.sourceType));
+function buildExecutionPrompt(actualPrompt: string, appliedSellingPoints: string[]): string {
+  const prompt = asString(actualPrompt);
+  const selectedSellingPoints = appliedSellingPoints
+    .map((item) => asString(item))
+    .filter(Boolean);
+  if (selectedSellingPoints.length === 0) {
+    return prompt;
+  }
+  return [
+    prompt,
+    '',
+    '请将以下卖点自然整合进画面中的文案或版式表达：',
+    ...selectedSellingPoints.map((item, index) => `${index + 1}. ${item}`),
+  ].join('\n');
 }
 
 export async function refineProductStudioPrompt(input: {
@@ -166,26 +173,38 @@ export async function refineProductStudioPrompt(input: {
   inputImages: ProductStudioPromptInputImageRef[];
 }): Promise<{ refinedPrompt: string; traceId?: string }> {
   const runtimeClient = getProductStudioRuntimeClient();
-  const resolvedInputImages = await resolveRuntimeInputImages(input.inputImages);
   try {
     const route = await runtimeClient.route.resolve({ capability: 'text.generate' });
-    const result = await runtimeClient.ai.text.generate({
-      input: buildRefinementRequest({
-        promptConfig: input.promptConfig,
-        sellingPoints: input.sellingPoints,
-        inputImages: resolvedInputImages,
-      }),
-      model: asString(input.promptConfig.promptOptimizeModel) || route.model || undefined,
-      temperature: 0.4,
-      maxTokens: 500,
+    const refinementRequest = buildRefinementRequest({
+      promptConfig: input.promptConfig,
+      sellingPoints: input.sellingPoints,
+      inputImages: input.inputImages,
     });
-    const refinedPrompt = asString(result.text);
+    const result = await runtimeClient.ai.text.generate({
+      input: refinementRequest.input,
+      system: refinementRequest.system,
+      model: asString(input.promptConfig.promptOptimizeModel) || route.model || undefined,
+      temperature: 0,
+      maxTokens: 1200,
+    });
+    let refinedPrompt = normalizeRefinedPrompt(result.text);
+    const traceId = asString(result.trace?.traceId) || undefined;
+    if (result.finishReason === 'length' || isLikelyIncompleteRefinedPrompt(refinedPrompt)) {
+      const preview = refinedPrompt.slice(0, 160);
+      throw createErrorEnvelope({
+        reasonCode: 'PS_PROMPT_REFINE_FAILED',
+        actionHint: 'retry_with_shorter_or_clearer_intent',
+        stage: 'prompt-ai-refine',
+        message: `Prompt refinement returned an incomplete result${result.finishReason ? ` (${result.finishReason})` : ''}${preview ? `: ${preview}` : ''}.`,
+        traceId,
+      });
+    }
     if (!refinedPrompt) {
       throw new Error('PRODUCT_STUDIO_PROMPT_EMPTY');
     }
     return {
       refinedPrompt,
-      traceId: asString(result.trace?.traceId) || undefined,
+      traceId,
     };
   } catch (error) {
     throw wrapAsEnvelope(error, {
@@ -201,6 +220,8 @@ async function generateProductStudioImageArtifact(input: {
   generationMode: ProductStudioPreviewGenerationInput['generationMode'];
   imageGenerateModel?: string;
   inputImages: ProductStudioPromptInputImageRef[];
+  appliedSellingPoints: string[];
+  outputSubfolder?: string;
 }) {
   const runtimeClient = getProductStudioRuntimeClient();
   let resolvedInputImages: ProductStudioPromptInputImageRef[] = [];
@@ -236,8 +257,9 @@ async function generateProductStudioImageArtifact(input: {
 
   try {
     const startedAt = Date.now();
+    const executionPrompt = buildExecutionPrompt(input.actualPrompt, input.appliedSellingPoints);
     const result = await runtimeClient.media.image.generate({
-      prompt: input.actualPrompt,
+      prompt: executionPrompt,
       ...(input.generationMode === 'multimodal' ? { referenceImages: resolvedInputImages.map((image) => image.fileUrl) } : {}),
       responseFormat: 'base64',
       size: '1536x1536',
@@ -249,7 +271,7 @@ async function generateProductStudioImageArtifact(input: {
       throw new Error('PRODUCT_STUDIO_IMAGE_ARTIFACT_EMPTY');
     }
     return {
-      fileUrl: await persistArtifactImage({ artifact, bucket: 'generated' }),
+      fileUrl: await persistArtifactImage({ artifact, bucket: 'generated', subfolder: input.outputSubfolder }),
       generationTimeMs: Date.now() - startedAt,
       traceId: asString(result.trace?.traceId) || undefined,
     };
@@ -263,11 +285,14 @@ async function generateProductStudioImageArtifact(input: {
 }
 
 export async function generateProductStudioPreview(input: ProductStudioPreviewGenerationInput): Promise<ProductStudioGeneratedImage> {
+  const executionPrompt = buildExecutionPrompt(input.actualPrompt, input.appliedSellingPoints);
   const generated = await generateProductStudioImageArtifact({
     actualPrompt: input.actualPrompt,
     generationMode: input.generationMode,
     imageGenerateModel: input.imageGenerateModel,
     inputImages: input.inputImages,
+    appliedSellingPoints: input.appliedSellingPoints,
+    outputSubfolder: input.outputSubfolder,
   });
 
   return {
@@ -278,7 +303,7 @@ export async function generateProductStudioPreview(input: ProductStudioPreviewGe
     generationMode: input.generationMode,
     fileUrl: generated.fileUrl,
     title: input.title,
-    actualPrompt: input.actualPrompt,
+    actualPrompt: executionPrompt,
     inputImageSnapshot: input.inputImages,
     appliedSellingPoints: input.appliedSellingPoints,
     status: 'success',
@@ -349,6 +374,7 @@ export async function runProductStudioBatchGeneration(input: {
   baseInputImages: ProductStudioPromptInputImageRef[];
   sourceRuns: Array<{ sourceId: string; sourceRef: ProductStudioPromptInputImageRef; title: string }>;
   variantCount: number;
+  outputSubfolder?: string;
   controller?: ProductStudioBatchRunController;
   onProgress?: (payload: {
     batchJob: ProductStudioBatchJob;
@@ -397,6 +423,8 @@ export async function runProductStudioBatchGeneration(input: {
     completedAt: completedCount + failedCount >= runCount || input.controller?.isCancelled() ? new Date().toISOString() : undefined,
     logs: [...logs],
     traceId: lastTraceId || undefined,
+    outputDirectoryKey: input.outputSubfolder,
+    outputDirectoryLabel: buildGeneratedOutputPathLabel(input.outputSubfolder),
   });
 
   input.onProgress?.({ batchJob: buildBatchJob() });
@@ -418,10 +446,14 @@ export async function runProductStudioBatchGeneration(input: {
     try {
       const resolvedInputImages = await resolveRuntimeInputImages(inputImages);
       const route = await runtimeClient.route.resolve({ capability: 'image.generate' });
+      const executionPrompt = buildExecutionPrompt(
+        input.promptText,
+        input.appliedSellingPoints.filter((item) => item.isActive).map((item) => item.text),
+      );
       const job = await runtimeClient.media.jobs.submit({
         modal: 'image',
         input: {
-          prompt: input.promptText,
+          prompt: executionPrompt,
           ...(batchMode === 'multimodal' ? { referenceImages: resolvedInputImages.map((image) => image.fileUrl) } : {}),
           responseFormat: 'base64',
           size: '1536x1536',
@@ -437,7 +469,8 @@ export async function runProductStudioBatchGeneration(input: {
       if (!artifact) {
         throw new Error('PRODUCT_STUDIO_JOB_ARTIFACT_EMPTY');
       }
-      const fileUrl = await persistArtifactImage({ artifact, bucket: 'generated' });
+      const fileUrl = await persistArtifactImage({ artifact, bucket: 'generated', subfolder: input.outputSubfolder });
+      const outputFileName = `${sanitizeFileName(sourceRun?.title || `variant-${index + 1}`)}-${Date.now().toString(36)}.${extensionFromMimeType(artifact.mimeType)}`;
       lastTraceId = asString(artifactsResponse.traceId || job.traceId) || lastTraceId;
       completedCount += 1;
       generatedImages.push({
@@ -449,12 +482,15 @@ export async function runProductStudioBatchGeneration(input: {
         generationMode: batchMode,
         fileUrl,
         title: sourceRun?.title || `Variant ${index + 1}`,
-        actualPrompt: input.promptText,
+        actualPrompt: executionPrompt,
         inputImageSnapshot: inputImages,
         appliedSellingPoints: input.appliedSellingPoints.filter((item) => item.isActive).map((item) => item.text),
         status: 'success',
         traceId: lastTraceId || undefined,
         createdAt: new Date().toISOString(),
+        outputDirectoryKey: input.outputSubfolder,
+        outputDirectoryLabel: buildGeneratedOutputPathLabel(input.outputSubfolder),
+        outputFileName,
       });
       logs.push(batchMode === 'multimodal'
         ? `${sourceRun?.title || `Source ${index + 1}`} completed`
