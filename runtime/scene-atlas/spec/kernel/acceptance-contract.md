@@ -37,7 +37,7 @@
 **验收条件**:
 - `isReady` 与 `readinessIssues[]` 根据硬条件自动派生
 - 非 ready pack 不得发布
-- `ScenePack` 发布后继续编辑的是 pack，不是 asset
+- `ScenePack` 发布后继续编辑的是 pack，不是 Bundle
 
 ## SA-ACC-005 — pack 顺序与清理验收门
 

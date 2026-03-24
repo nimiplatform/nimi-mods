@@ -49,6 +49,7 @@ Scene-Atlas 不保留生成历史版本。
 - 只有当 readiness 硬条件满足时，pack 才可发布。
 - `isReady` 与 `readinessIssues[]` 由系统自动计算。
 - 发布动作的主体是 `ScenePack`，不是 `SceneCard`。
+- 发布交接完成后，card 级结果可被承载为 `Asset`，pack 级结果可被承载为 `Bundle`。
 
 ## SA-PIPE-005 — 空 draft pack 清理
 
@@ -62,11 +63,11 @@ Scene-Atlas 不保留生成历史版本。
 
 ## SA-PIPE-006 — 发布后编辑与再发布
 
-发布后继续编辑的是 `ScenePack` 工作态，不是 asset。
+发布后继续编辑的是 `ScenePack` 工作态，不是 `Asset` 或 `Bundle`。
 
 **步骤**: 见 `pipeline-states.yaml` -> `published_edit_policy`
 
 **规则**:
 - 已发布 pack 仍可继续编辑。
-- Scene-Atlas 内不直接编辑 asset。
-- 若后续修改需要反映到上层市场结果，必须通过新的发布动作进入同一 asset 的新发布结果。
+- Scene-Atlas 内不直接编辑 `Asset` 或 `Bundle`。
+- 若后续修改需要反映到上层发布结果，必须通过新的发布动作进入新的上层发布结果。

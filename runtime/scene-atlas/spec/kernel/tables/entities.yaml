@@ -54,6 +54,7 @@ entities:
       - SceneCard 不定义正式 status 字段
       - 生成后的文本字段允许用户编辑
       - 图像结果修改通过重新生成完成，不通过手工替换图像完成
+      - SceneCard 在 Scene-Atlas 内不独立发布；当 ScenePack 进入发布交接时，card 级结果可被承载为 Asset
 
   - entity: ScenePack
     source_rule: SA-DOM-002
@@ -129,4 +130,5 @@ entities:
     notes:
       - ScenePack 不定义 visibility 字段
       - 只有 ScenePack 可进入发布交接
-      - 已发布后继续编辑的是 ScenePack，而不是上层 asset
+      - ScenePack 发布交接的正式目标是 Bundle，而 pack 内 card 级结果可对应 Asset
+      - 已发布后继续编辑的是 ScenePack，而不是上层 Bundle

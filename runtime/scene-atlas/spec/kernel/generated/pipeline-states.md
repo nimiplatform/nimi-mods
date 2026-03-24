@@ -67,6 +67,9 @@ publish_readiness:
     - isReady
     - readinessIssues
   publish_unit: scene-pack
+  publish_handoff_results:
+    - scene-cards-to-assets
+    - scene-pack-to-bundle
   source_rule: SA-PIPE-004
 empty_draft_cleanup:
   retain_while_context_open: true
@@ -74,6 +77,7 @@ empty_draft_cleanup:
   source_rule: SA-PIPE-005
 published_edit_policy:
   scene_pack_editable_after_publish: true
-  asset_editable_in_scene_atlas: false
+  bundle_editable_in_scene_atlas: false
+  direct_asset_edit_in_scene_atlas: false
   source_rule: SA-PIPE-006
 ```

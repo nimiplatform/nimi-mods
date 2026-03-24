@@ -50,7 +50,7 @@ cases:
       - readinessIssues
     source_rule: SA-ACC-004
   - id: SA-010-PUBLISHED-PACK-EDITS-MATERIAL-NOT-ASSET
-    description: 已发布 pack 的后续编辑发生在 ScenePack 工作态中，而不是直接修改 asset。
+    description: 已发布 pack 的后续编辑发生在 ScenePack 工作态中，而不是直接修改 Bundle。
     expected_ok: true
     source_rule: SA-ACC-004
   - id: SA-011-ORDER-PRESERVED-FOR-NARRATIVE-CONSUMPTION

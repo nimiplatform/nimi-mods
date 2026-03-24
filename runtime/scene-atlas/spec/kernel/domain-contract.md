@@ -16,6 +16,7 @@
 - `SceneCard` 的主体图为 `coverImage`；文本语义层允许生成后编辑，但图像结果不通过手工替换编辑。
 - `SceneCard` 不定义正式生命周期状态字段；删除语义通过从所属 `ScenePack` 中移除实现。
 - `storyHook` 为可选字段，不构成 `SceneCard` 成立前提。
+- `SceneCard` 在 Scene-Atlas 内不作为独立发布对象；其发布态承载由 `ScenePack` 发布交接统一处理。
 
 ## SA-DOM-002 — ScenePack（场景素材包）
 
@@ -29,14 +30,15 @@
 - `coverImage` 可自动推导，但在发布前必须已确认；默认取第一张 `SceneCard.coverImage`。
 - `ScenePack` 不定义 `visibility` 字段；Scene-Atlas 内部对象默认处于 owner-private 工作态。
 
-## SA-DOM-003 — scene working state / asset 边界
+## SA-DOM-003 — scene working state / Realm publish 边界
 
-Scene-Atlas 中的 `SceneCard` 与 `ScenePack` 均属于私有场景工作态，不属于 Realm `asset`。
+Scene-Atlas 中的 `SceneCard` 与 `ScenePack` 均属于私有场景工作态，不属于 Realm `Asset` 或 `Bundle`。
 
 **规则**:
 - 只有 `ScenePack` 可进入发布交接。
 - `SceneCard` 不得作为独立发布对象。
-- Scene-Atlas 不直接编辑上层 `asset`，也不持有市场 listing 语义。
+- 当 `ScenePack` 进入发布交接时，card 级结果可被承载为 `Asset`，pack 级结果可被承载为 `Bundle`。
+- Scene-Atlas 不直接编辑上层 `Asset` 或 `Bundle`，也不持有市场商品语义。
 
 ## SA-DOM-004 — implicit draft pack
 
@@ -76,9 +78,9 @@ Scene-Atlas 采用 pack-first 模型。
 
 ## SA-DOM-008 — editable scene pack after publish
 
-已发布 pack 之后，继续编辑的对象是 `ScenePack`，不是上层 `asset`。
+已发布 pack 之后，继续编辑的对象是 `ScenePack`，不是上层 `Bundle`。
 
 **规则**:
 - `ScenePack` 发布后仍可继续编辑。
-- Scene-Atlas 中不存在对 `asset` 本体的直接编辑。
-- 对已发布 pack 的后续修改，只有经过新的发布动作，才会进入上层已发布结果。
+- Scene-Atlas 中不存在对 `Asset` 或 `Bundle` 本体的直接编辑。
+- 对已发布 pack 的后续修改，只有经过新的发布动作，才会进入新的上层发布结果。
