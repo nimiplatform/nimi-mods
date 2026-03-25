@@ -11,7 +11,7 @@ function toNullableTrimmedString(value: unknown): string | null {
   return normalized ? normalized : null;
 }
 
-export async function syncMediaBindings(
+export async function syncResourceBindings(
   context: WorldStudioMaintainActionContext,
   scope: 'WORLD_ASSETS' | 'AGENT_ASSETS',
 ) {
@@ -27,8 +27,8 @@ export async function syncMediaBindings(
         targetId: context.selectedWorldId,
         slot: 'WORLD_ICON',
         priority: 0,
-        asset: {
-          mediaType: 'IMAGE',
+        resource: {
+          resourceType: 'IMAGE',
           storageRef: worldCoverUrl,
           provenance: 'GENERATED',
           sourceRef: 'world-studio:world-cover',
@@ -41,8 +41,8 @@ export async function syncMediaBindings(
         targetId: context.selectedWorldId,
         slot: 'WORLD_BANNER',
         priority: 0,
-        asset: {
-          mediaType: 'IMAGE',
+        resource: {
+          resourceType: 'IMAGE',
           storageRef: worldCoverUrl,
           provenance: 'GENERATED',
           sourceRef: 'world-studio:world-cover',
@@ -64,8 +64,8 @@ export async function syncMediaBindings(
         priority: galleryPriority,
         conditions: { location: locationName },
         tags: ['world-studio', 'location'],
-        asset: {
-          mediaType: 'IMAGE',
+        resource: {
+          resourceType: 'IMAGE',
           storageRef: imageUrl,
           provenance: 'GENERATED',
           sourceRef: `world-studio:location:${locationName}`,
@@ -99,8 +99,8 @@ export async function syncMediaBindings(
         priority: 0,
         conditions: { characterName },
         tags: ['world-studio', 'agent-avatar'],
-        asset: {
-          mediaType: 'IMAGE',
+        resource: {
+          resourceType: 'IMAGE',
           storageRef: imageUrl,
           provenance: 'GENERATED',
           sourceRef: `world-studio:avatar:${characterName}`,
@@ -115,8 +115,8 @@ export async function syncMediaBindings(
         priority: 0,
         conditions: { characterName },
         tags: ['world-studio', 'character-portrait'],
-        asset: {
-          mediaType: 'IMAGE',
+        resource: {
+          resourceType: 'IMAGE',
           storageRef: imageUrl,
           provenance: 'GENERATED',
           sourceRef: `world-studio:portrait:${characterName}`,
@@ -130,7 +130,7 @@ export async function syncMediaBindings(
     context.setNotice(worldStudioMessage('notice.mediaSyncSkipped', 'No generated assets are ready to sync.'));
     return;
   }
-  await context.mutations.syncMediaBindingsMutation.mutateAsync({
+  await context.mutations.syncResourceBindingsMutation.mutateAsync({
     worldId: context.selectedWorldId,
     bindingUpserts,
     reason: scope === 'WORLD_ASSETS'
@@ -145,15 +145,15 @@ export async function syncMediaBindings(
     },
   });
   await Promise.all([
-    context.queries.mediaBindingsQuery.refetch(),
+    context.queries.resourceBindingsQuery.refetch(),
     context.queries.creatorAgentsQuery.refetch(),
     context.queries.selectedAgentQuery.refetch(),
   ]);
   context.setStatusBanner({
     kind: 'success',
-    message: worldStudioMessage('banner.mediaBindingsSynchronized', 'Media bindings synchronized'),
+    message: worldStudioMessage('banner.resourceBindingsSynchronized', 'Resource bindings synchronized'),
   });
-  context.setNotice(worldStudioMessage('notice.mediaBindingsSynchronized', 'Synchronized {{count}} media bindings.', {
+  context.setNotice(worldStudioMessage('notice.resourceBindingsSynchronized', 'Synchronized {{count}} resource bindings.', {
     count: bindingUpserts.length,
   }));
 }

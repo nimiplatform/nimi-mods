@@ -597,7 +597,7 @@ test('media decision policy enriches explicit image request with visual anchor a
           mood: '安静、亲近',
           routeSource: 'local',
           routeModel: 'flux-local',
-          assetOrigin: 'generated',
+          artifactOrigin: 'generated',
           shadowText: '[media:image:ready] subject=Policy Bot，黑色长发，宽松家居衬衫',
         },
       },

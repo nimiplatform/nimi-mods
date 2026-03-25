@@ -1,5 +1,5 @@
 import type { InteractionBeat, RelationMemorySlot } from '../../state/index.js';
-import { getLocalChatInteractionSnapshot, getLocalChatSession, listLocalChatMediaAssets, listLocalChatRelationMemorySlots, mergeLocalChatRelationMemorySlots, replaceLocalChatRecallIndex, upsertLocalChatInteractionSnapshot, } from '../../state/index.js';
+import { getLocalChatInteractionSnapshot, getLocalChatSession, listLocalChatMediaArtifacts, listLocalChatRelationMemorySlots, mergeLocalChatRelationMemorySlots, replaceLocalChatRecallIndex, upsertLocalChatInteractionSnapshot, } from '../../state/index.js';
 import { createUlid } from '../../utils/ulid.js';
 import { compileInteractionState } from './interaction-state-compiler.js';
 import { compilePortableMemorySlots } from './portable-memory-compiler.js';
@@ -46,9 +46,9 @@ export async function persistLocalChatInteractionArtifacts(input: {
     conversationDirective?: string | null;
     userText?: string | null;
 }): Promise<void> {
-    const [session, mediaAssets, previousSnapshot, existingSlots] = await Promise.all([
+    const [session, mediaArtifacts, previousSnapshot, existingSlots] = await Promise.all([
         getLocalChatSession(input.sessionId, input.viewerId),
-        listLocalChatMediaAssets({ conversationId: input.sessionId, turnId: input.assistantTurnId }),
+        listLocalChatMediaArtifacts({ conversationId: input.sessionId, turnId: input.assistantTurnId }),
         getLocalChatInteractionSnapshot(input.sessionId),
         listLocalChatRelationMemorySlots({
             targetId: input.targetId,
@@ -61,7 +61,7 @@ export async function persistLocalChatInteractionArtifacts(input: {
         viewerId: input.viewerId,
         session,
         deliveredBeats: input.deliveredBeats,
-        mediaAssets,
+        mediaArtifacts,
         conversationDirective: input.conversationDirective,
         previousSnapshot,
     });
@@ -88,7 +88,7 @@ export async function persistLocalChatInteractionArtifacts(input: {
         routeBinding: input.routeBinding || undefined,
         recentSummaries: [
             ...input.deliveredBeats.map((beat) => normalizeBeatText(beat.text)),
-            ...mediaAssets.map((asset) => normalizeBeatText(`${asset.kind} ${asset.model || ''} ${asset.renderUri || ''}`)),
+            ...mediaArtifacts.map((artifact) => normalizeBeatText(`${artifact.kind} ${artifact.model || ''} ${artifact.renderUri || ''}`)),
         ].filter(Boolean),
     });
     await Promise.all([

@@ -7,7 +7,7 @@ import {
   listWorldDrafts,
   listWorldEvents,
   listWorldLorebooks,
-  listWorldMediaBindings,
+  listWorldResourceBindings,
   listWorldMutations,
 } from '../data.js';
 import type {
@@ -15,7 +15,7 @@ import type {
   WorldEventSummary,
   WorldMutationSummary,
   WorldStudioCreatorAgentSummary,
-  WorldStudioMediaBindingSummary,
+  WorldStudioResourceBindingSummary,
   WorldSummary,
 } from '../ui/types.js';
 import { type HookClient } from "@nimiplatform/sdk/mod";
@@ -201,14 +201,14 @@ function toCreatorAgentSummary(payload: unknown): WorldStudioCreatorAgentSummary
   return toCreatorAgentSummaryFromUser(record);
 }
 
-function toMediaBindingSummaryList(payload: unknown): WorldStudioMediaBindingSummary[] {
+function toResourceBindingSummaryList(payload: unknown): WorldStudioResourceBindingSummary[] {
   const directItems = Array.isArray(payload)
     ? (payload as unknown[])
     : (Array.isArray(toRecord(payload).items) ? (toRecord(payload).items as unknown[]) : []);
   return directItems
     .map((item) => toRecord(item))
     .map((item) => {
-      const asset = toRecord(item.asset);
+      const resource = toRecord(item.resource);
       return {
         id: String(item.id || ''),
         targetType: String(item.targetType || ''),
@@ -217,14 +217,14 @@ function toMediaBindingSummaryList(payload: unknown): WorldStudioMediaBindingSum
         priority: Number.isFinite(Number(item.priority)) ? Number(item.priority) : 0,
         conditions: Object.keys(toRecord(item.conditions)).length > 0 ? toRecord(item.conditions) : null,
         tags: toStringArray(item.tags),
-        asset: {
-          id: toStringOrNull(asset.id),
-          mediaType: toStringOrNull(asset.mediaType),
-          storageRef: toStringOrNull(asset.storageRef || asset.url),
-          label: toStringOrNull(asset.label || asset.title),
-          provenance: toStringOrNull(asset.provenance),
-          sourceRef: toStringOrNull(asset.sourceRef),
-          tags: toStringArray(asset.tags),
+        resource: {
+          id: toStringOrNull(resource.id),
+          resourceType: toStringOrNull(resource.resourceType),
+          storageRef: toStringOrNull(resource.storageRef || resource.url),
+          label: toStringOrNull(resource.label || resource.title),
+          provenance: toStringOrNull(resource.provenance),
+          sourceRef: toStringOrNull(resource.sourceRef),
+          tags: toStringArray(resource.tags),
         },
       };
     })
@@ -295,11 +295,11 @@ export function useWorldStudioResourceQueries(hookClient: HookClient, input: {
     queryFn: async () => toMutationSummaryList(await listWorldMutations(hookClient, input.worldId)),
   });
 
-  const mediaBindingsQuery = useQuery({
-    queryKey: ['world-studio', 'media-bindings', input.worldId],
+  const resourceBindingsQuery = useQuery({
+    queryKey: ['world-studio', 'resource-bindings', input.worldId],
     enabled: input.enabled && Boolean(input.worldId),
     retry: false,
-    queryFn: async () => toMediaBindingSummaryList(await listWorldMediaBindings(hookClient, input.worldId)),
+    queryFn: async () => toResourceBindingSummaryList(await listWorldResourceBindings(hookClient, input.worldId)),
   });
 
   return {
@@ -311,6 +311,6 @@ export function useWorldStudioResourceQueries(hookClient: HookClient, input: {
     eventsQuery,
     lorebooksQuery,
     mutationsQuery,
-    mediaBindingsQuery,
+    resourceBindingsQuery,
   };
 }

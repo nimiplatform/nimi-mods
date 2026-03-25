@@ -464,7 +464,7 @@ export function buildMediaArtifactShadow(input: {
   status: LocalChatMediaArtifactShadow['status'];
   routeSource: LocalChatMediaRouteSource;
   routeModel?: string | null;
-  assetOrigin: LocalChatMediaArtifactShadow['assetOrigin'];
+  artifactOrigin: LocalChatMediaArtifactShadow['artifactOrigin'];
   reason?: string | null;
 }): LocalChatMediaArtifactShadow {
   const prefix = buildShadowPrefix({
@@ -489,7 +489,7 @@ export function buildMediaArtifactShadow(input: {
     mood: input.spec.mood,
     routeSource: input.routeSource,
     routeModel: normalizeOptionalString(input.routeModel || '') || null,
-    assetOrigin: input.assetOrigin,
+    artifactOrigin: input.artifactOrigin,
     shadowText,
   };
 }

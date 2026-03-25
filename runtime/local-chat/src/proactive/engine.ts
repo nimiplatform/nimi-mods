@@ -84,17 +84,17 @@ function toMarkerOverrideIntent(input: {
   beat: OrchestratedBeat;
   planId: string;
 }) {
-  if ((input.beat.modality !== 'image' && input.beat.modality !== 'video') || !input.beat.assetRequest) {
+  if ((input.beat.modality !== 'image' && input.beat.modality !== 'video') || !input.beat.mediaRequest) {
     return null;
   }
   return {
-    type: input.beat.assetRequest.kind,
-    prompt: input.beat.assetRequest.prompt,
+    type: input.beat.mediaRequest.kind,
+    prompt: input.beat.mediaRequest.prompt,
     source: 'tag' as const,
     plannerTrigger: 'marker-override' as const,
     pendingMessageId: input.beat.beatId,
-    plannerConfidence: input.beat.assetRequest.confidence,
-    plannerSuggestsNsfw: input.beat.assetRequest.nsfwIntent === 'suggested',
+    plannerConfidence: input.beat.mediaRequest.confidence,
+    plannerSuggestsNsfw: input.beat.mediaRequest.nsfwIntent === 'suggested',
   };
 }
 
@@ -148,11 +148,11 @@ function buildPreparedDeliveries(input: {
         ? { channelDecision: beat.modality }
         : {}),
       intent: beat.intent,
-      ...(beat.assetRequest ? {
-        mediaType: beat.assetRequest.kind,
-        mediaPrompt: beat.assetRequest.prompt,
+      ...(beat.mediaRequest ? {
+        mediaKind: beat.mediaRequest.kind,
+        mediaPrompt: beat.mediaRequest.prompt,
         mediaPlannerTrigger: 'marker-override' as const,
-        mediaPlannerConfidence: beat.assetRequest.confidence,
+        mediaPlannerConfidence: beat.mediaRequest.confidence,
       } : {}),
     },
   })).filter((delivery) => Boolean(delivery.content) || delivery.kind === 'image' || delivery.kind === 'video');
@@ -371,7 +371,7 @@ export async function runLocalChatProactiveHeartbeatCycle(
         };
       });
       const firstMarkedBeat = turnMode === 'explicit-media'
-        ? deliveries.find((delivery) => delivery.beat.assetRequest)?.beat || null
+        ? deliveries.find((delivery) => delivery.beat.mediaRequest)?.beat || null
         : null;
       const markerOverrideIntent = firstMarkedBeat
         ? toMarkerOverrideIntent({ beat: firstMarkedBeat, planId: plan.planId })
@@ -467,7 +467,7 @@ export async function runLocalChatProactiveHeartbeatCycle(
           mediaDelivery.kind = boundMediaDecision.intent.type;
           mediaDelivery.meta = {
             ...(mediaDelivery.meta || {}),
-            mediaType: boundMediaDecision.intent.type,
+            mediaKind: boundMediaDecision.intent.type,
             mediaPrompt: boundMediaDecision.intent.prompt,
             mediaPlannerTrigger: boundMediaDecision.intent.plannerTrigger,
             mediaIntentSource: boundMediaDecision.intent.source,
@@ -476,7 +476,7 @@ export async function runLocalChatProactiveHeartbeatCycle(
             ...mediaDelivery.beat,
             modality: boundMediaDecision.intent.type,
             intent: 'media',
-            assetRequest: {
+            mediaRequest: {
               kind: boundMediaDecision.intent.type,
               prompt: boundMediaDecision.intent.prompt,
               confidence: boundMediaDecision.intent.plannerConfidence ?? 0.65,

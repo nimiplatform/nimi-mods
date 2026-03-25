@@ -193,7 +193,7 @@ test('tail turn composer increases explicit-media maxTokens after a length-trunc
                 relationMove: 'warm',
                 sceneMove: 'daily',
                 pauseMs: 700,
-                assetRequest: {
+                mediaRequest: {
                   kind: 'image',
                   prompt: 'a realistic portrait',
                 },

@@ -118,7 +118,7 @@ export function useWorldStudioPageContent() {
             eventsQuery: { data: context.queries.eventsQuery.data },
             lorebooksQuery: { data: context.queries.lorebooksQuery.data },
             creatorAgentsQuery: { data: context.queries.creatorAgentsQuery.data },
-            mediaBindingsQuery: { data: context.queries.mediaBindingsQuery.data },
+            resourceBindingsQuery: { data: context.queries.resourceBindingsQuery.data },
         },
         setSourceMode: ui.setSourceMode,
         setFilePreviewText: ui.setFilePreviewText,

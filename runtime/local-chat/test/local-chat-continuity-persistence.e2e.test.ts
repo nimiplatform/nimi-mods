@@ -251,7 +251,7 @@ test('send-flow keeps follow-up perception under budget even after a long media 
           relationMove: 'warm',
           sceneMove: 'visual',
           pauseMs: 420,
-          assetRequest: {
+          mediaRequest: {
             kind: 'image',
             prompt: `RAW_MEDIA_PROMPT_MARKER:${'云海山风灵界夜色'.repeat(600)}`,
           },
@@ -274,7 +274,7 @@ test('send-flow keeps follow-up perception under budget even after a long media 
           relationMove: 'warm',
           sceneMove: 'visual',
           pauseMs: 360,
-          assetRequest: {
+          mediaRequest: {
             kind: 'image',
             prompt: 'portrait by the night harbor',
           },

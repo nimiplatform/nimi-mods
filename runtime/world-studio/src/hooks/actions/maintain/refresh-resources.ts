@@ -10,6 +10,6 @@ export async function refreshResources(context: WorldStudioMaintainActionContext
     context.selectedWorldId ? context.queries.eventsQuery.refetch() : Promise.resolve(),
     context.selectedWorldId ? context.queries.lorebooksQuery.refetch() : Promise.resolve(),
     context.selectedWorldId ? context.queries.mutationsQuery.refetch() : Promise.resolve(),
-    context.selectedWorldId ? context.queries.mediaBindingsQuery.refetch() : Promise.resolve(),
+    context.selectedWorldId ? context.queries.resourceBindingsQuery.refetch() : Promise.resolve(),
   ]);
 }

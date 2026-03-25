@@ -180,7 +180,7 @@ function SectionContextCard(props: {
     },
     WORLD_ASSETS: {
       title: worldStudioMessage('maintain.section.worldAssetsTitle', 'World asset coverage'),
-      description: worldStudioMessage('maintain.section.worldAssetsDescription', 'Compare generated assets, synced media bindings, and missing world asset coverage.'),
+      description: worldStudioMessage('maintain.section.worldAssetsDescription', 'Compare generated assets, synced resource bindings, and missing world asset coverage.'),
       summary: worldStudioMessage('maintain.section.worldAssetsSummary', 'The next step should be obvious: generate, sync, or verify.'),
     },
     AGENT_ASSETS: {
@@ -325,7 +325,7 @@ function renderContextualActionBar(props: MaintainWorkbenchProps): React.ReactEl
           type="button"
           className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
           onClick={() => {
-            void props.actions.maintain.syncMediaBindings(section);
+            void props.actions.maintain.syncResourceBindings(section);
           }}
           disabled={disabled}
         >
@@ -453,7 +453,7 @@ function renderMaintainSection(props: MaintainWorkbenchProps): React.ReactElemen
   if (section === 'WORLD_ASSETS') {
     return (
       <WorldAssetsPanel
-        mediaBindings={props.main.mediaBindings}
+        resourceBindings={props.main.resourceBindings}
         worldCoverUrl={typeof props.main.snapshot.assets.worldCover.imageUrl === 'string'
           ? props.main.snapshot.assets.worldCover.imageUrl
           : null}
@@ -464,7 +464,7 @@ function renderMaintainSection(props: MaintainWorkbenchProps): React.ReactElemen
   if (section === 'AGENT_ASSETS') {
     return (
       <AgentAssetsPanel
-        mediaBindings={props.main.mediaBindings}
+        resourceBindings={props.main.resourceBindings}
         creatorAgents={props.main.creatorAgents}
         portraits={props.main.snapshot.assets.characterPortraits}
         draftsByCharacter={props.main.snapshot.agentSync.draftsByCharacter}

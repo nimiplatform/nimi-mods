@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { batchUpsertWorldMediaBindings, batchCreateCreatorAgents, batchUpsertWorldEvents, batchUpsertWorldLorebooks, createCreatorAgent, createWorldDraft, deleteWorldEvent, deleteWorldLorebook, publishWorldDraft, updateCreatorAgent, updateWorldDraft, updateWorldMaintenance, } from '../data.js';
+import { batchUpsertWorldResourceBindings, batchCreateCreatorAgents, batchUpsertWorldEvents, batchUpsertWorldLorebooks, createCreatorAgent, createWorldDraft, deleteWorldEvent, deleteWorldLorebook, publishWorldDraft, updateCreatorAgent, updateWorldDraft, updateWorldMaintenance, } from '../data.js';
 import { type HookClient } from "@nimiplatform/sdk/mod";
 type SaveDraftInput = {
     draftId?: string;
@@ -73,12 +73,12 @@ export function useWorldStudioMutations(hookClient: HookClient) {
             ifSnapshotVersion: input.ifSnapshotVersion,
         })),
     });
-    const syncMediaBindingsMutation = useMutation({
+    const syncResourceBindingsMutation = useMutation({
         mutationFn: async (input: {
             worldId: string;
             bindingUpserts: Array<Record<string, unknown>>;
             reason: string;
-        }) => (await batchUpsertWorldMediaBindings(hookClient, input.worldId, {
+        }) => (await batchUpsertWorldResourceBindings(hookClient, input.worldId, {
             bindingUpserts: input.bindingUpserts,
             reason: input.reason,
         })),
@@ -119,7 +119,7 @@ export function useWorldStudioMutations(hookClient: HookClient) {
         saveMaintenanceMutation,
         syncLorebooksMutation,
         syncEventsMutation,
-        syncMediaBindingsMutation,
+        syncResourceBindingsMutation,
         deleteLorebookMutation,
         deleteEventMutation,
         batchCreateCreatorAgentsMutation,

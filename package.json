@@ -123,6 +123,7 @@
     "verify": "pnpm run check && pnpm run check:spec && pnpm run typecheck && pnpm run verify:audio-book && pnpm run verify:buddy && pnpm run verify:daily-outfit && pnpm run verify:kismet && pnpm run verify:knowledge-base && pnpm run verify:local-chat && pnpm run verify:mint-you && pnpm run verify:music-score && pnpm run verify:narrative-engine && pnpm run verify:test-ai && pnpm run verify:textplay && pnpm run verify:videoplay && pnpm run verify:world-studio && pnpm run build -- --all && pnpm run check:dist"
   },
   "devDependencies": {
+    "@nimiplatform/sdk": "file:../sdk",
     "@radix-ui/react-dialog": "^1.1.6",
     "@radix-ui/react-progress": "^1.1.2",
     "@radix-ui/react-select": "^2.1.6",

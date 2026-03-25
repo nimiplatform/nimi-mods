@@ -463,7 +463,7 @@ export async function runLocalChatTurnSend(input: {
             ...promptTrace,
         };
         const firstMarkedBeat = turnMode === 'explicit-media'
-            ? deliveries.find((item) => item.beat.assetRequest)?.beat || null
+            ? deliveries.find((item) => item.beat.mediaRequest)?.beat || null
             : null;
         const rawMediaDecision = await decideMediaExecution({
             aiClient: context.aiClient,
@@ -530,7 +530,7 @@ export async function runLocalChatTurnSend(input: {
                 mediaDelivery.kind = boundMediaDecision.intent.type;
                 mediaDelivery.meta = {
                     ...(mediaDelivery.meta || {}),
-                    mediaType: boundMediaDecision.intent.type,
+                    mediaKind: boundMediaDecision.intent.type,
                     mediaPrompt: boundMediaDecision.intent.prompt,
                     mediaPlannerTrigger: boundMediaDecision.intent.plannerTrigger,
                     mediaIntentSource: boundMediaDecision.intent.source,
@@ -539,7 +539,7 @@ export async function runLocalChatTurnSend(input: {
                     ...mediaDelivery.beat,
                     modality: boundMediaDecision.intent.type,
                     intent: 'media',
-                    assetRequest: {
+                    mediaRequest: {
                         kind: boundMediaDecision.intent.type,
                         prompt: boundMediaDecision.intent.prompt,
                         confidence: boundMediaDecision.intent.plannerConfidence ?? 0.65,

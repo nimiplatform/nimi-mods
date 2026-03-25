@@ -66,7 +66,7 @@ type BuildWorldStudioScreenModelArgs = {
     onDeleteFirstLorebook: () => Promise<void>;
     onCreateAgentsFromDrafts: (characterNames?: string[]) => Promise<void>;
     onUpdateCreatorAgentMetadata: (agentId: string, patch: Record<string, unknown>) => Promise<void>;
-    onSyncMediaBindings: (scope: 'WORLD_ASSETS' | 'AGENT_ASSETS') => Promise<void>;
+    onSyncResourceBindings: (scope: 'WORLD_ASSETS' | 'AGENT_ASSETS') => Promise<void>;
   };
   snapshot: WorldStudioWorkspaceSnapshot;
   patchSnapshot: (patch: WorldStudioSnapshotPatch) => void;
@@ -619,7 +619,7 @@ export function buildWorldStudioScreenModel(args: BuildWorldStudioScreenModelArg
           },
         });
       },
-      syncMediaBindings: (scope) => args.actions.onSyncMediaBindings(scope),
+      syncResourceBindings: (scope) => args.actions.onSyncResourceBindings(scope),
       refreshResources: () => args.actions.refreshResources(),
       reloadRemote: () => args.actions.onReloadRemoteForConflict(),
       adoptRemoteSnapshot: () => args.actions.onAdoptRemoteSnapshot(),
@@ -692,7 +692,7 @@ export function buildWorldStudioScreenModel(args: BuildWorldStudioScreenModelArg
       working: args.context.working,
       creatorAgents: args.context.worldCreatorAgents,
       selectedCreatorAgent: args.context.selectedCreatorAgent,
-      mediaBindings: args.context.mediaBindings,
+      resourceBindings: args.context.resourceBindings,
     },
     routing: {
       activeCoarseRouteSource: args.context.activeCoarseRouteSource,

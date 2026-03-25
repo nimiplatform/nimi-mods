@@ -115,8 +115,8 @@ cases:
     description: Agents editor renders readable creator-agent fields, allows metadata edits only, and surfaces core persona editing as a future capability notice.
     expected_ok: true
     source_rule: WS-ACC-002
-  - id: WS-021-ASSETS-V1-MEDIA-BINDINGS-ROUNDTRIP
-    description: Assets V1 hydrates world and agent media bindings into maintain state, refreshes them, and writes updates back via media-bindings batch upsert.
+  - id: WS-021-ASSETS-V1-RESOURCE-BINDINGS-ROUNDTRIP
+    description: Assets V1 hydrates world and agent resource bindings into maintain state, refreshes them, and writes updates back via resource-bindings batch upsert.
     expected_ok: true
     source_rule: WS-ACC-002
   - id: WS-022-WORLD-TRUTH-LAYERED-COPY-FIELDS

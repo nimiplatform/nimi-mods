@@ -20,10 +20,10 @@ export const WORLD_STUDIO_DATA_API_NARRATIVE_CONTEXTS_LIST = 'data-api.world.nar
 export const WORLD_STUDIO_DATA_API_LOREBOOKS_LIST = 'data-api.world.lorebooks.list';
 export const WORLD_STUDIO_DATA_API_LOREBOOKS_BATCH_UPSERT = 'data-api.world.lorebooks.batch-upsert';
 export const WORLD_STUDIO_DATA_API_LOREBOOKS_DELETE = 'data-api.world.lorebooks.delete';
-export const WORLD_STUDIO_DATA_API_MEDIA_BINDINGS_LIST = 'data-api.world.media-bindings.list';
-export const WORLD_STUDIO_DATA_API_MEDIA_BINDINGS_BATCH_UPSERT =
-  'data-api.world.media-bindings.batch-upsert';
-export const WORLD_STUDIO_DATA_API_MEDIA_BINDINGS_DELETE = 'data-api.world.media-bindings.delete';
+export const WORLD_STUDIO_DATA_API_RESOURCE_BINDINGS_LIST = 'data-api.world.resource-bindings.list';
+export const WORLD_STUDIO_DATA_API_RESOURCE_BINDINGS_BATCH_UPSERT =
+  'data-api.world.resource-bindings.batch-upsert';
+export const WORLD_STUDIO_DATA_API_RESOURCE_BINDINGS_DELETE = 'data-api.world.resource-bindings.delete';
 export const WORLD_STUDIO_DATA_API_DRAFTS_LIST = 'data-api.world.drafts.list';
 export const WORLD_STUDIO_DATA_API_WORLDS_MINE = 'data-api.world.worlds.mine';
 export const WORLD_STUDIO_DATA_API_MUTATIONS_LIST = 'data-api.world.mutations.list';

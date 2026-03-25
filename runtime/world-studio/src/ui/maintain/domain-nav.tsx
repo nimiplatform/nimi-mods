@@ -28,7 +28,7 @@ const DOMAINS: Array<{
     labelKey: 'domainNav.assets.label',
     labelFallback: 'Assets',
     subtitleKey: 'domainNav.assets.subtitle',
-    subtitleFallback: 'World and agent media bindings',
+    subtitleFallback: 'World and agent resource bindings',
   },
   {
     value: 'RELEASES',

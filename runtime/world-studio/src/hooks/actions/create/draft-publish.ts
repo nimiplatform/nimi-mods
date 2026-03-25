@@ -484,16 +484,16 @@ export async function publishWorldDraft(input: WorldStudioCreateActionsInput, _o
         else {
             diagLog('agent sync SKIPPED: syncCharacters is empty');
         }
-        const mediaBindingUpserts: Array<Record<string, unknown>> = [];
+        const resourceBindingUpserts: Array<Record<string, unknown>> = [];
         const worldCoverUrl = toNullableTrimmedString(input.snapshot.assets.worldCover.imageUrl);
         if (worldCoverUrl) {
-            mediaBindingUpserts.push({
+            resourceBindingUpserts.push({
                 targetType: 'WORLD',
                 targetId: worldId,
                 slot: 'WORLD_ICON',
                 priority: 0,
-                asset: {
-                    mediaType: 'IMAGE',
+                resource: {
+                    resourceType: 'IMAGE',
                     storageRef: worldCoverUrl,
                     provenance: 'GENERATED',
                     sourceRef: 'world-studio:world-cover',
@@ -501,13 +501,13 @@ export async function publishWorldDraft(input: WorldStudioCreateActionsInput, _o
                     tags: ['world-studio', 'world-icon'],
                 },
             });
-            mediaBindingUpserts.push({
+            resourceBindingUpserts.push({
                 targetType: 'WORLD',
                 targetId: worldId,
                 slot: 'WORLD_BANNER',
                 priority: 0,
-                asset: {
-                    mediaType: 'IMAGE',
+                resource: {
+                    resourceType: 'IMAGE',
                     storageRef: worldCoverUrl,
                     provenance: 'GENERATED',
                     sourceRef: 'world-studio:world-cover',
@@ -522,15 +522,15 @@ export async function publishWorldDraft(input: WorldStudioCreateActionsInput, _o
             const imageUrl = toNullableTrimmedString(asRecord(draft).imageUrl);
             if (!imageUrl)
                 continue;
-            mediaBindingUpserts.push({
+            resourceBindingUpserts.push({
                 targetType: 'WORLD',
                 targetId: worldId,
                 slot: 'WORLD_GALLERY',
                 priority: locationPriority,
                 conditions: { location: locationName },
                 tags: ['world-studio', 'location'],
-                asset: {
-                    mediaType: 'IMAGE',
+                resource: {
+                    resourceType: 'IMAGE',
                     storageRef: imageUrl,
                     provenance: 'GENERATED',
                     sourceRef: `world-studio:location:${locationName}`,
@@ -546,15 +546,15 @@ export async function publishWorldDraft(input: WorldStudioCreateActionsInput, _o
             const agentId = createdAgentIdByCharacter.get(characterName);
             if (!imageUrl || !agentId)
                 continue;
-            mediaBindingUpserts.push({
+            resourceBindingUpserts.push({
                 targetType: 'AGENT',
                 targetId: agentId,
                 slot: 'AGENT_PORTRAIT',
                 priority: 0,
                 conditions: { characterName },
                 tags: ['world-studio', 'character-portrait'],
-                asset: {
-                    mediaType: 'IMAGE',
+                resource: {
+                    resourceType: 'IMAGE',
                     storageRef: imageUrl,
                     provenance: 'GENERATED',
                     sourceRef: `world-studio:portrait:${characterName}`,
@@ -563,10 +563,10 @@ export async function publishWorldDraft(input: WorldStudioCreateActionsInput, _o
                 },
             });
         }
-        if (mediaBindingUpserts.length > 0) {
-            await input.mutations.syncMediaBindingsMutation.mutateAsync({
+        if (resourceBindingUpserts.length > 0) {
+            await input.mutations.syncResourceBindingsMutation.mutateAsync({
                 worldId,
-                bindingUpserts: mediaBindingUpserts,
+                bindingUpserts: resourceBindingUpserts,
                 reason: 'Publish world media assets from world-studio draft',
             });
         }

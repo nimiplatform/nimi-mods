@@ -25,7 +25,7 @@ function createBaseMediaMeta(input: {
   return {
     ...(input.messageMeta || {}),
     beatModality: input.intent.type,
-    mediaType: input.intent.type,
+    mediaKind: input.intent.type,
     mediaStatus: input.status,
     mediaPrompt: input.intent.prompt,
     mediaIntentSource: input.intent.source,

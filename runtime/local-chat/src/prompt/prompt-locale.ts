@@ -471,8 +471,8 @@ intimacyCeiling rules:
     en: '- pauseMs: pause in ms relative to previous beat (recommended 300-2000)',
   },
   'composer.fieldAsset': {
-    zh: '- assetRequest: 可选，但只允许 explicit-media 模式输出 {"kind":"image|video","prompt":"描述"}',
-    en: '- assetRequest: optional, only allowed in explicit-media mode {"kind":"image|video","prompt":"description"}',
+    zh: '- mediaRequest: 可选，但只允许 explicit-media 模式输出 {"kind":"image|video","prompt":"描述"}',
+    en: '- mediaRequest: optional, only allowed in explicit-media mode {"kind":"image|video","prompt":"description"}',
   },
   'composer.ruleCount': {
     zh: '- beats 数量 0-4 条，不要超过 4 条',
@@ -491,8 +491,8 @@ intimacyCeiling rules:
     en: '- Subsequent beats must bring new information, new emotional action, or new relationship progression. Do not just rephrase the first beat or previous one',
   },
   'composer.ruleNoMedia': {
-    zh: '- 非 explicit-media 模式不要输出 assetRequest，也不要暗示系统会自动发图/发视频',
-    en: '- Do not output assetRequest in non-explicit-media mode, and do not imply the system will auto-send media',
+    zh: '- 非 explicit-media 模式不要输出 mediaRequest，也不要暗示系统会自动发图/发视频',
+    en: '- Do not output mediaRequest in non-explicit-media mode, and do not imply the system will auto-send media',
   },
   'composer.ruleNoMarkdown': {
     zh: '- 不要使用 markdown 格式、不要代码块、不要解释',

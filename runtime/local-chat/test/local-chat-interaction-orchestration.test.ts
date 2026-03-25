@@ -268,7 +268,7 @@ test('orchestrateBeatModalities does not let voice-first mode swallow explicit m
   const result = orchestrateBeatModalities({
     beats: [createBeat({
       text: '发张图给我看看。',
-      assetRequest: {
+      mediaRequest: {
         kind: 'image',
         prompt: 'casual portrait',
         confidence: 0.9,
@@ -301,10 +301,10 @@ test('orchestrateBeatModalities does not let voice-first mode swallow explicit m
   assert.equal(result[0]?.modality, 'image');
 });
 
-test('orchestrateBeatModalities keeps non-explicit turns text-first even if a beat carries assetRequest', () => {
+test('orchestrateBeatModalities keeps non-explicit turns text-first even if a beat carries mediaRequest', () => {
   const beat = createBeat({
     text: '我想给你看一眼我现在靠在窗边的样子。',
-    assetRequest: {
+    mediaRequest: {
       kind: 'image',
       prompt: 'window portrait',
       confidence: 0.91,

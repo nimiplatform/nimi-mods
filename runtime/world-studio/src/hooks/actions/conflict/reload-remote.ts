@@ -25,13 +25,13 @@ export async function reloadRemoteForConflict(context: WorldStudioConflictAction
     const beforeSecondaryCount = context.snapshot.knowledgeGraph.events.secondary.length;
     const beforeLorebookCount = context.snapshot.lorebooksDraft.length;
     const beforeSnapshotVersion = context.snapshot.editorSnapshotVersion || '-';
-    const [maintenanceResult, eventsResult, lorebooksResult, , creatorAgentsResult, mediaBindingsResult] = await Promise.all([
+    const [maintenanceResult, eventsResult, lorebooksResult, , creatorAgentsResult, resourceBindingsResult] = await Promise.all([
         context.queries.maintenanceQuery.refetch(),
         context.queries.eventsQuery.refetch(),
         context.queries.lorebooksQuery.refetch(),
         context.queries.mutationsQuery.refetch(),
         context.queries.creatorAgentsQuery.refetch(),
-        context.queries.mediaBindingsQuery.refetch(),
+        context.queries.resourceBindingsQuery.refetch(),
     ]);
     const maintenancePayload = asRecord(maintenanceResult.data);
     const world = asRecord(maintenancePayload.world);
@@ -65,7 +65,7 @@ export async function reloadRemoteForConflict(context: WorldStudioConflictAction
         String(eventItems.length),
         String(lorebooksItems.length),
         String(worldOwnedAgents.length),
-        String(Array.isArray(mediaBindingsResult.data) ? mediaBindingsResult.data.length : 0),
+        String(Array.isArray(resourceBindingsResult.data) ? resourceBindingsResult.data.length : 0),
     ].join(':');
     context.patchSnapshot({
         worldPatch: world,

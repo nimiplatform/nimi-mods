@@ -13,7 +13,7 @@ import type {
   WorldDraftSummary,
   WorldMutationSummary,
   WorldStudioCreatorAgentSummary,
-  WorldStudioMediaBindingSummary,
+  WorldStudioResourceBindingSummary,
   WorldSummary,
 } from '../ui/types.js';
 import type { LandingState } from '../ui/types.js';
@@ -92,7 +92,7 @@ export type WorldStudioMainSlice = {
   working: boolean;
   creatorAgents: WorldStudioCreatorAgentSummary[];
   selectedCreatorAgent: WorldStudioCreatorAgentSummary | null;
-  mediaBindings: WorldStudioMediaBindingSummary[];
+  resourceBindings: WorldStudioResourceBindingSummary[];
 };
 
 export type WorldStudioRoutingSlice = {
@@ -230,7 +230,7 @@ export type WorldStudioActionsSlice = {
     createAgentsFromDrafts: (characterNames?: string[]) => Promise<void>;
     updateCreatorAgentMetadata: (agentId: string, patch: Record<string, unknown>) => Promise<void>;
     setSectionDirty: (section: keyof WorldStudioWorkspaceSnapshot['unsavedChangesByPanel'], dirty: boolean) => void;
-    syncMediaBindings: (scope: 'WORLD_ASSETS' | 'AGENT_ASSETS') => Promise<void>;
+    syncResourceBindings: (scope: 'WORLD_ASSETS' | 'AGENT_ASSETS') => Promise<void>;
     refreshResources: () => Promise<void>;
     reloadRemote: () => Promise<void>;
     adoptRemoteSnapshot: () => void;

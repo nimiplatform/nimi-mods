@@ -35,7 +35,7 @@ export {
 } from './data/queries/creator-agents.js';
 
 export {
-  listWorldMediaBindings,
-  batchUpsertWorldMediaBindings,
-  deleteWorldMediaBinding,
-} from './data/queries/media-bindings.js';
+  listWorldResourceBindings,
+  batchUpsertWorldResourceBindings,
+  deleteWorldResourceBinding,
+} from './data/queries/resource-bindings.js';

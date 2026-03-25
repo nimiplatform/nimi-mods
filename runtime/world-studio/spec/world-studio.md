@@ -50,14 +50,14 @@
 - `WS-DOM-025`: `world.rules` is not a world-base field; world rule editing belongs to `worldview.coreSystem.rules` in both synthesize output and maintenance editing.
 - `WS-DOM-025a`: `worldview.coreSystem.rules` uses ordered rule items with fixed fields `key / title / value`; World-Studio must not degrade it back into object-map editing.
 - `WS-DOM-026`: Agents V1 is metadata-first: creator-agent readable fields may be shown, metadata fields may be edited, and unsupported core persona editing must remain an explicit future capability.
-- `WS-DOM-027`: Assets V1 manages `World Assets` and `Agent Assets` through `media-bindings` hydration and batch-upsert, without redefining backend media contracts.
+- `WS-DOM-027`: Assets V1 manages `World Assets` and `Agent Assets` through `resource-bindings` hydration and batch-upsert, without redefining backend resource contracts.
 - `WS-DOM-028`: Successful publish lands in `MAINTAIN` and defaults the editor context to `World > Base`.
 - `WS-DOM-029`: World base maintenance must consume layered world truth fields (`tagline`, `motto`, `overview`, `contentRating`) instead of limiting editing to the pre-upgrade subset.
 - `WS-DOM-030`: Agents maintenance must read upgraded realm truth (`importance`, `activeWorldId`, `liveState`, `stats`) even when write support remains metadata-first.
 - `WS-DOM-031`: Deprecated `timeModel.currentNode` is not a World-Studio editing surface; time-rule editing stays on `worldview.timeModel`, while `World.clockConfig` and `Worldview.languages` must remain maintainable truth modules.
 - `WS-DOM-032`: World-Studio does not retain legacy top-level `world.timeFlowRatio` compatibility; all time-flow editing and projection reads use `worldview.timeModel.timeFlowRatio`.
 - `WS-DOM-033`: Maintain mode must present a consistent workbench rhythm (`section navigation -> object summary -> section context -> editor surface -> contextual action bar`) across `World`, `Agents`, `Assets`, and `Releases`.
-- `WS-DOM-034`: Assets maintenance must distinguish generated local assets, synced media bindings, and missing coverage so creators can tell whether the next action is generate, link, or sync.
+- `WS-DOM-034`: Assets maintenance must distinguish generated local assets, synced resource bindings, and missing coverage so creators can tell whether the next action is generate, link, or sync.
 - `WS-DOM-035`: Releases maintenance must behave like a release surface, not a hidden transport panel; draft selection, publish entry, and mutation history must each have explicit reading context.
 - `WS-DOM-035a`: Mutation history in World-Studio keeps technical fields visible, but release-facing reading context must also expose realm-authored `title / summary`.
 - `WS-DOM-036`: `World.clockConfig` is a readable runtime truth surface in V2; until backend patch support exists, World-Studio must not present it as a writable Base editor field.

@@ -131,7 +131,7 @@ test('turn-mode regression: high flirt affinity does not upcast neutral question
   assert.equal(beats[0]?.modality, 'text');
 });
 
-test('media regression: non-explicit turns ignore hallucinated beat assetRequest', () => {
+test('media regression: non-explicit turns ignore hallucinated beat mediaRequest', () => {
   const interactionProfile = createInteractionProfile();
   const policy = compileResolvedExperiencePolicy({
     interactionProfile,
@@ -146,7 +146,7 @@ test('media regression: non-explicit turns ignore hallucinated beat assetRequest
   const beats = orchestrateBeatModalities({
     beats: [{
       ...createBeat('你好，今天过得怎么样？'),
-      assetRequest: {
+      mediaRequest: {
         kind: 'image',
         prompt: 'warm greeting portrait',
         confidence: 0.91,

@@ -1,39 +1,39 @@
 import {
-  WORLD_STUDIO_DATA_API_MEDIA_BINDINGS_BATCH_UPSERT,
-  WORLD_STUDIO_DATA_API_MEDIA_BINDINGS_DELETE,
-  WORLD_STUDIO_DATA_API_MEDIA_BINDINGS_LIST,
+  WORLD_STUDIO_DATA_API_RESOURCE_BINDINGS_BATCH_UPSERT,
+  WORLD_STUDIO_DATA_API_RESOURCE_BINDINGS_DELETE,
+  WORLD_STUDIO_DATA_API_RESOURCE_BINDINGS_LIST,
 } from '../../contracts.js';
 import { type HookClient } from '@nimiplatform/sdk/mod';
 
-export async function listWorldMediaBindings(
+export async function listWorldResourceBindings(
   hookClient: HookClient,
   worldId: string,
   query?: Record<string, unknown>,
 ) {
   return hookClient.data.query({
-    capability: WORLD_STUDIO_DATA_API_MEDIA_BINDINGS_LIST,
+    capability: WORLD_STUDIO_DATA_API_RESOURCE_BINDINGS_LIST,
     query: { worldId, ...(query || {}) },
   });
 }
 
-export async function batchUpsertWorldMediaBindings(
+export async function batchUpsertWorldResourceBindings(
   hookClient: HookClient,
   worldId: string,
   payload: Record<string, unknown>,
 ) {
   return hookClient.data.query({
-    capability: WORLD_STUDIO_DATA_API_MEDIA_BINDINGS_BATCH_UPSERT,
+    capability: WORLD_STUDIO_DATA_API_RESOURCE_BINDINGS_BATCH_UPSERT,
     query: { worldId, payload },
   });
 }
 
-export async function deleteWorldMediaBinding(
+export async function deleteWorldResourceBinding(
   hookClient: HookClient,
   worldId: string,
   bindingId: string,
 ) {
   return hookClient.data.query({
-    capability: WORLD_STUDIO_DATA_API_MEDIA_BINDINGS_DELETE,
+    capability: WORLD_STUDIO_DATA_API_RESOURCE_BINDINGS_DELETE,
     query: { worldId, bindingId },
   });
 }

@@ -6,7 +6,7 @@ import type {
   ChatMessageMedia,
   ChatMessageMeta,
   LocalChatTurnMode,
-  LocalChatCachedMediaAsset,
+  LocalChatCachedMediaArtifact,
   LocalChatMediaArtifactShadow,
   LocalChatMediaGenerationSpec,
 } from '../types.js';
@@ -87,7 +87,7 @@ export type LocalChatReplyPacingPlan = {
   reason: string;
 };
 
-export type InteractionBeatAssetRequest = {
+export type InteractionBeatMediaRequest = {
   kind: 'image' | 'video';
   prompt: string;
   confidence: number;
@@ -105,7 +105,7 @@ export type InteractionBeat = {
   modality: LocalChatBeatModality;
   text: string;
   pauseMs: number;
-  assetRequest?: InteractionBeatAssetRequest;
+  mediaRequest?: InteractionBeatMediaRequest;
   cancellationScope: 'turn' | 'tail';
   autoPlayVoice?: boolean;
 };
@@ -304,7 +304,7 @@ export type LocalChatConversationRecord = {
   lastTurnSeq: number;
 };
 
-export type LocalChatMediaAssetRecord = LocalChatCachedMediaAsset & {
+export type LocalChatMediaArtifactRecord = LocalChatCachedMediaArtifact & {
   id: string;
   conversationId: string | null;
   turnId: string | null;

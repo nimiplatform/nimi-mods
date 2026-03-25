@@ -54,17 +54,17 @@ export function toMarkerOverrideIntent(input: {
     beat: OrchestratedBeat;
     turnTxnId: string;
 }) {
-    if ((input.beat.modality !== 'image' && input.beat.modality !== 'video') || !input.beat.assetRequest) {
+    if ((input.beat.modality !== 'image' && input.beat.modality !== 'video') || !input.beat.mediaRequest) {
         return null;
     }
     return {
-        type: input.beat.assetRequest.kind,
-        prompt: input.beat.assetRequest.prompt,
+        type: input.beat.mediaRequest.kind,
+        prompt: input.beat.mediaRequest.prompt,
         source: 'tag' as const,
         plannerTrigger: 'marker-override' as const,
         pendingMessageId: input.beat.beatId,
-        plannerConfidence: input.beat.assetRequest.confidence,
-        plannerSuggestsNsfw: input.beat.assetRequest.nsfwIntent === 'suggested',
+        plannerConfidence: input.beat.mediaRequest.confidence,
+        plannerSuggestsNsfw: input.beat.mediaRequest.nsfwIntent === 'suggested',
     };
 }
 export function bindMediaDecisionToDelivery(decision: ConcreteMediaDecision, deliveryId: string): ConcreteMediaDecision {
@@ -101,7 +101,7 @@ export function createStandaloneMediaDelivery(input: {
         text: '',
         pauseMs: 420,
         cancellationScope: 'tail',
-        assetRequest: {
+        mediaRequest: {
             kind: input.decision.intent.type,
             prompt: input.decision.intent.prompt,
             confidence: input.decision.intent.plannerConfidence ?? 0.65,
@@ -131,7 +131,7 @@ export function createStandaloneMediaDelivery(input: {
             segmentIndex: beat.beatIndex + 1,
             segmentCount: beat.beatCount,
             intent: beat.intent,
-            mediaType: input.decision.intent.type,
+            mediaKind: input.decision.intent.type,
             mediaPrompt: input.decision.intent.prompt,
             mediaPlannerTrigger: input.decision.intent.plannerTrigger,
             mediaPlannerConfidence: input.decision.intent.plannerConfidence,
@@ -172,11 +172,11 @@ export function buildAssistantDeliveries(input: {
                 ? { channelDecision: beat.modality }
                 : {}),
             intent: beat.intent,
-            ...(beat.assetRequest ? {
-                mediaType: beat.assetRequest.kind,
-                mediaPrompt: beat.assetRequest.prompt,
+            ...(beat.mediaRequest ? {
+                mediaKind: beat.mediaRequest.kind,
+                mediaPrompt: beat.mediaRequest.prompt,
                 mediaPlannerTrigger: 'marker-override' as const,
-                mediaPlannerConfidence: beat.assetRequest.confidence,
+                mediaPlannerConfidence: beat.mediaRequest.confidence,
             } : {}),
         },
     })).filter((delivery) => Boolean(delivery.content) || delivery.kind === 'image' || delivery.kind === 'video');

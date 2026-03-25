@@ -226,7 +226,7 @@ test('local-chat runtime ai client: generateObject repairs missing colon between
         ai: {
             text: {
                 generate: async () => ({
-                    text: '{"beats":[{"text":"嗨，我刚随手拍了一张，你瞧瞧。","pauseMs":1200,"assetRequest" "image"}]}',
+                    text: '{"beats":[{"text":"嗨，我刚随手拍了一张，你瞧瞧。","pauseMs":1200,"mediaRequest" "image"}]}',
                     trace: {
                         traceId: 'trace-broken-json-4',
                     },
@@ -241,7 +241,7 @@ test('local-chat runtime ai client: generateObject repairs missing colon between
     });
     const beats = result.object.beats as Array<Record<string, unknown>>;
     assert.equal(beats.length, 1);
-    assert.equal(beats[0]?.assetRequest, 'image');
+    assert.equal(beats[0]?.mediaRequest, 'image');
 });
 test('local-chat runtime ai client: generateObject exposes call failure metadata', async () => {
     const runtimeClient = {

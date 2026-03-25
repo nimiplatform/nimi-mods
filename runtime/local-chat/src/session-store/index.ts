@@ -1,7 +1,7 @@
 import type {
   ChatMessage,
   ChatMessageMeta,
-  LocalChatCachedMediaAsset,
+  LocalChatCachedMediaArtifact,
   LocalChatMediaArtifactShadow,
   LocalChatMediaGenerationSpec,
 } from '../types.js';
@@ -24,7 +24,7 @@ import type {
   LocalChatReplyStyleProfile,
   LocalChatTurnSendPhase,
   LocalChatStoredBeat,
-  LocalChatMediaAssetRecord,
+  LocalChatMediaArtifactRecord,
   LocalChatSession,
   LocalChatTurn,
   LocalChatTurnAudit,
@@ -45,8 +45,8 @@ import {
   normalizeInteractionSnapshot,
   normalizeRelationMemorySlot,
   normalizeInteractionRecallDoc,
-  normalizeMediaAssetRecord,
-  normalizeCachedMediaAsset,
+  normalizeMediaArtifactRecord,
+  normalizeCachedMediaArtifact,
   normalizeMediaSpec,
   normalizeMediaShadow,
   cloneConversation,
@@ -55,7 +55,7 @@ import {
   cloneInteractionSnapshot,
   cloneRelationMemorySlot,
   cloneInteractionRecallDoc,
-  cloneMediaAssetRecord,
+  cloneMediaArtifactRecord,
 } from './normalizers.js';
 
 import {
@@ -63,7 +63,7 @@ import {
   STORE_BEATS,
   STORE_CONVERSATIONS,
   STORE_INTERACTION_SNAPSHOTS,
-  STORE_MEDIA_ASSETS,
+  STORE_MEDIA_ARTIFACTS,
   STORE_RECALL_INDEX,
   STORE_RELATION_MEMORY_SLOTS,
   STORE_TURNS,
@@ -102,7 +102,7 @@ export type {
   LocalChatReplyStyleProfile,
   LocalChatTurnSendPhase,
   LocalChatStoredBeat,
-  LocalChatMediaAssetRecord,
+  LocalChatMediaArtifactRecord,
   LocalChatSession,
   LocalChatTurn,
   LocalChatTurnAudit,
@@ -232,9 +232,9 @@ function beatsForTurn(turnId: string): LocalChatStoredBeat[] {
   );
 }
 
-function mediaAssetsForConversation(conversationId: string): LocalChatMediaAssetRecord[] {
-  return [...getLedgerCache().mediaAssetsById.values()]
-    .filter((asset) => asset.conversationId === conversationId)
+function mediaArtifactsForConversation(conversationId: string): LocalChatMediaArtifactRecord[] {
+  return [...getLedgerCache().mediaArtifactsById.values()]
+    .filter((artifact) => artifact.conversationId === conversationId)
     .sort((left, right) => (
       compareIsoTimestamp(right.lastHitAt, left.lastHitAt)
       || compareIsoTimestamp(right.createdAt, left.createdAt)
@@ -541,16 +541,16 @@ export async function deleteLocalChatSession(sessionId: string): Promise<void> {
   const beatIds = [...ledgerCache.beatsById.values()]
     .filter((beat) => beat.conversationId === conversation.id)
     .map((beat) => beat.id);
-  const mediaAssetIds = [...ledgerCache.mediaAssetsById.values()]
-    .filter((asset) => asset.conversationId === conversation.id)
-    .map((asset) => asset.id);
+  const mediaArtifactIds = [...ledgerCache.mediaArtifactsById.values()]
+    .filter((artifact) => artifact.conversationId === conversation.id)
+    .map((artifact) => artifact.id);
   const recallIndexIds = [...ledgerCache.recallIndexById.values()]
     .filter((doc) => doc.conversationId === conversation.id)
     .map((doc) => doc.id);
 
   turnIds.forEach((turnId) => ledgerCache.turnsById.delete(turnId));
   beatIds.forEach((beatId) => ledgerCache.beatsById.delete(beatId));
-  mediaAssetIds.forEach((assetId) => ledgerCache.mediaAssetsById.delete(assetId));
+  mediaArtifactIds.forEach((artifactId) => ledgerCache.mediaArtifactsById.delete(artifactId));
   ledgerCache.interactionSnapshotsByConversationId.delete(conversation.id);
   recallIndexIds.forEach((docId) => ledgerCache.recallIndexById.delete(docId));
 
@@ -559,7 +559,7 @@ export async function deleteLocalChatSession(sessionId: string): Promise<void> {
       [STORE_CONVERSATIONS]: [conversation.id],
       [STORE_TURNS]: turnIds,
       [STORE_BEATS]: beatIds,
-      [STORE_MEDIA_ASSETS]: mediaAssetIds,
+      [STORE_MEDIA_ARTIFACTS]: mediaArtifactIds,
       [STORE_INTERACTION_SNAPSHOTS]: [conversation.id],
       [STORE_RECALL_INDEX]: recallIndexIds,
     },
@@ -580,13 +580,13 @@ export async function clearLocalChatSessionHistory(sessionId: string): Promise<v
   const beatIds = [...ledgerCache.beatsById.values()]
     .filter((beat) => beat.conversationId === conversation.id)
     .map((beat) => beat.id);
-  const mediaAssetIds = [...ledgerCache.mediaAssetsById.values()]
-    .filter((asset) => asset.conversationId === conversation.id)
-    .map((asset) => asset.id);
+  const mediaArtifactIds = [...ledgerCache.mediaArtifactsById.values()]
+    .filter((artifact) => artifact.conversationId === conversation.id)
+    .map((artifact) => artifact.id);
 
   turnIds.forEach((turnId) => ledgerCache.turnsById.delete(turnId));
   beatIds.forEach((beatId) => ledgerCache.beatsById.delete(beatId));
-  mediaAssetIds.forEach((assetId) => ledgerCache.mediaAssetsById.delete(assetId));
+  mediaArtifactIds.forEach((artifactId) => ledgerCache.mediaArtifactsById.delete(artifactId));
 
   const nextConversation: LocalChatConversationRecord = {
     ...conversation,
@@ -602,7 +602,7 @@ export async function clearLocalChatSessionHistory(sessionId: string): Promise<v
     deletes: {
       [STORE_TURNS]: turnIds,
       [STORE_BEATS]: beatIds,
-      [STORE_MEDIA_ASSETS]: mediaAssetIds,
+      [STORE_MEDIA_ARTIFACTS]: mediaArtifactIds,
     },
   });
   emitSessionUpdated({
@@ -877,47 +877,47 @@ export async function updateLocalChatTurnArtifacts(input: {
   });
 }
 
-export async function listLocalChatMediaAssets(input: {
+export async function listLocalChatMediaArtifacts(input: {
   conversationId?: string;
   turnId?: string;
   beatId?: string;
-} = {}): Promise<LocalChatMediaAssetRecord[]> {
+} = {}): Promise<LocalChatMediaArtifactRecord[]> {
   await ensureLedgerHydrated();
-  return [...getLedgerCache().mediaAssetsById.values()]
-    .filter((asset) => (
-      (!input.conversationId || asset.conversationId === trimString(input.conversationId))
-      && (!input.turnId || asset.turnId === trimString(input.turnId))
-      && (!input.beatId || asset.beatId === trimString(input.beatId))
+  return [...getLedgerCache().mediaArtifactsById.values()]
+    .filter((artifact) => (
+      (!input.conversationId || artifact.conversationId === trimString(input.conversationId))
+      && (!input.turnId || artifact.turnId === trimString(input.turnId))
+      && (!input.beatId || artifact.beatId === trimString(input.beatId))
     ))
     .sort((left, right) => (
       compareIsoTimestamp(right.lastHitAt, left.lastHitAt)
       || compareIsoTimestamp(right.createdAt, left.createdAt)
       || left.id.localeCompare(right.id)
     ))
-    .map((asset) => cloneMediaAssetRecord(asset));
+    .map((artifact) => cloneMediaArtifactRecord(artifact));
 }
 
-export async function upsertLocalChatMediaAssetRecord(asset: LocalChatMediaAssetRecord): Promise<LocalChatMediaAssetRecord> {
+export async function upsertLocalChatMediaArtifactRecord(artifact: LocalChatMediaArtifactRecord): Promise<LocalChatMediaArtifactRecord> {
   await ensureLedgerHydrated();
-  const normalized = normalizeMediaAssetRecord(asset);
+  const normalized = normalizeMediaArtifactRecord(artifact);
   if (!normalized) {
-    throw new Error('LOCAL_CHAT_MEDIA_ASSET_INVALID');
+    throw new Error('LOCAL_CHAT_MEDIA_ARTIFACT_INVALID');
   }
-  getLedgerCache().mediaAssetsById.set(normalized.id, normalized);
+  getLedgerCache().mediaArtifactsById.set(normalized.id, normalized);
   await persistMutation({
     puts: {
-      [STORE_MEDIA_ASSETS]: [normalized],
+      [STORE_MEDIA_ARTIFACTS]: [normalized],
     },
   });
-  return cloneMediaAssetRecord(normalized);
+  return cloneMediaArtifactRecord(normalized);
 }
 
-export async function getLocalChatCachedMediaAsset(executionCacheKey: string): Promise<LocalChatCachedMediaAsset | null> {
+export async function getLocalChatCachedMediaArtifact(executionCacheKey: string): Promise<LocalChatCachedMediaArtifact | null> {
   await ensureLedgerHydrated();
   const normalizedKey = trimString(executionCacheKey);
   if (!normalizedKey) return null;
-  const record = [...getLedgerCache().mediaAssetsById.values()]
-    .filter((asset) => asset.executionCacheKey === normalizedKey)
+  const record = [...getLedgerCache().mediaArtifactsById.values()]
+    .filter((artifact) => artifact.executionCacheKey === normalizedKey)
     .sort((left, right) => (
       compareIsoTimestamp(right.lastHitAt, left.lastHitAt)
       || compareIsoTimestamp(right.createdAt, left.createdAt)
@@ -938,23 +938,23 @@ export async function getLocalChatCachedMediaAsset(executionCacheKey: string): P
   };
 }
 
-export async function putLocalChatCachedMediaAsset(asset: LocalChatCachedMediaAsset): Promise<LocalChatCachedMediaAsset> {
+export async function putLocalChatCachedMediaArtifact(artifact: LocalChatCachedMediaArtifact): Promise<LocalChatCachedMediaArtifact> {
   await ensureLedgerHydrated();
-  const normalized = normalizeCachedMediaAsset(asset);
+  const normalized = normalizeCachedMediaArtifact(artifact);
   if (!normalized) {
-    throw new Error('LOCAL_CHAT_MEDIA_CACHE_INVALID_ASSET');
+    throw new Error('LOCAL_CHAT_MEDIA_CACHE_INVALID_ARTIFACT');
   }
-  const record: LocalChatMediaAssetRecord = {
+  const record: LocalChatMediaArtifactRecord = {
     ...normalized,
-    id: `media_${createUlid()}`,
+    id: `artifact_${createUlid()}`,
     conversationId: null,
     turnId: null,
     beatId: null,
   };
-  getLedgerCache().mediaAssetsById.set(record.id, record);
+  getLedgerCache().mediaArtifactsById.set(record.id, record);
   await persistMutation({
     puts: {
-      [STORE_MEDIA_ASSETS]: [record],
+      [STORE_MEDIA_ARTIFACTS]: [record],
     },
   });
   return { ...normalized };
@@ -1316,7 +1316,7 @@ export async function searchLocalChatRecallIndex(input: {
     .map((item) => item.doc);
 }
 
-export async function listLocalChatConversationMediaAssets(conversationId: string): Promise<LocalChatMediaAssetRecord[]> {
+export async function listLocalChatConversationMediaArtifacts(conversationId: string): Promise<LocalChatMediaArtifactRecord[]> {
   await ensureLedgerHydrated();
-  return mediaAssetsForConversation(trimString(conversationId)).map((asset) => cloneMediaAssetRecord(asset));
+  return mediaArtifactsForConversation(trimString(conversationId)).map((artifact) => cloneMediaArtifactRecord(artifact));
 }

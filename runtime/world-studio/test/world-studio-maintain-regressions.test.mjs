@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cloneDefaultSnapshot } from '../src/state/workspace/defaults.ts';
 import { findLinkedCreatorAgent } from '../src/services/creator-agent-link.ts';
-import { syncMediaBindings } from '../src/hooks/actions/maintain/sync-media-bindings.ts';
+import { syncResourceBindings } from '../src/hooks/actions/maintain/sync-resource-bindings.ts';
 import { reloadRemoteForConflict } from '../src/hooks/actions/conflict/reload-remote.ts';
 
 test('findLinkedCreatorAgent prefers stable handle matching before displayName fallback', () => {
@@ -31,7 +31,7 @@ test('findLinkedCreatorAgent prefers stable handle matching before displayName f
   assert.equal(linked?.id, 'agent-1');
 });
 
-test('syncMediaBindings publishes world icon/banner and links agent assets by draft handle', async () => {
+test('syncResourceBindings publishes world icon/banner and links agent assets by draft handle', async () => {
   const snapshot = cloneDefaultSnapshot();
   snapshot.assets.worldCover.imageUrl = 'https://cdn.example/world-cover.png';
   snapshot.assets.locationImages['Sky Harbor'] = {
@@ -57,7 +57,7 @@ test('syncMediaBindings publishes world icon/banner and links agent assets by dr
     snapshot,
     patchSnapshot: () => {},
     mutations: {
-      syncMediaBindingsMutation: {
+      syncResourceBindingsMutation: {
         mutateAsync: async (payload) => {
           mutationCalls.push(payload);
           return {};
@@ -65,7 +65,7 @@ test('syncMediaBindings publishes world icon/banner and links agent assets by dr
       },
     },
     queries: {
-      mediaBindingsQuery: { refetch: async () => ({}) },
+      resourceBindingsQuery: { refetch: async () => ({}) },
       creatorAgentsQuery: {
         data: [{
           id: 'agent-1',
@@ -82,8 +82,8 @@ test('syncMediaBindings publishes world icon/banner and links agent assets by dr
     setError: () => {},
   };
 
-  await syncMediaBindings(context, 'WORLD_ASSETS');
-  await syncMediaBindings(context, 'AGENT_ASSETS');
+  await syncResourceBindings(context, 'WORLD_ASSETS');
+  await syncResourceBindings(context, 'AGENT_ASSETS');
 
   const upserts = mutationCalls.flatMap((call) => call.bindingUpserts);
   assert.equal(upserts.some((item) => item.slot === 'WORLD_ICON'), true);
@@ -137,7 +137,7 @@ test('reloadRemoteForConflict uses creator agent refetch result when restoring s
           }],
         }),
       },
-      mediaBindingsQuery: {
+      resourceBindingsQuery: {
         refetch: async () => ({ data: [] }),
       },
     },

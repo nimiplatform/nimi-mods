@@ -10,9 +10,9 @@ import type {
 import type { LocalChatTarget } from '../../data/index.js';
 import { resolveLocalChatTargetReferenceImageUrl } from '../../data/index.js';
 import {
-  getLocalChatCachedMediaAsset,
-  putLocalChatCachedMediaAsset,
-  upsertLocalChatMediaAssetRecord,
+  getLocalChatCachedMediaArtifact,
+  putLocalChatCachedMediaArtifact,
+  upsertLocalChatMediaArtifactRecord,
 } from '../../state/index.js';
 import type { MediaExecutionDecision, MediaPromptTracePatch, MediaRouteSource } from './media-decision-types.js';
 import { runImageTurn } from './image-turn-runner.js';
@@ -75,7 +75,7 @@ function createExecutionTracePatch(input: {
 }
 
 export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Promise<Partial<MediaPromptTracePatch> | null> {
-  async function recordDeliveredMediaAsset(asset: {
+  async function recordDeliveredMediaArtifact(artifact: {
     beatId: string;
     executionCacheKey: string;
     specHash: string;
@@ -88,21 +88,21 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
     createdAt: string;
     lastHitAt: string;
   }): Promise<void> {
-    await upsertLocalChatMediaAssetRecord({
-      id: `media_${asset.beatId}`,
-      executionCacheKey: asset.executionCacheKey,
-      specHash: asset.specHash,
-      kind: asset.kind,
-      renderUri: asset.renderUri,
-      mimeType: asset.mimeType,
-      routeSource: asset.routeSource,
-      ...(asset.connectorId ? { connectorId: asset.connectorId } : {}),
-      ...(asset.model ? { model: asset.model } : {}),
-      createdAt: asset.createdAt,
-      lastHitAt: asset.lastHitAt,
+    await upsertLocalChatMediaArtifactRecord({
+      id: `artifact_${artifact.beatId}`,
+      executionCacheKey: artifact.executionCacheKey,
+      specHash: artifact.specHash,
+      kind: artifact.kind,
+      renderUri: artifact.renderUri,
+      mimeType: artifact.mimeType,
+      routeSource: artifact.routeSource,
+      ...(artifact.connectorId ? { connectorId: artifact.connectorId } : {}),
+      ...(artifact.model ? { model: artifact.model } : {}),
+      createdAt: artifact.createdAt,
+      lastHitAt: artifact.lastHitAt,
       conversationId: input.sessionId,
       turnId: input.assistantTurnId,
-      beatId: asset.beatId,
+      beatId: artifact.beatId,
     });
   }
 
@@ -116,7 +116,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
       status: 'blocked',
       routeSource: input.decision.routeSource,
       routeModel: input.decision.resolvedRoute?.model || null,
-      assetOrigin: 'generated',
+      artifactOrigin: 'generated',
       reason: input.decision.blockedReason,
     });
     await commitAssistantMessage({
@@ -161,14 +161,14 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
     resolvedRoute,
     nsfwPolicy: input.nsfwPolicy,
   });
-  const cached = await getLocalChatCachedMediaAsset(executionCacheKey);
+  const cached = await getLocalChatCachedMediaArtifact(executionCacheKey);
   if (cached) {
     const shadow = buildMediaArtifactShadow({
       spec: prepared.spec,
       status: 'ready',
       routeSource: cached.routeSource,
       routeModel: cached.model || resolvedRoute.model || null,
-      assetOrigin: 'cache-hit',
+      artifactOrigin: 'cache-hit',
     });
     await commitAssistantMessage({
       sessionId: input.sessionId,
@@ -195,7 +195,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
         nsfwPolicy: input.nsfwPolicy,
       }),
     });
-    await recordDeliveredMediaAsset({
+    await recordDeliveredMediaArtifact({
       beatId: intent.pendingMessageId,
       executionCacheKey,
       specHash: prepared.specHash,
@@ -264,7 +264,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
     }
     if (result.status === 'ok') {
       const createdAt = new Date().toISOString();
-      await putLocalChatCachedMediaAsset({
+      await putLocalChatCachedMediaArtifact({
         executionCacheKey,
         specHash: prepared.specHash,
         kind: 'image',
@@ -281,7 +281,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
         status: 'ready',
         routeSource: result.routeSource,
         routeModel: result.routeModel || resolvedRoute.model || null,
-        assetOrigin: 'generated',
+        artifactOrigin: 'generated',
       });
       await commitAssistantMessage({
         sessionId: input.sessionId,
@@ -308,7 +308,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
         nsfwPolicy: input.nsfwPolicy,
       }),
     });
-      await recordDeliveredMediaAsset({
+      await recordDeliveredMediaArtifact({
         beatId: intent.pendingMessageId,
         executionCacheKey,
         specHash: prepared.specHash,
@@ -338,7 +338,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
         status: 'blocked',
         routeSource: result.routeSource,
         routeModel: resolvedRoute.model || null,
-        assetOrigin: 'generated',
+        artifactOrigin: 'generated',
         reason: result.message,
       });
       await commitAssistantMessage({
@@ -379,7 +379,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
       status: 'failed',
       routeSource: result.routeSource || resolvedRoute.source,
       routeModel: resolvedRoute.model || null,
-      assetOrigin: 'generated',
+      artifactOrigin: 'generated',
       reason: result.message,
     });
     await commitAssistantMessage({
@@ -435,7 +435,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
   }
   if (result.status === 'ok') {
     const createdAt = new Date().toISOString();
-    await putLocalChatCachedMediaAsset({
+    await putLocalChatCachedMediaArtifact({
       executionCacheKey,
       specHash: prepared.specHash,
       kind: 'video',
@@ -452,7 +452,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
       status: 'ready',
       routeSource: result.routeSource,
       routeModel: result.routeModel || resolvedRoute.model || null,
-      assetOrigin: 'generated',
+      artifactOrigin: 'generated',
     });
     await commitAssistantMessage({
       sessionId: input.sessionId,
@@ -479,7 +479,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
         nsfwPolicy: input.nsfwPolicy,
       }),
     });
-    await recordDeliveredMediaAsset({
+    await recordDeliveredMediaArtifact({
       beatId: intent.pendingMessageId,
       executionCacheKey,
       specHash: prepared.specHash,
@@ -509,7 +509,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
       status: 'blocked',
       routeSource: result.routeSource,
       routeModel: resolvedRoute.model || null,
-      assetOrigin: 'generated',
+      artifactOrigin: 'generated',
       reason: result.message,
     });
     await commitAssistantMessage({
@@ -550,7 +550,7 @@ export async function executeMediaDecision(input: ExecuteMediaDecisionInput): Pr
     status: 'failed',
     routeSource: result.routeSource || resolvedRoute.source,
     routeModel: resolvedRoute.model || null,
-    assetOrigin: 'generated',
+    artifactOrigin: 'generated',
     reason: result.message,
   });
   await commitAssistantMessage({

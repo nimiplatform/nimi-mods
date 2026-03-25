@@ -150,7 +150,7 @@ function defaultTailPlanObject(prompt: string): Record<string, unknown> {
                     relationMove: 'friendly',
                     sceneMove: 'visual',
                     pauseMs: 520,
-                    assetRequest: {
+                    mediaRequest: {
                         kind: 'image',
                         prompt: 'cinematic night harbor portrait',
                     },
@@ -579,7 +579,7 @@ test('send-flow ignores composer media marker on plain greeting turns', async ()
                                     relationMove: 'friendly',
                                     sceneMove: '打招呼',
                                     pauseMs: 0,
-                                    assetRequest: {
+                                    mediaRequest: {
                                         kind: 'image',
                                         prompt: 'warm greeting portrait',
                                     },

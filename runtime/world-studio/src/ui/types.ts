@@ -105,7 +105,7 @@ export type WorldStudioCreatorAgentSummary = {
   stats: WorldStudioAgentStatsSummary | null;
 };
 
-export type WorldStudioMediaBindingSummary = {
+export type WorldStudioResourceBindingSummary = {
   id: string;
   targetType: string;
   targetId: string;
@@ -113,9 +113,9 @@ export type WorldStudioMediaBindingSummary = {
   priority: number;
   conditions: Record<string, unknown> | null;
   tags: string[];
-  asset: {
+  resource: {
     id: string | null;
-    mediaType: string | null;
+    resourceType: string | null;
     storageRef: string | null;
     label: string | null;
     provenance: string | null;

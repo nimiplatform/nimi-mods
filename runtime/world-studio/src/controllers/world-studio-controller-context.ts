@@ -3,7 +3,7 @@ import type {
   LandingState,
   WorldDraftSummary,
   WorldStudioCreatorAgentSummary,
-  WorldStudioMediaBindingSummary,
+  WorldStudioResourceBindingSummary,
   WorldSummary,
 } from '../ui/types.js';
 import type { Phase1Result } from '../generation/pipeline.js';
@@ -76,7 +76,7 @@ export function useWorldStudioControllerContext(input: UseWorldStudioControllerC
         || creatorAgents.find((agent) => agent.id === selectedAgentId)
         || null);
     const worldCreatorAgents = creatorAgents.filter((agent) => agent.worldId === selectedWorldId);
-    const mediaBindings = (queries.mediaBindingsQuery.data || []) as WorldStudioMediaBindingSummary[];
+    const resourceBindings = (queries.resourceBindingsQuery.data || []) as WorldStudioResourceBindingSummary[];
     const primaryWorld = worlds[0] || null;
     const latestDraft = drafts[0] || null;
     const activeTask = input.snapshot.taskState.activeTask;
@@ -132,7 +132,7 @@ export function useWorldStudioControllerContext(input: UseWorldStudioControllerC
         creatorAgents,
         worldCreatorAgents,
         selectedCreatorAgent,
-        mediaBindings,
+        resourceBindings,
         primaryWorld,
         latestDraft,
         activeTask,

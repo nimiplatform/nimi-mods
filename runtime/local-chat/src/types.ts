@@ -85,11 +85,11 @@ export type LocalChatMediaArtifactShadow = {
   mood: string;
   routeSource: LocalChatMediaRouteSource;
   routeModel: string | null;
-  assetOrigin: 'generated' | 'cache-hit';
+  artifactOrigin: 'generated' | 'cache-hit';
   shadowText: string;
 };
 
-export type LocalChatCachedMediaAsset = {
+export type LocalChatCachedMediaArtifact = {
   executionCacheKey: string;
   specHash: string;
   kind: LocalChatMediaKind;
@@ -131,7 +131,7 @@ export type ChatMessageMeta = {
   streamChunkCount?: number;
   nsfwPolicy?: 'disabled' | 'local-only' | 'allowed';
   segmentParseMode?: 'explicit-delimiter' | 'double-newline' | 'single-message';
-  mediaType?: 'image' | 'video';
+  mediaKind?: 'image' | 'video';
   mediaStatus?: 'pending' | 'ready' | 'failed' | 'blocked';
   mediaPrompt?: string;
   mediaIntentSource?: 'tag' | 'explicit' | 'planner';

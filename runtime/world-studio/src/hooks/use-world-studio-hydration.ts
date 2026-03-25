@@ -33,7 +33,7 @@ export function useWorldStudioHydration(input: {
         creatorAgentsQuery: {
             data: unknown;
         };
-        mediaBindingsQuery: {
+        resourceBindingsQuery: {
             data: unknown;
         };
     };

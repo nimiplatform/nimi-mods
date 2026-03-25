@@ -18,7 +18,7 @@ export type WorldStudioMaintainHydrationInput = {
         creatorAgentsQuery: {
             data: unknown;
         };
-        mediaBindingsQuery: {
+        resourceBindingsQuery: {
             data: unknown;
         };
     };
@@ -45,12 +45,12 @@ export function useWorldStudioMaintainHydration(input: WorldStudioMaintainHydrat
             return;
         if (!Array.isArray(input.queries.creatorAgentsQuery.data))
             return;
-        if (!Array.isArray(input.queries.mediaBindingsQuery.data))
+        if (!Array.isArray(input.queries.resourceBindingsQuery.data))
             return;
         const eventItems = input.queries.eventsQuery.data as unknown[];
         const lorebooksItems = lorebooksPayload.items as unknown[];
         const creatorAgents = input.queries.creatorAgentsQuery.data as unknown[];
-        const mediaBindings = input.queries.mediaBindingsQuery.data as unknown[];
+        const resourceBindings = input.queries.resourceBindingsQuery.data as unknown[];
         const worldOwnedAgents = creatorAgents
             .filter((item) => {
             const record = asRecord(item);
@@ -66,7 +66,7 @@ export function useWorldStudioMaintainHydration(input: WorldStudioMaintainHydrat
             String(eventItems.length),
             String(lorebooksItems.length),
             String(worldOwnedAgents.length),
-            String(mediaBindings.length),
+            String(resourceBindings.length),
         ].join(':');
         if (hydrationKey === input.lastHydratedWorldIdRef.current)
             return;
@@ -123,7 +123,7 @@ export function useWorldStudioMaintainHydration(input: WorldStudioMaintainHydrat
         input.queries.eventsQuery.data,
         input.queries.lorebooksQuery.data,
         input.queries.creatorAgentsQuery.data,
-        input.queries.mediaBindingsQuery.data,
+        input.queries.resourceBindingsQuery.data,
         input.queries.maintenanceQuery.data,
         input.selectedWorldId,
         input.snapshot.knowledgeGraph,

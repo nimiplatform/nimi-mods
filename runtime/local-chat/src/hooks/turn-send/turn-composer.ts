@@ -132,10 +132,10 @@ function parsePlanObject(input: {
         if (isSemanticallyDuplicate(text, input.sealedFirstBeatText)) {
             return;
         }
-        const kind = asString(asRecord(record.assetRequest).kind);
-        const prompt = asBeatText(asRecord(record.assetRequest).prompt);
+        const kind = asString(asRecord(record.mediaRequest).kind);
+        const prompt = asBeatText(asRecord(record.mediaRequest).prompt);
         const rawRelationMove = asString(record.relationMove || record.relation_move || input.turnMode);
-        const allowAssetRequest = input.turnMode === 'explicit-media';
+        const allowMediaRequest = input.turnMode === 'explicit-media';
         beats.push({
             beatId: `beat_${createUlid()}`,
             turnId: input.turnId,
@@ -147,7 +147,7 @@ function parsePlanObject(input: {
             modality: 'text',
             text,
             pauseMs: normalizePauseMs(record.pauseMs || record.pause_ms, index),
-            assetRequest: allowAssetRequest && (kind === 'image' || kind === 'video')
+            mediaRequest: allowMediaRequest && (kind === 'image' || kind === 'video')
                 ? {
                     kind,
                     prompt: prompt || text,

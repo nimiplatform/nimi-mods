@@ -19,7 +19,7 @@ import { deleteFirstEvent as deleteFirstEventAction } from './actions/maintain/d
 import { deleteFirstLorebook as deleteFirstLorebookAction } from './actions/maintain/delete-first-lorebook.js';
 import { createAgentsFromDrafts as createAgentsFromDraftsAction } from './actions/maintain/create-agents-from-drafts.js';
 import { updateCreatorAgentMetadata as updateCreatorAgentMetadataAction } from './actions/maintain/update-creator-agent.js';
-import { syncMediaBindings as syncMediaBindingsAction } from './actions/maintain/sync-media-bindings.js';
+import { syncResourceBindings as syncResourceBindingsAction } from './actions/maintain/sync-resource-bindings.js';
 
 type UseWorldStudioMaintainActionsInput = {
   flowId: string;
@@ -71,8 +71,8 @@ export function useWorldStudioMaintainActions(input: UseWorldStudioMaintainActio
     await updateCreatorAgentMetadataAction(context, agentId, patch);
   }, [context]);
 
-  const onSyncMediaBindings = useCallback(async (scope: 'WORLD_ASSETS' | 'AGENT_ASSETS') => {
-    await syncMediaBindingsAction(context, scope);
+  const onSyncResourceBindings = useCallback(async (scope: 'WORLD_ASSETS' | 'AGENT_ASSETS') => {
+    await syncResourceBindingsAction(context, scope);
   }, [context]);
 
   return {
@@ -84,6 +84,6 @@ export function useWorldStudioMaintainActions(input: UseWorldStudioMaintainActio
     onDeleteFirstLorebook,
     onCreateAgentsFromDrafts,
     onUpdateCreatorAgentMetadata,
-    onSyncMediaBindings,
+    onSyncResourceBindings,
   };
 }

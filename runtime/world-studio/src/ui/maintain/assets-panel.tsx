@@ -1,5 +1,5 @@
 import React from 'react';
-import type { WorldStudioCreatorAgentSummary, WorldStudioMediaBindingSummary } from '../../ui/types.js';
+import type { WorldStudioCreatorAgentSummary, WorldStudioResourceBindingSummary } from '../../ui/types.js';
 import { findLinkedCreatorAgent } from '../../services/creator-agent-link.js';
 import { useModTranslation } from "@nimiplatform/sdk/mod";
 import { asRecord } from "@nimiplatform/sdk/mod";
@@ -21,21 +21,21 @@ function SectionCard(props: {
 function RenderBindingList(props: {
   title: string;
   description?: string;
-  items: WorldStudioMediaBindingSummary[];
+  items: WorldStudioResourceBindingSummary[];
 }) {
   const { t } = useModTranslation('world-studio');
   return (
     <SectionCard title={props.title} description={props.description || t('assets.synced.description', 'These are the bindings that already exist remotely as world truth.')}>
       <div className="space-y-3">
         {props.items.length === 0 ? (
-          <p className="text-xs text-gray-500">{t('assets.synced.empty', 'No synced media bindings yet.')}</p>
+          <p className="text-xs text-gray-500">{t('assets.synced.empty', 'No synced resource bindings yet.')}</p>
         ) : props.items.map((binding) => (
           <div key={`${binding.id || binding.slot}-${binding.targetId}`} className="rounded-[18px] border border-slate-200 bg-white p-3">
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
               <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">{binding.slot}</span>
               <span>{binding.targetType}:{binding.targetId}</span>
             </div>
-            <p className="mt-2 break-all text-xs text-slate-700">{binding.asset.storageRef || t('assets.synced.noStorageRef', 'No asset storageRef')}</p>
+            <p className="mt-2 break-all text-xs text-slate-700">{binding.resource.storageRef || t('assets.synced.noStorageRef', 'No asset storageRef')}</p>
           </div>
         ))}
       </div>
@@ -82,12 +82,12 @@ function MissingCoverageCard(props: {
 }
 
 export function WorldAssetsPanel(props: {
-  mediaBindings: WorldStudioMediaBindingSummary[];
+  resourceBindings: WorldStudioResourceBindingSummary[];
   worldCoverUrl: string | null;
   locationImages: Record<string, unknown>;
 }): React.ReactElement {
   const { t } = useModTranslation('world-studio');
-  const worldBindings = props.mediaBindings.filter((item) => item.targetType === 'WORLD');
+  const worldBindings = props.resourceBindings.filter((item) => item.targetType === 'WORLD');
   const syncedSlots = new Set(worldBindings.map((item) => item.slot));
   const generatedLocations = Object.entries(props.locationImages || {})
     .map(([name, draft]) => ({
@@ -125,14 +125,14 @@ export function WorldAssetsPanel(props: {
 }
 
 export function AgentAssetsPanel(props: {
-  mediaBindings: WorldStudioMediaBindingSummary[];
+  resourceBindings: WorldStudioResourceBindingSummary[];
   creatorAgents: WorldStudioCreatorAgentSummary[];
   portraits: Record<string, unknown>;
   draftsByCharacter: Record<string, unknown>;
   worldId: string;
 }): React.ReactElement {
   const { t } = useModTranslation('world-studio');
-  const agentBindings = props.mediaBindings.filter((item) => item.targetType === 'AGENT');
+  const agentBindings = props.resourceBindings.filter((item) => item.targetType === 'AGENT');
   const localPortraits = Object.entries(props.portraits || {})
     .map(([name, draft]) => ({
       name,
@@ -155,7 +155,7 @@ export function AgentAssetsPanel(props: {
   return (
     <div className="space-y-4">
       <SummaryCards items={summaryCards} />
-      <SectionCard title={t('assets.agent.generatedTitle', 'Generated Agent Assets')} description={t('assets.agent.generatedDescription', 'These are local portrait outputs before or after they become remote media bindings.')}>
+      <SectionCard title={t('assets.agent.generatedTitle', 'Generated Agent Assets')} description={t('assets.agent.generatedDescription', 'These are local portrait outputs before or after they become remote resource bindings.')}>
         <div className="grid gap-3 lg:grid-cols-2">
           {localPortraits.length === 0 ? (
             <p className="text-xs text-gray-500">{t('assets.agent.emptyGenerated', 'No generated character portraits yet.')}</p>
