@@ -1,0 +1,30 @@
+version: 1
+codes:
+  - code: AC_INPUT_REQUIRED
+    stage: generate
+    meaning: blocked because neither sourceImage nor sourcePrompt is present
+    source_rule: AC-ERR-002
+  - code: AC_ROUTE_UNAVAILABLE
+    stage: route
+    meaning: blocked because no usable generation route is available
+    source_rule: AC-ERR-002
+  - code: AC_IMAGE_GENERATION_FAILED
+    stage: generate
+    meaning: blocked because generatedImage creation failed
+    source_rule: AC-ERR-002
+  - code: AC_TEXT_GENERATION_FAILED
+    stage: generate
+    meaning: blocked because name/bio/personaSeed/tags generation failed
+    source_rule: AC-ERR-002
+  - code: AC_HANDOFF_UNAVAILABLE
+    stage: handoff
+    meaning: blocked because the Forge handoff surface is unavailable
+    source_rule: AC-ERR-002
+  - code: AC_HANDOFF_FAILED
+    stage: handoff
+    meaning: blocked because the explicit Forge handoff request failed
+    source_rule: AC-ERR-002
+  - code: AC_DRAFT_NOT_FOUND
+    stage: draft
+    meaning: blocked because the current AgentDraft cannot be resolved
+    source_rule: AC-ERR-002

@@ -1,4 +1,43 @@
 export const MOD_SPEC_CONFIG = {
+  'agent-capture': {
+    modId: 'world.nimi.agent-capture',
+    specRoot: 'runtime/agent-capture/spec',
+    domainDoc: 'agent-capture.md',
+    rulePrefix: 'AC',
+    requiredKernelDocs: [
+      'index.md',
+      'domain-contract.md',
+      'capability-contract.md',
+      'pipeline-contract.md',
+      'error-model.md',
+      'acceptance-contract.md',
+    ],
+    tableSpecs: [
+      { input: 'capabilities.yaml', output: 'capabilities.md', title: 'Generated Capabilities' },
+      { input: 'entities.yaml', output: 'entities.md', title: 'Generated Entities' },
+      { input: 'pipeline-states.yaml', output: 'pipeline-states.md', title: 'Generated Pipeline States' },
+      { input: 'reason-codes.yaml', output: 'reason-codes.md', title: 'Generated Reason Codes' },
+      { input: 'acceptance-cases.yaml', output: 'acceptance-cases.md', title: 'Generated Acceptance Cases' },
+    ],
+    requiredAcceptanceCaseIds: [
+      'AC-001-IMPLICIT-DRAFT-ON-FIRST-INPUT',
+      'AC-002-NO-AUTO-GENERATE-ON-INPUT',
+      'AC-003-ONE-GENERATE-ONE-CURRENT-RESULT',
+      'AC-004-FEELING-LED-NOT-QUESTIONNAIRE',
+      'AC-005-STYLE-HINT-OPTIONAL',
+      'AC-006-REGENERATE-REPLACES-CURRENT-RESULT',
+      'AC-007-VISIBLE-FIELDS-EDITABLE-WITHOUT-REGENERATE',
+      'AC-008-PERSONA-SEED-NOT-DIRECTLY-EDITABLE',
+      'AC-009-SAVE-DOES-NOT-AUTO-HANDOFF',
+      'AC-010-HANDOFF-FAILURE-KEEPS-LOCAL-DRAFT',
+      'AC-011-EMPTY-DRAFT-DELETES-ON-EXIT',
+    ],
+    requiredVerificationCommands: [
+      'pnpm -C nimi-mods run generate:spec:agent-capture-kernel-docs',
+      'pnpm -C nimi-mods run check:spec:agent-capture-kernel-docs-drift',
+      'pnpm -C nimi-mods run check:spec:agent-capture-kernel-consistency',
+    ],
+  },
   'audio-book': {
     modId: 'world.nimi.audio-book',
     specRoot: 'runtime/audio-book/spec',

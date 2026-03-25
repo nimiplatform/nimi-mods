@@ -1,0 +1,61 @@
+version: 1
+pipeline:
+  name: agent-capture-flow
+  steps:
+    - step: input-start
+      order: 1
+      type: user-input
+      description: provide Image, Prompt, or Image + Prompt as the current capture source
+      source_rule: AC-PIPE-001
+    - step: draft-ensure
+      order: 2
+      type: deterministic
+      description: implicitly create or reuse the current AgentDraft after the first valid input
+      source_rule: AC-PIPE-001
+    - step: capture-dialog
+      order: 3
+      type: user-input
+      description: conduct feeling-led dialogue to help the user and system converge on the character sense
+      source_rule: AC-PIPE-001
+    - step: style-adjust
+      order: 4
+      type: user-input
+      description: user may add, change, or skip styleHint before generation
+      source_rule: AC-PIPE-002
+    - step: agent-generate
+      order: 5
+      type: generation
+      description: explicit Generate Agent action produces one current generatedImage with name, bio, personaSeed, and tags
+      source_rule: AC-PIPE-001
+    - step: draft-curate
+      order: 6
+      type: user-input
+      description: user may edit name, bio, and tags, regenerate the current result, or keep the current draft
+      source_rule: AC-PIPE-004
+    - step: stop-or-handoff
+      order: 7
+      type: user-input
+      description: user may stop at the current draft or explicitly request handoff to Forge
+      source_rule: AC-PIPE-004
+
+result_policy:
+  auto_generation_on_input: false
+  generation_unit: one-generate-to-one-current-agent-result
+  history_retention: replace-current-result-only
+  source_rule: AC-PIPE-003
+
+conversation_policy:
+  questionnaire_mode_forbidden: true
+  feeling_led_capture_required: true
+  source_rule: AC-PIPE-001
+
+handoff_policy:
+  explicit_handoff_only: true
+  default_handoff_target: forge
+  local_draft_retained_on_handoff_failure: true
+  source_rule: AC-PIPE-004
+
+empty_draft_cleanup:
+  retain_while_context_open: true
+  delete_on_context_exit: true
+  source_rule: AC-PIPE-005
