@@ -4,6 +4,7 @@ import { cloneDefaultSnapshot } from '../src/state/workspace/defaults.ts';
 import { findLinkedCreatorAgent } from '../src/services/creator-agent-link.ts';
 import { syncResourceBindings } from '../src/hooks/actions/maintain/sync-resource-bindings.ts';
 import { reloadRemoteForConflict } from '../src/hooks/actions/conflict/reload-remote.ts';
+import { resolveEventWorkbenchSelection } from '../src/ui/shared/event-graph-workbench.tsx';
 
 test('findLinkedCreatorAgent prefers stable handle matching before displayName fallback', () => {
   const creatorAgents = [
@@ -159,4 +160,56 @@ test('reloadRemoteForConflict uses creator agent refetch result when restoring s
 
   assert.equal(patched?.panel?.selectedAgentId, 'agent-1');
   assert.match(context.lastHydratedWorldIdRef.current, /^world-1:snap-2:/);
+});
+
+test('resolveEventWorkbenchSelection keeps secondary selection on the selected secondary card', () => {
+  const selection = resolveEventWorkbenchSelection({
+    graph: {
+      primary: [
+        {
+          id: 'primary-1',
+          title: '掌天瓶发现',
+          summary: '',
+          cause: '',
+          process: '',
+          result: '',
+          level: 'PRIMARY',
+          parentEventId: null,
+          timeRef: '',
+          locationRefs: [],
+          characterRefs: [],
+          dependsOnEventIds: [],
+          evidenceRefs: [],
+          confidence: 1,
+          needsEvidence: false,
+          eventHorizon: 'PAST',
+        },
+      ],
+      secondary: [
+        {
+          id: 'secondary-1',
+          title: '七玄门夺旗大赛',
+          summary: '',
+          cause: '',
+          process: '',
+          result: '',
+          level: 'SECONDARY',
+          parentEventId: 'primary-1',
+          timeRef: '',
+          locationRefs: [],
+          characterRefs: [],
+          dependsOnEventIds: [],
+          evidenceRefs: [],
+          confidence: 1,
+          needsEvidence: false,
+          eventHorizon: 'PAST',
+        },
+      ],
+    },
+    selectedEventId: 'secondary-1',
+  });
+
+  assert.equal(selection.selected?.id, 'secondary-1');
+  assert.equal(selection.selected?.level, 'SECONDARY');
+  assert.equal(selection.activePrimaryId, 'primary-1');
 });

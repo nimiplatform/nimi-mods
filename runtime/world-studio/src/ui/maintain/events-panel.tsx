@@ -1,6 +1,7 @@
 import React from 'react';
 import type { EventNodeDraft } from '../../contracts.js';
-import { EventGraphMaintenance } from './event-graph-maintenance.js';
+import { EventGraphWorkbench } from '../shared/event-graph-workbench.js';
+import { useModTranslation } from "@nimiplatform/sdk/mod";
 
 type EventsPanelProps = {
   events: {
@@ -23,32 +24,35 @@ type EventsPanelProps = {
 };
 
 export function EventsPanel(props: EventsPanelProps) {
+  const { t } = useModTranslation('world-studio');
   const graph = props.events;
   const totalEvents = graph.primary.length + graph.secondary.length;
 
   return (
-    <EventGraphMaintenance
+    <EventGraphWorkbench
+      title={t('eventGraphMaintenance.title', 'Events (Primary / Secondary)')}
       events={graph}
-      syncMode={props.syncMode}
-      editorSnapshotVersion={props.editorSnapshotVersion}
       layout={props.eventGraphLayout}
-      working={props.working}
-      onSyncModeChange={props.onSyncModeChange}
-      onSyncEvents={() => {
-        if (props.syncMode === 'replace' && totalEvents > 0) {
-          const confirmed = typeof window !== 'undefined'
-            ? window.confirm(
-              'Replace mode will archive current active remote events and rewrite them from your graph. Continue?',
-            )
-            : true;
-          if (!confirmed) return;
-        }
-        props.onSyncEvents();
-      }}
-      onDeleteFirstEvent={props.onDeleteFirstEvent}
-      onLayoutChange={props.onEventGraphLayoutChange}
       onEventsChange={props.onEventsChange}
-      showActions={props.showActions}
+      onLayoutChange={props.onEventGraphLayoutChange}
+      sync={{
+        mode: props.syncMode,
+        snapshotVersion: props.editorSnapshotVersion,
+        showActions: props.showActions,
+        working: props.working,
+        onModeChange: props.onSyncModeChange,
+        onSync: () => {
+          if (props.syncMode === 'replace' && totalEvents > 0) {
+            const confirmed = typeof window !== 'undefined'
+              ? window.confirm(
+                'Replace mode will archive current active remote events and rewrite them from your graph. Continue?',
+              )
+              : true;
+            if (!confirmed) return;
+          }
+          props.onSyncEvents();
+        },
+      }}
     />
   );
 }

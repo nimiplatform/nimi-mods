@@ -3,7 +3,7 @@ import { WorldBasePanel } from './world-base-panel.js';
 import { WorldviewPanel } from './worldview-panel.js';
 import { EventsPanel } from './events-panel.js';
 import { LorebooksPanel } from './lorebooks-panel.js';
-import { AgentsRegistryPanel, AgentEditorPanel } from './agents-panel.js';
+import { AgentsRegistryPanel } from './agents-panel.js';
 import { WorldAssetsPanel, AgentAssetsPanel } from './assets-panel.js';
 import { ReleaseDraftsPanel, ReleaseHistoryPanel, ReleasePublishPanel } from './releases-panel.js';
 import { SectionNav } from './section-nav.js';
@@ -51,10 +51,10 @@ function ConflictBanner(props: {
           type="button"
           className="rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900"
           onClick={() => {
-            void props.actions.reloadRemote();
+            void props.actions.reloadFromRemote();
           }}
         >
-          {t('maintain.reloadRemoteSnapshot', 'Reload Remote Snapshot')}
+          {t('maintain.reloadFromRemoteSnapshot', 'Reload From Remote Snapshot')}
         </button>
         <button
           type="button"
@@ -67,21 +67,11 @@ function ConflictBanner(props: {
           type="button"
           className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-60"
           onClick={() => {
-            void props.actions.saveMaintenance({ force: true });
+            void props.actions.syncToRemote({ force: true });
           }}
           disabled={props.working}
         >
-          {t('maintain.forceSave', 'Force Save')}
-        </button>
-        <button
-          type="button"
-          className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-60"
-          onClick={() => {
-            void props.actions.syncEvents({ force: true });
-          }}
-          disabled={props.working}
-        >
-          {t('maintain.forceSyncEvents', 'Force Sync Events')}
+          {t('maintain.forceSyncToRemote', 'Force Sync To Remote')}
         </button>
       </div>
     </div>
@@ -92,6 +82,23 @@ function MaintainObjectHeader(props: MaintainWorkbenchProps): React.ReactElement
   const { t } = useModTranslation('world-studio');
   const worldName = String(props.main.snapshot.worldPatch.name || '').trim();
   const missingEvidenceCount = props.status.missingPrimaryEvidenceCount;
+  const localSavedAtLabel = (() => {
+    if (!props.status.localWorkspaceSavedAt) {
+      return t('maintain.localWorkspaceAutoSaved', 'Local workspace auto-save is enabled.');
+    }
+    const timestamp = new Date(props.status.localWorkspaceSavedAt);
+    if (Number.isNaN(timestamp.getTime())) {
+      return t('maintain.localWorkspaceSaved', 'Local workspace saved.');
+    }
+    return t('maintain.localWorkspaceSavedAt', 'Local workspace saved at {{value}}.', {
+      value: timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    });
+  })();
+  const remoteSyncLabel = props.layout.dirtySummary.hasDirty
+    ? t('maintain.remoteSyncPending', 'These sections still need remote sync: {{value}}', {
+        value: props.layout.dirtySummary.labels.join(', '),
+      })
+    : t('maintain.remoteSyncClean', 'Current edits are synced to the remote snapshot.');
   return (
     <section className="rounded-[28px] border border-white/80 bg-white/88 p-5 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -102,6 +109,9 @@ function MaintainObjectHeader(props: MaintainWorkbenchProps): React.ReactElement
           <h3 className="mt-1 text-lg font-semibold text-gray-900">
             {worldName || props.workflow.selectedWorldId || t('maintain.untitledWorld', 'Untitled world')}
           </h3>
+          <p className="mt-2 text-xs text-slate-500">
+            {t('maintain.headerDescription', 'You are currently editing this world. The information below shows the current snapshot, local edit state, and key world stats.')}
+          </p>
           <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-600">
             <span>{t('maintain.worldId', 'World ID: {{value}}', { value: props.workflow.selectedWorldId || '-' })}</span>
             <span>{t('maintain.snapshotVersion', 'Snapshot: {{value}}', { value: props.status.maintenanceEditorSnapshotVersion || '-' })}</span>
@@ -111,17 +121,20 @@ function MaintainObjectHeader(props: MaintainWorkbenchProps): React.ReactElement
           {props.layout.dirtySummary.shortLabel}
         </div>
       </div>
-      {props.layout.dirtySummary.hasDirty ? (
-        <p className="mt-3 text-xs text-amber-700">
-          {t('maintain.unsavedPanels', 'Unsaved panels: {{value}}', {
-            value: props.layout.dirtySummary.labels.join(', '),
-          })}
+      <div className="mt-3 space-y-2">
+        <p className="text-xs text-slate-600">
+          <span className="font-semibold text-slate-700">
+            {t('maintain.localWorkspaceStatusLabel', 'Local Workspace')}:
+          </span>{' '}
+          {localSavedAtLabel}
         </p>
-      ) : (
-        <p className="mt-3 text-xs text-emerald-700">
-          {t('maintain.savedState', 'Local edits are synced with the current snapshot.')}
+        <p className={`text-xs ${props.layout.dirtySummary.hasDirty ? 'text-amber-700' : 'text-emerald-700'}`}>
+          <span className="font-semibold">
+            {t('maintain.remoteSyncStatusLabel', 'Remote Sync')}:
+          </span>{' '}
+          {remoteSyncLabel}
         </p>
-      )}
+      </div>
       <div className="mt-3 flex flex-wrap gap-2">
         <span className="rounded-full bg-[#eef5f5] px-3 py-1 text-xs font-medium text-slate-600">
           {t('studioStatus.primary', 'Primary')} {props.status.primaryEventCount}
@@ -146,7 +159,9 @@ function MaintainObjectHeader(props: MaintainWorkbenchProps): React.ReactElement
 function SectionContextCard(props: {
   workflow: WorldStudioWorkflowSlice;
 }): React.ReactElement {
-  const section = props.workflow.activeSection;
+  const section = props.workflow.activeDomain === 'AGENTS' && props.workflow.activeSection === 'EDITOR'
+    ? 'REGISTRY'
+    : props.workflow.activeSection;
   const sectionCopy: Record<string, { title: string; description: string; summary: string }> = {
     BASE: {
       title: worldStudioMessage('maintain.section.baseTitle', 'World identity'),
@@ -154,9 +169,9 @@ function SectionContextCard(props: {
       summary: worldStudioMessage('maintain.section.baseSummary', 'Edit the world name, layered copy, classification, and descriptive context in one place.'),
     },
     WORLDVIEW: {
-      title: worldStudioMessage('maintain.section.worldviewTitle', 'World rules'),
+      title: worldStudioMessage('maintain.section.worldviewTitle', 'Worldview Guide'),
       description: worldStudioMessage('maintain.section.worldviewDescription', 'Maintain how the world works, how it is structured, and how creators should reason about it.'),
-      summary: worldStudioMessage('maintain.section.worldviewSummary', 'Group edits by time rules, systems, culture, structure, and narrative support.'),
+      summary: worldStudioMessage('maintain.section.worldviewSummary', 'Start from the module overview, then drill down into the entries that need editing.'),
     },
     WORLD_EVENTS: {
       title: worldStudioMessage('maintain.section.eventsTitle', 'World timeline'),
@@ -170,17 +185,17 @@ function SectionContextCard(props: {
     },
     REGISTRY: {
       title: worldStudioMessage('maintain.section.registryTitle', 'Agent roster'),
-      description: worldStudioMessage('maintain.section.registryDescription', 'See which characters already exist remotely and which draft candidates still need an agent record.'),
-      summary: worldStudioMessage('maintain.section.registrySummary', 'The registry helps you decide whether the next step is create, review, or edit metadata.'),
+      description: worldStudioMessage('maintain.section.registryDescription', 'Start from the roster, inspect one agent at a time, and enter focused metadata editing only when that specific agent needs work.'),
+      summary: worldStudioMessage('maintain.section.registrySummary', 'This page should stay roster-first: scan the world-owned agents, inspect one, then enter focused editing for that agent only when needed.'),
     },
     EDITOR: {
-      title: worldStudioMessage('maintain.section.editorTitle', 'Agent metadata'),
-      description: worldStudioMessage('maintain.section.editorDescription', 'Inspect readable agent truth, watch runtime signal, and edit the metadata fields that are currently writable.'),
-      summary: worldStudioMessage('maintain.section.editorSummary', 'Full persona editing remains future-facing; this surface focuses on readable truth plus safe metadata updates.'),
+      title: worldStudioMessage('maintain.section.editorTitle', 'Focused agent metadata'),
+      description: worldStudioMessage('maintain.section.editorDescription', 'This focused editor belongs to the currently selected agent only. Inspect its truth, watch runtime signal, and edit the metadata fields that are currently writable.'),
+      summary: worldStudioMessage('maintain.section.editorSummary', 'Full persona editing remains future-facing; this view is a focused editor for one agent, not a top-level mode for the whole roster.'),
     },
     WORLD_ASSETS: {
       title: worldStudioMessage('maintain.section.worldAssetsTitle', 'World asset coverage'),
-      description: worldStudioMessage('maintain.section.worldAssetsDescription', 'Compare generated assets, synced resource bindings, and missing world asset coverage.'),
+      description: worldStudioMessage('maintain.section.worldAssetsDescription', 'Compare generated assets, synced bindings, and missing world asset coverage.'),
       summary: worldStudioMessage('maintain.section.worldAssetsSummary', 'The next step should be obvious: generate, sync, or verify.'),
     },
     AGENT_ASSETS: {
@@ -222,151 +237,47 @@ function SectionContextCard(props: {
 }
 
 function renderContextualActionBar(props: MaintainWorkbenchProps): React.ReactElement {
-  const section = props.workflow.activeSection;
   const disabled = props.main.working || !props.workflow.selectedWorldId;
-  if (section === 'BASE' || section === 'WORLDVIEW') {
-    return (
+  return (
+    <>
+      <button
+        type="button"
+        className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 disabled:opacity-60"
+        onClick={() => {
+          void props.actions.maintain.saveLocalWorkspace();
+        }}
+        disabled={disabled}
+      >
+        {worldStudioMessage('maintain.saveLocal', 'Save Local')}
+      </button>
       <button
         type="button"
         className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
         onClick={() => {
-          void props.actions.maintain.saveMaintenance();
+          void props.actions.maintain.syncWorkspaceToRemote();
         }}
         disabled={disabled}
       >
-        {worldStudioMessage('maintain.save', 'Save')}
+        {worldStudioMessage('maintain.syncToRemote', 'Sync To Remote')}
       </button>
-    );
-  }
-  if (section === 'EDITOR') {
-    return (
       <button
-        type="submit"
-        form="world-studio-agent-editor-form"
-        className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
-        disabled={props.main.working || !props.workflow.selectedAgentId}
+        type="button"
+        className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 disabled:opacity-60"
+        onClick={() => {
+          void props.actions.maintain.reloadFromRemote();
+        }}
+        disabled={disabled}
       >
-        {worldStudioMessage('maintain.saveAgentMetadata', 'Save Agent Metadata')}
+        {worldStudioMessage('maintain.reloadFromRemote', 'Reload From Remote')}
       </button>
-    );
-  }
-  if (section === 'WORLD_EVENTS') {
-    return (
-      <>
-        <button
-          type="button"
-          className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
-          onClick={() => {
-            void props.actions.maintain.syncEvents();
-          }}
-          disabled={disabled}
-        >
-          {worldStudioMessage('maintain.syncEvents', 'Sync Events')}
-        </button>
-        <button
-          type="button"
-          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 disabled:opacity-60"
-          onClick={() => {
-            void props.actions.maintain.deleteFirstEvent();
-          }}
-          disabled={disabled}
-        >
-          {worldStudioMessage('maintain.deleteFirstEvent', 'Delete First Event')}
-        </button>
-      </>
-    );
-  }
-  if (section === 'LOREBOOKS') {
-    return (
-      <>
-        <button
-          type="button"
-          className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
-          onClick={() => {
-            void props.actions.maintain.syncLorebooks();
-          }}
-          disabled={disabled}
-        >
-          {worldStudioMessage('maintain.syncLorebooks', 'Sync Lorebooks')}
-        </button>
-        <button
-          type="button"
-          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 disabled:opacity-60"
-          onClick={() => {
-            void props.actions.maintain.deleteFirstLorebook();
-          }}
-          disabled={disabled}
-        >
-          {worldStudioMessage('maintain.deleteFirstLorebook', 'Delete First Lorebook')}
-        </button>
-      </>
-    );
-  }
-  if (section === 'REGISTRY') {
-    return (
-      <>
-        <button
-          type="button"
-          className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
-          onClick={() => {
-            void props.actions.maintain.createAgentsFromDrafts();
-          }}
-          disabled={disabled}
-        >
-          {worldStudioMessage('maintain.createMissingDraftAgents', 'Create Missing Draft Agents')}
-        </button>
-      </>
-    );
-  }
-  if (section === 'WORLD_ASSETS' || section === 'AGENT_ASSETS') {
-    return (
-      <>
-        <button
-          type="button"
-          className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
-          onClick={() => {
-            void props.actions.maintain.syncResourceBindings(section);
-          }}
-          disabled={disabled}
-        >
-          {section === 'WORLD_ASSETS'
-            ? worldStudioMessage('maintain.syncWorldAssets', 'Sync World Assets')
-            : worldStudioMessage('maintain.syncAgentAssets', 'Sync Agent Assets')}
-        </button>
-      </>
-    );
-  }
-  if (section === 'DRAFTS') {
-    return (
-      <>
-        <button
-          type="button"
-          className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white"
-          onClick={() => props.actions.workflow.openCreate(null)}
-        >
-          {worldStudioMessage('releases.drafts.newDraft', 'New Draft')}
-        </button>
-      </>
-    );
-  }
-  if (section === 'PUBLISH') {
-    return (
-      <>
-        <button
-          type="button"
-          className="ui-sync-btn ui-sync-btn-primary rounded-md px-3 py-1.5 text-xs font-semibold text-white"
-          onClick={() => props.actions.workflow.openCreate(props.workflow.selectedDraftId || null)}
-        >
-          {worldStudioMessage('releases.publish.openFlow', 'Open Publish Flow')}
-        </button>
-      </>
-    );
-  }
-  return <></>;
+    </>
+  );
 }
 
 function renderMaintainSection(props: MaintainWorkbenchProps): React.ReactElement | null {
-  const section = props.workflow.activeSection;
+  const section = props.workflow.activeDomain === 'AGENTS' && props.workflow.activeSection === 'EDITOR'
+    ? 'REGISTRY'
+    : props.workflow.activeSection;
   if (section === 'BASE') {
     return (
       <WorldBasePanel
@@ -413,9 +324,6 @@ function renderMaintainSection(props: MaintainWorkbenchProps): React.ReactElemen
         onSyncLorebooks={() => {
           void props.actions.maintain.syncLorebooks();
         }}
-        onDeleteFirstLorebook={() => {
-          void props.actions.maintain.deleteFirstLorebook();
-        }}
         showActions={false}
       />
     );
@@ -431,21 +339,16 @@ function renderMaintainSection(props: MaintainWorkbenchProps): React.ReactElemen
       <AgentsRegistryPanel
         world={currentWorld}
         creatorAgents={props.main.creatorAgents}
+        selectedAgent={props.main.selectedCreatorAgent}
         selectedAgentId={props.workflow.selectedAgentId}
         draftCharacterNames={draftCharacterNames}
         draftsByCharacter={props.main.snapshot.agentSync.draftsByCharacter}
+        working={props.main.working}
         onSelectAgent={props.actions.workflow.selectMaintainAgent}
         onCreateAgentsFromDrafts={(characterNames) => {
           void props.actions.maintain.createAgentsFromDrafts(characterNames);
         }}
-      />
-    );
-  }
-  if (section === 'EDITOR') {
-    return (
-      <AgentEditorPanel
-        agent={props.main.selectedCreatorAgent}
-        onSave={(agentId, patch) => props.actions.maintain.updateCreatorAgentMetadata(agentId, patch)}
+        onSaveAgentMetadata={(agentId, patch) => props.actions.maintain.updateCreatorAgentMetadata(agentId, patch)}
         onDirtyChange={(dirty) => props.actions.maintain.setSectionDirty('agentEditor', dirty)}
       />
     );
@@ -506,7 +409,9 @@ export function MaintainWorkbench(props: MaintainWorkbenchProps) {
         <div className="space-y-4">
           <SectionNav
             activeDomain={props.workflow.activeDomain}
-            activeSection={props.workflow.activeSection}
+            activeSection={props.workflow.activeDomain === 'AGENTS' && props.workflow.activeSection === 'EDITOR'
+              ? 'REGISTRY'
+              : props.workflow.activeSection}
             onSelectSection={props.actions.workflow.selectMaintainSection}
           />
           <MaintainObjectHeader {...props} />
@@ -518,15 +423,6 @@ export function MaintainWorkbench(props: MaintainWorkbenchProps) {
 
       <StickyActionBar>
         {renderContextualActionBar(props)}
-        <button
-          type="button"
-          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700"
-          onClick={() => {
-            void props.actions.maintain.refreshResources();
-          }}
-        >
-          {worldStudioMessage('maintain.reloadRemote', 'Refresh Remote')}
-        </button>
       </StickyActionBar>
     </div>
   );

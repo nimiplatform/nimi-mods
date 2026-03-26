@@ -283,6 +283,10 @@
     "noFieldsYet": "还没有字段。",
     "keyPlaceholder": "键",
     "valuePlaceholder": "值",
+    "inspect": "检查",
+    "focusEdit": "专注编辑",
+    "quickOverview": "快速概览",
+    "close": "关闭",
     "deleteShort": "删",
     "rawJsonDebug": "原始 JSON（调试）"
   },
@@ -405,6 +409,17 @@
     "title": "世界基础信息",
     "description": "用于编辑世界核心设定的结构化面板。",
     "explainer": "这里维护世界身份卡和发布用说明文案；时间规则仍归 worldview.timeModel，时钟 truth 目前只在这里只读展示。",
+    "summaryTitle": "总览",
+    "summaryHint": "这里只负责世界基础信息与发布说明；更深的时间与规则仍在世界观页。",
+    "commonFieldsTitle": "常用字段编辑",
+    "commonFieldsLabel": "可直接编辑的基础字段",
+    "commonFieldsNote": "这里直接改可展示、可发布的基础字段；更深的时间与规则仍在世界观页。",
+    "clockDisclosure": "运行时时钟（只读）",
+    "deepEditTitle": "必要时深编辑",
+    "deepEditLabel": "深层检查与运行时时钟",
+    "deepEditNote": "这里只在需要核对运行时时钟 truth 时打开，不把它做成复杂结构编辑器。",
+    "rawJsonLabel": "原始世界补丁（只读）",
+    "rawJsonEmpty": "当前没有可展示的原始补丁。",
     "name": "名称",
     "genre": "类型",
     "tagline": "副标题",
@@ -433,6 +448,117 @@
     "requiredModules": "必填模块：`timeModel`、`spaceTopology`、`causality`、`coreSystem`。",
     "missingModules": "以下模块缺失或为空：{{modules}}",
     "ready": "必填世界观模块已齐备。",
+    "shared": {
+      "itemLabel": "第 {{index}} 项"
+    },
+    "summary": {
+      "empty": "空",
+      "emptyText": "空文本",
+      "booleanTrue": "是",
+      "booleanFalse": "否",
+      "emptyList": "空列表",
+      "itemList": "{{count}} 个条目",
+      "nestedItems": "{{count}} 个嵌套条目",
+      "emptyObject": "空对象",
+      "fields": "{{count}} 个字段",
+      "value": "值"
+    },
+    "preview": {
+      "item": "第 {{index}} 项"
+    },
+    "kind": {
+      "primitive": "基础值",
+      "object": "对象",
+      "array": "数组"
+    },
+    "patternHint": "当前模式是：先用总览选中这一层，再用检查抽屉做快速判断，最后用专注编辑器处理深层结构。",
+    "modules": {
+      "timeModel": {
+        "title": "时间模型",
+        "description": "维护历法、时间锚点，以及这个世界里时间如何流动的规则。"
+      },
+      "lifecycle": {
+        "title": "生命周期",
+        "description": "维护长期阶段、循环变化，以及生命或系统如何随时间推进。"
+      },
+      "coreSystem": {
+        "title": "核心系统",
+        "description": "维护定义世界运作方式的规则、体系、限制条件和共享机制。"
+      },
+      "causality": {
+        "title": "因果机制",
+        "description": "维护变化如何发生、后果如何传导，以及结果如何保持一致。"
+      },
+      "languages": {
+        "title": "语言",
+        "description": "维护世界本身及其 inhabitants 共用的语言 truth。"
+      },
+      "existences": {
+        "title": "存在形态",
+        "description": "维护这个世界允许存在的种族、生灵和生命形态。"
+      },
+      "resources": {
+        "title": "资源体系",
+        "description": "维护稀缺性、材料、货币以及资源如何流动。"
+      },
+      "spaceTopology": {
+        "title": "空间拓扑",
+        "description": "维护地点、边界、旅行路径，以及世界的空间组织方式。"
+      },
+      "structures": {
+        "title": "组织结构",
+        "description": "维护势力、组织和塑造社会秩序的结构骨架。"
+      },
+      "visualGuide": {
+        "title": "视觉参考",
+        "description": "维护视觉母题、审美锚点和参考，确保世界在视觉上保持一致。"
+      },
+      "narrativeHooks": {
+        "title": "叙事钩子",
+        "description": "维护主题、张力和故事入口，支撑后续草稿与发布审查。"
+      }
+    },
+    "tabs": {
+      "fields": "字段",
+      "raw": "原始 JSON"
+    },
+    "mode": {
+      "overview": "总览",
+      "inspect": "检查抽屉",
+      "focus": "专注编辑"
+    },
+    "card": {
+      "ready": "已齐备",
+      "missing": "较薄",
+      "fields": "{{count}} 个字段",
+      "nested": "{{count}} 个深层项"
+    },
+    "drawer": {
+      "closeOverlay": "关闭世界观抽屉",
+      "label": "检查",
+      "defaultDescription": "先检查这一层，再决定是否需要进入更深的编辑。",
+      "nextLayer": "更深一层的对象",
+      "openFocus": "专注编辑"
+    },
+    "editor": {
+      "arrayItems": "数组项",
+      "arrayHint": "每行一个条目。",
+      "nestedItems": "嵌套条目",
+      "addItem": "新增条目",
+      "inspect": "检查",
+      "objectFields": "对象字段",
+      "objectHint": "基础字段可直接在这里编辑；嵌套字段可以再往下一层检查。",
+      "openItems": "打开条目"
+    },
+    "focus": {
+      "label": "专注编辑器",
+      "backOneLevel": "返回上一层",
+      "backToInspect": "返回检查抽屉",
+      "backToOverview": "返回总览",
+      "moduleLabel": "模块",
+      "currentLayer": "当前层级",
+      "noChildren": "这一层没有更深的对象。"
+    },
     "groups": {
       "timeTitle": "时间与生命周期",
       "timeDescription": "维护时间如何流动、如何建模，以及世界长期阶段如何被描述。",
@@ -447,33 +573,78 @@
     }
   },
   "lorebooks": {
-    "title": "知识条目 / Knowledge Base",
-    "description": "结构化知识条目编辑。原始 JSON 仅用于调试。",
+    "title": "知识条目",
+    "description": "先从总览中选中条目，再用检查抽屉做快速修改；需要处理复杂内容时再进入专注编辑。",
     "addLorebook": "新增知识条目",
     "invalidRows": "有 {{count}} 条知识条目缺少 `key`，同步前请先修正。",
     "empty": "还没有知识条目。",
     "key": "key",
-    "name": "name",
-    "namePlaceholder": "短标题",
+    "name": "标题",
+    "namePlaceholder": "知识条目标题",
     "content": "content",
     "contentPlaceholder": "供 LLM 读取的完整段落",
     "keywords": "keywords",
     "keywordsPlaceholder": "逗号分隔关键词",
     "validFrom": "validFrom",
+    "validTo": "validTo",
     "priority": "priority",
     "constant": "constant",
     "enabled": "enabled",
     "value": "value",
     "provenance": "provenance",
+    "emptyContent": "还没有内容",
+    "summaryTotal": "总计 {{count}}",
+    "summaryEnabled": "已启用 {{count}}",
+    "summaryInvalid": "无效 {{count}}",
+    "always": "始终有效",
+    "from": "自 {{value}} 起",
+    "until": "到 {{value}} 为止",
+    "validRange": "{{from}} -> {{to}}",
+    "enabledBadge": "已启用",
+    "disabledBadge": "已停用",
+    "invalidKey": "缺少键",
+    "noKey": "未设置键",
+    "complexFields": "复杂字段",
+    "valueFields": "结构值：{{count}} 个字段",
+    "provenanceFields": "来源信息：{{count}} 个字段",
+    "focusTitle": "专注编辑器",
+    "listLabel": "知识条目列表",
+    "rawTitle": "原始 JSON",
+    "keywordsEmpty": "暂无关键词",
+    "inspectDescription": "先检查这一条，再决定是否进入更深的编辑。",
     "deleteLorebook": "删除知识条目",
     "bulkUpdate": "批量更新知识条目",
-    "deleteFirst": "删除第一条知识条目"
+    "deleteFirst": "删除第一条知识条目",
+    "structure": {
+      "rootHint": "先在这里查看顶层字段；遇到嵌套对象时，可以继续往下一层检查。",
+      "pathHint": "当前正在编辑 {{value}}。",
+      "objectHint": "简单字段可直接改，嵌套对象和数组可继续下探一层。",
+      "nestedHint": "打开这个字段后，可以继续检查更深层结构。",
+      "arrayHint": "每行一个简单条目。",
+      "arrayNestedHint": "数组里的复杂条目也可以继续下探编辑。",
+      "addItem": "新增条目",
+      "item": "条目 {{index}}",
+      "empty": "空",
+      "emptyText": "空文本",
+      "true": "是",
+      "false": "否",
+      "emptyList": "空列表",
+      "items": "{{count}} 个条目",
+      "emptyObject": "空对象",
+      "fields": "{{count}} 个字段",
+      "value": "值"
+    }
   },
   "eventGraphMaintenance": {
     "title": "事件（主线 / 支线）",
     "snapshot": "快照：{{value}}",
     "eventSummary": "事件：总计 {{total}} · 主线 {{primary}} · 支线 {{secondary}}",
     "evidenceSummary": "主线缺证据：{{missing}} · 孤立支线：{{orphan}}",
+    "inspectLabel": "检查",
+    "focusLabel": "专注编辑",
+    "openFocus": "专注编辑",
+    "backToInspect": "返回检查",
+    "backToOverview": "返回总览",
     "bulkSyncMode": "批量同步模式",
     "mergeLabel": "merge（增量更新）",
     "replaceLabel": "replace（重写当前活动图）",
@@ -496,7 +667,21 @@
     "secondaryEvents": "支线事件",
     "secondaryCount": "支线 {{count}}",
     "evidenceCount": "证据 {{count}}",
+    "evidenceLabel": "证据",
+    "dependencyLabel": "依赖",
+    "characterRefsLabel": "角色引用",
+    "locationRefsLabel": "地点引用",
     "parentEvent": "父事件：{{value}}",
+    "parentEventMissing": "父事件缺失",
+    "selectedSecondaryCount": "支线 {{count}}",
+    "selectedMissingDeps": "缺失依赖 {{count}}",
+    "selectedDepsHealthy": "依赖健康",
+    "selectedSelfRef": "存在自引用",
+    "selectedCycle": "位于环路中",
+    "selectedMissingEvidence": "主线证据缺失",
+    "selectedEvidenceReady": "主线证据齐备",
+    "summaryLabel": "摘要",
+    "summaryEmpty": "还没有摘要。进入专注编辑后，可以补充事件背景、起因、过程和结果。",
     "noPrimaryEvents": "还没有主线事件。",
     "noSecondaryEventsForParent": "当前选中父事件下没有支线事件。",
     "selectEventToEdit": "请选择一个事件后再编辑详情。",
@@ -626,9 +811,9 @@
     "releaseDrafts": "草稿",
     "releasePublish": "发布",
     "releaseHistory": "历史",
-    "clean": "已保存",
-    "single": "1 处未保存修改",
-    "multiple": "{{count}} 处未保存修改"
+    "clean": "已同步远端",
+    "single": "1 处待同步修改",
+    "multiple": "{{count}} 处待同步修改"
   },
   "header": {
     "currentWorld": "世界：{{name}}",
@@ -726,7 +911,9 @@
         "pendingDrafts": "待补建草稿候选",
         "activeHere": "当前世界活跃"
       },
-      "pendingHint": "还有 {{count}} 个草稿候选尚未建立远端角色，素材同步前最好先补齐。"
+      "pendingHint": "还有 {{count}} 个草稿候选尚未建立远端角色，素材同步前最好先补齐。",
+      "linkedHint": "已连接到远端角色 {{value}}。",
+      "focusSummary": "专注编辑只属于当前选中的角色；先在总览里筛选和检查，再进入该角色自己的元数据编辑。"
     },
     "editor": {
       "title": "角色编辑",
@@ -760,10 +947,22 @@
       "tags": "标签",
       "webhookUrl": "Webhook URL",
       "capabilitiesJson": "Capabilities JSON",
-      "dnaSnapshot": "DNA 快照"
+      "dnaSnapshot": "DNA 快照",
+      "backToInspect": "返回当前角色",
+      "backToRoster": "返回角色总览"
     }
   },
   "assets": {
+    "inspect": {
+      "open": "检查",
+      "generatedLocal": "本地已生成",
+      "syncedBinding": "远端已绑定",
+      "storageRef": "素材地址",
+      "linkedAgent": "关联远端角色",
+      "tags": "标签",
+      "conditions": "条件",
+      "none": "无"
+    },
     "missing": {
       "none": "当前跟踪的素材槽位都已覆盖。"
     },
@@ -775,7 +974,11 @@
     "world": {
       "generatedTitle": "已生成的世界素材",
       "generatedDescription": "这里展示创建流或维护流已经生成出来的本地世界素材。",
+      "emptyGenerated": "当前还没有可检查的本地世界素材。",
       "cover": "世界封面：{{value}}",
+      "coverItemTitle": "世界封面",
+      "locationItemBadge": "地点图片",
+      "locationItemSummary": "这是当前本地生成的地点图片。",
       "noGeneratedCover": "还没有生成封面",
       "locationImages": "已生成地点图片：{{count}}",
       "syncedTitle": "已同步的世界素材",
@@ -792,6 +995,8 @@
       "generatedTitle": "已生成的角色素材",
       "generatedDescription": "这里展示本地已生成的角色立绘，无论是否已经绑定到远端角色。",
       "emptyGenerated": "当前还没有生成角色立绘。",
+      "linked": "已关联",
+      "unlinked": "待关联",
       "remoteAgent": "远端角色：{{value}}",
       "notCreated": "未创建",
       "syncedTitle": "已同步的角色素材",
@@ -809,11 +1014,26 @@
     "shared": {
       "none": "无"
     },
+    "inspect": {
+      "open": "检查",
+      "draftEyebrow": "草稿",
+      "historyEyebrow": "历史条目",
+      "targetWorld": "目标世界",
+      "sourceType": "来源类型",
+      "sourceRef": "来源引用",
+      "publishedAt": "发布时间",
+      "targetPath": "目标路径",
+      "reason": "原因",
+      "creator": "创建者",
+      "createdAt": "创建时间"
+    },
     "drafts": {
       "title": "草稿",
       "description": "详细的草稿选择现在放在这里；左侧工作区只保留快捷入口。",
       "newDraft": "新建草稿",
       "empty": "当前没有草稿。",
+      "published": "已发布",
+      "unpublished": "未发布",
       "statusLine": "状态：{{status}} · 更新时间：{{updatedAt}}",
       "continue": "继续",
       "summary": {
@@ -825,14 +1045,19 @@
     "publish": {
       "title": "发布",
       "description": "发布仍然通过 Create 的审阅流完成。这里提供一个回到当前草稿发布语境的入口。",
+      "currentWorldLabel": "当前世界",
       "currentWorld": "当前世界：{{value}}",
       "noWorldSelected": "未选择世界",
+      "latestDraftLabel": "当前草稿",
       "latestDraft": "当前选中的草稿：{{value}}",
       "noDraftSelected": "未选择草稿",
       "openFlow": "打开发布流程",
+      "maintainStateLabel": "维护状态",
       "maintainState": "维护状态：{{value}}",
       "recommendationDirty": "进入发布审阅前，建议先保存或同步当前维护修改。",
-      "recommendationReady": "当前维护面已清爽，可在草稿准备好后直接回到发布审阅。"
+      "recommendationReady": "当前维护面已清爽，可在草稿准备好后直接回到发布审阅。",
+      "nextStepTitle": "下一步",
+      "nextStepBody": "当这次维护修改确认无误后，就从这里回到发布审阅流。"
     },
     "history": {
       "title": "历史",
@@ -912,14 +1137,28 @@
     "currentSection": "当前内容",
     "forceSave": "强制保存",
     "forceSyncEvents": "强制同步事件",
-    "headerLabel": "维护",
+    "headerLabel": "当前维护世界",
+    "headerDescription": "你现在正在维护这个世界。下面展示的是当前快照、本地编辑状态，以及关键世界数据摘要。",
+    "localWorkspaceAutoSaved": "当前工作区会自动保存到本地。",
+    "localWorkspaceSaved": "当前工作区已保存到本地。",
+    "localWorkspaceSavedAt": "当前工作区已在 {{value}} 保存到本地。",
+    "localWorkspaceStatusLabel": "本地工作区",
     "reloadRemote": "刷新远端",
     "reloadRemoteSnapshot": "重载远端快照",
+    "reloadFromRemote": "从远端重载",
+    "reloadFromRemoteSnapshot": "从远端重载快照",
     "save": "保存",
+    "saveLocal": "保存本地",
+    "forceSyncToRemote": "强制同步到远端",
     "saveAgentMetadata": "保存角色元数据",
     "savedState": "本地编辑与当前快照已同步。",
+    "remoteSyncClean": "当前修改已经同步到远端快照。",
+    "remoteSyncPending": "这些分区还没有同步到远端：{{value}}",
+    "remoteSyncStatusLabel": "远端同步",
     "snapshotVersion": "快照：{{value}}",
     "syncEvents": "同步事件",
+    "syncToRemote": "同步到远端",
+    "workspaceSyncStepFailed": "工作区同步在 {{label}} 处停止：{{message}}",
     "deleteFirstEvent": "删除首个事件",
     "syncLorebooks": "同步知识条目",
     "deleteFirstLorebook": "删除首个知识条目",
@@ -934,21 +1173,21 @@
       "baseTitle": "世界身份卡",
       "baseDescription": "维护最适合发布和展示的世界身份信息。",
       "baseSummary": "把世界名称、分层文案、分类和描述上下文集中维护在这里。",
-      "worldviewTitle": "世界规则",
+      "worldviewTitle": "世界观维护说明",
       "worldviewDescription": "维护这个世界如何运作、如何组织，以及创作者该如何理解它。",
-      "worldviewSummary": "按时间规则、系统、文化、结构和叙事支撑来分组编辑。",
-      "eventsTitle": "世界时间线",
+      "worldviewSummary": "建议先从模块总览进入，再逐层下探到具体条目。",
+      "eventsTitle": "世界事件维护说明",
       "eventsDescription": "这里维护的是发布后会被下游系统视为 canonical 的世界事件图。",
       "eventsSummary": "同步前先确认图结构、证据要求和同步模式。",
-      "lorebooksTitle": "知识面",
+      "lorebooksTitle": "知识条目维护说明",
       "lorebooksDescription": "让知识条目保持清晰、可检索，并随时可同步。",
       "lorebooksSummary": "先把可复用的知识行整理好，再在集合有效后整体同步。",
-      "registryTitle": "角色 roster",
-      "registryDescription": "看清哪些角色已经存在远端记录，哪些草稿候选还缺角色实体。",
-      "registrySummary": "这个总览帮助你判断下一步是补建、检查，还是继续编辑元数据。",
-      "editorTitle": "角色元数据",
-      "editorDescription": "查看可读角色 truth、运行态信号，并编辑当前真正可写的元数据字段。",
-      "editorSummary": "完整人格编辑仍是后续能力；这里专注于 truth 阅读和安全的元数据更新。",
+      "registryTitle": "角色总览说明",
+      "registryDescription": "这里先从角色列表出发，一次检查一个角色；只有当某个具体角色需要修改时，才进入它的专注元数据编辑。",
+      "registrySummary": "这一页应保持 roster-first：先扫一遍世界归属角色，检查其中一个，再按需进入该角色的专注编辑。",
+      "editorTitle": "角色专注元数据维护说明",
+      "editorDescription": "这个专注编辑器只属于当前选中的一个角色。这里查看它的真相、运行态信号，并编辑当前真正可写的元数据字段。",
+      "editorSummary": "完整人格编辑仍是后续能力；当前这一页是针对单个角色的专注编辑，不是整个角色模块的顶层模式。",
       "worldAssetsTitle": "世界素材覆盖",
       "worldAssetsDescription": "对照查看已生成素材、已同步绑定和缺失的世界素材覆盖情况。",
       "worldAssetsSummary": "下一步应该很直观：生成、同步，或做最终核对。",

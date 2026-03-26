@@ -283,6 +283,10 @@
     "noFieldsYet": "No fields yet.",
     "keyPlaceholder": "Key",
     "valuePlaceholder": "Value",
+    "inspect": "Inspect",
+    "focusEdit": "Focus Editor",
+    "quickOverview": "Quick Overview",
+    "close": "Close",
     "deleteShort": "Del",
     "rawJsonDebug": "Raw JSON (Debug)"
   },
@@ -405,6 +409,17 @@
     "title": "World Base",
     "description": "Structured editor for core world settings.",
     "explainer": "Base keeps the world card readable and publication-ready. Time rules stay under worldview.timeModel, while clock truth is shown here as read-only runtime state.",
+    "summaryTitle": "Overview",
+    "summaryHint": "This page owns publish-facing world basics; deeper time and rule structure still belongs in Worldview.",
+    "commonFieldsTitle": "Common fields",
+    "commonFieldsLabel": "Directly editable basics",
+    "commonFieldsNote": "Edit readable, publish-facing base fields here; deeper time and rule structure still belongs in Worldview.",
+    "clockDisclosure": "Runtime clock (read-only)",
+    "deepEditTitle": "Deep checks when needed",
+    "deepEditLabel": "Deep inspection and runtime clock",
+    "deepEditNote": "Only open this area when you need to verify runtime clock truth; it is not intended to become another complex editor.",
+    "rawJsonLabel": "Raw world patch (read-only)",
+    "rawJsonEmpty": "There is no raw patch to display right now.",
     "name": "Name",
     "genre": "Genre",
     "tagline": "Tagline",
@@ -433,6 +448,117 @@
     "requiredModules": "Required modules: `timeModel`, `spaceTopology`, `causality`, `coreSystem`.",
     "missingModules": "Missing/empty modules: {{modules}}",
     "ready": "All required worldview modules are ready.",
+    "shared": {
+      "itemLabel": "Item {{index}}"
+    },
+    "summary": {
+      "empty": "empty",
+      "emptyText": "empty text",
+      "booleanTrue": "true",
+      "booleanFalse": "false",
+      "emptyList": "empty list",
+      "itemList": "{{count}} item list",
+      "nestedItems": "{{count}} nested items",
+      "emptyObject": "empty object",
+      "fields": "{{count}} fields",
+      "value": "value"
+    },
+    "preview": {
+      "item": "item {{index}}"
+    },
+    "kind": {
+      "primitive": "primitive",
+      "object": "object",
+      "array": "array"
+    },
+    "patternHint": "Pattern: overview chooses the current layer, inspect drawer handles quick checks, and focus editor handles deep structure edits.",
+    "modules": {
+      "timeModel": {
+        "title": "Time Model",
+        "description": "Calendars, temporal anchors, and the rules that describe how time moves."
+      },
+      "lifecycle": {
+        "title": "Lifecycle",
+        "description": "Long-running phases, cycles, and how beings or systems evolve over time."
+      },
+      "coreSystem": {
+        "title": "Core System",
+        "description": "Rules, systems, constraints, and shared mechanics that define how the world works."
+      },
+      "causality": {
+        "title": "Causality",
+        "description": "What drives change, how consequences propagate, and how outcomes stay consistent."
+      },
+      "languages": {
+        "title": "Languages",
+        "description": "Shared language truth used by the world itself and its inhabitants."
+      },
+      "existences": {
+        "title": "Existences",
+        "description": "The beings, races, and life forms that are allowed to exist in this world."
+      },
+      "resources": {
+        "title": "Resources",
+        "description": "Scarcity, materials, currencies, and how resources circulate."
+      },
+      "spaceTopology": {
+        "title": "Space Topology",
+        "description": "Places, boundaries, travel paths, and how the world is spatially organized."
+      },
+      "structures": {
+        "title": "Structures",
+        "description": "Organizations, factions, and the scaffolding that shapes social order."
+      },
+      "visualGuide": {
+        "title": "Visual Guide",
+        "description": "Visual motifs, aesthetic anchors, and references that keep the world visually coherent."
+      },
+      "narrativeHooks": {
+        "title": "Narrative Hooks",
+        "description": "Themes, tensions, and story-facing hooks that support downstream drafting."
+      }
+    },
+    "tabs": {
+      "fields": "Fields",
+      "raw": "Raw"
+    },
+    "mode": {
+      "overview": "Overview",
+      "inspect": "Inspect drawer",
+      "focus": "Focus edit"
+    },
+    "card": {
+      "ready": "ready",
+      "missing": "thin",
+      "fields": "{{count}} fields",
+      "nested": "{{count}} nested"
+    },
+    "drawer": {
+      "closeOverlay": "Close worldview drawer",
+      "label": "Inspect",
+      "defaultDescription": "Inspect this slice before deciding whether it needs a deeper editor.",
+      "nextLayer": "Deeper items",
+      "openFocus": "Focus Editor"
+    },
+    "editor": {
+      "arrayItems": "Array items",
+      "arrayHint": "One item per line.",
+      "nestedItems": "Nested items",
+      "addItem": "Add item",
+      "inspect": "Inspect",
+      "objectFields": "Object fields",
+      "objectHint": "Primitive fields edit inline. Nested fields can be inspected one level deeper.",
+      "openItems": "Open items"
+    },
+    "focus": {
+      "label": "Focused Editor",
+      "backOneLevel": "Back One Level",
+      "backToInspect": "Back to Inspect",
+      "backToOverview": "Back to Overview",
+      "moduleLabel": "Modules",
+      "currentLayer": "Current Layer",
+      "noChildren": "No deeper items here."
+    },
     "groups": {
       "timeTitle": "Time and lifecycle",
       "timeDescription": "Define how time moves, how it is modeled, and how long-running world phases are described.",
@@ -447,33 +573,78 @@
     }
   },
   "lorebooks": {
-    "title": "Lorebooks / Knowledge Base",
-    "description": "Structured lorebook rows. Raw JSON is for debugging only.",
+    "title": "Lorebooks",
+    "description": "Start from the overview, use the inspect drawer for quick edits, and enter the focus editor only when the entry is complex.",
     "addLorebook": "Add Lorebook",
     "invalidRows": "{{count}} lorebooks are missing `key`. Fix them before sync.",
     "empty": "No lorebooks yet.",
     "key": "key",
     "name": "name",
-    "namePlaceholder": "Short title",
+    "namePlaceholder": "Lorebook title",
     "content": "content",
     "contentPlaceholder": "LLM-readable full paragraph",
     "keywords": "keywords",
     "keywordsPlaceholder": "Comma-separated keywords",
     "validFrom": "validFrom",
+    "validTo": "validTo",
     "priority": "priority",
     "constant": "constant",
     "enabled": "enabled",
     "value": "value",
     "provenance": "provenance",
+    "emptyContent": "No content yet",
+    "summaryTotal": "Total {{count}}",
+    "summaryEnabled": "Enabled {{count}}",
+    "summaryInvalid": "Invalid {{count}}",
+    "always": "always",
+    "from": "from {{value}}",
+    "until": "until {{value}}",
+    "validRange": "{{from}} -> {{to}}",
+    "enabledBadge": "enabled",
+    "disabledBadge": "disabled",
+    "invalidKey": "invalid key",
+    "noKey": "no key yet",
+    "complexFields": "Complex fields",
+    "valueFields": "value: {{count}} fields",
+    "provenanceFields": "provenance: {{count}} fields",
+    "focusTitle": "Focus Editor",
+    "listLabel": "Lorebook list",
+    "rawTitle": "Raw JSON",
+    "keywordsEmpty": "no keywords",
+    "inspectDescription": "Inspect this entry first, then decide whether it needs deeper editing.",
     "deleteLorebook": "Delete Lorebook",
     "bulkUpdate": "Bulk Update Lorebooks",
-    "deleteFirst": "Delete First Lorebook"
+    "deleteFirst": "Delete First Lorebook",
+    "structure": {
+      "rootHint": "Inspect top-level fields here. Nested objects can continue one level deeper.",
+      "pathHint": "Currently editing {{value}}.",
+      "objectHint": "Primitive fields edit inline. Nested objects and arrays can be inspected one level deeper.",
+      "nestedHint": "Open this field to continue inspecting deeper structure.",
+      "arrayHint": "One primitive item per line.",
+      "arrayNestedHint": "Nested array items can be inspected and edited one level deeper.",
+      "addItem": "Add item",
+      "item": "Item {{index}}",
+      "empty": "empty",
+      "emptyText": "empty text",
+      "true": "true",
+      "false": "false",
+      "emptyList": "empty list",
+      "items": "{{count}} items",
+      "emptyObject": "empty object",
+      "fields": "{{count}} fields",
+      "value": "value"
+    }
   },
   "eventGraphMaintenance": {
     "title": "Events (Primary / Secondary)",
     "snapshot": "Snapshot: {{value}}",
     "eventSummary": "Events: total {{total}} · primary {{primary}} · secondary {{secondary}}",
     "evidenceSummary": "Primary missing evidence: {{missing}} · orphan secondary: {{orphan}}",
+    "inspectLabel": "Inspect",
+    "focusLabel": "Focused Editor",
+    "openFocus": "Open Focus Editor",
+    "backToInspect": "Back to Inspect",
+    "backToOverview": "Back to Overview",
     "bulkSyncMode": "Bulk Sync Mode",
     "mergeLabel": "merge (incremental update)",
     "replaceLabel": "replace (active graph rewrite)",
@@ -496,7 +667,21 @@
     "secondaryEvents": "Secondary Events",
     "secondaryCount": "Secondary {{count}}",
     "evidenceCount": "Evidence {{count}}",
+    "evidenceLabel": "Evidence",
+    "dependencyLabel": "Dependencies",
+    "characterRefsLabel": "Characters",
+    "locationRefsLabel": "Locations",
     "parentEvent": "Parent Event: {{value}}",
+    "parentEventMissing": "Parent event missing",
+    "selectedSecondaryCount": "Secondary {{count}}",
+    "selectedMissingDeps": "Missing deps {{count}}",
+    "selectedDepsHealthy": "Dependencies healthy",
+    "selectedSelfRef": "Contains self reference",
+    "selectedCycle": "Participates in a cycle",
+    "selectedMissingEvidence": "Primary evidence missing",
+    "selectedEvidenceReady": "Primary evidence ready",
+    "summaryLabel": "Summary",
+    "summaryEmpty": "No summary yet. Enter focus edit to add event context, cause, process, and result.",
     "noPrimaryEvents": "No primary events yet.",
     "noSecondaryEventsForParent": "No secondary events under the selected parent.",
     "selectEventToEdit": "Select an event to edit details.",
@@ -626,9 +811,9 @@
     "releaseDrafts": "Drafts",
     "releasePublish": "Publish",
     "releaseHistory": "History",
-    "clean": "Saved",
-    "single": "1 unsaved change",
-    "multiple": "{{count}} unsaved changes"
+    "clean": "Synced to Remote",
+    "single": "1 change pending sync",
+    "multiple": "{{count}} changes pending sync"
   },
   "header": {
     "currentWorld": "World: {{name}}",
@@ -726,7 +911,9 @@
         "pendingDrafts": "Pending draft candidates",
         "activeHere": "Active in this world"
       },
-      "pendingHint": "{{count}} draft candidates still need remote agents before assets can sync cleanly."
+      "pendingHint": "{{count}} draft candidates still need remote agents before assets can sync cleanly.",
+      "linkedHint": "Linked to remote agent {{value}}.",
+      "focusSummary": "Focused editing belongs to the currently selected agent only; start from the roster, inspect one agent, then enter that agent's own metadata editor."
     },
     "editor": {
       "title": "Agent Editor",
@@ -760,10 +947,22 @@
       "tags": "Tags",
       "webhookUrl": "Webhook URL",
       "capabilitiesJson": "Capabilities JSON",
-      "dnaSnapshot": "Readable DNA snapshot"
+      "dnaSnapshot": "Readable DNA snapshot",
+      "backToInspect": "Back to Current Agent",
+      "backToRoster": "Back to Roster"
     }
   },
   "assets": {
+    "inspect": {
+      "open": "Inspect",
+      "generatedLocal": "Generated locally",
+      "syncedBinding": "Synced binding",
+      "storageRef": "Storage ref",
+      "linkedAgent": "Linked remote agent",
+      "tags": "Tags",
+      "conditions": "Conditions",
+      "none": "None"
+    },
     "missing": {
       "none": "All tracked slots are covered."
     },
@@ -775,7 +974,11 @@
     "world": {
       "generatedTitle": "Generated World Assets",
       "generatedDescription": "These are local outputs produced during create or maintenance flows.",
+      "emptyGenerated": "No local world assets are ready to inspect yet.",
       "cover": "World cover: {{value}}",
+      "coverItemTitle": "World cover",
+      "locationItemBadge": "Location image",
+      "locationItemSummary": "This is a locally generated location image.",
       "noGeneratedCover": "No generated cover yet",
       "locationImages": "Generated location images: {{count}}",
       "syncedTitle": "Synced World Assets",
@@ -792,6 +995,8 @@
       "generatedTitle": "Generated Agent Assets",
       "generatedDescription": "These are local portrait outputs before or after they become remote media bindings.",
       "emptyGenerated": "No generated character portraits yet.",
+      "linked": "Linked",
+      "unlinked": "Needs link",
       "remoteAgent": "Remote agent: {{value}}",
       "notCreated": "not created",
       "syncedTitle": "Synced Agent Assets",
@@ -809,11 +1014,26 @@
     "shared": {
       "none": "None"
     },
+    "inspect": {
+      "open": "Inspect",
+      "draftEyebrow": "Draft",
+      "historyEyebrow": "History entry",
+      "targetWorld": "Target world",
+      "sourceType": "Source type",
+      "sourceRef": "Source ref",
+      "publishedAt": "Published at",
+      "targetPath": "Target path",
+      "reason": "Reason",
+      "creator": "Creator",
+      "createdAt": "Created at"
+    },
     "drafts": {
       "title": "Drafts",
       "description": "Detailed draft selection now lives here; the workspace drawer keeps only quick entry points.",
       "newDraft": "New Draft",
       "empty": "No drafts are available.",
+      "published": "Published",
+      "unpublished": "Unpublished",
       "statusLine": "Status: {{status}} · Updated: {{updatedAt}}",
       "continue": "Continue",
       "summary": {
@@ -825,14 +1045,19 @@
     "publish": {
       "title": "Publish",
       "description": "Publishing still runs through the Create review flow. Use this section to jump back into the current draft with the right mental model.",
+      "currentWorldLabel": "Current world",
       "currentWorld": "Current world: {{value}}",
       "noWorldSelected": "No world selected",
+      "latestDraftLabel": "Current draft",
       "latestDraft": "Latest selected draft: {{value}}",
       "noDraftSelected": "No draft selected",
       "openFlow": "Open Publish Flow",
+      "maintainStateLabel": "Maintain state",
       "maintainState": "Maintain state: {{value}}",
       "recommendationDirty": "Save or sync the current maintenance edits before entering the publish review flow.",
-      "recommendationReady": "The maintenance surface is clean. You can jump back into publish review when the draft is ready."
+      "recommendationReady": "The maintenance surface is clean. You can jump back into publish review when the draft is ready.",
+      "nextStepTitle": "Next step",
+      "nextStepBody": "When this maintenance pass is ready, jump back into the publish review flow from here."
     },
     "history": {
       "title": "History",
@@ -912,14 +1137,28 @@
     "currentSection": "Current content",
     "forceSave": "Force Save",
     "forceSyncEvents": "Force Sync Events",
-    "headerLabel": "Maintenance",
+    "headerLabel": "Current World",
+    "headerDescription": "You are currently editing this world. The information below shows the current snapshot, local edit state, and key world stats.",
+    "localWorkspaceAutoSaved": "The current workspace is automatically saved locally.",
+    "localWorkspaceSaved": "The current workspace has been saved locally.",
+    "localWorkspaceSavedAt": "The current workspace was saved locally at {{value}}.",
+    "localWorkspaceStatusLabel": "Local Workspace",
     "reloadRemote": "Reload Remote",
     "reloadRemoteSnapshot": "Reload Remote Snapshot",
+    "reloadFromRemote": "Reload From Remote",
+    "reloadFromRemoteSnapshot": "Reload From Remote Snapshot",
     "save": "Save",
+    "saveLocal": "Save Local",
+    "forceSyncToRemote": "Force Sync To Remote",
     "saveAgentMetadata": "Save Agent Metadata",
     "savedState": "Local edits are synced with the current snapshot.",
+    "remoteSyncClean": "Current edits are synced to the remote snapshot.",
+    "remoteSyncPending": "These sections still need remote sync: {{value}}",
+    "remoteSyncStatusLabel": "Remote Sync",
     "snapshotVersion": "Snapshot: {{value}}",
     "syncEvents": "Sync Events",
+    "syncToRemote": "Sync To Remote",
+    "workspaceSyncStepFailed": "Workspace sync stopped at {{label}}: {{message}}",
     "deleteFirstEvent": "Delete First Event",
     "syncLorebooks": "Sync Lorebooks",
     "deleteFirstLorebook": "Delete First Lorebook",
@@ -934,23 +1173,23 @@
       "baseTitle": "World identity",
       "baseDescription": "Keep the canonical world card readable and publication-ready.",
       "baseSummary": "Edit the world name, layered copy, classification, and descriptive context in one place.",
-      "worldviewTitle": "World rules",
+      "worldviewTitle": "Worldview Guide",
       "worldviewDescription": "Maintain how the world works, how it is structured, and how creators should reason about it.",
-      "worldviewSummary": "Group edits by time rules, systems, culture, structure, and narrative support.",
-      "eventsTitle": "World timeline",
+      "worldviewSummary": "Start from the module overview, then drill down into the entries that need editing.",
+      "eventsTitle": "Events Guide",
       "eventsDescription": "Curate the published event graph that downstream systems will treat as canonical world sequence.",
       "eventsSummary": "Review graph shape, evidence expectations, and sync mode before writing timeline truth.",
       "lorebooksTitle": "Knowledge surface",
       "lorebooksDescription": "Keep lore entries coherent, queryable, and ready for sync.",
       "lorebooksSummary": "Add and curate reusable lore rows, then sync them once the set is valid.",
       "registryTitle": "Agent roster",
-      "registryDescription": "See which characters already exist remotely and which draft candidates still need an agent record.",
-      "registrySummary": "The registry helps you decide whether the next step is create, review, or edit metadata.",
-      "editorTitle": "Agent metadata",
-      "editorDescription": "Inspect readable agent truth, watch runtime signal, and edit the metadata fields that are currently writable.",
-      "editorSummary": "Full persona editing remains future-facing; this surface focuses on readable truth plus safe metadata updates.",
+      "registryDescription": "Start from the roster, inspect one agent at a time, and enter focused metadata editing only when that specific agent needs work.",
+      "registrySummary": "This page should stay roster-first: scan the world-owned agents, inspect one, then enter focused editing for that agent only when needed.",
+      "editorTitle": "Focused Agent Metadata Guide",
+      "editorDescription": "This focused editor belongs to the currently selected agent only. Inspect its truth, watch runtime signal, and edit the metadata fields that are currently writable.",
+      "editorSummary": "Full persona editing remains future-facing; this view is a focused editor for one agent, not a top-level mode for the whole roster.",
       "worldAssetsTitle": "World asset coverage",
-      "worldAssetsDescription": "Compare generated assets, synced media bindings, and missing world asset coverage.",
+      "worldAssetsDescription": "Compare generated assets, synced bindings, and missing world asset coverage.",
       "worldAssetsSummary": "The next step should be obvious: generate, sync, or verify.",
       "agentAssetsTitle": "Agent asset coverage",
       "agentAssetsDescription": "Review which portraits already map to remote agents and which still need linkage.",

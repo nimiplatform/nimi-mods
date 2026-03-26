@@ -72,5 +72,8 @@ export async function saveMaintenance(context: WorldStudioMaintainActionContext,
         else {
             context.setError(message);
         }
+        if (payload?.throwOnError) {
+            throw saveError;
+        }
     }
 }

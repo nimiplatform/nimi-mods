@@ -15,7 +15,6 @@ const SECTIONS: Record<WorldStudioMaintainDomain, Array<{
   ],
   AGENTS: [
     { value: 'REGISTRY', labelKey: 'sectionNav.registry', labelFallback: 'Registry' },
-    { value: 'EDITOR', labelKey: 'sectionNav.editor', labelFallback: 'Editor' },
   ],
   ASSETS: [
     { value: 'WORLD_ASSETS', labelKey: 'sectionNav.worldAssets', labelFallback: 'World Assets' },

@@ -139,6 +139,7 @@ export type WorldStudioStatusSlice = {
   activeTask: WorldStudioTaskRecord | null;
   recentTasks: WorldStudioTaskRecord[];
   expertMode: boolean;
+  localWorkspaceSavedAt: string | null;
   notice: string | null;
   error: string | null;
   conflictReloadSummary: string | null;
@@ -222,6 +223,9 @@ export type WorldStudioActionsSlice = {
     onLorebooksChange: (value: WorldStudioWorkspaceSnapshot['lorebooksDraft']) => void;
     onEventGraphLayoutChange: (next: { selectedEventId: string; expandedPrimaryIds: string[] }) => void;
     onEventSyncModeChange: (mode: 'merge' | 'replace') => void;
+    saveLocalWorkspace: () => Promise<void>;
+    syncToRemote: (payload?: { force?: boolean }) => Promise<void>;
+    syncWorkspaceToRemote: () => Promise<void>;
     saveMaintenance: (payload?: { force?: boolean }) => Promise<void>;
     syncEvents: (payload?: { force?: boolean }) => Promise<void>;
     syncLorebooks: () => Promise<void>;
@@ -233,6 +237,7 @@ export type WorldStudioActionsSlice = {
     syncResourceBindings: (scope: 'WORLD_ASSETS' | 'AGENT_ASSETS') => Promise<void>;
     refreshResources: () => Promise<void>;
     reloadRemote: () => Promise<void>;
+    reloadFromRemote: () => Promise<void>;
     adoptRemoteSnapshot: () => void;
   };
   routing: {

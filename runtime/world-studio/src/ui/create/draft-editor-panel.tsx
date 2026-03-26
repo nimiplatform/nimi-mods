@@ -1,12 +1,15 @@
 import React from 'react';
-import type { EventNodeDraft } from '../../contracts.js';
+import type { EventNodeDraft, WorldLorebookDraftRow } from '../../contracts.js';
 import { WorldBasePanel } from '../maintain/world-base-panel.js';
-import { EventGraphEditor } from './event-graph-editor.js';
+import { WorldviewPanel } from '../maintain/worldview-panel.js';
+import { LorebooksPanel } from '../maintain/lorebooks-panel.js';
 import { RuleTruthDraftPanel } from './rule-truth-draft-panel.js';
+import { EventGraphWorkbench } from '../shared/event-graph-workbench.js';
 import { useModTranslation } from "@nimiplatform/sdk/mod";
 type DraftEditorPanelProps = {
     sourceText: string;
     worldPatch: Record<string, unknown>;
+    worldviewPatch: Record<string, unknown>;
     ruleTruthDraft: {
         worldRules: Record<string, unknown>[];
         agentRules: Array<{ characterName: string; payload: Record<string, unknown> }>;
@@ -15,12 +18,15 @@ type DraftEditorPanelProps = {
         primary: EventNodeDraft[];
         secondary: EventNodeDraft[];
     };
+    lorebooksDraft: WorldLorebookDraftRow[];
     onWorldPatchChange: (value: Record<string, unknown>) => void;
+    onWorldviewPatchChange: (value: Record<string, unknown>) => void;
     onRuleTruthDraftChange: (value: DraftEditorPanelProps['ruleTruthDraft']) => void;
     onEventsChange: (value: {
         primary: EventNodeDraft[];
         secondary: EventNodeDraft[];
     }) => void;
+    onLorebooksChange: (value: WorldLorebookDraftRow[]) => void;
     eventGraphLayout?: {
         selectedEventId: string;
         expandedPrimaryIds: string[];
@@ -45,11 +51,31 @@ export function DraftEditorPanel(props: DraftEditorPanelProps) {
         onWorldPatchChange={props.onWorldPatchChange}
       />
 
+      <WorldviewPanel
+        worldviewPatch={props.worldviewPatch}
+        onWorldviewPatchChange={props.onWorldviewPatchChange}
+      />
+
       <RuleTruthDraftPanel
         ruleTruthDraft={props.ruleTruthDraft}
         onRuleTruthDraftChange={props.onRuleTruthDraftChange}
       />
 
-      <EventGraphEditor title={t('draftEditor.eventGraph')} events={props.events} sourceContextText={props.sourceText} onChange={props.onEventsChange} layout={props.eventGraphLayout} onLayoutChange={props.onEventGraphLayoutChange}/>
+      <EventGraphWorkbench
+        title={t('draftEditor.eventGraph')}
+        events={props.events}
+        sourceContextText={props.sourceText}
+        onEventsChange={props.onEventsChange}
+        layout={props.eventGraphLayout}
+        onLayoutChange={props.onEventGraphLayoutChange}
+      />
+
+      <LorebooksPanel
+        lorebooksDraft={props.lorebooksDraft}
+        working={false}
+        onLorebooksChange={props.onLorebooksChange}
+        onSyncLorebooks={() => undefined}
+        showActions={false}
+      />
     </div>);
 }

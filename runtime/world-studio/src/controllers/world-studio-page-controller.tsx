@@ -214,6 +214,7 @@ export function useWorldStudioPageContent() {
             setStatusBanner,
             setError: ui.setError,
             setNotice: ui.setNotice,
+            setLocalWorkspaceSavedAt: ui.setLocalWorkspaceSavedAt,
         },
         conflict: {
             selectedWorldId: context.selectedWorldId,

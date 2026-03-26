@@ -29,6 +29,7 @@ export type WorldStudioMaintainActionContext = {
 export type WorldStudioMaintainActionPayload = {
   force?: boolean;
   taskId?: string;
+  throwOnError?: boolean;
 };
 
 export type WorldStudioMaintainActionResult = {

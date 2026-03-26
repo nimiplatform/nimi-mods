@@ -166,5 +166,8 @@ export async function syncEvents(context: WorldStudioMaintainActionContext, payl
         if ((syncError instanceof Error ? syncError.message : String(syncError)).includes('WORLD_MAINTENANCE_VERSION_CONFLICT')) {
             context.setError('WORLD_STUDIO_MAINTENANCE_CONFLICT: event graph is stale. Use Reload Remote or Force Sync Events.');
         }
+        if (payload?.throwOnError) {
+            throw syncError;
+        }
     }
 }

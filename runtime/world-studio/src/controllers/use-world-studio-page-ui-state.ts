@@ -152,6 +152,7 @@ export function useWorldStudioPageUiState() {
   const [phase2, setPhase2] = useState<Phase2Result | null>(null);
   const [routeOptions, setRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
   const [eventSyncMode, setEventSyncMode] = useState<'merge' | 'replace'>('merge');
+  const [localWorkspaceSavedAt, setLocalWorkspaceSavedAt] = useState<string | null>(null);
 
   const setLanding = useCallback((value: LandingState) => {
     dispatchNotice({ type: 'SET_LANDING', value });
@@ -234,5 +235,7 @@ export function useWorldStudioPageUiState() {
     setRetryErrorCode,
     eventSyncMode,
     setEventSyncMode,
+    localWorkspaceSavedAt,
+    setLocalWorkspaceSavedAt,
   };
 }

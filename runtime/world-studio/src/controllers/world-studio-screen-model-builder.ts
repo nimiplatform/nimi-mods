@@ -62,6 +62,8 @@ type BuildWorldStudioScreenModelArgs = {
     onAdoptRemoteSnapshot: () => void;
     refreshResources: () => Promise<void>;
     onSaveMaintenance: (payload?: { force?: boolean }) => Promise<void>;
+    onSaveLocalWorkspace: () => Promise<void>;
+    onSyncWorkspaceToRemote: () => Promise<void>;
     onDeleteFirstEvent: () => Promise<void>;
     onDeleteFirstLorebook: () => Promise<void>;
     onCreateAgentsFromDrafts: (characterNames?: string[]) => Promise<void>;
@@ -601,6 +603,9 @@ export function buildWorldStudioScreenModel(args: BuildWorldStudioScreenModelArg
         });
       },
       onEventSyncModeChange: (mode) => args.ui.setEventSyncMode(mode),
+      saveLocalWorkspace: () => args.actions.onSaveLocalWorkspace(),
+      syncToRemote: (payload) => args.actions.onSaveMaintenance(payload),
+      syncWorkspaceToRemote: () => args.actions.onSyncWorkspaceToRemote(),
       saveMaintenance: (payload) => args.actions.onSaveMaintenance(payload),
       syncEvents: (payload) => args.actions.onSyncEvents(payload),
       syncLorebooks: () => args.actions.onSyncLorebooks(),
@@ -622,6 +627,7 @@ export function buildWorldStudioScreenModel(args: BuildWorldStudioScreenModelArg
       syncResourceBindings: (scope) => args.actions.onSyncResourceBindings(scope),
       refreshResources: () => args.actions.refreshResources(),
       reloadRemote: () => args.actions.onReloadRemoteForConflict(),
+      reloadFromRemote: () => args.actions.onReloadRemoteForConflict(),
       adoptRemoteSnapshot: () => args.actions.onAdoptRemoteSnapshot(),
     },
     routing: {
@@ -722,6 +728,7 @@ export function buildWorldStudioScreenModel(args: BuildWorldStudioScreenModelArg
       activeTask: args.context.activeTask,
       recentTasks: args.context.recentTasks,
       expertMode: args.context.expertMode,
+      localWorkspaceSavedAt: args.ui.localWorkspaceSavedAt,
       notice: args.ui.notice,
       error: args.ui.error,
       conflictReloadSummary: args.ui.conflictReloadSummary,

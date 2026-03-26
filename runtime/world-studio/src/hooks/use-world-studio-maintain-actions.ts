@@ -4,6 +4,7 @@ import type {
   WorldStudioSnapshotPatch,
   WorldStudioWorkspaceSnapshot,
 } from '../contracts.js';
+import { worldStudioMessage } from '../i18n/messages.js';
 import type {
   StatusBannerInput,
   WorldStudioMutations,
@@ -19,7 +20,10 @@ import { deleteFirstEvent as deleteFirstEventAction } from './actions/maintain/d
 import { deleteFirstLorebook as deleteFirstLorebookAction } from './actions/maintain/delete-first-lorebook.js';
 import { createAgentsFromDrafts as createAgentsFromDraftsAction } from './actions/maintain/create-agents-from-drafts.js';
 import { updateCreatorAgentMetadata as updateCreatorAgentMetadataAction } from './actions/maintain/update-creator-agent.js';
-import { syncResourceBindings as syncResourceBindingsAction } from './actions/maintain/sync-resource-bindings.js';
+import {
+  buildPendingResourceBindingUpserts,
+  syncResourceBindings as syncResourceBindingsAction,
+} from './actions/maintain/sync-resource-bindings.js';
 
 type UseWorldStudioMaintainActionsInput = {
   flowId: string;
@@ -33,6 +37,7 @@ type UseWorldStudioMaintainActionsInput = {
   setStatusBanner: (input: StatusBannerInput) => void;
   setError: (message: string | null) => void;
   setNotice: (message: string | null) => void;
+  setLocalWorkspaceSavedAt: (value: string | null) => void;
   taskController: WorldStudioTaskController;
 };
 
@@ -53,6 +58,106 @@ export function useWorldStudioMaintainActions(input: UseWorldStudioMaintainActio
 
   const onSyncEvents = useCallback(async (payload?: { force?: boolean; taskId?: string }) => {
     await syncEventsAction(context, payload);
+  }, [context]);
+
+  const onSaveLocalWorkspace = useCallback(async () => {
+    const savedAt = new Date().toISOString();
+    context.setError(null);
+    input.setLocalWorkspaceSavedAt(savedAt);
+    context.setNotice(worldStudioMessage(
+      'notice.localWorkspaceSaved',
+      'Current workspace saved locally. Sync to remote is still a separate step.',
+    ));
+  }, [context, input]);
+
+  const onSyncWorkspaceToRemote = useCallback(async () => {
+    const dirty = context.snapshot.unsavedChangesByPanel;
+    const hasWorldDirty = dirty.base;
+    const hasEventsDirty = dirty.worldEvents;
+    const hasLorebooksDirty = dirty.lorebooks;
+    const hasWorldAssetsPending = buildPendingResourceBindingUpserts(context, 'WORLD_ASSETS').length > 0;
+    const hasAgentAssetsPending = buildPendingResourceBindingUpserts(context, 'AGENT_ASSETS').length > 0;
+
+    if (!hasWorldDirty && !hasEventsDirty && !hasLorebooksDirty && !hasWorldAssetsPending && !hasAgentAssetsPending) {
+      if (dirty.agentEditor) {
+        context.setNotice(worldStudioMessage(
+          'notice.agentMetadataSaveRequired',
+          'Focused agent metadata still needs Save Agent Metadata before workspace sync can continue.',
+        ));
+        return;
+      }
+      context.setNotice(worldStudioMessage('notice.remoteSyncSkipped', 'No workspace-level remote sync actions are pending.'));
+      return;
+    }
+
+    context.setError(null);
+    context.setNotice(null);
+
+    if (hasEventsDirty && context.eventSyncMode === 'replace') {
+      const totalEvents = context.eventsGraph.primary.length + context.eventsGraph.secondary.length;
+      if (totalEvents > 0) {
+        const confirmed = typeof window !== 'undefined'
+          ? window.confirm(
+            worldStudioMessage(
+              'eventGraphMaintenance.replaceConfirm',
+              'Replace mode will archive current active remote events and rewrite them from your graph. Continue?',
+            ),
+          )
+          : true;
+        if (!confirmed) {
+          context.setNotice(worldStudioMessage('notice.eventSyncCanceled', 'Event sync canceled.'));
+          return;
+        }
+      }
+    }
+
+    const steps: Array<{ label: string; run: () => Promise<void> }> = [];
+    if (hasWorldDirty) {
+      steps.push({
+        label: worldStudioMessage('dirty.world', 'World'),
+        run: () => saveMaintenanceAction(context, { throwOnError: true }),
+      });
+    }
+    if (hasEventsDirty) {
+      steps.push({
+        label: worldStudioMessage('dirty.events', 'Events'),
+        run: () => syncEventsAction(context, { throwOnError: true }),
+      });
+    }
+    if (hasLorebooksDirty) {
+      steps.push({
+        label: worldStudioMessage('dirty.lorebooks', 'Lorebooks'),
+        run: () => syncLorebooksAction(context, { throwOnError: true }),
+      });
+    }
+    if (hasWorldAssetsPending) {
+      steps.push({
+        label: worldStudioMessage('dirty.worldAssets', 'World Assets'),
+        run: () => syncResourceBindingsAction(context, 'WORLD_ASSETS'),
+      });
+    }
+    if (hasAgentAssetsPending) {
+      steps.push({
+        label: worldStudioMessage('dirty.agentAssets', 'Agent Assets'),
+        run: () => syncResourceBindingsAction(context, 'AGENT_ASSETS'),
+      });
+    }
+
+    for (const step of steps) {
+      try {
+        await step.run();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        context.setError(worldStudioMessage(
+          'maintain.workspaceSyncStepFailed',
+          'Workspace sync stopped at {{label}}: {{message}}',
+          { label: step.label, message },
+        ));
+        return;
+      }
+    }
+
+    context.setNotice(worldStudioMessage('notice.workspaceRemoteSyncComplete', 'Workspace remote sync completed.'));
   }, [context]);
 
   const onDeleteFirstEvent = useCallback(async () => {
@@ -80,6 +185,8 @@ export function useWorldStudioMaintainActions(input: UseWorldStudioMaintainActio
     onSaveMaintenance,
     onSyncLorebooks,
     onSyncEvents,
+    onSaveLocalWorkspace,
+    onSyncWorkspaceToRemote,
     onDeleteFirstEvent,
     onDeleteFirstLorebook,
     onCreateAgentsFromDrafts,

@@ -24,5 +24,8 @@ export async function syncLorebooks(context: WorldStudioMaintainActionContext, _
     catch (syncError) {
         context.taskController.failTask(started.taskId, syncError);
         context.setError(syncError instanceof Error ? syncError.message : String(syncError));
+        if (_payload?.throwOnError) {
+            throw syncError;
+        }
     }
 }

@@ -11,12 +11,12 @@ function toNullableTrimmedString(value: unknown): string | null {
   return normalized ? normalized : null;
 }
 
-export async function syncResourceBindings(
+export function buildPendingResourceBindingUpserts(
   context: WorldStudioMaintainActionContext,
   scope: 'WORLD_ASSETS' | 'AGENT_ASSETS',
-) {
+): Array<Record<string, unknown>> {
   if (!context.selectedWorldId) {
-    return;
+    return [];
   }
   const bindingUpserts: Array<Record<string, unknown>> = [];
   if (scope === 'WORLD_ASSETS') {
@@ -126,6 +126,17 @@ export async function syncResourceBindings(
       });
     }
   }
+  return bindingUpserts;
+}
+
+export async function syncResourceBindings(
+  context: WorldStudioMaintainActionContext,
+  scope: 'WORLD_ASSETS' | 'AGENT_ASSETS',
+) {
+  if (!context.selectedWorldId) {
+    return;
+  }
+  const bindingUpserts = buildPendingResourceBindingUpserts(context, scope);
   if (bindingUpserts.length === 0) {
     context.setNotice(worldStudioMessage('notice.mediaSyncSkipped', 'No generated assets are ready to sync.'));
     return;

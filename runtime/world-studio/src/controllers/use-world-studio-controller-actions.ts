@@ -36,6 +36,7 @@ type UseWorldStudioControllerActionsInput = {
     }) => void;
     setError: (value: string | null) => void;
     setNotice: (value: string | null) => void;
+    setLocalWorkspaceSavedAt: (value: string | null) => void;
   };
   conflict: {
     selectedWorldId: string;
