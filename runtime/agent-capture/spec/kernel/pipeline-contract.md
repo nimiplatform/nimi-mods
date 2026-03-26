@@ -12,10 +12,11 @@ Agent-Capture 的默认流程是 draft-first、dialog-led，而不是 form-first
 **步骤**: 见 `pipeline-states.yaml` -> `pipeline: agent-capture-flow`
 
 **规则**:
-- 用户可从 `Image`、`Prompt` 或 `Image + Prompt` 开始。
+- 用户可从角色描述文字开始，并可附加 `Image` 与 selected existing agent 作为补充上下文。
 - 首次有效输入时隐式创建 `AgentDraft`。
 - 输入本身不自动触发 `Generate Agent`；生成必须由用户显式发起。
 - 对话目标是角色感觉收敛，而不是固定字段填写。
+- 当前会话中的有效用户意图可由多轮对话逐步形成，而不是只取最后一句消息。
 
 ## AC-PIPE-002 — styleHint 辅助输入流水线
 
@@ -53,3 +54,15 @@ Agent-Capture 的生成后流程以当前 draft 整理为主，handoff 为后续
 **规则**:
 - 若用户仍处于当前 draft 编辑上下文中，空 draft 可暂时保留。
 - 当用户离开该上下文时，空 draft 应自动删除。
+
+## AC-PIPE-006 — brief confirm before generate
+
+Agent-Capture 不负责判断“是否已经聊够”，而由用户自行决定何时请求生成。
+
+**步骤**: 见 `pipeline-states.yaml` -> `pipeline: agent-capture-flow`
+
+**规则**:
+- 用户请求 `Generate Agent` 时，系统必须先在主会话流中输出一句当前 brief 确认消息，再进入正式生成。
+- 用户若不认可当前 brief，应继续对话修正，而不是直接编辑 brief 文本。
+- 用户确认 brief 后，显式 `Generate Agent` 才可继续执行。
+- 最新 brief 必须反映当前会话中仍然有效的用户意图集合，而不是机械使用完整原始历史或仅使用最后一句消息。

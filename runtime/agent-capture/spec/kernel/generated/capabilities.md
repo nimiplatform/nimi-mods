@@ -38,6 +38,14 @@ capabilities:
     direction: consume
     purpose: persist generated image artifacts and imported file references
     source_rule: AC-CAP-006
+  - key: data.query.data-api.creator.agents.list
+    direction: consume
+    purpose: list selectable existing agents through the host-provided SDK data query surface
+    source_rule: AC-CAP-009
+  - key: data.query.data-api.creator.agents.get
+    direction: consume
+    purpose: resolve the selected existing agent background through the host-provided SDK data query surface
+    source_rule: AC-CAP-009
   - key: ui.register.ui-extension.app.sidebar.mods
     direction: consume
     purpose: register Agent-Capture entry in Desktop mod navigation

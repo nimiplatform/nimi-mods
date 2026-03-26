@@ -2,7 +2,7 @@
 
 > Status: Active
 > Date: 2026-03-25
-> Scope: 图像/提示输入 → 对话式角色捕捉 → AgentDraft 生成与整理 → 显式 handoff 边界。
+> Scope: 角色文字输入为主、可附加参考图与已有 agent 背景 → 对话式角色捕捉 → brief 确认 → AgentDraft 生成与整理 → 显式 handoff 边界。
 
 ## 0. Normative Imports
 
@@ -14,7 +14,7 @@
 
 ## 1. 产品定位
 
-Agent-Capture 是一个 desktop mod，用于把用户的图像输入或角色感觉，通过轻对话逐步收敛成可继续使用的 `AgentDraft`。
+Agent-Capture 是一个 desktop mod，也是一个帮助用户获得角色形象的工具。它以角色文字输入为一等入口，并允许用户附加参考图或选择已有 agent 作为背景上下文，通过轻对话逐步收敛成可继续使用的 `AgentDraft`。
 
 它不直接创建 canonical agent，也不直接发布 Realm `OwnableAsset`。它负责生成和整理私有角色工作态对象，其中 `AgentDraft` 是用户可感知的主要产出物。
 
@@ -22,11 +22,14 @@ Agent-Capture 是一个 desktop mod，用于把用户的图像输入或角色感
 
 核心边界：
 
-- `Agent-Capture` 负责把 `Image` / `Prompt` / `Image + Prompt` 变成可继续流转的角色草稿
+- `Agent-Capture` 负责把角色描述输入变成可继续流转的角色草稿；参考图与已有 agent 仅作为可选补充上下文
 - `Agent-Capture` 采用 feeling-led 对话式捕捉，而不是调查问卷式字段收集
-- 正式产出以显式 `Generate Agent` 结果为准；对话期间可存在渐进式视觉反馈，但其不是 canonical output
+- 用户自行决定何时请求 `Generate Agent`；系统不承担“是否已经聊够”的判断职责
+- 正式产出以显式 `Generate Agent` 结果为准；生成前系统必须先在会话内给出一句 brief 确认消息；对话期间可存在渐进式视觉反馈，但其不是 canonical output
 - `Agent-Capture` 不直接编辑 canonical agent，也不持有市场、授权、交易语义
 - `Agent-Capture` 可定义显式 handoff 目标；当前仅定义 `Forge`
+- 当已有 agent 背景与当前用户输入冲突时，当前用户输入永远优先
+- 当前用户输入指当前会话中仍然有效的用户意图集合；系统以最新 brief 承载这组有效意图
 
 ## 2. Domain Invariants
 
@@ -38,6 +41,9 @@ Agent-Capture 是一个 desktop mod，用于把用户的图像输入或角色感
 - `AC-DOM-006`: `name`、`bio`、`tags` 为用户可编辑字段；`personaSeed` 是系统整理后的中间种子文本，不作为第一版直接手改字段。
 - `AC-DOM-007`: 保存后的 `AgentDraft` 默认留在 mod 私有 working state 中；handoff 是显式后续动作，不是保存完成条件。
 - `AC-DOM-008`: 空 draft 仅允许在当前上下文中临时存在；离开上下文后应自动清理。
+- `AC-DOM-009`: 生成前必须存在系统自动总结的一句 brief；用户通过继续对话修正 brief，而不是直接编辑它。
+- `AC-DOM-010`: 已选择的 existing agent 仅作为辅助上下文；当前用户输入始终优先，且上下文变化必须重新形成 brief。
+- `AC-DOM-011`: 当前用户输入是当前会话中仍然有效的用户意图集合；新的冲突输入覆盖旧输入，生成使用最新 brief。
 
 ## 3. Domain Increments
 
@@ -58,6 +64,8 @@ Agent-Capture 是一个 desktop mod，用于把用户的图像输入或角色感
 | `AC-DOM-004` | feeling-led capture | 通过对话逐步提炼角色感觉 |
 | `AC-DOM-005` | one-generate-one-result | 一次生成只产出一个当前结果 |
 | `AC-DOM-006` | editable visible fields | 只开放 name / bio / tags 的直接编辑 |
+| `AC-DOM-009` | brief confirmation | 生成前用一句 brief 对齐当前角色感觉和关键视觉特征 |
+| `AC-DOM-010` | selected agent context precedence | 已选 agent 只做辅助背景；当前用户输入永远优先 |
 
 ### 3.3 Handoff Boundary
 

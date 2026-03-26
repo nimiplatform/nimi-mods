@@ -1,7 +1,7 @@
 version: 1
 cases:
   - id: AC-001-IMPLICIT-DRAFT-ON-FIRST-INPUT
-    description: Providing the first valid Image, Prompt, or Image+Prompt implicitly creates an AgentDraft.
+    description: Providing the first valid character input implicitly creates an AgentDraft; text alone is sufficient, while reference image remains optional.
     expected_ok: true
     source_rule: AC-ACC-001
 
@@ -28,33 +28,73 @@ cases:
   - id: AC-006-REGENERATE-REPLACES-CURRENT-RESULT
     description: Regenerate replaces the current generatedImage and text result set instead of appending candidate history.
     expected_ok: true
-    source_rule: AC-ACC-003
+    source_rule: AC-ACC-004
 
   - id: AC-007-VISIBLE-FIELDS-EDITABLE-WITHOUT-REGENERATE
     description: Editing name, bio, or tags does not auto-trigger image regeneration.
     expected_ok: true
-    source_rule: AC-ACC-003
+    source_rule: AC-ACC-004
 
   - id: AC-008-PERSONA-SEED-NOT-DIRECTLY-EDITABLE
     description: personaSeed is not directly exposed as a first-version editable field.
     expected_ok: true
-    source_rule: AC-ACC-003
+    source_rule: AC-ACC-004
 
   - id: AC-009-SAVE-DOES-NOT-AUTO-HANDOFF
     description: Saving the draft does not automatically hand it off to Forge.
     expected_ok: true
-    source_rule: AC-ACC-004
+    source_rule: AC-ACC-005
 
   - id: AC-010-HANDOFF-FAILURE-KEEPS-LOCAL-DRAFT
     description: When explicit Forge handoff fails, the local AgentDraft remains intact.
     expected_ok: false
     reason_code: AC_HANDOFF_FAILED
-    source_rule: AC-ACC-004
+    source_rule: AC-ACC-005
 
   - id: AC-011-EMPTY-DRAFT-DELETES-ON-EXIT
     description: An empty draft may remain temporarily while the current context is open, but deletes on context exit.
     expected_ok: true
-    source_rule: AC-ACC-004
+    source_rule: AC-ACC-005
+
+  - id: AC-012-BRIEF-CONFIRM-BEFORE-GENERATE
+    description: Clicking Generate Agent first yields one natural-language brief confirmation message inside the conversation flow before actual generation.
+    expected_ok: true
+    source_rule: AC-ACC-003
+
+  - id: AC-013-BRIEF-NOT-DIRECTLY-EDITABLE
+    description: The user does not directly edit the brief text; correcting the brief happens by continuing the conversation and letting the system restate it.
+    expected_ok: true
+    source_rule: AC-ACC-003
+
+  - id: AC-014-SELECTED-AGENT-IS-AUXILIARY-CONTEXT
+    description: A selected existing agent acts only as auxiliary context and does not override current user input.
+    expected_ok: true
+    source_rule: AC-ACC-003
+
+  - id: AC-015-INPUT-PRIORITY-OVER-SELECTED-AGENT
+    description: When selected agent background conflicts with the current user input, the current user input wins for the next brief and generation direction.
+    expected_ok: true
+    source_rule: AC-ACC-003
+
+  - id: AC-016-CONTEXT-CHANGE-RECOMPUTES-BRIEF
+    description: Adding, replacing, or removing the selected existing agent counts as input change and recomputes the current brief.
+    expected_ok: true
+    source_rule: AC-ACC-003
+
+  - id: AC-017-EFFECTIVE-USER-INTENT-NOT-LAST-MESSAGE
+    description: The current user input is the set of still-effective user intents in the session, not merely the last message.
+    expected_ok: true
+    source_rule: AC-ACC-003
+
+  - id: AC-018-CONFLICTING-NEW-INPUT-OVERRIDES-OLD-INTENT
+    description: New user input that conflicts with prior intent overrides the older intent in the next brief.
+    expected_ok: true
+    source_rule: AC-ACC-003
+
+  - id: AC-019-EXISTING-AGENT-BACKGROUND-USES-DATA-QUERY-SURFACE
+    description: Selecting an existing agent uses declared SDK/host data query capabilities rather than ad hoc Realm access or raw request assembly.
+    expected_ok: true
+    source_rule: AC-ACC-003
 
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:agent-capture-kernel-docs

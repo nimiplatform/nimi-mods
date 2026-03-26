@@ -12,7 +12,7 @@
 **字段**: 见 `entities.yaml` -> `entity: AgentDraft`
 
 **不变量**:
-- `AgentDraft` 必须至少拥有 `sourceImage` 或 `sourcePrompt` 之一，才能进入显式生成阶段。
+- `AgentDraft` 必须至少拥有一个有效角色输入，才能进入显式生成阶段；`sourcePrompt` 单独存在即可满足该条件，`sourceImage` 作为可选补充输入存在。
 - `generatedImage` 是当前正式图像结果；不存在多候选 canonical image 集。
 - `name`、`bio`、`tags` 可在生成后编辑。
 - `personaSeed` 是系统整理后的中间种子文本，不作为第一版直接手改字段。
@@ -33,7 +33,7 @@ Agent-Capture 中的 `AgentDraft` 属于 mod 私有角色工作态，不属于 c
 Agent-Capture 采用 draft-first 工作流。
 
 **规则**:
-- 用户首次提供有效 `Image` / `Prompt` / `Image + Prompt` 时，系统隐式创建当前 `AgentDraft`。
+- 用户首次提供有效角色输入时，系统隐式创建当前 `AgentDraft`。
 - 用户无需在输入前先创建项目壳或填写完整设定。
 
 ## AC-DOM-004 — feeling-led capture
@@ -44,6 +44,35 @@ Agent-Capture 通过轻对话提炼角色感觉，而不是通过固定字段问
 - 系统提问应服务于角色气质收敛，不应退化为问卷式参数采集。
 - `styleHint` 作为自由文本辅助输入存在，不引入硬枚举风格字段。
 - 对话阶段可提供渐进式视觉反馈，但不应把其中间态反馈当作正式最终结果。
+
+## AC-DOM-009 — brief confirmation
+
+Agent-Capture 在显式生成前必须形成当前 brief。
+
+**规则**:
+- brief 是系统基于当前输入形成的一句自然语言总结，用于确认当前角色感觉与关键视觉特征。
+- brief 不作为用户直接编辑字段暴露；用户应通过继续对话修正系统理解，再由系统重新形成 brief。
+- brief 确认发生在主会话流中，不采用独立问卷或审批式弹窗流程。
+
+## AC-DOM-010 — selected agent context precedence
+
+已选择的 existing agent 只作为辅助背景上下文。
+
+**规则**:
+- existing agent 必须通过显式选择进入当前 draft 上下文，不以手工粘贴完整设定文本作为正式入口。
+- existing agent 不构成必须逐条兑现的完整生成约束。
+- 当前会话中的用户输入永远优先于 existing agent 背景；若两者冲突，系统必须以当前用户输入形成和更新 brief。
+- 添加、替换或移除 existing agent 都属于输入变化，系统必须据此重新形成当前 brief。
+
+## AC-DOM-011 — effective user intent set
+
+Agent-Capture 生成前使用的“当前用户输入”不是最后一句消息，也不是完整原始历史的机械拼接。
+
+**规则**:
+- 当前用户输入指当前会话中仍然有效的用户意图集合。
+- 补充性的用户输入默认累加到当前意图集合中。
+- 与当前意图冲突的新输入默认覆盖旧输入。
+- 系统必须基于当前有效意图集合重新形成最新 brief，并以最新 brief 进入显式生成。
 
 ## AC-DOM-005 — one-generate-one-result
 

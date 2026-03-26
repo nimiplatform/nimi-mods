@@ -5,7 +5,7 @@ pipeline:
     - step: input-start
       order: 1
       type: user-input
-      description: provide Image, Prompt, or Image + Prompt as the current capture source
+      description: provide character description text as the primary input, with optional reference image and optional selected existing agent context
       source_rule: AC-PIPE-001
     - step: draft-ensure
       order: 2
@@ -22,18 +22,23 @@ pipeline:
       type: user-input
       description: user may add, change, or skip styleHint before generation
       source_rule: AC-PIPE-002
-    - step: agent-generate
+    - step: brief-confirm
       order: 5
-      type: generation
-      description: explicit Generate Agent action produces one current generatedImage with name, bio, personaSeed, and tags
-      source_rule: AC-PIPE-001
-    - step: draft-curate
+      type: deterministic
+      description: when the user requests Generate Agent, the system first emits one natural-language brief confirmation message summarizing the current role feel and key visual features
+      source_rule: AC-PIPE-006
+    - step: agent-generate
       order: 6
+      type: generation
+      description: after the user confirms the current brief in the conversation flow, explicit Generate Agent produces one current generatedImage with name, bio, personaSeed, and tags
+      source_rule: AC-PIPE-006
+    - step: draft-curate
+      order: 7
       type: user-input
       description: user may edit name, bio, and tags, regenerate the current result, or keep the current draft
       source_rule: AC-PIPE-004
     - step: stop-or-handoff
-      order: 7
+      order: 8
       type: user-input
       description: user may stop at the current draft or explicitly request handoff to Forge
       source_rule: AC-PIPE-004
@@ -48,6 +53,11 @@ conversation_policy:
   questionnaire_mode_forbidden: true
   feeling_led_capture_required: true
   source_rule: AC-PIPE-001
+
+brief_policy:
+  brief_confirmation_in_conversation_required: true
+  brief_direct_edit_forbidden: true
+  source_rule: AC-PIPE-006
 
 handoff_policy:
   explicit_handoff_only: true

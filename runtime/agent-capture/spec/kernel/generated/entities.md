@@ -24,11 +24,15 @@ entities:
       - name: sourceImage
         type: ImageRef
         required: false
-        description: 图像输入引用；与 sourcePrompt 至少其一存在后，方可进入生成阶段
+        description: 可选参考图输入；文字输入已可单独满足最小生成条件，参考图用于补充当前角色形象方向
       - name: sourcePrompt
         type: string
         required: false
-        description: 用户原始文字输入；与 sourceImage 至少其一存在后，方可进入生成阶段
+        description: 用户原始角色描述输入；单独存在即可满足最小生成条件，也是角色捕捉的一等入口
+      - name: selectedAgentId
+        type: ULID
+        required: false
+        description: 用户显式选择的已有 agent 作为辅助背景上下文；不构成必须逐条兑现的完整生成约束
       - name: styleHint
         type: string
         required: false
@@ -63,4 +67,5 @@ entities:
       - AgentDraft 是 mod 私有 working state，不是 canonical agent
       - 保存 draft 不要求立即 handoff
       - 空 draft 可临时存在，但离开上下文后应自动清理
+      - selectedAgentId 仅作为辅助上下文；当前会话中的用户输入始终优先
 ```

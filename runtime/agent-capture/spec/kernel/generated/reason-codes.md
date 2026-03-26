@@ -8,7 +8,7 @@ version: 1
 codes:
   - code: AC_INPUT_REQUIRED
     stage: generate
-    meaning: blocked because neither sourceImage nor sourcePrompt is present
+    meaning: blocked because no valid character input is present
     source_rule: AC-ERR-002
   - code: AC_ROUTE_UNAVAILABLE
     stage: route
