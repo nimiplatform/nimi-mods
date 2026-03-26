@@ -31,7 +31,7 @@ pipeline:
     - step: brief-confirm
       order: 5
       type: deterministic
-      description: when the user requests Generate Agent, the system first emits one natural-language brief confirmation message summarizing the current role feel and key visual features
+      description: when the user requests Generate Agent, the system first emits one natural-language brief confirmation message summarizing the current role feel, key visual features, and any retained-versus-adjusted direction
       source_rule: AC-PIPE-006
     - step: agent-generate
       order: 6
@@ -61,6 +61,17 @@ brief_policy:
   brief_confirmation_in_conversation_required: true
   brief_direct_edit_forbidden: true
   source_rule: AC-PIPE-006
+generation_context_policy:
+  current_generation_context_required: true
+  rebuild_on_input_change: true
+  effective_intent_set_required: true
+  generated_image_reused_as_context_when_present: true
+  latest_correction_treated_as_delta_by_default: true
+  source_rule: AC-PIPE-007
+readout_policy:
+  character_readout_required_with_current_result: true
+  readout_must_reflect_current_direction: true
+  source_rule: AC-PIPE-008
 handoff_policy:
   explicit_handoff_only: true
   default_handoff_target: forge

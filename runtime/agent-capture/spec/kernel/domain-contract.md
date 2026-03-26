@@ -45,35 +45,6 @@ Agent-Capture 通过轻对话提炼角色感觉，而不是通过固定字段问
 - `styleHint` 作为自由文本辅助输入存在，不引入硬枚举风格字段。
 - 对话阶段可提供渐进式视觉反馈，但不应把其中间态反馈当作正式最终结果。
 
-## AC-DOM-009 — brief confirmation
-
-Agent-Capture 在显式生成前必须形成当前 brief。
-
-**规则**:
-- brief 是系统基于当前输入形成的一句自然语言总结，用于确认当前角色感觉与关键视觉特征。
-- brief 不作为用户直接编辑字段暴露；用户应通过继续对话修正系统理解，再由系统重新形成 brief。
-- brief 确认发生在主会话流中，不采用独立问卷或审批式弹窗流程。
-
-## AC-DOM-010 — selected agent context precedence
-
-已选择的 existing agent 只作为辅助背景上下文。
-
-**规则**:
-- existing agent 必须通过显式选择进入当前 draft 上下文，不以手工粘贴完整设定文本作为正式入口。
-- existing agent 不构成必须逐条兑现的完整生成约束。
-- 当前会话中的用户输入永远优先于 existing agent 背景；若两者冲突，系统必须以当前用户输入形成和更新 brief。
-- 添加、替换或移除 existing agent 都属于输入变化，系统必须据此重新形成当前 brief。
-
-## AC-DOM-011 — effective user intent set
-
-Agent-Capture 生成前使用的“当前用户输入”不是最后一句消息，也不是完整原始历史的机械拼接。
-
-**规则**:
-- 当前用户输入指当前会话中仍然有效的用户意图集合。
-- 补充性的用户输入默认累加到当前意图集合中。
-- 与当前意图冲突的新输入默认覆盖旧输入。
-- 系统必须基于当前有效意图集合重新形成最新 brief，并以最新 brief 进入显式生成。
-
 ## AC-DOM-005 — one-generate-one-result
 
 一次显式 `Generate Agent` 只产出一个当前 `generatedImage` 结果。
@@ -108,3 +79,60 @@ Agent-Capture 对用户暴露的草稿编辑面必须保持轻量。
 **规则**:
 - 若用户仍处于当前 draft 编辑上下文中，空 draft 可暂时保留。
 - 当用户离开该上下文时，空的 draft 应自动删除。
+
+## AC-DOM-009 — brief confirmation
+
+Agent-Capture 在显式生成前必须形成当前 brief。
+
+**规则**:
+- brief 是系统基于当前输入形成的一句自然语言总结，用于确认当前角色感觉与关键视觉特征。
+- brief 不作为用户直接编辑字段暴露；用户应通过继续对话修正系统理解，再由系统重新形成 brief。
+- brief 确认发生在主会话流中，不采用独立问卷或审批式弹窗流程。
+
+## AC-DOM-010 — selected agent context precedence
+
+已选择的 existing agent 只作为辅助背景上下文。
+
+**规则**:
+- existing agent 必须通过显式选择进入当前 draft 上下文，不以手工粘贴完整设定文本作为正式入口。
+- existing agent 不构成必须逐条兑现的完整生成约束。
+- 当前会话中的用户输入永远优先于 existing agent 背景；若两者冲突，系统必须以当前用户输入形成和更新 brief。
+- 添加、替换或移除 existing agent 都属于输入变化，系统必须据此重新形成当前 brief。
+
+## AC-DOM-011 — effective user intent set
+
+Agent-Capture 生成前使用的“当前用户输入”不是最后一句消息，也不是完整原始历史的机械拼接。
+
+**规则**:
+- 当前用户输入指当前会话中仍然有效的用户意图集合。
+- 补充性的用户输入默认累加到当前意图集合中。
+- 与当前意图冲突的新输入默认覆盖旧输入。
+- 系统必须基于当前有效意图集合重新形成最新 brief，并以最新 brief 进入显式生成。
+
+## AC-DOM-012 — current generation context
+
+Agent-Capture 的每次生成都基于当前生成上下文，而不是把所有原始历史机械拼接后重新投喂。
+
+**规则**:
+- 当前生成上下文至少由当前有效用户意图集合构成。
+- `sourceImage`、selected existing agent 背景、`styleHint`、当前 `generatedImage`、以及针对当前结果的最新修正，都可成为当前生成上下文的组成部分。
+- 输入变化后，系统必须重建当前生成上下文，再形成最新 brief。
+- `generatedImage` 在存在时可作为后续生成时的参考上下文之一，但不升级为 canonical truth。
+
+## AC-DOM-013 — directional follow
+
+Agent-Capture 的方向性跟随不等于承诺最终精确逼近，但必须让本轮变化方向可被用户感知。
+
+**规则**:
+- 新的修正输入默认应被解释为对当前方向的增量调整，而不是整轮重置；除非用户明确表达需要重来或改换方向。
+- 系统形成的下一版 brief 必须体现当前方向中被保留的部分与本轮被调整的部分。
+- 系统应让用户感知到本轮变化是在当前方向上的继续调整，而不是与前文脱节的无关变化。
+
+## AC-DOM-014 — character readout
+
+当前结果必须附带轻量角色读取文本，帮助用户感知角色正在成形。
+
+**规则**:
+- 每次当前 `generatedImage` 形成后，系统都应同时形成一段简短的 `characterReadout`。
+- `characterReadout` 用于表达当前角色感觉、第一印象或本轮变化方向，不替代 `bio` 或 `personaSeed`。
+- `characterReadout` 应保持轻量自然语言，不退化为标签堆叠或参数清单。

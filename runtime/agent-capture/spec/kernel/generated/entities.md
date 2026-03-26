@@ -40,7 +40,11 @@ entities:
       - name: generatedImage
         type: ImageRef
         required: false
-        description: 当前正式图像结果；一次显式生成只产出一个当前结果
+        description: 当前正式图像结果；一次显式生成只产出一个当前结果，并可在后续生成中作为参考上下文的一部分
+      - name: characterReadout
+        type: string
+        required: false
+        description: 当前结果配套的轻量角色读取文本，用于表达当前角色感觉与本轮方向变化
       - name: name
         type: string
         required: false
@@ -68,4 +72,5 @@ entities:
       - 保存 draft 不要求立即 handoff
       - 空 draft 可临时存在，但离开上下文后应自动清理
       - selectedAgentId 仅作为辅助上下文；当前会话中的用户输入始终优先
+      - 当前生成使用的是“当前生成上下文”，不是对完整原始历史的机械重放
 ```

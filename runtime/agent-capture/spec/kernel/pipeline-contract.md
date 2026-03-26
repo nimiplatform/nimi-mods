@@ -66,3 +66,22 @@ Agent-Capture 不负责判断“是否已经聊够”，而由用户自行决定
 - 用户若不认可当前 brief，应继续对话修正，而不是直接编辑 brief 文本。
 - 用户确认 brief 后，显式 `Generate Agent` 才可继续执行。
 - 最新 brief 必须反映当前会话中仍然有效的用户意图集合，而不是机械使用完整原始历史或仅使用最后一句消息。
+- 当当前结果已存在时，最新 brief 还应说明本轮变化将延续什么、调整什么。
+
+## AC-PIPE-007 — current generation context assembly
+
+Agent-Capture 的每次生成都必须先装配当前生成上下文。
+
+**规则**:
+- 当前生成上下文以当前有效用户意图集合为基础，并按需并入 `sourceImage`、selected existing agent 背景、`styleHint`、当前 `generatedImage` 与最新修正。
+- 当用户只是补充或微调当前角色方向时，系统应把这次输入视为对当前上下文的增量更新。
+- 当用户明确表达重来、改换方向或放弃当前结果时，系统才应重置相应的上下文部分。
+
+## AC-PIPE-008 — result readout
+
+Agent-Capture 的生成结果不仅包含图像，还必须包含轻量角色读取文本。
+
+**规则**:
+- 每次当前结果形成后，系统都应同步生成 `characterReadout`。
+- `characterReadout` 应帮助用户理解“这个角色现在像谁、是什么感觉、这轮改了什么”。
+- `characterReadout` 不是 `bio` 的别名，也不承担设定真相职责。

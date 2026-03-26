@@ -96,6 +96,26 @@ cases:
     expected_ok: true
     source_rule: AC-ACC-003
 
+  - id: AC-020-GENERATION-USES-CURRENT-CONTEXT
+    description: Each generation uses the current generation context rather than mechanically replaying the full raw history.
+    expected_ok: true
+    source_rule: AC-ACC-003
+
+  - id: AC-021-LATEST-CORRECTION-IS-DELTA-BY-DEFAULT
+    description: New correction input is treated as a delta on the current direction unless the user explicitly indicates a reset.
+    expected_ok: true
+    source_rule: AC-ACC-003
+
+  - id: AC-022-WHEN-PRESENT-GENERATED-IMAGE-JOINS-NEXT-CONTEXT
+    description: When a current generatedImage already exists, it may join the next generation context as part of the ongoing reference context rather than being ignored.
+    expected_ok: true
+    source_rule: AC-ACC-003
+
+  - id: AC-023-RESULT-INCLUDES-CHARACTER-READOUT
+    description: Each current result includes a lightweight character readout that reflects the current role feel and direction of change.
+    expected_ok: true
+    source_rule: AC-ACC-003
+
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:agent-capture-kernel-docs
     source_rule: AC-ACC-004
