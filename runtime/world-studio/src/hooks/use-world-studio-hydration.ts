@@ -21,7 +21,13 @@ export function useWorldStudioHydration(input: {
     patchSnapshot: (patch: WorldStudioSnapshotPatch) => void;
     snapshot: WorldStudioWorkspaceSnapshot;
     queries: {
-        maintenanceQuery: {
+        stateQuery: {
+            data: unknown;
+        };
+        worldTruthQuery: {
+            data: unknown;
+        };
+        worldviewTruthQuery: {
             data: unknown;
         };
         eventsQuery: {

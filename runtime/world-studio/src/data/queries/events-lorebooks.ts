@@ -1,13 +1,22 @@
-import { WORLD_STUDIO_DATA_API_EVENTS_BATCH_UPSERT, WORLD_STUDIO_DATA_API_EVENTS_DELETE, WORLD_STUDIO_DATA_API_EVENTS_LIST, WORLD_STUDIO_DATA_API_LOREBOOKS_BATCH_UPSERT, WORLD_STUDIO_DATA_API_LOREBOOKS_DELETE, WORLD_STUDIO_DATA_API_LOREBOOKS_LIST, } from '../../contracts.js';
-import { type HookClient } from "@nimiplatform/sdk/mod";
-export async function listWorldEvents(hookClient: HookClient, worldId: string) {
-    return hookClient.data.query({ capability: WORLD_STUDIO_DATA_API_EVENTS_LIST, query: { worldId } });
+import {
+  WORLD_STUDIO_DATA_API_HISTORY_APPEND,
+  WORLD_STUDIO_DATA_API_HISTORY_LIST,
+  WORLD_STUDIO_DATA_API_LOREBOOKS_BATCH_UPSERT,
+  WORLD_STUDIO_DATA_API_LOREBOOKS_DELETE,
+  WORLD_STUDIO_DATA_API_LOREBOOKS_LIST,
+} from '../../contracts.js';
+import { type HookClient } from '@nimiplatform/sdk/mod';
+
+export async function listWorldHistory(hookClient: HookClient, worldId: string) {
+  return hookClient.data.query({ capability: WORLD_STUDIO_DATA_API_HISTORY_LIST, query: { worldId } });
 }
-export async function batchUpsertWorldEvents(hookClient: HookClient, worldId: string, payload: Record<string, unknown>) {
-    return hookClient.data.query({ capability: WORLD_STUDIO_DATA_API_EVENTS_BATCH_UPSERT, query: { worldId, payload } });
-}
-export async function deleteWorldEvent(hookClient: HookClient, worldId: string, eventId: string) {
-    return hookClient.data.query({ capability: WORLD_STUDIO_DATA_API_EVENTS_DELETE, query: { worldId, eventId } });
+
+export async function appendWorldHistory(
+  hookClient: HookClient,
+  worldId: string,
+  payload: Record<string, unknown>,
+) {
+  return hookClient.data.query({ capability: WORLD_STUDIO_DATA_API_HISTORY_APPEND, query: { worldId, payload } });
 }
 export async function listWorldLorebooks(hookClient: HookClient, worldId: string) {
     return hookClient.data.query({ capability: WORLD_STUDIO_DATA_API_LOREBOOKS_LIST, query: { worldId } });

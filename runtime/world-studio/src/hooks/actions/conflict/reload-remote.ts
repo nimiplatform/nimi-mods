@@ -1,8 +1,28 @@
 import { formatConflictReloadSummary } from '../../../ui/status-summary.js';
 import { worldStudioMessage } from '../../../i18n/messages.js';
+import { WORLD_STUDIO_STATE_TARGET_PATH } from '../../../contracts.js';
 import type { EventNodeDraft, WorldLorebookDraftRow, WorldStudioSnapshotPatch, WorldStudioWorkspaceSnapshot, } from '../../../contracts.js';
 import type { WorldStudioQueries } from '../create/types.js';
 import { asRecord } from "@nimiplatform/sdk/mod";
+
+function getWorkspaceStateDraft(payload: unknown): { workspaceVersion: string; worldPatch: Record<string, unknown> } | null {
+    const record = asRecord(payload);
+    const items = Array.isArray(record.items) ? record.items : [];
+    const workspaceItem = items.find((item) => asRecord(item).targetPath === WORLD_STUDIO_STATE_TARGET_PATH);
+    if (!workspaceItem) {
+        return null;
+    }
+    const itemRecord = asRecord(workspaceItem);
+    const worldPatch = asRecord(itemRecord.payload);
+    if (Object.keys(worldPatch).length === 0) {
+        return null;
+    }
+    return {
+        workspaceVersion: String(itemRecord.version || record.version || ''),
+        worldPatch,
+    };
+}
+
 export type WorldStudioConflictActionContext = {
     selectedWorldId: string;
     snapshot: WorldStudioWorkspaceSnapshot;
@@ -25,22 +45,23 @@ export async function reloadRemoteForConflict(context: WorldStudioConflictAction
     const beforeSecondaryCount = context.snapshot.knowledgeGraph.events.secondary.length;
     const beforeLorebookCount = context.snapshot.lorebooksDraft.length;
     const beforeSnapshotVersion = context.snapshot.editorSnapshotVersion || '-';
-    const [maintenanceResult, eventsResult, lorebooksResult, , creatorAgentsResult, resourceBindingsResult] = await Promise.all([
-        context.queries.maintenanceQuery.refetch(),
+    const [stateResult, worldTruthResult, worldviewTruthResult, eventsResult, lorebooksResult, creatorAgentsResult, resourceBindingsResult] = await Promise.all([
+        context.queries.stateQuery.refetch(),
+        context.queries.worldTruthQuery.refetch(),
+        context.queries.worldviewTruthQuery.refetch(),
         context.queries.eventsQuery.refetch(),
         context.queries.lorebooksQuery.refetch(),
-        context.queries.mutationsQuery.refetch(),
         context.queries.creatorAgentsQuery.refetch(),
         context.queries.resourceBindingsQuery.refetch(),
     ]);
-    const maintenancePayload = asRecord(maintenanceResult.data);
-    const world = asRecord(maintenancePayload.world);
+    const workspaceState = getWorkspaceStateDraft(stateResult.data);
+    const world = workspaceState?.worldPatch || asRecord(worldTruthResult.data);
     if (Object.keys(world).length === 0) {
         context.setConflictReloadSummary(null);
         context.setNotice(worldStudioMessage('notice.remoteSnapshotUnavailable', 'Remote maintenance snapshot is unavailable.'));
         return;
     }
-    const worldview = asRecord(maintenancePayload.worldview);
+    const worldview = asRecord(worldviewTruthResult.data);
     const eventItems = Array.isArray(eventsResult.data) ? (eventsResult.data as unknown[]) : [];
     const primaryEvents = eventItems
         .filter((item) => asRecord(item).level === 'PRIMARY')
@@ -58,7 +79,7 @@ export async function reloadRemoteForConflict(context: WorldStudioConflictAction
     const selectedAgentId = worldOwnedAgents.some((item) => String(item.id || '') === context.snapshot.panel.selectedAgentId)
         ? context.snapshot.panel.selectedAgentId
         : String(worldOwnedAgents[0]?.id || '');
-    const resolvedSnapshotVersion = String(maintenancePayload.editorSnapshotVersion || world.updatedAt || '');
+    const resolvedSnapshotVersion = String(workspaceState?.workspaceVersion || asRecord(stateResult.data).version || world.updatedAt || '');
     const hydrationKey = [
         context.selectedWorldId,
         resolvedSnapshotVersion,

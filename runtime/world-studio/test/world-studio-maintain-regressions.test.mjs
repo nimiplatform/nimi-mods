@@ -109,23 +109,31 @@ test('reloadRemoteForConflict uses creator agent refetch result when restoring s
       patched = value;
     },
     queries: {
-      maintenanceQuery: {
+      stateQuery: {
         refetch: async () => ({
           data: {
-            world: { id: 'world-1', name: 'World One' },
-            worldview: {},
-            editorSnapshotVersion: 'snap-2',
+            version: 'snap-2',
+            items: [{
+              id: 'state-1',
+              scope: 'WORLD',
+              scopeKey: 'world-1',
+              targetPath: 'world-studio.workspace.world',
+              payload: { id: 'world-1', name: 'World One' },
+            }],
           },
         }),
+      },
+      worldTruthQuery: {
+        refetch: async () => ({ data: { id: 'world-1', name: 'World One' } }),
+      },
+      worldviewTruthQuery: {
+        refetch: async () => ({ data: {} }),
       },
       eventsQuery: {
         refetch: async () => ({ data: [] }),
       },
       lorebooksQuery: {
         refetch: async () => ({ data: { items: [] } }),
-      },
-      mutationsQuery: {
-        refetch: async () => ({ data: [{ id: 'mutation-1' }] }),
       },
       creatorAgentsQuery: {
         refetch: async () => ({

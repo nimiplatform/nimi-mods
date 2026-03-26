@@ -235,9 +235,14 @@ test('world-studio agent drafts flow persists phase2 drafts and publishes with d
       },
     },
     queries: {
-      maintenanceQuery: {
+      stateQuery: {
         refetch: async () => ({ data: null }),
       },
+      worldTruthQuery: { refetch: async () => ({ data: null }) },
+      worldviewTruthQuery: { refetch: async () => ({ data: null }) },
+      eventsQuery: { refetch: async () => ({ data: [] }) },
+      lorebooksQuery: { refetch: async () => ({ data: { items: [] } }) },
+      resourceBindingsQuery: { refetch: async () => ({ data: [] }) },
     },
     setStatusBanner: () => {},
     setError: () => {},
@@ -370,9 +375,14 @@ test('world-studio publish normalizes invalid handle to ASCII fallback', async (
       },
     },
     queries: {
-      maintenanceQuery: {
+      stateQuery: {
         refetch: async () => ({ data: null }),
       },
+      worldTruthQuery: { refetch: async () => ({ data: null }) },
+      worldviewTruthQuery: { refetch: async () => ({ data: null }) },
+      eventsQuery: { refetch: async () => ({ data: [] }) },
+      lorebooksQuery: { refetch: async () => ({ data: { items: [] } }) },
+      resourceBindingsQuery: { refetch: async () => ({ data: [] }) },
     },
     setStatusBanner: () => {},
     setError: () => {},
@@ -479,9 +489,14 @@ test('world-studio publish sanitizes dna traits to backend enums', async () => {
       },
     },
     queries: {
-      maintenanceQuery: {
+      stateQuery: {
         refetch: async () => ({ data: null }),
       },
+      worldTruthQuery: { refetch: async () => ({ data: null }) },
+      worldviewTruthQuery: { refetch: async () => ({ data: null }) },
+      eventsQuery: { refetch: async () => ({ data: [] }) },
+      lorebooksQuery: { refetch: async () => ({ data: { items: [] } }) },
+      resourceBindingsQuery: { refetch: async () => ({ data: [] }) },
     },
     setStatusBanner: () => {},
     setError: () => {},

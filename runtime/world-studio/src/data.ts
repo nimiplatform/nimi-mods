@@ -1,4 +1,4 @@
-export const WORLD_STUDIO_DATA_LAYER_VERSION = '2026-02-20';
+export const WORLD_STUDIO_DATA_LAYER_VERSION = '2026-03-26';
 
 export {
   getMyWorldAccess,
@@ -11,16 +11,16 @@ export {
 } from './data/queries/draft.js';
 
 export {
-  getWorldMaintenance,
-  updateWorldMaintenance,
+  getWorldState,
+  commitWorldState,
+  getWorldTruth,
+  getWorldviewTruth,
   listMyWorlds,
-  listWorldMutations,
 } from './data/queries/maintenance.js';
 
 export {
-  listWorldEvents,
-  batchUpsertWorldEvents,
-  deleteWorldEvent,
+  listWorldHistory,
+  appendWorldHistory,
   listWorldLorebooks,
   batchUpsertWorldLorebooks,
   deleteWorldLorebook,
@@ -35,7 +35,7 @@ export {
 } from './data/queries/creator-agents.js';
 
 export {
-  listWorldResourceBindings,
-  batchUpsertWorldResourceBindings,
-  deleteWorldResourceBinding,
+  listWorldBindings,
+  batchUpsertWorldBindings,
+  deleteWorldBinding,
 } from './data/queries/resource-bindings.js';

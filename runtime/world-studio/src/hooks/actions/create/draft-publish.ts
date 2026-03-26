@@ -598,7 +598,12 @@ export async function publishWorldDraft(input: WorldStudioCreateActionsInput, _o
             details: { draftId: input.selectedDraftId, worldId },
         });
         await Promise.all([
-            input.queries.maintenanceQuery.refetch(),
+            input.queries.stateQuery.refetch(),
+            input.queries.worldTruthQuery.refetch(),
+            input.queries.worldviewTruthQuery.refetch(),
+            input.queries.eventsQuery.refetch(),
+            input.queries.lorebooksQuery.refetch(),
+            input.queries.resourceBindingsQuery.refetch(),
         ]);
     }
     catch (publishError) {

@@ -46,22 +46,22 @@ capabilities:
     - data.query.data-api.world.draft.get
     - data.query.data-api.world.draft.update
     - data.query.data-api.world.draft.publish
-    - data.query.data-api.world.maintenance.get
-    - data.query.data-api.world.maintenance.update
-    - data.query.data-api.world.events.list
-    - data.query.data-api.world.events.batch-upsert
-    - data.query.data-api.world.events.delete
+    - data.query.data-api.world.state.get
+    - data.query.data-api.world.state.commit
+    - data.query.data-api.core.world.by-id.get
+    - data.query.data-api.core.worldview.by-id.get
+    - data.query.data-api.world.history.list
+    - data.query.data-api.world.history.append
     - data.query.data-api.world.scenes.list
     - data.query.data-api.world.narrative-contexts.list
     - data.query.data-api.world.lorebooks.list
     - data.query.data-api.world.lorebooks.batch-upsert
     - data.query.data-api.world.lorebooks.delete
-    - data.query.data-api.world.resource-bindings.list
-    - data.query.data-api.world.resource-bindings.batch-upsert
-    - data.query.data-api.world.resource-bindings.delete
+    - data.query.data-api.world.bindings.list
+    - data.query.data-api.world.bindings.batch-upsert
+    - data.query.data-api.world.bindings.delete
     - data.query.data-api.world.drafts.list
     - data.query.data-api.world.worlds.mine
-    - data.query.data-api.world.mutations.list
     - data.query.data-api.creator.agents.list
     - data.query.data-api.creator.agents.get
     - data.query.data-api.creator.agents.create

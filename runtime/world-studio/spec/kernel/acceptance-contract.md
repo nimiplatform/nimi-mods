@@ -8,7 +8,7 @@ Acceptance behavior is authoritative in `tables/acceptance-cases.yaml`.
 
 ## WS-ACC-002 Minimum Coverage
 
-Coverage includes route gating, retry logical-index safety, start-time projection, event-horizon preservation, synthesize context integrity, publish payload integrity, narrative handoff integrity, and conflict recovery.
+Coverage includes route gating, retry logical-index safety, start-time projection, event-horizon preservation, synthesize context integrity, publish payload integrity, narrative handoff integrity, conflict recovery, and maintain data-surface alignment (`state / truth / history / bindings`).
 
 ## WS-ACC-003 Verification Commands
 

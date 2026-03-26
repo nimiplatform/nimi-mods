@@ -1,14 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import {
   getCreatorAgent,
-  getWorldMaintenance,
+  getWorldState,
+  getWorldTruth,
+  getWorldviewTruth,
   listCreatorAgents,
   listMyWorlds,
   listWorldDrafts,
-  listWorldEvents,
+  listWorldHistory,
   listWorldLorebooks,
-  listWorldResourceBindings,
-  listWorldMutations,
+  listWorldBindings,
 } from '../data.js';
 import type {
   WorldDraftSummary,
@@ -18,10 +19,12 @@ import type {
   WorldStudioResourceBindingSummary,
   WorldSummary,
 } from '../ui/types.js';
-import { type HookClient } from "@nimiplatform/sdk/mod";
+import { type HookClient } from '@nimiplatform/sdk/mod';
 
 function toRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
 }
 
 function toStringOrNull(value: unknown): string | null {
@@ -37,6 +40,25 @@ function toStringArray(value: unknown): string[] {
     return [];
   }
   return value.map((item) => String(item || '').trim()).filter(Boolean);
+}
+
+function requireNonEmptyString(value: unknown, code: string): string {
+  if (typeof value !== 'string') {
+    throw new Error(code);
+  }
+  const normalized = value.trim();
+  if (!normalized) {
+    throw new Error(code);
+  }
+  return normalized;
+}
+
+function requireFiniteNumber(value: unknown, code: string): number {
+  const normalized = Number(value);
+  if (!Number.isFinite(normalized)) {
+    throw new Error(code);
+  }
+  return normalized;
 }
 
 function toDraftSummaryList(payload: unknown): WorldDraftSummary[] {
@@ -73,61 +95,92 @@ function toWorldSummaryList(payload: unknown): WorldSummary[] {
     .filter((item) => Boolean(item.id));
 }
 
-function toMutationSummaryList(payload: unknown): WorldMutationSummary[] {
+function toHistorySummaryList(payload: unknown): WorldEventSummary[] {
   const items = Array.isArray(toRecord(payload).items) ? (toRecord(payload).items as unknown[]) : [];
   return items
-    .map((item) => toRecord(item))
-    .map((item) => {
-      const id = String(item.id || '');
-      const title = toStringOrNull(item.title);
-      const summary = toStringOrNull(item.summary);
-      if (!id || !title || !summary) return null;
+    .map((item, index) => {
+      const record = toRecord(item);
+      const metadata = toRecord(record.payload);
+      const title = requireNonEmptyString(record.title, 'WORLD_STUDIO_HISTORY_TITLE_REQUIRED');
+      const eventId = requireNonEmptyString(record.eventId, 'WORLD_STUDIO_HISTORY_EVENT_ID_REQUIRED');
+      const worldId = requireNonEmptyString(record.worldId, 'WORLD_STUDIO_HISTORY_WORLD_ID_REQUIRED');
+      const level = String(metadata.level || '').trim().toUpperCase();
+      const eventHorizon = String(metadata.eventHorizon || '').trim().toUpperCase();
+      const confidence = metadata.confidence === undefined
+        ? (
+            Array.isArray(record.evidenceRefs) && record.evidenceRefs.length > 0
+              ? record.evidenceRefs.reduce((sum, entry) => {
+                  const evidence = toRecord(entry);
+                  return sum + requireFiniteNumber(evidence.confidence, 'WORLD_STUDIO_HISTORY_EVIDENCE_CONFIDENCE_REQUIRED');
+                }, 0) / record.evidenceRefs.length
+              : 0
+          )
+        : requireFiniteNumber(metadata.confidence, 'WORLD_STUDIO_HISTORY_CONFIDENCE_REQUIRED');
       return {
-        id,
-        worldId: String(item.worldId || ''),
-        mutationType: String(item.mutationType || 'SETTING_CHANGE') as WorldMutationSummary['mutationType'],
-        targetPath: String(item.targetPath || ''),
+        id: eventId,
+        worldId,
+        timelineSeq: metadata.timelineSeq === undefined
+          ? index + 1
+          : requireFiniteNumber(metadata.timelineSeq, 'WORLD_STUDIO_HISTORY_TIMELINE_SEQ_REQUIRED'),
+        level: level === 'SECONDARY' ? 'SECONDARY' : 'PRIMARY',
+        eventHorizon: eventHorizon === 'ONGOING'
+          ? 'ONGOING'
+          : eventHorizon === 'FUTURE'
+            ? 'FUTURE'
+            : 'PAST',
+        parentEventId: toStringOrNull(metadata.parentEventId),
         title,
-        summary,
-        reason: toStringOrNull(item.reason),
-        creatorId: String(item.creatorId || ''),
-        createdAt: String(item.createdAt || ''),
+        summary: toStringOrNull(record.summary),
+        cause: toStringOrNull(record.cause),
+        process: toStringOrNull(record.process),
+        result: toStringOrNull(record.result),
+        timeRef: toStringOrNull(record.timeRef) || toStringOrNull(record.happenedAt),
+        locationRefs: toStringArray(record.locationRefs),
+        characterRefs: toStringArray(record.characterRefs),
+        dependsOnEventIds: toStringArray(record.dependsOnEventIds),
+        evidenceRefs: Array.isArray(record.evidenceRefs)
+          ? record.evidenceRefs.filter((entry) => entry && typeof entry === 'object') as Array<Record<string, unknown>>
+          : [],
+        confidence,
+        needsEvidence: metadata.needsEvidence === undefined ? !(Array.isArray(record.evidenceRefs) && record.evidenceRefs.length > 0) : Boolean(metadata.needsEvidence),
+        createdBy: requireNonEmptyString(record.createdBy, 'WORLD_STUDIO_HISTORY_CREATED_BY_REQUIRED'),
+        updatedBy: requireNonEmptyString(record.createdBy || record.updatedBy, 'WORLD_STUDIO_HISTORY_UPDATED_BY_REQUIRED'),
+        createdAt: requireNonEmptyString(record.committedAt || record.createdAt, 'WORLD_STUDIO_HISTORY_CREATED_AT_REQUIRED'),
+        updatedAt: requireNonEmptyString(record.committedAt || record.updatedAt || record.createdAt, 'WORLD_STUDIO_HISTORY_UPDATED_AT_REQUIRED'),
       };
-    })
-    .filter((item): item is WorldMutationSummary => Boolean(item));
+    });
 }
 
-function toEventSummaryList(payload: unknown): WorldEventSummary[] {
-  const items = Array.isArray(toRecord(payload).items) ? (toRecord(payload).items as unknown[]) : [];
-  return items
+function toMutationSummaryList(statePayload: unknown, historyItems: WorldEventSummary[]): WorldMutationSummary[] {
+  const stateItems = Array.isArray(toRecord(statePayload).items) ? (toRecord(statePayload).items as unknown[]) : [];
+  const stateTimeline = stateItems
     .map((item) => toRecord(item))
     .map((item) => ({
-      id: String(item.id || ''),
-      worldId: String(item.worldId || ''),
-      timelineSeq: Number.isFinite(Number(item.timelineSeq)) ? Number(item.timelineSeq) : 0,
-      level: String(item.level || 'PRIMARY') as WorldEventSummary['level'],
-      eventHorizon: String(item.eventHorizon || 'PAST') as WorldEventSummary['eventHorizon'],
-      parentEventId: toStringOrNull(item.parentEventId),
-      title: String(item.title || 'Untitled Event'),
-      summary: toStringOrNull(item.summary),
-      cause: toStringOrNull(item.cause),
-      process: toStringOrNull(item.process),
-      result: toStringOrNull(item.result),
-      timeRef: toStringOrNull(item.timeRef),
-      locationRefs: toStringArray(item.locationRefs),
-      characterRefs: toStringArray(item.characterRefs),
-      dependsOnEventIds: toStringArray(item.dependsOnEventIds),
-      evidenceRefs: Array.isArray(item.evidenceRefs)
-        ? item.evidenceRefs.filter((entry) => entry && typeof entry === 'object') as Array<Record<string, unknown>>
-        : [],
-      confidence: Number.isFinite(Number(item.confidence)) ? Number(item.confidence) : 0.5,
-      needsEvidence: Boolean(item.needsEvidence),
-      createdBy: String(item.createdBy || ''),
-      updatedBy: String(item.updatedBy || ''),
-      createdAt: String(item.createdAt || ''),
-      updatedAt: String(item.updatedAt || ''),
-    }))
-    .filter((item) => Boolean(item.id));
+      id: requireNonEmptyString(item.id, 'WORLD_STUDIO_STATE_RECORD_ID_REQUIRED'),
+      worldId: requireNonEmptyString(item.worldId, 'WORLD_STUDIO_STATE_RECORD_WORLD_ID_REQUIRED'),
+      mutationType: 'SETTING_CHANGE' as const,
+      targetPath: requireNonEmptyString(item.targetPath, 'WORLD_STUDIO_STATE_RECORD_TARGET_PATH_REQUIRED'),
+      title: 'State commit',
+      summary: requireNonEmptyString(item.targetPath, 'WORLD_STUDIO_STATE_RECORD_TARGET_PATH_REQUIRED'),
+      reason: toStringOrNull(toRecord(item.metadata).reason),
+      creatorId: requireNonEmptyString(item.createdBy, 'WORLD_STUDIO_STATE_RECORD_CREATED_BY_REQUIRED'),
+      createdAt: requireNonEmptyString(item.committedAt, 'WORLD_STUDIO_STATE_RECORD_COMMITTED_AT_REQUIRED'),
+    }));
+
+  const historyTimeline = historyItems.map((item) => ({
+    id: item.id,
+    worldId: item.worldId,
+    mutationType: 'EVENT_BATCH_UPSERT' as const,
+    targetPath: `history:${item.level}`,
+    title: item.title,
+    summary: item.summary || item.title,
+    reason: null,
+    creatorId: item.createdBy,
+    createdAt: item.createdAt,
+  }));
+
+  return [...stateTimeline, ...historyTimeline]
+    .sort((left, right) => String(right.createdAt || '').localeCompare(String(left.createdAt || '')));
 }
 
 function toCreatorAgentSummaryFromUser(
@@ -211,9 +264,9 @@ function toResourceBindingSummaryList(payload: unknown): WorldStudioResourceBind
       const resource = toRecord(item.resource);
       return {
         id: String(item.id || ''),
-        targetType: String(item.targetType || ''),
-        targetId: String(item.targetId || ''),
-        slot: String(item.slot || ''),
+        targetType: String(item.hostType || ''),
+        targetId: String(item.hostId || ''),
+        slot: String(item.bindingPoint || ''),
         priority: Number.isFinite(Number(item.priority)) ? Number(item.priority) : 0,
         conditions: Object.keys(toRecord(item.conditions)).length > 0 ? toRecord(item.conditions) : null,
         tags: toStringArray(item.tags),
@@ -267,11 +320,25 @@ export function useWorldStudioResourceQueries(hookClient: HookClient, input: {
     queryFn: async () => toCreatorAgentSummary(await getCreatorAgent(hookClient, String(input.selectedAgentId || ''))),
   });
 
-  const maintenanceQuery = useQuery({
-    queryKey: ['world-studio', 'maintenance', input.worldId],
+  const stateQuery = useQuery({
+    queryKey: ['world-studio', 'state', input.worldId],
     enabled: input.enabled && Boolean(input.worldId),
     retry: false,
-    queryFn: async () => await getWorldMaintenance(hookClient, input.worldId),
+    queryFn: async () => await getWorldState(hookClient, input.worldId),
+  });
+
+  const worldTruthQuery = useQuery({
+    queryKey: ['world-studio', 'truth', input.worldId],
+    enabled: input.enabled && Boolean(input.worldId),
+    retry: false,
+    queryFn: async () => await getWorldTruth(hookClient, input.worldId),
+  });
+
+  const worldviewTruthQuery = useQuery({
+    queryKey: ['world-studio', 'truth-worldview', input.worldId],
+    enabled: input.enabled && Boolean(input.worldId),
+    retry: false,
+    queryFn: async () => await getWorldviewTruth(hookClient, input.worldId),
   });
 
   const lorebooksQuery = useQuery({
@@ -282,35 +349,32 @@ export function useWorldStudioResourceQueries(hookClient: HookClient, input: {
   });
 
   const eventsQuery = useQuery({
-    queryKey: ['world-studio', 'events', input.worldId],
+    queryKey: ['world-studio', 'history', input.worldId],
     enabled: input.enabled && Boolean(input.worldId),
     retry: false,
-    queryFn: async () => toEventSummaryList(await listWorldEvents(hookClient, input.worldId)),
-  });
-
-  const mutationsQuery = useQuery({
-    queryKey: ['world-studio', 'mutations', input.worldId],
-    enabled: input.enabled && Boolean(input.worldId),
-    retry: false,
-    queryFn: async () => toMutationSummaryList(await listWorldMutations(hookClient, input.worldId)),
+    queryFn: async () => toHistorySummaryList(await listWorldHistory(hookClient, input.worldId)),
   });
 
   const resourceBindingsQuery = useQuery({
-    queryKey: ['world-studio', 'resource-bindings', input.worldId],
+    queryKey: ['world-studio', 'bindings', input.worldId],
     enabled: input.enabled && Boolean(input.worldId),
     retry: false,
-    queryFn: async () => toResourceBindingSummaryList(await listWorldResourceBindings(hookClient, input.worldId)),
+    queryFn: async () => toResourceBindingSummaryList(await listWorldBindings(hookClient, input.worldId)),
   });
+
+  const maintenanceTimeline = toMutationSummaryList(stateQuery.data, eventsQuery.data || []);
 
   return {
     draftsQuery,
     worldsQuery,
     creatorAgentsQuery,
     selectedAgentQuery,
-    maintenanceQuery,
+    stateQuery,
+    worldTruthQuery,
+    worldviewTruthQuery,
     eventsQuery,
     lorebooksQuery,
-    mutationsQuery,
     resourceBindingsQuery,
+    maintenanceTimeline,
   };
 }

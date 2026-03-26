@@ -34,8 +34,16 @@ test('world-studio runtime capabilities include image generation used by the mod
     'WORLD_STUDIO_CAPABILITIES must include creator.agents.update',
   );
   assert.ok(
-    WORLD_STUDIO_CAPABILITIES.includes('data.query.data-api.world.resource-bindings.list'),
-    'WORLD_STUDIO_CAPABILITIES must include world.resource-bindings.list',
+    WORLD_STUDIO_CAPABILITIES.includes('data.query.data-api.world.bindings.list'),
+    'WORLD_STUDIO_CAPABILITIES must include world.bindings.list',
+  );
+  assert.ok(
+    WORLD_STUDIO_CAPABILITIES.includes('data.query.data-api.world.state.get'),
+    'WORLD_STUDIO_CAPABILITIES must include world.state.get',
+  );
+  assert.ok(
+    WORLD_STUDIO_CAPABILITIES.includes('data.query.data-api.core.worldview.by-id.get'),
+    'WORLD_STUDIO_CAPABILITIES must include core.worldview.by-id.get',
   );
 });
 
@@ -55,8 +63,8 @@ test('world-studio runtime manifest object stays aligned with yaml manifest capa
   );
 });
 
-test('world-studio constants use resource-bindings naming and drop legacy visual-bindings constants', () => {
+test('world-studio constants use canonical bindings naming and drop legacy visual-bindings constants', () => {
   const constantsSource = readFileSync(path.join(modDir, 'src/contracts/constants.ts'), 'utf8');
-  assert.match(constantsSource, /WORLD_STUDIO_DATA_API_RESOURCE_BINDINGS_LIST/);
+  assert.match(constantsSource, /WORLD_STUDIO_DATA_API_BINDINGS_LIST/);
   assert.doesNotMatch(constantsSource, /WORLD_STUDIO_DATA_API_VISUAL_BINDINGS_LIST/);
 });

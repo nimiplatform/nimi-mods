@@ -15,7 +15,20 @@ import { useWorldStudioStatusMetrics } from '../hooks/use-world-studio-status-me
 import { isTaskBlockingStatus } from '../hooks/actions/task-control/state-machine.js';
 import { useWorldStudioWorkspaceStore } from '../state/workspace-store.js';
 import { getTimeFlowRatioFromWorldviewPatch } from '../services/snapshot-normalize.js';
+import { WORLD_STUDIO_STATE_TARGET_PATH } from '../contracts.js';
 import { createHookClient, asRecord, type RuntimeRouteOptionsSnapshot } from "@nimiplatform/sdk/mod";
+
+function getWorkspaceStateVersion(payload: unknown): string {
+    const record = asRecord(payload);
+    const items = Array.isArray(record.items) ? record.items : [];
+    const workspaceItem = items.find((item) => asRecord(item).targetPath === WORLD_STUDIO_STATE_TARGET_PATH);
+    if (!workspaceItem) {
+        return String(record.version || '');
+    }
+    const itemRecord = asRecord(workspaceItem);
+    return String(itemRecord.version || record.version || '');
+}
+
 type UseWorldStudioControllerContextInput = {
     hookClient: ReturnType<typeof createHookClient>;
     userId: string;
@@ -110,16 +123,9 @@ export function useWorldStudioControllerContext(input: UseWorldStudioControllerC
         eventsGraph,
         phase1: effectivePhase1,
     });
-    const maintenancePayload = asRecord(queries.maintenanceQuery.data);
-    const maintenanceEditorSnapshotVersion = String(maintenancePayload.editorSnapshotVersion
+    const maintenanceEditorSnapshotVersion = String(getWorkspaceStateVersion(queries.stateQuery.data)
         || input.snapshot.editorSnapshotVersion
         || '');
-    const storyProjectionSummaryRaw = asRecord(maintenancePayload.storyProjectionSummary);
-    const storyProjectionSummary = {
-        storyCount: Number(storyProjectionSummaryRaw.storyCount || 0),
-        latestProjectedAt: String(storyProjectionSummaryRaw.latestProjectedAt || ''),
-        missingContextCount: Number(storyProjectionSummaryRaw.missingContextCount || 0),
-    };
     return {
         selectedWorldId,
         selectedDraftId,
@@ -142,7 +148,6 @@ export function useWorldStudioControllerContext(input: UseWorldStudioControllerC
         timeFlowRatio,
         selectedAgentSyncCharacters,
         maintenanceEditorSnapshotVersion,
-        storyProjectionSummary,
         runtimeDefaultRouteBinding,
         ...bindings,
         ...statusMetrics,

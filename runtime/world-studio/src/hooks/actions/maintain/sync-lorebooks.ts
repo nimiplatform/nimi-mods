@@ -1,7 +1,5 @@
 import { worldStudioMessage } from '../../../i18n/messages.js';
-import { validateLorebooksInput } from '../../../services/snapshot-normalize.js';
 import type { WorldStudioMaintainActionContext, WorldStudioMaintainActionPayload } from './types.js';
-import { asRecord } from "@nimiplatform/sdk/mod";
 export async function syncLorebooks(context: WorldStudioMaintainActionContext, _payload?: WorldStudioMaintainActionPayload) {
     if (!context.selectedWorldId)
         return;
@@ -21,45 +19,7 @@ export async function syncLorebooks(context: WorldStudioMaintainActionContext, _
     }
     context.setError(null);
     try {
-        const lorebookUpserts = context.snapshot.lorebooksDraft;
-        const lorebookErrors = validateLorebooksInput(lorebookUpserts);
-        if (lorebookErrors.length > 0) {
-            context.taskController.failTask(started.taskId, `WORLD_STUDIO_LOREBOOKS_INVALID: ${lorebookErrors.join(' | ')}`);
-            context.setError(`WORLD_STUDIO_LOREBOOKS_INVALID: ${lorebookErrors.join(' | ')}`);
-            return;
-        }
-        if (context.taskController.shouldCancel(started.taskId)) {
-            context.taskController.cancelTask(started.taskId, worldStudioMessage('task.lorebooksSyncCanceled', 'Lorebooks sync canceled'));
-            context.setNotice(worldStudioMessage('notice.lorebooksSyncCanceled', 'Lorebooks sync canceled.'));
-            return;
-        }
-        context.taskController.updateTask(started.taskId, {
-            canCancel: false,
-            message: worldStudioMessage('task.submittingLorebooksSync', 'Submitting lorebooks sync'),
-            progress: 0.2,
-        });
-        await context.mutations.syncLorebooksMutation.mutateAsync({
-            worldId: context.selectedWorldId,
-            lorebookUpserts,
-            reason: 'World Studio lorebooks sync',
-        });
-        const maintenancePayload = asRecord((await context.queries.maintenanceQuery.refetch()).data);
-        context.patchSnapshot({
-            editorSnapshotVersion: String(maintenancePayload.editorSnapshotVersion || context.snapshot.editorSnapshotVersion || ''),
-            unsavedChangesByPanel: {
-                ...context.snapshot.unsavedChangesByPanel,
-                lorebooks: false,
-            },
-        });
-        context.setStatusBanner({
-            kind: 'success',
-            message: worldStudioMessage('banner.lorebooksSynchronized', 'Lorebooks synchronized'),
-        });
-        context.taskController.completeTask(started.taskId, worldStudioMessage('task.lorebooksSynchronized', 'Lorebooks synchronized'));
-        await Promise.all([
-            context.queries.lorebooksQuery.refetch(),
-            context.queries.mutationsQuery.refetch(),
-        ]);
+        throw new Error('WORLD_STUDIO_LOREBOOK_MUTATION_UNAVAILABLE');
     }
     catch (syncError) {
         context.taskController.failTask(started.taskId, syncError);

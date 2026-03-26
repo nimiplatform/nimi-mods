@@ -50,7 +50,11 @@
 - `WS-DOM-025`: `world.rules` is not a world-base field; world rule editing belongs to `worldview.coreSystem.rules` in both synthesize output and maintenance editing.
 - `WS-DOM-025a`: `worldview.coreSystem.rules` uses ordered rule items with fixed fields `key / title / value`; World-Studio must not degrade it back into object-map editing.
 - `WS-DOM-026`: Agents V1 is metadata-first: creator-agent readable fields may be shown, metadata fields may be edited, and unsupported core persona editing must remain an explicit future capability.
-- `WS-DOM-027`: Assets V1 manages `World Assets` and `Agent Assets` through `resource-bindings` hydration and batch-upsert, without redefining backend resource contracts.
+- `WS-DOM-027`: Assets V1 manages `World Assets` and `Agent Assets` through canonical world `bindings` hydration and batch-upsert, without redefining backend resource contracts.
+- `WS-DOM-027a`: Maintain `Base` saves creator-editable world data through world state commit only. The write identity is fixed to `targetPath = world-studio.workspace.world`, `schemaId = world-studio.workspace.state`, and `schemaVersion = 1`.
+- `WS-DOM-027b`: Maintain `Worldview` is hydrated from canonical worldview truth projection. World-Studio must not reintroduce a private worldview write path or a compatibility fallback to legacy maintenance payloads.
+- `WS-DOM-027c`: Maintain event sync uses world history append only. The event write identity is fixed to `eventType = WORLD_EVENT`, `schemaId = world-studio.history.append`, and `schemaVersion = 1`; delete/replace semantics are not part of V2.
+- `WS-DOM-027d`: Maintain data surfaces are fixed to `state / truth / history / bindings`. Legacy `maintenance.*`, `events.*`, `resource-bindings.*`, and `mutations.*` query faces are outside the current World-Studio contract.
 - `WS-DOM-028`: Successful publish lands in `MAINTAIN` and defaults the editor context to `World > Base`.
 - `WS-DOM-029`: World base maintenance must consume layered world truth fields (`tagline`, `motto`, `overview`, `contentRating`) instead of limiting editing to the pre-upgrade subset.
 - `WS-DOM-030`: Agents maintenance must read upgraded realm truth (`importance`, `activeWorldId`, `liveState`, `stats`) even when write support remains metadata-first.

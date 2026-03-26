@@ -116,7 +116,7 @@ cases:
     expected_ok: true
     source_rule: WS-ACC-002
   - id: WS-021-ASSETS-V1-RESOURCE-BINDINGS-ROUNDTRIP
-    description: Assets V1 hydrates world and agent resource bindings into maintain state, refreshes them, and writes updates back via resource-bindings batch upsert.
+    description: Assets V1 hydrates world and agent bindings into maintain state, refreshes them, and writes updates back via canonical world bindings batch upsert.
     expected_ok: true
     source_rule: WS-ACC-002
   - id: WS-022-WORLD-TRUTH-LAYERED-COPY-FIELDS
@@ -133,6 +133,22 @@ cases:
     source_rule: WS-ACC-002
   - id: WS-025-MAINTAIN-WORKBENCH-UNIFIED-RHYTHM
     description: Maintain sections share a consistent workbench rhythm with section context copy and contextual primary actions instead of ad hoc panel-specific layouts.
+    expected_ok: true
+    source_rule: WS-ACC-002
+  - id: WS-026-MAINTAIN-STATE-WRITE-IDENTITY-FIXED
+    description: World Base maintain save uses world state commit with fixed write identity `targetPath=world-studio.workspace.world`, `schemaId=world-studio.workspace.state`, and `schemaVersion=1`.
+    expected_ok: true
+    source_rule: WS-ACC-002
+  - id: WS-027-MAINTAIN-WORLDVIEW-TRUTH-ONLY
+    description: Worldview maintain hydration comes from canonical worldview truth projection and does not fall back to legacy maintenance payload ownership semantics.
+    expected_ok: true
+    source_rule: WS-ACC-002
+  - id: WS-028-MAINTAIN-HISTORY-APPEND-ONLY
+    description: Event maintain sync uses world history append with fixed identity `eventType=WORLD_EVENT`, `schemaId=world-studio.history.append`, and `schemaVersion=1`; delete/replace semantics are not part of V2.
+    expected_ok: true
+    source_rule: WS-ACC-002
+  - id: WS-029-MAINTAIN-CANONICAL-DATA-SURFACES
+    description: Maintain data surfaces are fixed to `state / truth / history / bindings`; legacy `maintenance`, `events`, `resource-bindings`, and `mutations` query faces are not part of the active contract.
     expected_ok: true
     source_rule: WS-ACC-002
   - id: WS-026-ASSETS-GENERATED-SYNCED-MISSING

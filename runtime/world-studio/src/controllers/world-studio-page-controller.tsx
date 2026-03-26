@@ -25,6 +25,12 @@ function isRouteConfigBlockingNotice(message: string | null): boolean {
     return (message.includes('WORLD_STUDIO_')
         || message.includes('coarse/fine route'));
 }
+
+function formatQueryError(queryName: string, error: unknown): string {
+    const detail = error instanceof Error ? error.message : String(error || '');
+    return `WORLD_STUDIO_REMOTE_DATA_QUERY_FAILED: ${queryName}: ${detail}`;
+}
+
 export function useWorldStudioPageContent() {
     const { t } = useModTranslation('world-studio');
     const hookClient = useMemo(() => createHookClient(WORLD_STUDIO_MOD_ID), []);
@@ -52,6 +58,36 @@ export function useWorldStudioPageContent() {
         snapshot: storeBindings.snapshot,
         phase1: ui.phase1,
     });
+    useEffect(() => {
+        if (ui.landing.target !== 'MAINTAIN') {
+            return;
+        }
+        const failingQuery = [
+            ['state.get', context.queries.stateQuery.error],
+            ['world.by-id.get', context.queries.worldTruthQuery.error],
+            ['worldview.by-id.get', context.queries.worldviewTruthQuery.error],
+            ['history.list', context.queries.eventsQuery.error],
+            ['lorebooks.list', context.queries.lorebooksQuery.error],
+            ['bindings.list', context.queries.resourceBindingsQuery.error],
+        ].find((entry) => entry[1]);
+        if (!failingQuery) {
+            if (ui.error?.startsWith('WORLD_STUDIO_REMOTE_DATA_QUERY_FAILED:')) {
+                ui.setError(null);
+            }
+            return;
+        }
+        ui.setError(formatQueryError(String(failingQuery[0]), failingQuery[1]));
+    }, [
+        context.queries.eventsQuery.error,
+        context.queries.lorebooksQuery.error,
+        context.queries.resourceBindingsQuery.error,
+        context.queries.stateQuery.error,
+        context.queries.worldTruthQuery.error,
+        context.queries.worldviewTruthQuery.error,
+        ui.error,
+        ui.landing.target,
+        ui.setError,
+    ]);
     const { loadLanding, loadRuntimeRouteOptions, resolveRuntimeDefaultRouteBinding } = useWorldStudioBootstrap({
         bootstrapReady,
         flowId,
@@ -114,7 +150,9 @@ export function useWorldStudioPageContent() {
         patchSnapshot: storeBindings.patchSnapshot,
         snapshot: storeBindings.snapshot,
         queries: {
-            maintenanceQuery: { data: context.queries.maintenanceQuery.data },
+            stateQuery: { data: context.queries.stateQuery.data },
+            worldTruthQuery: { data: context.queries.worldTruthQuery.data },
+            worldviewTruthQuery: { data: context.queries.worldviewTruthQuery.data },
             eventsQuery: { data: context.queries.eventsQuery.data },
             lorebooksQuery: { data: context.queries.lorebooksQuery.data },
             creatorAgentsQuery: { data: context.queries.creatorAgentsQuery.data },
