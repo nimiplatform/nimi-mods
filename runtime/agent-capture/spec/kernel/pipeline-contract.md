@@ -17,15 +17,18 @@ Agent-Capture 的默认流程是 draft-first、dialog-led，而不是 form-first
 - 输入本身不自动触发 `Generate Agent`；生成必须由用户显式发起。
 - 对话目标是角色感觉收敛，而不是固定字段填写。
 - 当前会话中的有效用户意图可由多轮对话逐步形成，而不是只取最后一句消息。
+- 对话应优先收敛人物主体细节，例如服装、材质、配饰、手持道具、轮廓和画风，而不是把大量轮次消耗在背景场景讨论上。
+- 除非用户明确要求，背景在默认流程中只承担辅助氛围职责。
+- prompt shell 与 LLM 输出语言默认跟随 desktop 当前系统语言；仅 `zh*` 桌面语言走中文，其余语言统一回落为英文。
 
-## AC-PIPE-002 — styleHint 辅助输入流水线
+## AC-PIPE-002 — 辅助上下文输入流水线
 
-Agent-Capture 的风格控制是自由提示，不是硬枚举风格选择器。
+Agent-Capture 的辅助上下文只补强方向，不应挤占主输入心智。
 
 **规则**:
-- 系统可在输入后提供一个推荐风格方向。
-- 用户可补充、替换或留空 `styleHint`。
-- `styleHint` 服务于生成，不构成稳定 domain truth 分类。
+- 用户可附加、替换或留空参考图与 selected existing agent 等辅助上下文。
+- 风格要求默认通过主输入与继续对话表达，不单列独立风格输入项。
+- 辅助上下文服务于生成方向，不构成稳定 domain truth 分类。
 
 ## AC-PIPE-003 — 结果替换策略
 
@@ -35,6 +38,9 @@ Agent-Capture 不保留复杂图像候选历史。
 - 一次 `Generate Agent` 只生成一个当前 `generatedImage`。
 - `Regenerate` 直接替换当前结果以及配套文本草稿。
 - `name`、`bio`、`tags` 的后续编辑不自动触发重生成。
+- 默认正式图像结果应收敛为角色锚点图，而不是任意视角的角色美图。
+- 默认正式图像结果应采用固定焦距倾向、全身完整入画、主体清晰、姿态稳定、背景弱化的构图方向。
+- 默认正式图像结果应把服装、材质、配饰、手持道具和画风稳定落实到人物主体上，而不是让背景场景主导视觉阅读。
 
 ## AC-PIPE-004 — draft curate 与显式 handoff
 
@@ -67,15 +73,17 @@ Agent-Capture 不负责判断“是否已经聊够”，而由用户自行决定
 - 用户确认 brief 后，显式 `Generate Agent` 才可继续执行。
 - 最新 brief 必须反映当前会话中仍然有效的用户意图集合，而不是机械使用完整原始历史或仅使用最后一句消息。
 - 当当前结果已存在时，最新 brief 还应说明本轮变化将延续什么、调整什么。
+- 最新 brief 默认应优先反映人物主体、服装、材质、配饰、手持道具与画风等角色向视觉决策；背景只在用户明确强调时提升优先级。
 
 ## AC-PIPE-007 — current generation context assembly
 
 Agent-Capture 的每次生成都必须先装配当前生成上下文。
 
 **规则**:
-- 当前生成上下文以当前有效用户意图集合为基础，并按需并入 `sourceImage`、selected existing agent 背景、`styleHint`、当前 `generatedImage` 与最新修正。
+- 当前生成上下文以当前有效用户意图集合为基础，并按需并入 `sourceImage`、selected existing agent 背景、当前 `generatedImage` 与最新修正。
 - 当用户只是补充或微调当前角色方向时，系统应把这次输入视为对当前上下文的增量更新。
 - 当用户明确表达重来、改换方向或放弃当前结果时，系统才应重置相应的上下文部分。
+- 在默认策略下，`generatedImage` 应主要通过 brief、readout、会话与方向性说明影响下一轮生成；正式图像请求中的稳定视觉参考默认优先使用 `sourceImage`，避免递归放大上一轮渲染噪点与模糊。
 
 ## AC-PIPE-008 — result readout
 

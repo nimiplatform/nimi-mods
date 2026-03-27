@@ -28,19 +28,15 @@ entities:
       - name: sourcePrompt
         type: string
         required: false
-        description: 用户原始角色描述输入；单独存在即可满足最小生成条件，也是角色捕捉的一等入口
+        description: 用户原始角色描述输入；单独存在即可满足最小生成条件，也是角色捕捉的一等入口。默认应优先沉淀人物主体、服装、材质、配饰、手持道具与画风，而不是把背景场景当作主收敛目标
       - name: selectedAgentId
         type: ULID
         required: false
         description: 用户显式选择的已有 agent 作为辅助背景上下文；不构成必须逐条兑现的完整生成约束
-      - name: styleHint
-        type: string
-        required: false
-        description: 用户自由补充的风格提示，不是硬枚举风格字段
       - name: generatedImage
         type: ImageRef
         required: false
-        description: 当前正式图像结果；一次显式生成只产出一个当前结果，并可在后续生成中作为参考上下文的一部分
+        description: 当前正式图像结果；默认应为采用固定焦距倾向、主体清晰、视角稳定、全身完整入画、适合后续角色制作继续使用的角色锚点图。人物主体上的服装、材质、配饰、手持道具与画风应优先被稳定落实，背景只承担辅助氛围角色。一次显式生成只产出一个当前结果，并可在后续生成中作为参考上下文的一部分
       - name: characterReadout
         type: string
         required: false

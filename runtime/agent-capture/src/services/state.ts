@@ -1,0 +1,130 @@
+import type {
+  AgentCaptureDraftSnapshot,
+  AgentCaptureMessage,
+  AgentCaptureRouteState,
+  AgentCaptureSessionState,
+} from '../types.js';
+
+function makeId(): string {
+  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `agent-capture-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function createTimestamp(): string {
+  return new Date().toISOString();
+}
+
+export function createDraftId(): string {
+  return makeId();
+}
+
+export function createEmptyDraftSnapshot(): AgentCaptureDraftSnapshot {
+  const now = createTimestamp();
+  return {
+    id: createDraftId(),
+    status: 'draft',
+    sourceImage: null,
+    sourcePrompt: '',
+    selectedAgentId: null,
+    generatedImage: null,
+    characterReadout: '',
+    name: '',
+    bio: '',
+    personaSeed: '',
+    tags: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+export function createEmptySessionState(): AgentCaptureSessionState {
+  return {
+    messages: [],
+    currentBrief: '',
+    pendingBriefConfirmation: false,
+    workingState: 'idle',
+    surfaceError: '',
+    inputMode: 'expanded',
+    lastTextTraceId: '',
+    lastImageTraceId: '',
+  };
+}
+
+export function createEmptyRouteState(): AgentCaptureRouteState {
+  return {
+    textRouteBinding: null,
+    imageRouteBinding: null,
+  };
+}
+
+export function sanitizeHydratedSessionState(
+  value: AgentCaptureSessionState | null | undefined,
+): AgentCaptureSessionState {
+  if (!value) {
+    return createEmptySessionState();
+  }
+  return {
+    messages: Array.isArray(value.messages) ? value.messages : [],
+    currentBrief: String(value.currentBrief || '').trim(),
+    pendingBriefConfirmation: false,
+    workingState: 'idle',
+    surfaceError: '',
+    inputMode: value.inputMode === 'dialogue' ? 'dialogue' : 'expanded',
+    lastTextTraceId: String(value.lastTextTraceId || '').trim(),
+    lastImageTraceId: String(value.lastImageTraceId || '').trim(),
+  };
+}
+
+export function buildSourcePromptFromMessages(messages: AgentCaptureMessage[]): string {
+  return messages
+    .filter((message) => message.role === 'user')
+    .map((message) => String(message.content || '').trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
+export function appendSessionMessage(
+  session: AgentCaptureSessionState,
+  input: {
+    role: AgentCaptureMessage['role'];
+    kind: AgentCaptureMessage['kind'];
+    content: string;
+  },
+): AgentCaptureSessionState {
+  return {
+    ...session,
+    messages: [...session.messages, {
+      id: makeId(),
+      role: input.role,
+      kind: input.kind,
+      content: input.content,
+      createdAt: createTimestamp(),
+    }],
+  };
+}
+
+function isEmptyImageRef(input: AgentCaptureDraftSnapshot['sourceImage'] | AgentCaptureDraftSnapshot['generatedImage']): boolean {
+  if (!input) {
+    return true;
+  }
+  return !String(input.url || '').trim() && !String(input.path || '').trim();
+}
+
+export function isDraftFactuallyEmpty(snapshot: AgentCaptureDraftSnapshot): boolean {
+  return (
+    !String(snapshot.sourcePrompt || '').trim()
+    && isEmptyImageRef(snapshot.sourceImage)
+    && !String(snapshot.selectedAgentId || '').trim()
+    && isEmptyImageRef(snapshot.generatedImage)
+    && !String(snapshot.characterReadout || '').trim()
+    && !String(snapshot.name || '').trim()
+    && !String(snapshot.bio || '').trim()
+    && !String(snapshot.personaSeed || '').trim()
+    && snapshot.tags.length === 0
+  );
+}
+
+export function hasMinimumGenerationInput(snapshot: AgentCaptureDraftSnapshot): boolean {
+  return Boolean(String(snapshot.sourcePrompt || '').trim() || snapshot.sourceImage);
+}

@@ -24,10 +24,14 @@ Agent-Capture 是一个 desktop mod，也是一个帮助用户获得角色形象
 
 - `Agent-Capture` 负责把角色描述输入变成可继续流转的角色草稿；参考图与已有 agent 仅作为可选补充上下文
 - `Agent-Capture` 采用 feeling-led 对话式捕捉，而不是调查问卷式字段收集
+- 对话应优先把角色落实到人物主体、体态轮廓、服装、材质、配饰、手持道具、色彩与画风上；背景默认只做辅助氛围，除非用户明确希望强调场景
+- prompt shell 与 LLM 输出语言应跟随 desktop 当前系统语言；当系统语言不可判定或不在当前支持范围内时，默认使用中文
 - 用户自行决定何时请求 `Generate Agent`；系统不承担“是否已经聊够”的判断职责
 - 正式产出以显式 `Generate Agent` 结果为准；生成前系统必须先在会话内给出一句 brief 确认消息；对话期间可存在渐进式视觉反馈，但其不是 canonical output
+- 默认正式图像产物应收敛为采用固定焦距倾向、全身完整入画、主体清晰稳定、适合后续角色制作继续使用的角色锚点图，而不是任意视角的角色美图
 - `Agent-Capture` 不直接编辑 canonical agent，也不持有市场、授权、交易语义
 - `Agent-Capture` 可定义显式 handoff 目标；当前仅定义 `Forge`
+- 当前 workspace UI 里程碑收敛到“捕捉、生成、草稿整理”为止；handoff 边界继续保留为声明能力，而不是本轮 refactor 的用户可见操作
 - 当已有 agent 背景与当前用户输入冲突时，当前用户输入永远优先
 - 当前用户输入指当前会话中仍然有效的用户意图集合；系统以最新 brief 承载这组有效意图
 - 每次生成都基于当前生成上下文；当前结果应带有轻量角色读取文本，帮助用户感知角色正在成形
@@ -38,14 +42,14 @@ Agent-Capture 是一个 desktop mod，也是一个帮助用户获得角色形象
 - `AC-DOM-002`: `AgentDraft` 属于 mod 私有角色工作态，不得伪装成 canonical agent、Realm `OwnableAsset`、`Bundle` 或 market 商品对象。
 - `AC-DOM-003`: Agent-Capture 采用 draft-first 工作流。首次有效输入时隐式创建 `AgentDraft`，而不是要求用户先填写完整项目表单。
 - `AC-DOM-004`: 角色捕捉采用 feeling-led 对话式收敛，不采用调查问卷式显式分类采集。
-- `AC-DOM-005`: 一次显式 `Generate Agent` 只产出一个当前 `generatedImage` 及一组配套文本草稿；`Regenerate` 直接替换当前结果，不保留复杂版本历史。
+- `AC-DOM-005`: 一次显式 `Generate Agent` 只产出一个当前 `generatedImage` 及一组配套文本草稿；`Regenerate` 直接替换当前结果，不保留复杂版本历史；默认正式图像结果采用固定焦距倾向、全身完整入画、主体清晰稳定的角色锚点图 framing。
 - `AC-DOM-006`: `name`、`bio`、`tags` 为用户可编辑字段；`personaSeed` 是系统整理后的中间种子文本，不作为第一版直接手改字段。
 - `AC-DOM-007`: 保存后的 `AgentDraft` 默认留在 mod 私有 working state 中；handoff 是显式后续动作，不是保存完成条件。
 - `AC-DOM-008`: 空 draft 仅允许在当前上下文中临时存在；离开上下文后应自动清理。
 - `AC-DOM-009`: 生成前必须存在系统自动总结的一句 brief；用户通过继续对话修正 brief，而不是直接编辑它。
 - `AC-DOM-010`: 已选择的 existing agent 仅作为辅助上下文；当前用户输入始终优先，且上下文变化必须重新形成 brief。
 - `AC-DOM-011`: 当前用户输入是当前会话中仍然有效的用户意图集合；新的冲突输入覆盖旧输入，生成使用最新 brief。
-- `AC-DOM-012`: 每次生成都基于当前生成上下文；当前结果在存在时会回流为下一轮可复用锚点。
+- `AC-DOM-012`: 每次生成都基于当前生成上下文；当前结果在存在时主要作为方向性上下文参与下一轮整理，而不是默认以图像字节递归回流。
 - `AC-DOM-013`: 方向性跟随通过“保留什么、调整什么”的可感知变化成立，而不是靠空泛承诺。
 - `AC-DOM-014`: 当前结果必须附带轻量角色读取文本，帮助用户感知角色正在成形。
 
@@ -66,7 +70,7 @@ Agent-Capture 是一个 desktop mod，也是一个帮助用户获得角色形象
 |---------|------|------|
 | `AC-DOM-003` | implicit draft | 首次有效输入时隐式创建 draft |
 | `AC-DOM-004` | feeling-led capture | 通过对话逐步提炼角色感觉 |
-| `AC-DOM-005` | one-generate-one-result | 一次生成只产出一个当前结果 |
+| `AC-DOM-005` | one-generate-one-result | 一次生成只产出一个当前结果，且默认正式图像结果是固定焦距倾向的全身角色锚点图 |
 | `AC-DOM-006` | editable visible fields | 只开放 name / bio / tags 的直接编辑 |
 | `AC-DOM-009` | brief confirmation | 生成前用一句 brief 对齐当前角色感觉和关键视觉特征 |
 | `AC-DOM-010` | selected agent context precedence | 已选 agent 只做辅助背景；当前用户输入永远优先 |

@@ -1,0 +1,35 @@
+{
+  "name": "@nimiplatform/mod-agent-capture",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nimi-mod build",
+    "dev": "nimi-mod dev",
+    "doctor": "nimi-mod doctor",
+    "pack": "nimi-mod pack",
+    "watch": "nimi-mod dev",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "test:services": "tsx --test test/*.test.ts",
+    "test:ui": "vitest run --config vitest.config.ts",
+    "test": "pnpm run test:services && pnpm run test:ui",
+    "verify": "pnpm run typecheck && pnpm run test && pnpm run build",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@nimiplatform/sdk": "file:../../../sdk",
+    "react": "19.2.3"
+  },
+  "devDependencies": {
+    "@nimiplatform/dev-tools": "file:../../../dev-tools",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^28.1.0",
+    "react-dom": "^19.2.3",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.2"
+  }
+}

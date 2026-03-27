@@ -23,7 +23,7 @@ cases:
     expected_ok: true
     source_rule: AC-ACC-002
   - id: AC-005-STYLE-HINT-OPTIONAL
-    description: styleHint remains optional free text; leaving it empty does not block generation.
+    description: Support inputs such as reference image and selected existing agent remain optional; leaving them empty does not block generation.
     expected_ok: true
     source_rule: AC-ACC-002
   - id: AC-006-REGENERATE-REPLACES-CURRENT-RESULT
@@ -92,13 +92,25 @@ cases:
     expected_ok: true
     source_rule: AC-ACC-003
   - id: AC-022-WHEN-PRESENT-GENERATED-IMAGE-JOINS-NEXT-CONTEXT
-    description: When a current generatedImage already exists, it may join the next generation context as part of the ongoing reference context rather than being ignored.
+    description: When a current generatedImage already exists, it may join the next generation context as directional context, but the system should avoid recursively feeding its image bytes back into the next formal image request by default.
     expected_ok: true
     source_rule: AC-ACC-003
   - id: AC-023-RESULT-INCLUDES-CHARACTER-READOUT
     description: Each current result includes a lightweight character readout that reflects the current role feel and direction of change.
     expected_ok: true
     source_rule: AC-ACC-003
+  - id: AC-024-DEFAULT-RESULT-USES-STABLE-FULL-BODY-ANCHOR-FRAMING
+    description: The default formal image result is framed as a stable full-body character anchor image with fixed-focal-length tendency, clear subject, weak background, and no exaggerated perspective or dramatic shot language.
+    expected_ok: true
+    source_rule: AC-ACC-004
+  - id: AC-025-DIALOGUE-PRIORITIZES-CHARACTER-DETAILS-OVER-BACKGROUND
+    description: The default capture dialogue prioritizes character-facing details such as silhouette, outfit, materials, accessories, handheld props, and art style, while treating background as supporting-only unless explicitly requested.
+    expected_ok: true
+    source_rule: AC-ACC-002
+  - id: AC-026-PROMPT-AND-LLM-OUTPUT-FOLLOW-DESKTOP-LOCALE
+    description: Prompt shell language and LLM output language follow the current desktop system language; zh desktop locales use zh, and every other locale falls back to en by default.
+    expected_ok: true
+    source_rule: AC-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:agent-capture-kernel-docs
     source_rule: AC-ACC-004

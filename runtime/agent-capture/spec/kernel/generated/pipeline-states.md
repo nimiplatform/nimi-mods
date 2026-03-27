@@ -21,12 +21,12 @@ pipeline:
     - step: capture-dialog
       order: 3
       type: user-input
-      description: conduct feeling-led dialogue to help the user and system converge on the character sense
+      description: conduct feeling-led dialogue to help the user and system converge on the character sense, prioritizing character-facing details like outfit, material, accessories, props, silhouette, and art style over background by default
       source_rule: AC-PIPE-001
-    - step: style-adjust
+    - step: support-context-adjust
       order: 4
       type: user-input
-      description: user may add, change, or skip styleHint before generation
+      description: user may add, change, or skip support inputs such as a reference image or selected existing agent before generation
       source_rule: AC-PIPE-002
     - step: brief-confirm
       order: 5
@@ -52,10 +52,17 @@ result_policy:
   auto_generation_on_input: false
   generation_unit: one-generate-to-one-current-agent-result
   history_retention: replace-current-result-only
+  default_image_framing: stable-full-body-character-anchor
+  fixed_focal_length_tendency_required: true
   source_rule: AC-PIPE-003
 conversation_policy:
   questionnaire_mode_forbidden: true
   feeling_led_capture_required: true
+  character_facing_visual_detail_priority_required: true
+  background_secondary_unless_requested: true
+  prompt_shell_language_follows_desktop_locale: true
+  llm_output_language_follows_desktop_locale: true
+  default_prompt_language: en
   source_rule: AC-PIPE-001
 brief_policy:
   brief_confirmation_in_conversation_required: true
@@ -66,6 +73,7 @@ generation_context_policy:
   rebuild_on_input_change: true
   effective_intent_set_required: true
   generated_image_reused_as_context_when_present: true
+  generated_image_recursive_image_input_default: false
   latest_correction_treated_as_delta_by_default: true
   source_rule: AC-PIPE-007
 readout_policy:
