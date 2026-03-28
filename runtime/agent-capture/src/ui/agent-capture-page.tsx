@@ -17,6 +17,10 @@ import {
   runCaptureTurn,
   storeSourceImage,
 } from '../services/generation.js';
+import {
+  exportAgentDraftCardPng,
+  prepareAgentDraftCardPreview,
+} from '../services/export.js';
 import { resolveAgentCapturePreferredLanguage } from '../services/language.js';
 import {
   loadAgentCaptureRouteState,
@@ -100,6 +104,87 @@ function TagEditor(input: {
   );
 }
 
+function AgentDraftCardPreviewOverlay(input: {
+  open: boolean;
+  previewUrl: string;
+  loading: boolean;
+  exporting: boolean;
+  error: string;
+  saveLabel: string;
+  savingLabel: string;
+  closeLabel: string;
+  title: string;
+  loadingLabel: string;
+  failedLabel: string;
+  onClose: () => void;
+  onExport: () => void;
+}) {
+  if (!input.open) {
+    return null;
+  }
+
+  const showLoadingState = input.loading || (!input.previewUrl && !input.error);
+
+  return (
+    <div
+      className="absolute inset-0 z-40 overflow-auto bg-[rgba(10,20,18,0.34)] backdrop-blur-[18px]"
+      onClick={input.onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={input.title}
+        className="flex min-h-full items-center justify-center px-12 py-12"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="relative w-[560px] max-w-[min(560px,calc(100vw-320px))]">
+          {showLoadingState ? (
+            <div className="flex min-h-[720px] items-center justify-center rounded-[38px] border border-[rgba(255,255,255,0.4)] bg-[rgba(255,255,255,0.72)] text-sm text-[#5c756d] shadow-[0_30px_90px_-38px_rgba(14,39,33,0.45)]">
+              {input.loadingLabel}
+            </div>
+          ) : input.previewUrl ? (
+            <img
+              src={input.previewUrl}
+              alt={input.title}
+              className="block w-full rounded-[38px] border border-[rgba(255,255,255,0.32)] object-contain shadow-[0_30px_90px_-38px_rgba(14,39,33,0.45)]"
+            />
+          ) : (
+            <div className="flex min-h-[720px] items-center justify-center rounded-[38px] border border-[rgba(255,255,255,0.4)] bg-[rgba(255,255,255,0.72)] px-8 text-center text-sm leading-7 text-red-700 shadow-[0_30px_90px_-38px_rgba(14,39,33,0.45)]">
+              {input.error || input.failedLabel}
+            </div>
+          )}
+
+          <div
+            className="absolute left-full top-0 ml-7 flex w-[156px] flex-col gap-4"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="flex h-[68px] w-full items-center justify-center rounded-[34px] bg-[#173830] px-5 text-lg font-semibold text-white shadow-[0_18px_50px_-34px_rgba(14,39,33,0.35)] disabled:opacity-50"
+              onClick={input.onExport}
+              disabled={input.exporting || input.loading || !input.previewUrl}
+            >
+              {input.exporting ? input.savingLabel : input.saveLabel}
+            </button>
+            <button
+              type="button"
+              className="flex h-[68px] w-full items-center justify-center rounded-[34px] border border-[rgba(215,231,226,0.92)] bg-[rgba(255,255,255,0.9)] px-5 text-lg font-semibold text-[#36534b] shadow-[0_18px_50px_-34px_rgba(14,39,33,0.18)]"
+              onClick={input.onClose}
+            >
+              {input.closeLabel}
+            </button>
+            {input.error ? (
+              <div className="rounded-[22px] border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
+                {input.error}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AgentCapturePage() {
   const { t, i18n } = useModTranslation('agent-capture');
   const { hookClient, runtimeClient } = useAgentCaptureClients();
@@ -114,6 +199,11 @@ export function AgentCapturePage() {
   const [agentOptions, setAgentOptions] = useState<Array<{ id: string; label: string }>>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
+  const [cardPreviewOpen, setCardPreviewOpen] = useState(false);
+  const [cardPreviewLoading, setCardPreviewLoading] = useState(false);
+  const [cardPreviewUrl, setCardPreviewUrl] = useState('');
+  const [cardExporting, setCardExporting] = useState(false);
+  const [cardExportError, setCardExportError] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const briefRefreshTokenRef = useRef(0);
   const contextVersionRef = useRef(0);
@@ -642,6 +732,65 @@ export function AgentCapturePage() {
   }, [draft.sourceImage?.fileName, draft.visualSpec, selectedAgent, selectedAgentLabel, t]);
   const visibleConfirmedTraitChips = confirmedTraitChips.slice(0, 8);
   const hiddenConfirmedTraitCount = Math.max(confirmedTraitChips.length - visibleConfirmedTraitChips.length, 0);
+  useEffect(() => {
+    let cancelled = false;
+    if (!cardPreviewOpen || !draft.generatedImage) {
+      setCardPreviewLoading(false);
+      setCardPreviewUrl('');
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setCardPreviewLoading(true);
+    setCardExportError('');
+    void prepareAgentDraftCardPreview({
+      draft,
+      storage: hookClient.storage,
+      preferredLanguage,
+    }).then((result) => {
+      if (!cancelled) {
+        setCardPreviewUrl(result.svgDataUrl);
+        setCardPreviewLoading(false);
+      }
+    }).catch((error) => {
+      if (!cancelled) {
+        setCardPreviewLoading(false);
+        setCardPreviewUrl('');
+        setCardExportError(error instanceof Error ? error.message : String(error || 'AGENT_CAPTURE_CARD_PREVIEW_FAILED'));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cardPreviewOpen, draft, hookClient.storage, preferredLanguage]);
+
+  async function handleExportDraftCardPng() {
+    if (!draft.generatedImage || cardExporting) {
+      return;
+    }
+    setCardExporting(true);
+    setCardExportError('');
+    try {
+      await exportAgentDraftCardPng({
+        draft,
+        storage: hookClient.storage,
+        preferredLanguage,
+      });
+    } catch (error) {
+      setCardExportError(error instanceof Error ? error.message : String(error || 'AGENT_CAPTURE_CARD_EXPORT_FAILED'));
+    } finally {
+      setCardExporting(false);
+    }
+  }
+
+  function openCardPreview() {
+    setCardPreviewLoading(true);
+    setCardPreviewUrl('');
+    setCardExportError('');
+    setCardPreviewOpen(true);
+  }
 
   return (
     <div
@@ -692,6 +841,27 @@ export function AgentCapturePage() {
           </div>
         </div>
       ) : null}
+
+      <AgentDraftCardPreviewOverlay
+        open={cardPreviewOpen && Boolean(draft.generatedImage)}
+        previewUrl={cardPreviewUrl}
+        loading={cardPreviewLoading}
+        exporting={cardExporting}
+        error={cardExportError}
+        saveLabel={t('page.cardPreviewSavePng')}
+        savingLabel={t('page.cardPreviewExporting')}
+        closeLabel={t('page.cardPreviewClose')}
+        title={t('page.cardPreviewTitle')}
+        loadingLabel={t('page.cardPreviewLoading')}
+        failedLabel={t('page.cardPreviewLoadFailed')}
+        onClose={() => {
+          setCardPreviewOpen(false);
+          setCardExportError('');
+        }}
+        onExport={() => {
+          void handleExportDraftCardPng();
+        }}
+      />
 
       <div className="flex min-h-0 min-w-0 flex-1 gap-5 px-5 py-5">
         <aside className="flex min-h-0 w-[430px] shrink-0 flex-col">
@@ -943,6 +1113,15 @@ export function AgentCapturePage() {
                     >
                       {t('page.generate')}
                     </button>
+                    {draft.generatedImage ? (
+                      <button
+                        type="button"
+                        className="rounded-full border border-[#d7e7e2] bg-white px-5 py-2.5 text-sm font-semibold text-[#36534b] transition hover:bg-[#f6fbf9]"
+                        onClick={openCardPreview}
+                      >
+                        {t('page.exportCard')}
+                      </button>
+                    ) : null}
                   </div>
 
                   {surfaceError ? (

@@ -38,6 +38,12 @@ import {
   isDraftFactuallyEmpty,
   sanitizeHydratedSessionState,
 } from '../src/services/state.js';
+import {
+  buildAgentDraftCardFilename,
+  buildAgentDraftCardHeroPaletteFromRgb,
+  buildAgentDraftCardSummary,
+  buildAgentDraftCardSvg,
+} from '../src/services/export.js';
 import type { ModRuntimeClient } from '@nimiplatform/sdk/mod';
 import type { HookStorageClient, RuntimeRouteBinding } from '@nimiplatform/sdk/mod';
 import { z } from 'zod';
@@ -254,6 +260,18 @@ test('route validation keeps image binding untouched when only text route is bei
   assert.equal(sanitized.routeState.imageRouteBinding, imageBinding);
 });
 
+test('draft card hero palette derives a soft same-tone frame from image color', () => {
+  const palette = buildAgentDraftCardHeroPaletteFromRgb({
+    r: 151,
+    g: 175,
+    b: 158,
+  });
+  assert.match(palette.fillStart, /^#[0-9a-f]{6}$/i);
+  assert.match(palette.fillEnd, /^#[0-9a-f]{6}$/i);
+  assert.match(palette.stroke, /^#[0-9a-f]{6}$/i);
+  assert.notEqual(palette.fillStart.toLowerCase(), '#f8f2e5');
+});
+
 function createRuntimeClientStub(input?: {
   textPayloads?: Array<Record<string, unknown> | string>;
   finishReasons?: string[];
@@ -462,6 +480,36 @@ test('compileImagePromptFromSpec preserves stable core and signature hook in the
   assert.match(imagePrompt, /Palette: ink black, desaturated jade, muted gold/);
   assert.match(imagePrompt, /Full-body character anchor image/);
   assert.match(negativePrompt, /Do not change the confirmed core silhouette/);
+});
+
+test('draft card export helpers build a stable filename and svg payload', () => {
+  const draft = createEmptyDraftSnapshot();
+  draft.name = 'Zi Ling';
+  draft.bio = 'A restrained palace figure with a poetic presence.';
+  draft.characterReadout = 'The role lands on a poised palace silhouette with a purple gauze presence.';
+  draft.tags = ['palace', 'jade'];
+  draft.visualSpec = makeVisualSpec({
+    artStyle: 'stylized painterly realism',
+    palette: {
+      primary: 'palace purple',
+      secondary: 'jade green',
+    },
+    roleCore: 'poised palace strategist',
+  });
+
+  const filename = buildAgentDraftCardFilename(draft);
+  const summary = buildAgentDraftCardSummary(draft, 'en-US');
+  const svg = buildAgentDraftCardSvg({
+    draft,
+    imageDataUrl: 'data:image/png;base64,AAAA',
+    preferredLanguage: 'en-US',
+  });
+
+  assert.match(filename, /^Zi-Ling-\d{4}-\d{2}-\d{2}\.png$/);
+  assert.match(summary, /stylized painterly realism/);
+  assert.match(svg, /Zi Ling/);
+  assert.match(svg, /The role lands on a poised palace silhouette/);
+  assert.match(svg, /data:image\/png;base64,AAAA/);
 });
 
 test('runCaptureTurn applies Simplified Chinese locale lock by default for zh input', async () => {
@@ -791,17 +839,36 @@ test('generateAgentDraft uses current context and returns generated image metada
 });
 
 test('storeGeneratedArtifact preserves remote url artifacts without re-encoding them through local storage', async () => {
-  const storage = createStorageClientStub();
-  const image = await storeGeneratedArtifact({
-    storage,
-    draftId: 'draft-1',
-    artifact: {
-      uri: 'https://example.com/generated.png',
-      mimeType: 'image/png',
+  const originalFetch = globalThis.fetch;
+  const writeCalls: Array<{ path: string; size: number }> = [];
+  globalThis.fetch = (async () => ({
+    ok: true,
+    arrayBuffer: async () => Uint8Array.from([137, 80, 78, 71]).buffer,
+    headers: {
+      get: () => 'image/png',
     },
-  });
+  })) as typeof fetch;
+  try {
+    const storage = createStorageClientStub();
+    storage.files.writeBytes = async (path, content) => {
+      writeCalls.push({ path, size: content.length });
+      return { path, sizeBytes: content.length };
+    };
+    const image = await storeGeneratedArtifact({
+      storage,
+      draftId: 'draft-1',
+      artifact: {
+        uri: 'https://example.com/generated.png',
+        mimeType: 'image/png',
+      },
+    });
 
-  assert.ok(image);
-  assert.equal(image?.path, undefined);
-  assert.equal(image?.url, 'https://example.com/generated.png');
+    assert.ok(image);
+    assert.match(image?.path || '', /^images\/draft-1\/generated-/);
+    assert.match(image?.url || '', /^data:image\/png;base64,/);
+    assert.equal(writeCalls.length, 1);
+    assert.match(writeCalls[0]?.path || '', /^images\/draft-1\/generated-/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

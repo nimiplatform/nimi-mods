@@ -458,14 +458,24 @@ export async function storeGeneratedArtifact(input: {
 }): Promise<AgentCaptureImageRef | null> {
   if (!input.artifact) return null;
   const mimeType = String(input.artifact.mimeType || 'image/png').trim() || 'image/png';
-  if (input.artifact.uri && !input.artifact.uri.startsWith('data:')) {
-    return {
-      mimeType,
-      url: String(input.artifact.uri).trim(),
-    };
-  }
   const ext = mimeType.includes('jpeg') ? 'jpg' : mimeType.includes('webp') ? 'webp' : 'png';
   const path = `images/${input.draftId}/generated-${Date.now()}.${ext}`;
+  if (input.artifact.uri && !input.artifact.uri.startsWith('data:')) {
+    const response = await fetch(String(input.artifact.uri).trim());
+    if (!response.ok) {
+      throw new Error(`AGENT_CAPTURE_GENERATED_IMAGE_FETCH_FAILED:${response.status}`);
+    }
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    await input.storage.files.writeBytes(path, bytes);
+    return {
+      path,
+      mimeType: response.headers.get('content-type') || mimeType,
+      url: encodeBytesToDataUrl({
+        bytes,
+        mimeType: response.headers.get('content-type') || mimeType,
+      }),
+    };
+  }
   const bytes = await writeArtifactBytes({
     storage: input.storage,
     path,

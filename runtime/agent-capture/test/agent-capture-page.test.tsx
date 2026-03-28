@@ -118,6 +118,11 @@ const storeSourceImageMock = vi.hoisted(() => vi.fn(async (_storage: unknown, _d
   mimeType: file.type || 'image/png',
   path: '/tmp/source-image.png',
 })));
+const prepareAgentDraftCardPreviewMock = vi.hoisted(() => vi.fn(async () => ({
+  svg: '<svg />',
+  svgDataUrl: 'data:image/svg+xml;charset=utf-8,%3Csvg%20/%3E',
+})));
+const exportAgentDraftCardPngMock = vi.hoisted(() => vi.fn(async () => {}));
 
 function lookupValue(input: Record<string, unknown>, key: string): unknown {
   return key.split('.').reduce<unknown>((current, segment) => {
@@ -190,6 +195,11 @@ vi.mock('../src/services/generation.js', () => ({
   recomputeCurrentBrief: recomputeCurrentBriefMock,
   generateAgentDraft: generateAgentDraftMock,
   storeSourceImage: storeSourceImageMock,
+}));
+
+vi.mock('../src/services/export.js', () => ({
+  prepareAgentDraftCardPreview: prepareAgentDraftCardPreviewMock,
+  exportAgentDraftCardPng: exportAgentDraftCardPngMock,
 }));
 
 import { AgentCapturePage } from '../src/ui/agent-capture-page.js';
@@ -297,6 +307,8 @@ beforeEach(() => {
   runCaptureTurnMock.mockClear();
   generateAgentDraftMock.mockClear();
   storeSourceImageMock.mockClear();
+  prepareAgentDraftCardPreviewMock.mockClear();
+  exportAgentDraftCardPngMock.mockClear();
 });
 
 describe('AgentCapturePage UI flow', () => {
@@ -324,6 +336,38 @@ describe('AgentCapturePage UI flow', () => {
 
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: 'Close preview' })).toBeNull();
+    });
+  });
+
+  it('opens the draft card preview and exports the current draft as png', async () => {
+    fixtures.draft = makeDraft({
+      name: 'Zi Ling',
+      generatedImage: { url: 'https://images.test/ziling.png' },
+      characterReadout: 'A poised role image.',
+      bio: 'A restrained palace figure with a poetic presence.',
+      tags: ['palace', 'jade'],
+      visualSpec: makeVisualSpec(),
+    });
+
+    renderPage();
+
+    await screen.findByRole('heading', { name: 'Zi Ling' });
+    fireEvent.click(screen.getByRole('button', { name: 'Export draft card' }));
+
+    const previewDialog = await screen.findByRole('dialog', { name: 'Draft card preview' });
+    await waitFor(() => {
+      expect(prepareAgentDraftCardPreviewMock).toHaveBeenCalledTimes(1);
+    });
+    expect(within(previewDialog).getByRole('img', { name: 'Draft card preview' })).toBeDefined();
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Save PNG' })[0] as HTMLElement);
+
+    await waitFor(() => {
+      expect(exportAgentDraftCardPngMock).toHaveBeenCalledTimes(1);
+    });
+    expect(exportAgentDraftCardPngMock.mock.calls[0]?.[0]).toMatchObject({
+      storage: sdkState.hookClient.storage,
+      preferredLanguage: 'en-US',
     });
   });
 
