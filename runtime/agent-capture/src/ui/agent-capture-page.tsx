@@ -54,6 +54,14 @@ function formatTime(value: string): string {
   }
 }
 
+function pushUniqueChip(chips: string[], value: string | null | undefined) {
+  const normalized = String(value || '').trim();
+  if (!normalized || chips.includes(normalized)) {
+    return;
+  }
+  chips.push(normalized);
+}
+
 function useAgentCaptureClients() {
   return useMemo(() => ({
     hookClient: createHookClient(AGENT_CAPTURE_MOD_ID),
@@ -108,6 +116,7 @@ export function AgentCapturePage() {
   const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const briefRefreshTokenRef = useRef(0);
+  const contextVersionRef = useRef(0);
 
   const preferredLanguage = useMemo(() => {
     return resolveAgentCapturePreferredLanguage(
@@ -321,6 +330,7 @@ export function AgentCapturePage() {
   async function handleSendMessage() {
     const trimmed = inputText.trim();
     if (!trimmed || session.workingState !== 'idle') return;
+    const contextVersion = contextVersionRef.current;
     const usableRouteState = await ensureUsableRouteState({ includeText: true, includeImage: false }).catch((error) => {
       const message = error instanceof Error ? error.message : String(error || 'AGENT_CAPTURE_ROUTE_OVERRIDE_INVALID');
       setSession((current) => ({
@@ -363,6 +373,14 @@ export function AgentCapturePage() {
         userMessage: trimmed,
         preferredLanguage,
       });
+      if (contextVersion !== contextVersionRef.current) {
+        return;
+      }
+      setDraft((current) => ({
+        ...current,
+        lastVisualDelta: turn.visualDelta,
+        updatedAt: createTimestamp(),
+      }));
       setSession((current) => appendSessionMessage({
         ...current,
         currentBrief: turn.brief,
@@ -376,6 +394,9 @@ export function AgentCapturePage() {
         content: turn.assistantReply,
       }));
     } catch (error) {
+      if (contextVersion !== contextVersionRef.current) {
+        return;
+      }
       const message = error instanceof Error ? error.message : String(error || 'AGENT_CAPTURE_TURN_FAILED');
       setSession((current) => appendSessionMessage({
         ...current,
@@ -405,6 +426,7 @@ export function AgentCapturePage() {
 
   async function handleConfirmGenerate() {
     if (!session.pendingBriefConfirmation || session.workingState !== 'awaiting-confirmation') return;
+    const contextVersion = contextVersionRef.current;
     const usableRouteState = await ensureUsableRouteState({ includeText: true, includeImage: true }).catch((error) => {
       const message = error instanceof Error ? error.message : String(error || 'AGENT_CAPTURE_ROUTE_OVERRIDE_INVALID');
       setSession((current) => ({
@@ -434,9 +456,14 @@ export function AgentCapturePage() {
         imageBinding: usableRouteState.imageRouteBinding,
         preferredLanguage,
       });
+      if (contextVersion !== contextVersionRef.current) {
+        return;
+      }
       updateDraft((current) => ({
         ...current,
         generatedImage: result.image,
+        visualSpec: result.visualSpec,
+        resultFacts: result.resultFacts,
         name: result.draft.name,
         bio: result.draft.bio,
         personaSeed: result.draft.personaSeed,
@@ -456,6 +483,9 @@ export function AgentCapturePage() {
         content: result.draft.characterReadout,
       }));
     } catch (error) {
+      if (contextVersion !== contextVersionRef.current) {
+        return;
+      }
       const message = error instanceof Error ? error.message : String(error || 'AGENT_CAPTURE_GENERATE_FAILED');
       setSession((current) => appendSessionMessage({
         ...current,
@@ -472,9 +502,19 @@ export function AgentCapturePage() {
 
   async function handleSelectAgent(nextAgentId: string) {
     const normalized = String(nextAgentId || '').trim();
+    contextVersionRef.current += 1;
     const nextDraft = {
       ...draft,
       selectedAgentId: normalized || null,
+      generatedImage: null,
+      visualSpec: null,
+      lastVisualDelta: null,
+      resultFacts: null,
+      characterReadout: '',
+      name: '',
+      bio: '',
+      personaSeed: '',
+      tags: [],
       updatedAt: createTimestamp(),
     };
     setDraft(nextDraft);
@@ -508,10 +548,20 @@ export function AgentCapturePage() {
   async function handlePickImage(file: File | null) {
     if (!file) return;
     try {
+      contextVersionRef.current += 1;
       const sourceImage = await storeSourceImage(hookClient.storage, draft.id, file);
       const nextDraft = {
         ...draft,
         sourceImage,
+        generatedImage: null,
+        visualSpec: null,
+        lastVisualDelta: null,
+        resultFacts: null,
+        characterReadout: '',
+        name: '',
+        bio: '',
+        personaSeed: '',
+        tags: [],
         updatedAt: createTimestamp(),
       };
       setDraft(nextDraft);
@@ -529,6 +579,7 @@ export function AgentCapturePage() {
   }
 
   function handleResetDraft() {
+    contextVersionRef.current += 1;
     setDraft(createEmptyDraftSnapshot());
     setSession(createEmptySessionState());
     setSelectedAgent(null);
@@ -561,19 +612,36 @@ export function AgentCapturePage() {
   const confirmedTraitChips = useMemo(() => {
     const chips: string[] = [];
     if (draft.sourceImage?.fileName) {
-      chips.push(t('page.sourceImageChip', { name: draft.sourceImage.fileName }));
+      pushUniqueChip(chips, t('page.sourceImageChip', { name: draft.sourceImage.fileName }));
     }
     if (selectedAgent) {
-      chips.push(t('page.currentAgent', { agent: selectedAgentLabel }));
+      pushUniqueChip(chips, t('page.currentAgent', { agent: selectedAgentLabel }));
     }
-    for (const tag of draft.tags) {
-      const normalized = String(tag || '').trim();
-      if (normalized) {
-        chips.push(normalized);
+    if (draft.visualSpec) {
+      pushUniqueChip(chips, draft.visualSpec.roleCore);
+      pushUniqueChip(chips, draft.visualSpec.silhouette);
+      pushUniqueChip(chips, draft.visualSpec.outfit);
+      pushUniqueChip(chips, draft.visualSpec.handProp);
+      pushUniqueChip(chips, draft.visualSpec.signatureHook?.value);
+
+      const paletteValues = [
+        draft.visualSpec.palette.primary,
+        draft.visualSpec.palette.secondary,
+        draft.visualSpec.palette.accent,
+      ].filter(Boolean);
+      if (paletteValues.length > 0) {
+        pushUniqueChip(chips, t('page.paletteChip', { value: paletteValues.join(' / ') }));
       }
+
+      pushUniqueChip(chips, draft.visualSpec.artStyle);
+      pushUniqueChip(chips, draft.visualSpec.hairstyle);
+      pushUniqueChip(chips, draft.visualSpec.materials[0] || '');
+      pushUniqueChip(chips, draft.visualSpec.accessories[0] || '');
     }
     return chips;
-  }, [draft.sourceImage?.fileName, draft.tags, selectedAgent, selectedAgentLabel, t]);
+  }, [draft.sourceImage?.fileName, draft.visualSpec, selectedAgent, selectedAgentLabel, t]);
+  const visibleConfirmedTraitChips = confirmedTraitChips.slice(0, 8);
+  const hiddenConfirmedTraitCount = Math.max(confirmedTraitChips.length - visibleConfirmedTraitChips.length, 0);
 
   return (
     <div
@@ -781,15 +849,22 @@ export function AgentCapturePage() {
                     {t('page.confirmedTraitsTitle')}
                   </div>
                   {confirmedTraitChips.length > 0 ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {confirmedTraitChips.map((chip) => (
-                        <span
-                          key={chip}
-                          className="rounded-full bg-white px-3 py-1.5 text-xs leading-5 text-[#557069]"
-                        >
-                          {chip}
-                        </span>
-                      ))}
+                    <div className="mt-3 max-h-[64px] overflow-y-auto pr-1">
+                      <div className="flex flex-wrap gap-2">
+                        {visibleConfirmedTraitChips.map((chip) => (
+                          <span
+                            key={chip}
+                            className="rounded-full bg-white px-3 py-1.5 text-xs leading-5 text-[#557069]"
+                          >
+                            {chip}
+                          </span>
+                        ))}
+                        {hiddenConfirmedTraitCount > 0 ? (
+                          <span className="rounded-full border border-[#d7e7e2] bg-[#eef7f4] px-3 py-1.5 text-xs leading-5 text-[#557069]">
+                            {t('page.confirmedTraitsOverflow', { count: hiddenConfirmedTraitCount })}
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                   ) : (
                     <div className="mt-2 text-xs leading-5 text-[#6a8079]">
@@ -916,8 +991,18 @@ export function AgentCapturePage() {
                             const nextDraft = {
                               ...draft,
                               sourceImage: null,
+                              generatedImage: null,
+                              visualSpec: null,
+                              lastVisualDelta: null,
+                              resultFacts: null,
+                              characterReadout: '',
+                              name: '',
+                              bio: '',
+                              personaSeed: '',
+                              tags: [],
                               updatedAt: createTimestamp(),
                             };
+                            contextVersionRef.current += 1;
                             setDraft(nextDraft);
                             void refreshBriefForContext({
                               nextDraft,

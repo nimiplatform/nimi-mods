@@ -10,6 +10,8 @@ export default {
     briefPanelTitle: 'Current role direction',
     confirmedTraitsTitle: 'Confirmed traits',
     confirmedTraitsEmpty: 'Still taking shape',
+    confirmedTraitsOverflow: '{{count}} more',
+    paletteChip: 'Palette: {{value}}',
     summaryLabel: 'Current input summary',
     advancedExpand: 'Show support inputs',
     advancedCollapse: 'Hide support inputs',

@@ -4,8 +4,11 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import type {
   AgentCaptureAgentSummary,
   AgentCaptureDraftSnapshot,
+  AgentCaptureResultFacts,
   AgentCaptureRouteState,
   AgentCaptureSessionState,
+  AgentCaptureVisualDelta,
+  AgentCaptureVisualSpec,
 } from '../src/types.js';
 import { createEmptyDraftSnapshot, createEmptyRouteState, createEmptySessionState } from '../src/services/state.js';
 import enLocale from '../src/locales/en.js';
@@ -61,18 +64,50 @@ const recomputeCurrentBriefMock = vi.hoisted(() => vi.fn(async () => ({ brief: '
 const runCaptureTurnMock = vi.hoisted(() => vi.fn(async () => ({
   assistantReply: 'Thanks, the role direction is clearer now.',
   brief: 'Refined brief',
+  visualDelta: {
+    intentMode: 'refine',
+    retain: ['palace purple', 'jade flute'],
+    adjust: ['make the silhouette calmer'],
+    touchedFields: ['silhouette', 'palette'],
+  },
   traceId: 'trace-turn',
 })));
 const generateAgentDraftMock = vi.hoisted(() => vi.fn(async () => ({
   image: { url: 'https://images.test/final-role.png' },
+  visualSpec: {
+    roleCore: 'poised palace strategist',
+    silhouette: 'slender full-body silhouette',
+    outfit: 'layered palace robe',
+    materials: ['gauze'],
+    accessories: ['jade ornament'],
+    handProp: 'jade flute',
+    hairstyle: 'high ponytail',
+    palette: {
+      primary: 'palace purple',
+      secondary: 'jade green',
+    },
+    artStyle: 'stylized painterly realism',
+    backgroundWeight: 'minimal',
+    signatureHook: {
+      kind: 'prop',
+      value: 'jade flute',
+    },
+  },
+  resultFacts: {
+    framing: 'full-body-anchor',
+    backgroundWeight: 'minimal',
+    signatureHook: {
+      kind: 'prop',
+      value: 'jade flute',
+    },
+    usesSourceImage: false,
+  },
   draft: {
     name: 'Zi Ling',
     bio: 'A poised purple-robed palace figure.',
     personaSeed: 'Elegant and reserved.',
     tags: ['palace', 'purple'],
     characterReadout: 'The role lands on a poised palace silhouette with a purple gauze presence.',
-    imagePrompt: 'prompt',
-    negativePrompt: 'negative',
   },
   textTraceId: 'trace-text',
   imageTraceId: 'trace-image',
@@ -159,6 +194,52 @@ vi.mock('../src/services/generation.js', () => ({
 
 import { AgentCapturePage } from '../src/ui/agent-capture-page.js';
 
+function makeVisualSpec(overrides: Partial<AgentCaptureVisualSpec> = {}): AgentCaptureVisualSpec {
+  return {
+    roleCore: 'poised palace strategist',
+    silhouette: 'slender full-body silhouette',
+    outfit: 'layered palace robe',
+    materials: ['gauze'],
+    accessories: ['jade ornament'],
+    handProp: 'jade flute',
+    hairstyle: 'high ponytail',
+    palette: {
+      primary: 'palace purple',
+      secondary: 'jade green',
+    },
+    artStyle: 'stylized painterly realism',
+    backgroundWeight: 'minimal',
+    signatureHook: {
+      kind: 'prop',
+      value: 'jade flute',
+    },
+    ...overrides,
+  };
+}
+
+function makeVisualDelta(overrides: Partial<AgentCaptureVisualDelta> = {}): AgentCaptureVisualDelta {
+  return {
+    intentMode: 'refine',
+    retain: ['palace purple', 'jade flute'],
+    adjust: ['make the silhouette calmer'],
+    touchedFields: ['silhouette', 'palette'],
+    ...overrides,
+  };
+}
+
+function makeResultFacts(overrides: Partial<AgentCaptureResultFacts> = {}): AgentCaptureResultFacts {
+  return {
+    framing: 'full-body-anchor',
+    backgroundWeight: 'minimal',
+    signatureHook: {
+      kind: 'prop',
+      value: 'jade flute',
+    },
+    usesSourceImage: false,
+    ...overrides,
+  };
+}
+
 function makeDraft(overrides: Partial<AgentCaptureDraftSnapshot> = {}): AgentCaptureDraftSnapshot {
   return {
     ...createEmptyDraftSnapshot(),
@@ -224,6 +305,7 @@ describe('AgentCapturePage UI flow', () => {
       name: 'Zi Ling',
       generatedImage: { url: 'https://images.test/ziling.png' },
       characterReadout: 'A poised role image.',
+      visualSpec: makeVisualSpec(),
     });
 
     renderPage();
@@ -291,6 +373,7 @@ describe('AgentCapturePage UI flow', () => {
     expect(await screen.findByText('Current response')).toBeDefined();
     expect(await screen.findByText('Thanks, the role direction is clearer now.')).toBeDefined();
     expect(screen.getByText('Refined brief')).toBeDefined();
+    expect(screen.getByText('Still taking shape')).toBeDefined();
 
     fireEvent.click(screen.getByRole('button', { name: 'Generate Agent' }));
 
@@ -303,6 +386,7 @@ describe('AgentCapturePage UI flow', () => {
 
     expect(await screen.findByDisplayValue('Zi Ling')).toBeDefined();
     expect(screen.getAllByText('The role lands on a poised palace silhouette with a purple gauze presence.').length).toBeGreaterThan(0);
+    expect(screen.getByText('jade flute')).toBeDefined();
     expect(generateAgentDraftMock.mock.calls[0]?.[0]).toMatchObject({
       textBinding: fixtures.routeState.textRouteBinding,
       imageBinding: fixtures.routeState.imageRouteBinding,
@@ -356,6 +440,9 @@ describe('AgentCapturePage UI flow', () => {
   it('surfaces generation failures in the visible feedback area and error banner', async () => {
     fixtures.draft = makeDraft({
       sourcePrompt: 'Zi Ling in palace purple',
+      visualSpec: makeVisualSpec(),
+      lastVisualDelta: makeVisualDelta(),
+      resultFacts: makeResultFacts(),
     });
     fixtures.session = makeSession({
       currentBrief: 'Ready to generate',

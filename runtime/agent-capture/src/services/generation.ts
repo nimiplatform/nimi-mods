@@ -5,8 +5,13 @@ import type {
   AgentCaptureDraftGeneration,
   AgentCaptureDraftSnapshot,
   AgentCaptureImageRef,
+  AgentCaptureResultFacts,
   AgentCaptureSessionState,
+  AgentCaptureStableCore,
   AgentCaptureTurnResult,
+  AgentCaptureVisualDelta,
+  AgentCaptureVisualField,
+  AgentCaptureVisualSpec,
 } from '../types.js';
 import { encodeBytesToDataUrl } from './base64.js';
 import { resolveAgentCapturePromptLocale } from './language.js';
@@ -49,7 +54,7 @@ function makeJsonBlockPrompt(schema: string, requirements: string[]): string {
     'Do not wrap the JSON in markdown fences.',
     'Do not add prose before or after the JSON object.',
     'Do not use comments.',
-    'Do not leave any field out.',
+    'Do not leave any field out unless the schema explicitly allows null.',
     'Do not include explanatory text.',
     `Schema: ${schema}`,
     ...requirements.map((item) => `- ${item}`),
@@ -66,43 +71,30 @@ function buildLanguageLock(preferredLanguage: string | null | undefined): string
 function buildCharacterFocusGuidance(preferredLanguage: string | null | undefined): string[] {
   if (prefersSimplifiedChinese(preferredLanguage)) {
     return [
-      '对话应优先把角色落实到人物主体相关的细节上，例如体态轮廓、服装、材质、配饰、手持道具、发型、色彩和画风，而不是把大篇幅注意力放在环境背景上。',
-      '除非用户明确要求，背景只作为辅助氛围存在；不要让背景地点、场景叙事或镜头故事感主导 brief 或生成方向。',
+      '对话和生成应优先把角色落实到人物主体细节，例如轮廓、服装、材质、配饰、手持道具、发型、色彩和画风，而不是让环境背景主导。',
+      '除非用户明确要求，背景只作为辅助氛围存在；不要让背景地点、剧情叙事或镜头戏剧感主导生成方向。',
+      '结果要像“可继续创作的角色视觉设定起稿”，而不是随机好看的海报图。',
     ];
   }
   return [
-    'Prioritize character-facing details such as silhouette, outfit, material, accessories, handheld props, hairstyle, palette, and art style instead of spending most of the turn on environment background.',
-    'Unless the user explicitly asks for it, treat background as supporting atmosphere only and do not let scene setting or cinematic storytelling dominate the brief or generation direction.',
-  ];
-}
-
-function buildIterativeRefinementGuidance(preferredLanguage: string | null | undefined): string[] {
-  if (prefersSimplifiedChinese(preferredLanguage)) {
-    return [
-      '当当前结果已存在时，应把它视为方向反馈而不是不可更改的像素真相；优先承接用户确认的人物主体特征与最新修正。',
-      '在没有用户显式附加新参考图时，应通过当前 brief、characterReadout、会话与已确认的视觉特征维持连续性，尽量保住已确认的轮廓、色彩、材质、配饰、道具与画风。',
-      '不要机械继承上一版图中的偶发脏污、模糊、噪点、背景残留、面部瑕疵或其他未被用户确认的绘制副作用。',
-    ];
-  }
-  return [
-    'When a current result already exists, treat it as directional feedback rather than immutable pixel truth; preserve user-confirmed character-defining traits and the latest corrections first.',
-    'When the user has not attached a new explicit reference image, preserve continuity through the current brief, characterReadout, conversation, and previously confirmed visual traits so silhouette, palette, materials, accessories, props, and art style stay coherent.',
-    'Do not mechanically inherit incidental dirt, blur, noise, leftover background texture, facial blemishes, or other accidental rendering artifacts from the previous image unless the user explicitly reaffirms them.',
+    'Prioritize character-facing decisions such as silhouette, outfit, materials, accessories, handheld props, hairstyle, palette, and art style instead of letting environment dominate.',
+    'Unless the user explicitly asks for it, background should stay supporting-only; do not let cinematic scene storytelling take over.',
+    'The result should feel like a reusable character visual draft rather than a random pretty poster shot.',
   ];
 }
 
 function buildAnchorImagePromptSuffix(preferredLanguage: string | null | undefined): string {
   if (prefersSimplifiedChinese(preferredLanguage)) {
-    return '全身角色锚点图，人物从头到脚完整入画，采用稳定统一的标准人物镜头语言，固定焦距人物视角，平视或接近平视，镜头与人物距离稳定，主体居中，姿态稳定，四肢与整体轮廓清楚可见，服装材质、配饰、手持道具与画风明确，背景弱化且不喧宾夺主。';
+    return '全身角色锚点图，人物从头到脚完整入画，固定焦距倾向，平视或接近平视，主体居中，姿态稳定，轮廓清楚可读，背景弱化。';
   }
-  return 'Full-body character anchor image, complete figure visible from head to toe, using stable standard character lens language, fixed focal-length character framing, eye-level or near-eye-level view, consistent camera-to-subject distance, centered subject, stable pose, limbs and silhouette clearly readable, outfit material, accessories, handheld props, and art style explicit, background subdued and non-dominant.';
+  return 'Full-body character anchor image, complete figure visible head-to-toe, fixed-focal-length tendency, eye-level or near-eye-level view, centered subject, stable pose, readable silhouette, subdued background.';
 }
 
 function buildAnchorImageNegativeSuffix(preferredLanguage: string | null | undefined): string {
   if (prefersSimplifiedChinese(preferredLanguage)) {
-    return '半身像，胸像，特写，头部裁切，脚部裁切，手部缺失，配饰不可见，道具不可见，强透视，广角畸变，夸张动作，电影海报感，背景过重，剧情化场景，俯拍，仰拍，荷兰角，远景，超近景，镜头距离飘忽。';
+    return '半身像，胸像，特写，头部裁切，脚部裁切，手部缺失，道具缺失，强透视，广角畸变，背景主导阅读，电影海报感，戏剧化剧情镜头。';
   }
-  return 'half-body portrait, bust shot, close-up, cropped head, cropped feet, missing hands, hidden accessories, hidden props, strong perspective, wide-angle distortion, exaggerated action pose, cinematic poster look, overpowering background, scene-first storytelling, high-angle shot, low-angle shot, dutch angle, long shot, extreme close-up, inconsistent camera distance.';
+  return 'half-body portrait, bust shot, close-up, cropped head, cropped feet, missing hands, missing prop, strong perspective, wide-angle distortion, background-dominant composition, cinematic poster look, dramatic story shot.';
 }
 
 function enforceAnchorImagePrompt(prompt: string, preferredLanguage: string | null | undefined): string {
@@ -142,7 +134,7 @@ export function buildSourcePrompt(snapshot: AgentCaptureDraftSnapshot): string {
 
 export function buildReferenceImages(snapshot: AgentCaptureDraftSnapshot): string[] {
   const seen = new Set<string>();
-  const images = [snapshot.sourceImage?.url || '']
+  return [snapshot.sourceImage?.url || '']
     .map((item) => String(item || '').trim())
     .filter(Boolean)
     .filter((item) => {
@@ -150,7 +142,6 @@ export function buildReferenceImages(snapshot: AgentCaptureDraftSnapshot): strin
       seen.add(item);
       return true;
     });
-  return images;
 }
 
 export function extractJsonObject(text: string): Record<string, unknown> {
@@ -187,23 +178,62 @@ export function extractJsonObject(text: string): Record<string, unknown> {
   }
 }
 
-const CaptureTurnSchema = z.object({
+const SignatureHookSchema = z.object({
+  kind: z.enum(['prop', 'accessory', 'garment-detail', 'pattern', 'color-pair']),
+  value: z.string().trim().min(1),
+});
+
+const VisualSpecSchema = z.object({
+  roleCore: z.string().trim().min(1),
+  silhouette: z.string().trim().min(1),
+  outfit: z.string().trim().min(1),
+  materials: z.array(z.string().trim().min(1)).max(6).default([]),
+  accessories: z.array(z.string().trim().min(1)).max(6).default([]),
+  handProp: z.string().trim().min(1).nullable(),
+  hairstyle: z.string().trim().min(1),
+  palette: z.object({
+    primary: z.string().trim().min(1),
+    secondary: z.string().trim().min(1).optional(),
+    accent: z.string().trim().min(1).optional(),
+  }),
+  artStyle: z.string().trim().min(1),
+  backgroundWeight: z.enum(['minimal', 'supporting', 'requested']),
+  signatureHook: SignatureHookSchema.nullable(),
+});
+
+const VisualFieldSchema = z.enum([
+  'roleCore',
+  'silhouette',
+  'outfit',
+  'materials',
+  'accessories',
+  'handProp',
+  'hairstyle',
+  'palette',
+  'artStyle',
+  'backgroundWeight',
+  'signatureHook',
+]);
+
+const TurnEnvelopeSchema = z.object({
   assistantReply: z.string().trim().min(1),
   brief: z.string().trim().min(1),
+  intentMode: z.string().trim().optional(),
+  retain: z.array(z.string().trim().min(1)).optional(),
+  adjust: z.array(z.string().trim().min(1)).optional(),
+  touchedFields: z.array(z.string().trim().min(1)).optional(),
 });
 
 const BriefSchema = z.object({
   brief: z.string().trim().min(1),
 });
 
-const DraftGenerationSchema = z.object({
+const DraftTextPackSchema = z.object({
   name: z.string().trim().min(1),
   bio: z.string().trim().min(1),
   personaSeed: z.string().trim().min(1),
   tags: z.array(z.string().trim().min(1)).min(1).max(8),
   characterReadout: z.string().trim().min(1),
-  imagePrompt: z.string().trim().min(1),
-  negativePrompt: z.string().trim().default(''),
 });
 
 type StructuredAttempt = {
@@ -213,6 +243,45 @@ type StructuredAttempt = {
 
 function normalizeErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error || 'UNKNOWN_ERROR');
+}
+
+function normalizeIntentMode(value: string | undefined): AgentCaptureVisualDelta['intentMode'] {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'restart') {
+    return 'restart';
+  }
+  return 'refine';
+}
+
+function normalizeStringList(values: string[] | undefined, maxItems = 6): string[] {
+  const normalized: string[] = [];
+  for (const value of values || []) {
+    const item = String(value || '').trim();
+    if (!item || normalized.includes(item)) {
+      continue;
+    }
+    normalized.push(item);
+    if (normalized.length >= maxItems) {
+      break;
+    }
+  }
+  return normalized;
+}
+
+function normalizeTouchedFields(values: string[] | undefined): AgentCaptureVisualField[] {
+  const allowed = new Set<AgentCaptureVisualField>(VisualFieldSchema.options);
+  const normalized: AgentCaptureVisualField[] = [];
+  for (const value of values || []) {
+    const item = String(value || '').trim() as AgentCaptureVisualField;
+    if (!allowed.has(item) || normalized.includes(item)) {
+      continue;
+    }
+    normalized.push(item);
+    if (normalized.length >= 6) {
+      break;
+    }
+  }
+  return normalized;
 }
 
 export async function generateStructuredObject<T extends z.ZodType<Record<string, unknown>>>(input: {
@@ -287,7 +356,7 @@ function buildImageGenerateRequestParams(input: {
     ...(String(input.negativePrompt || '').trim() ? { negativePrompt: String(input.negativePrompt || '').trim() } : {}),
     ...(input.referenceImages.length > 0 ? { referenceImages: input.referenceImages } : {}),
     responseFormat: 'url',
-    size: '1024x1024',
+    size: '1024x1536',
     quality: 'medium',
     timeoutMs: AGENT_CAPTURE_IMAGE_GENERATE_TIMEOUT_MS,
     ...(String(input.model || '').trim() ? { model: String(input.model || '').trim() } : {}),
@@ -415,53 +484,124 @@ export async function storeGeneratedArtifact(input: {
   return decodeGeneratedArtifact(input.artifact);
 }
 
-export async function runCaptureTurn(input: {
-  runtimeClient: ModRuntimeClient;
+function summarizeVisualSpec(spec: AgentCaptureVisualSpec | null, preferredLanguage?: string): string {
+  if (!spec) {
+    return pickPromptCopy(preferredLanguage, '尚未形成视觉规格。', 'No visual spec yet.');
+  }
+  const palette = [spec.palette.primary, spec.palette.secondary, spec.palette.accent].filter(Boolean).join(', ');
+  return [
+    `roleCore: ${spec.roleCore}`,
+    `silhouette: ${spec.silhouette}`,
+    `outfit: ${spec.outfit}`,
+    `materials: ${spec.materials.join(', ') || '-'}`,
+    `accessories: ${spec.accessories.join(', ') || '-'}`,
+    `handProp: ${spec.handProp || '-'}`,
+    `hairstyle: ${spec.hairstyle}`,
+    `palette: ${palette || '-'}`,
+    `artStyle: ${spec.artStyle}`,
+    `backgroundWeight: ${spec.backgroundWeight}`,
+    `signatureHook: ${spec.signatureHook ? `${spec.signatureHook.kind}:${spec.signatureHook.value}` : '-'}`,
+  ].join('\n');
+}
+
+function summarizeResultFacts(facts: AgentCaptureResultFacts | null, preferredLanguage?: string): string {
+  if (!facts) {
+    return pickPromptCopy(preferredLanguage, '尚无结果事实。', 'No result facts yet.');
+  }
+  return [
+    `framing: ${facts.framing}`,
+    `backgroundWeight: ${facts.backgroundWeight}`,
+    `signatureHook: ${facts.signatureHook ? `${facts.signatureHook.kind}:${facts.signatureHook.value}` : '-'}`,
+    `usesSourceImage: ${facts.usesSourceImage ? 'yes' : 'no'}`,
+  ].join('\n');
+}
+
+function summarizeVisualDelta(delta: AgentCaptureVisualDelta | null, preferredLanguage?: string): string {
+  if (!delta) {
+    return pickPromptCopy(preferredLanguage, '尚无本轮调整摘要。', 'No visual delta yet.');
+  }
+  return [
+    `intentMode: ${delta.intentMode}`,
+    `retain: ${delta.retain.join(', ') || '-'}`,
+    `adjust: ${delta.adjust.join(', ') || '-'}`,
+    `touchedFields: ${delta.touchedFields.join(', ') || '-'}`,
+  ].join('\n');
+}
+
+const LOCKED_FIELDS_IN_REFINE = new Set<AgentCaptureVisualField>([
+  'silhouette',
+  'palette',
+  'artStyle',
+  'signatureHook',
+]);
+
+export function deriveStableCore(spec: AgentCaptureVisualSpec): AgentCaptureStableCore {
+  return {
+    silhouette: spec.silhouette,
+    palette: spec.palette,
+    artStyle: spec.artStyle,
+    signatureHook: spec.signatureHook,
+    framing: 'full-body-anchor',
+    cameraLanguage: 'stable-eye-level',
+  };
+}
+
+export function mergeVisualSpec(
+  previousSpec: AgentCaptureVisualSpec | null,
+  delta: AgentCaptureVisualDelta,
+  resolvedNextSpec: AgentCaptureVisualSpec,
+): AgentCaptureVisualSpec {
+  if (!previousSpec || delta.intentMode === 'restart') {
+    return resolvedNextSpec;
+  }
+
+  const touched = new Set(delta.touchedFields);
+  const merged: AgentCaptureVisualSpec = {
+    ...previousSpec,
+    ...resolvedNextSpec,
+  };
+
+  for (const field of LOCKED_FIELDS_IN_REFINE) {
+    if (!touched.has(field)) {
+      switch (field) {
+        case 'silhouette':
+          merged.silhouette = previousSpec.silhouette;
+          break;
+        case 'palette':
+          merged.palette = previousSpec.palette;
+          break;
+        case 'artStyle':
+          merged.artStyle = previousSpec.artStyle;
+          break;
+        case 'signatureHook':
+          merged.signatureHook = previousSpec.signatureHook;
+          break;
+      }
+    }
+  }
+
+  return merged;
+}
+
+export function buildResultFacts(input: {
+  spec: AgentCaptureVisualSpec;
+  sourceImage: AgentCaptureDraftSnapshot['sourceImage'];
+}): AgentCaptureResultFacts {
+  return {
+    framing: 'full-body-anchor',
+    backgroundWeight: input.spec.backgroundWeight,
+    signatureHook: input.spec.signatureHook,
+    usesSourceImage: Boolean(input.sourceImage),
+  };
+}
+
+function buildVisualSpecPrompt(input: {
   draft: AgentCaptureDraftSnapshot;
   session: AgentCaptureSessionState;
   selectedAgent: AgentCaptureAgentSummary | null;
-  textBinding: RuntimeRouteBinding | null;
-  userMessage: string;
   preferredLanguage?: string;
-}): Promise<AgentCaptureTurnResult & { traceId?: string }> {
-  const system = [
-    pickPromptCopy(
-      input.preferredLanguage,
-      '你是 Agent-Capture 的角色形象捕捉助手。',
-      'You are Agent-Capture, a role-visual exploration assistant.',
-    ),
-    pickPromptCopy(
-      input.preferredLanguage,
-      '帮助用户把角色感觉逐步落实成可见的形象决策，而不是收集一份僵硬的问卷。',
-      'Help the user turn an emerging role feeling into visible character decisions instead of collecting a rigid questionnaire.',
-    ),
-    buildLanguageLock(input.preferredLanguage),
-    ...buildCharacterFocusGuidance(input.preferredLanguage),
-    ...buildIterativeRefinementGuidance(input.preferredLanguage),
-    makeJsonBlockPrompt(
-      '{"assistantReply":"string","brief":"string"}',
-      prefersSimplifiedChinese(input.preferredLanguage)
-        ? [
-            'assistantReply 必须像自然协作对话，而不是控制台指令；长度不超过 120 个中文字符。',
-            'assistantReply 应尽量把讨论往服装、材质、配饰、手持道具、轮廓、色彩与画风这些角色可见决策上推进。',
-            'assistantReply 默认不要把大段篇幅用于铺陈背景场景；只有用户明确要求时才提升背景优先级。',
-            'brief 必须是一句自然语言，总结当前角色感觉和关键视觉特征；长度不超过 80 个中文字符。',
-            'brief 必须优先概括轮廓、服装、材质、配饰、手持道具、色彩与画风；背景除非明确被要求，否则保持次要。',
-            '除非用户明确要求重来，否则默认把最新修正视为对当前方向的增量调整。',
-            '每个字段都必须存在且非空。',
-          ]
-        : [
-            'assistantReply should sound like a natural collaborative response rather than a control panel, within 260 English characters.',
-            'assistantReply should steer toward concrete character decisions like outfit, materials, accessories, handheld props, silhouette, palette, and art style whenever useful.',
-            'assistantReply should not spend most of its space on background scene-building unless the user explicitly asks for that.',
-            'brief must be one natural-language sentence summarizing the current role feel and key visual traits, within 180 English characters.',
-            'brief should prioritize silhouette, outfit, materials, accessories, handheld props, palette, and art style; background stays secondary unless explicitly requested.',
-            'use the latest user correction as a delta on the current direction by default unless the user clearly asks to restart.',
-            'every field must be present and non-empty.',
-          ],
-    ),
-  ].join('\n\n');
-  const prompt = [
+}): string {
+  return [
     formatPromptSection(
       input.preferredLanguage,
       { zh: '当前角色输入：', en: 'Current source prompt:' },
@@ -474,6 +614,11 @@ export async function runCaptureTurn(input: {
     ),
     formatPromptSection(
       input.preferredLanguage,
+      { zh: '当前 brief：', en: 'Current brief:' },
+      input.session.currentBrief,
+    ),
+    formatPromptSection(
+      input.preferredLanguage,
       { zh: '已选已有角色背景：', en: 'Selected agent background:' },
       summarizeAgent(input.selectedAgent),
       {
@@ -481,25 +626,145 @@ export async function runCaptureTurn(input: {
         en: 'No selected existing agent.',
       },
     ),
-    input.session.currentBrief
-      ? formatPromptSection(input.preferredLanguage, { zh: '当前 brief：', en: 'Current brief:' }, input.session.currentBrief)
+    input.draft.visualSpec
+      ? formatPromptSection(
+          input.preferredLanguage,
+          { zh: '当前视觉规格：', en: 'Current visual spec:' },
+          summarizeVisualSpec(input.draft.visualSpec, input.preferredLanguage),
+        )
+      : '',
+    input.draft.lastVisualDelta
+      ? formatPromptSection(
+          input.preferredLanguage,
+          { zh: '上一轮调整摘要：', en: 'Previous visual delta:' },
+          summarizeVisualDelta(input.draft.lastVisualDelta, input.preferredLanguage),
+        )
       : '',
     input.draft.characterReadout
-      ? formatPromptSection(input.preferredLanguage, { zh: '当前角色读取：', en: 'Current character readout:' }, input.draft.characterReadout)
+      ? formatPromptSection(
+          input.preferredLanguage,
+          { zh: '上一版角色读取：', en: 'Previous character readout:' },
+          input.draft.characterReadout,
+        )
       : '',
-    optionalPromptNote(
-      input.preferredLanguage,
-      Boolean(input.draft.generatedImage),
-      '当前已经存在一张生成图，应把它视为方向反馈：保留已确认的人物主体特征与最新修正，但不要机械继承偶发瑕疵。',
-      'A current generated image already exists and should be treated as directional feedback: preserve confirmed character traits and latest corrections, but do not mechanically inherit incidental artifacts.',
-    ),
     optionalPromptNote(
       input.preferredLanguage,
       Boolean(input.draft.sourceImage),
-      '已附加一张参考图，应纳入当前方向判断。',
-      'A source reference image is attached and should inform the current direction.',
+      '已附加参考图，应纳入视觉规格判断。',
+      'A source reference image is attached and should inform the visual spec.',
     ),
-    formatPromptSection(input.preferredLanguage, { zh: '用户最新输入：', en: 'Latest user message:' }, input.userMessage),
+  ].filter(Boolean).join('\n\n');
+}
+
+export async function generateVisualSpec(input: {
+  runtimeClient: ModRuntimeClient;
+  draft: AgentCaptureDraftSnapshot;
+  session: AgentCaptureSessionState;
+  selectedAgent: AgentCaptureAgentSummary | null;
+  textBinding: RuntimeRouteBinding | null;
+  preferredLanguage?: string;
+}): Promise<{ visualSpec: AgentCaptureVisualSpec; traceId?: string }> {
+  const system = [
+    pickPromptCopy(
+      input.preferredLanguage,
+      '你要为 Agent-Capture 产出一份稳定的角色视觉规格。',
+      'You produce one stable character visual spec for Agent-Capture.',
+    ),
+    buildLanguageLock(input.preferredLanguage),
+    ...buildCharacterFocusGuidance(input.preferredLanguage),
+    makeJsonBlockPrompt(
+      '{"roleCore":"string","silhouette":"string","outfit":"string","materials":["string"],"accessories":["string"],"handProp":"string|null","hairstyle":"string","palette":{"primary":"string","secondary":"string?","accent":"string?"},"artStyle":"string","backgroundWeight":"minimal|supporting|requested","signatureHook":{"kind":"prop|accessory|garment-detail|pattern|color-pair","value":"string"}|null}',
+      prefersSimplifiedChinese(input.preferredLanguage)
+        ? [
+            '角色视觉规格必须优先服务“可继续创作的角色视觉设定起稿”。',
+            'silhouette、outfit、hairstyle、palette.primary、artStyle 都必须明确且非空。',
+            'backgroundWeight 默认应偏 minimal 或 supporting；只有用户明确强调环境时才允许 requested。',
+            'signatureHook 尽量给出一个最可记忆、最可稳定体现的识别锚点；如果确实不成立，可以为 null。',
+            '不要输出解释性文字。',
+          ]
+        : [
+            'The visual spec must serve a reusable character visual draft.',
+            'silhouette, outfit, hairstyle, palette.primary, and artStyle must be explicit and non-empty.',
+            'backgroundWeight should default to minimal or supporting; only use requested when the user clearly asks for a stronger environment.',
+            'Try to provide one memorable, visually stable signature hook; use null only when it truly does not fit.',
+            'Do not add explanatory prose.',
+          ],
+    ),
+  ].join('\n\n');
+  const { parsed, traceId } = await generateStructuredObject({
+    runtimeClient: input.runtimeClient,
+    binding: input.textBinding,
+    resolveCapability: 'text.generate',
+    system,
+    prompt: buildVisualSpecPrompt(input),
+    attempts: [
+      { temperature: 0.2, maxTokens: 2048 },
+      { temperature: 0.1, maxTokens: 2560 },
+      { temperature: 0, maxTokens: 3072 },
+    ],
+    schema: VisualSpecSchema,
+    parseErrorCode: 'AGENT_CAPTURE_VISUAL_SPEC_JSON_INVALID',
+    truncationErrorCode: 'AGENT_CAPTURE_VISUAL_SPEC_TRUNCATED',
+    contractErrorCode: 'AGENT_CAPTURE_VISUAL_SPEC_CONTRACT_INVALID',
+  });
+  return {
+    visualSpec: parsed,
+    traceId,
+  };
+}
+
+export async function extractVisualDelta(input: {
+  runtimeClient: ModRuntimeClient;
+  draft: AgentCaptureDraftSnapshot;
+  session: AgentCaptureSessionState;
+  selectedAgent: AgentCaptureAgentSummary | null;
+  textBinding: RuntimeRouteBinding | null;
+  userMessage: string;
+  preferredLanguage?: string;
+}): Promise<{ assistantReply: string; brief: string; visualDelta: AgentCaptureVisualDelta; traceId?: string }> {
+  const system = [
+    pickPromptCopy(
+      input.preferredLanguage,
+      '你是 Agent-Capture 的角色视觉起稿助手。',
+      'You are Agent-Capture, a character visual drafting assistant.',
+    ),
+    buildLanguageLock(input.preferredLanguage),
+    ...buildCharacterFocusGuidance(input.preferredLanguage),
+    makeJsonBlockPrompt(
+      '{"assistantReply":"string","brief":"string","intentMode":"refine|restart","retain":["string"],"adjust":["string"],"touchedFields":["roleCore|silhouette|outfit|materials|accessories|handProp|hairstyle|palette|artStyle|backgroundWeight|signatureHook"]}',
+      prefersSimplifiedChinese(input.preferredLanguage)
+        ? [
+            'assistantReply 必须像自然协作对话，长度不超过 120 个中文字符。',
+            'brief 必须是一句自然语言，概括当前角色方向，长度不超过 80 个中文字符。',
+            '如需提供 intentMode，只能用 refine 或 restart；除非用户明确要求重来或改向，否则用 refine。',
+            '如需提供 touchedFields，只列出本轮确实被用户触碰或明确想改的视觉字段；不确定时可以留空。',
+            'retain 和 adjust 不确定时可以给空数组。',
+            '不要输出完整视觉规格；这里只做轻量对话理解与调整摘要。',
+          ]
+        : [
+            'assistantReply must sound like a natural collaborative response and stay within 260 English characters.',
+            'brief must be one natural-language sentence summarizing the current direction within 180 English characters.',
+            'If you provide intentMode, it must be refine or restart; unless the user clearly asks to restart or change direction, use refine.',
+            'If you provide touchedFields, only include visual fields the user actually touched or clearly wants changed; leave it empty when unsure.',
+            'retain and adjust may be empty arrays when uncertain.',
+            'Do not output a full visual spec here; this stage only handles lightweight dialogue understanding and adjustment summary.',
+          ],
+    ),
+  ].join('\n\n');
+  const prompt = [
+    buildVisualSpecPrompt(input),
+    formatPromptSection(
+      input.preferredLanguage,
+      { zh: '用户最新输入：', en: 'Latest user message:' },
+      input.userMessage,
+    ),
+    input.draft.lastVisualDelta
+      ? formatPromptSection(
+          input.preferredLanguage,
+          { zh: '上一轮调整摘要：', en: 'Previous visual delta:' },
+          summarizeVisualDelta(input.draft.lastVisualDelta, input.preferredLanguage),
+        )
+      : '',
   ].filter(Boolean).join('\n\n');
   const { parsed, traceId } = await generateStructuredObject({
     runtimeClient: input.runtimeClient,
@@ -508,11 +773,11 @@ export async function runCaptureTurn(input: {
     system,
     prompt,
     attempts: [
-      { temperature: 0.25, maxTokens: 1536 },
-      { temperature: 0.15, maxTokens: 2048 },
-      { temperature: 0.05, maxTokens: 2560 },
+      { temperature: 0.2, maxTokens: 2560 },
+      { temperature: 0.1, maxTokens: 3072 },
+      { temperature: 0, maxTokens: 3584 },
     ],
-    schema: CaptureTurnSchema,
+    schema: TurnEnvelopeSchema,
     parseErrorCode: 'AGENT_CAPTURE_TURN_JSON_INVALID',
     truncationErrorCode: 'AGENT_CAPTURE_TURN_TRUNCATED',
     contractErrorCode: 'AGENT_CAPTURE_TURN_CONTRACT_INVALID',
@@ -520,6 +785,12 @@ export async function runCaptureTurn(input: {
   return {
     assistantReply: parsed.assistantReply,
     brief: parsed.brief,
+    visualDelta: {
+      intentMode: normalizeIntentMode(parsed.intentMode),
+      retain: normalizeStringList(parsed.retain),
+      adjust: normalizeStringList(parsed.adjust),
+      touchedFields: normalizeTouchedFields(parsed.touchedFields),
+    },
     traceId,
   };
 }
@@ -540,60 +811,27 @@ export async function recomputeCurrentBrief(input: {
     ),
     buildLanguageLock(input.preferredLanguage),
     ...buildCharacterFocusGuidance(input.preferredLanguage),
-    ...buildIterativeRefinementGuidance(input.preferredLanguage),
     makeJsonBlockPrompt(
       '{"brief":"string"}',
       prefersSimplifiedChinese(input.preferredLanguage)
         ? [
-            'brief 必须是一句自然语言，概括当前角色感觉和关键视觉特征；长度不超过 80 个中文字符。',
-            'brief 必须优先概括人物主体相关的轮廓、服装、材质、配饰、手持道具与画风；背景除非明确被要求，否则只作辅助。',
-            '如果当前结果已存在，brief 需要轻量说明本轮保留什么、调整什么。',
-            '不要输出标签、数组或解释文字。',
-            'brief 必须存在且非空。',
+            'brief 必须是一句自然语言，长度不超过 80 个中文字符。',
+            'brief 必须优先体现人物主体、服装、材质、配饰、道具、色彩与画风。',
+            '如果当前结果已存在，可轻量说明延续什么、调整什么。',
           ]
         : [
-            'brief must describe the current role feel and key visual traits in one sentence, within 180 English characters.',
-            'brief should prioritize silhouette, outfit, materials, accessories, handheld props, and art style; background should be supporting-only unless explicitly requested.',
-            'if a current result exists, briefly reflect what is being retained and what is being adjusted.',
-            'do not output labels or arrays.',
-            'brief must be present and non-empty.',
+            'brief must be one natural-language sentence within 180 English characters.',
+            'brief should foreground the character body, outfit, materials, accessories, prop, palette, and art style.',
+            'If a current result exists, it may briefly mention what is being retained and adjusted.',
           ],
     ),
   ].join('\n\n');
   const prompt = [
+    buildVisualSpecPrompt(input),
     formatPromptSection(
       input.preferredLanguage,
-      { zh: '当前角色输入：', en: 'Current source prompt:' },
-      buildSourcePrompt(input.draft),
-    ),
-    formatPromptSection(
-      input.preferredLanguage,
-      { zh: '当前会话：', en: 'Current conversation:' },
-      summarizeConversation(input.session),
-    ),
-    formatPromptSection(
-      input.preferredLanguage,
-      { zh: '已选已有角色背景：', en: 'Selected agent background:' },
-      summarizeAgent(input.selectedAgent),
-      {
-        zh: '未附加已有角色。',
-        en: 'No selected existing agent.',
-      },
-    ),
-    input.draft.characterReadout
-      ? formatPromptSection(input.preferredLanguage, { zh: '当前角色读取：', en: 'Current character readout:' }, input.draft.characterReadout)
-      : '',
-    optionalPromptNote(
-      input.preferredLanguage,
-      Boolean(input.draft.generatedImage),
-      '当前方向里已经存在一张生成图；它提供方向反馈，但不等于所有视觉细节都必须被继承。',
-      'There is already a current generated image in this direction; it provides directional feedback, but not every visual artifact should be inherited.',
-    ),
-    optionalPromptNote(
-      input.preferredLanguage,
-      Boolean(input.draft.sourceImage),
-      '已附加一张参考图，应纳入当前方向判断。',
-      'A source reference image is attached and should inform the current direction.',
+      { zh: '结果事实摘要：', en: 'Result facts:' },
+      summarizeResultFacts(input.draft.resultFacts, input.preferredLanguage),
     ),
   ].filter(Boolean).join('\n\n');
   const { parsed, traceId } = await generateStructuredObject({
@@ -603,9 +841,9 @@ export async function recomputeCurrentBrief(input: {
     system,
     prompt,
     attempts: [
-      { temperature: 0.15, maxTokens: 512 },
-      { temperature: 0.05, maxTokens: 768 },
-      { temperature: 0, maxTokens: 1024 },
+      { temperature: 0.1, maxTokens: 768 },
+      { temperature: 0.05, maxTokens: 1024 },
+      { temperature: 0, maxTokens: 1280 },
     ],
     schema: BriefSchema,
     parseErrorCode: 'AGENT_CAPTURE_BRIEF_JSON_INVALID',
@@ -614,6 +852,177 @@ export async function recomputeCurrentBrief(input: {
   });
   return {
     brief: parsed.brief,
+    traceId,
+  };
+}
+
+function compilePaletteText(palette: AgentCaptureVisualSpec['palette']): string {
+  return [palette.primary, palette.secondary, palette.accent]
+    .filter(Boolean)
+    .join(', ');
+}
+
+export function compileImagePromptFromSpec(input: {
+  spec: AgentCaptureVisualSpec;
+  stableCore: AgentCaptureStableCore;
+  currentBrief: string;
+  visualDelta: AgentCaptureVisualDelta | null;
+  preferredLanguage?: string;
+}): {
+  imagePrompt: string;
+  negativePrompt: string;
+} {
+  const backgroundText = input.spec.backgroundWeight === 'requested'
+    ? pickPromptCopy(input.preferredLanguage, '背景可被明确描写，但仍不抢人物主体。', 'Background may be explicit, but should still not overpower the character.')
+    : input.spec.backgroundWeight === 'supporting'
+      ? pickPromptCopy(input.preferredLanguage, '背景仅作为辅助氛围。', 'Background should stay supporting-only.')
+      : pickPromptCopy(input.preferredLanguage, '背景极简、弱化。', 'Background should be minimal and subdued.');
+
+  const promptParts = [
+    input.currentBrief,
+    pickPromptCopy(input.preferredLanguage, `角色核心感觉：${input.spec.roleCore}`, `Role core: ${input.spec.roleCore}`),
+    pickPromptCopy(input.preferredLanguage, `轮廓体态：${input.stableCore.silhouette}`, `Silhouette: ${input.stableCore.silhouette}`),
+    pickPromptCopy(input.preferredLanguage, `发型：${input.spec.hairstyle}`, `Hairstyle: ${input.spec.hairstyle}`),
+    pickPromptCopy(input.preferredLanguage, `服装主体：${input.spec.outfit}`, `Primary outfit: ${input.spec.outfit}`),
+    input.spec.materials.length > 0
+      ? pickPromptCopy(input.preferredLanguage, `材质：${input.spec.materials.join('、')}`, `Materials: ${input.spec.materials.join(', ')}`)
+      : '',
+    input.spec.accessories.length > 0
+      ? pickPromptCopy(input.preferredLanguage, `配饰：${input.spec.accessories.join('、')}`, `Accessories: ${input.spec.accessories.join(', ')}`)
+      : '',
+    input.spec.handProp
+      ? pickPromptCopy(input.preferredLanguage, `手持道具：${input.spec.handProp}`, `Handheld prop: ${input.spec.handProp}`)
+      : '',
+    pickPromptCopy(
+      input.preferredLanguage,
+      `色彩关系：${compilePaletteText(input.stableCore.palette)}`,
+      `Palette: ${compilePaletteText(input.stableCore.palette)}`,
+    ),
+    pickPromptCopy(input.preferredLanguage, `画风：${input.stableCore.artStyle}`, `Art style: ${input.stableCore.artStyle}`),
+    input.stableCore.signatureHook
+      ? pickPromptCopy(
+          input.preferredLanguage,
+          `识别锚点：${input.stableCore.signatureHook.value}`,
+          `Signature hook: ${input.stableCore.signatureHook.value}`,
+        )
+      : '',
+    backgroundText,
+    input.visualDelta?.retain.length
+      ? pickPromptCopy(input.preferredLanguage, `必须保留：${input.visualDelta.retain.join('、')}`, `Must retain: ${input.visualDelta.retain.join(', ')}`)
+      : '',
+    input.visualDelta?.adjust.length
+      ? pickPromptCopy(input.preferredLanguage, `本轮微调：${input.visualDelta.adjust.join('、')}`, `Adjust this round: ${input.visualDelta.adjust.join(', ')}`)
+      : '',
+  ].filter(Boolean).join('\n');
+
+  const negativeParts = [
+    pickPromptCopy(
+      input.preferredLanguage,
+      '不要改变已确认的核心人物轮廓、主色关系、画风与识别锚点。',
+      'Do not change the confirmed core silhouette, palette relationship, art style, or signature hook.',
+    ),
+    input.visualDelta?.adjust.length
+      ? pickPromptCopy(
+          input.preferredLanguage,
+          `除了这些明确调整点，不要大改：${input.visualDelta.adjust.join('、')}`,
+          `Do not make large changes outside these explicit adjustments: ${input.visualDelta.adjust.join(', ')}`,
+        )
+      : '',
+  ].filter(Boolean).join(' ');
+
+  return {
+    imagePrompt: enforceAnchorImagePrompt(promptParts, input.preferredLanguage),
+    negativePrompt: enforceAnchorNegativePrompt(negativeParts, input.preferredLanguage),
+  };
+}
+
+export async function generateDraftTextPack(input: {
+  runtimeClient: ModRuntimeClient;
+  textBinding: RuntimeRouteBinding | null;
+  spec: AgentCaptureVisualSpec;
+  currentBrief: string;
+  resultFacts: AgentCaptureResultFacts;
+  preferredLanguage?: string;
+}): Promise<{ draft: AgentCaptureDraftGeneration; traceId?: string }> {
+  const system = [
+    pickPromptCopy(
+      input.preferredLanguage,
+      '你要为 Agent-Capture 的当前角色结果补全文案包。',
+      'You are producing the text pack for the current Agent-Capture result.',
+    ),
+    buildLanguageLock(input.preferredLanguage),
+    makeJsonBlockPrompt(
+      '{"name":"string","bio":"string","personaSeed":"string","tags":["string"],"characterReadout":"string"}',
+      prefersSimplifiedChinese(input.preferredLanguage)
+        ? [
+            'name 应简洁且有识别感；长度不超过 24 个中文字符。',
+            'bio 应为 1-2 句短句；长度不超过 120 个中文字符。',
+            'personaSeed 应为紧凑的人设种子段落；长度不超过 160 个中文字符。',
+            'tags 应为 3-6 个简洁标签。',
+            'characterReadout 必须像“对当前结果的解释”，而不是机械复述规格；长度不超过 100 个中文字符。',
+          ]
+        : [
+            'name should be concise and evocative, within 48 English characters.',
+            'bio should be 1-2 short sentences, within 240 English characters.',
+            'personaSeed should be a compact role seed paragraph, within 320 English characters.',
+            'tags should be 3-6 concise tags.',
+            'characterReadout must read like an explanation of the current result rather than a mechanical spec restatement, within 220 English characters.',
+          ],
+    ),
+  ].join('\n\n');
+  const prompt = [
+    formatPromptSection(
+      input.preferredLanguage,
+      { zh: '当前 brief：', en: 'Current brief:' },
+      input.currentBrief,
+    ),
+    formatPromptSection(
+      input.preferredLanguage,
+      { zh: '当前视觉规格：', en: 'Current visual spec:' },
+      summarizeVisualSpec(input.spec, input.preferredLanguage),
+    ),
+    formatPromptSection(
+      input.preferredLanguage,
+      { zh: '结果事实摘要：', en: 'Result facts:' },
+      summarizeResultFacts(input.resultFacts, input.preferredLanguage),
+    ),
+  ].join('\n\n');
+  const { parsed, traceId } = await generateStructuredObject({
+    runtimeClient: input.runtimeClient,
+    binding: input.textBinding,
+    resolveCapability: 'text.generate',
+    system,
+    prompt,
+    attempts: [
+      { temperature: 0.25, maxTokens: 2048 },
+      { temperature: 0.1, maxTokens: 2560 },
+      { temperature: 0, maxTokens: 3072 },
+    ],
+    schema: DraftTextPackSchema,
+    parseErrorCode: 'AGENT_CAPTURE_DRAFT_JSON_INVALID',
+    truncationErrorCode: 'AGENT_CAPTURE_DRAFT_TRUNCATED',
+    contractErrorCode: 'AGENT_CAPTURE_GENERATION_TEXT_CONTRACT_INVALID',
+  });
+  return {
+    draft: parsed,
+    traceId,
+  };
+}
+
+export async function runCaptureTurn(input: {
+  runtimeClient: ModRuntimeClient;
+  draft: AgentCaptureDraftSnapshot;
+  session: AgentCaptureSessionState;
+  selectedAgent: AgentCaptureAgentSummary | null;
+  textBinding: RuntimeRouteBinding | null;
+  userMessage: string;
+  preferredLanguage?: string;
+}): Promise<AgentCaptureTurnResult & { traceId?: string }> {
+  const { assistantReply, brief, visualDelta, traceId } = await extractVisualDelta(input);
+  return {
+    assistantReply,
+    brief,
+    visualDelta,
     traceId,
   };
 }
@@ -630,6 +1039,8 @@ export async function generateAgentDraft(input: {
 }): Promise<{
   draft: AgentCaptureDraftGeneration;
   image: AgentCaptureImageRef;
+  visualSpec: AgentCaptureVisualSpec;
+  resultFacts: AgentCaptureResultFacts;
   textTraceId?: string;
   imageTraceId?: string;
 }> {
@@ -637,125 +1048,37 @@ export async function generateAgentDraft(input: {
   if (!currentBrief) {
     throw new Error('AGENT_CAPTURE_BRIEF_REQUIRED');
   }
-  const system = [
-    pickPromptCopy(
-      input.preferredLanguage,
-      '你正在为 Agent-Capture 准备一份角色首图与文本草稿包。',
-      'You are preparing one role-image draft package for Agent-Capture.',
-    ),
-    pickPromptCopy(
-      input.preferredLanguage,
-      '输出应让用户清楚感到角色形象正在变得更明确、更可继续使用。',
-      'The output should help the user feel the role is becoming clearer and more reusable.',
-    ),
-    buildLanguageLock(input.preferredLanguage),
-    ...buildCharacterFocusGuidance(input.preferredLanguage),
-    ...buildIterativeRefinementGuidance(input.preferredLanguage),
-    makeJsonBlockPrompt(
-      '{"name":"string","bio":"string","personaSeed":"string","tags":["string"],"characterReadout":"string","imagePrompt":"string","negativePrompt":"string"}',
-      prefersSimplifiedChinese(input.preferredLanguage)
-        ? [
-            'name 应简洁且有识别感；长度不超过 24 个中文字符。',
-            'bio 应为 1-2 句短句；长度不超过 120 个中文字符。',
-            'personaSeed 应为紧凑的角色种子段落；长度不超过 160 个中文字符。',
-            'tags 应为 3-6 个简洁标签。',
-            'characterReadout 应简短说明这个角色现在像谁、这轮落实了什么；长度不超过 100 个中文字符。',
-            'characterReadout 应先提人物主体上的服装、配饰、道具、材质、轮廓或画风变化，再提背景氛围。',
-            'imagePrompt 必须面向一张稳定的全身角色锚点图，而不是戏剧化海报镜头。',
-            'imagePrompt 必须明确：人物全身、头到脚完整可见、主体居中、姿态稳定、标准人物镜头语言、固定焦距人物视角、平视或接近平视、镜头距离稳定。',
-            'imagePrompt 必须把服装、材质、配饰、手持道具、色彩与画风尽量写具体。',
-            'imagePrompt 必须避免夸张广角、强透视、明显近大远小、极近特写、半身像、动作大片感和重剧情场景叙事。',
-            'imagePrompt 必须让背景退后、弱化、低细节；除非用户明确要求，不要让背景成为视觉主体。',
-            '如果当前结果已存在，imagePrompt 必须保留用户确认的人物主体特征与最新修正，但不要机械继承上一版图中的脏污、模糊、噪点、背景残留或未被确认的瑕疵。',
-            'negativePrompt 应简洁，并在相关时规避现代感、跑偏气质或不匹配设定。',
-            'negativePrompt 必须明确压制半身裁切、脚部缺失、手部遮挡、道具缺失、镜头角度漂移和背景主导阅读。',
-            '每个字段都必须存在。',
-          ]
-        : [
-            'name should be concise and evocative, within 48 English characters.',
-            'bio should be 1-2 short sentences, within 240 English characters.',
-            'personaSeed should be a compact role-seed paragraph, within 320 English characters.',
-            'tags should be 3-6 concise tags.',
-            'characterReadout should briefly describe who this role now feels like and what changed this round, within 220 English characters.',
-            'characterReadout should mention character-facing changes such as outfit, accessories, props, materials, silhouette, or art style before background atmosphere.',
-            'imagePrompt should be optimized for one stable full-body character anchor image rather than a dramatic poster shot.',
-            'imagePrompt must explicitly lock the subject to full-body, head-to-toe visible, centered framing, stable pose, standard character lens language, fixed focal-length character framing, eye-level or near-eye-level view, and consistent camera distance.',
-            'imagePrompt should make outfit, materials, accessories, handheld props, palette, and art style concrete whenever the context supports them.',
-            'imagePrompt should avoid exaggerated wide-angle perspective, strong foreshortening, extreme close-up framing, half-body portrait framing, action-poster energy, and scene-first storytelling.',
-            'imagePrompt should keep background subordinate and low-detail unless the user explicitly wants a strong environment treatment.',
-            'if a current result exists, imagePrompt must preserve user-confirmed character-defining traits and the latest corrections without mechanically inheriting dirt, blur, noise, leftover background texture, or other unconfirmed artifacts from the previous render.',
-            'negativePrompt should be concise and avoid modern, off-tone, or mismatched traits when relevant.',
-            'negativePrompt should explicitly discourage half-body crops, missing feet, hidden hands, missing props, drifting camera angle, and background-dominant cinematic framing.',
-            'every field must be present.',
-          ],
-    ),
-  ].join('\n\n');
-  const prompt = [
-    formatPromptSection(
-      input.preferredLanguage,
-      { zh: '当前角色输入：', en: 'Current source prompt:' },
-      buildSourcePrompt(input.draft),
-    ),
-    formatPromptSection(input.preferredLanguage, { zh: '当前 brief：', en: 'Current brief:' }, currentBrief),
-    formatPromptSection(
-      input.preferredLanguage,
-      { zh: '当前会话：', en: 'Current conversation:' },
-      summarizeConversation(input.session),
-    ),
-    formatPromptSection(
-      input.preferredLanguage,
-      { zh: '已选已有角色背景：', en: 'Selected agent background:' },
-      summarizeAgent(input.selectedAgent),
-      {
-        zh: '未附加已有角色。',
-        en: 'No selected existing agent.',
-      },
-    ),
-    input.draft.characterReadout
-      ? formatPromptSection(input.preferredLanguage, { zh: '上一版角色读取：', en: 'Previous character readout:' }, input.draft.characterReadout)
-      : '',
-    optionalPromptNote(
-      input.preferredLanguage,
-      Boolean(input.draft.generatedImage),
-      '当前已经存在一张生成图，应被视为本轮方向反馈的一部分：保留已确认主体特征与最新修正，但不要机械继承其中的偶发瑕疵。',
-      'A current generated image already exists and should be treated as directional feedback for this round: preserve confirmed character traits and latest corrections, but do not mechanically inherit incidental artifacts from it.',
-    ),
-    optionalPromptNote(
-      input.preferredLanguage,
-      Boolean(input.draft.sourceImage),
-      '已附加一张参考图，应影响本轮新结果。',
-      'A source reference image is attached and should inform the new result.',
-    ),
-  ].filter(Boolean).join('\n\n');
-  const { parsed, traceId: textTraceId } = await generateStructuredObject({
+
+  const generatedVisualSpec = (await generateVisualSpec({
     runtimeClient: input.runtimeClient,
-    binding: input.textBinding,
-    resolveCapability: 'text.generate',
-    system,
-    prompt,
-    attempts: [
-      { temperature: 0.2, maxTokens: 2048 },
-      { temperature: 0.1, maxTokens: 2560 },
-      { temperature: 0, maxTokens: 3072 },
-    ],
-    schema: DraftGenerationSchema,
-    parseErrorCode: 'AGENT_CAPTURE_DRAFT_JSON_INVALID',
-    truncationErrorCode: 'AGENT_CAPTURE_DRAFT_TRUNCATED',
-    contractErrorCode: 'AGENT_CAPTURE_GENERATION_TEXT_CONTRACT_INVALID',
+    draft: input.draft,
+    session: input.session,
+    selectedAgent: input.selectedAgent,
+    textBinding: input.textBinding,
+    preferredLanguage: input.preferredLanguage,
+  })).visualSpec;
+  const visualSpec = mergeVisualSpec(
+    input.draft.visualSpec,
+    input.draft.lastVisualDelta || {
+      intentMode: 'restart',
+      retain: [],
+      adjust: [],
+      touchedFields: [],
+    },
+    generatedVisualSpec,
+  );
+  const stableCore = deriveStableCore(visualSpec);
+  const compiledPrompt = compileImagePromptFromSpec({
+    spec: visualSpec,
+    stableCore,
+    currentBrief,
+    visualDelta: input.draft.lastVisualDelta,
+    preferredLanguage: input.preferredLanguage,
   });
-  const draft: AgentCaptureDraftGeneration = {
-    name: parsed.name,
-    bio: parsed.bio,
-    personaSeed: parsed.personaSeed,
-    tags: parsed.tags,
-    characterReadout: parsed.characterReadout,
-    imagePrompt: enforceAnchorImagePrompt(parsed.imagePrompt, input.preferredLanguage),
-    negativePrompt: enforceAnchorNegativePrompt(parsed.negativePrompt, input.preferredLanguage),
-  };
   const resolvedImageRoute = await input.runtimeClient.route.resolve({ capability: 'image.generate' });
   const imageResult = await input.runtimeClient.media.image.generate(buildImageGenerateRequestParams({
-    prompt: draft.imagePrompt,
-    negativePrompt: draft.negativePrompt,
+    prompt: compiledPrompt.imagePrompt,
+    negativePrompt: compiledPrompt.negativePrompt,
     referenceImages: buildReferenceImages(input.draft),
     model: input.imageBinding?.model || String(resolvedImageRoute.model || '').trim() || undefined,
     binding: input.imageBinding,
@@ -768,10 +1091,26 @@ export async function generateAgentDraft(input: {
   if (!image) {
     throw new Error('AGENT_CAPTURE_GENERATED_IMAGE_EMPTY');
   }
+
+  const resultFacts = buildResultFacts({
+    spec: visualSpec,
+    sourceImage: input.draft.sourceImage,
+  });
+  const textPack = await generateDraftTextPack({
+    runtimeClient: input.runtimeClient,
+    textBinding: input.textBinding,
+    spec: visualSpec,
+    currentBrief,
+    resultFacts,
+    preferredLanguage: input.preferredLanguage,
+  });
+
   return {
-    draft,
+    draft: textPack.draft,
     image,
-    textTraceId,
+    visualSpec,
+    resultFacts,
+    textTraceId: textPack.traceId,
     imageTraceId: String(imageResult.trace?.traceId || '').trim() || undefined,
   };
 }

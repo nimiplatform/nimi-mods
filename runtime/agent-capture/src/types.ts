@@ -22,6 +22,65 @@ export type AgentCaptureImageRef = {
   url: string;
 };
 
+export type AgentCaptureSignatureHook = {
+  kind: 'prop' | 'accessory' | 'garment-detail' | 'pattern' | 'color-pair';
+  value: string;
+};
+
+export type AgentCaptureVisualSpec = {
+  roleCore: string;
+  silhouette: string;
+  outfit: string;
+  materials: string[];
+  accessories: string[];
+  handProp: string | null;
+  hairstyle: string;
+  palette: {
+    primary: string;
+    secondary?: string;
+    accent?: string;
+  };
+  artStyle: string;
+  backgroundWeight: 'minimal' | 'supporting' | 'requested';
+  signatureHook: AgentCaptureSignatureHook | null;
+};
+
+export type AgentCaptureStableCore = {
+  silhouette: string;
+  palette: AgentCaptureVisualSpec['palette'];
+  artStyle: string;
+  signatureHook: AgentCaptureVisualSpec['signatureHook'];
+  framing: 'full-body-anchor';
+  cameraLanguage: 'stable-eye-level';
+};
+
+export type AgentCaptureVisualField =
+  | 'roleCore'
+  | 'silhouette'
+  | 'outfit'
+  | 'materials'
+  | 'accessories'
+  | 'handProp'
+  | 'hairstyle'
+  | 'palette'
+  | 'artStyle'
+  | 'backgroundWeight'
+  | 'signatureHook';
+
+export type AgentCaptureVisualDelta = {
+  intentMode: 'refine' | 'restart';
+  retain: string[];
+  adjust: string[];
+  touchedFields: AgentCaptureVisualField[];
+};
+
+export type AgentCaptureResultFacts = {
+  framing: 'full-body-anchor';
+  backgroundWeight: AgentCaptureVisualSpec['backgroundWeight'];
+  signatureHook: AgentCaptureSignatureHook | null;
+  usesSourceImage: boolean;
+};
+
 export type AgentCaptureAgentSummary = {
   id: string;
   handle: string;
@@ -45,6 +104,9 @@ export type AgentCaptureDraftSnapshot = {
   sourceImage: AgentCaptureImageRef | null;
   selectedAgentId: string | null;
   generatedImage: AgentCaptureImageRef | null;
+  visualSpec: AgentCaptureVisualSpec | null;
+  lastVisualDelta: AgentCaptureVisualDelta | null;
+  resultFacts: AgentCaptureResultFacts | null;
   characterReadout: string;
   name: string;
   bio: string;
@@ -77,6 +139,7 @@ export type AgentCaptureRouteState = {
 export type AgentCaptureTurnResult = {
   assistantReply: string;
   brief: string;
+  visualDelta: AgentCaptureVisualDelta;
 };
 
 export type AgentCaptureDraftGeneration = {
@@ -85,6 +148,4 @@ export type AgentCaptureDraftGeneration = {
   personaSeed: string;
   tags: string[];
   characterReadout: string;
-  imagePrompt: string;
-  negativePrompt: string;
 };

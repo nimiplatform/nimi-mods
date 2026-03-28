@@ -3,9 +3,12 @@ import assert from 'node:assert/strict';
 import {
   buildReferenceImages,
   buildSourcePrompt,
+  compileImagePromptFromSpec,
+  deriveStableCore,
   extractJsonObject,
   generateAgentDraft,
   generateStructuredObject,
+  mergeVisualSpec,
   recomputeCurrentBrief,
   runCaptureTurn,
   storeGeneratedArtifact,
@@ -38,6 +41,31 @@ import {
 import type { ModRuntimeClient } from '@nimiplatform/sdk/mod';
 import type { HookStorageClient, RuntimeRouteBinding } from '@nimiplatform/sdk/mod';
 import { z } from 'zod';
+import type { AgentCaptureVisualSpec } from '../src/types.js';
+
+function makeVisualSpec(overrides: Partial<AgentCaptureVisualSpec> = {}): AgentCaptureVisualSpec {
+  return {
+    roleCore: 'restrained strategist',
+    silhouette: 'slender full-body silhouette',
+    outfit: 'layered ancient robe',
+    materials: ['matte silk', 'light gauze'],
+    accessories: ['jade ornament'],
+    handProp: 'bamboo scroll',
+    hairstyle: 'half-up knot',
+    palette: {
+      primary: 'ink black',
+      secondary: 'desaturated jade',
+      accent: 'muted gold',
+    },
+    artStyle: 'painterly realism',
+    backgroundWeight: 'minimal',
+    signatureHook: {
+      kind: 'prop',
+      value: 'bamboo scroll',
+    },
+    ...overrides,
+  };
+}
 
 test('toCreatorAgentSummary normalizes nested user payload', () => {
   const summary = toCreatorAgentSummary({
@@ -369,6 +397,73 @@ test('language resolution follows desktop locale and defaults to en for any non-
   assert.equal(resolveAgentCapturePreferredLanguage(undefined), 'en-US');
 });
 
+test('mergeVisualSpec keeps locked core fields stable during refine unless explicitly touched', () => {
+  const previousSpec = makeVisualSpec({
+    silhouette: 'slender full-body silhouette',
+    palette: {
+      primary: 'ink black',
+      secondary: 'jade green',
+    },
+    artStyle: 'painterly realism',
+    signatureHook: {
+      kind: 'prop',
+      value: 'bamboo scroll',
+    },
+  });
+
+  const merged = mergeVisualSpec(previousSpec, {
+    intentMode: 'refine',
+    retain: ['ink black palette'],
+    adjust: ['lighter sleeve trim'],
+    touchedFields: ['outfit', 'materials'],
+  }, makeVisualSpec({
+    silhouette: 'broad-shouldered stance',
+    outfit: 'dark robe with lighter sleeve trim',
+    materials: ['matte silk'],
+    palette: {
+      primary: 'pale silver',
+    },
+    artStyle: 'anime cel shading',
+    signatureHook: {
+      kind: 'accessory',
+      value: 'silver earring',
+    },
+  }));
+
+  assert.equal(merged.silhouette, previousSpec.silhouette);
+  assert.deepEqual(merged.palette, previousSpec.palette);
+  assert.equal(merged.artStyle, previousSpec.artStyle);
+  assert.deepEqual(merged.signatureHook, previousSpec.signatureHook);
+  assert.equal(merged.outfit, 'dark robe with lighter sleeve trim');
+});
+
+test('compileImagePromptFromSpec preserves stable core and signature hook in the single prompt path', () => {
+  const spec = makeVisualSpec({
+    handProp: 'jade flute',
+    signatureHook: {
+      kind: 'prop',
+      value: 'jade flute',
+    },
+  });
+  const { imagePrompt, negativePrompt } = compileImagePromptFromSpec({
+    spec,
+    stableCore: deriveStableCore(spec),
+    currentBrief: 'A restrained character draft with a calm silhouette.',
+    visualDelta: {
+      intentMode: 'refine',
+      retain: ['jade flute'],
+      adjust: ['cool the palette slightly'],
+      touchedFields: ['palette'],
+    },
+    preferredLanguage: 'en-US',
+  });
+
+  assert.match(imagePrompt, /Signature hook: jade flute/);
+  assert.match(imagePrompt, /Palette: ink black, desaturated jade, muted gold/);
+  assert.match(imagePrompt, /Full-body character anchor image/);
+  assert.match(negativePrompt, /Do not change the confirmed core silhouette/);
+});
+
 test('runCaptureTurn applies Simplified Chinese locale lock by default for zh input', async () => {
   let capturedSystem = '';
   let capturedPrompt = '';
@@ -385,6 +480,28 @@ test('runCaptureTurn applies Simplified Chinese locale lock by default for zh in
       textPayloads: [{
         assistantReply: '我会先抓住她清峭、克制、书卷感的方向。',
         brief: '一个年轻、克制、带古典书卷气的角色。',
+        intentMode: 'refine',
+        retain: ['书卷气'],
+        adjust: ['更像乱世里的聪明人'],
+        touchedFields: ['roleCore', 'outfit'],
+        nextSpec: makeVisualSpec({
+          roleCore: '年轻、克制、带古典书卷气的乱世谋士',
+          outfit: '收束感很强的深色古典长袍',
+          materials: ['哑光织物', '轻薄罩纱'],
+          accessories: ['玉佩'],
+          handProp: '卷轴',
+          hairstyle: '半束发',
+          palette: {
+            primary: '墨黑',
+            secondary: '冷青',
+            accent: '旧金',
+          },
+          artStyle: '克制写实插画',
+          signatureHook: {
+            kind: 'prop',
+            value: '卷轴',
+          },
+        }),
       }],
       onTextGenerate: (request) => {
         capturedSystem = String(request.system || '');
@@ -400,6 +517,7 @@ test('runCaptureTurn applies Simplified Chinese locale lock by default for zh in
   });
   assert.match(result.assistantReply, /清峭|克制/);
   assert.match(result.brief, /年轻/);
+  assert.deepEqual(result.visualDelta.adjust, ['更像乱世里的聪明人']);
   assert.match(capturedSystem, /使用简体中文输出/);
   assert.match(capturedSystem, /服装、材质、配饰、手持道具、发型、色彩和画风/);
   assert.match(capturedSystem, /背景只作为辅助氛围存在/);
@@ -423,6 +541,28 @@ test('runCaptureTurn uses English prompt shell when preferred language is Englis
       textPayloads: [{
         assistantReply: 'Let us lock her robe, ornament, and scroll before adding any more scene detail.',
         brief: 'A poised, distant scholar in a pale robe with jade ornament and scroll.',
+        intentMode: 'refine',
+        retain: ['jade ornament', 'scroll'],
+        adjust: ['keep the background minimal'],
+        touchedFields: ['backgroundWeight'],
+        nextSpec: makeVisualSpec({
+          roleCore: 'poised distant scholar',
+          outfit: 'pale robe with clean layered drape',
+          materials: ['matte silk'],
+          accessories: ['jade ornament'],
+          handProp: 'scroll',
+          hairstyle: 'pinned half-up hair',
+          palette: {
+            primary: 'pale stone',
+            secondary: 'jade green',
+          },
+          artStyle: 'stylized painterly realism',
+          backgroundWeight: 'minimal',
+          signatureHook: {
+            kind: 'prop',
+            value: 'scroll',
+          },
+        }),
       }],
       onTextGenerate: (request) => {
         capturedSystem = String(request.system || '');
@@ -438,7 +578,7 @@ test('runCaptureTurn uses English prompt shell when preferred language is Englis
   });
 
   assert.match(capturedSystem, /Reply in English/);
-  assert.match(capturedSystem, /outfit, materials, accessories, handheld props, silhouette, palette, and art style/);
+  assert.match(capturedSystem, /silhouette, outfit, materials, accessories, handheld props, hairstyle, palette, and art style/);
   assert.match(capturedPrompt, /Current source prompt:/);
   assert.doesNotMatch(capturedPrompt, /当前角色输入：/);
 });
@@ -459,6 +599,28 @@ test('runCaptureTurn retries after invalid json output and eventually succeeds',
         {
           assistantReply: '我会先抓住她清峭、书卷、晚年沉郁的感觉。',
           brief: '一位面容清瘦、气质孤高、带宋代书卷与晚年沉郁感的女性。',
+          intentMode: 'refine',
+          retain: ['宋代书卷气'],
+          adjust: ['晚年沉郁感'],
+          touchedFields: ['roleCore', 'palette'],
+          nextSpec: makeVisualSpec({
+            roleCore: '清瘦孤高的宋代词人',
+            outfit: '宋代文人女性长裙',
+            materials: ['旧绢', '细纱'],
+            accessories: ['簪饰'],
+            handProp: '词稿',
+            hairstyle: '低束发',
+            palette: {
+              primary: '烟灰白',
+              secondary: '旧青',
+              accent: '暗褐',
+            },
+            artStyle: '宋韵写意写实',
+            signatureHook: {
+              kind: 'prop',
+              value: '词稿',
+            },
+          }),
         },
       ],
     }),
@@ -472,6 +634,39 @@ test('runCaptureTurn retries after invalid json output and eventually succeeds',
   assert.match(result.assistantReply, /清峭/);
   assert.match(result.brief, /宋代/);
   assert.equal(result.traceId, 'text-trace-2');
+});
+
+test('runCaptureTurn stays lightweight and does not require a full visual spec payload', async () => {
+  const draft = createEmptyDraftSnapshot();
+  draft.sourcePrompt = 'A calm strategist with a dark robe and a scroll.';
+  const session = appendSessionMessage(createEmptySessionState(), {
+    role: 'user',
+    kind: 'chat',
+    content: 'Keep the silhouette slim but make the robe more ceremonial.',
+  });
+
+  const result = await runCaptureTurn({
+    runtimeClient: createRuntimeClientStub({
+      textPayloads: [{
+        assistantReply: 'I will keep the slim silhouette and refine the robe into something more ceremonial.',
+        brief: 'A calm strategist with a slim silhouette and a darker ceremonial robe.',
+        intentMode: 'refine',
+        retain: ['slim silhouette'],
+        adjust: ['robe becomes more ceremonial'],
+        touchedFields: ['outfit'],
+      }],
+    }),
+    draft,
+    session,
+    selectedAgent: null,
+    textBinding: { source: 'local', model: 'chat-model' } as RuntimeRouteBinding,
+    userMessage: 'Keep the silhouette slim but make the robe more ceremonial.',
+    preferredLanguage: 'en-US',
+  });
+
+  assert.match(result.assistantReply, /slim silhouette/);
+  assert.deepEqual(result.visualDelta.adjust, ['robe becomes more ceremonial']);
+  assert.equal(result.traceId, 'text-trace-1');
 });
 
 test('recomputeCurrentBrief recalculates brief when context changes', async () => {
@@ -497,8 +692,8 @@ test('recomputeCurrentBrief recalculates brief when context changes', async () =
 });
 
 test('generateAgentDraft uses current context and returns generated image metadata', async () => {
-  let capturedSystem = '';
-  let capturedPrompt = '';
+  const capturedTextSystems: string[] = [];
+  const capturedTextPrompts: string[] = [];
   let capturedImageRequest: Record<string, unknown> | null = null;
   const draft = createEmptyDraftSnapshot();
   draft.sourcePrompt = '年轻、克制、更像乱世谋士';
@@ -511,6 +706,12 @@ test('generateAgentDraft uses current context and returns generated image metada
     url: 'data:image/png;base64,current',
     mimeType: 'image/png',
   };
+  draft.lastVisualDelta = {
+    intentMode: 'refine',
+    retain: ['书卷气', '卷轴'],
+    adjust: ['袖口更轻一些'],
+    touchedFields: ['outfit'],
+  };
   const session = {
     ...createEmptySessionState(),
     currentBrief: '一个年轻、克制、偏古典书卷气的角色。',
@@ -519,18 +720,37 @@ test('generateAgentDraft uses current context and returns generated image metada
   const result = await generateAgentDraft({
     storage: createStorageClientStub(),
     runtimeClient: createRuntimeClientStub({
-      textPayloads: [{
-        name: '乱世谋士',
-        bio: '一个在动荡时代仍然保持冷静与克制的年轻谋士。',
-        personaSeed: '年轻，克制，聪明，带书卷气，不轻易显露情绪。',
-        tags: ['young', 'strategist', 'restrained'],
-        characterReadout: '这版更像一个年轻但不轻浮、克制却很清醒的谋士。',
-        imagePrompt: 'full-body character anchor image of a young restrained strategist in ancient east asia, stable pose, weak background',
-        negativePrompt: 'modern clothes, neon, cartoon',
-      }],
+      textPayloads: [
+        makeVisualSpec({
+          roleCore: '年轻、克制、书卷气很强的乱世谋士',
+          outfit: '收束感很强的深色古典长袍',
+          materials: ['哑光织物', '轻薄罩纱'],
+          accessories: ['玉佩'],
+          handProp: '卷轴',
+          hairstyle: '半束发',
+          palette: {
+            primary: '墨黑',
+            secondary: '冷青',
+            accent: '旧金',
+          },
+          artStyle: '克制写实插画',
+          backgroundWeight: 'minimal',
+          signatureHook: {
+            kind: 'prop',
+            value: '卷轴',
+          },
+        }),
+        {
+          name: '乱世谋士',
+          bio: '一个在动荡时代仍然保持冷静与克制的年轻谋士。',
+          personaSeed: '年轻，克制，聪明，带书卷气，不轻易显露情绪。',
+          tags: ['young', 'strategist', 'restrained'],
+          characterReadout: '这版更像一个年轻但不轻浮、克制却很清醒的谋士。',
+        },
+      ],
       onTextGenerate: (request) => {
-        capturedSystem = String(request.system || '');
-        capturedPrompt = String(request.input || '');
+        capturedTextSystems.push(String(request.system || ''));
+        capturedTextPrompts.push(String(request.input || ''));
       },
       onImageGenerate: (request) => {
         capturedImageRequest = request;
@@ -547,25 +767,27 @@ test('generateAgentDraft uses current context and returns generated image metada
   assert.deepEqual(result.draft.tags, ['young', 'strategist', 'restrained']);
   assert.match(result.draft.characterReadout, /谋士/);
   assert.match(result.image.url, /^data:image\/png;base64,/);
-  assert.equal(result.textTraceId, 'text-trace-1');
+  assert.equal(result.visualSpec.handProp, '卷轴');
+  assert.equal(result.resultFacts.backgroundWeight, 'minimal');
+  assert.equal(result.textTraceId, 'text-trace-2');
   assert.equal(result.imageTraceId, 'image-trace-1');
-  assert.match(capturedSystem, /使用简体中文输出/);
-  assert.match(capturedSystem, /固定焦距人物视角/);
-  assert.match(capturedSystem, /服装、材质、配饰、手持道具、色彩与画风/);
-  assert.match(capturedSystem, /背景退后、弱化、低细节/);
-  assert.match(capturedSystem, /不要机械继承上一版图中的脏污、模糊、噪点|Do not mechanically inherit incidental dirt, blur, noise/);
-  assert.match(capturedPrompt, /当前已经存在一张生成图，应被视为本轮方向反馈的一部分|A current generated image already exists and should be treated as directional feedback/);
+  assert.equal(capturedTextSystems.length, 2);
+  assert.match(capturedTextSystems[0] || '', /使用简体中文输出/);
+  assert.match(capturedTextSystems[0] || '', /稳定的角色视觉规格/);
+  assert.match(capturedTextSystems[1] || '', /补全文案包/);
+  assert.match(capturedTextPrompts[0] || '', /当前角色输入：/);
+  assert.match(capturedTextPrompts[1] || '', /结果事实摘要：/);
   assert.equal(capturedImageRequest?.timeoutMs, 600000);
-  assert.equal(capturedImageRequest?.size, '1024x1024');
+  assert.equal(capturedImageRequest?.size, '1024x1536');
   assert.equal(capturedImageRequest?.quality, 'medium');
   assert.equal(capturedImageRequest?.responseFormat, 'url');
   assert.deepEqual(capturedImageRequest?.referenceImages, ['data:image/png;base64,source']);
   assert.match(String(capturedImageRequest?.prompt || ''), /Full-body character anchor image|全身角色锚点图/);
-  assert.match(String(capturedImageRequest?.prompt || ''), /配饰、手持道具与画风明确/);
+  assert.match(String(capturedImageRequest?.prompt || ''), /卷轴/);
   assert.match(String(capturedImageRequest?.prompt || ''), /平视或接近平视/);
   assert.match(String(capturedImageRequest?.negativePrompt || ''), /half-body portrait|半身像/);
   assert.match(String(capturedImageRequest?.negativePrompt || ''), /cropped feet|脚部裁切/);
-  assert.match(String(capturedImageRequest?.negativePrompt || ''), /俯拍|high-angle shot/);
+  assert.match(String(capturedImageRequest?.negativePrompt || ''), /袖口更轻一些/);
 });
 
 test('storeGeneratedArtifact preserves remote url artifacts without re-encoding them through local storage', async () => {

@@ -28,6 +28,9 @@ export function createEmptyDraftSnapshot(): AgentCaptureDraftSnapshot {
     sourcePrompt: '',
     selectedAgentId: null,
     generatedImage: null,
+    visualSpec: null,
+    lastVisualDelta: null,
+    resultFacts: null,
     characterReadout: '',
     name: '',
     bio: '',
@@ -45,7 +48,7 @@ export function createEmptySessionState(): AgentCaptureSessionState {
     pendingBriefConfirmation: false,
     workingState: 'idle',
     surfaceError: '',
-    inputMode: 'expanded',
+    inputMode: 'dialogue',
     lastTextTraceId: '',
     lastImageTraceId: '',
   };
@@ -117,6 +120,9 @@ export function isDraftFactuallyEmpty(snapshot: AgentCaptureDraftSnapshot): bool
     && isEmptyImageRef(snapshot.sourceImage)
     && !String(snapshot.selectedAgentId || '').trim()
     && isEmptyImageRef(snapshot.generatedImage)
+    && !snapshot.visualSpec
+    && !snapshot.lastVisualDelta
+    && !snapshot.resultFacts
     && !String(snapshot.characterReadout || '').trim()
     && !String(snapshot.name || '').trim()
     && !String(snapshot.bio || '').trim()

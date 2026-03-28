@@ -10,6 +10,8 @@ export default {
     briefPanelTitle: '当前角色方向',
     confirmedTraitsTitle: '当前已确认要素',
     confirmedTraitsEmpty: '还在逐步形成中',
+    confirmedTraitsOverflow: '还有 {{count}} 项',
+    paletteChip: '色彩：{{value}}',
     summaryLabel: '当前输入摘要',
     advancedExpand: '展开辅助设置',
     advancedCollapse: '收起辅助设置',
