@@ -177,6 +177,24 @@ export function isLocalRuntimeModelReady(model: Pick<LocalRuntimeModelLike, 'sta
     }
     return true;
 }
+function isInstalledLocalRuntimeModel(model: Pick<LocalRuntimeModelLike, 'status' | 'goRuntimeStatus'> | null | undefined): boolean {
+    if (!model) {
+        return false;
+    }
+    const runtimeStatus = normalizeStatus(model.status);
+    const goRuntimeStatus = normalizeStatus(model.goRuntimeStatus);
+    return runtimeStatus === 'installed' || goRuntimeStatus === 'installed';
+}
+export function isSelectableLocalRuntimeModelForScenario(model: Pick<LocalRuntimeModelLike, 'status' | 'goRuntimeStatus'> | null | undefined, scenario: ExtendedScenario): boolean {
+    if (isLocalRuntimeModelReady(model)) {
+        return true;
+    }
+    const normalizedScenario = normalizeScenario(scenario);
+    if (normalizedScenario !== 'chat') {
+        return false;
+    }
+    return isInstalledLocalRuntimeModel(model);
+}
 export function findLocalRuntimeModelForBinding<T extends LocalRuntimeModelLike>(input: {
     models: T[];
     binding: LocalRuntimeModelMatchInput;
@@ -206,7 +224,7 @@ export function resolveLocalRuntimeModelsForScenario<T extends LocalRuntimeModel
     models: T[];
     scenario: ExtendedScenario;
 }): T[] {
-    const allModels = dedupeLocalRuntimeModels(input.models).filter((model) => isLocalRuntimeModelReady(model));
+    const allModels = dedupeLocalRuntimeModels(input.models).filter((model) => isSelectableLocalRuntimeModelForScenario(model, input.scenario));
     if (allModels.length === 0) {
         return [];
     }

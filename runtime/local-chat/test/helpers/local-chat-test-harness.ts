@@ -153,7 +153,7 @@ export function createScriptedAiClient(input: {
     governanceSlots?: Array<Record<string, unknown>>;
     mediaPlannerDecision?: Record<string, unknown> | null;
 }): {
-    client: Pick<LocalChatAiClient, 'generateText' | 'generateObject' | 'streamText' | 'generateImage' | 'generateVideo' | 'resolveRoute'>;
+    client: Pick<LocalChatAiClient, 'checkRouteHealth' | 'generateText' | 'generateObject' | 'streamText' | 'generateImage' | 'generateVideo' | 'resolveRoute'>;
     counters: {
         plan: number;
         governance: number;
@@ -174,6 +174,14 @@ export function createScriptedAiClient(input: {
     return {
         counters,
         client: {
+            async checkRouteHealth() {
+                return {
+                    status: 'healthy',
+                    reasonCode: 'RUNTIME_ROUTE_HEALTHY',
+                    actionHint: 'none',
+                    detail: '',
+                };
+            },
             async generateText() {
                 return {
                     text: String(input.firstBeatText || '嗯，我在。'),
@@ -441,7 +449,7 @@ export function createSendFlowHarness(input: {
             defaultSettings?: Partial<typeof DEFAULT_LOCAL_CHAT_DEFAULT_SETTINGS>;
             imageDependencySnapshot?: ModRuntimeLocalProfileSnapshot | null;
             videoDependencySnapshot?: ModRuntimeLocalProfileSnapshot | null;
-            aiClient: Pick<LocalChatAiClient, 'generateText' | 'generateObject' | 'streamText' | 'generateImage' | 'generateVideo' | 'resolveRoute'>;
+            aiClient: Pick<LocalChatAiClient, 'checkRouteHealth' | 'generateText' | 'generateObject' | 'streamText' | 'generateImage' | 'generateVideo' | 'resolveRoute'>;
         }) {
             state.inputText = exec.userText;
             state.selectedSessionId = String(exec.selectedSessionId ?? state.selectedSessionId ?? '');

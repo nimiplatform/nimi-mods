@@ -418,3 +418,28 @@ test('first-beat reactor fails instead of inventing a hardcoded reply when all r
     transientMessageId: 'transient-emergency',
   }), /LOCAL_CHAT_FIRST_BEAT_UNAVAILABLE/);
 });
+
+test('first-beat reactor preserves the upstream failure message when all attempts fail', async () => {
+  await assert.rejects(async () => runFirstBeatReactor({
+    aiClient: {
+      streamText: async function* () {
+        throw new Error('connect ECONNREFUSED 127.0.0.1:1234');
+      },
+      generateText: async () => {
+        throw new Error('connect ECONNREFUSED 127.0.0.1:1234');
+      },
+    } as unknown as LocalChatTurnAiClient,
+    invokeInput: {
+      capability: 'text.generate',
+      prompt: 'raw prompt',
+      mode: 'STORY',
+      agentId: 'agent-1',
+    },
+    contextPacket: {
+      ...createContextPacket(),
+      turnMode: 'information',
+    } as LocalChatContextPacket,
+    userText: '你好',
+    transientMessageId: 'transient-upstream-error',
+  }), /LOCAL_CHAT_FIRST_BEAT_UNAVAILABLE: connect ECONNREFUSED 127\.0\.0\.1:1234/);
+});

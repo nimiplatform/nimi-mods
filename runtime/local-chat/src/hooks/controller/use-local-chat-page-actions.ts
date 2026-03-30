@@ -5,7 +5,7 @@ import type { ChatMessage } from '../../types.js';
 import type { useLocalChatPageState } from './use-local-chat-page-state.js';
 import type { RuntimeStatusSidebarProps } from '../../components/sidebar/types.js';
 import { ReasonCode } from '@nimiplatform/sdk/types';
-import { findLocalRuntimeModelForBinding, hasReadyLocalRuntimeModelForScenario, isLocalRuntimeModelReady, resolveModelsForScenario, } from '../../services/route/connector-model-capabilities.js';
+import { findLocalRuntimeModelForBinding, hasReadyLocalRuntimeModelForScenario, isSelectableLocalRuntimeModelForScenario, resolveModelsForScenario, } from '../../services/route/connector-model-capabilities.js';
 import { type RuntimeCanonicalCapability } from "@nimiplatform/sdk/mod";
 type LocalChatPageState = ReturnType<typeof useLocalChatPageState>;
 export function shouldIncludeDependencyRepairAction(input: {
@@ -120,7 +120,7 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
                     goRuntimeLocalModelId: selected.goRuntimeLocalModelId,
                 },
             });
-            if (!isLocalRuntimeModelReady(localModel)) {
+            if (!isSelectableLocalRuntimeModelForScenario(localModel, 'text.generate')) {
                 return false;
             }
             const capabilities = Array.isArray(localModel?.capabilities) ? localModel?.capabilities : [];
@@ -146,10 +146,11 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
                 },
             });
             if (localModel) {
-                return isLocalRuntimeModelReady(localModel);
+                return isSelectableLocalRuntimeModelForScenario(localModel, 'text.generate');
             }
             if (resolvedSnapshot?.source === 'local' && resolvedSnapshot.goRuntimeStatus) {
-                return String(resolvedSnapshot.goRuntimeStatus).trim().toLowerCase() === 'active';
+                const goRuntimeStatus = String(resolvedSnapshot.goRuntimeStatus).trim().toLowerCase();
+                return goRuntimeStatus === 'active' || goRuntimeStatus === 'installed';
             }
             return false;
         })();

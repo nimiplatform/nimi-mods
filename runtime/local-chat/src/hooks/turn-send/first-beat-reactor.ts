@@ -23,6 +23,49 @@ type FirstBeatDebugContext = {
   entry?: 'send-flow' | 'proactive';
 };
 
+type FirstBeatFailureRecord = {
+  stage: 'stream' | 'repair' | 'fallback';
+  error: unknown;
+};
+
+function buildFirstBeatUnavailableError(
+  failure: FirstBeatFailureRecord | null,
+): Error {
+  const message = failure?.error instanceof Error
+    ? failure.error.message
+    : String(failure?.error || '').trim();
+  const enriched = new Error(
+    message ? `${FIRST_BEAT_UNAVAILABLE_ERROR}: ${message}` : FIRST_BEAT_UNAVAILABLE_ERROR,
+  ) as Error & {
+    cause?: unknown;
+    reasonCode?: string;
+    actionHint?: string;
+    traceId?: string;
+  };
+
+  if (failure) {
+    enriched.cause = failure.error;
+  }
+
+  if (failure?.error && typeof failure.error === 'object') {
+    const record = failure.error as Record<string, unknown>;
+    const reasonCode = String(record.reasonCode || '').trim();
+    const actionHint = String(record.actionHint || '').trim();
+    const traceId = String(record.traceId || '').trim();
+    if (reasonCode) {
+      enriched.reasonCode = reasonCode;
+    }
+    if (actionHint) {
+      enriched.actionHint = actionHint;
+    }
+    if (traceId) {
+      enriched.traceId = traceId;
+    }
+  }
+
+  return enriched;
+}
+
 function persistFirstBeatDebugRecord(record: Record<string, unknown>): void {
   try {
     const runtimeWindow = window as typeof window & {
@@ -229,6 +272,7 @@ export async function runFirstBeatReactor(input: {
   let finishReason: string | null = null;
   let streamDeltaCount = 0;
   let streamFailed = false;
+  let lastFailure: FirstBeatFailureRecord | null = null;
   const routeBinding = input.invokeInput.routeBinding;
 
   emitFirstBeatDebugLog({
@@ -344,6 +388,7 @@ export async function runFirstBeatReactor(input: {
       throw error;
     }
     streamFailed = true;
+    lastFailure = { stage: 'stream', error };
     emitFirstBeatDebugLog({
       event: 'stream-error',
       context: input.debugContext,
@@ -462,6 +507,7 @@ export async function runFirstBeatReactor(input: {
     if (input.abortSignal?.aborted) {
       throw error;
     }
+    lastFailure = { stage: 'repair', error };
     emitFirstBeatDebugLog({
       event: 'repair-error',
       context: input.debugContext,
@@ -534,6 +580,7 @@ export async function runFirstBeatReactor(input: {
     if (input.abortSignal?.aborted) {
       throw error;
     }
+    lastFailure = { stage: 'fallback', error };
     emitFirstBeatDebugLog({
       event: 'fallback-error',
       context: input.debugContext,
@@ -554,7 +601,13 @@ export async function runFirstBeatReactor(input: {
       finishReason,
       partialText,
       buffer,
+      lastFailureStage: lastFailure?.stage || null,
+      lastFailureMessage: lastFailure
+        ? (lastFailure.error instanceof Error
+          ? lastFailure.error.message
+          : String(lastFailure.error || ''))
+        : null,
     },
   });
-  throw new Error(FIRST_BEAT_UNAVAILABLE_ERROR);
+  throw buildFirstBeatUnavailableError(lastFailure);
 }

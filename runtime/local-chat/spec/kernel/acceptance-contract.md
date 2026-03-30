@@ -46,3 +46,4 @@ Minimum acceptance coverage must include:
 34. derived relationship boundary must block automatic high-risk visual planner paths without altering explicit media hard-gate behavior
 35. tail planner failure must degrade to firstBeat-only success without reviving legacy full-text post-segmentation
 36. context compile must not duplicate the just-persisted current user turn across both `recentTurns` and the dedicated `userInput` lane
+37. local route preflight must block turn execution before first-beat generation when runtime authoritative route health is unavailable, while preserving the upstream runtime detail

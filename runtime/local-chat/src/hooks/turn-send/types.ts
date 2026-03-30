@@ -25,7 +25,7 @@ export type InteractionDeliveryBeat = InteractionBeat & {
     media?: ChatMessage['media'];
     meta?: ChatMessage['meta'];
 };
-export type LocalChatTurnAiClient = Pick<LocalChatAiClient, 'generateText' | 'generateObject' | 'streamText' | 'generateImage' | 'generateVideo' | 'resolveRoute'>;
+export type LocalChatTurnAiClient = Pick<LocalChatAiClient, 'checkRouteHealth' | 'generateText' | 'generateObject' | 'streamText' | 'generateImage' | 'generateVideo' | 'resolveRoute'>;
 export type UseLocalChatTurnSendInput = {
     aiClient: LocalChatTurnAiClient;
     inputText: string;

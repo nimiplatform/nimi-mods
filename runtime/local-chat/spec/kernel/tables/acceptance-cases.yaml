@@ -222,6 +222,12 @@ cases:
     reason_code: LOCAL_CHAT_CONTEXT_ASSEMBLE_OK
     test_reference: local-chat-turn-perception.test.ts
     source_rule: LC-ACC-002
+  - id: LC-039-LOCAL-ROUTE-PREFLIGHT-BLOCK
+    description: Local route preflight must fail-close before first-beat generation when runtime route health is unavailable and must preserve the upstream route detail for UI display.
+    expected_ok: true
+    reason_code: null
+    test_reference: local-chat-route-preflight.test.ts
+    source_rule: LC-ACC-002
 verification_commands:
   - command: pnpm -C nimi-mods run generate:spec:local-chat-kernel-docs
     source_rule: LC-ACC-001

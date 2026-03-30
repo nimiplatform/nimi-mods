@@ -1,6 +1,6 @@
 import type { LocalChatDefaultSettings } from '../../state/index.js';
 import type { LocalChatResolvedMediaRoute } from '../../types.js';
-import { findLocalRuntimeModelForBinding, isLocalRuntimeModelReady, } from '../../services/route/connector-model-capabilities.js';
+import { findLocalRuntimeModelForBinding, isLocalRuntimeModelReady, isSelectableLocalRuntimeModelForScenario, } from '../../services/route/connector-model-capabilities.js';
 import { type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot } from "@nimiplatform/sdk/mod";
 type MediaKind = 'image' | 'video';
 type MediaRouteSource = LocalChatDefaultSettings['imageRouteSource'];
@@ -15,7 +15,8 @@ function asTrimmedString(value: unknown): string {
     return String(value ?? '').trim();
 }
 function isActiveGoRuntimeStatus(value: unknown): boolean {
-    return asTrimmedString(value).toLowerCase() === 'active';
+    const normalized = asTrimmedString(value).toLowerCase();
+    return normalized === 'active';
 }
 function resolveReadyLocalRuntimeBinding(input: {
     binding?: RuntimeRouteBinding | null;
@@ -98,7 +99,8 @@ function isResolvedMediaRouteOperational(input: {
         },
     });
     if (matchedLocalModel) {
-        return isLocalRuntimeModelReady(matchedLocalModel);
+        return isSelectableLocalRuntimeModelForScenario(matchedLocalModel, 'image.generate')
+            && isLocalRuntimeModelReady(matchedLocalModel);
     }
     return Boolean(asTrimmedString(input.resolvedRoute.model || input.resolvedRoute.localModelId));
 }

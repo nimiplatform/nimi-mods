@@ -9,9 +9,10 @@ Text turn pipeline is beat-first, deterministic, and auditable from input to per
 1. resolve a local fast turn hint before first-beat generation
 2. compile a lightweight `first-beat` `ContextPacket` for first-beat generation and a full `ContextPacket` for deep perception / tail planning
 3. persist user turn immediately after session resolution, before assistant generation
-4. start `firstBeat` before turn perception blocks the user-visible path; turn perception may run in parallel or after first-beat seal, but tail planning must still consume its result
-5. deliver assistant `firstBeat` as a finalized message before tail beats are planned or scheduled
-6. schedule later beats through a single delivery director within the same assistant turn
+4. if the resolved route source is `local`, execute route-health preflight before first-beat generation; unavailable local routes must fail-close before model invocation and surface runtime reason/action detail
+5. start `firstBeat` before turn perception blocks the user-visible path; turn perception may run in parallel or after first-beat seal, but tail planning must still consume its result
+6. deliver assistant `firstBeat` as a finalized message before tail beats are planned or scheduled
+7. schedule later beats through a single delivery director within the same assistant turn
 
 ## LC-PIPE-002 Session Lifecycle Pipeline
 
@@ -57,6 +58,7 @@ Successful text turns may use multiple model calls on the critical path:
 4. `TurnComposer` must not repeat, revise, or explain the already sealed first beat
 5. planner failure must degrade to `firstBeat`-only success
 6. the successful path MUST NOT depend on full-text generation followed by forced post-splitting
+7. `LOCAL_CHAT_FIRST_BEAT_UNAVAILABLE` is a last-resort internal fallback only; if stream / repair / fallback returned a structured upstream error, that upstream cause must remain visible to UI/audit surfaces
 
 ## LC-PIPE-007 Delivery Director Pipeline
 

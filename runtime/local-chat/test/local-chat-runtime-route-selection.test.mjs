@@ -70,7 +70,7 @@ test('local runtime chat model selection stays valid when user picks a non-prefe
   assert.equal(result, true);
 });
 
-test('local runtime chat model selection is rejected when the selected model is not active', () => {
+test('local runtime chat model selection stays valid when the selected model is installed', () => {
   const result = hasValidLocalRuntimeChatModelSelection({
     model: 'chat-installed',
     localModelId: 'chat-installed',
@@ -90,7 +90,7 @@ test('local runtime chat model selection is rejected when the selected model is 
     ],
   });
 
-  assert.equal(result, false);
+  assert.equal(result, true);
 });
 
 test('buildRouteBindingForModel refreshes local runtime metadata when user switches models', () => {
@@ -151,7 +151,7 @@ test('buildRouteBindingForModel refreshes local runtime metadata when user switc
   });
 });
 
-test('buildRouteBindingForModel ignores non-active local runtime candidates', () => {
+test('buildRouteBindingForModel preserves installed local runtime candidates', () => {
   const result = buildRouteBindingForModel({
     model: 'chat-installed',
     previous: {
@@ -204,6 +204,10 @@ test('buildRouteBindingForModel ignores non-active local runtime candidates', ()
     source: 'local',
     connectorId: '',
     model: 'chat-installed',
+    localModelId: 'chat-installed',
+    engine: 'mlx',
+    goRuntimeLocalModelId: 'go-chat-installed',
+    goRuntimeStatus: 'installed',
   });
 });
 

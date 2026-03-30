@@ -328,6 +328,7 @@ function createHarness() {
             imageDependencySnapshot?: ModRuntimeLocalProfileSnapshot | null;
             videoDependencySnapshot?: ModRuntimeLocalProfileSnapshot | null;
             aiClientOverrides?: Partial<{
+                checkRouteHealth: (input: Record<string, unknown>) => Promise<Record<string, unknown>>;
                 streamText: ReturnType<typeof createTextStream>;
                 generateText: (input: Record<string, unknown>) => Promise<Record<string, unknown>>;
                 generateObject: (input: Record<string, unknown>) => Promise<Record<string, unknown>>;
@@ -365,6 +366,14 @@ function createHarness() {
             const isTailPlanPrompt = (payload: Record<string, unknown>) => isTailPlanPromptText(String(payload.prompt || ''));
             const context = {
                 aiClient: {
+                    checkRouteHealth: input.aiClientOverrides?.checkRouteHealth
+                        ? input.aiClientOverrides.checkRouteHealth
+                        : async () => ({
+                            status: 'healthy',
+                            reasonCode: 'RUNTIME_ROUTE_HEALTHY',
+                            actionHint: 'none',
+                            detail: '',
+                        }),
                     streamText: input.aiClientOverrides?.streamText
                         ? input.aiClientOverrides.streamText
                         : createTextStream('这是一条正常的文字回复。'),

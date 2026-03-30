@@ -45,6 +45,31 @@ import {
     isAbortedError,
     upsertTransientFirstBeatMessage,
 } from './send-flow-helpers.js';
+
+function buildRoutePreflightError(result: unknown): Error | null {
+    const record = (result && typeof result === 'object')
+        ? result as Record<string, unknown>
+        : {};
+    const status = String(record.status || '').trim().toLowerCase();
+    if (status === 'healthy') {
+        return null;
+    }
+    const detail = String(record.detail || record.message || '').trim()
+        || 'runtime route unavailable';
+    const error = new Error(detail) as Error & {
+        reasonCode?: string;
+        actionHint?: string;
+        traceId?: string;
+    };
+    error.reasonCode = String(record.reasonCode || '').trim() || 'RUNTIME_ROUTE_UNAVAILABLE';
+    error.actionHint = String(record.actionHint || '').trim() || 'check_runtime_route_health';
+    const traceId = String(record.traceId || '').trim();
+    if (traceId) {
+        error.traceId = traceId;
+    }
+    return error;
+}
+
 export async function runLocalChatTurnSend(input: {
     context: UseLocalChatTurnSendInput;
     abortSignal?: AbortSignal;
@@ -123,6 +148,17 @@ export async function runLocalChatTurnSend(input: {
         });
         userTurnPersisted = true;
         ensureNotAborted(input.abortSignal);
+        const routeSource = String(routeBinding?.source || context.routeSnapshot?.source || '').trim().toLowerCase();
+        if (routeSource === 'local') {
+            const routeHealth = await context.aiClient.checkRouteHealth({
+                capability: 'text.generate',
+                routeBinding: routeBinding || undefined,
+            });
+            const routeError = buildRoutePreflightError(routeHealth);
+            if (routeError) {
+                throw routeError;
+            }
+        }
         logTurnSendStart({
             flowId,
             target: selectedTarget,
