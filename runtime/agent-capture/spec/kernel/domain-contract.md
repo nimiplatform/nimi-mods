@@ -115,6 +115,7 @@ Agent-Capture 生成前使用的“当前用户输入”不是最后一句消息
 - 补充性的用户输入默认累加到当前意图集合中。
 - 与当前意图冲突的新输入默认覆盖旧输入。
 - 系统必须基于当前有效意图集合重新形成最新 brief，并以最新 brief 进入显式生成。
+- `sourcePrompt` 允许承接后续对话里的角色展开，不应被冻结为最初一句描述。
 
 ## AC-DOM-012 — current generation context
 
@@ -126,6 +127,7 @@ Agent-Capture 的每次生成都基于当前生成上下文，而不是把所有
 - 输入变化后，系统必须重建当前生成上下文，再形成最新 brief。
 - `generatedImage` 在存在时默认作为方向性上下文参与后续生成整理，不升级为 canonical truth。
 - 为避免多轮迭代中累积画质退化，系统默认不得把上一轮 `generatedImage` 的图像字节机械递归注入下一轮正式图像生成请求；稳定视觉参考默认优先来自 `sourceImage`。
+- 对当前结果的偏差修正默认通过用户继续对话并形成下一版 brief 完成，而不是在当前生成后隐式追加自动纠偏回合。
 
 ## AC-DOM-013 — directional follow
 
@@ -135,6 +137,7 @@ Agent-Capture 的方向性跟随不等于承诺最终精确逼近，但必须让
 - 新的修正输入默认应被解释为对当前方向的增量调整，而不是整轮重置；除非用户明确表达需要重来或改换方向。
 - 系统形成的下一版 brief 必须体现当前方向中被保留的部分与本轮被调整的部分。
 - 系统应让用户感知到本轮变化是在当前方向上的继续调整，而不是与前文脱节的无关变化。
+- 当前结果若仍有问题，纠偏默认由用户在下一轮继续提出；系统应优先正确承载新的纠偏输入，而不是自作主张补做隐藏修正。
 
 ## AC-DOM-014 — character readout
 
@@ -144,3 +147,14 @@ Agent-Capture 的方向性跟随不等于承诺最终精确逼近，但必须让
 - 每次当前 `generatedImage` 形成后，系统都应同时形成一段简短的 `characterReadout`。
 - `characterReadout` 用于表达当前角色感觉、第一印象或本轮变化方向，不替代 `bio` 或 `personaSeed`。
 - `characterReadout` 应保持轻量自然语言，不退化为标签堆叠或参数清单。
+
+## AC-DOM-015 — feeling anchor and state-driven generation
+
+Agent-Capture 必须把用户感觉沉淀为可持续打磨的稳定 feeling anchor，再由该 anchor 与其他当前状态共同驱动正式生成。
+
+**规则**:
+- 原始对话的主要职责是更新当前状态，而不是在正式生成时被机械重放。
+- 当前 feeling anchor 至少承载 core vibe、稳定 tone phrases 与当前 avoid-vibe cues。
+- 当前 working memory 至少承载 effective intent、preserve focus、adjust focus 与 negative constraints。
+- 正式生成默认消费当前 feeling anchor、brief、working memory、visual spec、latest delta 与必要辅助上下文组成的 state bundle。
+- 若某句原话已经成为稳定感觉锚点，应先被提炼进入 feeling anchor，而不是依赖原话历史持续在生成阶段存活。

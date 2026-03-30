@@ -39,9 +39,11 @@ import {
   createEmptyRouteState,
   createEmptySessionState,
   createTimestamp,
+  createEmptyWorkingMemory,
   hasMinimumGenerationInput,
   isDraftFactuallyEmpty,
-} from '../services/state.js';
+  sanitizeFeelingAnchor,
+  } from '../services/state.js';
 import type {
   AgentCaptureAgentSummary,
   AgentCaptureDraftSnapshot,
@@ -306,6 +308,7 @@ export function AgentCapturePage() {
     setSession((current) => ({
       ...current,
       currentBrief: '',
+      workingMemory: createEmptyWorkingMemory(),
       pendingBriefConfirmation: false,
       workingState: 'idle',
       surfaceError: '',
@@ -349,6 +352,7 @@ export function AgentCapturePage() {
       setSession((current) => ({
         ...current,
         currentBrief: '',
+        workingMemory: createEmptyWorkingMemory(),
         pendingBriefConfirmation: false,
         workingState: 'idle',
         surfaceError: message === 'AGENT_CAPTURE_ROUTE_OVERRIDE_INVALID'
@@ -360,6 +364,7 @@ export function AgentCapturePage() {
     setSession((current) => ({
       ...current,
       currentBrief: '',
+      workingMemory: current.workingMemory,
       pendingBriefConfirmation: false,
       workingState: 'thinking',
       surfaceError: '',
@@ -371,6 +376,7 @@ export function AgentCapturePage() {
         session: {
           ...session,
           currentBrief: '',
+          workingMemory: session.workingMemory,
           pendingBriefConfirmation: false,
           workingState: 'thinking',
           surfaceError: '',
@@ -382,9 +388,15 @@ export function AgentCapturePage() {
       if (token !== briefRefreshTokenRef.current) {
         return;
       }
+      setDraft((current) => ({
+        ...current,
+        feelingAnchor: sanitizeFeelingAnchor(result.feelingAnchor),
+        updatedAt: createTimestamp(),
+      }));
       setSession((current) => ({
         ...current,
         currentBrief: result.brief,
+        workingMemory: result.workingMemory,
         pendingBriefConfirmation: false,
         workingState: 'idle',
         surfaceError: '',
@@ -398,6 +410,7 @@ export function AgentCapturePage() {
       setSession((current) => ({
         ...current,
         currentBrief: '',
+        workingMemory: createEmptyWorkingMemory(),
         pendingBriefConfirmation: false,
         workingState: 'idle',
         surfaceError: message,
@@ -468,12 +481,14 @@ export function AgentCapturePage() {
       }
       setDraft((current) => ({
         ...current,
+        feelingAnchor: sanitizeFeelingAnchor(turn.feelingAnchor),
         lastVisualDelta: turn.visualDelta,
         updatedAt: createTimestamp(),
       }));
       setSession((current) => appendSessionMessage({
         ...current,
         currentBrief: turn.brief,
+        workingMemory: turn.workingMemory,
         pendingBriefConfirmation: false,
         workingState: 'idle',
         surfaceError: '',

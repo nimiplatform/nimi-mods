@@ -1,8 +1,10 @@
 import type {
   AgentCaptureDraftSnapshot,
+  AgentCaptureFeelingAnchor,
   AgentCaptureMessage,
   AgentCaptureRouteState,
   AgentCaptureSessionState,
+  AgentCaptureWorkingMemory,
 } from '../types.js';
 
 function makeId(): string {
@@ -26,6 +28,7 @@ export function createEmptyDraftSnapshot(): AgentCaptureDraftSnapshot {
     status: 'draft',
     sourceImage: null,
     sourcePrompt: '',
+    feelingAnchor: null,
     selectedAgentId: null,
     generatedImage: null,
     visualSpec: null,
@@ -45,6 +48,7 @@ export function createEmptySessionState(): AgentCaptureSessionState {
   return {
     messages: [],
     currentBrief: '',
+    workingMemory: createEmptyWorkingMemory(),
     pendingBriefConfirmation: false,
     workingState: 'idle',
     surfaceError: '',
@@ -61,6 +65,63 @@ export function createEmptyRouteState(): AgentCaptureRouteState {
   };
 }
 
+export function createEmptyWorkingMemory(): AgentCaptureWorkingMemory {
+  return {
+    effectiveIntentSummary: '',
+    preserveFocus: [],
+    adjustFocus: [],
+    negativeConstraints: [],
+  };
+}
+
+function sanitizeStringList(values: string[] | null | undefined, maxItems = 8): string[] {
+  const result: string[] = [];
+  for (const value of values || []) {
+    const normalized = String(value || '').trim();
+    if (!normalized || result.includes(normalized)) {
+      continue;
+    }
+    result.push(normalized);
+    if (result.length >= maxItems) {
+      break;
+    }
+  }
+  return result;
+}
+
+export function sanitizeFeelingAnchor(
+  value: AgentCaptureFeelingAnchor | null | undefined,
+): AgentCaptureFeelingAnchor | null {
+  if (!value) {
+    return null;
+  }
+  const coreVibe = String(value.coreVibe || '').trim();
+  const tonePhrases = sanitizeStringList(value.tonePhrases, 3);
+  const avoidVibe = sanitizeStringList(value.avoidVibe, 4);
+  if (!coreVibe && tonePhrases.length === 0 && avoidVibe.length === 0) {
+    return null;
+  }
+  return {
+    coreVibe,
+    tonePhrases,
+    avoidVibe,
+  };
+}
+
+export function sanitizeWorkingMemory(
+  value: AgentCaptureWorkingMemory | null | undefined,
+): AgentCaptureWorkingMemory {
+  if (!value) {
+    return createEmptyWorkingMemory();
+  }
+  return {
+    effectiveIntentSummary: String(value.effectiveIntentSummary || '').trim(),
+    preserveFocus: sanitizeStringList(value.preserveFocus, 8),
+    adjustFocus: sanitizeStringList(value.adjustFocus, 8),
+    negativeConstraints: sanitizeStringList(value.negativeConstraints, 8),
+  };
+}
+
 export function sanitizeHydratedSessionState(
   value: AgentCaptureSessionState | null | undefined,
 ): AgentCaptureSessionState {
@@ -70,6 +131,7 @@ export function sanitizeHydratedSessionState(
   return {
     messages: Array.isArray(value.messages) ? value.messages : [],
     currentBrief: String(value.currentBrief || '').trim(),
+    workingMemory: sanitizeWorkingMemory(value.workingMemory),
     pendingBriefConfirmation: false,
     workingState: 'idle',
     surfaceError: '',
@@ -117,6 +179,7 @@ function isEmptyImageRef(input: AgentCaptureDraftSnapshot['sourceImage'] | Agent
 export function isDraftFactuallyEmpty(snapshot: AgentCaptureDraftSnapshot): boolean {
   return (
     !String(snapshot.sourcePrompt || '').trim()
+    && !snapshot.feelingAnchor
     && isEmptyImageRef(snapshot.sourceImage)
     && !String(snapshot.selectedAgentId || '').trim()
     && isEmptyImageRef(snapshot.generatedImage)

@@ -4,6 +4,7 @@ import type {
   AgentCaptureAgentSummary,
   AgentCaptureDraftGeneration,
   AgentCaptureDraftSnapshot,
+  AgentCaptureFeelingAnchor,
   AgentCaptureImageRef,
   AgentCaptureResultFacts,
   AgentCaptureSessionState,
@@ -12,6 +13,7 @@ import type {
   AgentCaptureVisualDelta,
   AgentCaptureVisualField,
   AgentCaptureVisualSpec,
+  AgentCaptureWorkingMemory,
 } from '../types.js';
 import { encodeBytesToDataUrl } from './base64.js';
 import { resolveAgentCapturePromptLocale } from './language.js';
@@ -121,11 +123,39 @@ function summarizeAgent(agent: AgentCaptureAgentSummary | null): string {
   ].filter(Boolean).join('\n');
 }
 
-function summarizeConversation(session: AgentCaptureSessionState): string {
-  return session.messages
-    .filter((message) => message.kind === 'chat' || message.kind === 'brief-confirm')
-    .map((message) => `${message.role.toUpperCase()}: ${message.content}`)
-    .join('\n');
+function summarizeWorkingMemory(
+  memory: AgentCaptureWorkingMemory,
+  preferredLanguage?: string,
+): string {
+  const effectiveIntent = String(memory.effectiveIntentSummary || '').trim();
+  if (
+    !effectiveIntent
+    && memory.preserveFocus.length === 0
+    && memory.adjustFocus.length === 0
+    && memory.negativeConstraints.length === 0
+  ) {
+    return pickPromptCopy(preferredLanguage, '尚无当前工作约束。', 'No active working constraints yet.');
+  }
+  return [
+    `effectiveIntent: ${effectiveIntent || '-'}`,
+    `preserveFocus: ${memory.preserveFocus.join(', ') || '-'}`,
+    `adjustFocus: ${memory.adjustFocus.join(', ') || '-'}`,
+    `negativeConstraints: ${memory.negativeConstraints.join(', ') || '-'}`,
+  ].join('\n');
+}
+
+function summarizeFeelingAnchor(
+  anchor: AgentCaptureFeelingAnchor | null,
+  preferredLanguage?: string,
+): string {
+  if (!anchor) {
+    return pickPromptCopy(preferredLanguage, '尚无稳定感觉锚点。', 'No stable feeling anchor yet.');
+  }
+  return [
+    `coreVibe: ${String(anchor.coreVibe || '').trim() || '-'}`,
+    `tonePhrases: ${anchor.tonePhrases.join(', ') || '-'}`,
+    `avoidVibe: ${anchor.avoidVibe.join(', ') || '-'}`,
+  ].join('\n');
 }
 
 export function buildSourcePrompt(snapshot: AgentCaptureDraftSnapshot): string {
@@ -218,14 +248,26 @@ const VisualFieldSchema = z.enum([
 const TurnEnvelopeSchema = z.object({
   assistantReply: z.string().trim().min(1),
   brief: z.string().trim().min(1),
+  effectiveIntentSummary: z.string().trim().min(1),
+  coreVibe: z.string().trim().min(1),
+  tonePhrases: z.array(z.string().trim().min(1)).optional(),
+  avoidVibe: z.array(z.string().trim().min(1)).optional(),
   intentMode: z.string().trim().optional(),
   retain: z.array(z.string().trim().min(1)).optional(),
   adjust: z.array(z.string().trim().min(1)).optional(),
+  negativeConstraints: z.array(z.string().trim().min(1)).optional(),
   touchedFields: z.array(z.string().trim().min(1)).optional(),
 });
 
-const BriefSchema = z.object({
+const ContextEnvelopeSchema = z.object({
   brief: z.string().trim().min(1),
+  effectiveIntentSummary: z.string().trim().min(1),
+  coreVibe: z.string().trim().min(1),
+  tonePhrases: z.array(z.string().trim().min(1)).optional(),
+  avoidVibe: z.array(z.string().trim().min(1)).optional(),
+  retain: z.array(z.string().trim().min(1)).optional(),
+  adjust: z.array(z.string().trim().min(1)).optional(),
+  negativeConstraints: z.array(z.string().trim().min(1)).optional(),
 });
 
 const DraftTextPackSchema = z.object({
@@ -282,6 +324,32 @@ function normalizeTouchedFields(values: string[] | undefined): AgentCaptureVisua
     }
   }
   return normalized;
+}
+
+function normalizeWorkingMemory(input: {
+  effectiveIntentSummary: string;
+  retain?: string[];
+  adjust?: string[];
+  negativeConstraints?: string[];
+}): AgentCaptureWorkingMemory {
+  return {
+    effectiveIntentSummary: String(input.effectiveIntentSummary || '').trim(),
+    preserveFocus: normalizeStringList(input.retain, 8),
+    adjustFocus: normalizeStringList(input.adjust, 8),
+    negativeConstraints: normalizeStringList(input.negativeConstraints, 8),
+  };
+}
+
+function normalizeFeelingAnchor(input: {
+  coreVibe: string;
+  tonePhrases?: string[];
+  avoidVibe?: string[];
+}): AgentCaptureFeelingAnchor {
+  return {
+    coreVibe: String(input.coreVibe || '').trim(),
+    tonePhrases: normalizeStringList(input.tonePhrases, 3),
+    avoidVibe: normalizeStringList(input.avoidVibe, 4),
+  };
 }
 
 export async function generateStructuredObject<T extends z.ZodType<Record<string, unknown>>>(input: {
@@ -614,13 +682,18 @@ function buildVisualSpecPrompt(input: {
   return [
     formatPromptSection(
       input.preferredLanguage,
-      { zh: '当前角色输入：', en: 'Current source prompt:' },
+      { zh: '当前累计角色描述：', en: 'Current accumulated role description:' },
       buildSourcePrompt(input.draft),
     ),
     formatPromptSection(
       input.preferredLanguage,
-      { zh: '当前会话：', en: 'Current conversation:' },
-      summarizeConversation(input.session),
+      { zh: '当前感觉锚点：', en: 'Current feeling anchor:' },
+      summarizeFeelingAnchor(input.draft.feelingAnchor, input.preferredLanguage),
+    ),
+    formatPromptSection(
+      input.preferredLanguage,
+      { zh: '当前工作约束：', en: 'Current working constraints:' },
+      summarizeWorkingMemory(input.session.workingMemory, input.preferredLanguage),
     ),
     formatPromptSection(
       input.preferredLanguage,
@@ -663,6 +736,88 @@ function buildVisualSpecPrompt(input: {
       '已附加参考图，应纳入视觉规格判断。',
       'A source reference image is attached and should inform the visual spec.',
     ),
+  ].filter(Boolean).join('\n\n');
+}
+
+function buildDialogueStatePrompt(input: {
+  draft: AgentCaptureDraftSnapshot;
+  session: AgentCaptureSessionState;
+  selectedAgent: AgentCaptureAgentSummary | null;
+  preferredLanguage?: string;
+  latestUserMessage?: string;
+  includeResultFacts?: boolean;
+}): string {
+  return [
+    formatPromptSection(
+      input.preferredLanguage,
+      { zh: '当前累计角色描述：', en: 'Current accumulated role description:' },
+      buildSourcePrompt(input.draft),
+    ),
+    formatPromptSection(
+      input.preferredLanguage,
+      { zh: '当前感觉锚点：', en: 'Current feeling anchor:' },
+      summarizeFeelingAnchor(input.draft.feelingAnchor, input.preferredLanguage),
+    ),
+    formatPromptSection(
+      input.preferredLanguage,
+      { zh: '当前工作约束：', en: 'Current working constraints:' },
+      summarizeWorkingMemory(input.session.workingMemory, input.preferredLanguage),
+    ),
+    formatPromptSection(
+      input.preferredLanguage,
+      { zh: '当前 brief：', en: 'Current brief:' },
+      input.session.currentBrief,
+    ),
+    formatPromptSection(
+      input.preferredLanguage,
+      { zh: '已选已有角色背景：', en: 'Selected agent background:' },
+      summarizeAgent(input.selectedAgent),
+      {
+        zh: '未附加已有角色。',
+        en: 'No selected existing agent.',
+      },
+    ),
+    input.draft.visualSpec
+      ? formatPromptSection(
+          input.preferredLanguage,
+          { zh: '当前视觉规格：', en: 'Current visual spec:' },
+          summarizeVisualSpec(input.draft.visualSpec, input.preferredLanguage),
+        )
+      : '',
+    input.draft.lastVisualDelta
+      ? formatPromptSection(
+          input.preferredLanguage,
+          { zh: '上一轮调整摘要：', en: 'Previous visual delta:' },
+          summarizeVisualDelta(input.draft.lastVisualDelta, input.preferredLanguage),
+        )
+      : '',
+    input.draft.characterReadout
+      ? formatPromptSection(
+          input.preferredLanguage,
+          { zh: '上一版角色读取：', en: 'Previous character readout:' },
+          input.draft.characterReadout,
+        )
+      : '',
+    input.includeResultFacts
+      ? formatPromptSection(
+          input.preferredLanguage,
+          { zh: '结果事实摘要：', en: 'Result facts:' },
+          summarizeResultFacts(input.draft.resultFacts, input.preferredLanguage),
+        )
+      : '',
+    optionalPromptNote(
+      input.preferredLanguage,
+      Boolean(input.draft.sourceImage),
+      '已附加参考图，应纳入当前角色感觉和视觉判断。',
+      'A source reference image is attached and should inform the current role feeling and visual judgment.',
+    ),
+    String(input.latestUserMessage || '').trim()
+      ? formatPromptSection(
+          input.preferredLanguage,
+          { zh: '用户最新输入：', en: 'Latest user message:' },
+          input.latestUserMessage,
+        )
+      : '',
   ].filter(Boolean).join('\n\n');
 }
 
@@ -731,7 +886,14 @@ export async function extractVisualDelta(input: {
   textBinding: RuntimeRouteBinding | null;
   userMessage: string;
   preferredLanguage?: string;
-}): Promise<{ assistantReply: string; brief: string; visualDelta: AgentCaptureVisualDelta; traceId?: string }> {
+}): Promise<{
+  assistantReply: string;
+  brief: string;
+  visualDelta: AgentCaptureVisualDelta;
+  workingMemory: AgentCaptureWorkingMemory;
+  feelingAnchor: AgentCaptureFeelingAnchor;
+  traceId?: string;
+}> {
   const system = [
     pickPromptCopy(
       input.preferredLanguage,
@@ -741,41 +903,39 @@ export async function extractVisualDelta(input: {
     buildLanguageLock(input.preferredLanguage),
     ...buildCharacterFocusGuidance(input.preferredLanguage),
     makeJsonBlockPrompt(
-      '{"assistantReply":"string","brief":"string","intentMode":"refine|restart","retain":["string"],"adjust":["string"],"touchedFields":["roleCore|silhouette|outfit|materials|accessories|handProp|hairstyle|palette|artStyle|backgroundWeight|signatureHook"]}',
+      '{"assistantReply":"string","brief":"string","effectiveIntentSummary":"string","coreVibe":"string","tonePhrases":["string"],"avoidVibe":["string"],"intentMode":"refine|restart","retain":["string"],"adjust":["string"],"negativeConstraints":["string"],"touchedFields":["roleCore|silhouette|outfit|materials|accessories|handProp|hairstyle|palette|artStyle|backgroundWeight|signatureHook"]}',
       prefersSimplifiedChinese(input.preferredLanguage)
         ? [
             'assistantReply 必须像自然协作对话，长度不超过 120 个中文字符。',
             'brief 必须是一句自然语言，概括当前角色方向，长度不超过 80 个中文字符。',
+            'effectiveIntentSummary 必须总结当前仍然有效的角色意图。',
+            'coreVibe 必须用一句短语概括当前最稳定的角色感觉。',
+            'tonePhrases 应提炼 1-3 条可持续复用的感觉短语。',
+            'avoidVibe 应提炼当前明确不要漂向的感觉。',
             '如需提供 intentMode，只能用 refine 或 restart；除非用户明确要求重来或改向，否则用 refine。',
             '如需提供 touchedFields，只列出本轮确实被用户触碰或明确想改的视觉字段；不确定时可以留空。',
-            'retain 和 adjust 不确定时可以给空数组。',
+            'retain、adjust 和 negativeConstraints 不确定时可以给空数组。',
             '不要输出完整视觉规格；这里只做轻量对话理解与调整摘要。',
           ]
         : [
             'assistantReply must sound like a natural collaborative response and stay within 260 English characters.',
             'brief must be one natural-language sentence summarizing the current direction within 180 English characters.',
+            'effectiveIntentSummary must summarize the currently effective role intent.',
+            'coreVibe must capture the most stable role feeling in one concise phrase.',
+            'tonePhrases should distill 1-3 reusable feeling phrases.',
+            'avoidVibe should capture the directions the role should avoid drifting toward right now.',
             'If you provide intentMode, it must be refine or restart; unless the user clearly asks to restart or change direction, use refine.',
             'If you provide touchedFields, only include visual fields the user actually touched or clearly wants changed; leave it empty when unsure.',
-            'retain and adjust may be empty arrays when uncertain.',
+            'retain, adjust, and negativeConstraints may be empty arrays when uncertain.',
             'Do not output a full visual spec here; this stage only handles lightweight dialogue understanding and adjustment summary.',
           ],
     ),
   ].join('\n\n');
-  const prompt = [
-    buildVisualSpecPrompt(input),
-    formatPromptSection(
-      input.preferredLanguage,
-      { zh: '用户最新输入：', en: 'Latest user message:' },
-      input.userMessage,
-    ),
-    input.draft.lastVisualDelta
-      ? formatPromptSection(
-          input.preferredLanguage,
-          { zh: '上一轮调整摘要：', en: 'Previous visual delta:' },
-          summarizeVisualDelta(input.draft.lastVisualDelta, input.preferredLanguage),
-        )
-      : '',
-  ].filter(Boolean).join('\n\n');
+  const prompt = buildDialogueStatePrompt({
+    ...input,
+    latestUserMessage: input.userMessage,
+    includeResultFacts: true,
+  });
   const { parsed, traceId } = await generateStructuredObject({
     runtimeClient: input.runtimeClient,
     binding: input.textBinding,
@@ -801,6 +961,17 @@ export async function extractVisualDelta(input: {
       adjust: normalizeStringList(parsed.adjust),
       touchedFields: normalizeTouchedFields(parsed.touchedFields),
     },
+    workingMemory: normalizeWorkingMemory({
+      effectiveIntentSummary: parsed.effectiveIntentSummary,
+      retain: parsed.retain,
+      adjust: parsed.adjust,
+      negativeConstraints: parsed.negativeConstraints,
+    }),
+    feelingAnchor: normalizeFeelingAnchor({
+      coreVibe: parsed.coreVibe,
+      tonePhrases: parsed.tonePhrases,
+      avoidVibe: parsed.avoidVibe,
+    }),
     traceId,
   };
 }
@@ -812,38 +983,49 @@ export async function recomputeCurrentBrief(input: {
   selectedAgent: AgentCaptureAgentSummary | null;
   textBinding: RuntimeRouteBinding | null;
   preferredLanguage?: string;
-}): Promise<{ brief: string; traceId?: string }> {
+}): Promise<{
+  brief: string;
+  workingMemory: AgentCaptureWorkingMemory;
+  feelingAnchor: AgentCaptureFeelingAnchor;
+  traceId?: string;
+}> {
   const system = [
     pickPromptCopy(
       input.preferredLanguage,
-      '你要为当前 Agent-Capture 上下文生成一句自然语言 brief。',
-      'You produce one natural-language brief sentence for the current Agent-Capture context.',
+      '你要为当前 Agent-Capture 上下文整理 feeling anchor、工作约束，并生成一句自然语言 brief。',
+      'You produce a current feeling anchor, working constraints, and one natural-language brief sentence for the current Agent-Capture context.',
     ),
     buildLanguageLock(input.preferredLanguage),
     ...buildCharacterFocusGuidance(input.preferredLanguage),
     makeJsonBlockPrompt(
-      '{"brief":"string"}',
+      '{"brief":"string","effectiveIntentSummary":"string","coreVibe":"string","tonePhrases":["string"],"avoidVibe":["string"],"retain":["string"],"adjust":["string"],"negativeConstraints":["string"]}',
       prefersSimplifiedChinese(input.preferredLanguage)
         ? [
             'brief 必须是一句自然语言，长度不超过 80 个中文字符。',
             'brief 必须优先体现人物主体、服装、材质、配饰、道具、色彩与画风。',
             '如果当前结果已存在，可轻量说明延续什么、调整什么。',
+            'effectiveIntentSummary 必须总结当前仍然有效的角色意图。',
+            'coreVibe 必须用一句短语概括当前最稳定的角色感觉。',
+            'tonePhrases 应提炼 1-3 条可持续复用的感觉短语。',
+            'avoidVibe 应提炼当前明确不要漂向的感觉。',
+            'retain、adjust 和 negativeConstraints 可为空数组，但必须基于当前上下文给出最有价值的整理结果。',
           ]
         : [
             'brief must be one natural-language sentence within 180 English characters.',
             'brief should foreground the character body, outfit, materials, accessories, prop, palette, and art style.',
             'If a current result exists, it may briefly mention what is being retained and adjusted.',
+            'effectiveIntentSummary must summarize the currently effective role intent.',
+            'coreVibe must capture the most stable role feeling in one concise phrase.',
+            'tonePhrases should distill 1-3 reusable feeling phrases.',
+            'avoidVibe should capture the directions the role should avoid drifting toward right now.',
+            'retain, adjust, and negativeConstraints may be empty arrays, but should reflect the most valuable current organization.',
           ],
     ),
   ].join('\n\n');
-  const prompt = [
-    buildVisualSpecPrompt(input),
-    formatPromptSection(
-      input.preferredLanguage,
-      { zh: '结果事实摘要：', en: 'Result facts:' },
-      summarizeResultFacts(input.draft.resultFacts, input.preferredLanguage),
-    ),
-  ].filter(Boolean).join('\n\n');
+  const prompt = buildDialogueStatePrompt({
+    ...input,
+    includeResultFacts: true,
+  });
   const { parsed, traceId } = await generateStructuredObject({
     runtimeClient: input.runtimeClient,
     binding: input.textBinding,
@@ -855,13 +1037,24 @@ export async function recomputeCurrentBrief(input: {
       { temperature: 0.05, maxTokens: 1024 },
       { temperature: 0, maxTokens: 1280 },
     ],
-    schema: BriefSchema,
+    schema: ContextEnvelopeSchema,
     parseErrorCode: 'AGENT_CAPTURE_BRIEF_JSON_INVALID',
     truncationErrorCode: 'AGENT_CAPTURE_BRIEF_TRUNCATED',
     contractErrorCode: 'AGENT_CAPTURE_BRIEF_CONTRACT_INVALID',
   });
   return {
     brief: parsed.brief,
+    workingMemory: normalizeWorkingMemory({
+      effectiveIntentSummary: parsed.effectiveIntentSummary,
+      retain: parsed.retain,
+      adjust: parsed.adjust,
+      negativeConstraints: parsed.negativeConstraints,
+    }),
+    feelingAnchor: normalizeFeelingAnchor({
+      coreVibe: parsed.coreVibe,
+      tonePhrases: parsed.tonePhrases,
+      avoidVibe: parsed.avoidVibe,
+    }),
     traceId,
   };
 }
@@ -877,6 +1070,8 @@ export function compileImagePromptFromSpec(input: {
   stableCore: AgentCaptureStableCore;
   currentBrief: string;
   visualDelta: AgentCaptureVisualDelta | null;
+  feelingAnchor: AgentCaptureFeelingAnchor | null;
+  workingMemory: AgentCaptureWorkingMemory;
   preferredLanguage?: string;
 }): {
   imagePrompt: string;
@@ -890,6 +1085,16 @@ export function compileImagePromptFromSpec(input: {
 
   const promptParts = [
     input.currentBrief,
+    input.feelingAnchor?.coreVibe
+      ? pickPromptCopy(input.preferredLanguage, `感觉锚点：${input.feelingAnchor.coreVibe}`, `Feeling anchor: ${input.feelingAnchor.coreVibe}`)
+      : '',
+    input.feelingAnchor?.tonePhrases.length
+      ? pickPromptCopy(
+          input.preferredLanguage,
+          `稳定感觉短语：${input.feelingAnchor.tonePhrases.join('、')}`,
+          `Stable feeling phrases: ${input.feelingAnchor.tonePhrases.join(', ')}`,
+        )
+      : '',
     pickPromptCopy(input.preferredLanguage, `角色核心感觉：${input.spec.roleCore}`, `Role core: ${input.spec.roleCore}`),
     pickPromptCopy(input.preferredLanguage, `轮廓体态：${input.stableCore.silhouette}`, `Silhouette: ${input.stableCore.silhouette}`),
     pickPromptCopy(input.preferredLanguage, `发型：${input.spec.hairstyle}`, `Hairstyle: ${input.spec.hairstyle}`),
@@ -923,6 +1128,9 @@ export function compileImagePromptFromSpec(input: {
     input.visualDelta?.adjust.length
       ? pickPromptCopy(input.preferredLanguage, `本轮微调：${input.visualDelta.adjust.join('、')}`, `Adjust this round: ${input.visualDelta.adjust.join(', ')}`)
       : '',
+    input.workingMemory.adjustFocus.length
+      ? pickPromptCopy(input.preferredLanguage, `当前重点调整：${input.workingMemory.adjustFocus.join('、')}`, `Current adjustment focus: ${input.workingMemory.adjustFocus.join(', ')}`)
+      : '',
   ].filter(Boolean).join('\n');
 
   const negativeParts = [
@@ -938,6 +1146,20 @@ export function compileImagePromptFromSpec(input: {
           `Do not make large changes outside these explicit adjustments: ${input.visualDelta.adjust.join(', ')}`,
         )
       : '',
+    input.feelingAnchor?.avoidVibe.length
+      ? pickPromptCopy(
+          input.preferredLanguage,
+          `避免漂向：${input.feelingAnchor.avoidVibe.join('、')}`,
+          `Avoid drifting toward: ${input.feelingAnchor.avoidVibe.join(', ')}`,
+        )
+      : '',
+    input.workingMemory.negativeConstraints.length
+      ? pickPromptCopy(
+          input.preferredLanguage,
+          `当前避免项：${input.workingMemory.negativeConstraints.join('、')}`,
+          `Current avoid list: ${input.workingMemory.negativeConstraints.join(', ')}`,
+        )
+      : '',
   ].filter(Boolean).join(' ');
 
   return {
@@ -951,6 +1173,8 @@ export async function generateDraftTextPack(input: {
   textBinding: RuntimeRouteBinding | null;
   spec: AgentCaptureVisualSpec;
   currentBrief: string;
+  feelingAnchor: AgentCaptureFeelingAnchor | null;
+  workingMemory: AgentCaptureWorkingMemory;
   resultFacts: AgentCaptureResultFacts;
   preferredLanguage?: string;
 }): Promise<{ draft: AgentCaptureDraftGeneration; traceId?: string }> {
@@ -985,6 +1209,16 @@ export async function generateDraftTextPack(input: {
       input.preferredLanguage,
       { zh: '当前 brief：', en: 'Current brief:' },
       input.currentBrief,
+    ),
+    formatPromptSection(
+      input.preferredLanguage,
+      { zh: '当前感觉锚点：', en: 'Current feeling anchor:' },
+      summarizeFeelingAnchor(input.feelingAnchor, input.preferredLanguage),
+    ),
+    formatPromptSection(
+      input.preferredLanguage,
+      { zh: '当前工作约束：', en: 'Current working constraints:' },
+      summarizeWorkingMemory(input.workingMemory, input.preferredLanguage),
     ),
     formatPromptSection(
       input.preferredLanguage,
@@ -1028,11 +1262,20 @@ export async function runCaptureTurn(input: {
   userMessage: string;
   preferredLanguage?: string;
 }): Promise<AgentCaptureTurnResult & { traceId?: string }> {
-  const { assistantReply, brief, visualDelta, traceId } = await extractVisualDelta(input);
+  const {
+    assistantReply,
+    brief,
+    visualDelta,
+    workingMemory,
+    feelingAnchor,
+    traceId,
+  } = await extractVisualDelta(input);
   return {
     assistantReply,
     brief,
     visualDelta,
+    workingMemory,
+    feelingAnchor,
     traceId,
   };
 }
@@ -1083,6 +1326,8 @@ export async function generateAgentDraft(input: {
     stableCore,
     currentBrief,
     visualDelta: input.draft.lastVisualDelta,
+    feelingAnchor: input.draft.feelingAnchor,
+    workingMemory: input.session.workingMemory,
     preferredLanguage: input.preferredLanguage,
   });
   const resolvedImageRoute = await input.runtimeClient.route.resolve({ capability: 'image.generate' });
@@ -1111,6 +1356,8 @@ export async function generateAgentDraft(input: {
     textBinding: input.textBinding,
     spec: visualSpec,
     currentBrief,
+    feelingAnchor: input.draft.feelingAnchor,
+    workingMemory: input.session.workingMemory,
     resultFacts,
     preferredLanguage: input.preferredLanguage,
   });

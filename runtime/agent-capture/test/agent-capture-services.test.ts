@@ -159,6 +159,12 @@ test('sanitizeHydratedSessionState decouples restored session from transient wor
     ...createEmptySessionState(),
     messages: [{ id: '1', role: 'user', kind: 'chat', content: '李清照', createdAt: new Date().toISOString() }],
     currentBrief: '宋代词人感',
+    workingMemory: {
+      effectiveIntentSummary: '清寒词人',
+      preserveFocus: ['词人气'],
+      adjustFocus: ['更疏离'],
+      negativeConstraints: ['不要病态'],
+    },
     pendingBriefConfirmation: true,
     workingState: 'generating',
     surfaceError: 'stale',
@@ -168,6 +174,7 @@ test('sanitizeHydratedSessionState decouples restored session from transient wor
   });
   assert.equal(restored.messages.length, 1);
   assert.equal(restored.currentBrief, '宋代词人感');
+  assert.equal(restored.workingMemory.effectiveIntentSummary, '清寒词人');
   assert.equal(restored.pendingBriefConfirmation, false);
   assert.equal(restored.workingState, 'idle');
   assert.equal(restored.surfaceError, '');
@@ -473,12 +480,25 @@ test('compileImagePromptFromSpec preserves stable core and signature hook in the
       adjust: ['cool the palette slightly'],
       touchedFields: ['palette'],
     },
+    feelingAnchor: {
+      coreVibe: 'restrained and distant',
+      tonePhrases: ['cold poise'],
+      avoidVibe: ['poster glamour'],
+    },
+    workingMemory: {
+      effectiveIntentSummary: 'Keep the role restrained and cool the palette slightly.',
+      preserveFocus: ['jade flute'],
+      adjustFocus: ['cool the palette slightly'],
+      negativeConstraints: ['poster glamour'],
+    },
     preferredLanguage: 'en-US',
   });
 
   assert.match(imagePrompt, /Signature hook: jade flute/);
+  assert.match(imagePrompt, /Feeling anchor: restrained and distant/);
   assert.match(imagePrompt, /Palette: ink black, desaturated jade, muted gold/);
   assert.match(imagePrompt, /Full-body character anchor image/);
+  assert.match(negativePrompt, /Current avoid list: poster glamour/);
   assert.match(negativePrompt, /Do not change the confirmed core silhouette/);
 });
 
@@ -528,28 +548,15 @@ test('runCaptureTurn applies Simplified Chinese locale lock by default for zh in
       textPayloads: [{
         assistantReply: '我会先抓住她清峭、克制、书卷感的方向。',
         brief: '一个年轻、克制、带古典书卷气的角色。',
+        effectiveIntentSummary: '保留书卷气，往乱世中的聪明人方向微调。',
+        coreVibe: '清峭克制的书卷气',
+        tonePhrases: ['清峭', '克制', '书卷感'],
+        avoidVibe: ['病态脆弱'],
         intentMode: 'refine',
         retain: ['书卷气'],
         adjust: ['更像乱世里的聪明人'],
+        negativeConstraints: ['病态脆弱'],
         touchedFields: ['roleCore', 'outfit'],
-        nextSpec: makeVisualSpec({
-          roleCore: '年轻、克制、带古典书卷气的乱世谋士',
-          outfit: '收束感很强的深色古典长袍',
-          materials: ['哑光织物', '轻薄罩纱'],
-          accessories: ['玉佩'],
-          handProp: '卷轴',
-          hairstyle: '半束发',
-          palette: {
-            primary: '墨黑',
-            secondary: '冷青',
-            accent: '旧金',
-          },
-          artStyle: '克制写实插画',
-          signatureHook: {
-            kind: 'prop',
-            value: '卷轴',
-          },
-        }),
       }],
       onTextGenerate: (request) => {
         capturedSystem = String(request.system || '');
@@ -566,10 +573,12 @@ test('runCaptureTurn applies Simplified Chinese locale lock by default for zh in
   assert.match(result.assistantReply, /清峭|克制/);
   assert.match(result.brief, /年轻/);
   assert.deepEqual(result.visualDelta.adjust, ['更像乱世里的聪明人']);
+  assert.equal(result.feelingAnchor?.coreVibe, '清峭克制的书卷气');
+  assert.deepEqual(result.workingMemory.negativeConstraints, ['病态脆弱']);
   assert.match(capturedSystem, /使用简体中文输出/);
   assert.match(capturedSystem, /服装、材质、配饰、手持道具、发型、色彩和画风/);
   assert.match(capturedSystem, /背景只作为辅助氛围存在/);
-  assert.match(capturedPrompt, /当前角色输入：/);
+  assert.match(capturedPrompt, /当前累计角色描述：/);
   assert.doesNotMatch(capturedPrompt, /Current source prompt:/);
 });
 
@@ -589,28 +598,15 @@ test('runCaptureTurn uses English prompt shell when preferred language is Englis
       textPayloads: [{
         assistantReply: 'Let us lock her robe, ornament, and scroll before adding any more scene detail.',
         brief: 'A poised, distant scholar in a pale robe with jade ornament and scroll.',
+        effectiveIntentSummary: 'Keep the scholar poised and distant while minimizing scene weight.',
+        coreVibe: 'poised distant scholar',
+        tonePhrases: ['poised', 'distant'],
+        avoidVibe: ['poster drama'],
         intentMode: 'refine',
         retain: ['jade ornament', 'scroll'],
         adjust: ['keep the background minimal'],
+        negativeConstraints: ['poster drama'],
         touchedFields: ['backgroundWeight'],
-        nextSpec: makeVisualSpec({
-          roleCore: 'poised distant scholar',
-          outfit: 'pale robe with clean layered drape',
-          materials: ['matte silk'],
-          accessories: ['jade ornament'],
-          handProp: 'scroll',
-          hairstyle: 'pinned half-up hair',
-          palette: {
-            primary: 'pale stone',
-            secondary: 'jade green',
-          },
-          artStyle: 'stylized painterly realism',
-          backgroundWeight: 'minimal',
-          signatureHook: {
-            kind: 'prop',
-            value: 'scroll',
-          },
-        }),
       }],
       onTextGenerate: (request) => {
         capturedSystem = String(request.system || '');
@@ -627,8 +623,8 @@ test('runCaptureTurn uses English prompt shell when preferred language is Englis
 
   assert.match(capturedSystem, /Reply in English/);
   assert.match(capturedSystem, /silhouette, outfit, materials, accessories, handheld props, hairstyle, palette, and art style/);
-  assert.match(capturedPrompt, /Current source prompt:/);
-  assert.doesNotMatch(capturedPrompt, /当前角色输入：/);
+  assert.match(capturedPrompt, /Current accumulated role description:/);
+  assert.doesNotMatch(capturedPrompt, /当前累计角色描述：/);
 });
 
 test('runCaptureTurn retries after invalid json output and eventually succeeds', async () => {
@@ -647,28 +643,15 @@ test('runCaptureTurn retries after invalid json output and eventually succeeds',
         {
           assistantReply: '我会先抓住她清峭、书卷、晚年沉郁的感觉。',
           brief: '一位面容清瘦、气质孤高、带宋代书卷与晚年沉郁感的女性。',
+          effectiveIntentSummary: '保留宋代书卷气，强化晚年沉郁感。',
+          coreVibe: '清瘦孤高的宋代词人',
+          tonePhrases: ['清瘦', '孤高', '沉郁'],
+          avoidVibe: ['甜美闺阁'],
           intentMode: 'refine',
           retain: ['宋代书卷气'],
           adjust: ['晚年沉郁感'],
+          negativeConstraints: ['甜美闺阁'],
           touchedFields: ['roleCore', 'palette'],
-          nextSpec: makeVisualSpec({
-            roleCore: '清瘦孤高的宋代词人',
-            outfit: '宋代文人女性长裙',
-            materials: ['旧绢', '细纱'],
-            accessories: ['簪饰'],
-            handProp: '词稿',
-            hairstyle: '低束发',
-            palette: {
-              primary: '烟灰白',
-              secondary: '旧青',
-              accent: '暗褐',
-            },
-            artStyle: '宋韵写意写实',
-            signatureHook: {
-              kind: 'prop',
-              value: '词稿',
-            },
-          }),
         },
       ],
     }),
@@ -681,6 +664,7 @@ test('runCaptureTurn retries after invalid json output and eventually succeeds',
   });
   assert.match(result.assistantReply, /清峭/);
   assert.match(result.brief, /宋代/);
+  assert.equal(result.feelingAnchor?.coreVibe, '清瘦孤高的宋代词人');
   assert.equal(result.traceId, 'text-trace-2');
 });
 
@@ -698,9 +682,14 @@ test('runCaptureTurn stays lightweight and does not require a full visual spec p
       textPayloads: [{
         assistantReply: 'I will keep the slim silhouette and refine the robe into something more ceremonial.',
         brief: 'A calm strategist with a slim silhouette and a darker ceremonial robe.',
+        effectiveIntentSummary: 'Refine the strategist toward a more ceremonial robe while keeping the silhouette slim.',
+        coreVibe: 'calm strategist',
+        tonePhrases: ['calm'],
+        avoidVibe: ['loud spectacle'],
         intentMode: 'refine',
         retain: ['slim silhouette'],
         adjust: ['robe becomes more ceremonial'],
+        negativeConstraints: ['loud spectacle'],
         touchedFields: ['outfit'],
       }],
     }),
@@ -714,6 +703,7 @@ test('runCaptureTurn stays lightweight and does not require a full visual spec p
 
   assert.match(result.assistantReply, /slim silhouette/);
   assert.deepEqual(result.visualDelta.adjust, ['robe becomes more ceremonial']);
+  assert.equal(result.workingMemory.effectiveIntentSummary, 'Refine the strategist toward a more ceremonial robe while keeping the silhouette slim.');
   assert.equal(result.traceId, 'text-trace-1');
 });
 
@@ -727,7 +717,16 @@ test('recomputeCurrentBrief recalculates brief when context changes', async () =
   };
   const result = await recomputeCurrentBrief({
     runtimeClient: createRuntimeClientStub({
-      textPayloads: [{ brief: '一个克制清冷、带古典书卷气的角色。' }],
+      textPayloads: [{
+        brief: '一个克制清冷、带古典书卷气的角色。',
+        effectiveIntentSummary: '保留克制清冷感，强化古典书卷气。',
+        coreVibe: '克制清冷的书卷气',
+        tonePhrases: ['克制', '清冷', '书卷气'],
+        avoidVibe: ['甜美闺阁'],
+        retain: ['书卷气'],
+        adjust: ['更古典'],
+        negativeConstraints: ['甜美闺阁'],
+      }],
     }),
     draft,
     session,
@@ -736,6 +735,8 @@ test('recomputeCurrentBrief recalculates brief when context changes', async () =
     preferredLanguage: 'zh-CN',
   });
   assert.equal(result.brief, '一个克制清冷、带古典书卷气的角色。');
+  assert.equal(result.feelingAnchor.coreVibe, '克制清冷的书卷气');
+  assert.deepEqual(result.workingMemory.preserveFocus, ['书卷气']);
   assert.equal(result.traceId, 'text-trace-1');
 });
 
@@ -745,6 +746,11 @@ test('generateAgentDraft uses current context and returns generated image metada
   let capturedImageRequest: Record<string, unknown> | null = null;
   const draft = createEmptyDraftSnapshot();
   draft.sourcePrompt = '年轻、克制、更像乱世谋士';
+  draft.feelingAnchor = {
+    coreVibe: '克制清寒的书卷气',
+    tonePhrases: ['克制', '清寒'],
+    avoidVibe: ['病态脆弱'],
+  };
   draft.sourceImage = {
     url: 'data:image/png;base64,source',
     mimeType: 'image/png',
@@ -763,6 +769,12 @@ test('generateAgentDraft uses current context and returns generated image metada
   const session = {
     ...createEmptySessionState(),
     currentBrief: '一个年轻、克制、偏古典书卷气的角色。',
+    workingMemory: {
+      effectiveIntentSummary: '保留书卷气，袖口更轻一些。',
+      preserveFocus: ['书卷气', '卷轴'],
+      adjustFocus: ['袖口更轻一些'],
+      negativeConstraints: ['病态脆弱'],
+    },
   };
 
   const result = await generateAgentDraft({
@@ -823,7 +835,9 @@ test('generateAgentDraft uses current context and returns generated image metada
   assert.match(capturedTextSystems[0] || '', /使用简体中文输出/);
   assert.match(capturedTextSystems[0] || '', /稳定的角色视觉规格/);
   assert.match(capturedTextSystems[1] || '', /补全文案包/);
-  assert.match(capturedTextPrompts[0] || '', /当前角色输入：/);
+  assert.match(capturedTextPrompts[0] || '', /当前累计角色描述：/);
+  assert.match(capturedTextPrompts[0] || '', /当前感觉锚点：/);
+  assert.match(capturedTextPrompts[0] || '', /当前工作约束：/);
   assert.match(capturedTextPrompts[1] || '', /结果事实摘要：/);
   assert.equal(capturedImageRequest?.timeoutMs, 600000);
   assert.equal(capturedImageRequest?.size, '1024x1536');

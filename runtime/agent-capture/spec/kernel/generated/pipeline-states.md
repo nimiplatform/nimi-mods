@@ -21,7 +21,7 @@ pipeline:
     - step: capture-dialog
       order: 3
       type: user-input
-      description: conduct feeling-led dialogue to help the user and system converge on the character sense, prioritizing character-facing details like outfit, material, accessories, props, silhouette, and art style over background by default
+      description: conduct feeling-led dialogue to help the user and system converge on the character sense, continuously refreshing a stable feeling anchor and prioritizing character-facing details like outfit, material, accessories, props, silhouette, and art style over background by default
       source_rule: AC-PIPE-001
     - step: support-context-adjust
       order: 4
@@ -36,7 +36,7 @@ pipeline:
     - step: agent-generate
       order: 6
       type: generation
-      description: after the user confirms the current brief in the conversation flow, explicit Generate Agent produces one current generatedImage with name, bio, personaSeed, and tags
+      description: after the user confirms the current brief in the conversation flow, explicit Generate Agent produces one current generatedImage with name, bio, personaSeed, and tags; deviation is corrected through the next dialogue turn instead of an implicit automatic post-generation fix
       source_rule: AC-PIPE-006
     - step: draft-curate
       order: 7
@@ -72,9 +72,14 @@ generation_context_policy:
   current_generation_context_required: true
   rebuild_on_input_change: true
   effective_intent_set_required: true
+  feeling_anchor_required_when_available: true
+  state_bundle_generation_input_required: true
+  raw_dialogue_history_generation_input_default: false
   generated_image_reused_as_context_when_present: true
   generated_image_recursive_image_input_default: false
   latest_correction_treated_as_delta_by_default: true
+  post_generation_auto_correction_default: false
+  user_driven_correction_via_dialogue_required: true
   source_rule: AC-PIPE-007
 readout_policy:
   character_readout_required_with_current_result: true

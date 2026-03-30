@@ -74,6 +74,7 @@ Agent-Capture 不负责判断“是否已经聊够”，而由用户自行决定
 - 最新 brief 必须反映当前会话中仍然有效的用户意图集合，而不是机械使用完整原始历史或仅使用最后一句消息。
 - 当当前结果已存在时，最新 brief 还应说明本轮变化将延续什么、调整什么。
 - 最新 brief 默认应优先反映人物主体、服装、材质、配饰、手持道具与画风等角色向视觉决策；背景只在用户明确强调时提升优先级。
+- 最新 brief 在进入正式生成前，应与当前 feeling anchor 与 working memory 保持一致，而不是彼此漂移。
 
 ## AC-PIPE-007 — current generation context assembly
 
@@ -81,9 +82,12 @@ Agent-Capture 的每次生成都必须先装配当前生成上下文。
 
 **规则**:
 - 当前生成上下文以当前有效用户意图集合为基础，并按需并入 `sourceImage`、selected existing agent 背景、当前 `generatedImage` 与最新修正。
+- 当前生成上下文默认应由 state bundle 承载，至少包括 current brief、feeling anchor、working memory、visual spec、latest delta 与必要辅助上下文。
 - 当用户只是补充或微调当前角色方向时，系统应把这次输入视为对当前上下文的增量更新。
 - 当用户明确表达重来、改换方向或放弃当前结果时，系统才应重置相应的上下文部分。
 - 在默认策略下，`generatedImage` 应主要通过 brief、readout、会话与方向性说明影响下一轮生成；正式图像请求中的稳定视觉参考默认优先使用 `sourceImage`，避免递归放大上一轮渲染噪点与模糊。
+- 在默认策略下，正式生成不应直接消费按时间顺序堆叠的 raw dialogue history；raw dialogue 主要用于更新上述 state bundle。
+- 在默认策略下，系统不应在单次正式生成后隐式追加自动验收或自动纠偏回合；结果偏差由用户在后续对话中提出，并进入新的当前生成上下文。
 
 ## AC-PIPE-008 — result readout
 

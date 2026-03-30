@@ -60,7 +60,21 @@ const sanitizeRouteStateAgainstRuntimeMock = vi.hoisted(() => vi.fn(async () => 
   changed: false,
   routeState: fixtures.routeState,
 })));
-const recomputeCurrentBriefMock = vi.hoisted(() => vi.fn(async () => ({ brief: 'Refined brief', traceId: 'trace-brief' })));
+const recomputeCurrentBriefMock = vi.hoisted(() => vi.fn(async () => ({
+  brief: 'Refined brief',
+  workingMemory: {
+    effectiveIntentSummary: 'Refined brief intent',
+    preserveFocus: ['jade flute'],
+    adjustFocus: ['calmer silhouette'],
+    negativeConstraints: ['poster drama'],
+  },
+  feelingAnchor: {
+    coreVibe: 'poised and distant',
+    tonePhrases: ['poised', 'distant'],
+    avoidVibe: ['poster drama'],
+  },
+  traceId: 'trace-brief',
+})));
 const runCaptureTurnMock = vi.hoisted(() => vi.fn(async () => ({
   assistantReply: 'Thanks, the role direction is clearer now.',
   brief: 'Refined brief',
@@ -69,6 +83,17 @@ const runCaptureTurnMock = vi.hoisted(() => vi.fn(async () => ({
     retain: ['palace purple', 'jade flute'],
     adjust: ['make the silhouette calmer'],
     touchedFields: ['silhouette', 'palette'],
+  },
+  workingMemory: {
+    effectiveIntentSummary: 'Keep the palace purple and calm the silhouette.',
+    preserveFocus: ['palace purple', 'jade flute'],
+    adjustFocus: ['make the silhouette calmer'],
+    negativeConstraints: ['poster drama'],
+  },
+  feelingAnchor: {
+    coreVibe: 'poised palace reserve',
+    tonePhrases: ['poised', 'reserved'],
+    avoidVibe: ['poster drama'],
   },
   traceId: 'trace-turn',
 })));
@@ -450,6 +475,17 @@ describe('AgentCapturePage UI flow', () => {
     fixtures.selectedAgent = makeAgent();
     recomputeCurrentBriefMock.mockResolvedValue({
       brief: 'Refined brief from support inputs',
+      workingMemory: {
+        effectiveIntentSummary: 'Support inputs reinforce the current role direction.',
+        preserveFocus: ['purple silhouette'],
+        adjustFocus: ['support context'],
+        negativeConstraints: ['poster drama'],
+      },
+      feelingAnchor: {
+        coreVibe: 'restrained support context',
+        tonePhrases: ['restrained'],
+        avoidVibe: ['poster drama'],
+      },
       traceId: 'trace-support',
     });
 

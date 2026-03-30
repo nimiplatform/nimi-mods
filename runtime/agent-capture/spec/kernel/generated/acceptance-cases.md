@@ -87,6 +87,18 @@ cases:
     description: Each generation uses the current generation context rather than mechanically replaying the full raw history.
     expected_ok: true
     source_rule: AC-ACC-003
+  - id: AC-027-FEELING-ANCHOR-CARRIES-STABLE-SENSE
+    description: The current role feel is carried forward through a structured feeling anchor with core vibe, stable tone phrases, and avoid-vibe cues instead of living only in raw dialogue text.
+    expected_ok: true
+    source_rule: AC-ACC-003
+  - id: AC-028-GENERATION-CONSUMES-STATE-BUNDLE
+    description: Formal generation consumes a current state bundle such as feeling anchor, working memory, brief, visual spec, and latest delta, rather than directly consuming chronological raw dialogue history.
+    expected_ok: true
+    source_rule: AC-ACC-003
+  - id: AC-029-DEVIATION-CORRECTS-THROUGH-NEXT-DIALOGUE
+    description: If a generated result still feels off, correction happens through the next user dialogue turn and a newly formed brief rather than a hidden automatic post-generation correction round.
+    expected_ok: true
+    source_rule: AC-ACC-003
   - id: AC-021-LATEST-CORRECTION-IS-DELTA-BY-DEFAULT
     description: New correction input is treated as a delta on the current direction unless the user explicitly indicates a reset.
     expected_ok: true

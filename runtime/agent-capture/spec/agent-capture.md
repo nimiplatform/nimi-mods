@@ -34,7 +34,10 @@ Agent-Capture 是一个 desktop mod，也是一个帮助用户获得角色形象
 - 当前 workspace UI 里程碑收敛到“捕捉、生成、草稿整理”为止；handoff 边界继续保留为声明能力，而不是本轮 refactor 的用户可见操作
 - 当已有 agent 背景与当前用户输入冲突时，当前用户输入永远优先
 - 当前用户输入指当前会话中仍然有效的用户意图集合；系统以最新 brief 承载这组有效意图
-- 每次生成都基于当前生成上下文；当前结果应带有轻量角色读取文本，帮助用户感知角色正在成形
+- 系统必须把当前角色感觉沉淀为稳定 feeling anchor，再与 brief、working memory、visual spec 等状态一起组成正式生成上下文
+- `sourcePrompt` 允许随着后续对话继续展开角色描述，不被冻结为最初一句输入
+- 每次生成都基于当前状态化生成上下文；当前结果应带有轻量角色读取文本，帮助用户感知角色正在成形
+- 当前结果若仍有偏差，默认由用户通过下一轮继续对话纠偏；系统职责是正确承接新的纠偏输入，而不是在生成后隐式追加自动纠偏回合
 
 ## 2. Domain Invariants
 
@@ -52,6 +55,7 @@ Agent-Capture 是一个 desktop mod，也是一个帮助用户获得角色形象
 - `AC-DOM-012`: 每次生成都基于当前生成上下文；当前结果在存在时主要作为方向性上下文参与下一轮整理，而不是默认以图像字节递归回流。
 - `AC-DOM-013`: 方向性跟随通过“保留什么、调整什么”的可感知变化成立，而不是靠空泛承诺。
 - `AC-DOM-014`: 当前结果必须附带轻量角色读取文本，帮助用户感知角色正在成形。
+- `AC-DOM-015`: 原始对话负责更新 feeling anchor 与其他状态；正式生成默认消费 feeling anchor 与当前 state bundle，而不是直接重放原始对话历史。
 
 ## 3. Domain Increments
 
@@ -74,6 +78,7 @@ Agent-Capture 是一个 desktop mod，也是一个帮助用户获得角色形象
 | `AC-DOM-006` | editable visible fields | 只开放 name / bio / tags 的直接编辑 |
 | `AC-DOM-009` | brief confirmation | 生成前用一句 brief 对齐当前角色感觉和关键视觉特征 |
 | `AC-DOM-010` | selected agent context precedence | 已选 agent 只做辅助背景；当前用户输入永远优先 |
+| `AC-DOM-015` | feeling anchor + state bundle generation | 原始对话先沉淀 feeling，再由状态包驱动正式生成 |
 
 ### 3.3 Handoff Boundary
 

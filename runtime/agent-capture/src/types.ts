@@ -74,6 +74,19 @@ export type AgentCaptureVisualDelta = {
   touchedFields: AgentCaptureVisualField[];
 };
 
+export type AgentCaptureFeelingAnchor = {
+  coreVibe: string;
+  tonePhrases: string[];
+  avoidVibe: string[];
+};
+
+export type AgentCaptureWorkingMemory = {
+  effectiveIntentSummary: string;
+  preserveFocus: string[];
+  adjustFocus: string[];
+  negativeConstraints: string[];
+};
+
 export type AgentCaptureResultFacts = {
   framing: 'full-body-anchor';
   backgroundWeight: AgentCaptureVisualSpec['backgroundWeight'];
@@ -101,6 +114,7 @@ export type AgentCaptureDraftSnapshot = {
   createdAt: string;
   updatedAt: string;
   sourcePrompt: string;
+  feelingAnchor: AgentCaptureFeelingAnchor | null;
   sourceImage: AgentCaptureImageRef | null;
   selectedAgentId: string | null;
   generatedImage: AgentCaptureImageRef | null;
@@ -123,6 +137,7 @@ export type AgentCaptureWorkingState =
 export type AgentCaptureSessionState = {
   messages: AgentCaptureMessage[];
   currentBrief: string;
+  workingMemory: AgentCaptureWorkingMemory;
   pendingBriefConfirmation: boolean;
   workingState: AgentCaptureWorkingState;
   surfaceError: string;
@@ -140,6 +155,8 @@ export type AgentCaptureTurnResult = {
   assistantReply: string;
   brief: string;
   visualDelta: AgentCaptureVisualDelta;
+  workingMemory: AgentCaptureWorkingMemory;
+  feelingAnchor: AgentCaptureFeelingAnchor | null;
 };
 
 export type AgentCaptureDraftGeneration = {

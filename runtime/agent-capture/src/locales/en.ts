@@ -108,7 +108,7 @@ export default {
   },
   context: {
     eyebrow: 'Generation Context',
-    sourcePrompt: 'Current source prompt',
+    sourcePrompt: 'Current role description',
     sourcePromptEmpty: 'Not formed yet',
     selectedAgent: 'Selected existing agent',
     trace: 'Trace',
