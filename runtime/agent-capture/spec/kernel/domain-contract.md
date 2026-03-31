@@ -103,6 +103,7 @@ Agent-Capture 在显式生成前必须形成当前 brief。
 **规则**:
 - existing agent 必须通过显式选择进入当前 draft 上下文，不以手工粘贴完整设定文本作为正式入口。
 - existing agent 不构成必须逐条兑现的完整生成约束。
+- selected existing agent 背景可补充受控的 creator-scoped 语义字段，例如 `description`、`greeting`、有限 identity 信息与有限 appearance 线索；这些字段只能帮助系统形成当前状态化理解，不得在 mod 内升级为必须复现的既有视觉真相。
 - 当前会话中的用户输入永远优先于 existing agent 背景；若两者冲突，系统必须以当前用户输入形成和更新 brief。
 - 添加、替换或移除 existing agent 都属于输入变化，系统必须据此重新形成当前 brief。
 

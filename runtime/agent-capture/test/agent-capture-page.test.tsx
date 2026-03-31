@@ -295,13 +295,12 @@ function makeAgent(overrides: Partial<AgentCaptureAgentSummary> = {}): AgentCapt
     handle: 'zi_ling',
     displayName: 'Zi Ling',
     bio: null,
-    avatarUrl: null,
+    description: null,
+    greeting: null,
     tags: ['palace'],
-    worldId: null,
-    activeWorldId: null,
-    ownershipType: null,
     importance: null,
-    state: null,
+    identity: null,
+    appearance: null,
     ...overrides,
   };
 }

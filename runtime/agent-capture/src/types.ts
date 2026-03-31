@@ -99,13 +99,19 @@ export type AgentCaptureAgentSummary = {
   handle: string;
   displayName: string;
   bio: string | null;
-  avatarUrl: string | null;
+  description: string | null;
+  greeting: string | null;
   tags: string[];
-  worldId: string | null;
-  activeWorldId: string | null;
-  ownershipType: string | null;
   importance: string | null;
-  state: string | null;
+  identity: {
+    role: string | null;
+    species: string | null;
+    summary: string | null;
+  } | null;
+  appearance: {
+    fashionStyle: string | null;
+    signatureItems: string[];
+  } | null;
 };
 
 export type AgentCaptureDraftSnapshot = {

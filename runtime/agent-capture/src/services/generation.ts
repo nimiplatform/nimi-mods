@@ -113,13 +113,30 @@ function enforceAnchorNegativePrompt(prompt: string, preferredLanguage: string |
 
 function summarizeAgent(agent: AgentCaptureAgentSummary | null): string {
   if (!agent) return 'No selected existing agent.';
+  const identityHints = agent.identity
+    ? [
+        agent.identity.role ? `Role: ${agent.identity.role}` : '',
+        agent.identity.species ? `Species: ${agent.identity.species}` : '',
+        agent.identity.summary ? `Identity summary: ${agent.identity.summary}` : '',
+      ].filter(Boolean).join('\n')
+    : '';
+  const appearanceHints = agent.appearance
+    ? [
+        agent.appearance.fashionStyle ? `Fashion style: ${agent.appearance.fashionStyle}` : '',
+        agent.appearance.signatureItems.length > 0
+          ? `Signature items: ${agent.appearance.signatureItems.join(', ')}`
+          : '',
+      ].filter(Boolean).join('\n')
+    : '';
   return [
     `Selected agent: ${agent.displayName || agent.handle || agent.id}`,
     agent.bio ? `Bio: ${agent.bio}` : '',
-    agent.worldId ? `World: ${agent.worldId}` : '',
-    agent.activeWorldId ? `Active world: ${agent.activeWorldId}` : '',
+    agent.description ? `Description: ${agent.description}` : '',
+    agent.greeting ? `Greeting: ${agent.greeting}` : '',
     agent.importance ? `Importance: ${agent.importance}` : '',
     agent.tags.length > 0 ? `Tags: ${agent.tags.join(', ')}` : '',
+    identityHints,
+    appearanceHints,
   ].filter(Boolean).join('\n');
 }
 

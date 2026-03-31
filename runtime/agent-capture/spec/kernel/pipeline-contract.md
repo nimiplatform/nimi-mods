@@ -29,6 +29,7 @@ Agent-Capture 的辅助上下文只补强方向，不应挤占主输入心智。
 - 用户可附加、替换或留空参考图与 selected existing agent 等辅助上下文。
 - 风格要求默认通过主输入与继续对话表达，不单列独立风格输入项。
 - 辅助上下文服务于生成方向，不构成稳定 domain truth 分类。
+- selected existing agent 若存在，可补充 `description`、`greeting`、有限 identity 信息与有限 appearance 线索，用于帮助系统形成当前 brief、feeling anchor、working memory 与 visual spec；这些背景字段不得直接绕过状态整理阶段写入最终图像生成提示。
 
 ## AC-PIPE-003 — 结果替换策略
 

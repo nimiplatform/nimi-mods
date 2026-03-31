@@ -82,16 +82,31 @@ test('toCreatorAgentSummary normalizes nested user payload', () => {
       bio: 'A brilliant strategist',
       tags: ['history', 'strategy'],
       agentProfile: {
-        worldId: 'w-han',
-        activeWorldId: 'w-han',
         importance: 'PRIMARY',
+        dna: {
+          identity: {
+            role: 'military strategist',
+            species: 'human',
+            summary: 'A calculating commander who values discipline.',
+          },
+          appearance: {
+            fashionStyle: 'layered military court attire',
+            signatureItems: ['inkstone token'],
+          },
+        },
       },
     },
+    description: 'Keeps a restrained, tactical presence.',
+    greeting: 'I only speak when the move is clear.',
   });
   assert.ok(summary);
   assert.equal(summary?.id, 'agent-1');
   assert.equal(summary?.displayName, 'Han Xin');
-  assert.equal(summary?.worldId, 'w-han');
+  assert.equal(summary?.description, 'Keeps a restrained, tactical presence.');
+  assert.equal(summary?.greeting, 'I only speak when the move is clear.');
+  assert.equal(summary?.identity?.role, 'military strategist');
+  assert.equal(summary?.appearance?.fashionStyle, 'layered military court attire');
+  assert.deepEqual(summary?.appearance?.signatureItems, ['inkstone token']);
   assert.deepEqual(summary?.tags, ['history', 'strategy']);
 });
 

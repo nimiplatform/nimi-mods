@@ -35,6 +35,7 @@ Agent-Capture 是一个 desktop mod，也是一个帮助用户获得角色形象
 - 当已有 agent 背景与当前用户输入冲突时，当前用户输入永远优先
 - 当前用户输入指当前会话中仍然有效的用户意图集合；系统以最新 brief 承载这组有效意图
 - 系统必须把当前角色感觉沉淀为稳定 feeling anchor，再与 brief、working memory、visual spec 等状态一起组成正式生成上下文
+- selected existing agent 的背景可使用受控的 creator-scoped 语义字段补强当前角色理解，例如 `description`、`greeting`、有限 identity 信息与有限 appearance 线索；这些字段只用于形成当前状态化上下文，不得在 mod 内升级为必须兑现的既有视觉真相
 - `sourcePrompt` 允许随着后续对话继续展开角色描述，不被冻结为最初一句输入
 - 每次生成都基于当前状态化生成上下文；当前结果应带有轻量角色读取文本，帮助用户感知角色正在成形
 - 当前结果若仍有偏差，默认由用户通过下一轮继续对话纠偏；系统职责是正确承接新的纠偏输入，而不是在生成后隐式追加自动纠偏回合
