@@ -36,6 +36,9 @@ function createTarget(): LocalChatTarget {
     },
     agentProfile: {
       persona: '温柔但有一点俏皮',
+      scenario: '在一个安静的深夜咖啡厅，你和用户坐在角落。',
+      greeting: '嗨，今晚又来了呀。要不要来杯热可可？',
+      exampleDialogue: '用户：最近心情不好。\nAki：嗯……要不要跟我说说？我听着。',
       dna: {
         communication: {
           responseLength: 'short',
@@ -59,13 +62,15 @@ function createTarget(): LocalChatTarget {
     },
     world: {
       name: 'Local Chat',
-      summary: '一个强调在场感和节奏感的交流世界。',
+      description: '一个强调在场感和节奏感的交流世界。',
+      truth: {
+        rules: [
+          { title: '短句优先', statement: '优先短句和停顿', domain: 'AXIOM', hardness: 'HARD', status: 'ACTIVE' },
+          { title: '递进对话', statement: '保持对话递进感', domain: 'AXIOM', hardness: 'FIRM', status: 'ACTIVE' },
+        ],
+      },
     },
-    worldview: {
-      name: 'Warm Night',
-      summary: '关系推进要自然，不要一次说尽。',
-      rules: ['优先短句和停顿', '保持对话递进感'],
-    },
+    worldview: {},
     payload: {},
   };
 }
@@ -166,6 +171,11 @@ test('context assembler derives interaction profile, pacing plan, and prompt lan
     contextPacket: packet,
   });
 
+  assert.ok(packet.world.lines.some((l: string) => l.includes('World Rule: 优先短句和停顿')), 'world rules should include truth rule statements');
+  assert.ok(packet.world.lines.some((l: string) => l.includes('World Rule: 保持对话递进感')), 'world rules should include truth rule statements');
+  assert.ok(packet.target.identityLines.some((l: string) => l.includes('Scenario:')), 'identity should include scenario from agent profile');
+  assert.ok(packet.target.identityLines.some((l: string) => l.includes('Greeting:')), 'identity should include greeting from agent profile');
+  assert.ok(packet.target.identityLines.some((l: string) => l.includes('Dialogue Examples:')), 'identity should include example dialogue from agent profile');
   assert.equal(packet.target.interactionProfile.expression.firstBeatStyle, 'gentle');
   assert.equal(packet.interactionSnapshot?.relationshipState, 'warm');
   assert.equal(packet.relationMemorySlots?.[0]?.key, 'comfort-style');

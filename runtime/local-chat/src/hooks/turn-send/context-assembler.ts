@@ -238,18 +238,19 @@ export function derivePacingPlan(input: {
 }
 function summarizeWorld(target: LocalChatTarget): string[] {
     const world = asRecord(target.world);
-    const worldview = asRecord(target.worldview);
     const worldName = asString(world.name || world.title);
     const worldSummary = asString(world.summary || world.description);
-    const worldviewName = asString(worldview.name || worldview.title);
-    const worldviewSummary = asString(worldview.summary || worldview.description);
-    const rules = asStringArray(worldview.rules);
+    // WorldRule objects live in world.truth.rules (WorldDetailDto.truth: WorldTruthDto).
+    // Backend returns ACTIVE rules sorted by domain asc / ruleKey asc / version desc.
+    const truth = asRecord(world.truth);
+    const rawRules = Array.isArray(truth.rules) ? truth.rules as unknown[] : [];
+    const ruleStatements = rawRules
+        .slice(0, 4)
+        .map((r) => asString(asRecord(r).statement));
     return [
         worldName ? `World: ${worldName}` : '',
         worldSummary ? `World Summary: ${worldSummary}` : '',
-        worldviewName ? `Worldview: ${worldviewName}` : '',
-        worldviewSummary ? `Worldview Summary: ${worldviewSummary}` : '',
-        ...rules.slice(0, 4).map((rule) => `World Rule: ${rule}`),
+        ...ruleStatements.map((s) => `World Rule: ${s}`),
     ].filter(Boolean);
 }
 function summarizeIdentity(target: LocalChatTarget, interactionProfile: DerivedInteractionProfile, locale: PromptLocale): {
@@ -266,6 +267,9 @@ function summarizeIdentity(target: LocalChatTarget, interactionProfile: DerivedI
     ].slice(0, 8);
     const systemPromptBase = asString(profile.systemPromptBase || metadata.systemPromptBase);
     const persona = asString(profile.persona || asRecord(profile.dna).persona || metadata.persona);
+    const scenario = asString(profile.scenario || metadata.scenario);
+    const greeting = asString(profile.greeting || metadata.greeting);
+    const exampleDialogue = asString(profile.exampleDialogue || metadata.exampleDialogue);
     return {
         identityLines: [
             `Display Name: ${target.displayName}`,
@@ -273,6 +277,9 @@ function summarizeIdentity(target: LocalChatTarget, interactionProfile: DerivedI
             target.bio ? `Bio: ${target.bio}` : '',
             persona ? `Persona: ${persona}` : '',
             systemPromptBase ? `System Base: ${systemPromptBase}` : '',
+            scenario ? `Scenario: ${scenario}` : '',
+            greeting ? `Greeting: ${greeting}` : '',
+            exampleDialogue ? `Dialogue Examples: ${exampleDialogue}` : '',
         ].filter(Boolean),
         rulesLines: rules,
         replyStyleLines: [
