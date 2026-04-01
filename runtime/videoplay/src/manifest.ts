@@ -88,8 +88,9 @@ export const VIDEOPLAY_MANIFEST = {
         entries: [
           {
             entryId: 'videoplay/chat-default',
-            kind: 'model',
+            kind: 'asset',
             capability: 'chat',
+            assetKind: 'chat',
             engine: 'openai-compatible',
             title: 'Default Chat Model (runtime-resolved)',
             required: true,
@@ -97,8 +98,9 @@ export const VIDEOPLAY_MANIFEST = {
           },
           {
             entryId: 'videoplay/image-default',
-            kind: 'model',
+            kind: 'asset',
             capability: 'image',
+            assetKind: 'image',
             engine: 'openai-compatible',
             title: 'Default Image Model (runtime-resolved)',
             required: true,
@@ -106,8 +108,9 @@ export const VIDEOPLAY_MANIFEST = {
           },
           {
             entryId: 'videoplay/video-default',
-            kind: 'model',
+            kind: 'asset',
             capability: 'video',
+            assetKind: 'video',
             engine: 'openai-compatible',
             title: 'Default Video Model (runtime-resolved)',
             required: true,
@@ -115,8 +118,9 @@ export const VIDEOPLAY_MANIFEST = {
           },
           {
             entryId: 'videoplay/tts-default',
-            kind: 'model',
+            kind: 'asset',
             capability: 'tts',
+            assetKind: 'tts',
             engine: 'openai-compatible',
             title: 'Default TTS Model (runtime-resolved)',
             required: true,

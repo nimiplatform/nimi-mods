@@ -38,9 +38,10 @@ ai:
         - tts
       entries:
         - entryId: audio-book/chat-qwen2.5-7b
-          kind: model
+          kind: asset
           capability: chat
-          modelId: qwen2.5-7b-instruct
+          assetId: qwen2.5-7b-instruct
+          assetKind: chat
           repo: Qwen/Qwen2.5-7B-Instruct-GGUF
           engine: openai-compatible
           title: Qwen2.5 7B Instruct (analysis)
@@ -50,7 +51,8 @@ ai:
           kind: service
           capability: tts
           serviceId: qwen-tts-python
-          modelId: Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign
+          assetId: Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign
+          assetKind: tts
           repo: Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign
           engine: qwen-tts-python
           title: Qwen3 TTS 1.7B (recommended)
@@ -65,9 +67,10 @@ ai:
         - tts
       entries:
         - entryId: audio-book/chat-qwen2.5-7b
-          kind: model
+          kind: asset
           capability: chat
-          modelId: qwen2.5-7b-instruct
+          assetId: qwen2.5-7b-instruct
+          assetKind: chat
           repo: Qwen/Qwen2.5-7B-Instruct-GGUF
           engine: openai-compatible
           title: Qwen2.5 7B Instruct (analysis)
@@ -77,7 +80,8 @@ ai:
           kind: service
           capability: tts
           serviceId: qwen-tts-python
-          modelId: Qwen/Qwen3-TTS-12Hz-0.6B-VoiceDesign
+          assetId: Qwen/Qwen3-TTS-12Hz-0.6B-VoiceDesign
+          assetKind: tts
           repo: Qwen/Qwen3-TTS-12Hz-0.6B-VoiceDesign
           engine: qwen-tts-python
           title: Qwen3 TTS 0.6B

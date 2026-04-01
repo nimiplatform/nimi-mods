@@ -15,9 +15,10 @@ test('local-chat manifest profiles align local image stack with canonical local 
     const imageModel = profile.entries.find((entry) => entry.entryId === 'local-chat/image-z-image-turbo');
     assert.deepEqual(imageModel, {
       entryId: 'local-chat/image-z-image-turbo',
-      kind: 'model',
+      kind: 'asset',
       capability: 'image',
-      modelId: 'local/z_image_turbo',
+      assetId: 'local/z_image_turbo',
+      assetKind: 'image',
       repo: 'jayn7/Z-Image-Turbo-GGUF',
       engine: 'media',
       title: 'Z-Image Turbo (GGUF)',
@@ -28,27 +29,29 @@ test('local-chat manifest profiles align local image stack with canonical local 
     const vaeArtifact = profile.entries.find((entry) => entry.entryId === 'local-chat/image-z-image-ae');
     assert.deepEqual(vaeArtifact, {
       entryId: 'local-chat/image-z-image-ae',
-      kind: 'artifact',
+      kind: 'asset',
       capability: 'image',
-      artifactId: 'local/z_image_ae',
-      artifactKind: 'vae',
-      templateId: 'verified.artifact.z_image.vae',
+      assetId: 'local/z_image_ae',
+      assetKind: 'vae',
+      engineSlot: 'vae_path',
+      templateId: 'verified.asset.z_image.vae',
       engine: 'media',
       title: 'Z-Image AE VAE',
       required: true,
       preferred: true,
     });
 
-    const llmArtifact = profile.entries.find((entry) => entry.entryId === 'local-chat/image-qwen3-4b-companion');
+    const llmArtifact = profile.entries.find((entry) => entry.entryId === 'local-chat/image-qwen3-4b-text-encoder');
     assert.deepEqual(llmArtifact, {
-      entryId: 'local-chat/image-qwen3-4b-companion',
-      kind: 'artifact',
+      entryId: 'local-chat/image-qwen3-4b-text-encoder',
+      kind: 'asset',
       capability: 'image',
-      artifactId: 'local/qwen3_4b_companion',
-      artifactKind: 'llm',
-      templateId: 'verified.artifact.z_image.qwen3_4b',
+      assetId: 'local/qwen3_4b',
+      assetKind: 'chat',
+      engineSlot: 'llm_path',
+      templateId: 'verified.asset.z_image.qwen3_4b',
       engine: 'media',
-      title: 'Qwen3 4B Companion LLM',
+      title: 'Qwen3 4B Text Encoder',
       required: true,
       preferred: true,
     });

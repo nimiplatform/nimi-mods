@@ -68,41 +68,45 @@ ai:
         - stt
       entries:
         - entryId: local-chat/chat-qwen2.5-7b
-          kind: model
+          kind: asset
           capability: chat
-          modelId: qwen2.5-7b-instruct
+          assetId: qwen2.5-7b-instruct
+          assetKind: chat
           repo: Qwen/Qwen2.5-7B-Instruct-GGUF
           engine: openai-compatible
           title: Qwen2.5 7B Instruct (default)
           required: true
           preferred: true
         - entryId: local-chat/image-z-image-turbo
-          kind: model
+          kind: asset
           capability: image
-          modelId: local/z_image_turbo
+          assetId: local/z_image_turbo
+          assetKind: image
           repo: jayn7/Z-Image-Turbo-GGUF
           engine: media
           title: Z-Image Turbo (GGUF)
           required: true
           preferred: true
         - entryId: local-chat/image-z-image-ae
-          kind: artifact
+          kind: asset
           capability: image
-          artifactId: local/z_image_ae
-          artifactKind: vae
-          templateId: verified.artifact.z_image.vae
+          assetId: local/z_image_ae
+          assetKind: vae
+          engineSlot: vae_path
+          templateId: verified.asset.z_image.vae
           engine: media
           title: Z-Image AE VAE
           required: true
           preferred: true
-        - entryId: local-chat/image-qwen3-4b-companion
-          kind: artifact
+        - entryId: local-chat/image-qwen3-4b-text-encoder
+          kind: asset
           capability: image
-          artifactId: local/qwen3_4b_companion
-          artifactKind: llm
-          templateId: verified.artifact.z_image.qwen3_4b
+          assetId: local/qwen3_4b
+          assetKind: chat
+          engineSlot: llm_path
+          templateId: verified.asset.z_image.qwen3_4b
           engine: media
-          title: Qwen3 4B Companion LLM
+          title: Qwen3 4B Text Encoder
           required: true
           preferred: true
         - entryId: local-chat/video-generate-token-node
@@ -121,7 +125,8 @@ ai:
           kind: service
           capability: tts
           serviceId: qwen-tts-python
-          modelId: Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign
+          assetId: Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign
+          assetKind: tts
           repo: Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign
           engine: qwen-tts-python
           title: Qwen3 TTS 1.7B (recommended)
@@ -139,41 +144,45 @@ ai:
         - stt
       entries:
         - entryId: local-chat/chat-qwen2.5-7b
-          kind: model
+          kind: asset
           capability: chat
-          modelId: qwen2.5-7b-instruct
+          assetId: qwen2.5-7b-instruct
+          assetKind: chat
           repo: Qwen/Qwen2.5-7B-Instruct-GGUF
           engine: openai-compatible
           title: Qwen2.5 7B Instruct (default)
           required: true
           preferred: true
         - entryId: local-chat/image-z-image-turbo
-          kind: model
+          kind: asset
           capability: image
-          modelId: local/z_image_turbo
+          assetId: local/z_image_turbo
+          assetKind: image
           repo: jayn7/Z-Image-Turbo-GGUF
           engine: media
           title: Z-Image Turbo (GGUF)
           required: true
           preferred: true
         - entryId: local-chat/image-z-image-ae
-          kind: artifact
+          kind: asset
           capability: image
-          artifactId: local/z_image_ae
-          artifactKind: vae
-          templateId: verified.artifact.z_image.vae
+          assetId: local/z_image_ae
+          assetKind: vae
+          engineSlot: vae_path
+          templateId: verified.asset.z_image.vae
           engine: media
           title: Z-Image AE VAE
           required: true
           preferred: true
-        - entryId: local-chat/image-qwen3-4b-companion
-          kind: artifact
+        - entryId: local-chat/image-qwen3-4b-text-encoder
+          kind: asset
           capability: image
-          artifactId: local/qwen3_4b_companion
-          artifactKind: llm
-          templateId: verified.artifact.z_image.qwen3_4b
+          assetId: local/qwen3_4b
+          assetKind: chat
+          engineSlot: llm_path
+          templateId: verified.asset.z_image.qwen3_4b
           engine: media
-          title: Qwen3 4B Companion LLM
+          title: Qwen3 4B Text Encoder
           required: true
           preferred: true
         - entryId: local-chat/video-generate-token-node
@@ -192,7 +201,8 @@ ai:
           kind: service
           capability: tts
           serviceId: qwen-tts-python
-          modelId: Qwen/Qwen3-TTS-12Hz-0.6B-VoiceDesign
+          assetId: Qwen/Qwen3-TTS-12Hz-0.6B-VoiceDesign
+          assetKind: tts
           repo: Qwen/Qwen3-TTS-12Hz-0.6B-VoiceDesign
           engine: qwen-tts-python
           title: Qwen3 TTS 0.6B

@@ -88,8 +88,9 @@ export const TEXTPLAY_MANIFEST = {
         entries: [
           {
             entryId: 'textplay/chat-default',
-            kind: 'model',
+            kind: 'asset',
             capability: 'chat',
+            assetKind: 'chat',
             engine: 'openai-compatible',
             title: 'Default Chat Model (runtime-resolved)',
             required: true,

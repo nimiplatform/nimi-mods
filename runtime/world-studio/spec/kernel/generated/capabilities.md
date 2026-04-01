@@ -22,9 +22,10 @@ ai_profile:
     - image
   required_dependencies:
     - dependency_id: world-studio/chat-qwen2.5-7b
-      kind: model
+      kind: asset
       capability: chat
-      model_id: qwen2.5-7b-instruct
+      asset_id: qwen2.5-7b-instruct
+      asset_kind: chat
       engine: openai-compatible
   optional_dependencies:
     - dependency_id: world-studio/image-token-node
