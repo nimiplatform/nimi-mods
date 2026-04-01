@@ -1,13 +1,22 @@
-<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect x="12" y="12" width="104" height="104" rx="28" fill="url(#paint0_linear)"/>
-  <path d="M42 84C46.5 74 54.5 69 64 69C73.5 69 81.5 74 86 84" stroke="white" stroke-width="7" stroke-linecap="round"/>
-  <circle cx="64" cy="51" r="16" stroke="white" stroke-width="7"/>
-  <path d="M90 34L98 42" stroke="white" stroke-width="7" stroke-linecap="round"/>
-  <path d="M98 34L90 42" stroke="white" stroke-width="7" stroke-linecap="round"/>
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="paint0_linear" x1="20" y1="18" x2="106" y2="112" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FF9C6B"/>
-      <stop offset="1" stop-color="#FF5E7E"/>
+    <linearGradient id="grad-agent-capture" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF9C6B" />
+      <stop offset="50%" stop-color="#FF7A70" />
+      <stop offset="100%" stop-color="#FF5E7E" />
+    </linearGradient>
+    <linearGradient id="glass-agent-capture" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="white" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="white" stop-opacity="0" />
     </linearGradient>
   </defs>
+  <rect x="0" y="0" width="512" height="512" rx="115" ry="115" fill="url(#grad-agent-capture)" />
+  <path d="M 0 115 A 115 115 0 0 1 115 0 L 397 0 A 115 115 0 0 1 512 115 L 512 230 L 0 230 Z" fill="url(#glass-agent-capture)" opacity="0.5" />
+  <rect x="0" y="0" width="512" height="512" rx="115" ry="115" fill="none" stroke="white" stroke-opacity="0.2" stroke-width="2" />
+  <svg x="88" y="88" width="336" height="336" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M7.4 17.6C8.5 15.2 10.2 14 12 14C13.8 14 15.5 15.2 16.6 17.6" />
+    <circle cx="12" cy="8.2" r="3.2" />
+    <path d="M17.8 4.8 19.9 6.9" />
+    <path d="M19.9 4.8 17.8 6.9" />
+  </svg>
 </svg>
