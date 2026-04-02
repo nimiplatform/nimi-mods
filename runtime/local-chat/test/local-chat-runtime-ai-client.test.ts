@@ -420,11 +420,11 @@ test('local-chat runtime ai client: local z-image route injects companions and f
             }),
         },
         local: {
-            listArtifacts: async () => {
+            listAssets: async () => {
                 listedArtifactsCount += 1;
                 return [
                     {
-                        localArtifactId: 'vae-1',
+                        localAssetId: 'vae-1',
                         artifactId: 'z_image_ae',
                         kind: 'vae',
                         engine: 'media',
@@ -439,9 +439,9 @@ test('local-chat runtime ai client: local z-image route injects companions and f
                         metadata: { family: 'z-image' },
                     },
                     {
-                        localArtifactId: 'llm-1',
+                        localAssetId: 'llm-1',
                         artifactId: 'qwen3_4b_companion',
-                        kind: 'llm',
+                        kind: 'chat',
                         engine: 'media',
                         entry: 'Qwen3-4B-Q4_K_M.gguf',
                         files: ['Qwen3-4B-Q4_K_M.gguf'],
@@ -499,9 +499,11 @@ test('local-chat runtime ai client: local z-image route injects companions and f
     assert.equal('aspectRatio' in (captured.extensions || {}), false);
     assert.equal(captured.extensions?.style, 'photorealistic');
     assert.deepEqual(captured.extensions?.profile_overrides, { step: 8 });
-    assert.deepEqual(captured.extensions?.components, [
-        { slot: 'vae_path', localArtifactId: 'vae-1' },
-        { slot: 'llm_path', localArtifactId: 'llm-1' },
+    assert.equal(Array.isArray(captured.extensions?.profile_entries), true);
+    assert.deepEqual(captured.extensions?.entry_overrides, [
+        { entry_id: 'local-chat/image-z-image-turbo', local_asset_id: '01-model' },
+        { entry_id: 'local-chat/image-z-image-ae', local_asset_id: 'vae-1' },
+        { entry_id: 'local-chat/image-qwen3-4b-text-encoder', local_asset_id: 'llm-1' },
     ]);
     assert.equal(captured.timeoutMs, 600000);
     assert.equal(result.traceId, 'trace-local-image');
@@ -519,7 +521,7 @@ test('local-chat runtime ai client: cloud image route keeps original request pay
             resolve: async () => createResolvedRoute(),
         },
         local: {
-            listArtifacts: async () => {
+            listAssets: async () => {
                 listedArtifactsCount += 1;
                 return [];
             },

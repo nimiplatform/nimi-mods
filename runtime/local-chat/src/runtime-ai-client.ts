@@ -1,6 +1,7 @@
 import { emitLocalChatLog } from './logging.js';
+import { LOCAL_CHAT_MANIFEST } from './manifest.js';
 import { parseJsonObject } from './json-repair.js';
-import { buildLocalImageWorkflowExtensions, type ModRuntimeClient, type ModRuntimeLocalArtifactRecord, type ModRuntimeResolvedBinding, type RuntimeCanonicalCapability, type RuntimeRouteBinding } from "@nimiplatform/sdk/mod";
+import { type ModRuntimeClient, type ModRuntimeLocalAssetRecord, type ModRuntimeResolvedBinding, type RuntimeCanonicalCapability, type RuntimeRouteBinding } from "@nimiplatform/sdk/mod";
 type LocalChatFinishReason = 'stop' | 'length' | 'content-filter' | 'tool-calls' | 'error';
 export type LocalChatAiRouteInput = {
     capability?: RuntimeCanonicalCapability;
@@ -174,6 +175,30 @@ const LOCAL_CHAT_LOCAL_IMAGE_FAMILY = 'z-image';
 const LOCAL_CHAT_LOCAL_IMAGE_SIZE = '512x512';
 const LOCAL_CHAT_LOCAL_IMAGE_STEP = 8;
 const LOCAL_CHAT_LOCAL_IMAGE_TIMEOUT_MS = 600000;
+function buildLocalProfileExtensionsCompat(input: {
+    entryOverrides?: Array<{
+        entryId: string;
+        localAssetId: string;
+    }>;
+    profileOverrides?: Record<string, unknown>;
+}, baseExtensions?: Record<string, unknown>): Record<string, unknown> {
+    const merged: Record<string, unknown> = { ...(baseExtensions || {}) };
+    const entryOverrides = Array.isArray(input.entryOverrides)
+        ? input.entryOverrides
+            .map((item) => ({
+            entry_id: String(item.entryId || '').trim(),
+            local_asset_id: String(item.localAssetId || '').trim(),
+        }))
+            .filter((item) => item.entry_id && item.local_asset_id)
+        : [];
+    if (entryOverrides.length > 0) {
+        merged.entry_overrides = entryOverrides;
+    }
+    if (input.profileOverrides && Object.keys(input.profileOverrides).length > 0) {
+        merged.profile_overrides = input.profileOverrides;
+    }
+    return merged;
+}
 function normalizeLocalImageModelId(value: unknown): string {
     let normalized = String(value ?? '').trim().toLowerCase();
     if (normalized.startsWith('media/'))
@@ -208,10 +233,10 @@ function metadataString(metadata: Record<string, unknown> | undefined, key: stri
     }
     return '';
 }
-function isSelectableLocalArtifact(artifact: ModRuntimeLocalArtifactRecord): boolean {
+function isSelectableLocalAsset(artifact: ModRuntimeLocalAssetRecord): boolean {
     return artifact.status === 'active' || artifact.status === 'installed';
 }
-function localArtifactSortValue(artifact: ModRuntimeLocalArtifactRecord): [
+function localAssetSortValue(artifact: ModRuntimeLocalAssetRecord): [
     number,
     number,
     string
@@ -224,16 +249,16 @@ function localArtifactSortValue(artifact: ModRuntimeLocalArtifactRecord): [
         : artifact.status === 'installed'
             ? 1
             : 9;
-    return [familyPriority, statusPriority, artifact.artifactId];
+    return [familyPriority, statusPriority, artifact.assetId];
 }
-function pickLocalImageCompanionArtifact(artifacts: ModRuntimeLocalArtifactRecord[], kind: 'vae' | 'llm'): ModRuntimeLocalArtifactRecord | null {
+function pickLocalImageCompanionAsset(artifacts: ModRuntimeLocalAssetRecord[], kind: 'vae' | 'chat'): ModRuntimeLocalAssetRecord | null {
     const matches = artifacts
         .filter((artifact) => artifact.engine.toLowerCase() === 'media')
-        .filter(isSelectableLocalArtifact)
+        .filter(isSelectableLocalAsset)
         .filter((artifact) => artifact.kind === kind)
         .sort((left, right) => {
-        const leftKey = localArtifactSortValue(left);
-        const rightKey = localArtifactSortValue(right);
+        const leftKey = localAssetSortValue(left);
+        const rightKey = localAssetSortValue(right);
         if (leftKey[0] !== rightKey[0])
             return leftKey[0] - rightKey[0];
         if (leftKey[1] !== rightKey[1])
@@ -281,9 +306,9 @@ async function resolveLocalImageExtensions(input: {
             requestedModel: input.requestedModel || '',
         },
     });
-    const artifacts = await input.runtimeClient.local.listArtifacts({ engine: 'media' });
-    const vaeArtifact = pickLocalImageCompanionArtifact(artifacts, 'vae');
-    const llmArtifact = pickLocalImageCompanionArtifact(artifacts, 'llm');
+    const artifacts = await input.runtimeClient.local.listAssets({ engine: 'media' });
+    const vaeArtifact = pickLocalImageCompanionAsset(artifacts, 'vae');
+    const llmArtifact = pickLocalImageCompanionAsset(artifacts, 'chat');
     if (!vaeArtifact || !llmArtifact) {
         emitLocalChatLog({
             level: 'error',
@@ -292,10 +317,10 @@ async function resolveLocalImageExtensions(input: {
                 routeModel: input.route.model,
                 requestedModel: input.requestedModel || '',
                 selectableArtifacts: artifacts
-                    .filter(isSelectableLocalArtifact)
+                    .filter(isSelectableLocalAsset)
                     .map((artifact) => ({
-                    artifactId: artifact.artifactId,
-                    localArtifactId: artifact.localArtifactId,
+                    artifactId: artifact.assetId,
+                    localArtifactId: artifact.localAssetId,
                     kind: artifact.kind,
                     status: artifact.status,
                     family: metadataString(artifact.metadata, 'family'),
@@ -309,15 +334,47 @@ async function resolveLocalImageExtensions(input: {
         size: LOCAL_CHAT_LOCAL_IMAGE_SIZE,
     };
     delete baseExtensions.aspectRatio;
-    const resolvedExtensions = buildLocalImageWorkflowExtensions({
-        components: [
-            { slot: 'vae_path', localArtifactId: vaeArtifact.localArtifactId },
-            { slot: 'llm_path', localArtifactId: llmArtifact.localArtifactId },
-        ],
+    const profileEntries = (((LOCAL_CHAT_MANIFEST.ai?.profiles || []).find((profile) => profile.recommended) || LOCAL_CHAT_MANIFEST.ai?.profiles?.[0])?.entries || [])
+        .filter((entry) => entry.kind === 'asset' && entry.capability === 'image')
+        .map((entry) => ({
+        entryId: entry.entryId,
+        kind: entry.kind,
+        capability: entry.capability,
+        title: entry.title,
+        required: entry.required === true,
+        preferred: entry.preferred === true,
+        assetId: entry.assetId,
+        assetKind: entry.assetKind,
+        engine: entry.engine,
+        ...('engineSlot' in entry && entry.engineSlot ? { engineSlot: entry.engineSlot } : {}),
+        ...('templateId' in entry && entry.templateId ? { templateId: entry.templateId } : {}),
+    }));
+    const entryOverrides = [
+        {
+            entryId: 'local-chat/image-z-image-ae',
+            localAssetId: vaeArtifact.localAssetId,
+        },
+        {
+            entryId: 'local-chat/image-qwen3-4b-text-encoder',
+            localAssetId: llmArtifact.localAssetId,
+        },
+    ];
+    const mainLocalAssetId = String(input.route.goRuntimeLocalModelId || input.route.localModelId || '').trim();
+    if (mainLocalAssetId) {
+        entryOverrides.unshift({
+            entryId: 'local-chat/image-z-image-turbo',
+            localAssetId: mainLocalAssetId,
+        });
+    }
+    const resolvedExtensions = {
+        ...buildLocalProfileExtensionsCompat({
+        entryOverrides,
         profileOverrides: {
             step: LOCAL_CHAT_LOCAL_IMAGE_STEP,
         },
-    }, baseExtensions);
+    }, baseExtensions),
+        profile_entries: profileEntries,
+    };
     emitLocalChatLog({
         level: 'info',
         message: 'local-chat:image-media-workflow:inject:ready',
@@ -326,10 +383,10 @@ async function resolveLocalImageExtensions(input: {
             requestedModel: input.requestedModel || '',
             injectedSize: LOCAL_CHAT_LOCAL_IMAGE_SIZE,
             injectedStep: LOCAL_CHAT_LOCAL_IMAGE_STEP,
-            vaeArtifactId: vaeArtifact.artifactId,
-            vaeLocalArtifactId: vaeArtifact.localArtifactId,
-            llmArtifactId: llmArtifact.artifactId,
-            llmLocalArtifactId: llmArtifact.localArtifactId,
+            vaeArtifactId: vaeArtifact.assetId,
+            vaeLocalArtifactId: vaeArtifact.localAssetId,
+            llmArtifactId: llmArtifact.assetId,
+            llmLocalArtifactId: llmArtifact.localAssetId,
             inheritedStyle: typeof baseExtensions.style === 'string' ? baseExtensions.style : '',
             inheritedQuality: typeof baseExtensions.quality === 'string' ? baseExtensions.quality : '',
         },
@@ -734,7 +791,8 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
                         aspectRatio: typeof extensions?.aspectRatio === 'string' ? extensions.aspectRatio : '',
                         style: typeof extensions?.style === 'string' ? extensions.style : '',
                         quality: typeof extensions?.quality === 'string' ? extensions.quality : '',
-                        componentCount: Array.isArray(extensions?.components) ? extensions.components.length : 0,
+                        profileEntryCount: Array.isArray(extensions?.profile_entries) ? extensions.profile_entries.length : 0,
+                        entryOverrideCount: Array.isArray(extensions?.entry_overrides) ? extensions.entry_overrides.length : 0,
                         profileOverrides: extensions?.profile_overrides && typeof extensions.profile_overrides === 'object'
                             ? extensions.profile_overrides
                             : null,
