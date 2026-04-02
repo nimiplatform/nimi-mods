@@ -7,7 +7,7 @@ import { TextEmbedPanel, TextGeneratePanel } from './test-ai-page/panels-text.js
 import { ImageGeneratePanel } from './test-ai-page/panels-image.js';
 import { AudioSynthesizePanel, AudioTranscribePanel, VideoGeneratePanel, VoiceClonePanel, VoiceDesignPanel, } from './test-ai-page/panels-media.js';
 import { type RuntimeCanonicalCapability, type RuntimeRouteBinding } from "@nimiplatform/sdk/mod";
-export { MEDIA_IMAGE_COMPONENTS_REQUIRED_ERROR, bindingForModel, buildAsyncImageJobOutcome, buildImageGenerateRequestParams, buildImageWorkflowComponentSelections, buildImageWorkflowProfileOverrides, buildMediaImageWorkflowExtensionsForRequest, resolveRouteModelPickerState, scenarioJobEventLabel, scenarioJobStatusLabel, toArtifactPreviewUri, } from './test-ai-page/core.js';
+export { MEDIA_IMAGE_COMPONENTS_REQUIRED_ERROR, bindingForModel, buildAsyncImageJobOutcome, buildImageGenerateRequestParams, buildImageWorkflowComponentSelections, buildImageWorkflowProfileOverrides, buildMediaImageWorkflowExtensionsForRequest, companionAssetListQueryForImageWorkflow, resolveRouteModelPickerState, scenarioJobEventLabel, scenarioJobStatusLabel, toArtifactPreviewUri, } from './test-ai-page/core.js';
 export function TestAiPage() {
     const locale = useTestAiLocale();
     const runtimeClient = React.useMemo(() => getTestAiRuntimeClient(), []);

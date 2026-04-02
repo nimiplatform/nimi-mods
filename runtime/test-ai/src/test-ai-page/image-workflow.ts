@@ -1,15 +1,66 @@
 import { IMAGE_WORKFLOW_PRESET_SELECTIONS, MEDIA_IMAGE_COMPONENTS_REQUIRED_ERROR, type CompanionArtifactSelectionsInput, type ImageResponseFormatMode, type ImageWorkflowComponentDraft, type ImageWorkflowProfileOverridesInput, } from './types.js';
 import { asString } from './utils.js';
 import { resolveImageResponseFormat } from './route.js';
-import { buildLocalImageWorkflowExtensions, type LocalImageWorkflowComponentSelection, type ModRuntimeLocalArtifactKind, type ModRuntimeLocalArtifactRecord, type RuntimeRouteBinding } from "@nimiplatform/sdk/mod";
-export function inferArtifactKindForSlot(slot: string): ModRuntimeLocalArtifactKind | undefined {
+import { type ModRuntimeLocalAssetKind, type ModRuntimeLocalAssetRecord, type RuntimeRouteBinding } from "@nimiplatform/sdk/mod";
+export type LocalImageWorkflowComponentSelection = {
+    slot: string;
+    localArtifactId: string;
+};
+const TEST_AI_IMAGE_MAIN_ENTRY_ID = 'test-ai/image-main-model';
+function buildLocalProfileExtensionsCompat(input: {
+    entryOverrides?: Array<{
+        entryId: string;
+        localAssetId: string;
+    }>;
+    profileOverrides?: Record<string, unknown>;
+}): Record<string, unknown> {
+    const merged: Record<string, unknown> = {};
+    const entryOverrides = Array.isArray(input.entryOverrides)
+        ? input.entryOverrides
+            .map((item) => ({
+            entry_id: String(item.entryId || '').trim(),
+            local_asset_id: String(item.localAssetId || '').trim(),
+        }))
+            .filter((item) => item.entry_id && item.local_asset_id)
+        : [];
+    if (entryOverrides.length > 0) {
+        merged.entry_overrides = entryOverrides;
+    }
+    if (input.profileOverrides && Object.keys(input.profileOverrides).length > 0) {
+        merged.profile_overrides = input.profileOverrides;
+    }
+    return merged;
+}
+function localImageComponentEntryId(slot: string): string {
+    return `test-ai/image-slot/${asString(slot)}`;
+}
+function localImageEngine(binding?: RuntimeRouteBinding): string {
+    return asString(binding?.engine || binding?.provider) || 'media';
+}
+function localImageAssetId(binding?: RuntimeRouteBinding): string {
+    let normalized = asString(binding?.modelId || binding?.model);
+    if (normalized.toLowerCase().startsWith('media/')) {
+        normalized = normalized.slice('media/'.length).trim();
+    }
+    return normalized || 'selected-local-image-model';
+}
+export function companionAssetListQueryForImageWorkflow(binding?: RuntimeRouteBinding): {
+    engine: string;
+} | undefined {
+    const engine = asString(binding?.engine || binding?.provider).toLowerCase();
+    if (!engine || engine === 'media') {
+        return undefined;
+    }
+    return { engine };
+}
+export function inferArtifactKindForSlot(slot: string): ModRuntimeLocalAssetKind | undefined {
     const normalized = asString(slot).toLowerCase();
     if (!normalized)
         return undefined;
     if (normalized.includes('vae'))
         return 'vae';
     if (normalized.includes('llm'))
-        return 'llm';
+        return 'chat';
     if (normalized.includes('clip'))
         return 'clip';
     if (normalized.includes('controlnet'))
@@ -20,22 +71,22 @@ export function inferArtifactKindForSlot(slot: string): ModRuntimeLocalArtifactK
         return 'auxiliary';
     return undefined;
 }
-export function isSelectableLocalArtifact(artifact: ModRuntimeLocalArtifactRecord): boolean {
+export function isSelectableLocalArtifact(artifact: ModRuntimeLocalAssetRecord): boolean {
     return artifact.status === 'installed' || artifact.status === 'active';
 }
-export function artifactDisplayLabel(artifact: ModRuntimeLocalArtifactRecord): string {
-    return `${artifact.artifactId} [${artifact.kind}]`;
+export function artifactDisplayLabel(artifact: ModRuntimeLocalAssetRecord): string {
+    return `${artifact.assetId} [${artifact.kind}]`;
 }
-export function artifactsForPresetKind(artifacts: ModRuntimeLocalArtifactRecord[], kind: ModRuntimeLocalArtifactKind): ModRuntimeLocalArtifactRecord[] {
+export function artifactsForPresetKind(artifacts: ModRuntimeLocalAssetRecord[], kind: ModRuntimeLocalAssetKind): ModRuntimeLocalAssetRecord[] {
     return artifacts
         .filter(isSelectableLocalArtifact)
         .filter((artifact) => artifact.kind === kind)
-        .sort((left, right) => `${left.kind}:${left.artifactId}`.localeCompare(`${right.kind}:${right.artifactId}`));
+        .sort((left, right) => `${left.kind}:${left.assetId}`.localeCompare(`${right.kind}:${right.assetId}`));
 }
-export function artifactsForWorkflowSlot(artifacts: ModRuntimeLocalArtifactRecord[], slot: string): ModRuntimeLocalArtifactRecord[] {
+export function artifactsForWorkflowSlot(artifacts: ModRuntimeLocalAssetRecord[], slot: string): ModRuntimeLocalAssetRecord[] {
     const selectableArtifacts = artifacts.filter(isSelectableLocalArtifact);
     const preferredKind = inferArtifactKindForSlot(slot);
-    const sorted = [...selectableArtifacts].sort((left, right) => (`${left.kind}:${left.artifactId}`.localeCompare(`${right.kind}:${right.artifactId}`)));
+    const sorted = [...selectableArtifacts].sort((left, right) => (`${left.kind}:${left.assetId}`.localeCompare(`${right.kind}:${right.assetId}`)));
     if (!preferredKind) {
         return sorted;
     }
@@ -69,6 +120,7 @@ export function buildImageWorkflowComponentSelections(input: CompanionArtifactSe
     }));
 }
 export function buildMediaImageWorkflowExtensionsForRequest(input: CompanionArtifactSelectionsInput & {
+    binding?: RuntimeRouteBinding;
     profileOverrides: Record<string, unknown>;
 }): {
     extensions?: Record<string, unknown>;
@@ -81,11 +133,49 @@ export function buildMediaImageWorkflowExtensionsForRequest(input: CompanionArti
             error: MEDIA_IMAGE_COMPONENTS_REQUIRED_ERROR,
         };
     }
+    const entryOverrides = components.map((component) => ({
+        entryId: localImageComponentEntryId(component.slot),
+        localAssetId: component.localArtifactId,
+    }));
+    const mainLocalAssetId = asString(input.binding?.goRuntimeLocalModelId || input.binding?.localModelId);
+    if (mainLocalAssetId) {
+        entryOverrides.unshift({
+            entryId: TEST_AI_IMAGE_MAIN_ENTRY_ID,
+            localAssetId: mainLocalAssetId,
+        });
+    }
     return {
-        extensions: buildLocalImageWorkflowExtensions({
-            components,
+        extensions: {
+            ...buildLocalProfileExtensionsCompat({
+            entryOverrides,
             profileOverrides: input.profileOverrides,
         }),
+            profile_entries: [
+                {
+                    entryId: TEST_AI_IMAGE_MAIN_ENTRY_ID,
+                    kind: 'asset',
+                    capability: 'image',
+                    title: 'Selected local image model',
+                    required: true,
+                    preferred: true,
+                    assetId: localImageAssetId(input.binding),
+                    assetKind: 'image',
+                    engine: localImageEngine(input.binding),
+                },
+                ...components.map((component) => ({
+                    entryId: localImageComponentEntryId(component.slot),
+                    kind: 'asset',
+                    capability: 'image',
+                    title: `Workflow slot ${component.slot}`,
+                    required: true,
+                    preferred: true,
+                    assetId: component.slot,
+                    assetKind: inferArtifactKindForSlot(component.slot),
+                    engine: localImageEngine(input.binding),
+                    engineSlot: component.slot,
+                })),
+            ],
+        },
         error: null,
     };
 }

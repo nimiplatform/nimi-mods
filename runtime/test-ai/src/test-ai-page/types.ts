@@ -1,4 +1,4 @@
-import { type ModRuntimeLocalArtifactKind, type ModRuntimeResolvedBinding, type RuntimeCanonicalCapability, type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot } from "@nimiplatform/sdk/mod";
+import { type ModRuntimeLocalAssetKind, type ModRuntimeResolvedBinding, type RuntimeCanonicalCapability, type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot } from "@nimiplatform/sdk/mod";
 export type CapabilityId = 'text.generate' | 'text.embed' | 'image.generate' | 'image.create-job' | 'video.generate' | 'audio.synthesize' | 'audio.transcribe' | 'voice.clone' | 'voice.design';
 export type CapabilityMeta = {
     id: CapabilityId;
@@ -104,12 +104,12 @@ export type ImageWorkflowCompanionTier = 'core' | 'extended';
 export type ImageWorkflowPresetSelection = {
     key: ImageWorkflowPresetSelectionKey;
     slot: typeof COMMON_IMAGE_WORKFLOW_SLOTS[number];
-    kind: ModRuntimeLocalArtifactKind;
+    kind: ModRuntimeLocalAssetKind;
     tier: ImageWorkflowCompanionTier;
 };
 export const IMAGE_WORKFLOW_PRESET_SELECTIONS: ImageWorkflowPresetSelection[] = [
     { key: 'vaeModel', slot: 'vae_path', kind: 'vae', tier: 'core' },
-    { key: 'llmModel', slot: 'llm_path', kind: 'llm', tier: 'core' },
+    { key: 'llmModel', slot: 'llm_path', kind: 'chat', tier: 'core' },
     { key: 'clipLModel', slot: 'clip_l_path', kind: 'clip', tier: 'extended' },
     { key: 'clipGModel', slot: 'clip_g_path', kind: 'clip', tier: 'extended' },
     { key: 'controlnetModel', slot: 'controlnet_path', kind: 'controlnet', tier: 'extended' },

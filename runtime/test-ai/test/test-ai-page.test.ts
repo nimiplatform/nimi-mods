@@ -9,6 +9,7 @@ import {
   buildImageWorkflowProfileOverrides,
   buildImageWorkflowComponentSelections,
   buildImageGenerateRequestParams,
+  companionAssetListQueryForImageWorkflow,
   resolveRouteModelPickerState,
   scenarioJobEventLabel,
   scenarioJobStatusLabel,
@@ -142,6 +143,12 @@ test('media image workflow extensions keep explicit components and profile overr
     controlnetModel: '',
     loraModel: '',
     auxiliaryModel: '',
+    binding: {
+      source: 'local',
+      connectorId: '',
+      model: 'media/local/z_image_turbo',
+      localModelId: 'local-image-main',
+    },
     components: [
       { slot: 'controlnet_path', localArtifactId: 'artifact-controlnet' },
     ],
@@ -150,14 +157,94 @@ test('media image workflow extensions keep explicit components and profile overr
 
   assert.equal(result.error, null);
   assert.deepEqual(result.extensions, {
-    components: [
-      { slot: 'vae_path', localArtifactId: 'artifact-vae' },
-      { slot: 'llm_path', localArtifactId: 'artifact-llm' },
-      { slot: 'clip_g_path', localArtifactId: 'artifact-clip-g' },
-      { slot: 'controlnet_path', localArtifactId: 'artifact-controlnet' },
+    entry_overrides: [
+      { entry_id: 'test-ai/image-main-model', local_asset_id: 'local-image-main' },
+      { entry_id: 'test-ai/image-slot/vae_path', local_asset_id: 'artifact-vae' },
+      { entry_id: 'test-ai/image-slot/llm_path', local_asset_id: 'artifact-llm' },
+      { entry_id: 'test-ai/image-slot/clip_g_path', local_asset_id: 'artifact-clip-g' },
+      { entry_id: 'test-ai/image-slot/controlnet_path', local_asset_id: 'artifact-controlnet' },
+    ],
+    profile_entries: [
+      {
+        entryId: 'test-ai/image-main-model',
+        kind: 'asset',
+        capability: 'image',
+        title: 'Selected local image model',
+        required: true,
+        preferred: true,
+        assetId: 'local/z_image_turbo',
+        assetKind: 'image',
+        engine: 'media',
+      },
+      {
+        entryId: 'test-ai/image-slot/vae_path',
+        kind: 'asset',
+        capability: 'image',
+        title: 'Workflow slot vae_path',
+        required: true,
+        preferred: true,
+        assetId: 'vae_path',
+        assetKind: 'vae',
+        engine: 'media',
+        engineSlot: 'vae_path',
+      },
+      {
+        entryId: 'test-ai/image-slot/llm_path',
+        kind: 'asset',
+        capability: 'image',
+        title: 'Workflow slot llm_path',
+        required: true,
+        preferred: true,
+        assetId: 'llm_path',
+        assetKind: 'chat',
+        engine: 'media',
+        engineSlot: 'llm_path',
+      },
+      {
+        entryId: 'test-ai/image-slot/clip_g_path',
+        kind: 'asset',
+        capability: 'image',
+        title: 'Workflow slot clip_g_path',
+        required: true,
+        preferred: true,
+        assetId: 'clip_g_path',
+        assetKind: 'clip',
+        engine: 'media',
+        engineSlot: 'clip_g_path',
+      },
+      {
+        entryId: 'test-ai/image-slot/controlnet_path',
+        kind: 'asset',
+        capability: 'image',
+        title: 'Workflow slot controlnet_path',
+        required: true,
+        preferred: true,
+        assetId: 'controlnet_path',
+        assetKind: 'controlnet',
+        engine: 'media',
+        engineSlot: 'controlnet_path',
+      },
     ],
     profile_overrides: { step: 25, options: ['diffusion_model'] },
   });
+});
+
+test('media image companion queries do not filter out cross-engine chat assets', () => {
+  assert.equal(companionAssetListQueryForImageWorkflow({
+    source: 'local',
+    connectorId: '',
+    provider: 'media',
+    engine: 'media',
+    model: 'z-image-turbo-Q4_K',
+  }), undefined);
+
+  assert.deepEqual(companionAssetListQueryForImageWorkflow({
+    source: 'local',
+    connectorId: '',
+    provider: 'speech',
+    engine: 'speech',
+    model: 'kokoro-tts',
+  }), { engine: 'speech' });
 });
 
 test('image workflow profile overrides merge structured fields with raw json', () => {

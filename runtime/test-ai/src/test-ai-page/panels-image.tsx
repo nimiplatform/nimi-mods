@@ -1,10 +1,10 @@
 import React from 'react';
-import { IMAGE_WORKFLOW_PRESET_SELECTIONS, artifactsForPresetKind, asString, buildAsyncImageJobOutcome, buildImageGenerateRequestParams, buildImageWorkflowProfileOverrides, buildMediaImageWorkflowExtensionsForRequest, isSelectableLocalArtifact, isTerminalScenarioJobStatus, localizeKnownMessage, localizedJobEvent, localizedJobStatus, makeEmptyDiagnostics, resolveEffectiveBinding, scenarioJobEventLabel, scenarioJobStatusLabel, stripArtifacts, toArtifactPreviewUri, toPrettyJson, useTestAiLocale, } from './core.js';
+import { IMAGE_WORKFLOW_PRESET_SELECTIONS, artifactsForPresetKind, asString, buildAsyncImageJobOutcome, buildImageGenerateRequestParams, buildImageWorkflowProfileOverrides, buildMediaImageWorkflowExtensionsForRequest, companionAssetListQueryForImageWorkflow, isSelectableLocalArtifact, isTerminalScenarioJobStatus, localizeKnownMessage, localizedJobEvent, localizedJobStatus, makeEmptyDiagnostics, resolveEffectiveBinding, scenarioJobEventLabel, scenarioJobStatusLabel, stripArtifacts, toArtifactPreviewUri, toPrettyJson, useTestAiLocale, } from './core.js';
 import type { CapabilityState, ImageWorkflowDraftState, ImageWorkflowPresetSelectionKey, } from './core.js';
 import { DiagnosticsPanel, ErrorBox, InfoBox, RawJsonSection, RouteBindingEditor, RunButton, } from './components.js';
 import { ImageDraftEditor } from './image-draft-editor.js';
 import { ImageJobPanel } from './image-job-panel.js';
-import { type ModRuntimeClient, type ModRuntimeLocalArtifactRecord, type ModRuntimeResolvedBinding, type RuntimeCanonicalCapability, type RuntimeRouteBinding } from "@nimiplatform/sdk/mod";
+import { type ModRuntimeClient, type ModRuntimeLocalAssetRecord, type ModRuntimeResolvedBinding, type RuntimeCanonicalCapability, type RuntimeRouteBinding } from "@nimiplatform/sdk/mod";
 type ImageGeneratePanelProps = {
     mode: 'generate' | 'job';
     state: CapabilityState;
@@ -18,7 +18,7 @@ type ImageGeneratePanelProps = {
 export function ImageGeneratePanel(props: ImageGeneratePanelProps) {
     const locale = useTestAiLocale();
     const { mode, state, runtimeClient, draft, onDraftChange, onStateChange, onRouteReload, onBindingChange, } = props;
-    const [artifacts, setArtifacts] = React.useState<ModRuntimeLocalArtifactRecord[]>([]);
+    const [artifacts, setArtifacts] = React.useState<ModRuntimeLocalAssetRecord[]>([]);
     const [artifactLoading, setArtifactLoading] = React.useState(false);
     const [artifactError, setArtifactError] = React.useState('');
     const [watchJobId, setWatchJobId] = React.useState('');
@@ -49,7 +49,7 @@ export function ImageGeneratePanel(props: ImageGeneratePanelProps) {
         let cancelled = false;
         setArtifactLoading(true);
         setArtifactError('');
-        void runtimeClient.local.listArtifacts(localEngine ? { engine: localEngine } : undefined).then((rows) => {
+        void runtimeClient.local.listAssets(companionAssetListQueryForImageWorkflow(effectiveBinding || undefined)).then((rows) => {
             if (cancelled)
                 return;
             setArtifacts(rows);
@@ -64,14 +64,14 @@ export function ImageGeneratePanel(props: ImageGeneratePanelProps) {
         return () => {
             cancelled = true;
         };
-    }, [runtimeClient, isMediaImageWorkflow, localEngine]);
+    }, [runtimeClient, isMediaImageWorkflow, effectiveBinding]);
     React.useEffect(() => {
         if (!isMediaImageWorkflow) {
             return;
         }
         const selectableArtifactIds = new Set(artifacts
             .filter(isSelectableLocalArtifact)
-            .map((artifact) => artifact.localArtifactId));
+            .map((artifact) => artifact.localAssetId));
         const nextPresetSelections = Object.fromEntries(IMAGE_WORKFLOW_PRESET_SELECTIONS.map((preset) => {
             const current = draft[preset.key];
             return [
@@ -146,6 +146,7 @@ export function ImageGeneratePanel(props: ImageGeneratePanelProps) {
                 controlnetModel: draft.controlnetModel,
                 loraModel: draft.loraModel,
                 auxiliaryModel: draft.auxiliaryModel,
+                binding,
                 components: draft.componentDrafts,
                 profileOverrides: profileOverridesResult.overrides,
             });
@@ -390,13 +391,24 @@ export function ImageGeneratePanel(props: ImageGeneratePanelProps) {
         catch (error) {
             const elapsed = Date.now() - t0;
             const message = error instanceof Error ? error.message : String(error || (mode === 'job' ? locale.image.submitFailed : locale.image.generateFailed));
+            const errorRecord = error && typeof error === 'object'
+                ? error as Record<string, unknown>
+                : null;
+            const debugError = {
+                message,
+                ...(typeof errorRecord?.reasonCode === 'string' ? { reasonCode: errorRecord.reasonCode } : {}),
+                ...(typeof errorRecord?.actionHint === 'string' ? { actionHint: errorRecord.actionHint } : {}),
+                ...(typeof errorRecord?.traceId === 'string' ? { traceId: errorRecord.traceId } : {}),
+                ...(typeof errorRecord?.retryable === 'boolean' ? { retryable: errorRecord.retryable } : {}),
+                ...(errorRecord?.details && typeof errorRecord.details === 'object' ? { details: errorRecord.details as Record<string, unknown> } : {}),
+            };
             onStateChange((prev) => ({
                 ...prev,
                 busy: false,
                 result: 'failed',
                 error: message,
                 output: [],
-                rawResponse: toPrettyJson({ request: requestParams, resolved, error: message }),
+                rawResponse: toPrettyJson({ request: requestParams, resolved, error: debugError }),
                 diagnostics: { requestParams, resolvedRoute: resolved ?? null, responseMetadata: { elapsed } },
             }));
         }
@@ -463,7 +475,7 @@ export function ImageGeneratePanel(props: ImageGeneratePanelProps) {
     const companionPresetArtifacts = React.useMemo(() => (Object.fromEntries(IMAGE_WORKFLOW_PRESET_SELECTIONS.map((preset) => [
         preset.key,
         artifactsForPresetKind(artifacts, preset.kind),
-    ])) as Record<ImageWorkflowPresetSelectionKey, ModRuntimeLocalArtifactRecord[]>), [artifacts]);
+    ])) as Record<ImageWorkflowPresetSelectionKey, ModRuntimeLocalAssetRecord[]>), [artifacts]);
     const hasKnownCompanionArtifacts = React.useMemo(() => IMAGE_WORKFLOW_PRESET_SELECTIONS.some((preset) => (companionPresetArtifacts[preset.key] || []).length > 0), [companionPresetArtifacts]);
     const coreCompanionPresets = React.useMemo(() => IMAGE_WORKFLOW_PRESET_SELECTIONS.filter((preset) => preset.tier === 'core'), []);
     const extendedCompanionPresets = React.useMemo(() => IMAGE_WORKFLOW_PRESET_SELECTIONS.filter((preset) => preset.tier === 'extended'), []);

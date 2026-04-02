@@ -59,7 +59,7 @@ function createSdkRuntimeContext() {
       }),
     },
     local: {
-      listArtifacts: async () => [],
+      listAssets: async () => [],
     },
     ai: {
       text: {
@@ -250,7 +250,7 @@ test('test-ai runtime client exposes embed, stt, video api surfaces', async () =
     assert.equal(typeof client.media.tts.listVoices, 'function', 'media.tts.listVoices must be a function');
     assert.equal(typeof client.media.image.generate, 'function', 'media.image.generate must be a function');
     assert.equal(typeof client.media.jobs.submit, 'function', 'media.jobs.submit must be a function');
-    assert.equal(typeof client.local.listArtifacts, 'function', 'local.listArtifacts must be a function');
+    assert.equal(typeof client.local.listAssets, 'function', 'local.listAssets must be a function');
   } finally {
     restoreHost();
   }

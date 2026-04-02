@@ -1,18 +1,18 @@
 import React from 'react';
 import { COMMON_IMAGE_WORKFLOW_SLOTS, artifactDisplayLabel, artifactsForWorkflowSlot, presetLabel, useTestAiLocale, } from './core.js';
 import type { ImageResponseFormatMode, ImageWorkflowDraftState, ImageWorkflowPresetSelection, ImageWorkflowPresetSelectionKey, } from './core.js';
-import { type ModRuntimeLocalArtifactRecord } from "@nimiplatform/sdk/mod";
+import { type ModRuntimeLocalAssetRecord } from "@nimiplatform/sdk/mod";
 type ImageDraftEditorProps = {
     draft: ImageWorkflowDraftState;
     updateDraft: (updater: Partial<ImageWorkflowDraftState> | ((prev: ImageWorkflowDraftState) => ImageWorkflowDraftState)) => void;
     isMediaImageWorkflow: boolean;
-    artifacts: ModRuntimeLocalArtifactRecord[];
+    artifacts: ModRuntimeLocalAssetRecord[];
     artifactLoading: boolean;
     artifactError: string;
     hasKnownCompanionArtifacts: boolean;
     coreCompanionPresets: ImageWorkflowPresetSelection[];
     extendedCompanionPresets: ImageWorkflowPresetSelection[];
-    companionPresetArtifacts: Record<ImageWorkflowPresetSelectionKey, ModRuntimeLocalArtifactRecord[]>;
+    companionPresetArtifacts: Record<ImageWorkflowPresetSelectionKey, ModRuntimeLocalAssetRecord[]>;
     onAddComponent: () => void;
     onRemoveComponent: (componentId: string) => void;
     onComponentChange: (componentId: string, key: 'slot' | 'localArtifactId', value: string) => void;
@@ -21,7 +21,7 @@ function CompanionPresetSelect(props: {
     preset: ImageWorkflowPresetSelection;
     draft: ImageWorkflowDraftState;
     artifactLoading: boolean;
-    presetArtifacts: ModRuntimeLocalArtifactRecord[];
+    presetArtifacts: ModRuntimeLocalAssetRecord[];
     onChange: (value: string) => void;
 }) {
     const locale = useTestAiLocale();
@@ -30,7 +30,7 @@ function CompanionPresetSelect(props: {
       <span className="text-gray-500">{presetLabel(locale, preset.key)}</span>
       <select className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs" value={draft[preset.key]} onChange={(event) => onChange(event.target.value)} disabled={artifactLoading || presetArtifacts.length === 0}>
         <option value="">{locale.image.layerOptional}</option>
-        {presetArtifacts.map((artifact) => (<option key={artifact.localArtifactId} value={artifact.localArtifactId}>
+        {presetArtifacts.map((artifact) => (<option key={artifact.localAssetId} value={artifact.localAssetId}>
             {artifactDisplayLabel(artifact)}
           </option>))}
       </select>
@@ -148,10 +148,10 @@ export function ImageDraftEditor(props: ImageDraftEditorProps) {
                   {locale.image.noExtraComponents}
                 </div>) : null}
               {draft.componentDrafts.map((component) => {
-                const selectedArtifact = artifacts.find((artifact) => artifact.localArtifactId === component.localArtifactId) || null;
+                const selectedArtifact = artifacts.find((artifact) => artifact.localAssetId === component.localArtifactId) || null;
                 const artifactChoices = (() => {
                     const choices = artifactsForWorkflowSlot(artifacts, component.slot);
-                    if (selectedArtifact && !choices.some((artifact) => artifact.localArtifactId === selectedArtifact.localArtifactId)) {
+                    if (selectedArtifact && !choices.some((artifact) => artifact.localAssetId === selectedArtifact.localAssetId)) {
                         return [selectedArtifact, ...choices];
                     }
                     return choices;
@@ -165,7 +165,7 @@ export function ImageDraftEditor(props: ImageDraftEditorProps) {
                       <span className="text-gray-500">{locale.image.artifact}</span>
                       <select className="rounded-md border border-gray-300 bg-white px-2 py-1 font-mono text-xs" value={component.localArtifactId} onChange={(event) => onComponentChange(component.id, 'localArtifactId', event.target.value)} disabled={artifactLoading || artifactChoices.length === 0}>
                         <option value="">{locale.image.layerOptional}</option>
-                        {artifactChoices.map((artifact) => (<option key={artifact.localArtifactId} value={artifact.localArtifactId}>
+                        {artifactChoices.map((artifact) => (<option key={artifact.localAssetId} value={artifact.localAssetId}>
                             {artifactDisplayLabel(artifact)}
                           </option>))}
                       </select>
