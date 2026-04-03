@@ -16,6 +16,9 @@ export function VideoGeneratePanel(props: VideoGeneratePanelProps) {
     const [mode, setMode] = React.useState<VideoMode>('t2v');
     const [prompt, setPrompt] = React.useState<string>(locale.video.defaultPrompt);
     const [refImageUri, setRefImageUri] = React.useState('');
+    const [ratio, setRatio] = React.useState('16:9');
+    const [durationSec, setDurationSec] = React.useState(5);
+    const [generateAudio, setGenerateAudio] = React.useState(false);
     const isI2v = mode !== 't2v';
     const handleRun = React.useCallback(async () => {
         if (!asString(prompt)) {
@@ -44,8 +47,13 @@ export function VideoGeneratePanel(props: VideoGeneratePanelProps) {
             const role = mode === 'i2v-first-frame' ? 'first_frame' : 'reference_image';
             contentItems.push({ type: 'image_url', role, imageUrl: refImageUri });
         }
+        const options = {
+            ratio,
+            durationSec,
+            generateAudio,
+        };
         const requestParams: Record<string, unknown> = {
-            mode, prompt,
+            mode, prompt, options,
             ...(refImageUri ? { refImageUri } : {}),
             content: contentItems,
             ...(binding ? { binding } : {}),
@@ -53,7 +61,7 @@ export function VideoGeneratePanel(props: VideoGeneratePanelProps) {
         let resolved: ModRuntimeResolvedBinding | undefined;
         try {
             resolved = await runtimeClient.route.resolve({ capability: 'video.generate' as RuntimeCanonicalCapability, binding });
-            const result = await runtimeClient.media.video.generate({ mode, content: contentItems, prompt, binding });
+            const result = await runtimeClient.media.video.generate({ mode, content: contentItems, prompt, options, binding });
             const elapsed = Date.now() - t0;
             onStateChange((prev) => ({
                 ...prev,
@@ -76,17 +84,20 @@ export function VideoGeneratePanel(props: VideoGeneratePanelProps) {
         }
         catch (error) {
             const elapsed = Date.now() - t0;
-            const message = error instanceof Error ? error.message : String(error || locale.video.failed);
+            const baseMessage = error instanceof Error ? error.message : String(error || locale.video.failed);
+            const details = (error as Record<string, unknown>)?.details as Record<string, unknown> | undefined;
+            const providerMessage = details?.provider_message as string | undefined;
+            const message = providerMessage ? `${baseMessage} [provider: ${providerMessage}]` : baseMessage;
             onStateChange((prev) => ({
                 ...prev,
                 busy: false,
                 result: 'failed',
                 error: message,
-                rawResponse: toPrettyJson({ request: requestParams, resolved, error: message }),
+                rawResponse: toPrettyJson({ request: requestParams, resolved, error: message, details }),
                 diagnostics: { requestParams, resolvedRoute: resolved ?? null, responseMetadata: { elapsed } },
             }));
         }
-    }, [isI2v, locale, mode, prompt, refImageUri, state.snapshot, state.binding, runtimeClient, onStateChange]);
+    }, [isI2v, locale, mode, prompt, refImageUri, ratio, durationSec, generateAudio, state.snapshot, state.binding, runtimeClient, onStateChange]);
     return (<div className="flex flex-col gap-3">
       <RouteBindingEditor capabilityId="video.generate" snapshot={state.snapshot} binding={state.binding} loading={state.routeLoading} error={state.routeError} onReload={onRouteReload} onBindingChange={(binding) => onStateChange((prev) => ({ ...prev, binding }))}/>
       <label className="flex flex-col gap-1 text-xs">
@@ -99,6 +110,27 @@ export function VideoGeneratePanel(props: VideoGeneratePanelProps) {
       </label>
       <textarea className="h-20 w-full resize-y rounded-lg border border-gray-300 bg-white p-2 font-mono text-xs" value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder={locale.video.promptPlaceholder}/>
       {isI2v ? (<input className="w-full rounded-lg border border-gray-300 bg-white p-2 font-mono text-xs" value={refImageUri} onChange={(event) => setRefImageUri(event.target.value)} placeholder={locale.video.referenceImagePlaceholder}/>) : null}
+      <div className="grid grid-cols-3 gap-2">
+        <label className="flex flex-col gap-1 text-xs">
+          <span className="text-gray-500">Ratio</span>
+          <select className="rounded-md border border-gray-300 bg-white px-2 py-1" value={ratio} onChange={(event) => setRatio(event.target.value)}>
+            <option value="16:9">16:9</option>
+            <option value="9:16">9:16</option>
+            <option value="1:1">1:1</option>
+            <option value="4:3">4:3</option>
+            <option value="3:4">3:4</option>
+            <option value="21:9">21:9</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs">
+          <span className="text-gray-500">Duration (s)</span>
+          <input type="number" min={1} max={11} className="rounded-md border border-gray-300 bg-white px-2 py-1" value={durationSec} onChange={(event) => setDurationSec(Number(event.target.value) || 5)}/>
+        </label>
+        <label className="flex items-center gap-1.5 text-xs pt-4">
+          <input type="checkbox" checked={generateAudio} onChange={(event) => setGenerateAudio(event.target.checked)}/>
+          <span className="text-gray-500">Audio</span>
+        </label>
+      </div>
       <RunButton busy={state.busy} label={locale.video.run} onClick={() => { void handleRun(); }}/>
       {state.error ? <ErrorBox message={state.error}/> : null}
       <DiagnosticsPanel diagnostics={state.diagnostics}/>

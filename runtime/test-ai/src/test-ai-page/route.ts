@@ -71,10 +71,8 @@ export function hydrateLocalRuntimeBinding(snapshot: RuntimeRouteOptionsSnapshot
     }
     const normalizedLocalModelId = asString(binding.localModelId);
     const normalizedModelId = normalizeLocalRuntimeModelRoot(binding.modelId || binding.model);
-    const normalizedEngine = asString(binding.engine || binding.provider).toLowerCase();
     const localModel = (snapshot.local?.models || []).find((item) => ((normalizedLocalModelId && asString(item.localModelId) === normalizedLocalModelId)
-        || (normalizeLocalRuntimeModelRoot(item.modelId || item.model) === normalizedModelId
-            && (!normalizedEngine || asString(item.engine || item.provider).toLowerCase() === normalizedEngine)))) || null;
+        || (normalizeLocalRuntimeModelRoot(item.modelId || item.model) === normalizedModelId))) || null;
     if (!localModel) {
         return {
             ...binding,

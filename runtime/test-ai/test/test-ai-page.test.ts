@@ -174,7 +174,6 @@ test('media image workflow extensions keep explicit components and profile overr
         preferred: true,
         assetId: 'local/z_image_turbo',
         assetKind: 'image',
-        engine: 'media',
       },
       {
         entryId: 'test-ai/image-slot/vae_path',
@@ -185,7 +184,6 @@ test('media image workflow extensions keep explicit components and profile overr
         preferred: true,
         assetId: 'vae_path',
         assetKind: 'vae',
-        engine: 'media',
         engineSlot: 'vae_path',
       },
       {
@@ -197,7 +195,6 @@ test('media image workflow extensions keep explicit components and profile overr
         preferred: true,
         assetId: 'llm_path',
         assetKind: 'chat',
-        engine: 'media',
         engineSlot: 'llm_path',
       },
       {
@@ -209,7 +206,6 @@ test('media image workflow extensions keep explicit components and profile overr
         preferred: true,
         assetId: 'clip_g_path',
         assetKind: 'clip',
-        engine: 'media',
         engineSlot: 'clip_g_path',
       },
       {
@@ -221,7 +217,6 @@ test('media image workflow extensions keep explicit components and profile overr
         preferred: true,
         assetId: 'controlnet_path',
         assetKind: 'controlnet',
-        engine: 'media',
         engineSlot: 'controlnet_path',
       },
     ],
@@ -238,13 +233,13 @@ test('media image companion queries do not filter out cross-engine chat assets',
     model: 'z-image-turbo-Q4_K',
   }), undefined);
 
-  assert.deepEqual(companionAssetListQueryForImageWorkflow({
+  assert.equal(companionAssetListQueryForImageWorkflow({
     source: 'local',
     connectorId: '',
     provider: 'speech',
     engine: 'speech',
     model: 'kokoro-tts',
-  }), { engine: 'speech' });
+  }), undefined);
 });
 
 test('image workflow profile overrides merge structured fields with raw json', () => {

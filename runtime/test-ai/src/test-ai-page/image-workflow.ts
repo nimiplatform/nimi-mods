@@ -34,9 +34,6 @@ function buildLocalProfileExtensionsCompat(input: {
 function localImageComponentEntryId(slot: string): string {
     return `test-ai/image-slot/${asString(slot)}`;
 }
-function localImageEngine(binding?: RuntimeRouteBinding): string {
-    return asString(binding?.engine || binding?.provider) || 'media';
-}
 function localImageAssetId(binding?: RuntimeRouteBinding): string {
     let normalized = asString(binding?.modelId || binding?.model);
     if (normalized.toLowerCase().startsWith('media/')) {
@@ -44,14 +41,8 @@ function localImageAssetId(binding?: RuntimeRouteBinding): string {
     }
     return normalized || 'selected-local-image-model';
 }
-export function companionAssetListQueryForImageWorkflow(binding?: RuntimeRouteBinding): {
-    engine: string;
-} | undefined {
-    const engine = asString(binding?.engine || binding?.provider).toLowerCase();
-    if (!engine || engine === 'media') {
-        return undefined;
-    }
-    return { engine };
+export function companionAssetListQueryForImageWorkflow(_binding?: RuntimeRouteBinding): undefined {
+    return undefined;
 }
 export function inferArtifactKindForSlot(slot: string): ModRuntimeLocalAssetKind | undefined {
     const normalized = asString(slot).toLowerCase();
@@ -160,7 +151,6 @@ export function buildMediaImageWorkflowExtensionsForRequest(input: CompanionArti
                     preferred: true,
                     assetId: localImageAssetId(input.binding),
                     assetKind: 'image',
-                    engine: localImageEngine(input.binding),
                 },
                 ...components.map((component) => ({
                     entryId: localImageComponentEntryId(component.slot),
@@ -171,7 +161,6 @@ export function buildMediaImageWorkflowExtensionsForRequest(input: CompanionArti
                     preferred: true,
                     assetId: component.slot,
                     assetKind: inferArtifactKindForSlot(component.slot),
-                    engine: localImageEngine(input.binding),
                     engineSlot: component.slot,
                 })),
             ],
