@@ -59,9 +59,9 @@ export function buildPromptTrace(input: BuildPromptTraceInput): LocalChatPromptT
         id: `trace-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
         conversationId: input.contextPacket.conversationId,
         routeSource: input.routeSnapshot?.source
-            || (input.routeBinding?.source || input.chatRouteOptions?.selected.source || 'unknown'),
+            || (input.routeBinding?.source || input.chatRouteOptions?.selected?.source || 'unknown'),
         routeModel: input.routeSnapshot?.model
-            || (input.routeBinding?.model || input.chatRouteOptions?.selected.model || ''),
+            || (input.routeBinding?.model || input.chatRouteOptions?.selected?.model || ''),
         promptChars: input.compiledPrompt.prompt.length,
         layerOrder: [...input.compiledPrompt.layerOrder],
         appliedLayers,

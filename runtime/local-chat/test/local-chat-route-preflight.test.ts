@@ -3,14 +3,14 @@ import test from 'node:test';
 
 import { createSendFlowHarness, createTestTarget, withLocalChatTestEnv } from './helpers/local-chat-test-harness.ts';
 
-test('send-flow blocks local turn before first beat when runtime route health is unavailable', async () => {
+test('send-flow skips local route preflight and lets the first runtime call surface route failures', async () => {
   await withLocalChatTestEnv({}, async () => {
     const harness = createSendFlowHarness({
       target: createTestTarget(),
     });
 
     let checkRouteHealthCalls = 0;
-    let generationCalls = 0;
+    let streamTextCalls = 0;
     const result = await harness.executeTurn({
       userText: '你好',
       aiClient: {
@@ -26,38 +26,32 @@ test('send-flow blocks local turn before first beat when runtime route health is
           return {
             status: 'unreachable',
             detail: 'runtime local model unavailable',
-            reasonCode: 'AI_LOCAL_MODEL_UNAVAILABLE',
-            actionHint: 'inspect_local_runtime_model_health',
           };
         },
         async generateText() {
-          generationCalls += 1;
-          throw new Error('generateText should not run after failed preflight');
+          throw new Error('runtime local model unavailable');
         },
         async generateObject() {
-          generationCalls += 1;
-          throw new Error('generateObject should not run after failed preflight');
+          throw new Error('generateObject should not run after failed first beat');
         },
         async *streamText() {
-          generationCalls += 1;
-          throw new Error('streamText should not run after failed preflight');
+          streamTextCalls += 1;
+          throw new Error('runtime local model unavailable');
         },
         async generateImage() {
-          generationCalls += 1;
-          throw new Error('generateImage should not run after failed preflight');
+          throw new Error('generateImage should not run after failed first beat');
         },
         async generateVideo() {
-          generationCalls += 1;
-          throw new Error('generateVideo should not run after failed preflight');
+          throw new Error('generateVideo should not run after failed first beat');
         },
       },
     });
 
-    assert.equal(checkRouteHealthCalls, 1);
-    assert.equal(generationCalls, 0);
+    assert.equal(checkRouteHealthCalls, 0);
+    assert.equal(streamTextCalls, 1);
     assert.equal(result.messages.length, 1);
     assert.equal(result.statusBanners.length, 1);
     assert.equal(result.statusBanners[0]?.kind, 'error');
-    assert.equal(result.statusBanners[0]?.message, 'runtime local model unavailable');
+    assert.match(String(result.statusBanners[0]?.message || ''), /runtime local model unavailable/);
   });
 });

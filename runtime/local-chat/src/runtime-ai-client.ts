@@ -7,7 +7,10 @@ export type LocalChatAiRouteInput = {
     capability?: RuntimeCanonicalCapability;
     routeBinding?: RuntimeRouteBinding;
 };
-export type LocalChatAiTextRequest = LocalChatAiRouteInput & {
+type LocalChatAiResolvedRouteRequest = {
+    resolvedRoute?: ModRuntimeResolvedBinding;
+};
+export type LocalChatAiTextRequest = LocalChatAiRouteInput & LocalChatAiResolvedRouteRequest & {
     prompt: string;
     systemPrompt?: string;
     maxTokens?: number;
@@ -19,7 +22,7 @@ export type LocalChatAiTextRequest = LocalChatAiRouteInput & {
     abortSignal?: AbortSignal;
     debugLabel?: string;
 };
-export type LocalChatAiImageRequest = LocalChatAiRouteInput & {
+export type LocalChatAiImageRequest = LocalChatAiRouteInput & LocalChatAiResolvedRouteRequest & {
     prompt: string;
     negativePrompt?: string;
     model?: string;
@@ -27,7 +30,7 @@ export type LocalChatAiImageRequest = LocalChatAiRouteInput & {
     extensions?: Record<string, unknown>;
     timeoutMs?: number;
 };
-export type LocalChatAiVideoRequest = LocalChatAiRouteInput & {
+export type LocalChatAiVideoRequest = LocalChatAiRouteInput & LocalChatAiResolvedRouteRequest & {
     mode: 't2v' | 'i2v-first-frame' | 'i2v-first-last' | 'i2v-reference';
     prompt?: string;
     negativePrompt?: string;
@@ -57,13 +60,13 @@ export type LocalChatAiVideoRequest = LocalChatAiRouteInput & {
         returnLastFrame?: boolean;
     };
 };
-export type LocalChatAiTranscribeRequest = LocalChatAiRouteInput & {
+export type LocalChatAiTranscribeRequest = LocalChatAiRouteInput & LocalChatAiResolvedRouteRequest & {
     audioUri?: string;
     audioBase64?: string;
     mimeType?: string;
     language?: string;
 };
-export type LocalChatAiSpeechRequest = LocalChatAiRouteInput & {
+export type LocalChatAiSpeechRequest = LocalChatAiRouteInput & LocalChatAiResolvedRouteRequest & {
     text: string;
     voice?: string;
     audioFormat?: string;
@@ -170,6 +173,26 @@ export type LocalChatAudioPlaybackSource = {
 function resolveCapability(capability: LocalChatAiRouteInput['capability'], fallback: RuntimeCanonicalCapability = 'text.generate'): RuntimeCanonicalCapability {
     return capability || fallback;
 }
+function normalizeRouteCacheString(value: unknown): string {
+    return String(value ?? '').trim();
+}
+function buildLocalChatAiRouteCacheKey(input?: LocalChatAiRouteInput): string {
+    const binding = input?.routeBinding;
+    return JSON.stringify({
+        capability: resolveCapability(input?.capability),
+        binding: binding
+            ? {
+                source: normalizeRouteCacheString(binding.source),
+                connectorId: normalizeRouteCacheString(binding.connectorId),
+                model: normalizeRouteCacheString(binding.model),
+                localModelId: normalizeRouteCacheString(binding.localModelId),
+                goRuntimeLocalModelId: normalizeRouteCacheString(binding.goRuntimeLocalModelId),
+                goRuntimeStatus: normalizeRouteCacheString(binding.goRuntimeStatus),
+                engine: normalizeRouteCacheString(binding.engine),
+            }
+            : null,
+    });
+}
 const LOCAL_CHAT_LOCAL_IMAGE_MODEL_ID = 'z_image_turbo';
 const LOCAL_CHAT_LOCAL_IMAGE_FAMILY = 'z-image';
 const LOCAL_CHAT_LOCAL_IMAGE_SIZE = '512x512';
@@ -250,6 +273,60 @@ function localAssetSortValue(artifact: ModRuntimeLocalAssetRecord): [
             ? 1
             : 9;
     return [familyPriority, statusPriority, artifact.assetId];
+}
+type LocalChatTurnScopedAiClient = Pick<LocalChatAiClient, 'resolveRoute'> & Partial<Pick<LocalChatAiClient, 'checkRouteHealth' | 'generateText' | 'generateObject' | 'streamText' | 'generateImage' | 'generateVideo' | 'transcribeAudio' | 'synthesizeSpeech'>>;
+export function createTurnScopedLocalChatAiClient<TClient extends LocalChatTurnScopedAiClient>(baseClient: TClient): TClient {
+    const routeCache = new Map<string, Promise<ModRuntimeResolvedBinding>>();
+    const resolveRoute = (async (input?: LocalChatAiRouteInput) => {
+        const key = buildLocalChatAiRouteCacheKey(input);
+        const cached = routeCache.get(key);
+        if (cached) {
+            return cached;
+        }
+        const task = Promise.resolve(baseClient.resolveRoute(input));
+        routeCache.set(key, task);
+        void task.catch(() => {
+            if (routeCache.get(key) === task) {
+                routeCache.delete(key);
+            }
+        });
+        return task;
+    }) as TClient['resolveRoute'];
+    const withResolvedRoute = async <TInput extends LocalChatAiRouteInput>(input: TInput): Promise<TInput & LocalChatAiResolvedRouteRequest> => ({
+        ...input,
+        resolvedRoute: await resolveRoute(input),
+    });
+    const wrapped: LocalChatTurnScopedAiClient = {
+        ...baseClient,
+        resolveRoute,
+    };
+    if (baseClient.checkRouteHealth) {
+        wrapped.checkRouteHealth = ((input?: LocalChatAiRouteInput) => baseClient.checkRouteHealth!(input)) as TClient['checkRouteHealth'];
+    }
+    if (baseClient.generateText) {
+        wrapped.generateText = (async (input: LocalChatAiTextRequest) => baseClient.generateText!(await withResolvedRoute(input))) as TClient['generateText'];
+    }
+    if (baseClient.generateObject) {
+        wrapped.generateObject = (async (input: LocalChatAiTextRequest & {
+            parse?: (text: string) => Record<string, unknown>;
+        }) => baseClient.generateObject!(await withResolvedRoute(input))) as TClient['generateObject'];
+    }
+    if (baseClient.streamText) {
+        wrapped.streamText = ((input: LocalChatAiTextRequest) => baseClient.streamText!(input)) as TClient['streamText'];
+    }
+    if (baseClient.generateImage) {
+        wrapped.generateImage = (async (input: LocalChatAiImageRequest) => baseClient.generateImage!(await withResolvedRoute(input))) as TClient['generateImage'];
+    }
+    if (baseClient.generateVideo) {
+        wrapped.generateVideo = (async (input: LocalChatAiVideoRequest) => baseClient.generateVideo!(await withResolvedRoute(input))) as TClient['generateVideo'];
+    }
+    if (baseClient.transcribeAudio) {
+        wrapped.transcribeAudio = (async (input: LocalChatAiTranscribeRequest) => baseClient.transcribeAudio!(await withResolvedRoute(input))) as TClient['transcribeAudio'];
+    }
+    if (baseClient.synthesizeSpeech) {
+        wrapped.synthesizeSpeech = (async (input: LocalChatAiSpeechRequest) => baseClient.synthesizeSpeech!(await withResolvedRoute(input))) as TClient['synthesizeSpeech'];
+    }
+    return wrapped as TClient;
 }
 function pickLocalImageCompanionAsset(artifacts: ModRuntimeLocalAssetRecord[], kind: 'vae' | 'chat'): ModRuntimeLocalAssetRecord | null {
     const matches = artifacts
@@ -616,7 +693,7 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
         resolveRoute,
         checkRouteHealth,
         generateText: async (input) => {
-            const route = await resolveRoute(input);
+            const route = input.resolvedRoute || await resolveRoute(input);
             const response = await runtimeClient.ai.text.generate({
                 input: input.prompt,
                 system: input.systemPrompt,
@@ -637,6 +714,7 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
         generateObject: async (input) => {
             const parser = input.parse || parseJsonObject;
             const requestSummary = createGenerateObjectRequestSummary(input);
+            const route = input.resolvedRoute || await resolveRoute(input);
             emitGenerateObjectDiagnostic({
                 level: 'info',
                 phase: 'request',
@@ -650,6 +728,7 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
                     maxTokens: input.maxTokens,
                     timeoutMs: input.timeoutMs,
                     temperature: input.temperature,
+                    model: route.model || undefined,
                     binding: input.routeBinding,
                 });
             }
@@ -723,7 +802,7 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
                 text,
                 traceId,
                 promptTraceId: traceId,
-                route: await resolveRoute(input),
+                route,
             };
         },
         streamText: async function* (input) {
@@ -758,7 +837,7 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
             }
         },
         generateImage: async (input) => {
-            const route = await resolveRoute(input);
+            const route = input.resolvedRoute || await resolveRoute(input);
             const useLocalImageWorkflow = shouldInjectLocalImageWorkflow({
                 route,
                 requestedModel: input.model,
@@ -868,7 +947,7 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
             }
         },
         generateVideo: async (input) => {
-            const route = await resolveRoute(input);
+            const route = input.resolvedRoute || await resolveRoute(input);
             try {
                 emitLocalChatLog({
                     level: 'info',
@@ -946,7 +1025,7 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
             }
         },
         transcribeAudio: async (input) => {
-            const route = await resolveRoute(input);
+            const route = input.resolvedRoute || await resolveRoute(input);
             const response = await runtimeClient.media.stt.transcribe({
                 audio: input.audioUri
                     ? { kind: 'url', url: input.audioUri }
@@ -966,7 +1045,7 @@ export function createLocalChatAiClient(runtimeClient: ModRuntimeClient): LocalC
             };
         },
         synthesizeSpeech: async (input) => {
-            const route = await resolveRoute({
+            const route = input.resolvedRoute || await resolveRoute({
                 ...input,
                 capability: input.capability || 'audio.synthesize',
             });

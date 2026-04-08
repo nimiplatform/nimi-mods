@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createLocalChatAiClient, describeLocalChatGenerateObjectFailure, } from '../src/runtime-ai-client.ts';
+import { createLocalChatAiClient, createTurnScopedLocalChatAiClient, describeLocalChatGenerateObjectFailure, } from '../src/runtime-ai-client.ts';
 import { type RuntimeRouteBinding, type ModRuntimeClient } from "@nimiplatform/sdk/mod";
 function createBinding(): RuntimeRouteBinding {
     return {
@@ -44,6 +44,50 @@ test('local-chat runtime ai client: resolveRoute preserves go-runtime metadata',
     assert.equal(route.localModelId, 'qwen-tts');
     assert.equal(route.goRuntimeLocalModelId, 'go-qwen-tts');
     assert.equal(route.goRuntimeStatus, 'active');
+});
+test('local-chat runtime ai client: turn-scoped wrapper reuses resolved route across repeated text stages', async () => {
+    let resolveCalls = 0;
+    const runtimeClient = {
+        route: {
+            resolve: async () => {
+                resolveCalls += 1;
+                return createResolvedRoute();
+            },
+        },
+        ai: {
+            text: {
+                generate: async () => ({
+                    text: '{"ok":true}',
+                    trace: {
+                        traceId: 'trace-turn-scoped',
+                    },
+                }),
+                stream: async () => ({
+                    stream: (async function* () {
+                        yield {
+                            type: 'finish' as const,
+                            finishReason: 'stop',
+                            usage: {},
+                            trace: {
+                                traceId: 'trace-stream',
+                            },
+                        };
+                    })(),
+                }),
+            },
+        },
+    } as unknown as ModRuntimeClient;
+    const aiClient = createTurnScopedLocalChatAiClient(createLocalChatAiClient(runtimeClient));
+    await aiClient.generateText({
+        prompt: '第一阶段',
+        routeBinding: createBinding(),
+    });
+    const objectResult = await aiClient.generateObject({
+        prompt: '第二阶段',
+        routeBinding: createBinding(),
+    });
+    assert.equal(resolveCalls, 1);
+    assert.equal(objectResult.route.model, 'gemini-2.5-flash');
 });
 test('local-chat runtime ai client: streamText rethrows runtime stream errors', async () => {
     const runtimeClient = {
@@ -245,6 +289,9 @@ test('local-chat runtime ai client: generateObject repairs missing colon between
 });
 test('local-chat runtime ai client: generateObject exposes call failure metadata', async () => {
     const runtimeClient = {
+        route: {
+            resolve: async () => createResolvedRoute(),
+        },
         ai: {
             text: {
                 generate: async () => {
@@ -281,6 +328,9 @@ test('local-chat runtime ai client: generateObject exposes call failure metadata
 });
 test('local-chat runtime ai client: generateObject exposes parse failure metadata and raw text preview', async () => {
     const runtimeClient = {
+        route: {
+            resolve: async () => createResolvedRoute(),
+        },
         ai: {
             text: {
                 generate: async () => ({

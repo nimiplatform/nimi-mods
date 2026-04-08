@@ -9,6 +9,42 @@ import type { ChatRouteSnapshot, UseLocalChatRuntimeRouteInput } from './runtime
 import { type RuntimeRouteBinding, type RuntimeCanonicalCapability, type RuntimeRouteOptionsSnapshot, type RuntimeRouteSource } from "@nimiplatform/sdk/mod";
 type RouteCapability = RuntimeCanonicalCapability;
 type RouteOptionsCapability = 'text.generate' | 'image.generate' | 'video.generate' | 'audio.synthesize' | 'audio.transcribe';
+const ALL_ROUTE_OPTIONS_CAPABILITIES: RouteOptionsCapability[] = [
+    'text.generate',
+    'image.generate',
+    'video.generate',
+    'audio.synthesize',
+    'audio.transcribe',
+];
+const SECONDARY_ROUTE_OPTIONS_CAPABILITIES: RouteOptionsCapability[] = ALL_ROUTE_OPTIONS_CAPABILITIES.filter((capability) => capability !== 'text.generate');
+const MEDIA_ROUTE_OPTIONS_CAPABILITIES: RouteOptionsCapability[] = [
+    'image.generate',
+    'video.generate',
+];
+const VOICE_ROUTE_OPTIONS_CAPABILITIES: RouteOptionsCapability[] = [
+    'audio.synthesize',
+    'audio.transcribe',
+];
+const ROUTE_SNAPSHOT_FOCUS_DEBOUNCE_MS = 10000;
+export function resolveRequestedRouteOptionsCapabilities(input: {
+    requestedCapabilities?: Iterable<RouteOptionsCapability> | null;
+}): RouteOptionsCapability[] {
+    const requested = new Set(input.requestedCapabilities || ['text.generate']);
+    return ALL_ROUTE_OPTIONS_CAPABILITIES.filter((capability) => requested.has(capability));
+}
+export function shouldSkipRouteSnapshotRefresh(input: {
+    lastCompletedAtMs?: number | null;
+    nowMs?: number;
+    debounceMs?: number;
+}): boolean {
+    const lastCompletedAtMs = Number(input.lastCompletedAtMs || 0);
+    if (!Number.isFinite(lastCompletedAtMs) || lastCompletedAtMs <= 0) {
+        return false;
+    }
+    const nowMs = Number.isFinite(input.nowMs) ? Number(input.nowMs) : Date.now();
+    const debounceMs = Number.isFinite(input.debounceMs) ? Math.max(0, Number(input.debounceMs)) : ROUTE_SNAPSHOT_FOCUS_DEBOUNCE_MS;
+    return (nowMs - lastCompletedAtMs) < debounceMs;
+}
 export function hasValidTokenApiChatModelSelection(input: {
     model: string;
     models: string[];
@@ -55,7 +91,22 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
     const [sttRouteOptions, setSttRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
     const [routeBinding, setRouteBinding] = useState<RuntimeRouteBinding | null>(null);
     const [routeBindingHydrated, setRouteBindingHydrated] = useState(false);
+    const [requestedCapabilitiesRevision, setRequestedCapabilitiesRevision] = useState(0);
     const routeOptionsLoadInFlightRef = useRef<Partial<Record<RouteOptionsCapability, Promise<RuntimeRouteOptionsSnapshot | null>>>>({});
+    const requestedCapabilitiesRef = useRef<Set<RouteOptionsCapability>>(new Set(['text.generate']));
+    const lastRouteSnapshotCompletedAtRef = useRef<number | null>(null);
+    const markRouteOptionsRequested = useCallback((capabilities: RouteOptionsCapability[]) => {
+        let changed = false;
+        capabilities.forEach((capability) => {
+            if (!requestedCapabilitiesRef.current.has(capability)) {
+                requestedCapabilitiesRef.current.add(capability);
+                changed = true;
+            }
+        });
+        if (changed) {
+            setRequestedCapabilitiesRevision((previous) => previous + 1);
+        }
+    }, []);
     const setRouteOptionsSafely = useCallback((capability: RouteOptionsCapability, next: RuntimeRouteOptionsSnapshot | null) => {
         if (capability === 'text.generate') {
             setChatRouteOptions((previous) => {
@@ -86,15 +137,27 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
             return;
         }
     }, []);
-    const refreshRouteSnapshot = useCallback(async () => {
-        await resolveRouteSnapshot({
+    const refreshRouteSnapshot = useCallback(async (options?: {
+        force?: boolean;
+    }) => {
+        if (!options?.force && shouldSkipRouteSnapshotRefresh({
+            lastCompletedAtMs: lastRouteSnapshotCompletedAtRef.current,
+        })) {
+            return false;
+        }
+        const refreshed = await resolveRouteSnapshot({
             runtimeClient: input.runtimeClient,
             routeBinding,
             setRouteSnapshot,
             setStatusBanner: input.setStatusBanner,
         });
+        if (refreshed) {
+            lastRouteSnapshotCompletedAtRef.current = Date.now();
+        }
+        return refreshed;
     }, [input.runtimeClient, input.setStatusBanner, routeBinding]);
     const loadRuntimeRouteOptions = useCallback(async (capability: RouteOptionsCapability) => {
+        markRouteOptionsRequested([capability]);
         const inFlight = routeOptionsLoadInFlightRef.current[capability];
         if (inFlight) {
             emitLocalChatLog({
@@ -123,8 +186,8 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
                     capability,
                     loaded: Boolean(loaded),
                     connectorsCount: loaded?.connectors.length ?? 0,
-                    selectedSource: loaded?.selected.source ?? null,
-                    selectedConnectorId: loaded?.selected.connectorId || null,
+                    selectedSource: loaded?.selected?.source ?? null,
+                    selectedConnectorId: loaded?.selected?.connectorId || null,
                 },
             });
             return loaded;
@@ -136,30 +199,58 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
             }
         });
         return task;
-    }, [input.runtimeClient, setRouteOptionsSafely]);
+    }, [input.runtimeClient, markRouteOptionsRequested, setRouteOptionsSafely]);
     const loadChatRuntimeRouteOptions = useCallback(() => loadRuntimeRouteOptions('text.generate'), [loadRuntimeRouteOptions]);
     const loadTtsRuntimeRouteOptions = useCallback(() => loadRuntimeRouteOptions('audio.synthesize'), [loadRuntimeRouteOptions]);
     const loadSttRuntimeRouteOptions = useCallback(() => loadRuntimeRouteOptions('audio.transcribe'), [loadRuntimeRouteOptions]);
     const loadImageRuntimeRouteOptions = useCallback(() => loadRuntimeRouteOptions('image.generate'), [loadRuntimeRouteOptions]);
     const loadVideoRuntimeRouteOptions = useCallback(() => loadRuntimeRouteOptions('video.generate'), [loadRuntimeRouteOptions]);
-    const loadAllRuntimeRouteOptions = useCallback(async () => {
+    const loadRouteOptionsSet = useCallback(async (capabilities: RouteOptionsCapability[]) => {
         // Sequential loading: each call triggers a state update + re-render.
         // Running them in parallel (Promise.all) causes 5 gRPC responses to land
         // in the same frame, flooding the main thread with state updates and
         // re-renders — this was the root cause of the app-wide UI stalls.
-        const chat = await loadChatRuntimeRouteOptions();
-        const image = await loadImageRuntimeRouteOptions();
-        const video = await loadVideoRuntimeRouteOptions();
-        const tts = await loadTtsRuntimeRouteOptions();
-        const stt = await loadSttRuntimeRouteOptions();
+        const requestedCapabilities = resolveRequestedRouteOptionsCapabilities({
+            requestedCapabilities: capabilities,
+        });
+        let chat: RuntimeRouteOptionsSnapshot | null = null;
+        let image: RuntimeRouteOptionsSnapshot | null = null;
+        let video: RuntimeRouteOptionsSnapshot | null = null;
+        let tts: RuntimeRouteOptionsSnapshot | null = null;
+        let stt: RuntimeRouteOptionsSnapshot | null = null;
+        for (const capability of requestedCapabilities) {
+            const loaded = await loadRuntimeRouteOptions(capability);
+            if (capability === 'text.generate') {
+                chat = loaded;
+                continue;
+            }
+            if (capability === 'image.generate') {
+                image = loaded;
+                continue;
+            }
+            if (capability === 'video.generate') {
+                video = loaded;
+                continue;
+            }
+            if (capability === 'audio.synthesize') {
+                tts = loaded;
+                continue;
+            }
+            if (capability === 'audio.transcribe') {
+                stt = loaded;
+            }
+        }
         return { chat, image, video, tts, stt };
     }, [
-        loadChatRuntimeRouteOptions,
-        loadImageRuntimeRouteOptions,
-        loadVideoRuntimeRouteOptions,
-        loadTtsRuntimeRouteOptions,
-        loadSttRuntimeRouteOptions,
+        loadRuntimeRouteOptions,
     ]);
+    const loadVoiceRuntimeRouteOptions = useCallback(() => loadRouteOptionsSet(VOICE_ROUTE_OPTIONS_CAPABILITIES), [loadRouteOptionsSet]);
+    const loadMediaRuntimeRouteOptions = useCallback(() => loadRouteOptionsSet(MEDIA_ROUTE_OPTIONS_CAPABILITIES), [loadRouteOptionsSet]);
+    const loadSecondaryRuntimeRouteOptions = useCallback(() => loadRouteOptionsSet(SECONDARY_ROUTE_OPTIONS_CAPABILITIES), [loadRouteOptionsSet]);
+    const loadAllRuntimeRouteOptions = useCallback(() => loadRouteOptionsSet(ALL_ROUTE_OPTIONS_CAPABILITIES), [loadRouteOptionsSet]);
+    const requestedCapabilities = resolveRequestedRouteOptionsCapabilities({
+        requestedCapabilities: requestedCapabilitiesRef.current,
+    });
     const handleHealthCheck = useCallback(async () => {
         await runRouteHealthCheck({
             runtimeClient: input.runtimeClient,
@@ -217,7 +308,7 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
         void persistLocalChatRouteBinding(routeBinding);
     }, [routeBinding, routeBindingHydrated]);
     useEffect(() => {
-        void refreshRouteSnapshot();
+        void refreshRouteSnapshot({ force: true });
     }, [refreshRouteSnapshot]);
     useEffect(() => {
         let cancelled = false;
@@ -235,13 +326,7 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
                 }
                 let loaded: RuntimeRouteOptionsSnapshot | null = null;
                 try {
-                    const loadedSnapshot = await loadAllRuntimeRouteOptions();
-                    loaded = (loadedSnapshot.chat
-                        || loadedSnapshot.image
-                        || loadedSnapshot.video
-                        || loadedSnapshot.tts
-                        || loadedSnapshot.stt
-                        || null);
+                    loaded = await loadChatRuntimeRouteOptions();
                 }
                 catch {
                     loaded = null;
@@ -255,23 +340,38 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
         return () => {
             cancelled = true;
         };
-    }, [loadAllRuntimeRouteOptions]);
+    }, [loadChatRuntimeRouteOptions]);
     useEffect(() => {
-        const connectorCount = Math.max(chatRouteOptions?.connectors.length || 0, imageRouteOptions?.connectors.length || 0, videoRouteOptions?.connectors.length || 0, ttsRouteOptions?.connectors.length || 0, sttRouteOptions?.connectors.length || 0);
+        const connectorCount = Math.max(...requestedCapabilities.map((capability) => {
+            if (capability === 'text.generate') {
+                return chatRouteOptions?.connectors.length || 0;
+            }
+            if (capability === 'image.generate') {
+                return imageRouteOptions?.connectors.length || 0;
+            }
+            if (capability === 'video.generate') {
+                return videoRouteOptions?.connectors.length || 0;
+            }
+            if (capability === 'audio.synthesize') {
+                return ttsRouteOptions?.connectors.length || 0;
+            }
+            return sttRouteOptions?.connectors.length || 0;
+        }), 0);
         const pollIntervalMs = connectorCount > 0 ? 30000 : 60000;
         const timer = setInterval(() => {
-            void loadAllRuntimeRouteOptions();
+            void loadRouteOptionsSet(requestedCapabilities);
         }, pollIntervalMs);
         return () => {
             clearInterval(timer);
         };
     }, [
+        requestedCapabilitiesRevision,
         chatRouteOptions?.connectors.length,
         imageRouteOptions?.connectors.length,
         videoRouteOptions?.connectors.length,
         ttsRouteOptions?.connectors.length,
         sttRouteOptions?.connectors.length,
-        loadAllRuntimeRouteOptions,
+        loadRouteOptionsSet,
     ]);
     return {
         healthStatus,
@@ -295,6 +395,9 @@ export function useLocalChatRuntimeRoute(input: UseLocalChatRuntimeRouteInput) {
         loadVideoRuntimeRouteOptions,
         loadTtsRuntimeRouteOptions,
         loadSttRuntimeRouteOptions,
+        loadMediaRuntimeRouteOptions,
+        loadVoiceRuntimeRouteOptions,
+        loadSecondaryRuntimeRouteOptions,
         loadAllRuntimeRouteOptions,
         refreshRouteSnapshot,
         handleHealthCheck,

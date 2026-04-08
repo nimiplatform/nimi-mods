@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import {
   hasValidLocalRuntimeChatModelSelection,
   hasValidTokenApiChatModelSelection,
+  resolveRequestedRouteOptionsCapabilities,
+  shouldSkipRouteSnapshotRefresh,
 } from '../src/hooks/use-local-chat-runtime-route.ts';
 import {
   buildRouteBindingForModel,
@@ -251,6 +253,40 @@ test('buildRouteBindingForSource tolerates route options without a local snapsho
     goRuntimeLocalModelId: undefined,
     goRuntimeStatus: undefined,
   });
+});
+
+test('requested route option capabilities default to chat only before sidebar bootstrap', () => {
+  const result = resolveRequestedRouteOptionsCapabilities({
+    requestedCapabilities: ['text.generate'],
+  });
+
+  assert.deepEqual(result, ['text.generate']);
+});
+
+test('requested route option capabilities preserve canonical refresh order for secondary routes', () => {
+  const result = resolveRequestedRouteOptionsCapabilities({
+    requestedCapabilities: ['video.generate', 'audio.transcribe', 'text.generate', 'image.generate'],
+  });
+
+  assert.deepEqual(result, [
+    'text.generate',
+    'image.generate',
+    'video.generate',
+    'audio.transcribe',
+  ]);
+});
+
+test('route snapshot refresh debounce suppresses repeated focus refreshes inside the TTL window', () => {
+  assert.equal(shouldSkipRouteSnapshotRefresh({
+    lastCompletedAtMs: 1000,
+    nowMs: 5000,
+    debounceMs: 10000,
+  }), true);
+  assert.equal(shouldSkipRouteSnapshotRefresh({
+    lastCompletedAtMs: 1000,
+    nowMs: 12001,
+    debounceMs: 10000,
+  }), false);
 });
 
 test('cloud chat model query commits freeform model input on blur/enter', () => {

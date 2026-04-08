@@ -33,7 +33,9 @@ function normalizeRouteOptionsSnapshot(snapshot: unknown): RuntimeRouteOptionsSn
     if (!parsed || parsed.connectors.length === 0) {
         return parsed;
     }
-    const selected = normalizeTokenApiBinding(parsed.selected, parsed.connectors);
+    const selected = parsed.selected
+        ? normalizeTokenApiBinding(parsed.selected, parsed.connectors)
+        : null;
     const resolvedDefault = parsed.resolvedDefault
         ? normalizeTokenApiBinding(parsed.resolvedDefault, parsed.connectors)
         : undefined;
@@ -65,7 +67,7 @@ export async function resolveRouteSnapshot(input: {
     routeBinding: RuntimeRouteBinding | null;
     setRouteSnapshot: (value: ChatRouteSnapshot | null) => void;
     setStatusBanner: UseLocalChatRuntimeRouteInput['setStatusBanner'];
-}) {
+}): Promise<boolean> {
     try {
         const resolved = await input.runtimeClient.resolve({
             capability: 'text.generate',
@@ -83,6 +85,7 @@ export async function resolveRouteSnapshot(input: {
             goRuntimeLocalModelId: resolved.goRuntimeLocalModelId || undefined,
             goRuntimeStatus: resolved.goRuntimeStatus || undefined,
         });
+        return true;
     }
     catch (error) {
         input.setRouteSnapshot(null);
@@ -90,6 +93,7 @@ export async function resolveRouteSnapshot(input: {
             kind: 'warning',
             message: error instanceof Error ? error.message : String(error || ''),
         });
+        return false;
     }
 }
 export async function loadRouteOptions(input: {
@@ -127,9 +131,9 @@ export async function loadRouteOptions(input: {
             area: 'local-chat',
             message: `local-chat:${input.capability}-route-options:loaded`,
             details: {
-                selectedSource: resolved?.selected.source || null,
-                selectedConnectorId: resolved?.selected.connectorId || null,
-                selectedModel: resolved?.selected.model || null,
+                selectedSource: resolved?.selected?.source || null,
+                selectedConnectorId: resolved?.selected?.connectorId || null,
+                selectedModel: resolved?.selected?.model || null,
                 connectorsCount: resolved?.connectors.length ?? 0,
                 connectorIds: resolved?.connectors.map((item) => item.id) || [],
             },

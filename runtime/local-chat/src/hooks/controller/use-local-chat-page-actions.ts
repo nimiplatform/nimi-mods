@@ -354,16 +354,20 @@ export function useLocalChatPageActions(state: LocalChatPageState) {
             isImageRouteProbeLoading: false,
             isVideoRouteProbeLoading: false,
             onRefreshMediaDependencies: () => {
-                void state.runtimeRouteState.loadAllRuntimeRouteOptions();
+                void state.runtimeRouteState.loadMediaRuntimeRouteOptions();
                 void state.refreshAllDependencySnapshots();
             },
             onSidebarBootstrap: () => {
-                void state.runtimeRouteState.loadAllRuntimeRouteOptions();
+                void state.runtimeRouteState.loadSecondaryRuntimeRouteOptions();
                 void state.refreshAllDependencySnapshots();
             },
             onOpenChatPanel: () => { },
-            onOpenVoicePanel: () => { },
-            onOpenMediaPanel: () => { },
+            onOpenVoicePanel: () => {
+                void state.runtimeRouteState.loadVoiceRuntimeRouteOptions();
+            },
+            onOpenMediaPanel: () => {
+                void state.runtimeRouteState.loadMediaRuntimeRouteOptions();
+            },
             onOpenRuntimeSetup: () => {
                 state.setActiveTab('runtime');
             },

@@ -10,6 +10,7 @@ import { decideMediaExecution } from './media-decision-policy.js';
 import { executeMediaDecision } from './media-execution-pipeline.js';
 import { isMediaRouteReady } from './media-route.js';
 import { createPersistableVoicePlaybackCacheMeta } from '../../services/voice/playback-source.js';
+import { createTurnScopedLocalChatAiClient } from '../../runtime-ai-client.js';
 import { deriveInteractionProfile } from './interaction-profile.js';
 import { resolveTurnMode } from './turn-mode-resolver.js';
 import { resolveFastTurnPerception } from './fast-turn-perception.js';
@@ -46,30 +47,6 @@ import {
     upsertTransientFirstBeatMessage,
 } from './send-flow-helpers.js';
 
-function buildRoutePreflightError(result: unknown): Error | null {
-    const record = (result && typeof result === 'object')
-        ? result as Record<string, unknown>
-        : {};
-    const status = String(record.status || '').trim().toLowerCase();
-    if (status === 'healthy') {
-        return null;
-    }
-    const detail = String(record.detail || record.message || '').trim()
-        || 'runtime route unavailable';
-    const error = new Error(detail) as Error & {
-        reasonCode?: string;
-        actionHint?: string;
-        traceId?: string;
-    };
-    error.reasonCode = String(record.reasonCode || '').trim() || 'RUNTIME_ROUTE_UNAVAILABLE';
-    error.actionHint = String(record.actionHint || '').trim() || 'check_runtime_route_health';
-    const traceId = String(record.traceId || '').trim();
-    if (traceId) {
-        error.traceId = traceId;
-    }
-    return error;
-}
-
 export async function runLocalChatTurnSend(input: {
     context: UseLocalChatTurnSendInput;
     abortSignal?: AbortSignal;
@@ -82,6 +59,7 @@ export async function runLocalChatTurnSend(input: {
     clearScheduleByTxn: (turnTxnId: string) => void;
 }) {
     const { context } = input;
+    const aiClient = createTurnScopedLocalChatAiClient(context.aiClient);
     if (context.isTranscribing)
         return;
     const text = (context.inputTextRef ? context.inputTextRef.current : context.inputText).trim();
@@ -148,17 +126,6 @@ export async function runLocalChatTurnSend(input: {
         });
         userTurnPersisted = true;
         ensureNotAborted(input.abortSignal);
-        const routeSource = String(routeBinding?.source || context.routeSnapshot?.source || '').trim().toLowerCase();
-        if (routeSource === 'local') {
-            const routeHealth = await context.aiClient.checkRouteHealth({
-                capability: 'text.generate',
-                routeBinding: routeBinding || undefined,
-            });
-            const routeError = buildRoutePreflightError(routeHealth);
-            if (routeError) {
-                throw routeError;
-            }
-        }
         logTurnSendStart({
             flowId,
             target: selectedTarget,
@@ -244,7 +211,7 @@ export async function runLocalChatTurnSend(input: {
                     .slice(-5)
                     .map((turn) => ({ role: turn.role, text: turn.lines.join(' ') }));
                 const perception = await perceiveTurn({
-                    aiClient: context.aiClient,
+                    aiClient,
                     invokeInput: prepared.invokeInput,
                     userText: text,
                     snapshot: prepared.contextPacket.interactionSnapshot || null,
@@ -267,7 +234,7 @@ export async function runLocalChatTurnSend(input: {
             profile: 'first-beat',
         });
         const firstBeatResult = await runFirstBeatReactor({
-            aiClient: context.aiClient,
+            aiClient,
             invokeInput: {
                 ...firstBeatPrepared.invokeInput,
                 prompt: firstBeatCompiledPrompt.prompt,
@@ -397,7 +364,7 @@ export async function runLocalChatTurnSend(input: {
             .flatMap((turn) => turn.lines)
             .filter(Boolean);
         const plan = await composeInteractionTurnPlan({
-            aiClient: context.aiClient,
+            aiClient,
             invokeInput: prepared.invokeInput,
             contextPacket: prepared.contextPacket,
             userText: text,
@@ -502,7 +469,7 @@ export async function runLocalChatTurnSend(input: {
             ? deliveries.find((item) => item.beat.mediaRequest)?.beat || null
             : null;
         const rawMediaDecision = await decideMediaExecution({
-            aiClient: context.aiClient,
+            aiClient,
             turnTxnId,
             routeBinding,
             defaultSettings: context.defaultSettings,
@@ -683,7 +650,7 @@ export async function runLocalChatTurnSend(input: {
                 viewerId: context.viewerId,
                 assistantTurnId: turnId,
                 deliveredBeats,
-                aiClient: context.aiClient,
+                aiClient,
                 routeBinding,
                 conversationDirective: activeDirective,
                 userText: text,
@@ -771,7 +738,7 @@ export async function runLocalChatTurnSend(input: {
                     }
                     const executionTracePatch = await executeMediaDecision({
                         decision,
-                        aiClient: context.aiClient,
+                        aiClient,
                         defaultSettings: context.defaultSettings,
                         nsfwPolicy,
                         fallbackRouteSource: prepared.invokeInput.routeBinding?.source === 'cloud' ? 'cloud' : 'local',
@@ -840,7 +807,7 @@ export async function runLocalChatTurnSend(input: {
                 viewerId: context.viewerId,
                 assistantTurnId: schedule.assistantTurnId,
                 deliveredBeats: deliveredBeats.filter((beat) => deliveredBeatIds.has(beat.beatId)),
-                aiClient: context.aiClient,
+                aiClient,
                 routeBinding,
                 conversationDirective: activeDirective,
                 userText: text,

@@ -46,7 +46,7 @@ export function buildAssistantTurnOutput(input: {
         planId,
     });
     const routeSource = input.routeSnapshot?.source === 'cloud' ? 'cloud' : 'local';
-    const routeModel = String(input.routeSnapshot?.model || input.routeBinding?.model || input.chatRouteOptions?.selected.model || '').trim();
+    const routeModel = String(input.routeSnapshot?.model || input.routeBinding?.model || input.chatRouteOptions?.selected?.model || '').trim();
     assistantOutput.deliveries.forEach((delivery) => {
         delivery.meta = {
             ...(delivery.meta || {}),

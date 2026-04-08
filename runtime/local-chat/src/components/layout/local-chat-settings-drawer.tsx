@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { LocalChatProductSettings } from '../../state/index.js';
 import { dedupeModelIds } from '../../services/index.js';
 import { resolveLocalRuntimeModelsForScenario, resolveModelsForScenario, } from '../../services/route/connector-model-capabilities.js';
@@ -168,6 +168,16 @@ export const LocalChatSettingsDrawer = React.memo(function LocalChatSettingsDraw
         if (open && !hasOpened)
             setHasOpened(true);
     }, [open, hasOpened]);
+    useEffect(() => {
+        if (voiceRouteOpen) {
+            runtimeSidebarProps.onOpenVoicePanel?.();
+        }
+    }, [runtimeSidebarProps, voiceRouteOpen]);
+    useEffect(() => {
+        if (mediaRouteOpen) {
+            runtimeSidebarProps.onOpenMediaPanel?.();
+        }
+    }, [mediaRouteOpen, runtimeSidebarProps]);
     if (!hasOpened)
         return null;
     return (<div className={`absolute inset-y-0 right-0 z-30 w-[360px] max-w-[92vw] border-l border-white/70 bg-[#f8fbfb] shadow-[-8px_0_24px_rgba(15,23,42,0.08)] transition-transform duration-280 ease-[cubic-bezier(0.2,0.7,0.2,1)] ${open ? 'translate-x-0' : 'translate-x-full pointer-events-none'}`} aria-hidden={!open}>
