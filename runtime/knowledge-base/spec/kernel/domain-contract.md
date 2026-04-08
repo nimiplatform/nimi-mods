@@ -64,10 +64,11 @@
 
 ## KB-DOM-007 — KBSettings
 
-设置控制分块、检索和路由行为，持久化到宿主 sqlite。
+设置控制分块与检索行为，持久化到宿主 sqlite。
 
 - **分块参数**：`chunkSize`（128-2048 tokens）、`chunkOverlap`（0-256 tokens，必须小于 chunkSize）。
 - **检索参数**：`topK`（1-20）、`similarityThreshold`（0.0-1.0）、`maxContextChunks`。
-- **路由参数**：`chatRouteSource`/`embeddingRouteSource`（`auto`|`local`|`cloud`），配套 `connectorId` 和 `model` 字段。
 - `queryRewritingEnabled` 控制多轮 query rewriting 开关。
+- AI route/config truth 不属于 `KBSettings`；其 owner 是 formal mod-scoped `AIConfig`，由 Desktop host 暴露的 mod-facing AIConfig surface 持久化和分发。
+- Knowledge Base 只消费 mod-scoped `AIConfig` 中的 chat / embedding binding；`KBSettings` 不得重复持久化 route preference truth。
 - 修改分块参数不影响已处理文档；需用户显式重新导入。

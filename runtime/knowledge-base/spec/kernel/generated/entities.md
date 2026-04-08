@@ -268,36 +268,6 @@ entities:
         required: true
         default: true
         description: 是否启用多轮 query rewriting
-      - name: chatRouteSource
-        type: string
-        required: true
-        default: "'auto'"
-        description: "'auto' | 'local' | 'cloud'"
-      - name: chatConnectorId
-        type: string
-        required: true
-        default: "''"
-        description: Chat connector 指定（空则自动）
-      - name: chatModel
-        type: string
-        required: true
-        default: "''"
-        description: Chat model 指定（空则自动）
-      - name: embeddingRouteSource
-        type: string
-        required: true
-        default: "'auto'"
-        description: "'auto' | 'local' | 'cloud'"
-      - name: embeddingConnectorId
-        type: string
-        required: true
-        default: "''"
-        description: Embedding connector 指定（空则自动）
-      - name: embeddingModel
-        type: string
-        required: true
-        default: "''"
-        description: Embedding model 指定（空则自动）
 source_kinds:
   - id: file
     label: File upload

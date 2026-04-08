@@ -14,12 +14,6 @@ const settings: KBSettings = {
   chunkOverlap: 64,
   topK: 5,
   similarityThreshold: 0.1,
-  chatRouteSource: 'auto',
-  chatConnectorId: '',
-  chatModel: '',
-  embeddingRouteSource: 'auto',
-  embeddingConnectorId: '',
-  embeddingModel: '',
   maxContextChunks: 8,
   queryRewritingEnabled: false,
 };

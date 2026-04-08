@@ -14,12 +14,19 @@ export function useKBPageController() {
   const runtimeClient = useRuntimeClient();
   const store = useKnowledgeBaseStore();
   const {
+    aiConfig,
+    chatBinding,
+    embeddingBinding,
+    chatRouteSelection,
+    embeddingRouteSelection,
+    setChatRouteSelection,
+    setEmbeddingRouteSelection,
     llmClient,
     embeddingClient,
     chatRouteOptions,
     embeddingRouteOptions,
     refreshRouteOptions,
-  } = useKBClients(runtimeClient, store.settings);
+  } = useKBClients(runtimeClient);
   const ui = useKBUiState();
 
   // Initialize store on mount
@@ -29,6 +36,8 @@ export function useKBPageController() {
 
   const documentActions = useDocumentActions({
     embeddingClient,
+    chatBinding,
+    embeddingBinding,
     ui,
   });
 
@@ -43,6 +52,13 @@ export function useKBPageController() {
     ui,
     hookClient,
     runtimeClient,
+    aiConfig,
+    chatBinding,
+    embeddingBinding,
+    chatRouteSelection,
+    embeddingRouteSelection,
+    setChatRouteSelection,
+    setEmbeddingRouteSelection,
     llmClient,
     embeddingClient,
     chatRouteOptions,

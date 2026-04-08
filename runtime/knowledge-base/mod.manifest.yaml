@@ -10,6 +10,11 @@ description: >
   Private local knowledge base with document import, semantic search, and RAG-powered Q&A.
 capabilities:
   # AI
+  - runtime.ai-config.get
+  - runtime.ai-config.update
+  - runtime.ai-config.subscribe
+  - runtime.ai-config.probe.scheduling.target
+  - runtime.ai-snapshot.record
   - runtime.ai.text.generate
   - runtime.ai.text.stream
   - runtime.ai.embedding.generate

@@ -4,6 +4,7 @@
 
 import { useCallback } from 'react';
 import type { KBDocument, EmbeddingClient } from '../types.js';
+import type { RuntimeRouteBinding } from '@nimiplatform/sdk/mod';
 import { useKnowledgeBaseStore } from '../state/knowledge-base-store.js';
 import { processDocument } from '../services/document-pipeline.js';
 import { guessMimeType } from '../services/document-parser.js';
@@ -18,9 +19,11 @@ function generateId(): string {
 
 export function useDocumentActions(input: {
   embeddingClient: EmbeddingClient;
+  chatBinding?: RuntimeRouteBinding;
+  embeddingBinding?: RuntimeRouteBinding;
   ui: KBUiState;
 }) {
-  const { embeddingClient, ui } = input;
+  const { embeddingClient, chatBinding, embeddingBinding, ui } = input;
   const store = useKnowledgeBaseStore();
 
   const importFile = useCallback(async (file: File) => {
@@ -81,12 +84,8 @@ export function useDocumentActions(input: {
         source: 'useDocumentActions.importFile',
         details: {
           docId: doc.id,
-          chatRouteSource: settings.chatRouteSource,
-          chatConnectorId: settings.chatConnectorId || null,
-          chatModel: settings.chatModel || null,
-          embeddingRouteSource: settings.embeddingRouteSource,
-          embeddingConnectorId: settings.embeddingConnectorId || null,
-          embeddingModel: settings.embeddingModel || null,
+          aiConfigChatBinding: chatBinding || null,
+          aiConfigEmbeddingBinding: embeddingBinding || null,
           chunkSize: settings.chunkSize,
           chunkOverlap: settings.chunkOverlap,
         },
@@ -153,7 +152,7 @@ export function useDocumentActions(input: {
     } finally {
       ui.setIsImporting(false);
     }
-  }, [embeddingClient, store, ui]);
+  }, [chatBinding, embeddingBinding, embeddingClient, store, ui]);
 
   const importText = useCallback(async (text: string, title?: string) => {
     const flowId = createKBFlowId('import-text');
@@ -193,12 +192,8 @@ export function useDocumentActions(input: {
         source: 'useDocumentActions.importText',
         details: {
           docId: doc.id,
-          chatRouteSource: store.settings.chatRouteSource,
-          chatConnectorId: store.settings.chatConnectorId || null,
-          chatModel: store.settings.chatModel || null,
-          embeddingRouteSource: store.settings.embeddingRouteSource,
-          embeddingConnectorId: store.settings.embeddingConnectorId || null,
-          embeddingModel: store.settings.embeddingModel || null,
+          aiConfigChatBinding: chatBinding || null,
+          aiConfigEmbeddingBinding: embeddingBinding || null,
           chunkSize: store.settings.chunkSize,
           chunkOverlap: store.settings.chunkOverlap,
         },
@@ -236,7 +231,7 @@ export function useDocumentActions(input: {
     } finally {
       ui.setIsImporting(false);
     }
-  }, [embeddingClient, store, ui]);
+  }, [chatBinding, embeddingBinding, embeddingClient, store, ui]);
 
   const importUrl = useCallback(async (url: string, title?: string) => {
     const flowId = createKBFlowId('import-url');
@@ -281,12 +276,8 @@ export function useDocumentActions(input: {
         source: 'useDocumentActions.importUrl',
         details: {
           docId: doc.id,
-          chatRouteSource: store.settings.chatRouteSource,
-          chatConnectorId: store.settings.chatConnectorId || null,
-          chatModel: store.settings.chatModel || null,
-          embeddingRouteSource: store.settings.embeddingRouteSource,
-          embeddingConnectorId: store.settings.embeddingConnectorId || null,
-          embeddingModel: store.settings.embeddingModel || null,
+          aiConfigChatBinding: chatBinding || null,
+          aiConfigEmbeddingBinding: embeddingBinding || null,
           chunkSize: store.settings.chunkSize,
           chunkOverlap: store.settings.chunkOverlap,
         },
@@ -324,7 +315,7 @@ export function useDocumentActions(input: {
     } finally {
       ui.setIsImporting(false);
     }
-  }, [embeddingClient, store, ui]);
+  }, [chatBinding, embeddingBinding, embeddingClient, store, ui]);
 
   const deleteDocument = useCallback(async (docId: string) => {
     emitKBLog({

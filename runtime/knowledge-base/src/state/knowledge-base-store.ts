@@ -80,26 +80,22 @@ type KnowledgeBaseStore = {
   setActiveTab: (tab: KBViewTab) => void;
 };
 
-function normalizeSettings(settings: Partial<KBSettings> | null | undefined): KBSettings {
-  const merged: KBSettings = {
-    ...DEFAULT_KB_SETTINGS,
-    ...(settings ?? {}),
+export function normalizeKBSettings(settings: Partial<KBSettings> | null | undefined): KBSettings {
+  const record = (settings && typeof settings === 'object') ? settings : {};
+  return {
+    chunkSize: typeof record.chunkSize === 'number' ? record.chunkSize : DEFAULT_KB_SETTINGS.chunkSize,
+    chunkOverlap: typeof record.chunkOverlap === 'number' ? record.chunkOverlap : DEFAULT_KB_SETTINGS.chunkOverlap,
+    topK: typeof record.topK === 'number' ? record.topK : DEFAULT_KB_SETTINGS.topK,
+    similarityThreshold: typeof record.similarityThreshold === 'number'
+      ? record.similarityThreshold
+      : DEFAULT_KB_SETTINGS.similarityThreshold,
+    maxContextChunks: typeof record.maxContextChunks === 'number'
+      ? record.maxContextChunks
+      : DEFAULT_KB_SETTINGS.maxContextChunks,
+    queryRewritingEnabled: typeof record.queryRewritingEnabled === 'boolean'
+      ? record.queryRewritingEnabled
+      : DEFAULT_KB_SETTINGS.queryRewritingEnabled,
   };
-  if (
-    merged.chatRouteSource !== 'auto'
-    && merged.chatRouteSource !== 'cloud'
-    && merged.chatRouteSource !== 'local'
-  ) {
-    merged.chatRouteSource = DEFAULT_KB_SETTINGS.chatRouteSource;
-  }
-  if (
-    merged.embeddingRouteSource !== 'auto'
-    && merged.embeddingRouteSource !== 'cloud'
-    && merged.embeddingRouteSource !== 'local'
-  ) {
-    merged.embeddingRouteSource = DEFAULT_KB_SETTINGS.embeddingRouteSource;
-  }
-  return merged;
 }
 
 export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
@@ -139,7 +135,7 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
 
     // Load settings
     const savedSettings = await dbGetSettings();
-    const settings = normalizeSettings(savedSettings);
+    const settings = normalizeKBSettings(savedSettings);
 
     set({
       initialized: true,
@@ -298,7 +294,7 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
 
   async updateSettings(patch) {
     const current = get().settings;
-    const updated = normalizeSettings({ ...current, ...patch });
+    const updated = normalizeKBSettings({ ...current, ...patch });
     const flowId = createKBFlowId('settings-update');
     set({ settings: updated });
     emitKBLog({
@@ -308,12 +304,12 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
       source: 'useKnowledgeBaseStore.updateSettings',
       details: {
         patch,
-        updatedChatRouteSource: updated.chatRouteSource,
-        updatedChatConnectorId: updated.chatConnectorId || null,
-        updatedChatModel: updated.chatModel || null,
-        updatedEmbeddingRouteSource: updated.embeddingRouteSource,
-        updatedEmbeddingConnectorId: updated.embeddingConnectorId || null,
-        updatedEmbeddingModel: updated.embeddingModel || null,
+        updatedChunkSize: updated.chunkSize,
+        updatedChunkOverlap: updated.chunkOverlap,
+        updatedTopK: updated.topK,
+        updatedSimilarityThreshold: updated.similarityThreshold,
+        updatedMaxContextChunks: updated.maxContextChunks,
+        updatedQueryRewritingEnabled: updated.queryRewritingEnabled,
       },
     });
     try {

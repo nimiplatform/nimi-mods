@@ -19,11 +19,16 @@ export const KB_DATA_API_CONVERSATIONS_GET = 'data-api.knowledge-base.conversati
 export const KB_DATA_API_CONVERSATIONS_UPSERT = 'data-api.knowledge-base.conversations.upsert';
 export const KB_DATA_API_CONVERSATIONS_DELETE = 'data-api.knowledge-base.conversations.delete';
 // ---------------------------------------------------------------------------
-// Full capability list (22 keys, per SSOT §5.2)
+// Full capability list (29 keys, per SSOT §5.2)
 // ---------------------------------------------------------------------------
 
 export const KB_CAPABILITIES = [
   // AI
+  'runtime.ai-config.get',
+  'runtime.ai-config.update',
+  'runtime.ai-config.subscribe',
+  'runtime.ai-config.probe.scheduling.target',
+  'runtime.ai-snapshot.record',
   'runtime.ai.text.generate',
   'runtime.ai.text.stream',
   'runtime.ai.embedding.generate',

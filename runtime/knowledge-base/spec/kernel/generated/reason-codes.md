@@ -54,7 +54,7 @@ codes:
   - code: KB_STORAGE_QUOTA_EXCEEDED
     stage: storage
     blocking: true
-    action_hint: Free browser storage or delete unused documents.
+    action_hint: Free local app storage or delete unused documents.
     source_rule: KB-ERR-002
   - code: KB_DOCUMENT_NOT_FOUND
     stage: query

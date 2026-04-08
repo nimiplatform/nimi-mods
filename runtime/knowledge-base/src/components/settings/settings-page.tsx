@@ -2,12 +2,16 @@
 // Settings page — redesigned with card-grouped layout
 // ---------------------------------------------------------------------------
 import React, { useCallback, useMemo } from 'react';
-import type { KBSettings } from '../../types.js';
+import type { KBRouteSelection, KBSettings } from '../../types.js';
 import { Button } from '../ui/button.js';
 import { useModTranslation, type RuntimeRouteOptionsSnapshot } from "@nimiplatform/sdk/mod";
 type SettingsPageProps = {
     settings: KBSettings;
-    onUpdate: (patch: Partial<KBSettings>) => void;
+    onUpdateSettings: (patch: Partial<KBSettings>) => void;
+    chatRoute: KBRouteSelection;
+    embeddingRoute: KBRouteSelection;
+    onUpdateChatRoute: (next: KBRouteSelection) => void;
+    onUpdateEmbeddingRoute: (next: KBRouteSelection) => void;
     chatRouteOptions: RuntimeRouteOptionsSnapshot | null;
     embeddingRouteOptions: RuntimeRouteOptionsSnapshot | null;
     onRefreshRouteOptions?: () => void;
@@ -92,11 +96,11 @@ function asString(value: unknown): string {
 }
 function RoutePanel(props: {
     title: string;
-    source: KBSettings['chatRouteSource'];
+    route: KBRouteSelection;
     connectorId: string;
     model: string;
     routeOptions: RuntimeRouteOptionsSnapshot | null;
-    onSourceChange: (value: KBSettings['chatRouteSource']) => void;
+    onSourceChange: (value: KBRouteSelection['source']) => void;
     onConnectorChange: (value: string) => void;
     onModelChange: (value: string) => void;
     modelListId: string;
@@ -131,13 +135,12 @@ function RoutePanel(props: {
     return (<div className="flex-1 rounded-lg bg-gray-50 p-4">
       <h4 className="mb-3 text-xs font-semibold text-gray-700">{props.title}</h4>
       <div className="flex flex-col gap-3">
-        <SelectField label={t('settings.source')} value={props.source} options={[
-            { value: 'auto', label: t('settings.sourceAutoCloudFirst') },
+        <SelectField label={t('settings.source')} value={props.route.source} options={[
             { value: 'cloud', label: t('settings.sourceCloud') },
             { value: 'local', label: t('settings.sourceLocal') },
-        ]} onChange={(v) => props.onSourceChange(v as KBSettings['chatRouteSource'])}/>
+        ]} onChange={(v) => props.onSourceChange(v as KBRouteSelection['source'])}/>
 
-        {props.source === 'cloud' && (<>
+        {props.route.source === 'cloud' && (<>
             <SelectField label={t('settings.connector')} value={effectiveConnectorId} options={[
                 { value: '', label: t('common.auto') },
                 ...(props.routeOptions?.connectors || []).map((c) => ({
@@ -152,7 +155,7 @@ function RoutePanel(props: {
             </InputField>
           </>)}
 
-        {props.source === 'local' && (<SelectField label={t('settings.model')} value={props.model} options={[
+        {props.route.source === 'local' && (<SelectField label={t('settings.model')} value={props.model} options={[
                 { value: '', label: t('common.auto') },
                 ...localModels.map((item) => ({
                     value: item.model,
@@ -167,13 +170,21 @@ function RoutePanel(props: {
 // ---------------------------------------------------------------------------
 export function SettingsPage(props: SettingsPageProps) {
     const { t } = useModTranslation('knowledge-base');
-    const { settings, onUpdate } = props;
-    const handleChatRouteSourceChange = useCallback((value: KBSettings['chatRouteSource']) => {
-        onUpdate({ chatRouteSource: value });
-    }, [onUpdate]);
-    const handleEmbeddingRouteSourceChange = useCallback((value: KBSettings['embeddingRouteSource']) => {
-        onUpdate({ embeddingRouteSource: value });
-    }, [onUpdate]);
+    const { settings, onUpdateSettings } = props;
+    const handleChatRouteSourceChange = useCallback((value: KBRouteSelection['source']) => {
+        props.onUpdateChatRoute({
+            ...props.chatRoute,
+            source: value,
+            connectorId: value === 'cloud' ? props.chatRoute.connectorId : '',
+        });
+    }, [props]);
+    const handleEmbeddingRouteSourceChange = useCallback((value: KBRouteSelection['source']) => {
+        props.onUpdateEmbeddingRoute({
+            ...props.embeddingRoute,
+            source: value,
+            connectorId: value === 'cloud' ? props.embeddingRoute.connectorId : '',
+        });
+    }, [props]);
     return (<div className="flex h-full flex-col overflow-y-auto">
       <div className="px-6 py-4">
         <h2 className="text-lg font-bold text-gray-900">{t('settings.title')}</h2>
@@ -183,8 +194,8 @@ export function SettingsPage(props: SettingsPageProps) {
         {/* Card 1: Chunking */}
         <SettingsCard title={t('settings.chunkingTitle')} description={t('settings.chunkingDescription')}>
           <div className="grid grid-cols-2 gap-4">
-            <NumberField label={t('settings.chunkSize')} value={settings.chunkSize} min={128} max={2048} onChange={(v) => onUpdate({ chunkSize: v })}/>
-            <NumberField label={t('settings.overlap')} value={settings.chunkOverlap} min={0} max={256} onChange={(v) => onUpdate({ chunkOverlap: v })}/>
+            <NumberField label={t('settings.chunkSize')} value={settings.chunkSize} min={128} max={2048} onChange={(v) => onUpdateSettings({ chunkSize: v })}/>
+            <NumberField label={t('settings.overlap')} value={settings.chunkOverlap} min={0} max={256} onChange={(v) => onUpdateSettings({ chunkOverlap: v })}/>
           </div>
           <p className="mt-3 text-[10px] text-gray-400">
             {t('settings.chunkingReimportHint')}
@@ -194,9 +205,9 @@ export function SettingsPage(props: SettingsPageProps) {
         {/* Card 2: Retrieval */}
         <SettingsCard title={t('settings.retrievalTitle')} description={t('settings.retrievalDescription')}>
           <div className="grid grid-cols-3 gap-4">
-            <NumberField label={t('settings.topKResults')} value={settings.topK} min={1} max={20} onChange={(v) => onUpdate({ topK: v })}/>
-            <NumberField label={t('settings.similarityThreshold')} value={settings.similarityThreshold} min={0} max={1} step={0.05} onChange={(v) => onUpdate({ similarityThreshold: v })}/>
-            <NumberField label={t('settings.maxContextChunks')} value={settings.maxContextChunks} min={1} max={20} onChange={(v) => onUpdate({ maxContextChunks: v })}/>
+            <NumberField label={t('settings.topKResults')} value={settings.topK} min={1} max={20} onChange={(v) => onUpdateSettings({ topK: v })}/>
+            <NumberField label={t('settings.similarityThreshold')} value={settings.similarityThreshold} min={0} max={1} step={0.05} onChange={(v) => onUpdateSettings({ similarityThreshold: v })}/>
+            <NumberField label={t('settings.maxContextChunks')} value={settings.maxContextChunks} min={1} max={20} onChange={(v) => onUpdateSettings({ maxContextChunks: v })}/>
           </div>
         </SettingsCard>
 
@@ -209,7 +220,7 @@ export function SettingsPage(props: SettingsPageProps) {
                 {t('settings.rewritingHint')}
               </p>
             </div>
-            <ToggleSwitch checked={settings.queryRewritingEnabled} onChange={(v) => onUpdate({ queryRewritingEnabled: v })}/>
+            <ToggleSwitch checked={settings.queryRewritingEnabled} onChange={(v) => onUpdateSettings({ queryRewritingEnabled: v })}/>
           </div>
         </SettingsCard>
 
@@ -221,8 +232,8 @@ export function SettingsPage(props: SettingsPageProps) {
               </Button>)}
           </div>
           <div className="flex gap-4">
-            <RoutePanel title={t('settings.chatRoute')} source={settings.chatRouteSource} connectorId={settings.chatConnectorId} model={settings.chatModel} routeOptions={props.chatRouteOptions} onSourceChange={handleChatRouteSourceChange} onConnectorChange={(value) => onUpdate({ chatConnectorId: value })} onModelChange={(value) => onUpdate({ chatModel: value })} modelListId="kb-chat-model-list"/>
-            <RoutePanel title={t('settings.embeddingRoute')} source={settings.embeddingRouteSource} connectorId={settings.embeddingConnectorId} model={settings.embeddingModel} routeOptions={props.embeddingRouteOptions} onSourceChange={handleEmbeddingRouteSourceChange} onConnectorChange={(value) => onUpdate({ embeddingConnectorId: value })} onModelChange={(value) => onUpdate({ embeddingModel: value })} modelListId="kb-embedding-model-list"/>
+            <RoutePanel title={t('settings.chatRoute')} route={props.chatRoute} connectorId={props.chatRoute.connectorId} model={props.chatRoute.model} routeOptions={props.chatRouteOptions} onSourceChange={handleChatRouteSourceChange} onConnectorChange={(value) => props.onUpdateChatRoute({ ...props.chatRoute, connectorId: value })} onModelChange={(value) => props.onUpdateChatRoute({ ...props.chatRoute, model: value })} modelListId="kb-chat-model-list"/>
+            <RoutePanel title={t('settings.embeddingRoute')} route={props.embeddingRoute} connectorId={props.embeddingRoute.connectorId} model={props.embeddingRoute.model} routeOptions={props.embeddingRouteOptions} onSourceChange={handleEmbeddingRouteSourceChange} onConnectorChange={(value) => props.onUpdateEmbeddingRoute({ ...props.embeddingRoute, connectorId: value })} onModelChange={(value) => props.onUpdateEmbeddingRoute({ ...props.embeddingRoute, model: value })} modelListId="kb-embedding-model-list"/>
           </div>
           <p className="mt-3 text-[10px] text-gray-400">
             {t('settings.routeHint')}

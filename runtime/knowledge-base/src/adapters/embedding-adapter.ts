@@ -1,10 +1,13 @@
 import type { EmbeddingClient, KBResolvedRoute } from '../types.js';
 import { createKBFlowId, emitKBLog } from '../logging.js';
-import { type RuntimeCanonicalCapability, type ModRuntimeClient } from "@nimiplatform/sdk/mod";
+import { type AIConfig, type ModRuntimeClient } from "@nimiplatform/sdk/mod";
+import { recordKnowledgeBaseExecutionSnapshot } from '../controllers/kb-ai-config.js';
+import type { KBRouteCapability } from '../controllers/kb-ai-config.js';
 /**
  * Wrap a ModRuntimeClient into the service-layer EmbeddingClient abstraction.
  */
 export function createEmbeddingClientAdapter(runtimeClient: ModRuntimeClient, options?: {
+    resolveConfig?: () => AIConfig | Promise<AIConfig>;
     resolveRoute?: () => KBResolvedRoute | Promise<KBResolvedRoute>;
 }): EmbeddingClient {
     let routeProbeLogged = false;
@@ -12,8 +15,23 @@ export function createEmbeddingClientAdapter(runtimeClient: ModRuntimeClient, op
         async generateEmbedding(input) {
             const flowId = createKBFlowId('embed-adapter');
             const resolvedRoute = options?.resolveRoute ? await options.resolveRoute() : {};
+            const config = options?.resolveConfig ? await options.resolveConfig() : null;
             const binding = resolvedRoute.binding;
-            const capability = (input.capability || 'text.embed') as RuntimeCanonicalCapability;
+            const capability = (input.capability || 'text.embed') as KBRouteCapability;
+            if (!binding) {
+                throw new Error(`KB_AI_CONFIG_BINDING_REQUIRED:${capability}`);
+            }
+            if (config) {
+                await recordKnowledgeBaseExecutionSnapshot(runtimeClient, {
+                    config,
+                    capability,
+                    metadata: {
+                        source: 'knowledge-base',
+                        operation: 'text.embed',
+                        batchSize: input.texts.length,
+                    },
+                });
+            }
             if (!routeProbeLogged) {
                 routeProbeLogged = true;
                 emitKBLog({

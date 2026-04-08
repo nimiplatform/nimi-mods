@@ -42,7 +42,7 @@ export function KnowledgeBasePage() {
             content = <ChatPage controller={controller}/>;
             break;
         case 'settings':
-            content = (<SettingsPage settings={store.settings} onUpdate={(patch) => store.updateSettings(patch)} chatRouteOptions={controller.chatRouteOptions} embeddingRouteOptions={controller.embeddingRouteOptions} onRefreshRouteOptions={() => { void controller.refreshRouteOptions(); }}/>);
+            content = (<SettingsPage settings={store.settings} onUpdateSettings={(patch) => store.updateSettings(patch)} chatRoute={controller.chatRouteSelection} embeddingRoute={controller.embeddingRouteSelection} onUpdateChatRoute={(next) => controller.setChatRouteSelection(next)} onUpdateEmbeddingRoute={(next) => controller.setEmbeddingRouteSelection(next)} chatRouteOptions={controller.chatRouteOptions} embeddingRouteOptions={controller.embeddingRouteOptions} onRefreshRouteOptions={() => { void controller.refreshRouteOptions(); }}/>);
             break;
     }
     return (<div data-nimi-mod-root="knowledge-base" className="h-full min-h-0">

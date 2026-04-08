@@ -80,12 +80,6 @@ export type KBSettings = {
     chunkOverlap: number;
     topK: number;
     similarityThreshold: number;
-    chatRouteSource: 'auto' | 'local' | 'cloud';
-    chatConnectorId: string;
-    chatModel: string;
-    embeddingRouteSource: 'auto' | 'local' | 'cloud';
-    embeddingConnectorId: string;
-    embeddingModel: string;
     maxContextChunks: number;
     queryRewritingEnabled: boolean;
 };
@@ -99,12 +93,6 @@ export const DEFAULT_KB_SETTINGS: KBSettings = {
     chunkOverlap: 64,
     topK: 5,
     similarityThreshold: 0.3,
-    chatRouteSource: 'auto',
-    chatConnectorId: '',
-    chatModel: '',
-    embeddingRouteSource: 'auto',
-    embeddingConnectorId: '',
-    embeddingModel: '',
     maxContextChunks: 8,
     queryRewritingEnabled: true,
 };
@@ -150,8 +138,8 @@ export type EmbeddingClient = {
         trace?: KBAiTrace;
     }>;
 };
-export type KBRoutePreference = {
-    source: 'auto' | 'local' | 'cloud';
+export type KBRouteSelection = {
+    source: 'local' | 'cloud';
     connectorId: string;
     model: string;
 };

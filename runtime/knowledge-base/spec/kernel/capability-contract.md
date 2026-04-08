@@ -12,11 +12,17 @@
 - Entry: `./dist/mods/knowledge-base/index.js`
 - 注册 nav-item（priority 160）+ route-page。
 - Manifest capabilities 与源码常量（`contracts.ts`）必须一致。
-- 22 个 capability 键全部在 manifest 与源码中声明（参考 `tables/capabilities.yaml`）。
+- 29 个 capability 键全部在 manifest 与源码中声明（参考 `tables/capabilities.yaml`）。
 
 ## KB-CAP-002 — AI 能力消费
 
-KB mod 消费三种 runtime 能力：
+KB mod 消费 Desktop host mod-facing `AIConfig` authority + 三种 runtime execution 能力：
+
+- `runtime.ai-config.get`：读取 canonical mod-scoped `AIConfig`
+- `runtime.ai-config.update`：更新 canonical mod-scoped `AIConfig`
+- `runtime.ai-config.subscribe`：订阅 canonical mod-scoped `AIConfig` 变更
+- `runtime.ai-config.probe.scheduling.target`：读取 submit-target scheduling judgement，用于 execution snapshot runtime evidence
+- `runtime.ai-snapshot.record`：通过 Desktop host authority 记录 canonical mod-scoped `AISnapshot`
 
 - `runtime.ai.text.generate`：query rewriting、对话标题生成。
 - `runtime.ai.text.stream`：RAG 流式回答生成。
@@ -24,10 +30,11 @@ KB mod 消费三种 runtime 能力：
 
 调用入口统一为 `@nimiplatform/sdk/mod`（`createModRuntimeClient`）。
 
-路由策略：
-- Chat route：`auto`（cloud-first）| `cloud` | `local`，由 `KBSettings.chatRouteSource` 控制。
-- Embedding route：`auto`（cloud-first）| `cloud` | `local`，由 `KBSettings.embeddingRouteSource` 控制。
-- Adapter 层（`llm-adapter.ts`、`embedding-adapter.ts`）桥接 `ModRuntimeClient` + selected binding → 服务层接口。
+AI truth 边界：
+- Chat / Embedding live binding truth 固定存于 canonical mod scope `AIConfig`，而不是 `KBSettings`。
+- Execution snapshot truth 固定记录于 canonical mod scope `AISnapshot`，由 Desktop host record/read owner 持有；KB 不自持久化另一套 snapshot schema。
+- `KBSettings` 仅保留 `chunkSize`、`chunkOverlap`、`topK`、`similarityThreshold`、`maxContextChunks`、`queryRewritingEnabled` 等 domain state。
+- Adapter 层（`llm-adapter.ts`、`embedding-adapter.ts`）桥接 `ModRuntimeClient` + current mod-scoped `AIConfig` binding → 服务层接口。
 
 ## KB-CAP-003 — 文档数据 API
 
@@ -60,7 +67,7 @@ KB mod 消费三种 runtime 能力：
 
 - 通过 `runtime.route.listOptions` 查询可用的 `text.generate` / `text.embed` 路由。
 - 每 15 秒自动轮询更新（`use-kb-clients.ts`）。
-- 路由选择遵循 mod 本地 source/connector/model 偏好，否则使用 runtime 默认 binding。
+- route options 只作为 editor 候选集与首次 binding hydration helper；不再持有 live AI truth。
 
 ## KB-CAP-007 — 跨 Mod 集成
 

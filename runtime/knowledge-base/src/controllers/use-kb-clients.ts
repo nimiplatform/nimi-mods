@@ -5,18 +5,36 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { KB_MOD_ID } from '../contracts.js';
 import { createLlmClientAdapter } from '../adapters/llm-adapter.js';
 import { createEmbeddingClientAdapter } from '../adapters/embedding-adapter.js';
-import type { LlmClient, EmbeddingClient, KBSettings, KBRoutePreference } from '../types.js';
+import type { LlmClient, EmbeddingClient } from '../types.js';
 import { createKBFlowId, emitKBLog } from '../logging.js';
-import { createHookClient, createModRuntimeClient, type ModRuntimeClient, type HookClient, parseRuntimeRouteOptions, type RuntimeRouteBinding, type RuntimeRouteOptionsSnapshot } from "@nimiplatform/sdk/mod";
+import {
+    createEmptyAIConfig,
+    createHookClient,
+    createModRuntimeClient,
+    parseRuntimeRouteOptions,
+    type AIConfig,
+    type HookClient,
+    type ModRuntimeClient,
+    type RuntimeRouteOptionsSnapshot,
+} from "@nimiplatform/sdk/mod";
+import {
+    KB_AI_SCOPE_REF,
+    deriveKnowledgeBaseRouteSelection,
+    getKnowledgeBaseCapabilityBinding,
+    getKnowledgeBaseAIConfig,
+    hydrateKnowledgeBaseCapabilityBinding,
+    resolveKnowledgeBaseRoute,
+    subscribeKnowledgeBaseAIConfig,
+    updateKnowledgeBaseCapabilityBinding,
+    materializeKnowledgeBaseBinding,
+    type KBRouteCapability,
+} from './kb-ai-config.js';
 type RouteCapability = 'text.generate' | 'text.embed';
 export function useHookClient(): HookClient {
     return useMemo(() => createHookClient(KB_MOD_ID), []);
 }
 export function useRuntimeClient(): ModRuntimeClient {
     return useMemo(() => createModRuntimeClient(KB_MOD_ID), []);
-}
-function asString(value: unknown): string {
-    return String(value || '').trim();
 }
 function ensureRouteOptionsSnapshotShape(snapshot: RuntimeRouteOptionsSnapshot | null): RuntimeRouteOptionsSnapshot | null {
     if (!snapshot) {
@@ -31,76 +49,24 @@ function ensureRouteOptionsSnapshotShape(snapshot: RuntimeRouteOptionsSnapshot |
         connectors: Array.isArray(snapshot.connectors) ? snapshot.connectors : [],
     };
 }
-function resolveTokenApiBindingFromOptions(options: RuntimeRouteOptionsSnapshot | null, preferredConnectorId: string, preferredModel: string): RuntimeRouteBinding | undefined {
-    if (!options)
-        return undefined;
-    const targetConnectorId = asString(preferredConnectorId);
-    const selectedConnectorId = options.selected.source === 'cloud'
-        ? asString(options.selected.connectorId)
-        : '';
-    const connector = ((targetConnectorId ? options.connectors.find((item) => item.id === targetConnectorId) : null)
-        || (selectedConnectorId ? options.connectors.find((item) => item.id === selectedConnectorId) : null)
-        || options.connectors[0]
-        || null);
-    const connectorId = asString(connector?.id || targetConnectorId || selectedConnectorId);
-    const preferred = asString(preferredModel);
-    const selectedModel = options.selected.source === 'cloud'
-        ? asString(options.selected.model)
-        : '';
-    const connectorModels = connector?.models || [];
-    const model = ((preferred && (connectorModels.length === 0 || connectorModels.includes(preferred)) ? preferred : '')
-        || (selectedModel && (connectorModels.length === 0 || connectorModels.includes(selectedModel)) ? selectedModel : '')
-        || asString(connectorModels[0])
-        || preferred
-        || selectedModel);
-    if (!connectorId || !model) {
-        return undefined;
-    }
-    return {
-        source: 'cloud',
-        connectorId,
-        model,
-    };
+function hydrateCapabilityBindingIfMissing(
+    runtimeClient: ModRuntimeClient,
+    capability: KBRouteCapability,
+    options: RuntimeRouteOptionsSnapshot | null,
+): AIConfig {
+    hydrateKnowledgeBaseCapabilityBinding(runtimeClient, capability, options);
+    return getKnowledgeBaseAIConfig(runtimeClient);
 }
-function resolveLocalRuntimeBindingFromOptions(options: RuntimeRouteOptionsSnapshot | null, preferredModel: string): RuntimeRouteBinding | undefined {
-    if (!options)
-        return undefined;
-    const targetModel = asString(preferredModel);
-    const selectedModel = options?.selected.source === 'local'
-        ? asString(options.selected.model)
-        : '';
-    const localModels = options?.local?.models || [];
-    const matchedModel = localModels.find((item) => {
-        const model = asString(item.model);
-        const localModelId = asString(item.localModelId);
-        return (targetModel && (model === targetModel || localModelId === targetModel))
-            || (selectedModel && (model === selectedModel || localModelId === selectedModel));
-    }) || null;
-    const fallbackModel = matchedModel || localModels[0] || null;
-    const model = asString(matchedModel?.model || targetModel || selectedModel || fallbackModel?.model);
-    const localModelId = asString(matchedModel?.localModelId || fallbackModel?.localModelId);
-    if (!model) {
-        return undefined;
-    }
-    return {
-        source: 'local',
-        connectorId: '',
-        model,
-        ...(localModelId ? { localModelId } : {}),
-        ...(asString(fallbackModel?.engine) ? { engine: asString(fallbackModel?.engine) } : {}),
-    };
-}
-function resolveConfiguredBinding(preference: KBRoutePreference, options: RuntimeRouteOptionsSnapshot | null): RuntimeRouteBinding | undefined {
-    if (preference.source === 'auto')
-        return undefined;
-    if (preference.source === 'cloud') {
-        return resolveTokenApiBindingFromOptions(options, preference.connectorId, preference.model);
-    }
-    return resolveLocalRuntimeBindingFromOptions(options, preference.model);
-}
-export function useKBClients(runtimeClient: ModRuntimeClient, settings: KBSettings) {
+export function useKBClients(runtimeClient: ModRuntimeClient) {
+    const [aiConfig, setAiConfig] = useState<AIConfig>(() => createEmptyAIConfig(KB_AI_SCOPE_REF));
     const [chatRouteOptions, setChatRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
     const [embeddingRouteOptions, setEmbeddingRouteOptions] = useState<RuntimeRouteOptionsSnapshot | null>(null);
+    useEffect(() => {
+        setAiConfig(getKnowledgeBaseAIConfig(runtimeClient));
+        return subscribeKnowledgeBaseAIConfig(runtimeClient, (config) => {
+            setAiConfig(config);
+        });
+    }, [runtimeClient]);
     const loadRouteOptions = useCallback(async (capability: RouteCapability): Promise<RuntimeRouteOptionsSnapshot | null> => {
         const flowId = createKBFlowId(`route-options-${capability}`);
         try {
@@ -117,9 +83,9 @@ export function useKBClients(runtimeClient: ModRuntimeClient, settings: KBSettin
                 source: 'useKBClients.loadRouteOptions',
                 details: {
                     capability,
-                    selectedSource: options.selected.source,
-                    selectedConnectorId: options.selected.connectorId || null,
-                    selectedModel: options.selected.model || null,
+                    selectedSource: options.selected?.source || null,
+                    selectedConnectorId: options.selected?.connectorId || null,
+                    selectedModel: options.selected?.model || null,
                     connectorsCount: options.connectors.length,
                     localModelsCount: options.local?.models.length || 0,
                 },
@@ -130,6 +96,7 @@ export function useKBClients(runtimeClient: ModRuntimeClient, settings: KBSettin
             else {
                 setEmbeddingRouteOptions(options);
             }
+            setAiConfig(hydrateCapabilityBindingIfMissing(runtimeClient, capability, options));
             return options;
         }
         catch (error) {
@@ -165,40 +132,56 @@ export function useKBClients(runtimeClient: ModRuntimeClient, settings: KBSettin
         }, 15000);
         return () => clearInterval(timer);
     }, [refreshRouteOptions]);
-    const configuredChatBinding = useMemo(() => resolveConfiguredBinding({
-        source: settings.chatRouteSource,
-        connectorId: settings.chatConnectorId,
-        model: settings.chatModel,
-    }, chatRouteOptions), [settings.chatRouteSource, settings.chatConnectorId, settings.chatModel, chatRouteOptions]);
-    const configuredEmbeddingBinding = useMemo(() => resolveConfiguredBinding({
-        source: settings.embeddingRouteSource,
-        connectorId: settings.embeddingConnectorId,
-        model: settings.embeddingModel,
-    }, embeddingRouteOptions), [
-        settings.embeddingRouteSource,
-        settings.embeddingConnectorId,
-        settings.embeddingModel,
-        embeddingRouteOptions,
-    ]);
+    const configuredChatBinding = useMemo(() =>
+        getKnowledgeBaseCapabilityBinding(aiConfig, 'text.generate'), [aiConfig]);
+    const configuredEmbeddingBinding = useMemo(() =>
+        getKnowledgeBaseCapabilityBinding(aiConfig, 'text.embed'), [aiConfig]);
+    const chatRouteSelection = useMemo(() =>
+        deriveKnowledgeBaseRouteSelection(configuredChatBinding, chatRouteOptions), [
+            configuredChatBinding,
+            chatRouteOptions,
+        ]);
+    const embeddingRouteSelection = useMemo(() =>
+        deriveKnowledgeBaseRouteSelection(configuredEmbeddingBinding, embeddingRouteOptions), [
+            configuredEmbeddingBinding,
+            embeddingRouteOptions,
+        ]);
+    const updateRouteSelection = useCallback((
+        capability: KBRouteCapability,
+        selection: ReturnType<typeof deriveKnowledgeBaseRouteSelection>,
+        options: RuntimeRouteOptionsSnapshot | null,
+    ) => {
+        const binding = materializeKnowledgeBaseBinding(selection, options);
+        if (!binding) {
+            throw new Error(`KB_AI_CONFIG_BINDING_REQUIRED:${capability}`);
+        }
+        const nextConfig = updateKnowledgeBaseCapabilityBinding(runtimeClient, capability, binding);
+        setAiConfig(nextConfig);
+    }, [runtimeClient]);
     const llmClient: LlmClient = useMemo(() => createLlmClientAdapter(runtimeClient, {
-        resolveRoute: () => ({
-            binding: configuredChatBinding || chatRouteOptions?.selected,
-        }),
+        resolveConfig: () => aiConfig,
+        resolveRoute: () => resolveKnowledgeBaseRoute(aiConfig, 'text.generate'),
     }), [
         runtimeClient,
-        configuredChatBinding,
-        chatRouteOptions,
+        aiConfig,
     ]);
     const embeddingClient: EmbeddingClient = useMemo(() => createEmbeddingClientAdapter(runtimeClient, {
-        resolveRoute: () => ({
-            binding: configuredEmbeddingBinding || embeddingRouteOptions?.selected,
-        }),
+        resolveConfig: () => aiConfig,
+        resolveRoute: () => resolveKnowledgeBaseRoute(aiConfig, 'text.embed'),
     }), [
         runtimeClient,
-        configuredEmbeddingBinding,
-        embeddingRouteOptions,
+        aiConfig,
     ]);
     return {
+        aiConfig,
+        chatBinding: configuredChatBinding,
+        embeddingBinding: configuredEmbeddingBinding,
+        chatRouteSelection,
+        embeddingRouteSelection,
+        setChatRouteSelection: (selection: ReturnType<typeof deriveKnowledgeBaseRouteSelection>) =>
+            updateRouteSelection('text.generate', selection, chatRouteOptions),
+        setEmbeddingRouteSelection: (selection: ReturnType<typeof deriveKnowledgeBaseRouteSelection>) =>
+            updateRouteSelection('text.embed', selection, embeddingRouteOptions),
         llmClient,
         embeddingClient,
         chatRouteOptions,

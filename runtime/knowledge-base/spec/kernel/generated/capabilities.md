@@ -11,6 +11,21 @@ mod_identity:
   entry: ./dist/mods/knowledge-base/index.js
   source_rule: KB-CAP-001
 required_capabilities:
+  - key: runtime.ai-config.get
+    purpose: Read canonical mod-scoped AIConfig from Desktop host authority
+    source_rule: KB-CAP-002
+  - key: runtime.ai-config.update
+    purpose: Persist canonical mod-scoped AIConfig edits through Desktop host authority
+    source_rule: KB-CAP-002
+  - key: runtime.ai-config.subscribe
+    purpose: Subscribe to canonical mod-scoped AIConfig changes
+    source_rule: KB-CAP-002
+  - key: runtime.ai-config.probe.scheduling.target
+    purpose: Query submit-target scheduling judgement for mod-scoped AISnapshot runtime evidence
+    source_rule: KB-CAP-002
+  - key: runtime.ai-snapshot.record
+    purpose: Record canonical mod-scoped AISnapshot through Desktop host authority
+    source_rule: KB-CAP-002
   - key: runtime.ai.text.generate
     purpose: Single-turn text generation (query rewriting, title generation)
     source_rule: KB-CAP-002

@@ -9,48 +9,10 @@ import { ChatInput } from './chat-input.js';
 import { CitationPanel } from './citation-panel.js';
 import { ScopeSelector } from './scope-selector.js';
 import { useModTranslation } from "@nimiplatform/sdk/mod";
+import type { KBRouteSelection } from '../../types.js';
 type ChatPageProps = {
     controller: KBPageController;
 };
-type RouteDisplay = {
-    source: 'auto' | 'local' | 'cloud';
-    connectorId: string;
-    model: string;
-};
-function asString(value: unknown): string {
-    return String(value || '').trim();
-}
-function resolveRouteDisplay(input: {
-    source: 'auto' | 'local' | 'cloud';
-    connectorId: string;
-    model: string;
-    routeOptions: KBPageController['chatRouteOptions'] | KBPageController['embeddingRouteOptions'];
-}): RouteDisplay {
-    const selected = input.routeOptions?.resolvedDefault || input.routeOptions?.selected || null;
-    if (input.source === 'auto') {
-        return {
-            source: 'auto',
-            connectorId: asString(selected?.source === 'cloud' ? selected.connectorId : ''),
-            model: asString(selected?.model),
-        };
-    }
-    if (input.source === 'cloud') {
-        const selectedConnectorId = asString(selected?.source === 'cloud' ? selected.connectorId : '');
-        const connectorId = asString(input.connectorId || selectedConnectorId || input.routeOptions?.connectors[0]?.id);
-        const connector = input.routeOptions?.connectors.find((item) => item.id === connectorId) || null;
-        const selectedModel = asString(selected?.source === 'cloud' ? selected.model : '');
-        const model = asString(input.model || selectedModel || connector?.models[0]);
-        return { source: 'cloud', connectorId, model };
-    }
-    const localModel = asString(input.model
-        || (selected?.source === 'local' ? selected.model : '')
-        || input.routeOptions?.local?.models[0]?.model);
-    return {
-        source: 'local',
-        connectorId: '',
-        model: localModel,
-    };
-}
 function ChevronDownIcon({ className }: {
     className?: string;
 }) {
@@ -60,12 +22,10 @@ function ChevronDownIcon({ className }: {
 }
 function RouteChip({ label, value }: {
     label: string;
-    value: RouteDisplay;
+    value: KBRouteSelection;
 }) {
     const { t } = useModTranslation('knowledge-base');
-    const sourceLabel = value.source === 'auto' ? t('common.autoRoute')
-        : value.source === 'cloud' ? t('common.cloud')
-            : t('common.local');
+    const sourceLabel = value.source === 'cloud' ? t('common.cloud') : t('common.local');
     const modelLabel = value.model || t('common.auto');
     return (<span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-1 text-[11px] text-gray-600">
       <span className="font-medium text-gray-700">{label}:</span>
@@ -125,28 +85,8 @@ export function ChatPage(props: ChatPageProps) {
     const turns = store.activeConversation?.turns ?? [];
     const citations = turns.flatMap((t) => t.citations);
     const hasReadyDocs = store.documents.some((d) => d.status === 'ready');
-    const chatRouteDisplay = useMemo(() => resolveRouteDisplay({
-        source: store.settings.chatRouteSource,
-        connectorId: store.settings.chatConnectorId,
-        model: store.settings.chatModel,
-        routeOptions: controller.chatRouteOptions,
-    }), [
-        store.settings.chatRouteSource,
-        store.settings.chatConnectorId,
-        store.settings.chatModel,
-        controller.chatRouteOptions,
-    ]);
-    const embeddingRouteDisplay = useMemo(() => resolveRouteDisplay({
-        source: store.settings.embeddingRouteSource,
-        connectorId: store.settings.embeddingConnectorId,
-        model: store.settings.embeddingModel,
-        routeOptions: controller.embeddingRouteOptions,
-    }), [
-        store.settings.embeddingRouteSource,
-        store.settings.embeddingConnectorId,
-        store.settings.embeddingModel,
-        controller.embeddingRouteOptions,
-    ]);
+    const chatRouteDisplay = useMemo(() => controller.chatRouteSelection, [controller.chatRouteSelection]);
+    const embeddingRouteDisplay = useMemo(() => controller.embeddingRouteSelection, [controller.embeddingRouteSelection]);
     return (<div className="flex h-full min-h-0">
       {/* Sidebar */}
       <ConversationSidebar conversations={store.conversations} activeId={store.activeConversationId} onSelect={handleSelectConversation} onCreate={handleCreateConversation} onDelete={handleDeleteConversation} onRename={handleRenameConversation}/>
