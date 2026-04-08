@@ -9,6 +9,11 @@ styles:
 description: >
   多角色 AI 有声书生成工作室。
 capabilities:
+  - runtime.ai-config.get
+  - runtime.ai-config.update
+  - runtime.ai-config.subscribe
+  - runtime.ai-config.probe.scheduling.target
+  - runtime.ai-snapshot.record
   - runtime.ai.text.generate
   - runtime.media.tts.list.voices
   - runtime.media.tts.synthesize

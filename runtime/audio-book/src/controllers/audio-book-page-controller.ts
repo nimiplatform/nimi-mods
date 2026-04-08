@@ -14,10 +14,7 @@ import { splitTextIntoChapters } from '../services/chapter-splitter.js';
 import { analyzeAllChapters } from '../services/analysis-pipeline.js';
 import type { AnalysisResult } from '../services/analysis-pipeline.js';
 import {
-  buildAnalysisRetrySeed,
-  isBetterAnalysisQuality,
   measureAnalysisQuality,
-  shouldRetryAnalysisWithDefaultRoute,
   type AnalysisQuality,
 } from '../services/analysis-quality.js';
 import { classifyAllCharacters } from '../services/character-tier.js';
@@ -28,6 +25,11 @@ import { pickTestSegments } from '../services/test-segment-picker.js';
 import { dbPutAudio, dbGetAudio } from '../state/indexed-db.js';
 import type { ScriptSegment, SegmentJob, VoiceCasting } from '../types.js';
 import { createLlmClientAdapter } from '../adapters/llm-adapter.js';
+import { createTtsClientAdapter } from '../adapters/tts-adapter.js';
+import {
+  readRequiredAudioBookExecutionBinding,
+  runWithAudioBookExecutionBinding,
+} from './audio-book-ai-config.js';
 import { AUDIO_BOOK_TAB_ID } from '../contracts.js';
 
 const FLOW_LOG_PREFIX = '[audio-book:flow]';
@@ -73,8 +75,8 @@ export function useAudioBookPageController() {
   const runtimeClient = useRuntimeClient();
   // 2. Route state (loads connectors for chat + TTS through runtime.route.*)
   const ttsRoute = useTtsRoute(runtimeClient);
-  // 3. Runtime-backed service clients — llmClient rebuilds when route binding changes
-  const clients = useAudioBookClients(hookClient, runtimeClient, ttsRoute.chatSelection, ttsRoute.ttsSelection);
+  // 3. Projection-only service clients for UI helpers
+  const clients = useAudioBookClients(hookClient, runtimeClient, ttsRoute.chatBinding, ttsRoute.ttsBinding);
   const ui = useAudioBookUiState();
   const store = useAudioBookStore();
 
@@ -301,8 +303,8 @@ export function useAudioBookPageController() {
 
     try {
       const runAnalysis = async (
-        llmClient: typeof clients.llmClient,
-        route: 'selected-chat-route' | 'default-chat-route',
+        llmClient: ReturnType<typeof createLlmClientAdapter>,
+        bindingLabel: string,
         seed?: {
           startFromChapter: number;
           existingSegments: ScriptSegment[];
@@ -311,7 +313,7 @@ export function useAudioBookPageController() {
       ): Promise<{ result: AnalysisResult; quality: AnalysisQuality }> => {
         const startedAt = performance.now();
         console.info(FLOW_LOG_PREFIX, 'analyze:run', {
-          route,
+          binding: bindingLabel,
           startFromChapter: seed?.startFromChapter ?? 0,
         });
         const result = await analyzeAllChapters(llmClient, chapters, {
@@ -329,7 +331,7 @@ export function useAudioBookPageController() {
         });
         const quality = measureAnalysisQuality(result);
         console.info(FLOW_LOG_PREFIX, 'analyze:result', {
-          route,
+          binding: bindingLabel,
           ...summarizeAnalysisDiagnostics(result),
           wallTimeMs: Math.round(performance.now() - startedAt),
           ...quality,
@@ -337,47 +339,36 @@ export function useAudioBookPageController() {
         return { result, quality };
       };
 
-      const primary = await runAnalysis(clients.llmClient, 'selected-chat-route');
+      const primary = await runWithAudioBookExecutionBinding(runtimeClient, {
+        capability: 'text.generate',
+        metadata: {
+          source: 'audio-book',
+          operation: 'analyze',
+          chaptersCount: chapters.length,
+        },
+        run: async ({ binding }) => runAnalysis(
+          createLlmClientAdapter(runtimeClient, binding),
+          `${binding.source}:${binding.connectorId || '(local)'}:${binding.model}`,
+        ),
+      });
 
       if (analysisAbortRef.current) {
         store.updateProject({ state: 'imported' });
         return;
       }
 
-      let chosen = primary;
-      const shouldRetryWithDefaultRoute = shouldRetryAnalysisWithDefaultRoute(primary.quality);
-      if (shouldRetryWithDefaultRoute) {
-        const fallbackLlmClient = createLlmClientAdapter(runtimeClient);
-        const retrySeed = buildAnalysisRetrySeed(primary.result);
-        const secondary = await runAnalysis(fallbackLlmClient, 'default-chat-route', retrySeed);
-        if (isBetterAnalysisQuality(secondary.quality, primary.quality)) {
-          chosen = secondary;
-          console.info(FLOW_LOG_PREFIX, 'analyze:choose', {
-            selectedRoute: 'default-chat-route',
-            replaced: 'selected-chat-route',
-            startFromChapter: retrySeed?.startFromChapter ?? 0,
-          });
-        } else {
-          console.info(FLOW_LOG_PREFIX, 'analyze:choose', {
-            selectedRoute: 'selected-chat-route',
-            keptOver: 'default-chat-route',
-            startFromChapter: retrySeed?.startFromChapter ?? 0,
-          });
-        }
-      }
-
-      if (chosen.result.segments.length === 0) {
+      if (primary.result.segments.length === 0) {
         throw new Error('Analyze produced zero segments. Please retry analysis.');
       }
-      if (chosen.quality.fallbackSegments === chosen.quality.totalSegments) {
+      if (primary.quality.fallbackSegments === primary.quality.totalSegments) {
         throw new Error('Analysis degraded to fallback segments only. Please switch Analyze LLM provider and retry.');
       }
 
-      const classified = classifyAllCharacters(chosen.result.characters);
+      const classified = classifyAllCharacters(primary.result.characters);
 
       // --- Patch orphan speakers: speakers in segments but not in characters ---
       const speakerCounts = new Map<string, number>();
-      for (const seg of chosen.result.segments) {
+      for (const seg of primary.result.segments) {
         speakerCounts.set(seg.speaker, (speakerCounts.get(seg.speaker) ?? 0) + 1);
       }
       const characterNames = new Set(classified.map((c) => c.name));
@@ -414,8 +405,8 @@ export function useAudioBookPageController() {
       store.updateProject({ state: 'analyzed' });
       store.setScript({
         projectId: store.project!.id,
-        segments: chosen.result.segments,
-        lastProcessedChapter: chosen.result.lastProcessedChapter,
+        segments: primary.result.segments,
+        lastProcessedChapter: primary.result.lastProcessedChapter,
       });
       store.setCharacters(classified);
 
@@ -429,7 +420,7 @@ export function useAudioBookPageController() {
       ui.setAnalysisRunning(false);
       ui.setAnalysisProgress(null);
     }
-  }, [store, clients.llmClient, ui, runtimeClient]);
+  }, [store, ui, runtimeClient]);
 
   const cancelAnalysis = useCallback(() => {
     analysisAbortRef.current = true;
@@ -452,29 +443,32 @@ export function useAudioBookPageController() {
 
     ui.setError(null);
     store.updateProject({ state: 'casting' });
-    console.info(FLOW_LOG_PREFIX, 'cast:auto:start', {
-      charactersCount: store.characters.length,
-      connectorId: ttsRoute.ttsSelection.connectorId || '(none)',
-      routeSource: ttsRoute.ttsSelection.routeSource,
-      model: ttsRoute.ttsSelection.model || '(none)',
-    });
 
     try {
-      const castings = await recommendAllVoices(
-        clients.llmClient,
-        clients.ttsClient,
-        store.characters,
-        {
-          binding: ttsRoute.ttsSelection.connectorId
-            ? {
-              source: ttsRoute.ttsSelection.routeSource === 'local' ? 'local' : 'cloud',
-              connectorId: ttsRoute.ttsSelection.connectorId,
-              model: ttsRoute.ttsSelection.model || '',
-            }
-            : undefined,
-          model: ttsRoute.ttsSelection.model,
+      const castings = await runWithAudioBookExecutionBinding(runtimeClient, {
+        capability: 'text.generate',
+        metadata: {
+          source: 'audio-book',
+          operation: 'auto-cast',
+          charactersCount: store.characters.length,
+          segmentsCount: store.script?.segments.length || 0,
         },
-      );
+        run: async ({ binding: chatBinding }) => {
+          const ttsBinding = readRequiredAudioBookExecutionBinding(runtimeClient, 'audio.synthesize');
+          const llmClient = createLlmClientAdapter(runtimeClient, chatBinding);
+          const ttsClient = createTtsClientAdapter(runtimeClient, ttsBinding);
+          console.info(FLOW_LOG_PREFIX, 'cast:auto:start', {
+            charactersCount: store.characters.length,
+            chatBinding,
+            ttsBinding,
+          });
+          return recommendAllVoices(
+            llmClient,
+            ttsClient,
+            store.characters,
+          );
+        },
+      });
       store.setVoiceCastings(castings);
       store.updateProject({ state: 'cast_complete' });
       console.info(FLOW_LOG_PREFIX, 'cast:auto:ok', {
@@ -501,21 +495,14 @@ export function useAudioBookPageController() {
     } catch (err) {
       console.warn(FLOW_LOG_PREFIX, 'cast:auto:failed', {
         error: err instanceof Error ? err.message : String(err),
-        connectorId: ttsRoute.ttsSelection.connectorId || '(none)',
-        routeSource: ttsRoute.ttsSelection.routeSource,
-        model: ttsRoute.ttsSelection.model || '(none)',
       });
       ui.setError(err instanceof Error ? err.message : 'Voice casting failed');
       store.updateProject({ state: 'analyzed' });
     }
   }, [
     store,
-    clients.llmClient,
-    clients.ttsClient,
     ui,
-    ttsRoute.ttsSelection.connectorId,
-    ttsRoute.ttsSelection.model,
-    ttsRoute.ttsSelection.routeSource,
+    runtimeClient,
   ]);
 
   const updateCasting = useCallback(
@@ -533,30 +520,33 @@ export function useAudioBookPageController() {
       stopPreviewAudio();
       stopPlaybackAudio();
       ui.setPreviewPlaying(casting.voiceId);
-      console.info(FLOW_LOG_PREFIX, 'cast:preview:start', {
-        characterName: casting.characterName,
-        voiceId: casting.voiceId,
-        providerId: casting.providerId,
-        connectorId: ttsRoute.ttsSelection.connectorId || '(none)',
-        routeSource: ttsRoute.ttsSelection.routeSource,
-        model: ttsRoute.ttsSelection.model || '(none)',
-      });
       try {
-        const result = await clients.ttsClient.synthesize({
-          text: '这是一段试听示例文本。This is a preview sample.',
-          voiceId: casting.voiceId,
-          providerId: casting.providerId,
-          speakingRate: casting.speakingRate,
-          pitch: casting.pitch,
-          emotion: casting.emotion,
-          binding: ttsRoute.ttsSelection.connectorId
-            ? {
-              source: ttsRoute.ttsSelection.routeSource === 'local' ? 'local' : 'cloud',
-              connectorId: ttsRoute.ttsSelection.connectorId,
-              model: ttsRoute.ttsSelection.model || '',
-            }
-            : undefined,
-          model: ttsRoute.ttsSelection.model,
+        const result = await runWithAudioBookExecutionBinding(runtimeClient, {
+          capability: 'audio.synthesize',
+          metadata: {
+            source: 'audio-book',
+            operation: 'preview',
+            characterName: casting.characterName,
+            voiceId: casting.voiceId,
+            providerId: casting.providerId,
+          },
+          run: async ({ binding: ttsBinding }) => {
+            const ttsClient = createTtsClientAdapter(runtimeClient, ttsBinding);
+            console.info(FLOW_LOG_PREFIX, 'cast:preview:start', {
+              characterName: casting.characterName,
+              voiceId: casting.voiceId,
+              providerId: casting.providerId,
+              ttsBinding,
+            });
+            return ttsClient.synthesize({
+              text: '这是一段试听示例文本。This is a preview sample.',
+              voiceId: casting.voiceId,
+              providerId: casting.providerId,
+              speakingRate: casting.speakingRate,
+              pitch: casting.pitch,
+              emotion: casting.emotion,
+            });
+          },
         });
         console.info(FLOW_LOG_PREFIX, 'cast:preview:ok', {
           characterName: casting.characterName,
@@ -584,22 +574,16 @@ export function useAudioBookPageController() {
           characterName: casting.characterName,
           voiceId: casting.voiceId,
           error: err instanceof Error ? err.message : String(err),
-          connectorId: ttsRoute.ttsSelection.connectorId || '(none)',
-          routeSource: ttsRoute.ttsSelection.routeSource,
-          model: ttsRoute.ttsSelection.model || '(none)',
         });
         stopPreviewAudio();
         ui.setError(err instanceof Error ? err.message : 'Preview failed');
       }
     },
     [
-      clients.ttsClient,
       stopPlaybackAudio,
       stopPreviewAudio,
       ui,
-      ttsRoute.ttsSelection.connectorId,
-      ttsRoute.ttsSelection.model,
-      ttsRoute.ttsSelection.routeSource,
+      runtimeClient,
     ],
   );
 
@@ -654,63 +638,63 @@ export function useAudioBookPageController() {
     if (reason !== 'test') {
       store.updateProject({ state: 'synthesizing' });
     }
-    console.info(FLOW_LOG_PREFIX, 'synth:start', {
-      reason,
-      projectId: store.project?.id || '(none)',
-      segmentsCount: segments.length,
-      castingsCount,
-      connectorId: ttsRoute.ttsSelection.connectorId || '(none)',
-      routeSource: ttsRoute.ttsSelection.routeSource,
-      model: ttsRoute.ttsSelection.model || '(none)',
-    });
-
     const castingMap = new Map<string, VoiceCasting>();
     for (const c of store.voiceCastings) {
       castingMap.set(c.characterName, c);
     }
-
-    const { promise, controller } = runSynthesisJob(
-      clients.ttsClient,
-      segments,
-      castingMap,
-      store.project!.id,
-      {
-        maxConcurrency: 3,
-        ttsRoute: {
-          binding: ttsRoute.ttsSelection.connectorId
-            ? {
-              source: ttsRoute.ttsSelection.routeSource === 'local' ? 'local' : 'cloud',
-              connectorId: ttsRoute.ttsSelection.connectorId,
-              model: ttsRoute.ttsSelection.model || '',
-            }
-            : undefined,
-          model: ttsRoute.ttsSelection.model,
-        },
-        existingJobs,
-        onProgress: (p) => {
-          ui.setSynthProgress({
-            completed: p.completed,
-            total: p.total,
-            failed: p.failed,
-            estimatedRemainingMs: p.estimatedRemainingMs,
-          });
-          console.info(FLOW_LOG_PREFIX, 'synth:progress', {
-            completed: p.completed,
-            total: p.total,
-            failed: p.failed,
-            estimatedRemainingMs: p.estimatedRemainingMs,
-          });
-        },
-        onAudioReady: async (segmentId, blob, _durationMs) => {
-          await dbPutAudio(store.project!.id, segmentId, blob);
-        },
-      },
-    );
-
-    synthControllerRef.current = controller;
-
     try {
-      const job = await promise;
+      const job = await runWithAudioBookExecutionBinding(runtimeClient, {
+        capability: 'audio.synthesize',
+        metadata: {
+          source: 'audio-book',
+          operation: 'synthesis',
+          reason,
+          projectId: store.project?.id || null,
+          segmentsCount: segments.length,
+          castingsCount,
+        },
+        run: async ({ binding: ttsBinding }) => {
+          const ttsClient = createTtsClientAdapter(runtimeClient, ttsBinding);
+          console.info(FLOW_LOG_PREFIX, 'synth:start', {
+            reason,
+            projectId: store.project?.id || '(none)',
+            segmentsCount: segments.length,
+            castingsCount,
+            ttsBinding,
+          });
+
+          const { promise, controller } = runSynthesisJob(
+            ttsClient,
+            segments,
+            castingMap,
+            store.project!.id,
+            {
+              maxConcurrency: 3,
+              existingJobs,
+              onProgress: (p) => {
+                ui.setSynthProgress({
+                  completed: p.completed,
+                  total: p.total,
+                  failed: p.failed,
+                  estimatedRemainingMs: p.estimatedRemainingMs,
+                });
+                console.info(FLOW_LOG_PREFIX, 'synth:progress', {
+                  completed: p.completed,
+                  total: p.total,
+                  failed: p.failed,
+                  estimatedRemainingMs: p.estimatedRemainingMs,
+                });
+              },
+              onAudioReady: async (segmentId, blob, _durationMs) => {
+                await dbPutAudio(store.project!.id, segmentId, blob);
+              },
+            },
+          );
+
+          synthControllerRef.current = controller;
+          return promise;
+        },
+      });
       console.info(FLOW_LOG_PREFIX, 'synth:done', {
         reason,
         status: job.status,
@@ -759,9 +743,6 @@ export function useAudioBookPageController() {
     } catch (err) {
       console.warn(FLOW_LOG_PREFIX, 'synth:failed', {
         error: err instanceof Error ? err.message : String(err),
-        connectorId: ttsRoute.ttsSelection.connectorId || '(none)',
-        routeSource: ttsRoute.ttsSelection.routeSource,
-        model: ttsRoute.ttsSelection.model || '(none)',
       });
       ui.setError(err instanceof Error ? err.message : 'Synthesis failed');
       // Only restore project state for full synthesis (test mode never changed it)
@@ -775,12 +756,9 @@ export function useAudioBookPageController() {
     }
   }, [
     store,
-    clients.ttsClient,
     ui,
     setTestSynthesisJob,
-    ttsRoute.ttsSelection.connectorId,
-    ttsRoute.ttsSelection.model,
-    ttsRoute.ttsSelection.routeSource,
+    runtimeClient,
   ]);
 
   const startSynthesis = useCallback(async () => {

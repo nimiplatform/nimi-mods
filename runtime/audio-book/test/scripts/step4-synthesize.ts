@@ -119,7 +119,6 @@ function createRuntimeTtsClient(endpoint: string, modelId: string): TtsClient {
       const result = await runtime.media.tts.listVoices({
         model: modelId,
         route: 'cloud',
-        fallback: 'deny',
         metadata,
       });
       return result.voices.map((v) => ({
@@ -143,7 +142,6 @@ function createRuntimeTtsClient(endpoint: string, modelId: string): TtsClient {
         pitch: input.pitch ?? 0,
         emotion: input.emotion ?? '',
         route: 'cloud',
-        fallback: 'deny',
         timeoutMs: 60_000,
         metadata,
       });

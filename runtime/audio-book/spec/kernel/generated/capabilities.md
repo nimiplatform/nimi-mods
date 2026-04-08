@@ -11,6 +11,21 @@ mod_identity:
   entry: ./dist/mods/audio-book/index.js
   source_rule: VS-CAP-001
 required_capabilities:
+  - key: runtime.ai-config.get
+    purpose: Read canonical mod-scoped AIConfig bindings for chat and TTS
+    source_rule: VS-CAP-002
+  - key: runtime.ai-config.update
+    purpose: Persist canonical mod-scoped AIConfig bindings for chat and TTS
+    source_rule: VS-CAP-002
+  - key: runtime.ai-config.subscribe
+    purpose: Subscribe to canonical mod-scoped AIConfig changes for route editor projection
+    source_rule: VS-CAP-002
+  - key: runtime.ai-config.probe.scheduling.target
+    purpose: Read submit-target scheduling judgement before execution
+    source_rule: VS-CAP-002
+  - key: runtime.ai-snapshot.record
+    purpose: Record canonical mod-scoped execution snapshots through Desktop host authority
+    source_rule: VS-CAP-002
   - key: runtime.ai.text.generate
     purpose: Chapter analysis, character extraction, and voice recommendation
     source_rule: VS-CAP-002
@@ -39,10 +54,10 @@ required_capabilities:
     purpose: List synthesized segment audio files for playback and cleanup
     source_rule: VS-CAP-004
   - key: runtime.route.list.options
-    purpose: Query available TTS route bindings
+    purpose: Query available route candidates for editor projection and hydration
     source_rule: VS-CAP-003
   - key: runtime.route.resolve
-    purpose: Resolve the selected TTS binding before execution
+    purpose: Resolve route metadata for projection and execution helper logic
     source_rule: VS-CAP-003
   - key: ui.register.ui-extension.app.sidebar.mods
     purpose: Sidebar entry registration

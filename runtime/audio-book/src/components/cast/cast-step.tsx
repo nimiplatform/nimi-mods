@@ -42,12 +42,16 @@ export function CastStep(props: CastStepProps) {
         setLoadingVoices(true);
         setVoiceError(null);
         const routeInput = {
+            binding: ttsRoute.ttsBinding,
+            model: ttsRoute.ttsBinding?.model,
             connectorId: ttsRoute.ttsSelection.connectorId || undefined,
             routeSource: ttsRoute.ttsSelection.routeSource,
-            model: ttsRoute.ttsSelection.model,
         };
         console.info(FLOW_LOG_PREFIX, 'cast:listVoices:start', routeInput);
-        ttsClient.listVoices(routeInput).then((voices) => {
+        ttsClient.listVoices({
+            binding: ttsRoute.ttsBinding,
+            model: ttsRoute.ttsBinding?.model,
+        }).then((voices) => {
             if (!cancelled) {
                 setAvailableVoices(voices);
                 setLoadingVoices(false);
@@ -72,6 +76,9 @@ export function CastStep(props: CastStepProps) {
     }, [
         ttsClient,
         ttsRoute.loading,
+        ttsRoute.ttsBinding?.connectorId,
+        ttsRoute.ttsBinding?.model,
+        ttsRoute.ttsBinding?.source,
         ttsRoute.ttsSelection.connectorId,
         ttsRoute.ttsSelection.model,
         ttsRoute.ttsSelection.routeSource,

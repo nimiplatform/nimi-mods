@@ -205,7 +205,6 @@ function createRuntimeLlmClient(runtime: Runtime, modelId: string, connectorId?:
         input: input.userPrompt,
         system: input.systemPrompt,
         route: 'cloud',
-        fallback: 'deny',
         connectorId: String(connectorId || '').trim() || undefined,
         metadata: buildMetadata(),
         temperature: input.temperature ?? 0.7,

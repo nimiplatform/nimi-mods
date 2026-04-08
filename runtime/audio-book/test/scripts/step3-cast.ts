@@ -103,7 +103,6 @@ function createRuntimeLlmClient(endpoint: string, modelId: string): LlmClient {
     runtime,
     appId: APP_ID,
     routePolicy: 'cloud',
-    fallback: 'deny',
     timeoutMs: 300_000,
     metadata: buildMetadata(),
   });

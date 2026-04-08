@@ -7,6 +7,11 @@ export const AUDIO_BOOK_NAV_SLOT = 'ui-extension.app.sidebar.mods';
 export const AUDIO_BOOK_ROUTE_SLOT = 'ui-extension.app.content.routes';
 
 export const AUDIO_BOOK_CAPABILITIES = [
+  'runtime.ai-config.get',
+  'runtime.ai-config.update',
+  'runtime.ai-config.subscribe',
+  'runtime.ai-config.probe.scheduling.target',
+  'runtime.ai-snapshot.record',
   'runtime.ai.text.generate',
   'runtime.route.list.options',
   'runtime.route.resolve',

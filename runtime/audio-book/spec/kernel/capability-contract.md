@@ -9,16 +9,21 @@
 - Entry: `./dist/mods/audio-book/index.js`
 - Audio Book is a desktop capability mod and must consume runtime capabilities only through the mod SDK surface.
 
-## VS-CAP-002 — Runtime AI Text Capability
+## VS-CAP-002 — Runtime AI / Config Capability
 
+- `runtime.ai-config.get` / `runtime.ai-config.update` / `runtime.ai-config.subscribe` 是 Audio Book 唯一允许消费的 mod-scoped AI config authority surface。
+- `runtime.ai-config.probe.scheduling.target` 用于读取 submit-target scheduling judgement，不能被 route helper 或本地启发式替代。
+- `runtime.ai-snapshot.record` 用于通过 Desktop host authority 记录 canonical mod-scoped `AISnapshot`。
+- Audio Book 的 chat route 与 TTS route 选择必须通过 canonical mod-scoped `AIConfig` 读写；`audio-book.route` 或其他 mod-local KV 不得再作为 live truth owner。
 - `runtime.ai.text.generate` is the only text-generation capability Audio Book may consume.
 - It is used for chapter analysis, character extraction, and voice recommendation.
 - Audio Book must not declare or consume `runtime.ai.text.stream`.
 
 ## VS-CAP-003 — Runtime Route Contract
 
-- Audio Book must query available TTS bindings via `runtime.route.list.options`.
-- Audio Book must resolve the selected binding via `runtime.route.resolve` before runtime TTS execution.
+- Audio Book may query available route candidates via `runtime.route.list.options`.
+- Audio Book may resolve route metadata via `runtime.route.resolve` for editor hydration and execution helper logic.
+- `runtime.route.*` is projection/helper substrate only; it is not the canonical route/config owner.
 - Route selection is capability-scoped; provider lists and legacy route hints are forbidden.
 
 ## VS-CAP-004 — Runtime TTS Capability

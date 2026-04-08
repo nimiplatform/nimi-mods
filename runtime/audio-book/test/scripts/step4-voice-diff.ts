@@ -99,7 +99,6 @@ async function synthesizeOne(
     pitch: 0,
     emotion: '',
     route: 'cloud',
-    fallback: 'deny',
     timeoutMs: 60_000,
     metadata,
   });

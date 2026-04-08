@@ -6,16 +6,34 @@
 //   3. Periodic polling to keep options fresh
 // ---------------------------------------------------------------------------
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { createModKvStore, createModStorageClient, parseRuntimeRouteOptions, type RuntimeCanonicalCapability, type RuntimeRouteConnectorOption, type RuntimeRouteOptionsSnapshot, type ModRuntimeClient } from "@nimiplatform/sdk/mod";
-import { AUDIO_BOOK_MOD_ID } from '../contracts.js';
-export type RouteSelection = {
-    connectorId: string;
-    routeSource: 'auto' | 'local' | 'cloud';
-    model?: string;
-};
+import {
+    createEmptyAIConfig,
+    parseRuntimeRouteOptions,
+    type AIConfig,
+    type RuntimeCanonicalCapability,
+    type RuntimeRouteConnectorOption,
+    type RuntimeRouteBinding,
+    type RuntimeRouteOptionsSnapshot,
+    type ModRuntimeClient,
+} from "@nimiplatform/sdk/mod";
+import {
+    AUDIO_BOOK_AI_SCOPE_REF,
+    clearLegacyAudioBookRouteSelections,
+    deriveAudioBookRouteSelection,
+    getAudioBookAIConfig,
+    getAudioBookCapabilityBinding,
+    hydrateAudioBookCapabilityBinding,
+    materializeAudioBookBinding,
+    readLegacyAudioBookRouteSelections,
+    subscribeAudioBookAIConfig,
+    updateAudioBookCapabilityBinding,
+    type RouteSelection,
+} from './audio-book-ai-config.js';
 export type TtsRouteState = {
     chatConnectors: RuntimeRouteConnectorOption[];
     ttsConnectors: RuntimeRouteConnectorOption[];
+    chatBinding?: RuntimeRouteBinding;
+    ttsBinding?: RuntimeRouteBinding;
     chatSelection: RouteSelection;
     ttsSelection: RouteSelection;
     loading: boolean;
@@ -24,8 +42,6 @@ export type TtsRouteState = {
     selectChatModel: (model: string) => void;
     selectTtsConnector: (connectorId: string) => void;
 };
-const STORAGE_KEY_CHAT = 'audio-book:chat-connector';
-const STORAGE_KEY_TTS = 'audio-book:tts-connector';
 const QUERY_TIMEOUT_MS = 8000;
 const LOG_PREFIX = '[audio-book:route]';
 const RETRY_DELAYS_MS = [0, 300, 800, 1500];
@@ -42,12 +58,7 @@ const OPENAI_TTS_MODEL_PREFERENCES = [
     'gpt-4o-mini-tts',
     'gpt-4o-audio-preview',
 ];
-const routeStateStore = createModKvStore({
-    storage: createModStorageClient(AUDIO_BOOK_MOD_ID),
-    namespace: 'audio-book.route',
-});
 const emptySelection: RouteSelection = { connectorId: '', routeSource: 'auto' };
-const persistedSelectionCache = new Map<string, RouteSelection>();
 function ensureRouteOptionsSnapshotShape(snapshot: RuntimeRouteOptionsSnapshot | null): RuntimeRouteOptionsSnapshot | null {
     if (!snapshot) {
         return null;
@@ -60,39 +71,6 @@ function ensureRouteOptionsSnapshotShape(snapshot: RuntimeRouteOptionsSnapshot |
         },
         connectors: Array.isArray(snapshot.connectors) ? snapshot.connectors : [],
     };
-}
-async function loadPersisted(key: string): Promise<RouteSelection> {
-    try {
-        const parsed = await routeStateStore.getJson<Record<string, unknown>>(key);
-        if (parsed) {
-            const persistedModel = String(parsed.model || '').trim();
-            return {
-                connectorId: String(parsed.connectorId || ''),
-                routeSource: parsed.routeSource === 'cloud' ? 'cloud' : parsed.routeSource === 'local' ? 'local' : 'auto',
-                model: persistedModel && !isPlaceholderModel(persistedModel) ? persistedModel : undefined,
-            };
-        }
-    }
-    catch { /* ignore */ }
-    return { ...emptySelection };
-}
-async function persist(key: string, selection: RouteSelection): Promise<void> {
-    try {
-        persistedSelectionCache.set(key, selection);
-        await routeStateStore.setJson(key, selection);
-    }
-    catch { /* ignore */ }
-}
-const persistedSelectionCacheReady = Promise.all([
-    loadPersisted(STORAGE_KEY_CHAT).then((selection) => {
-        persistedSelectionCache.set(STORAGE_KEY_CHAT, selection);
-    }),
-    loadPersisted(STORAGE_KEY_TTS).then((selection) => {
-        persistedSelectionCache.set(STORAGE_KEY_TTS, selection);
-    }),
-]).then(() => undefined);
-function readPersistedSelectionSync(key: string): RouteSelection {
-    return persistedSelectionCache.get(key) || { ...emptySelection };
 }
 // ---------------------------------------------------------------------------
 async function loadRouteOptions(runtimeClient: ModRuntimeClient, capability: RuntimeCanonicalCapability): Promise<RuntimeRouteOptionsSnapshot | null> {
@@ -111,8 +89,8 @@ async function loadRouteOptions(runtimeClient: ModRuntimeClient, capability: Run
         }
         console.info(LOG_PREFIX, 'loadRouteOptions:ok', {
             capability,
-            selectedSource: snapshot.selected.source,
-            selectedConnectorId: snapshot.selected.connectorId || '(none)',
+            selectedSource: snapshot.selected?.source || '(none)',
+            selectedConnectorId: snapshot.selected?.connectorId || '(none)',
             connectorsCount: snapshot.connectors.length,
             connectorIds: snapshot.connectors.map((connector) => connector.id),
         });
@@ -303,33 +281,104 @@ function hasModelOption(options: string[], model?: string): boolean {
         return false;
     return options.includes(normalized);
 }
-function resolveSelection(connectors: RuntimeRouteConnectorOption[], fallback: RouteSelectionFallback, storageKey: string, modelPicker: (connectors: RuntimeRouteConnectorOption[], connectorId: string, fallbackModel: string) => string, modelOptionsGetter: (connectors: RuntimeRouteConnectorOption[], connectorId: string) => string[]): RouteSelection {
-    const persisted = readPersistedSelectionSync(storageKey);
-    if (persisted.connectorId && connectors.some((c) => c.id === persisted.connectorId)) {
-        const options = modelOptionsGetter(connectors, persisted.connectorId);
-        const preferredPersistedModel = hasModelOption(options, persisted.model)
-            ? normalizeModel(persisted.model || '')
-            : '';
-        const next: RouteSelection = {
-            connectorId: persisted.connectorId,
-            routeSource: 'cloud',
-            model: preferredPersistedModel || modelPicker(connectors, persisted.connectorId, fallback.model || ''),
+function listTtsModelsForConnector(connectors: RuntimeRouteConnectorOption[], connectorId: string): string[] {
+    const matched = connectors.find((item) => item.id === connectorId) || null;
+    if (!matched)
+        return [];
+    return matched.models
+        .map((item) => normalizeModel(item))
+        .filter((item, index, array) => Boolean(item) && !isVoiceDesignTtsModel(item) && array.indexOf(item) === index);
+}
+function toSelectionFromResolvedRoute(resolved: {
+    source: string;
+    connectorId: string;
+    model: string;
+} | null): RouteSelection {
+    if (!resolved) {
+        return { ...emptySelection };
+    }
+    const model = normalizeModel(resolved.model || '');
+    if (resolved.source === 'local') {
+        return {
+            connectorId: '',
+            routeSource: 'local',
+            ...(model ? { model } : {}),
         };
-        void persist(storageKey, next);
-        return next;
+    }
+    if (resolved.source === 'cloud') {
+        return {
+            connectorId: String(resolved.connectorId || '').trim(),
+            routeSource: 'cloud',
+            ...(model ? { model } : {}),
+        };
+    }
+    return { ...emptySelection };
+}
+function toBindingFromResolvedRoute(resolved: {
+    source: string;
+    connectorId: string;
+    model: string;
+} | null) {
+    const normalizedModel = normalizeModel(resolved?.model || '');
+    if (!resolved || !normalizedModel) {
+        return null;
+    }
+    if (resolved.source === 'local') {
+        return {
+            source: 'local' as const,
+            connectorId: '',
+            model: normalizedModel,
+        };
+    }
+    if (resolved.source === 'cloud' && String(resolved.connectorId || '').trim()) {
+        return {
+            source: 'cloud' as const,
+            connectorId: String(resolved.connectorId || '').trim(),
+            model: normalizedModel,
+        };
+    }
+    return null;
+}
+function hasMeaningfulSelection(selection: RouteSelection | null | undefined): boolean {
+    if (!selection) {
+        return false;
+    }
+    return Boolean(
+        String(selection.connectorId || '').trim()
+        || String(selection.model || '').trim()
+        || selection.routeSource === 'local'
+        || selection.routeSource === 'cloud',
+    );
+}
+function resolveSelection(connectors: RuntimeRouteConnectorOption[], preferred: RouteSelection, fallback: RouteSelectionFallback, modelPicker: (connectors: RuntimeRouteConnectorOption[], connectorId: string, fallbackModel: string) => string, modelOptionsGetter: (connectors: RuntimeRouteConnectorOption[], connectorId: string) => string[]): RouteSelection {
+    if (preferred.routeSource === 'local') {
+        return {
+            connectorId: '',
+            routeSource: 'local',
+            ...(normalizeModel(preferred.model || fallback.model || '') ? { model: normalizeModel(preferred.model || fallback.model || '') } : {}),
+        };
+    }
+    if (preferred.connectorId && connectors.some((c) => c.id === preferred.connectorId)) {
+        const options = modelOptionsGetter(connectors, preferred.connectorId);
+        const preferredModel = hasModelOption(options, preferred.model)
+            ? normalizeModel(preferred.model || '')
+            : '';
+        return {
+            connectorId: preferred.connectorId,
+            routeSource: 'cloud',
+            model: preferredModel || modelPicker(connectors, preferred.connectorId, fallback.model || ''),
+        };
     }
     if (fallback.connectorId && connectors.some((c) => c.id === fallback.connectorId)) {
         const options = modelOptionsGetter(connectors, fallback.connectorId);
         const nextModel = hasModelOption(options, fallback.model)
             ? normalizeModel(fallback.model)
             : modelPicker(connectors, fallback.connectorId, fallback.model || '');
-        const next: RouteSelection = {
+        return {
             connectorId: fallback.connectorId,
             routeSource: 'cloud',
             model: nextModel || undefined,
         };
-        void persist(storageKey, next);
-        return next;
     }
     if (connectors.length > 0) {
         const first = connectors[0]?.id || '';
@@ -337,22 +386,25 @@ function resolveSelection(connectors: RuntimeRouteConnectorOption[], fallback: R
             return { connectorId: '', routeSource: 'auto', model: fallback.model || undefined };
         }
         const nextModel = modelPicker(connectors, first, fallback.model || '');
-        const selection: RouteSelection = {
+        return {
             connectorId: first,
             routeSource: 'cloud',
             model: nextModel || undefined,
         };
-        void persist(storageKey, selection);
-        return selection;
     }
     if (fallback.connectorId) {
-        const selection: RouteSelection = {
+        return {
             connectorId: fallback.connectorId,
             routeSource: 'cloud',
             model: fallback.model || undefined,
         };
-        void persist(storageKey, selection);
-        return selection;
+    }
+    if (normalizeModel(preferred.model || '')) {
+        return {
+            connectorId: '',
+            routeSource: preferred.routeSource,
+            model: normalizeModel(preferred.model || '') || undefined,
+        };
     }
     return { connectorId: '', routeSource: 'auto', model: undefined };
 }
@@ -362,11 +414,39 @@ function resolveSelection(connectors: RuntimeRouteConnectorOption[], fallback: R
 export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
     const [chatConnectors, setChatConnectors] = useState<RuntimeRouteConnectorOption[]>([]);
     const [ttsConnectors, setTtsConnectors] = useState<RuntimeRouteConnectorOption[]>([]);
-    const [chatSelection, setChatSelection] = useState<RouteSelection>(() => readPersistedSelectionSync(STORAGE_KEY_CHAT));
-    const [ttsSelection, setTtsSelection] = useState<RouteSelection>(() => readPersistedSelectionSync(STORAGE_KEY_TTS));
+    const [aiConfig, setAiConfig] = useState<AIConfig>(() => createEmptyAIConfig(AUDIO_BOOK_AI_SCOPE_REF));
+    const [chatSelection, setChatSelection] = useState<RouteSelection>(() => ({ ...emptySelection }));
+    const [ttsSelection, setTtsSelection] = useState<RouteSelection>(() => ({ ...emptySelection }));
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const loadInFlightRef = useRef(new Map<RuntimeCanonicalCapability, Promise<RuntimeRouteOptionsSnapshot | null>>());
+    const legacySelectionsRef = useRef<{
+        chatSelection: RouteSelection;
+        ttsSelection: RouteSelection;
+    }>({
+        chatSelection: { ...emptySelection },
+        ttsSelection: { ...emptySelection },
+    });
+    const latestRouteStateRef = useRef<{
+        chatSnapshot: RuntimeRouteOptionsSnapshot | null;
+        ttsSnapshot: RuntimeRouteOptionsSnapshot | null;
+        resolvedChat: {
+            source: string;
+            connectorId: string;
+            model: string;
+        } | null;
+        resolvedTts: {
+            source: string;
+            connectorId: string;
+            model: string;
+        } | null;
+    }>({
+        chatSnapshot: null,
+        ttsSnapshot: null,
+        resolvedChat: null,
+        resolvedTts: null,
+    });
+    const legacyClearedRef = useRef(false);
     const loadRouteOptionsDeduped = useCallback(async (capability: RuntimeCanonicalCapability): Promise<RuntimeRouteOptionsSnapshot | null> => {
         const existing = loadInFlightRef.current.get(capability);
         if (existing) {
@@ -381,15 +461,131 @@ export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
         });
         return task;
     }, [runtimeClient]);
+    const syncSelections = useCallback((input: {
+        config: AIConfig;
+        chatSnapshot: RuntimeRouteOptionsSnapshot | null;
+        ttsSnapshot: RuntimeRouteOptionsSnapshot | null;
+        resolvedChat: {
+            source: string;
+            connectorId: string;
+            model: string;
+        } | null;
+        resolvedTts: {
+            source: string;
+            connectorId: string;
+            model: string;
+        } | null;
+    }) => {
+        const chatBinding = getAudioBookCapabilityBinding(input.config, 'text.generate');
+        const ttsBinding = getAudioBookCapabilityBinding(input.config, 'audio.synthesize');
+        const nextChatConnectors = input.chatSnapshot?.connectors || [];
+        const nextTtsConnectors = input.ttsSnapshot?.connectors || [];
+        setChatConnectors(nextChatConnectors);
+        setTtsConnectors(nextTtsConnectors);
+        setChatSelection(resolveSelection(
+            nextChatConnectors,
+            deriveAudioBookRouteSelection(chatBinding, input.chatSnapshot),
+            {
+                connectorId: toSelectionFromResolvedRoute(input.resolvedChat).connectorId,
+                model: toSelectionFromResolvedRoute(input.resolvedChat).model || '',
+            },
+            pickChatModelForConnector,
+            listChatModelsForConnector,
+        ));
+        setTtsSelection(resolveSelection(
+            nextTtsConnectors,
+            deriveAudioBookRouteSelection(ttsBinding, input.ttsSnapshot),
+            {
+                connectorId: toSelectionFromResolvedRoute(input.resolvedTts).connectorId,
+                model: toSelectionFromResolvedRoute(input.resolvedTts).model || '',
+            },
+            pickTtsModelForConnector,
+            listTtsModelsForConnector,
+        ));
+    }, []);
+    const ensureAuthorityBindings = useCallback((input: {
+        config: AIConfig;
+        chatSnapshot: RuntimeRouteOptionsSnapshot | null;
+        ttsSnapshot: RuntimeRouteOptionsSnapshot | null;
+        resolvedChat: {
+            source: string;
+            connectorId: string;
+            model: string;
+        } | null;
+        resolvedTts: {
+            source: string;
+            connectorId: string;
+            model: string;
+        } | null;
+    }): AIConfig => {
+        let nextConfig = input.config;
+        if (!getAudioBookCapabilityBinding(nextConfig, 'text.generate')) {
+            const legacySelection = hasMeaningfulSelection(legacySelectionsRef.current.chatSelection)
+                ? legacySelectionsRef.current.chatSelection
+                : null;
+            const hydrated = hydrateAudioBookCapabilityBinding(
+                runtimeClient,
+                'text.generate',
+                input.chatSnapshot,
+                legacySelection,
+            ) || toBindingFromResolvedRoute(input.resolvedChat);
+            if (hydrated && !getAudioBookCapabilityBinding(nextConfig, 'text.generate')) {
+                nextConfig = getAudioBookCapabilityBinding(getAudioBookAIConfig(runtimeClient), 'text.generate')
+                    ? getAudioBookAIConfig(runtimeClient)
+                    : updateAudioBookCapabilityBinding(runtimeClient, 'text.generate', hydrated);
+            }
+        }
+        if (!getAudioBookCapabilityBinding(nextConfig, 'audio.synthesize')) {
+            const legacySelection = hasMeaningfulSelection(legacySelectionsRef.current.ttsSelection)
+                ? legacySelectionsRef.current.ttsSelection
+                : null;
+            const hydrated = hydrateAudioBookCapabilityBinding(
+                runtimeClient,
+                'audio.synthesize',
+                input.ttsSnapshot,
+                legacySelection,
+            ) || toBindingFromResolvedRoute(input.resolvedTts);
+            if (hydrated && !getAudioBookCapabilityBinding(nextConfig, 'audio.synthesize')) {
+                nextConfig = getAudioBookCapabilityBinding(getAudioBookAIConfig(runtimeClient), 'audio.synthesize')
+                    ? getAudioBookAIConfig(runtimeClient)
+                    : updateAudioBookCapabilityBinding(runtimeClient, 'audio.synthesize', hydrated);
+            }
+        }
+        const chatReady = getAudioBookCapabilityBinding(nextConfig, 'text.generate') || !hasMeaningfulSelection(legacySelectionsRef.current.chatSelection);
+        const ttsReady = getAudioBookCapabilityBinding(nextConfig, 'audio.synthesize') || !hasMeaningfulSelection(legacySelectionsRef.current.ttsSelection);
+        if (!legacyClearedRef.current && chatReady && ttsReady) {
+            legacyClearedRef.current = true;
+            void clearLegacyAudioBookRouteSelections();
+        }
+        return nextConfig;
+    }, [runtimeClient]);
+    useEffect(() => {
+        setAiConfig(getAudioBookAIConfig(runtimeClient));
+        return subscribeAudioBookAIConfig(runtimeClient, (config) => {
+            setAiConfig(config);
+        });
+    }, [runtimeClient]);
+    useEffect(() => {
+        const latest = latestRouteStateRef.current;
+        if (!latest.chatSnapshot && !latest.ttsSnapshot && !latest.resolvedChat && !latest.resolvedTts) {
+            return;
+        }
+        syncSelections({
+            config: aiConfig,
+            chatSnapshot: latest.chatSnapshot,
+            ttsSnapshot: latest.ttsSnapshot,
+            resolvedChat: latest.resolvedChat,
+            resolvedTts: latest.resolvedTts,
+        });
+    }, [aiConfig, syncSelections]);
     useEffect(() => {
         let cancelled = false;
-        void persistedSelectionCacheReady.then(() => {
+        async function init() {
+            legacySelectionsRef.current = await readLegacyAudioBookRouteSelections();
             if (cancelled)
                 return;
-            setChatSelection(readPersistedSelectionSync(STORAGE_KEY_CHAT));
-            setTtsSelection(readPersistedSelectionSync(STORAGE_KEY_TTS));
-        });
-        async function init() {
+            let currentConfig = getAudioBookAIConfig(runtimeClient);
+            setAiConfig(currentConfig);
             const [resolvedChat, resolvedTts] = await Promise.all([
                 resolveRouteBinding(runtimeClient, 'text.generate'),
                 resolveRouteBinding(runtimeClient, 'audio.synthesize'),
@@ -415,35 +611,35 @@ export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
                 if (chatSnapshot || ttsSnapshot) {
                     if (cancelled)
                         return;
-                    const nextChatConnectors = chatSnapshot?.connectors || [];
-                    const nextTtsConnectors = ttsSnapshot?.connectors || [];
-                    setChatConnectors(nextChatConnectors);
-                    setTtsConnectors(nextTtsConnectors);
-                    const defaultChatConnectorId = chatSnapshot?.selected?.connectorId || resolvedChatConnectorId;
-                    const defaultChatModel = pickChatModelForConnector(nextChatConnectors, defaultChatConnectorId, resolvedChatModel || chatSnapshot?.selected?.model || '');
-                    const defaultTtsConnectorId = resolvedTtsConnectorId || ttsSnapshot?.selected?.connectorId || defaultChatConnectorId;
-                    const defaultTtsModel = pickTtsModelForConnector(nextTtsConnectors, defaultTtsConnectorId, resolvedTtsModel || ttsSnapshot?.selected?.model || '');
-                    setChatSelection(resolveSelection(nextChatConnectors, {
-                        connectorId: defaultChatConnectorId,
-                        model: defaultChatModel,
-                    }, STORAGE_KEY_CHAT, pickChatModelForConnector, listChatModelsForConnector));
-                    setTtsSelection(resolveSelection(nextTtsConnectors, {
-                        connectorId: defaultTtsConnectorId,
-                        model: defaultTtsModel,
-                    }, STORAGE_KEY_TTS, pickTtsModelForConnector, (items, id) => {
-                        const matched = items.find((item) => item.id === id) || null;
-                        if (!matched)
-                            return [];
-                        return matched.models.map((item) => normalizeModel(item)).filter((item, index, array) => Boolean(item) && !isVoiceDesignTtsModel(item) && array.indexOf(item) === index);
-                    }));
+                    currentConfig = ensureAuthorityBindings({
+                        config: currentConfig,
+                        chatSnapshot,
+                        ttsSnapshot,
+                        resolvedChat,
+                        resolvedTts,
+                    });
+                    setAiConfig(currentConfig);
+                    latestRouteStateRef.current = {
+                        chatSnapshot,
+                        ttsSnapshot,
+                        resolvedChat,
+                        resolvedTts,
+                    };
+                    syncSelections({
+                        config: currentConfig,
+                        chatSnapshot,
+                        ttsSnapshot,
+                        resolvedChat,
+                        resolvedTts,
+                    });
                     console.info(LOG_PREFIX, 'init:loaded', {
-                        chatConnectorsCount: nextChatConnectors.length,
-                        defaultChatConnectorId: defaultChatConnectorId || '(none)',
-                        selectedChatModel: defaultChatModel || '(none)',
-                        ttsConnectorsCount: nextTtsConnectors.length,
-                        defaultTtsConnectorId: defaultTtsConnectorId || '(none)',
+                        chatConnectorsCount: chatSnapshot?.connectors.length || 0,
+                        selectedChatConnectorId: getAudioBookCapabilityBinding(currentConfig, 'text.generate')?.connectorId || '(none)',
+                        selectedChatModel: getAudioBookCapabilityBinding(currentConfig, 'text.generate')?.model || '(none)',
+                        ttsConnectorsCount: ttsSnapshot?.connectors.length || 0,
+                        selectedTtsConnectorId: getAudioBookCapabilityBinding(currentConfig, 'audio.synthesize')?.connectorId || '(none)',
                         resolvedTtsModel: resolvedTtsModel || '(none)',
-                        selectedTtsModel: defaultTtsModel || '(none)',
+                        selectedTtsModel: getAudioBookCapabilityBinding(currentConfig, 'audio.synthesize')?.model || '(none)',
                     });
                     setError(null);
                     setLoading(false);
@@ -452,6 +648,27 @@ export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
             }
             // All retries failed — still use resolvedConnectorId if available
             if (!cancelled) {
+                currentConfig = ensureAuthorityBindings({
+                    config: currentConfig,
+                    chatSnapshot: null,
+                    ttsSnapshot: null,
+                    resolvedChat,
+                    resolvedTts,
+                });
+                setAiConfig(currentConfig);
+                latestRouteStateRef.current = {
+                    chatSnapshot: null,
+                    ttsSnapshot: null,
+                    resolvedChat,
+                    resolvedTts,
+                };
+                syncSelections({
+                    config: currentConfig,
+                    chatSnapshot: null,
+                    ttsSnapshot: null,
+                    resolvedChat,
+                    resolvedTts,
+                });
                 console.warn(LOG_PREFIX, 'init:all-retries-failed', {
                     resolvedChatConnectorId: resolvedChatConnectorId || '(none)',
                     resolvedTtsConnectorId: resolvedTtsConnectorId || '(none)',
@@ -462,37 +679,40 @@ export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
         }
         init();
         return () => { cancelled = true; };
-    }, [loadRouteOptionsDeduped, runtimeClient]);
+    }, [ensureAuthorityBindings, loadRouteOptionsDeduped, runtimeClient, syncSelections]);
     useEffect(() => {
         const hasConnectors = chatConnectors.length > 0 || ttsConnectors.length > 0;
         const intervalMs = hasConnectors ? POLL_INTERVAL_WITH_CONNECTORS_MS : POLL_INTERVAL_WITHOUT_CONNECTORS_MS;
         const timer = setInterval(async () => {
+            const [resolvedChat, resolvedTts] = await Promise.all([
+                resolveRouteBinding(runtimeClient, 'text.generate'),
+                resolveRouteBinding(runtimeClient, 'audio.synthesize'),
+            ]);
             const [chatSnapshot, ttsSnapshot] = await Promise.all([
                 loadRouteOptionsDeduped('text.generate'),
                 loadRouteOptionsDeduped('audio.synthesize'),
             ]);
-            if (chatSnapshot) {
-                setChatConnectors(chatSnapshot.connectors);
-                const defaultChatModel = pickChatModelForConnector(chatSnapshot.connectors, chatSnapshot.selected?.connectorId || '', chatSelection.model || '');
-                setChatSelection(resolveSelection(chatSnapshot.connectors, {
-                    connectorId: chatSnapshot.selected?.connectorId || '',
-                    model: defaultChatModel,
-                }, STORAGE_KEY_CHAT, pickChatModelForConnector, listChatModelsForConnector));
-            }
-            if (ttsSnapshot) {
-                setTtsConnectors(ttsSnapshot.connectors);
-                const defaultTtsConnectorId = ttsSelection.connectorId || ttsSnapshot.selected?.connectorId || '';
-                const defaultTtsModel = pickTtsModelForConnector(ttsSnapshot.connectors, defaultTtsConnectorId, ttsSelection.model || '');
-                setTtsSelection(resolveSelection(ttsSnapshot.connectors, {
-                    connectorId: defaultTtsConnectorId,
-                    model: defaultTtsModel,
-                }, STORAGE_KEY_TTS, pickTtsModelForConnector, (items, id) => {
-                    const matched = items.find((item) => item.id === id) || null;
-                    if (!matched)
-                        return [];
-                    return matched.models.map((item) => normalizeModel(item)).filter((item, index, array) => Boolean(item) && !isVoiceDesignTtsModel(item) && array.indexOf(item) === index);
-                }));
-            }
+            const nextConfig = ensureAuthorityBindings({
+                config: getAudioBookAIConfig(runtimeClient),
+                chatSnapshot,
+                ttsSnapshot,
+                resolvedChat,
+                resolvedTts,
+            });
+            setAiConfig(nextConfig);
+            latestRouteStateRef.current = {
+                chatSnapshot,
+                ttsSnapshot,
+                resolvedChat,
+                resolvedTts,
+            };
+            syncSelections({
+                config: nextConfig,
+                chatSnapshot,
+                ttsSnapshot,
+                resolvedChat,
+                resolvedTts,
+            });
             if (chatSnapshot && ttsSnapshot) {
                 setError(null);
             }
@@ -500,11 +720,11 @@ export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
         return () => clearInterval(timer);
     }, [
         chatConnectors.length,
-        chatSelection.model,
+        ensureAuthorityBindings,
         loadRouteOptionsDeduped,
+        runtimeClient,
+        syncSelections,
         ttsConnectors.length,
-        ttsSelection.connectorId,
-        ttsSelection.model,
     ]);
     useEffect(() => {
         if (!ttsSelection.connectorId || ttsSelection.routeSource !== 'cloud')
@@ -528,7 +748,14 @@ export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
                 if (previous.model === nextModel)
                     return previous;
                 const next: RouteSelection = { ...previous, model: nextModel };
-                void persist(STORAGE_KEY_TTS, next);
+                const nextBinding = materializeAudioBookBinding(
+                    next,
+                    latestRouteStateRef.current.ttsSnapshot || null,
+                );
+                if (nextBinding) {
+                    const nextConfig = updateAudioBookCapabilityBinding(runtimeClient, 'audio.synthesize', nextBinding);
+                    setAiConfig(nextConfig);
+                }
                 return next;
             });
         }
@@ -544,9 +771,16 @@ export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
             routeSource: connectorId ? 'cloud' : 'auto',
             model: connectorId ? nextModel : undefined,
         };
+        const nextBinding = materializeAudioBookBinding(
+            selection,
+            latestRouteStateRef.current.chatSnapshot || null,
+        );
         setChatSelection(selection);
-        void persist(STORAGE_KEY_CHAT, selection);
-    }, [chatConnectors, chatSelection.model]);
+        if (nextBinding) {
+            const nextConfig = updateAudioBookCapabilityBinding(runtimeClient, 'text.generate', nextBinding);
+            setAiConfig(nextConfig);
+        }
+    }, [chatConnectors, chatSelection.model, runtimeClient]);
     const selectChatModel = useCallback((model: string) => {
         const nextModel = normalizeModel(model);
         setChatSelection((previous) => {
@@ -560,10 +794,17 @@ export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
                 ...previous,
                 model: resolvedModel || undefined,
             };
-            void persist(STORAGE_KEY_CHAT, next);
+            const nextBinding = materializeAudioBookBinding(
+                next,
+                latestRouteStateRef.current.chatSnapshot || null,
+            );
+            if (nextBinding) {
+                const nextConfig = updateAudioBookCapabilityBinding(runtimeClient, 'text.generate', nextBinding);
+                setAiConfig(nextConfig);
+            }
             return next;
         });
-    }, [chatConnectors]);
+    }, [chatConnectors, runtimeClient]);
     const selectTtsConnector = useCallback((connectorId: string) => {
         const nextModel = connectorId
             ? pickTtsModelForConnector(ttsConnectors, connectorId, ttsSelection.model || '')
@@ -573,12 +814,23 @@ export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
             routeSource: connectorId ? 'cloud' : 'auto',
             model: connectorId ? nextModel : undefined,
         };
+        const nextBinding = materializeAudioBookBinding(
+            selection,
+            latestRouteStateRef.current.ttsSnapshot || null,
+        );
         setTtsSelection(selection);
-        void persist(STORAGE_KEY_TTS, selection);
-    }, [ttsConnectors, ttsSelection.model]);
+        if (nextBinding) {
+            const nextConfig = updateAudioBookCapabilityBinding(runtimeClient, 'audio.synthesize', nextBinding);
+            setAiConfig(nextConfig);
+        }
+    }, [runtimeClient, ttsConnectors, ttsSelection.model]);
+    const chatBinding = getAudioBookCapabilityBinding(aiConfig, 'text.generate');
+    const ttsBinding = getAudioBookCapabilityBinding(aiConfig, 'audio.synthesize');
     return useMemo(() => ({
         chatConnectors,
         ttsConnectors,
+        chatBinding,
+        ttsBinding,
         chatSelection,
         ttsSelection,
         loading,
@@ -586,5 +838,5 @@ export function useTtsRoute(runtimeClient: ModRuntimeClient): TtsRouteState {
         selectChatConnector,
         selectChatModel,
         selectTtsConnector,
-    }), [chatConnectors, ttsConnectors, chatSelection, ttsSelection, loading, error, selectChatConnector, selectChatModel, selectTtsConnector]);
+    }), [chatConnectors, ttsConnectors, chatBinding, ttsBinding, chatSelection, ttsSelection, loading, error, selectChatConnector, selectChatModel, selectTtsConnector]);
 }

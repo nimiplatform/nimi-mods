@@ -5,7 +5,6 @@ import { useMemo } from 'react';
 import { AUDIO_BOOK_MOD_ID } from '../contracts.js';
 import { createLlmClientAdapter } from '../adapters/llm-adapter.js';
 import { createTtsClientAdapter } from '../adapters/tts-adapter.js';
-import type { RouteSelection } from './use-tts-route.js';
 import { createHookClient, createModRuntimeClient, type ModRuntimeClient, type RuntimeRouteBinding } from "@nimiplatform/sdk/mod";
 /** Stable singleton hook client — call this once at the top of the component tree. */
 export function useHookClient() {
@@ -15,30 +14,11 @@ export function useHookClient() {
 export function useRuntimeClient() {
     return useMemo(() => createModRuntimeClient(AUDIO_BOOK_MOD_ID), []);
 }
-function toBinding(selection?: RouteSelection): RuntimeRouteBinding | undefined {
-    if (!selection)
-        return undefined;
-    const source = selection.routeSource === 'cloud' || selection.routeSource === 'local'
-        ? selection.routeSource
-        : undefined;
-    const connectorId = String(selection.connectorId || '').trim();
-    const model = String(selection.model || '').trim();
-    if (!source && !connectorId && !model) {
-        return undefined;
-    }
-    return {
-        source: source || 'cloud',
-        connectorId,
-        model,
-    };
-}
 /**
- * AI clients — rebuilds llmClient when chatSelection changes.
- * hookClient + aiClient must be passed in (created via hooks above).
+ * Projection-only clients for UI helpers such as voice listing.
+ * Execution entry points must read formal AIConfig directly at call time.
  */
-export function useAudioBookClients(hookClient: ReturnType<typeof createHookClient>, runtimeClient: ModRuntimeClient, chatSelection?: RouteSelection, ttsSelection?: RouteSelection) {
-    const chatBinding = toBinding(chatSelection);
-    const ttsBinding = toBinding(ttsSelection);
+export function useAudioBookClients(hookClient: ReturnType<typeof createHookClient>, runtimeClient: ModRuntimeClient, chatBinding?: RuntimeRouteBinding, ttsBinding?: RuntimeRouteBinding) {
     const llmClient = useMemo(() => createLlmClientAdapter(runtimeClient, chatBinding), [runtimeClient, chatBinding?.connectorId, chatBinding?.model, chatBinding?.source]);
     const ttsClient = useMemo(() => createTtsClientAdapter(runtimeClient, ttsBinding), [runtimeClient, ttsBinding?.connectorId, ttsBinding?.model, ttsBinding?.source]);
     return { hookClient, runtimeClient, llmClient, ttsClient };
