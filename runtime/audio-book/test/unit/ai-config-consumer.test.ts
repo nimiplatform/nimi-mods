@@ -319,6 +319,7 @@ describe('audio-book aiConfig AB-C1 hard cut', () => {
           },
         },
         localProfileRefs: {},
+        selectedParams: {},
       },
       profileOrigin: null,
     } satisfies AIConfig;
@@ -423,6 +424,7 @@ describe('audio-book aiConfig AB-C1 hard cut', () => {
           },
         },
         localProfileRefs: {},
+        selectedParams: {},
       },
       profileOrigin: null,
     });
@@ -457,6 +459,7 @@ describe('audio-book aiConfig AB-C1 hard cut', () => {
             profileId: 'audio-book-tts-local',
           },
         },
+        selectedParams: {},
       },
       profileOrigin: null,
     };
@@ -495,6 +498,7 @@ describe('audio-book aiConfig AB-C1 hard cut', () => {
           },
         },
         localProfileRefs: {},
+        selectedParams: {},
       },
       profileOrigin: null,
     } satisfies AIConfig;
@@ -533,6 +537,7 @@ describe('audio-book aiConfig AB-C1 hard cut', () => {
           },
         },
         localProfileRefs: {},
+        selectedParams: {},
       },
       profileOrigin: null,
     } satisfies AIConfig;
@@ -573,6 +578,7 @@ describe('audio-book aiConfig AB-C1 hard cut', () => {
           },
         },
         localProfileRefs: {},
+        selectedParams: {},
       },
       profileOrigin: null,
     } satisfies AIConfig;
@@ -630,6 +636,7 @@ describe('audio-book aiConfig AB-C1 hard cut', () => {
           },
         },
         localProfileRefs: {},
+        selectedParams: {},
       },
       profileOrigin: null,
     } satisfies AIConfig;
@@ -691,6 +698,7 @@ describe('audio-book aiConfig AB-C1 hard cut', () => {
           'audio.synthesize': formalBinding,
         },
         localProfileRefs: {},
+        selectedParams: {},
       },
       profileOrigin: null,
     } satisfies AIConfig;

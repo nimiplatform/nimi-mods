@@ -14,9 +14,9 @@ type ModelSelectorProps = {
 };
 export function ModelSelector({ routeBinding, chatRouteOptions, routeOptionsLoading, routeOptionsError, onSourceChange, onConnectorChange, onModelChange, onClear, onReload, }: ModelSelectorProps) {
     const { t } = useTranslation('kismet');
-    const activeSource = routeBinding?.source || chatRouteOptions?.selected.source || 'local';
-    const activeConnectorId = routeBinding?.connectorId || chatRouteOptions?.selected.connectorId || '';
-    const activeModel = routeBinding?.model || chatRouteOptions?.selected.model || '';
+    const activeSource = routeBinding?.source || chatRouteOptions?.selected?.source || 'local';
+    const activeConnectorId = routeBinding?.connectorId || chatRouteOptions?.selected?.connectorId || '';
+    const activeModel = routeBinding?.model || chatRouteOptions?.selected?.model || '';
     const [modelQuery, setModelQuery] = useState(activeModel);
     const focusedRef = useRef(false);
     useEffect(() => {

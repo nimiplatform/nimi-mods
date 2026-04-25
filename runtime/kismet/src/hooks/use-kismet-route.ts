@@ -130,9 +130,9 @@ async function loadRouteOptionsWithTimeout(routeClient: ReturnType<typeof getKis
     console.log('[KISMET:route] loadRouteOptions: raw payload', JSON.stringify(payload, null, 2)?.slice(0, 2000));
     const parsed = ensureRouteOptionsSnapshotShape(parseRuntimeRouteOptions(payload, { includeResolvedDefault: true }));
     console.log('[KISMET:route] loadRouteOptions: parsed', parsed ? {
-        selectedSource: parsed.selected.source,
-        selectedConnectorId: parsed.selected.connectorId,
-        selectedModel: parsed.selected.model,
+        selectedSource: parsed.selected?.source || null,
+        selectedConnectorId: parsed.selected?.connectorId || null,
+        selectedModel: parsed.selected?.model || null,
         connectorsCount: parsed.connectors.length,
         connectorIds: parsed.connectors.map((c) => c.id),
         connectorModels: parsed.connectors.map((c) => ({ id: c.id, models: c.models.slice(0, 5) })),
@@ -140,7 +140,9 @@ async function loadRouteOptionsWithTimeout(routeClient: ReturnType<typeof getKis
     } : null);
     if (!parsed)
         return null;
-    const selected = normalizeTokenApiBinding(parsed.selected, parsed.connectors);
+    const selected = parsed.selected
+        ? normalizeTokenApiBinding(parsed.selected, parsed.connectors)
+        : null;
     const resolvedDefault = parsed.resolvedDefault
         ? normalizeTokenApiBinding(parsed.resolvedDefault, parsed.connectors)
         : undefined;

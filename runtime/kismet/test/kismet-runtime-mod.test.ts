@@ -210,9 +210,10 @@ test('kismet manifest declares chat ai profile and cloud-chat requirement', () =
       consumeCapabilities: ['chat'],
       entries: [{
         entryId: 'kismet/chat-qwen2.5-7b',
-        kind: 'model',
+        kind: 'asset',
         capability: 'chat',
-        modelId: 'qwen2.5-7b-instruct',
+        assetId: 'qwen2.5-7b-instruct',
+        assetKind: 'chat',
         repo: 'Qwen/Qwen2.5-7B-Instruct-GGUF',
         engine: 'openai-compatible',
         title: 'Qwen2.5 7B Instruct (analysis)',

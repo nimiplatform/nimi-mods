@@ -36,9 +36,9 @@ export function useMintYouRouteOptions() {
                     source: 'useMintYouRouteOptions',
                     details: {
                         forceRefresh,
-                        selectedSource: snapshot.selected.source,
-                        selectedConnectorId: snapshot.selected.connectorId,
-                        selectedModel: snapshot.selected.model,
+                        selectedSource: snapshot.selected?.source || null,
+                        selectedConnectorId: snapshot.selected?.connectorId || null,
+                        selectedModel: snapshot.selected?.model || null,
                         localModelCount: snapshot.local?.models.length || 0,
                         connectorCount: snapshot.connectors.length,
                     },

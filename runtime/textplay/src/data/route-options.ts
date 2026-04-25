@@ -25,9 +25,19 @@ export async function assertTextplayChatRouteAvailable(input: {
     runtimeClient: ModRuntimeClient['route'];
 }): Promise<TextplayRouteAvailability> {
     const parsed = await queryTextplayChatRouteOptions(input);
+    const binding = parsed.selected || parsed.resolvedDefault || null;
+    if (!binding) {
+        throw new TextplayPipelineError({
+            reasonCode: TEXTPLAY_REASON.ROUTE_UNAVAILABLE,
+            actionHint: 'Switch to an available route source and retry.',
+            message: 'TEXTPLAY_ROUTE_BINDING_UNAVAILABLE',
+            stage: 'route',
+            retryClass: 'retryable',
+        });
+    }
     return {
-        source: parsed.selected.source,
-        connectorId: parsed.selected.connectorId,
-        model: parsed.selected.model,
+        source: binding.source,
+        connectorId: binding.connectorId,
+        model: binding.model,
     };
 }

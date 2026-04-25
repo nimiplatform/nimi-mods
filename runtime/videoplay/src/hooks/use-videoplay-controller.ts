@@ -210,12 +210,13 @@ export function useVideoPlayController(): VideoPlayWorkbenchProps {
                 const options = await runtimeClient.route.listOptions({
                     capability: capability[1],
                 });
+                const binding = options.selected || options.resolvedDefault || null;
                 return {
                     capability: capability[0],
-                    source: options.selected.source,
-                    model: options.selected.model,
-                    connectorId: options.selected.connectorId,
-                    ready: Boolean(options.selected.model),
+                    source: binding?.source || 'unknown',
+                    model: binding?.model || '',
+                    connectorId: binding?.connectorId || '',
+                    ready: Boolean(binding?.model),
                 };
             }
             catch {
