@@ -277,28 +277,6 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@24.10.13)(jiti@2.6.1)(jsdom@28.1.0)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2)
 
-  runtime/local-chat:
-    dependencies:
-      '@nimiplatform/sdk':
-        specifier: file:../../../sdk
-        version: file:../sdk(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(typescript@5.9.3)
-      react:
-        specifier: 19.2.3
-        version: 19.2.3
-    devDependencies:
-      '@nimiplatform/dev-tools':
-        specifier: file:../../../dev-tools
-        version: file:../dev-tools
-      '@types/node':
-        specifier: ^24.10.1
-        version: 24.10.13
-      '@types/react':
-        specifier: ^19.2.14
-        version: 19.2.14
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-
   runtime/mint-you:
     dependencies:
       '@nimiplatform/sdk':

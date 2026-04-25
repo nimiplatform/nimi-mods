@@ -46,7 +46,6 @@ pnpm install
 These directories are already working examples:
 
 - `runtime/test-ai`: small diagnostic UI mod, easiest starting point for a page-style mod
-- `runtime/local-chat`: large production-style runtime mod
 - `runtime/kismet`: immersive full-screen mod page
 - `runtime/buddy`: animated character mod with more complex runtime cleanup
 
@@ -59,7 +58,6 @@ Loadable runtime mods:
 - `daily-outfit`
 - `kismet`
 - `knowledge-base`
-- `local-chat`
 - `mint-you`
 - `test-ai`
 - `textplay`

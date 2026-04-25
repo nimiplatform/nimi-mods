@@ -4,7 +4,7 @@ import { useKnowledgeBaseStore } from '../state/knowledge-base-store.js';
 import { type HookClient } from "@nimiplatform/sdk/mod";
 /**
  * Register all 8 data-api capabilities for cross-mod consumption.
- * The search capability is the primary integration point for local-chat.
+ * The search capability is the primary integration point for downstream mods.
  */
 export async function registerKBDataCapabilities(input: {
     hookClient: HookClient;

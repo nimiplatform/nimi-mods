@@ -125,4 +125,3 @@ pnpm run verify
 - Mod-side debugging is last-mile only: runtime + sdk gates must be green first.
 - When AI calls fail, retain and surface upstream `reasonCode`/`traceId`; do not mask failures with mod-only fallback shims.
 - Do not bypass `nimi-hook` or add hardcoded runtime/sdk compatibility branches to force local success.
-- `local-chat` deterministic E2E is required in PR scope; live smoke is required in nightly/release scope.

@@ -30,7 +30,6 @@ Current runtime mods:
 - `daily-outfit`
 - `kismet`
 - `knowledge-base`
-- `local-chat`
 - `mint-you`
 - `test-ai`
 - `textplay`
@@ -124,7 +123,6 @@ Targeted checks:
 ```bash
 pnpm run check:styles
 pnpm run check:dist
-pnpm --filter @nimiplatform/mod-local-chat run verify
 pnpm --filter @nimiplatform/mod-buddy run doctor
 ```
 
@@ -186,7 +184,6 @@ Every runtime mod should be safe under:
 
 Recent examples:
 
-- `local-chat`: heartbeat cleanup
 - `buddy`: Cubism loader and SDK context reset
 - `world-studio`: runtime client reset
 - `test-ai`: runtime client reset

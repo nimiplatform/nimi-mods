@@ -10,9 +10,9 @@ function createOptions(): RuntimeRouteOptionsSnapshot {
     local: {
       models: [
         {
-          model: 'local-chat',
-          modelId: 'local-chat',
-          localModelId: 'local-chat-1',
+          model: 'local-model',
+          modelId: 'local-model',
+          localModelId: 'local-model-1',
           engine: 'localai',
           provider: 'localai',
           adapter: 'openai_compat_adapter',
@@ -88,9 +88,9 @@ describe('reconcileRouteBinding', () => {
     const restored: RuntimeRouteBinding = {
       source: 'local',
       connectorId: '',
-      model: 'local-chat',
-      modelId: 'local-chat',
-      localModelId: 'local-chat-1',
+      model: 'local-model',
+      modelId: 'local-model',
+      localModelId: 'local-model-1',
       engine: 'localai',
     };
 
@@ -99,9 +99,9 @@ describe('reconcileRouteBinding', () => {
     assert.deepEqual(result, {
       source: 'local',
       connectorId: '',
-      model: 'local-chat',
-      modelId: 'local-chat',
-      localModelId: 'local-chat-1',
+      model: 'local-model',
+      modelId: 'local-model',
+      localModelId: 'local-model-1',
       engine: 'localai',
       provider: 'localai',
       endpoint: 'http://127.0.0.1:8080/v1',

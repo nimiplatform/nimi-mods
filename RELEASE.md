@@ -91,7 +91,7 @@ The workflow runs in the main monorepo because it needs both:
 
 ### Required workflow inputs
 
-- `mod_path`: the relative path under `nimi-mods/`, for example `runtime/local-chat`
+- `mod_path`: the relative path under `nimi-mods/`, for example `runtime/kismet`
 - `release_channel`: `stable` or `beta`
 - `publish`: whether to create/update GitHub Release assets and open/update the catalog PR
 - `publish_assets`: whether to upload workflow artifacts

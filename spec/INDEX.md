@@ -3,12 +3,26 @@
 > Status: Draft
 > Date: 2026-03-02
 
+This spec root is the mods workspace authority surface.
+
+It is physically nested under `nimi/`, but it remains logically independent
+from `nimi/.nimi/spec/**`.
+
+Cross-repo read path:
+
+- public upper-layer topology entrypoint lives in `nimi/.nimi/spec/**`
+- private realm / backend authority lives in `nimi-realm/.nimi/spec/**`
+- mods-local shared chain and per-mod business authority live here in
+  `nimi-mods/spec/**`
+
+Nesting under `nimi/` does not transfer mod semantic ownership back to the
+public platform spec root.
+
 ## Structure
 
 - Cross-mod contracts: `spec/mod/**`
 - Per-mod specs:
   - `runtime/kismet/spec/**`
-  - `runtime/local-chat/spec/**`
   - `runtime/scene-atlas/spec/**`
   - `audit/re-life/spec/**`
   - `runtime/mint-you/spec/**`
@@ -25,6 +39,9 @@
 3. Generated docs are derived artifacts and must not be edited manually.
 4. Shared world-studio -> narrative-engine -> renderer chain contracts are defined once in `spec/mod/**`.
 5. Workspace layout and package bucket rules are defined once in `spec/mod/kernel/workspace-structure-contract.md`.
+6. `world-studio` remains an active mods-local authority surface during the
+   current Forge migration line; Forge-native replacement direction does not
+   erase this spec root until replacement is fully landed elsewhere.
 
 ## Task-Oriented Read Path
 

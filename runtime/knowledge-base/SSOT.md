@@ -100,5 +100,5 @@ rules:
 1. `spec/platform/kernel/governance-contract.md` — 通用 Mod 治理规则；KB 业务由本文件定义。
 2. `spec/runtime/kernel/knowledge-contract.md`（K-KNOW-*）— RuntimeKnowledgeService 接口；KB mod 独立实现（Phase 1）。
 3. `spec/desktop/kernel/hook-capability-contract.md`（D-HOOK-*）— Hook 能力模型；KB 遵循但不重定义。
-4. `spec/kernel/capability-contract.md` § KB-CAP-007 — local-chat 集成协议。
+4. `spec/kernel/capability-contract.md` § KB-CAP-007 — 跨 Mod 检索集成协议。
 5. `spec/runtime/kernel/local-engine-contract.md` — 路由语义；KB 消费但不定义。

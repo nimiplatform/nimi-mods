@@ -35,9 +35,9 @@ Packages that are not part of the active runtime workspace contract MUST live un
 
 ### MC-WS-005 Workspace discovery is path-based
 
-Build, verify, spec, and release tooling MUST resolve packages from `nimi-mods`-root-relative paths such as `runtime/local-chat` or `modules/narrative-engine`.
+Build, verify, spec, and release tooling MUST resolve packages from `nimi-mods`-root-relative paths such as `runtime/kismet` or `modules/narrative-engine`.
 
-Tooling MUST NOT accept or infer flat top-level package names such as `local-chat`.
+Tooling MUST NOT accept or infer flat top-level package names such as `kismet`.
 
 ### MC-WS-006 Desktop dev source points at runtime buckets
 

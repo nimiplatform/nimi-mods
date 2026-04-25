@@ -20,7 +20,7 @@ export async function registerTestAiUiExtensions(input: {
             tabId: TEST_AI_TAB_ID,
             label: locale.nav.label,
             badge: 'TEST',
-            icon: 'local-chat',
+            icon: 'test-ai',
             strategy: 'append',
         },
     });

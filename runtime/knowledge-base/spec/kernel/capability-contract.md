@@ -71,11 +71,11 @@ AI truth 边界：
 
 ## KB-CAP-007 — 跨 Mod 集成
 
-与 local-chat 的集成协议：
+跨 mod 检索集成协议：
 
-- local-chat 通过 `data.query.data-api.knowledge-base.search` 消费 KB 检索能力。
-- 挂载时机：对话级——用户在 local-chat 会话中显式启用 KB 搜索。
-- KB mod 不参与 local-chat turn hook，仅提供按需查询。
+- 下游 mod 通过 `data.query.data-api.knowledge-base.search` 消费 KB 检索能力。
+- 挂载时机：由下游会话或工作流显式启用 KB 搜索。
+- KB mod 不参与下游 turn hook，仅提供按需查询。
 - KB 作为 data provider 注册搜索能力，消费方无需了解内部实现。
 
 ## KB-CAP-008 — 隐私与安全约束
