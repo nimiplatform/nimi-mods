@@ -11,7 +11,7 @@ export const KISMET_MANIFEST = {
   version: '1.0.0',
   description: 'BaZi destiny analysis workbench with candlestick chart visualization',
   iconAsset: './assets/icon.svg',
-  author: { name: 'Nimi', url: 'https://nimi.xyz' },
+  author: { name: 'Nimi', url: 'https://nimi.ai' },
   license: 'MIT',
   entry: './dist/mods/kismet/index.js',
   styles: ['./dist/mods/kismet/index.css'],

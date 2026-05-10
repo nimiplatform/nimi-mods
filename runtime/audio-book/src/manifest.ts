@@ -10,7 +10,7 @@ export const AUDIO_BOOK_MANIFEST = {
   name: 'Audio Book',
   version: '0.1.0',
   description: 'Multi-character AI voice narration and audiobook generation',
-  author: { name: 'Nimi', url: 'https://nimi.xyz' },
+  author: { name: 'Nimi', url: 'https://nimi.ai' },
   license: 'MIT',
   iconAsset: './assets/icon.svg',
   entry: './dist/mods/audio-book/index.js',

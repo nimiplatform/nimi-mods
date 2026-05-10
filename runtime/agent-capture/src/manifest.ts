@@ -12,9 +12,10 @@ export const AGENT_CAPTURE_MANIFEST = {
   id: AGENT_CAPTURE_MOD_ID,
   name: 'Agent-Capture',
   version: '1.0.0',
-  description: 'Role-image capture workspace with text-led guidance, optional reference image, and existing agent context.',
+  description:
+    'Role-image capture workspace with text-led guidance, optional reference image, and existing agent context.',
   iconAsset: './assets/icon.svg',
-  author: { name: 'Nimi', url: 'https://nimi.xyz' },
+  author: { name: 'Nimi', url: 'https://nimi.ai' },
   license: 'MIT',
   entry: './dist/mods/agent-capture/index.js',
   styles: ['./dist/mods/agent-capture/index.css'],

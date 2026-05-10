@@ -1,16 +1,12 @@
-import {
-  KB_CAPABILITIES,
-  KB_MOD_ID,
-  KB_NAV_SLOT,
-  KB_ROUTE_SLOT,
-} from './contracts.js';
+import { KB_CAPABILITIES, KB_MOD_ID, KB_NAV_SLOT, KB_ROUTE_SLOT } from './contracts.js';
 
 export const KB_MANIFEST = {
   id: KB_MOD_ID,
   name: 'Knowledge Base',
   version: '1.0.0',
-  description: 'Private local knowledge base with document import, semantic search, and RAG-powered Q&A',
-  author: { name: 'Nimi', url: 'https://nimi.xyz' },
+  description:
+    'Private local knowledge base with document import, semantic search, and RAG-powered Q&A',
+  author: { name: 'Nimi', url: 'https://nimi.ai' },
   license: 'MIT',
   iconAsset: './assets/icon.svg',
   entry: './dist/mods/knowledge-base/index.js',

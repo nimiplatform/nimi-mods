@@ -19,7 +19,7 @@ export const TEXTPLAY_MANIFEST = {
   version: '1.0.0',
   description: 'Narrative text renderer for interactive story play',
   iconAsset: './assets/icon.svg',
-  author: { name: 'Nimi', url: 'https://nimi.xyz' },
+  author: { name: 'Nimi', url: 'https://nimi.ai' },
   license: 'MIT',
   entry: './dist/mods/textplay/index.js',
   styles: ['./dist/mods/textplay/index.css'],
@@ -50,7 +50,8 @@ export const TEXTPLAY_MANIFEST = {
       },
       {
         name: TEXTPLAY_DATA_API_WORLD_NARRATIVE_CONTEXTS_LIST,
-        description: 'Read narrative contexts required by story startup package and prompt policy assembly',
+        description:
+          'Read narrative contexts required by story startup package and prompt policy assembly',
       },
       {
         name: TEXTPLAY_DATA_API_WORLD_SPINE_PUBLISH,
