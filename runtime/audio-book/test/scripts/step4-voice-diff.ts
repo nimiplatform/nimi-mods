@@ -92,7 +92,7 @@ async function synthesizeOne(
   const result = await runtime.media.tts.synthesize({
     model: TTS_MODEL_ID,
     text,
-    voice: voiceId,
+    voiceRef: { kind: 'preset_voice_id', presetVoiceId: voiceId },
     audioFormat: 'mp3',
     sampleRateHz: 24000,
     speed: 1.0,

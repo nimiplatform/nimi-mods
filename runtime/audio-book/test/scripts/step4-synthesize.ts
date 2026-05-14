@@ -135,7 +135,7 @@ function createRuntimeTtsClient(endpoint: string, modelId: string): TtsClient {
       const result = await runtime.media.tts.synthesize({
         model: modelId,
         text: input.text,
-        voice: input.voiceId,
+        voiceRef: { kind: 'preset_voice_id', presetVoiceId: input.voiceId },
         audioFormat: 'mp3',
         sampleRateHz: 24000,
         speed: input.speakingRate ?? 1.0,

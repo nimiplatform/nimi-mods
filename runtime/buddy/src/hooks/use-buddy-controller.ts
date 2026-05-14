@@ -708,7 +708,9 @@ export function useBuddyController(
       try {
         const streamResult = await runtimeRef.current.media.tts.stream({
           text: message.content,
-          voice: selectedTtsVoiceId || undefined,
+          voiceRef: selectedTtsVoiceId
+            ? { kind: 'preset_voice_id', presetVoiceId: selectedTtsVoiceId }
+            : undefined,
           audioFormat: DEFAULT_TTS_AUDIO_FORMAT,
           binding: ttsBindingRef.current || undefined,
         });
@@ -750,7 +752,9 @@ export function useBuddyController(
       if (!audioBytes) {
         const ttsResult = await runtimeRef.current.media.tts.synthesize({
           text: message.content,
-          voice: selectedTtsVoiceId || undefined,
+          voiceRef: selectedTtsVoiceId
+            ? { kind: 'preset_voice_id', presetVoiceId: selectedTtsVoiceId }
+            : undefined,
           audioFormat: DEFAULT_TTS_AUDIO_FORMAT,
           binding: ttsBindingRef.current || undefined,
         });

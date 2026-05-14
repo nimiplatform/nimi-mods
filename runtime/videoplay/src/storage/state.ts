@@ -6,7 +6,7 @@ import {
   VIDEOPLAY_REASON,
   VIDEOPLAY_STORAGE_KEY,
 } from '../contracts.js';
-import { createModKvStore, createModStorageClient } from '@nimiplatform/sdk/mod';
+import { createModKvStore, createModStorageClient, type ModKvStore } from '@nimiplatform/sdk/mod';
 import { createUlid } from '../id.js';
 import { VideoPlayError } from '../errors.js';
 import {
@@ -26,10 +26,34 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-const videoplayStateStore = createModKvStore({
-  storage: createModStorageClient(VIDEOPLAY_MOD_ID),
-  namespace: 'videoplay.state',
-});
+type LocalStorageLike = {
+  getItem: (key: string) => string | null;
+  setItem: (key: string, value: string) => void;
+};
+
+let videoplayStateStore: ModKvStore | null = null;
+
+function getVideoPlayStateStore(): ModKvStore {
+  if (!videoplayStateStore) {
+    videoplayStateStore = createModKvStore({
+      storage: createModStorageClient(VIDEOPLAY_MOD_ID),
+      namespace: 'videoplay.state',
+    });
+  }
+  return videoplayStateStore;
+}
+
+function getHostlessLocalStorage(): LocalStorageLike | null {
+  const hasModSdkHost = Boolean((globalThis as Record<PropertyKey, unknown>)[Symbol.for('nimi.mod.sdk.host')]);
+  if (hasModSdkHost) {
+    return null;
+  }
+  const storage = (globalThis as { localStorage?: Partial<LocalStorageLike> }).localStorage;
+  if (typeof storage?.getItem === 'function' && typeof storage.setItem === 'function') {
+    return storage as LocalStorageLike;
+  }
+  return null;
+}
 
 export function createInitialVideoPlayState(): VideoPlayStorageState {
   return {
@@ -47,17 +71,33 @@ export function createInitialVideoPlayState(): VideoPlayStorageState {
   };
 }
 
-export async function loadVideoPlayState(): Promise<VideoPlayStorageState> {
-  const fallback = createInitialVideoPlayState();
-  const loaded = await videoplayStateStore.getJson<VideoPlayStorageState>(VIDEOPLAY_STORAGE_KEY) || fallback;
-  const parsed = VideoPlayStorageStateSchema.safeParse(loaded);
+function parseVideoPlayStorageState(value: unknown, fallback: VideoPlayStorageState): VideoPlayStorageState {
+  const parsed = VideoPlayStorageStateSchema.safeParse(value);
   if (!parsed.success) {
     return fallback;
   }
   return parsed.data;
 }
 
-export async function saveVideoPlayState(state: VideoPlayStorageState): Promise<void> {
+export function loadVideoPlayState(): VideoPlayStorageState | Promise<VideoPlayStorageState> {
+  const fallback = createInitialVideoPlayState();
+  const localStorage = getHostlessLocalStorage();
+  if (localStorage) {
+    try {
+      const raw = localStorage.getItem(VIDEOPLAY_STORAGE_KEY);
+      const loaded = raw ? JSON.parse(raw) : fallback;
+      return parseVideoPlayStorageState(loaded, fallback);
+    } catch {
+      return fallback;
+    }
+  }
+
+  return getVideoPlayStateStore()
+    .getJson<VideoPlayStorageState>(VIDEOPLAY_STORAGE_KEY)
+    .then((loaded) => parseVideoPlayStorageState(loaded || fallback, fallback));
+}
+
+export function saveVideoPlayState(state: VideoPlayStorageState): void | Promise<void> {
   const parsed = VideoPlayStorageStateSchema.safeParse(state);
   if (!parsed.success) {
     throw new VideoPlayError({
@@ -70,7 +110,18 @@ export async function saveVideoPlayState(state: VideoPlayStorageState): Promise<
       },
     });
   }
-  await videoplayStateStore.setJson(VIDEOPLAY_STORAGE_KEY, parsed.data);
+
+  const localStorage = getHostlessLocalStorage();
+  if (localStorage) {
+    try {
+      localStorage.setItem(VIDEOPLAY_STORAGE_KEY, JSON.stringify(parsed.data));
+    } catch {
+      // Hostless tests and previews should fail closed to an empty state on the next read.
+    }
+    return;
+  }
+
+  return getVideoPlayStateStore().setJson(VIDEOPLAY_STORAGE_KEY, parsed.data);
 }
 
 function idempotencyKeyFor(capability: string, operation: string, key: string): string {

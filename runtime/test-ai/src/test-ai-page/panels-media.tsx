@@ -186,19 +186,22 @@ export function AudioSynthesizePanel(props: AudioSynthesizePanelProps) {
             onStateChange((prev) => ({ ...prev, error: locale.audioSynthesize.inputEmpty }));
             return;
         }
-        const voice = asString(manualVoiceId) || asString(selectedVoiceId);
-        if (!voice) {
+        const voiceId = asString(manualVoiceId) || asString(selectedVoiceId);
+        if (!voiceId) {
             onStateChange((prev) => ({ ...prev, error: locale.audioSynthesize.noVoiceSelected }));
             return;
         }
+        const voiceRef = asString(manualVoiceId)
+            ? { kind: 'provider_voice_ref' as const, providerVoiceRef: voiceId }
+            : { kind: 'preset_voice_id' as const, presetVoiceId: voiceId };
         onStateChange((prev) => ({ ...prev, busy: true, error: '', diagnostics: makeEmptyDiagnostics() }));
         const t0 = Date.now();
         const binding = resolveEffectiveBinding(state.snapshot, state.binding) || undefined;
-        const requestParams: Record<string, unknown> = { text, voice, audioFormat, ...(binding ? { binding } : {}) };
+        const requestParams: Record<string, unknown> = { text, voiceRef, audioFormat, ...(binding ? { binding } : {}) };
         let resolved: ModRuntimeResolvedBinding | undefined;
         try {
             resolved = await runtimeClient.route.resolve({ capability: 'audio.synthesize', binding });
-            const result = await runtimeClient.media.tts.synthesize({ text, voice, audioFormat, binding });
+            const result = await runtimeClient.media.tts.synthesize({ text, voiceRef, audioFormat, binding });
             const elapsed = Date.now() - t0;
             const artifact = result.artifacts[0];
             const audioUri = toArtifactPreviewUri({ uri: artifact?.uri, bytes: artifact?.bytes, mimeType: artifact?.mimeType });

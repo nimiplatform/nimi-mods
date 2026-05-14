@@ -230,7 +230,7 @@ export function createVideoPlayRuntimeAiClient(runtimeClient: ModRuntimeClient):
             }
             const result = await runtimeClient.media.tts.synthesize({
                 text: input.text,
-                voice: input.voiceId,
+                voiceRef: { kind: 'preset_voice_id', presetVoiceId: input.voiceId },
                 model: route.model || undefined,
                 audioFormat: input.format,
                 speed: input.speakingRate,

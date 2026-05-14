@@ -52,7 +52,7 @@ export function createTtsClientAdapter(runtimeClient: ModRuntimeClient, defaultB
             }
             const result = await runtimeClient.media.tts.synthesize({
                 text: input.text,
-                voice: input.voiceId,
+                voiceRef: { kind: 'preset_voice_id', presetVoiceId: input.voiceId },
                 speed: input.speakingRate,
                 pitch: input.pitch,
                 emotion: input.emotion,

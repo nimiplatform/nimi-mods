@@ -108,7 +108,7 @@ describe('createTtsClientAdapter', () => {
 
     expect(synthesize).toHaveBeenCalledWith({
       text: 'hello',
-      voice: 'Cherry',
+      voiceRef: { kind: 'preset_voice_id', presetVoiceId: 'Cherry' },
       speed: undefined,
       pitch: undefined,
       emotion: undefined,

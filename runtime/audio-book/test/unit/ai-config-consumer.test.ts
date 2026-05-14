@@ -603,7 +603,7 @@ describe('audio-book aiConfig AB-C1 hard cut', () => {
     });
     expect(synthesize).toHaveBeenCalledWith({
       text: 'preview sample',
-      voice: 'Cherry',
+      voiceRef: { kind: 'preset_voice_id', presetVoiceId: 'Cherry' },
       speed: undefined,
       pitch: undefined,
       emotion: undefined,
@@ -652,7 +652,7 @@ describe('audio-book aiConfig AB-C1 hard cut', () => {
       run: async ({ binding }) => {
         await runtimeClient.media.tts.synthesize({
           text: 'preview sample',
-          voice: 'Cherry',
+          voiceRef: { kind: 'preset_voice_id', presetVoiceId: 'Cherry' },
           binding,
           model: binding.model,
         } as any);
